@@ -21,28 +21,25 @@ import {
   Lock,
   MessageSquare,
   Palette,
+  RotateCcw,
   Save,
   School,
   Search,
-  Settings,
   Shield,
-  Trash2,
   Upload,
   Users,
+  X,
+  Check,
 } from 'lucide-react';
 
-import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
-import { Card, CardContent } from '../../../components/ui/card';
-import { Checkbox } from '../../../components/ui/checkbox';
 import { ConfirmDialog } from '../../../components/ui/confirm-dialog';
-import { FormField } from '../../../components/ui/form-field';
-import { Input } from '../../../components/ui/input';
-import { Select } from '../../../components/ui/select';
 import { useEntitlements } from '../../../components/entitlements-provider';
 import { api, type TenantLogoAccess } from '../../../lib/api';
 import { cn } from '../../../lib/utils';
 import type { TenantSettingKey, TenantSettingSummary } from '@schoolos/core';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type FieldType = 'text' | 'email' | 'number' | 'select' | 'checkbox' | 'multi-check' | 'color' | 'time';
 
@@ -76,17 +73,18 @@ type SettingSectionConfig = {
   };
 };
 
+type NavGroup = {
+  label: string;
+  items: string[];
+};
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const TENANT_LOGO_MAX_BYTES = 1024 * 1024;
 const TENANT_LOGO_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const workingDayOptions: FieldOption[] = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
+  'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
 ].map((day) => ({ label: day, value: day }));
 
 const paymentMethodOptions: FieldOption[] = ['Cash', 'Bank Transfer', 'eSewa', 'Khalti', 'Cheque'].map((method) => ({
@@ -130,7 +128,7 @@ const SETTINGS_SECTIONS: SettingSectionConfig[] = [
   {
     id: 'branding',
     eyebrow: 'Documents',
-    title: 'Branding & Regional Defaults',
+    title: 'Branding & Regional',
     description: 'Control the school logo, document copy, currency, date format, and default paper size.',
     icon: Palette,
     tone: 'bg-violet-50 text-violet-700 border-violet-100',
@@ -288,67 +286,9 @@ const SETTINGS_SECTIONS: SettingSectionConfig[] = [
     ],
   },
   {
-    id: 'payroll',
-    eyebrow: 'Staff controls',
-    title: 'HR & Payroll Rules',
-    description: 'Configure leave approval, salary calculation defaults, PF/TDS readiness, and payroll approvals.',
-    icon: Users,
-    tone: 'bg-sky-50 text-sky-700 border-sky-100',
-    fields: [
-      { key: 'payroll_month_day', label: 'Payroll Day of Month', type: 'number', defaultValue: 28 },
-      { key: 'default_working_days_per_month', label: 'Default Working Days / Month', type: 'number', defaultValue: 26 },
-      { key: 'pf_enabled', label: 'Enable PF', type: 'checkbox' },
-      { key: 'tds_enabled', label: 'Enable TDS', type: 'checkbox' },
-      { key: 'leave_approval_required', label: 'Leave Approval Required', type: 'checkbox', defaultValue: true },
-      { key: 'unpaid_leave_affects_payroll', label: 'Unpaid Leave Affects Payroll', type: 'checkbox', defaultValue: true },
-      { key: 'payroll_approval_required', label: 'Payroll Approval Required', type: 'checkbox', defaultValue: true },
-      {
-        key: 'salary_payment_methods',
-        label: 'Salary Payment Methods',
-        type: 'multi-check',
-        defaultValue: ['Bank Transfer'],
-        options: [
-          { label: 'Bank Transfer', value: 'Bank Transfer' },
-          { label: 'Cash', value: 'Cash' },
-          { label: 'Cheque', value: 'Cheque' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'accounting',
-    eyebrow: 'Finance control',
-    title: 'Accounting Defaults',
-    description: 'Set fiscal labels, account mappings, voucher numbering, and period lock behavior.',
-    icon: Calculator,
-    tone: 'bg-rose-50 text-rose-700 border-rose-100',
-    fields: [
-      { key: 'active_fiscal_year_label', label: 'Active Fiscal Year', type: 'text', placeholder: '2081/82' },
-      {
-        key: 'fiscal_period_lock_policy',
-        label: 'Fiscal Period Lock Policy',
-        type: 'select',
-        defaultValue: 'MANUAL',
-        options: [
-          { label: 'Manual close', value: 'MANUAL' },
-          { label: 'Monthly close', value: 'MONTHLY' },
-          { label: 'Quarterly close', value: 'QUARTERLY' },
-        ],
-      },
-      { key: 'default_cash_account_label', label: 'Default Cash Account', type: 'text' },
-      { key: 'default_bank_account_label', label: 'Default Bank Account', type: 'text' },
-      { key: 'salary_payable_account_label', label: 'Salary Payable Account', type: 'text' },
-      { key: 'tds_payable_account_label', label: 'TDS Payable Account', type: 'text' },
-      { key: 'pf_payable_account_label', label: 'PF Payable Account', type: 'text' },
-      { key: 'fee_income_account_label', label: 'Fee Income Account', type: 'text' },
-      { key: 'journal_number_prefix', label: 'Journal Number Prefix', type: 'text', placeholder: 'JV-' },
-      { key: 'voucher_number_prefix', label: 'Voucher Number Prefix', type: 'text', placeholder: 'VCH-' },
-    ],
-  },
-  {
     id: 'communication',
     eyebrow: 'Parent engagement',
-    title: 'Communication Rules',
+    title: 'Communication',
     description: 'Configure notification defaults, consent requirements, quiet hours, and teacher chat availability.',
     icon: MessageSquare,
     tone: 'bg-cyan-50 text-cyan-700 border-cyan-100',
@@ -377,6 +317,74 @@ const SETTINGS_SECTIONS: SettingSectionConfig[] = [
     ],
   },
   {
+    id: 'payroll',
+    eyebrow: 'Staff controls',
+    title: 'HR & Payroll',
+    description: 'Configure leave approval, salary calculation defaults, PF/TDS readiness, and payroll approvals.',
+    icon: Users,
+    tone: 'bg-sky-50 text-sky-700 border-sky-100',
+    featureLink: {
+      href: '/dashboard/hr',
+      label: 'Open HR Module',
+      description: 'Manage staff, leave, and payroll runs.',
+    },
+    fields: [
+      { key: 'payroll_month_day', label: 'Payroll Day of Month', type: 'number', defaultValue: 28 },
+      { key: 'default_working_days_per_month', label: 'Default Working Days / Month', type: 'number', defaultValue: 26 },
+      { key: 'pf_enabled', label: 'Enable PF', type: 'checkbox' },
+      { key: 'tds_enabled', label: 'Enable TDS', type: 'checkbox' },
+      { key: 'leave_approval_required', label: 'Leave Approval Required', type: 'checkbox', defaultValue: true },
+      { key: 'unpaid_leave_affects_payroll', label: 'Unpaid Leave Affects Payroll', type: 'checkbox', defaultValue: true },
+      { key: 'payroll_approval_required', label: 'Payroll Approval Required', type: 'checkbox', defaultValue: true },
+      {
+        key: 'salary_payment_methods',
+        label: 'Salary Payment Methods',
+        type: 'multi-check',
+        defaultValue: ['Bank Transfer'],
+        options: [
+          { label: 'Bank Transfer', value: 'Bank Transfer' },
+          { label: 'Cash', value: 'Cash' },
+          { label: 'Cheque', value: 'Cheque' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'accounting',
+    eyebrow: 'Finance control',
+    title: 'Accounting',
+    description: 'Set fiscal labels, account mappings, voucher numbering, and period lock behavior.',
+    icon: Calculator,
+    tone: 'bg-rose-50 text-rose-700 border-rose-100',
+    featureLink: {
+      href: '/dashboard/accounting',
+      label: 'Open Accounting Module',
+      description: 'Manage journals, accounts, and fiscal periods.',
+    },
+    fields: [
+      { key: 'active_fiscal_year_label', label: 'Active Fiscal Year', type: 'text', placeholder: '2081/82' },
+      {
+        key: 'fiscal_period_lock_policy',
+        label: 'Fiscal Period Lock Policy',
+        type: 'select',
+        defaultValue: 'MANUAL',
+        options: [
+          { label: 'Manual close', value: 'MANUAL' },
+          { label: 'Monthly close', value: 'MONTHLY' },
+          { label: 'Quarterly close', value: 'QUARTERLY' },
+        ],
+      },
+      { key: 'default_cash_account_label', label: 'Default Cash Account', type: 'text' },
+      { key: 'default_bank_account_label', label: 'Default Bank Account', type: 'text' },
+      { key: 'salary_payable_account_label', label: 'Salary Payable Account', type: 'text' },
+      { key: 'tds_payable_account_label', label: 'TDS Payable Account', type: 'text' },
+      { key: 'pf_payable_account_label', label: 'PF Payable Account', type: 'text' },
+      { key: 'fee_income_account_label', label: 'Fee Income Account', type: 'text' },
+      { key: 'journal_number_prefix', label: 'Journal Number Prefix', type: 'text', placeholder: 'JV-' },
+      { key: 'voucher_number_prefix', label: 'Voucher Number Prefix', type: 'text', placeholder: 'VCH-' },
+    ],
+  },
+  {
     id: 'security',
     eyebrow: 'Governance',
     title: 'Security & Access',
@@ -398,7 +406,7 @@ const UTILITY_SECTIONS = [
     id: 'data',
     eyebrow: 'Data operations',
     title: 'Import / Export',
-    description: 'Shortcuts for bulk data movement, official readiness, and migration workflows.',
+    description: 'Bulk data movement, official readiness, and migration workflows.',
     icon: Database,
     tone: 'bg-teal-50 text-teal-700 border-teal-100',
   },
@@ -421,6 +429,16 @@ const UTILITY_SECTIONS = [
 ] satisfies Array<Omit<SettingSectionConfig, 'fields'> & { fields?: never }>;
 
 const ALL_SECTIONS = [...SETTINGS_SECTIONS, ...UTILITY_SECTIONS];
+
+// Left nav groups define the visual grouping in the sidebar
+const NAV_GROUPS: NavGroup[] = [
+  { label: 'School', items: ['profile', 'branding'] },
+  { label: 'Academic & Operations', items: ['academic', 'attendance', 'fees', 'communication'] },
+  { label: 'Staff & Finance', items: ['payroll', 'accounting'] },
+  { label: 'Security & Data', items: ['security', 'data', 'audit', 'subscription'] },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const formatFileSize = (sizeBytes: number) => {
   if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return '0 B';
@@ -446,26 +464,28 @@ const normalizeFieldValue = (field: SettingFieldConfig, value: unknown) => {
 
 function buildInitialForm(settings: TenantSettingSummary[]) {
   const next: Record<string, unknown> = {};
-
   for (const section of SETTINGS_SECTIONS) {
     for (const field of section.fields) {
       const setting = settings.find((item) => item.key === field.key);
       next[field.key] = normalizeFieldValue(field, setting?.value);
     }
   }
-
   return next;
 }
 
 const valuesEqual = (left: unknown, right: unknown) => JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
 
+// ─── Page Entry ───────────────────────────────────────────────────────────────
+
 export default function TenantSettingsPage() {
   return (
-    <Suspense fallback={<SettingsLoading />}> 
+    <Suspense fallback={<SettingsLoading />}>
       <TenantSettingsContent />
     </Suspense>
   );
 }
+
+// ─── Main Content ─────────────────────────────────────────────────────────────
 
 function TenantSettingsContent() {
   const router = useRouter();
@@ -506,6 +526,13 @@ function TenantSettingsContent() {
     setForm(initialForm);
   }, [initialForm]);
 
+  // Auto-dismiss notice after 4s
+  useEffect(() => {
+    if (!notice) return;
+    const t = window.setTimeout(() => setNotice(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [notice]);
+
   async function fetchSettings() {
     try {
       setLoading(true);
@@ -528,6 +555,15 @@ function TenantSettingsContent() {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  function resetSection() {
+    if (!activeEditableSection) return;
+    const reset: Record<string, unknown> = { ...form };
+    for (const field of activeEditableSection.fields) {
+      reset[field.key] = initialForm[field.key];
+    }
+    setForm(reset);
+  }
+
   async function saveActiveSection() {
     if (!activeEditableSection || sectionChangedCount === 0) return;
 
@@ -543,7 +579,7 @@ function TenantSettingsContent() {
         }
       }
 
-      setNotice({ type: 'success', text: `${activeEditableSection.title} updated successfully.` });
+      setNotice({ type: 'success', text: `${activeEditableSection.title} saved successfully.` });
       await fetchSettings();
     } catch {
       setNotice({ type: 'error', text: 'Failed to save this settings group.' });
@@ -553,22 +589,25 @@ function TenantSettingsContent() {
   }
 
   const filteredSections = ALL_SECTIONS.filter((section) => {
+    if (!query.trim()) return true;
     const needle = `${section.title} ${section.description} ${section.eyebrow}`.toLowerCase();
     return needle.includes(query.toLowerCase());
   });
+
+  const filteredSectionIds = new Set(filteredSections.map((s) => s.id));
 
   if (loading) return <SettingsLoading />;
 
   if (error) {
     return (
-      <div className="p-6 md:p-8">
-        <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-rose-700">
-          <div className="flex items-center gap-2 font-bold">
-            <AlertCircle size={20} />
+      <div className="p-6">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-rose-700">
+          <div className="flex items-center gap-2 font-semibold">
+            <AlertCircle size={18} />
             <span>Settings unavailable</span>
           </div>
-          <p className="mt-2 text-sm">{error}</p>
-          <Button variant="outline" className="mt-4" onClick={() => void fetchSettings()}>
+          <p className="mt-1.5 text-sm text-rose-600">{error}</p>
+          <Button variant="outline" size="sm" className="mt-4 rounded-lg" onClick={() => void fetchSettings()}>
             Retry
           </Button>
         </div>
@@ -577,178 +616,293 @@ function TenantSettingsContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/60 pb-12">
-      <SettingsHero changedCount={changedKeys.length} settingsCount={settings.length} />
-
-      <div className="grid gap-6 px-6 md:px-8 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
-          <div className="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm">
-            <label className="relative block">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search settings"
-                className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm font-medium outline-none transition focus:border-primary-300 focus:bg-white focus:ring-4 focus:ring-primary-500/10"
-              />
-            </label>
-          </div>
-
-          <div className="rounded-[2rem] border border-slate-200 bg-white p-2 shadow-sm">
-            {filteredSections.map((section) => {
-              const Icon = section.icon;
-              const isActive = section.id === activeSectionId;
-              const editableSection = SETTINGS_SECTIONS.find((item) => item.id === section.id);
-              const dirtyCount = editableSection
-                ? editableSection.fields.filter((field) => changedKeys.includes(field.key)).length
-                : 0;
-
-              return (
-                <button
-                  key={section.id}
-                  type="button"
-                  onClick={() => switchSection(section.id)}
-                  className={cn(
-                    'group flex w-full items-start gap-3 rounded-[1.5rem] p-4 text-left transition-all',
-                    isActive ? 'bg-slate-950 text-white shadow-lg shadow-slate-900/10' : 'hover:bg-slate-50',
-                  )}
-                >
-                  <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border', isActive ? 'border-white/10 bg-white/10 text-white' : section.tone)}>
-                    <Icon size={18} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className={cn('block text-sm font-black tracking-tight', isActive ? 'text-white' : 'text-slate-900')}>
-                      {section.title}
-                    </span>
-                    <span className={cn('mt-1 line-clamp-2 block text-xs leading-5', isActive ? 'text-slate-300' : 'text-slate-500')}>
-                      {section.description}
-                    </span>
-                  </span>
-                  {dirtyCount > 0 ? (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-700">
-                      {dirtyCount}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-        </aside>
-
-        <main className="min-w-0 space-y-6">
-          <SectionHeader
-            section={activeSection}
-            changedCount={sectionChangedCount}
-            saving={saving}
-            onSave={() => void saveActiveSection()}
-            canSave={Boolean(activeEditableSection && sectionChangedCount > 0)}
-          />
-
-          {notice ? <SettingsNotice notice={notice} /> : null}
-
-          {activeEditableSection ? (
-            <EditableSettingsSection
-              section={activeEditableSection}
-              form={form}
-              logoFileAssetId={logoFileAssetId}
-              onFieldChange={setFieldValue}
-              onLogoChanged={() => void fetchSettings()}
-            />
-          ) : null}
-
-          {activeSectionId === 'data' ? <DataOperations /> : null}
-          {activeSectionId === 'audit' ? <AuditPanel /> : null}
-          {activeSectionId === 'subscription' ? <SubscriptionPanel /> : null}
-        </main>
-      </div>
-    </div>
-  );
-}
-
-function SettingsHero({ changedCount, settingsCount }: { changedCount: number; settingsCount: number }) {
-  return (
-    <section className="relative mb-6 overflow-hidden border-b border-slate-200 bg-slate-950 px-6 py-8 text-white md:px-8 md:py-10">
-      <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-primary-500/20 blur-3xl" />
-      <div className="absolute bottom-0 left-1/3 h-52 w-52 rounded-full bg-blue-400/10 blur-3xl" />
-
-      <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-3xl">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">
-            <Settings size={14} /> Tenant Configuration Plane
-          </div>
-          <h1 className="text-3xl font-black tracking-tight sm:text-5xl">School Settings</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-            Configure school identity, document branding, operational rules, communication defaults, and governance controls from one structured settings console.
+    <div className="min-h-screen">
+      {/* ── Compact Page Header ─────────────────────────────── */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Settings</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Manage school profile, rules, permissions, documents, and tenant configuration.
           </p>
         </div>
-
-        <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[520px]">
-          <HeroMetric label="Settings loaded" value={String(settingsCount)} />
-          <HeroMetric label="Pending changes" value={String(changedCount)} tone={changedCount > 0 ? 'warning' : 'success'} />
-          <HeroMetric label="Configuration" value="Tenant-scoped" />
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500">
+            Tenant-scoped
+          </span>
+          {changedKeys.length > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              {changedKeys.length} unsaved
+            </span>
+          )}
         </div>
       </div>
-    </section>
-  );
-}
 
-function HeroMetric({ label, value, tone = 'neutral' }: { label: string; value: string; tone?: 'neutral' | 'success' | 'warning' }) {
-  const toneClass = {
-    neutral: 'bg-white/5 text-white ring-white/10',
-    success: 'bg-emerald-400/10 text-emerald-100 ring-emerald-300/20',
-    warning: 'bg-amber-400/10 text-amber-100 ring-amber-300/20',
-  }[tone];
+      {/* ── Two-column Settings Shell ────────────────────────── */}
+      <div className="flex gap-6 xl:gap-8">
+        {/* Left Sidebar Nav */}
+        <SettingsSidebar
+          navGroups={NAV_GROUPS}
+          allSections={ALL_SECTIONS}
+          settingsSections={SETTINGS_SECTIONS}
+          activeSectionId={activeSectionId}
+          changedKeys={changedKeys}
+          query={query}
+          filteredSectionIds={filteredSectionIds}
+          onQueryChange={setQuery}
+          onSwitchSection={switchSection}
+        />
 
-  return (
-    <div className={cn('rounded-3xl p-4 ring-1 backdrop-blur', toneClass)}>
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-70">{label}</p>
-      <p className="mt-2 text-xl font-black tracking-tight">{value}</p>
+        {/* Right Content */}
+        <main className="min-w-0 flex-1">
+          {/* Toast Notice */}
+          {notice && (
+            <div
+              className={cn(
+                'mb-4 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium',
+                notice.type === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-rose-200 bg-rose-50 text-rose-700',
+              )}
+            >
+              {notice.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+              <span className="flex-1">{notice.text}</span>
+              <button type="button" onClick={() => setNotice(null)} className="opacity-60 hover:opacity-100">
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
+          {/* Section Content */}
+          <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+            {/* Section Header */}
+            <SectionHeader section={activeSection} />
+
+            {/* Editable Fields */}
+            {activeEditableSection && (
+              <EditableSettingsSection
+                section={activeEditableSection}
+                form={form}
+                logoFileAssetId={logoFileAssetId}
+                onFieldChange={setFieldValue}
+                onLogoChanged={() => void fetchSettings()}
+              />
+            )}
+
+            {/* Utility Panels */}
+            {activeSectionId === 'data' && <div className="p-6"><DataOperations /></div>}
+            {activeSectionId === 'audit' && <div className="p-6"><AuditPanel /></div>}
+            {activeSectionId === 'subscription' && <div className="p-6"><SubscriptionPanel /></div>}
+          </div>
+        </main>
+      </div>
+
+      {/* ── Sticky Unsaved Changes Bar ───────────────────────── */}
+      {sectionChangedCount > 0 && (
+        <UnsavedBar
+          sectionTitle={activeEditableSection?.title ?? ''}
+          changedCount={sectionChangedCount}
+          saving={saving}
+          onReset={resetSection}
+          onSave={() => void saveActiveSection()}
+        />
+      )}
     </div>
   );
 }
 
-function SectionHeader({
-  section,
-  changedCount,
-  saving,
-  canSave,
-  onSave,
+// ─── Settings Sidebar ─────────────────────────────────────────────────────────
+
+function SettingsSidebar({
+  navGroups,
+  allSections,
+  settingsSections,
+  activeSectionId,
+  changedKeys,
+  query,
+  filteredSectionIds,
+  onQueryChange,
+  onSwitchSection,
 }: {
-  section: (typeof ALL_SECTIONS)[number];
-  changedCount: number;
-  saving: boolean;
-  canSave: boolean;
-  onSave: () => void;
+  navGroups: NavGroup[];
+  allSections: typeof ALL_SECTIONS;
+  settingsSections: SettingSectionConfig[];
+  activeSectionId: string;
+  changedKeys: string[];
+  query: string;
+  filteredSectionIds: Set<string>;
+  onQueryChange: (q: string) => void;
+  onSwitchSection: (id: string) => void;
 }) {
+  return (
+    <aside className="hidden w-[240px] shrink-0 xl:block xl:sticky xl:top-4 xl:self-start">
+      {/* Search */}
+      <div className="relative mb-3">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+        <input
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          placeholder="Search settings…"
+          className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-xs font-medium text-slate-700 placeholder-slate-400 outline-none transition focus:border-slate-300 focus:ring-2 focus:ring-slate-900/5"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => onQueryChange('')}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+          >
+            <X size={12} />
+          </button>
+        )}
+      </div>
+
+      {/* Nav Groups */}
+      <nav className="space-y-4">
+        {navGroups.map((group) => {
+          const visibleItems = group.items.filter((id) => filteredSectionIds.has(id));
+          if (visibleItems.length === 0) return null;
+
+          return (
+            <div key={group.label}>
+              <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {visibleItems.map((sectionId) => {
+                  const section = allSections.find((s) => s.id === sectionId);
+                  if (!section) return null;
+                  const Icon = section.icon;
+                  const isActive = sectionId === activeSectionId;
+                  const editableSection = settingsSections.find((s) => s.id === sectionId);
+                  const dirtyCount = editableSection
+                    ? editableSection.fields.filter((f) => changedKeys.includes(f.key)).length
+                    : 0;
+
+                  return (
+                    <button
+                      key={sectionId}
+                      type="button"
+                      onClick={() => onSwitchSection(sectionId)}
+                      className={cn(
+                        'group flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors',
+                        isActive
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                      )}
+                    >
+                      <Icon
+                        size={14}
+                        className={cn(
+                          'shrink-0',
+                          isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600',
+                        )}
+                      />
+                      <span className="flex-1 truncate font-medium leading-none">{section.title}</span>
+                      {dirtyCount > 0 && (
+                        <span
+                          className={cn(
+                            'flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-bold',
+                            isActive ? 'bg-amber-400 text-amber-900' : 'bg-amber-100 text-amber-700',
+                          )}
+                        >
+                          {dirtyCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+
+// ─── Section Header ───────────────────────────────────────────────────────────
+
+function SectionHeader({ section }: { section: (typeof ALL_SECTIONS)[number] }) {
   const Icon = section.icon;
+  // Only editable sections (SETTINGS_SECTIONS) have featureLink
+  const settingsSection = SETTINGS_SECTIONS.find((s) => s.id === section.id);
+  const featureLink = settingsSection?.featureLink ?? null;
 
   return (
-    <div className="rounded-[2.5rem] border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex gap-4">
-          <span className={cn('flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl border', section.tone)}>
-            <Icon size={24} />
-          </span>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{section.eyebrow}</p>
-            <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">{section.title}</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{section.description}</p>
+    <div className="border-b border-slate-100 px-6 py-5">
+      <div className="flex items-start gap-3">
+        <span className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border', section.tone)}>
+          <Icon size={15} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold text-slate-900">{section.title}</h2>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{section.eyebrow}</span>
           </div>
+          <p className="mt-0.5 text-sm text-slate-500">{section.description}</p>
         </div>
+        {featureLink ? (
+          <Link
+            href={featureLink.href}
+            className="group ml-auto flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+          >
+            {featureLink.label}
+            <ExternalLink size={11} className="text-slate-400 group-hover:text-slate-600" />
+          </Link>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
-        <div className="flex flex-wrap items-center gap-3">
-          {changedCount > 0 ? (
-            <Badge className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-700">
-              {changedCount} unsaved
-            </Badge>
-          ) : (
-            <Badge className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700">
-              Saved
-            </Badge>
-          )}
-          <Button onClick={onSave} disabled={!canSave || saving} className="gap-2 rounded-2xl px-5">
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            {saving ? 'Saving...' : 'Save section'}
+// ─── Unsaved Changes Bar ──────────────────────────────────────────────────────
+
+function UnsavedBar({
+  sectionTitle,
+  changedCount,
+  saving,
+  onReset,
+  onSave,
+}: {
+  sectionTitle: string;
+  changedCount: number;
+  saving: boolean;
+  onReset: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white px-4 py-3 shadow-lg sm:px-6">
+      <div className="mx-auto flex max-w-[1600px] items-center gap-4">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100">
+            <span className="h-2 w-2 rounded-full bg-amber-500" />
+          </span>
+          <p className="truncate text-sm font-medium text-slate-700">
+            {changedCount} unsaved {changedCount === 1 ? 'change' : 'changes'} in{' '}
+            <span className="font-semibold text-slate-900">{sectionTitle}</span>
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onReset}
+            disabled={saving}
+            className="gap-1.5 rounded-lg text-slate-600 hover:text-slate-900"
+          >
+            <RotateCcw size={13} />
+            Reset
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={onSave}
+            disabled={saving}
+            className="gap-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
+          >
+            {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+            {saving ? 'Saving…' : 'Save changes'}
           </Button>
         </div>
       </div>
@@ -756,15 +910,7 @@ function SectionHeader({
   );
 }
 
-function SettingsNotice({ notice }: { notice: { type: 'success' | 'error'; text: string } }) {
-  const isSuccess = notice.type === 'success';
-  return (
-    <div className={cn('flex items-center gap-3 rounded-3xl border p-4 text-sm font-semibold', isSuccess ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700')}>
-      {isSuccess ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-      {notice.text}
-    </div>
-  );
-}
+// ─── Editable Settings Section ────────────────────────────────────────────────
 
 function EditableSettingsSection({
   section,
@@ -779,123 +925,306 @@ function EditableSettingsSection({
   onFieldChange: (key: TenantSettingKey, value: unknown) => void;
   onLogoChanged: () => void;
 }) {
+  // Separate fields by type for layout purposes
+  const textLikeFields = section.fields.filter(
+    (f) => f.type !== 'checkbox' && f.type !== 'multi-check',
+  );
+  const checkboxFields = section.fields.filter((f) => f.type === 'checkbox');
+  const multiCheckFields = section.fields.filter((f) => f.type === 'multi-check');
+
   return (
-    <div className="space-y-6">
-      {section.id === 'branding' ? <LogoPanel logoFileAssetId={logoFileAssetId} onLogoChanged={onLogoChanged} /> : null}
+    <div className="divide-y divide-slate-100">
+      {/* Branding: Logo Panel */}
+      {section.id === 'branding' && (
+        <div className="px-6 py-5">
+          <LogoPanel logoFileAssetId={logoFileAssetId} onLogoChanged={onLogoChanged} />
+        </div>
+      )}
 
-      {section.featureLink ? (
-        <Link
-          href={section.featureLink.href}
-          className="group flex items-center justify-between rounded-[2rem] border border-primary-100 bg-primary-50/50 p-5 transition hover:border-primary-200 hover:bg-primary-50"
-        >
-          <div>
-            <p className="text-sm font-black text-primary-900">{section.featureLink.label}</p>
-            <p className="mt-1 text-xs font-medium text-primary-600">{section.featureLink.description}</p>
-          </div>
-          <ExternalLink className="text-primary-500 transition group-hover:translate-x-0.5" size={18} />
-        </Link>
-      ) : null}
+      {/* Branding: Document preview */}
+      {section.id === 'branding' && (
+        <div className="px-6 py-5">
+          <BrandingPreview
+            schoolName={String(form['school_name'] ?? '')}
+            primaryColor={String(form['branding_primary_color'] ?? '#6366f1')}
+            headerText={String(form['receipt_header_text'] ?? '')}
+            footerText={String(form['receipt_footer_text'] ?? '')}
+            logoFileAssetId={logoFileAssetId}
+          />
+        </div>
+      )}
 
-      <Card className="overflow-hidden rounded-[2.5rem] border-slate-200 shadow-sm">
-        <CardContent className="p-0">
-          <div className="border-b border-slate-100 bg-slate-50/70 px-6 py-5">
-            <p className="text-sm font-black text-slate-950">{section.title} controls</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Related fields are grouped in one section so changes can be reviewed and saved together.</p>
-          </div>
+      {/* Text-like fields: rendered as FieldRow list */}
+      {textLikeFields.length > 0 && (
+        <div className="divide-y divide-slate-100">
+          {textLikeFields.map((field) => (
+            <FieldRow key={field.key} field={field} value={form[field.key]} onChange={(v) => onFieldChange(field.key, v)} />
+          ))}
+        </div>
+      )}
 
-          <div className="grid gap-5 p-6 md:grid-cols-2 xl:grid-cols-3">
-            {section.fields.map((field) => (
-              <SettingField key={field.key} field={field} value={form[field.key]} onChange={(value) => onFieldChange(field.key, value)} />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Checkbox toggle rows */}
+      {checkboxFields.length > 0 && (
+        <div className="divide-y divide-slate-100">
+          {checkboxFields.map((field) => (
+            <ToggleRow key={field.key} field={field} value={form[field.key]} onChange={(v) => onFieldChange(field.key, v)} />
+          ))}
+        </div>
+      )}
+
+      {/* Multi-check chip groups */}
+      {multiCheckFields.map((field) => (
+        <MultiCheckRow key={field.key} field={field} value={form[field.key]} onChange={(v) => onFieldChange(field.key, v)} />
+      ))}
     </div>
   );
 }
 
-function SettingField({ field, value, onChange }: { field: SettingFieldConfig; value: unknown; onChange: (value: unknown) => void }) {
-  if (field.type === 'checkbox') {
-    return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:col-span-1">
-        <Checkbox label={field.label} checked={Boolean(value)} onChange={(checked) => onChange(checked)} />
-        {field.description ? <p className="mt-2 text-xs leading-5 text-slate-500">{field.description}</p> : null}
-      </div>
-    );
-  }
+// ─── Field Row (text / select / color / number / time / email) ────────────────
 
-  if (field.type === 'multi-check') {
-    const selected = Array.isArray(value) ? value.map(String) : [];
-    return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:col-span-2 xl:col-span-3">
-        <div className="mb-3">
-          <p className="text-sm font-bold text-slate-800">{field.label}</p>
-          {field.description ? <p className="mt-1 text-xs leading-5 text-slate-500">{field.description}</p> : null}
-        </div>
-        <div className="flex flex-wrap gap-3">
-          {(field.options ?? []).map((option) => (
-            <Checkbox
-              key={option.value}
-              label={option.label}
-              checked={selected.includes(option.value)}
-              onChange={(checked) => {
-                const next = checked ? [...selected, option.value] : selected.filter((item) => item !== option.value);
-                onChange(next);
-              }}
-            />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (field.type === 'select') {
-    return (
-      <FormField label={field.label} description={field.description}>
-        <Select value={String(value ?? field.defaultValue ?? '')} onChange={(event) => onChange(event.target.value)}>
-          {(field.options ?? []).map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
-      </FormField>
-    );
-  }
-
-  if (field.type === 'color') {
-    return (
-      <FormField label={field.label} description={field.description}>
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2">
-          <input
-            type="color"
-            value={String(value || field.defaultValue || '#6366f1')}
-            onChange={(event) => onChange(event.target.value)}
-            className="h-10 w-16 cursor-pointer rounded-xl border border-slate-200 bg-white p-1"
-          />
-          <span className="font-mono text-xs font-bold uppercase text-slate-500">{String(value || field.defaultValue || '#6366f1')}</span>
-        </div>
-      </FormField>
-    );
-  }
-
+function FieldRow({
+  field,
+  value,
+  onChange,
+}: {
+  field: SettingFieldConfig;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
   return (
-    <FormField label={field.label} description={field.description}>
-      <Input
-        type={field.type === 'number' ? 'number' : field.type === 'email' ? 'email' : field.type === 'time' ? 'time' : 'text'}
-        value={String(value ?? '')}
-        placeholder={field.placeholder}
-        onChange={(event) => {
-          if (field.type === 'number') {
-            onChange(event.target.value === '' ? '' : Number(event.target.value));
-            return;
-          }
-          onChange(event.target.value);
-        }}
-      />
-    </FormField>
+    <div className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-start sm:justify-between">
+      {/* Label */}
+      <div className="sm:w-[240px] sm:shrink-0">
+        <p className="text-sm font-medium text-slate-800">{field.label}</p>
+        {field.description && (
+          <p className="mt-0.5 text-xs leading-5 text-slate-500">{field.description}</p>
+        )}
+      </div>
+
+      {/* Control */}
+      <div className="w-full sm:max-w-sm">
+        {field.type === 'color' ? (
+          <ColorField value={String(value || field.defaultValue || '#6366f1')} onChange={onChange} />
+        ) : field.type === 'select' ? (
+          <select
+            value={String(value ?? field.defaultValue ?? '')}
+            onChange={(e) => onChange(e.target.value)}
+            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 disabled:opacity-50"
+          >
+            {(field.options ?? []).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type={field.type === 'number' ? 'number' : field.type === 'email' ? 'email' : field.type === 'time' ? 'time' : 'text'}
+            value={String(value ?? '')}
+            placeholder={field.placeholder}
+            onChange={(e) => {
+              if (field.type === 'number') {
+                onChange(e.target.value === '' ? '' : Number(e.target.value));
+                return;
+              }
+              onChange(e.target.value);
+            }}
+            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 placeholder-slate-400 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
+          />
+        )}
+      </div>
+    </div>
   );
 }
+
+// ─── Color Field ──────────────────────────────────────────────────────────────
+
+function ColorField({ value, onChange }: { value: string; onChange: (v: unknown) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative">
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-9 w-14 cursor-pointer rounded-lg border border-slate-200 bg-white p-1 outline-none"
+        />
+      </div>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (/^#[0-9a-f]{6}$/i.test(v)) onChange(v);
+          else onChange(v); // allow partial typing
+        }}
+        maxLength={7}
+        placeholder="#6366f1"
+        className="h-9 w-[110px] rounded-lg border border-slate-200 bg-white px-3 font-mono text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
+      />
+      {/* Live preview strip */}
+      <div className="h-9 w-14 rounded-lg border border-slate-200" style={{ backgroundColor: value }} />
+    </div>
+  );
+}
+
+// ─── Toggle Row (checkbox) ────────────────────────────────────────────────────
+
+function ToggleRow({
+  field,
+  value,
+  onChange,
+}: {
+  field: SettingFieldConfig;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const checked = Boolean(value);
+  return (
+    <div className="flex items-center justify-between gap-4 px-6 py-4">
+      <div>
+        <p className="text-sm font-medium text-slate-800">{field.label}</p>
+        {field.description && (
+          <p className="mt-0.5 text-xs leading-5 text-slate-500">{field.description}</p>
+        )}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={cn(
+          'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2',
+          checked ? 'bg-slate-900' : 'bg-slate-200',
+        )}
+      >
+        <span
+          className={cn(
+            'pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
+            checked ? 'translate-x-4' : 'translate-x-0',
+          )}
+        />
+      </button>
+    </div>
+  );
+}
+
+// ─── Multi-Check Row ──────────────────────────────────────────────────────────
+
+function MultiCheckRow({
+  field,
+  value,
+  onChange,
+}: {
+  field: SettingFieldConfig;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const selected = Array.isArray(value) ? value.map(String) : [];
+
+  return (
+    <div className="px-6 py-4">
+      <div className="mb-3">
+        <p className="text-sm font-medium text-slate-800">{field.label}</p>
+        {field.description && (
+          <p className="mt-0.5 text-xs leading-5 text-slate-500">{field.description}</p>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {(field.options ?? []).map((option) => {
+          const isSelected = selected.includes(option.value);
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                const next = isSelected
+                  ? selected.filter((item) => item !== option.value)
+                  : [...selected, option.value];
+                onChange(next);
+              }}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition',
+                isSelected
+                  ? 'border-slate-900 bg-slate-900 text-white'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900',
+              )}
+            >
+              {isSelected && <Check size={11} />}
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Branding Preview ─────────────────────────────────────────────────────────
+
+function BrandingPreview({
+  schoolName,
+  primaryColor,
+  headerText,
+  footerText,
+}: {
+  schoolName: string;
+  primaryColor: string;
+  headerText: string;
+  footerText: string;
+  logoFileAssetId: string | null;
+}) {
+  const displayName = schoolName || 'Your School Name';
+  const displayHeader = headerText || 'Official Receipt';
+  const displayFooter = footerText || 'Thank you for your payment.';
+
+  return (
+    <div>
+      <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Document Branding Preview</p>
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        {/* Receipt header strip */}
+        <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: `3px solid ${primaryColor}` }}>
+          {/* Logo placeholder */}
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+            style={{ backgroundColor: `${primaryColor}18` }}
+          >
+            <School size={18} style={{ color: primaryColor }} />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-slate-900">{displayName}</p>
+            <p className="text-xs text-slate-500">{displayHeader}</p>
+          </div>
+          <div className="ml-auto text-right">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Receipt</p>
+            <p className="font-mono text-xs font-semibold text-slate-700">REC-2081-0001</p>
+          </div>
+        </div>
+        {/* Mock body */}
+        <div className="px-4 py-3">
+          <div className="space-y-1.5">
+            {['Student Fee', 'Transport Fee', 'Exam Fee'].map((item, i) => (
+              <div key={item} className="flex justify-between text-xs text-slate-600">
+                <span>{item}</span>
+                <span className="font-medium text-slate-800">NPR {[5000, 1500, 800][i]?.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex justify-between border-t border-slate-100 pt-2 text-xs font-semibold">
+            <span style={{ color: primaryColor }}>Total</span>
+            <span className="text-slate-900">NPR 7,300</span>
+          </div>
+        </div>
+        {/* Footer */}
+        <div className="border-t border-slate-100 px-4 py-2 text-center text-[10px] text-slate-400">
+          {displayFooter}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Logo Panel ───────────────────────────────────────────────────────────────
 
 function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string | null; onLogoChanged: () => void }) {
   const [preview, setPreview] = useState<TenantLogoAccess | null>(null);
@@ -913,31 +1242,23 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
     if (!logoFileAssetId) {
       setPreview(null);
       setError(null);
-      return () => {
-        active = false;
-      };
+      return () => { active = false; };
     }
 
     setLoading(true);
     setError(null);
     api
       .getSchoolLogoPreview()
-      .then((access) => {
-        if (active) setPreview(access);
-      })
+      .then((access) => { if (active) setPreview(access); })
       .catch((err: unknown) => {
         if (active) {
           setPreview(null);
           setError(err instanceof Error ? err.message : 'Failed to load school logo preview.');
         }
       })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+      .finally(() => { if (active) setLoading(false); });
 
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [logoFileAssetId]);
 
   const busy = loading || uploading || removing || downloading;
@@ -951,7 +1272,6 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
       setError('Use JPG, PNG, or WEBP for the school logo.');
       return;
     }
-
     if (file.size > TENANT_LOGO_MAX_BYTES) {
       setError('School logo must be 1MB or smaller.');
       return;
@@ -1002,72 +1322,108 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
 
   return (
     <>
-      <div className="rounded-[2.5rem] border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
-              {preview?.url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={preview.url} alt="School logo preview" className="h-full w-full object-contain p-2" />
-              ) : (
-                <ImageUp className="h-8 w-8 text-slate-300" />
+      <div>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">School Logo</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          {/* Logo preview */}
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+            {loading ? (
+              <Loader2 size={20} className="animate-spin text-slate-300" />
+            ) : preview?.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={preview.url} alt="School logo" className="h-full w-full object-contain p-2" />
+            ) : (
+              <ImageUp className="h-7 w-7 text-slate-300" />
+            )}
+          </div>
+
+          {/* Info + actions */}
+          <div className="flex-1">
+            <div className="mb-2.5 flex flex-wrap gap-1.5">
+              <span
+                className={cn(
+                  'inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold',
+                  logoFileAssetId
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-slate-100 text-slate-500',
+                )}
+              >
+                {logoFileAssetId ? 'Logo configured' : 'No logo uploaded'}
+              </span>
+              <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                Private File Registry
+              </span>
+              {preview && (
+                <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                  {formatFileSize(preview.sizeBytes)}
+                </span>
               )}
             </div>
-            <div>
-              <p className="text-sm font-black text-slate-950">School Logo</p>
-              <p className="mt-1 max-w-xl text-xs leading-5 text-slate-500">
-                Upload a JPG, PNG, or WEBP logo up to 1MB. The logo is stored privately and served through signed links.
+            <p className="text-xs leading-5 text-slate-500">
+              Upload a JPG, PNG, or WEBP logo up to 1MB. Stored privately and served through signed links.
+            </p>
+            {preview && (
+              <p className="mt-1 text-[11px] text-slate-400">
+                {preview.fileName} · Preview expires in {preview.expiresInSeconds}s
               </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Badge className={cn('rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest', logoFileAssetId ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500')}>
-                  {logoFileAssetId ? 'Configured' : 'Not configured'}
-                </Badge>
-                <Badge className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  Private File Registry
-                </Badge>
-                {preview ? (
-                  <Badge className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                    {formatFileSize(preview.sizeBytes)}
-                  </Badge>
-                ) : null}
-              </div>
-              {preview ? <p className="mt-2 text-xs text-slate-500">{preview.fileName} · Preview expires in {preview.expiresInSeconds}s</p> : null}
-            </div>
-          </div>
+            )}
 
-          <div className="flex flex-wrap gap-2">
-            <label className={cn('inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800', busy && 'cursor-not-allowed opacity-50')}>
-              {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-              {uploading ? 'Uploading...' : logoFileAssetId ? 'Replace' : 'Upload'}
-              <input
-                aria-label="Upload school logo"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="sr-only"
-                disabled={busy}
-                onChange={(event) => {
-                  void handleLogoSelection(event.target.files?.[0]);
-                  event.currentTarget.value = '';
-                }}
-              />
-            </label>
-            {logoFileAssetId ? (
-              <>
-                <Button type="button" variant="outline" className="gap-2 rounded-2xl" disabled={busy} onClick={() => void openLogoDownload()}>
-                  {downloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                  Download
-                </Button>
-                <Button type="button" variant="outline" className="gap-2 rounded-2xl border-rose-200 text-rose-600 hover:bg-rose-50" disabled={busy} onClick={() => setRemoveOpen(true)}>
-                  <Trash2 size={16} /> Remove
-                </Button>
-              </>
-            ) : null}
+            {/* Actions */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <label
+                className={cn(
+                  'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800',
+                  busy && 'cursor-not-allowed opacity-50',
+                )}
+              >
+                {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                {uploading ? 'Uploading…' : logoFileAssetId ? 'Replace' : 'Upload logo'}
+                <input
+                  aria-label="Upload school logo"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  disabled={busy}
+                  onChange={(e) => { void handleLogoSelection(e.target.files?.[0]); e.currentTarget.value = ''; }}
+                />
+              </label>
+              {logoFileAssetId && (
+                <>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void openLogoDownload()}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-50"
+                  >
+                    {downloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                    Download
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setRemoveOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                  >
+                    <X size={12} />
+                    Remove
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Status messages */}
+            {message && (
+              <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+                <CheckCircle2 size={12} /> {message}
+              </p>
+            )}
+            {error && (
+              <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-rose-600">
+                <AlertCircle size={12} /> {error}
+              </p>
+            )}
           </div>
         </div>
-
-        {loading ? <p className="mt-4 flex items-center gap-2 text-xs font-bold text-primary-600"><Loader2 size={14} className="animate-spin" /> Loading signed preview...</p> : null}
-        {message ? <p className="mt-4 flex items-center gap-2 text-xs font-bold text-emerald-700"><CheckCircle2 size={14} /> {message}</p> : null}
-        {error ? <p className="mt-4 flex items-center gap-2 text-xs font-bold text-rose-600"><AlertCircle size={14} /> {error}</p> : null}
       </div>
 
       <ConfirmDialog
@@ -1084,110 +1440,175 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
   );
 }
 
+// ─── Data Operations ──────────────────────────────────────────────────────────
+
 function DataOperations() {
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <UtilityColumn title="Imports" icon={Upload} items={[
-        { title: 'Student Import', description: 'Import students from CSV or iEMIS-ready source files.', href: '/dashboard/admissions' },
-        { title: 'Staff Import', description: 'Bulk upload staff records.', href: '/dashboard/hr/staff' },
-        { title: 'Fee Ledger Import', description: 'Import historic fee data before migration close.', href: '/dashboard/fees' },
-      ]} />
-      <UtilityColumn title="Exports" icon={Download} items={[
-        { title: 'iEMIS Export', description: 'Prepare government-ready student data files.', href: '/dashboard/students' },
-        { title: 'Accounting Audit', description: 'Download journal trail and accounting reports.', href: '/dashboard/accounting' },
-        { title: 'Class Roster', description: 'Export student lists by class and section.', href: '/dashboard/students' },
-        { title: 'Payroll Register', description: 'Export approved payroll summaries.', href: '/dashboard/payroll/reports' },
-      ]} />
-      <UtilityColumn title="Integrations" icon={ExternalLink} items={[
-        { title: 'Tenant API Access', description: 'Tenant API key routes are not available yet.', disabled: true },
-        { title: 'Webhooks', description: 'Tenant webhook routes are not available yet.', disabled: true },
-      ]} />
-    </div>
-  );
-}
-
-function AuditPanel() {
-  return (
-    <div className="rounded-[2.5rem] border border-dashed border-slate-200 bg-white p-10 text-center shadow-sm">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-slate-100 bg-slate-50 text-slate-400">
-        <Shield size={32} />
-      </div>
-      <h3 className="mt-5 text-xl font-black text-slate-950">Audit Trail Ready</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-        Sensitive actions are being recorded. Detailed log viewing and filtering will be available in a dedicated audit release.
+    <div className="space-y-6">
+      <p className="text-xs text-slate-500">
+        Use the shortcuts below to navigate to the relevant module for bulk imports, exports, and integrations.
       </p>
-      <Button variant="outline" className="mt-6 gap-2 rounded-2xl">
-        <Download size={16} /> Request Archive
-      </Button>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <DataOpColumn
+          title="Imports"
+          icon={Upload}
+          accent="bg-teal-50 text-teal-600 border-teal-100"
+          items={[
+            { title: 'Student Import', description: 'Import students from CSV or iEMIS-ready source files.', href: '/dashboard/admissions', status: 'available' },
+            { title: 'Staff Import', description: 'Bulk upload staff records.', href: '/dashboard/hr/staff', status: 'available' },
+            { title: 'Fee Ledger Import', description: 'Import historic fee data before migration close.', href: '/dashboard/fees', status: 'available' },
+          ]}
+        />
+        <DataOpColumn
+          title="Exports"
+          icon={Download}
+          accent="bg-blue-50 text-blue-600 border-blue-100"
+          items={[
+            { title: 'iEMIS Export', description: 'Prepare government-ready student data files.', href: '/dashboard/students', status: 'available' },
+            { title: 'Accounting Audit', description: 'Download journal trail and accounting reports.', href: '/dashboard/accounting', status: 'available' },
+            { title: 'Class Roster', description: 'Export student lists by class and section.', href: '/dashboard/students', status: 'available' },
+            { title: 'Payroll Register', description: 'Export approved payroll summaries.', href: '/dashboard/payroll/reports', status: 'available' },
+          ]}
+        />
+        <DataOpColumn
+          title="Integrations"
+          icon={ExternalLink}
+          accent="bg-purple-50 text-purple-600 border-purple-100"
+          items={[
+            { title: 'Tenant API Access', description: 'API key management for tenant integrations.', status: 'pending' },
+            { title: 'Webhooks', description: 'Configure event webhooks for external systems.', status: 'pending' },
+          ]}
+        />
+      </div>
     </div>
   );
 }
 
-function UtilityColumn({
+function DataOpColumn({
   title,
   icon: Icon,
+  accent,
   items,
 }: {
   title: string;
   icon: LucideIcon;
-  items: Array<{ title: string; description: string; href?: string; disabled?: boolean }>;
+  accent: string;
+  items: Array<{ title: string; description: string; href?: string; status: 'available' | 'pending' }>;
 }) {
   return (
-    <div className="rounded-[2.5rem] border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-5 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
-          <Icon size={18} />
-        </div>
-        <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">{title}</h3>
+    <div>
+      <div className="mb-3 flex items-center gap-2">
+        <span className={cn('flex h-6 w-6 items-center justify-center rounded-md border', accent)}>
+          <Icon size={13} />
+        </span>
+        <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
       </div>
-      <div className="space-y-3">
-        {items.map((item) => (
-          <UtilityCard key={item.title} {...item} />
-        ))}
+      <div className="space-y-2">
+        {items.map((item) =>
+          item.status === 'available' && item.href ? (
+            <Link
+              key={item.title}
+              href={item.href}
+              className="group flex items-start justify-between rounded-lg border border-slate-200 bg-white p-3 transition hover:border-slate-300 hover:shadow-sm"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-slate-800">{item.title}</p>
+                <p className="mt-0.5 text-xs leading-5 text-slate-500">{item.description}</p>
+              </div>
+              <ExternalLink size={12} className="ml-2 mt-0.5 shrink-0 text-slate-300 transition group-hover:text-slate-500" />
+            </Link>
+          ) : (
+            <div key={item.title} className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3">
+              <div className="flex items-start justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-500">{item.title}</p>
+                  <p className="mt-0.5 text-xs leading-5 text-slate-400">{item.description}</p>
+                </div>
+                <Lock size={12} className="ml-2 mt-0.5 shrink-0 text-slate-300" />
+              </div>
+              <span className="mt-2 inline-flex items-center rounded-md bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                Coming soon
+              </span>
+            </div>
+          ),
+        )}
       </div>
     </div>
   );
 }
 
-function UtilityCard({ title, description, href, disabled }: { title: string; description: string; href?: string; disabled?: boolean }) {
-  const content = (
-    <>
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <p className={cn('text-sm font-bold', disabled ? 'text-slate-500' : 'text-slate-900')}>{title}</p>
-        {disabled ? <Lock size={14} className="text-slate-300" /> : <ExternalLink size={14} className="text-slate-300 group-hover:text-primary-500" />}
-      </div>
-      <p className="text-xs leading-5 text-slate-500">{description}</p>
-      {disabled ? <span className="mt-3 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500">Backend route pending</span> : null}
-    </>
-  );
+// ─── Audit Panel ──────────────────────────────────────────────────────────────
 
-  if (disabled || !href) {
-    return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">{content}</div>;
-  }
-
+function AuditPanel() {
   return (
-    <Link href={href} className="group block rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-primary-200 hover:shadow-md">
-      {content}
-    </Link>
+    <div className="space-y-5">
+      <div className="flex items-start gap-4 rounded-xl border border-orange-100 bg-orange-50 p-4">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-orange-200 bg-white text-orange-500">
+          <Shield size={18} />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900">Audit Trail Active</h3>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            Sensitive admin actions (user creation, setting changes, fee waivers, payroll approvals) are being recorded in real time. Detailed log browsing and filtering will be available in an upcoming dedicated audit release.
+          </p>
+        </div>
+      </div>
+
+      {/* Disabled filter preview */}
+      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Log Filters (Coming Soon)</p>
+        <div className="flex flex-wrap gap-2 opacity-40">
+          {['Date range', 'Actor', 'Action type', 'Resource', 'Severity'].map((f) => (
+            <div key={f} className="h-8 w-24 animate-pulse rounded-lg bg-slate-200" />
+          ))}
+        </div>
+        <div className="mt-4 space-y-2 opacity-40">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div className="h-4 w-4 rounded-full bg-slate-200" />
+              <div className="h-3 flex-1 rounded-full bg-slate-200" />
+              <div className="h-3 w-20 rounded-full bg-slate-200" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          disabled
+          className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-400 opacity-60"
+        >
+          <Download size={14} />
+          Request Audit Archive
+        </button>
+        <p className="text-xs text-slate-400">Audit export will be available after the audit module release.</p>
+      </div>
+    </div>
   );
 }
+
+// ─── Subscription Panel ───────────────────────────────────────────────────────
 
 function SubscriptionPanel() {
   const { entitlements, loading, error } = useEntitlements();
 
   if (loading) {
     return (
-      <div className="flex h-[260px] items-center justify-center rounded-[2.5rem] border border-slate-200 bg-white">
-        <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
+      <div className="flex h-40 items-center justify-center">
+        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
       </div>
     );
   }
 
   if (error || !entitlements) {
     return (
-      <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-rose-700">
-        <div className="flex items-center gap-2 font-semibold"><AlertCircle size={20} /> Error loading subscription details</div>
-        <p className="mt-1 text-sm">Please refresh the page or try again later.</p>
+      <div className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-rose-700">
+        <div className="flex items-center gap-2 font-semibold">
+          <AlertCircle size={18} />
+          Error loading subscription details
+        </div>
+        <p className="mt-1 text-sm text-rose-600">Please refresh the page or try again later.</p>
       </div>
     );
   }
@@ -1207,37 +1628,46 @@ function SubscriptionPanel() {
     notices: 'M10 Notices & Communication',
   };
 
-  const activeModules = (entitlements.modules ?? []).filter((module) => module !== 'm0' && module !== 'platform' && !module.includes('m0') && !module.includes('platform'));
+  const activeModules = (entitlements.modules ?? []).filter(
+    (module) => module !== 'm0' && module !== 'platform' && !module.includes('m0') && !module.includes('platform'),
+  );
   const tier = entitlements.tier?.toUpperCase() || 'STARTER';
 
   return (
-    <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-950 p-8 text-white shadow-lg">
-        <div className="absolute right-0 top-0 h-48 w-48 translate-x-12 -translate-y-12 rounded-full bg-white/[0.04] blur-xl" />
-        <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Current Plan</p>
-            <h3 className="mt-1 flex items-center gap-3 text-3xl font-black tracking-tight">
-              {tier} Plan
-              <Badge className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700">Active</Badge>
-            </h3>
-            <p className="mt-2 max-w-md text-sm leading-6 text-slate-400">Your school has access to the {tier.toLowerCase()} tier features. Add-ons can be customized by contacting support.</p>
+    <div className="space-y-5">
+      {/* Plan card */}
+      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Current Plan</p>
+          <div className="mt-1.5 flex items-center gap-2">
+            <h3 className="text-xl font-bold text-slate-900">{tier}</h3>
+            <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+              Active
+            </span>
           </div>
-          <a href="mailto:support@schoolos.io?subject=SchoolOS Plan Upgrade Request" className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black text-slate-950 transition hover:bg-slate-100">
-            Upgrade Plan <ArrowUpRight size={16} />
-          </a>
+          <p className="mt-1 text-sm text-slate-500">
+            Your school has access to the {tier.toLowerCase()} tier features and included modules.
+          </p>
         </div>
+        <a
+          href="mailto:support@schoolos.io?subject=SchoolOS Plan Upgrade Request"
+          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+        >
+          Upgrade Plan
+          <ArrowUpRight size={14} />
+        </a>
       </div>
 
-      <div className="rounded-[2.5rem] border border-slate-200 bg-white p-6 shadow-sm">
-        <h4 className="text-sm font-black uppercase tracking-widest text-slate-900">Included Modules</h4>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {/* Modules grid */}
+      <div>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+          Included Modules ({activeModules.length})
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {activeModules.map((module) => (
-            <div key={module} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
-              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                <CheckCircle2 size={16} />
-              </div>
-              <span className="text-xs font-bold text-slate-800">{moduleFriendlyNames[module] || module}</span>
+            <div key={module} className="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+              <CheckCircle2 size={14} className="shrink-0 text-emerald-500" />
+              <span className="text-xs font-medium text-slate-700">{moduleFriendlyNames[module] || module}</span>
             </div>
           ))}
         </div>
@@ -1246,12 +1676,14 @@ function SubscriptionPanel() {
   );
 }
 
+// ─── Loading State ────────────────────────────────────────────────────────────
+
 function SettingsLoading() {
   return (
-    <div className="flex h-[520px] items-center justify-center">
-      <div className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-white px-5 py-4 text-sm font-bold text-slate-600 shadow-sm">
-        <Loader2 className="h-5 w-5 animate-spin text-primary-600" />
-        Loading school settings...
+    <div className="flex h-60 items-center justify-center">
+      <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-500 shadow-sm">
+        <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+        Loading school settings…
       </div>
     </div>
   );
