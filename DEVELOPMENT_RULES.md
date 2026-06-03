@@ -6,14 +6,29 @@ Read these docs for broader context:
 
 ```text
 docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
-docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
-docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md
+docs/project/SCHOOLOS_IMPLEMENTATION_STATUS_AND_PLAN.md
 docs/project/SCHOOLOS_PLATFORM_AND_SETTINGS.md
 docs/project/SCHOOLOS_STORAGE_AND_FILE_REGISTRY.md
+docs/project/SCHOOLOS_SCALABILITY_HARDENING_POLICY.md
 docs/design/SCHOOLOS_UI_UX_GUIDE.md
 ```
 
-Do not recreate separate `PROJECT_CONTEXT.md`, `ARCHITECTURE.md`, or code-file modularization docs. Their active rules are consolidated here.
+For product and requirements work, read:
+
+```text
+docs/product/SCHOOLOS_PRD_COMBINED_MASTER_2026.md
+docs/business/SCHOOLOS_BRD_2026.md
+docs/requirements/SCHOOLOS_SRS_2026.md
+docs/requirements/SCHOOLOS_FRS_2026.md
+```
+
+For mobile work, read:
+
+```text
+apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md
+```
+
+Do not recreate separate `PROJECT_CONTEXT.md`, `ARCHITECTURE.md`, old implementation-plan docs, old repo-analysis docs, or code-file modularization docs. Their active rules are consolidated here and in the files above.
 
 ---
 
@@ -285,6 +300,16 @@ pnpm test:e2e
 pnpm build
 pnpm verify:production
 pnpm smoke:phase1
+```
+
+For mobile changes:
+
+```bash
+cd apps/schoolos_mobile
+flutter pub get
+dart format .
+flutter analyze
+flutter test
 ```
 
 ---
