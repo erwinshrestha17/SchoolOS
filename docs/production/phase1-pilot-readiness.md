@@ -6,7 +6,7 @@ Phase 1 pilot scope:
 
 - Auth, RBAC, tenant context, and cookie-first browser session.
 - M1 Admissions and Student Directory/Profile.
-- M2 Attendance with teacher-first 3-tap flow.
+- M2 Attendance with a clear class/section/date register, present-by-default support, exception marking, draft/submit states, and correction/conflict handling.
 - M3 Fee Collection with invoices, receipts, and ledger boundary.
 - M5 Activity Feed and milestones.
 - M10 Notices, Events, Delivery Records, and Consent Management.
@@ -98,7 +98,7 @@ Train in this order so staff understand the daily school flow:
 - Settings: academic year, class, and section setup.
 - Student Directory/Profile: filter roster, search by name/SCH ID, open profile, open ID card PDF, jump to fee collection.
 - New Enrollment: multi-step admission, guardian phone, iEMIS disability confirmation, duplicate warning, document upload, success actions.
-- Attendance: 3-tap flow, present-by-default behavior, absent/late/leave exceptions, submit result, lock/conflict state.
+- Attendance: class/section/date register, present-by-default support, absent/late/leave exceptions, draft/submit result, lock/conflict state.
 - Fee Collection: invoice search, outstanding amount, overpayment block, partial/full payment, receipt PDF, ledger preview.
 - Activity Feed: audience targeting, 1-5 image rule, private media object-key behavior, feed preview, delivery records.
 - Notices/Communications: normal/urgent/emergency notice, event creation, delivery records, guardian consent capture/revoke.
