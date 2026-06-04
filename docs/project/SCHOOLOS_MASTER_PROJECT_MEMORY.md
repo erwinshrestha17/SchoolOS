@@ -23,6 +23,7 @@ docs/design/SCHOOLOS_UI_UX_GUIDE.md
 
 docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 docs/project/SCHOOLOS_IMPLEMENTATION_STATUS_AND_PLAN.md
+docs/project/SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md
 docs/project/SCHOOLOS_PLATFORM_AND_SETTINGS.md
 docs/project/SCHOOLOS_STORAGE_AND_FILE_REGISTRY.md
 docs/project/SCHOOLOS_TRANSPORT_REALTIME_READINESS.md
@@ -137,10 +138,11 @@ Rules:
 
 ## 6. Current Implementation Plan
 
-Use the active plan:
+Use these active plans:
 
 ```text
 docs/project/SCHOOLOS_IMPLEMENTATION_STATUS_AND_PLAN.md
+docs/project/SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md
 ```
 
 Mandatory near-term order:
@@ -154,6 +156,14 @@ Phase 4 — harden library, transport, and canteen operation-specific QA
 Phase 5 — deepen Flutter mobile only through purpose-limited APIs and ownership tests
 Phase 6 — M11 intelligence only after reliable production data exists
 ```
+
+The module-wise feature and enhancement backlog is maintained in:
+
+```text
+docs/project/SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md
+```
+
+Use it for feature planning after the active phase gate allows new or deeper module work. It does not override verification, tenant-isolation, permission, File Registry, mobile ownership, or provider-disabled/mock-mode rules.
 
 Explicitly deferred unless requested:
 
@@ -207,6 +217,7 @@ Read these first:
 - DEVELOPMENT_RULES.md
 - docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 - docs/project/SCHOOLOS_IMPLEMENTATION_STATUS_AND_PLAN.md
+- docs/project/SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md when planning or enhancing module features
 - docs/project/SCHOOLOS_PLATFORM_AND_SETTINGS.md when touching platform/settings boundaries
 - docs/project/SCHOOLOS_STORAGE_AND_FILE_REGISTRY.md when touching files/media/exports
 - docs/design/SCHOOLOS_UI_UX_GUIDE.md when touching web UI
