@@ -1,7 +1,7 @@
 # SchoolOS Implementation Status and Plan
 
-**Last updated:** 2026-06-03  
-**Status source:** Consolidated from `SCHOOLOS_CURRENT_REPO_ANALYSIS.md`, `SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`, and `SCHOOLOS_MASTER_PROJECT_MEMORY.md`  
+**Last updated:** 2026-06-04  
+**Status source:** Consolidated from `SCHOOLOS_CURRENT_REPO_ANALYSIS.md`, `SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`, `SCHOOLOS_MASTER_PROJECT_MEMORY.md`, and `SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md`  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard, Flutter companion app
 
 ---
@@ -27,6 +27,12 @@ For long-term project context, read:
 
 ```text
 docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
+```
+
+For module-wise feature and enhancement planning, read:
+
+```text
+docs/project/SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md
 ```
 
 For coding rules, read:
@@ -103,6 +109,12 @@ Active mobile guide:
 
 ```text
 apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md
+```
+
+Active module-wise feature/enhancement guide:
+
+```text
+docs/project/SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md
 ```
 
 ---
@@ -287,7 +299,41 @@ Tenant isolation and audit logging are mandatory.
 
 ---
 
-## 7. Required Verification Gate
+## 7. Module-Wise Feature Enhancement Backlog
+
+The active module-wise feature and enhancement backlog is maintained separately in:
+
+```text
+docs/project/SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md
+```
+
+Use that document when planning feature enhancements for:
+
+```text
+Auth/Security
+M0 Platform Core
+M1 Admissions and Student Profiles
+M2 Smart Attendance
+M3 Fees and Receipts
+M4 Academics, Exams, CAS, and Report Cards
+M5 Activity Feed and Milestones
+M6 Homework and Timetable
+M7 HR and Payroll
+M8A Library
+M8B Transport
+M8C Canteen
+M9 Accounting and Finance
+M10 Notices, Communication, and Chat
+M11 School Intelligence and AI
+Flutter Mobile Companion App
+Cross-module search, notifications, audit, offline, performance, and UI/UX polish
+```
+
+This backlog does not override the strict phase gate. During Phase Gate 0, only verification, migrations, seed data, tenant isolation, permissions, doc alignment, and small touched-area modularization are allowed.
+
+---
+
+## 8. Required Verification Gate
 
 Run after every meaningful backend/module hardening change:
 
@@ -319,7 +365,7 @@ Add `flutter build apk --debug` and `flutter build ios --no-codesign` when prepa
 
 ---
 
-## 8. Non-Negotiable Rules
+## 9. Non-Negotiable Rules
 
 ```text
 - Tenant isolation is mandatory.
@@ -336,7 +382,7 @@ Add `flutter build apk --debug` and `flutter build ios --no-codesign` when prepa
 
 ---
 
-## 9. Fresh Backend/Web Audit Checklist - 2026-06-03
+## 10. Fresh Backend/Web Audit Checklist - 2026-06-03
 
 Audit inputs used for this checklist:
 
@@ -344,6 +390,7 @@ Audit inputs used for this checklist:
 DEVELOPMENT_RULES.md
 docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 docs/project/SCHOOLOS_IMPLEMENTATION_STATUS_AND_PLAN.md
+docs/project/SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md
 docs/design/SCHOOLOS_UI_UX_GUIDE.md
 apps/api/src controllers/services/modules
 apps/web/lib/api
