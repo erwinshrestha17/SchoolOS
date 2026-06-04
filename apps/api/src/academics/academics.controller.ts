@@ -568,8 +568,14 @@ export class AcademicsController {
 
   @Get('grading-scale')
   @Permissions('academics:read')
-  getGradingScale() {
-    return this.gradeCalculatorService.getGradingScale();
+  getGradingScale(@CurrentAuth() auth: AuthContext) {
+    return this.gradeCalculatorService.getGradingScale(auth.tenantId);
+  }
+
+  @Get('grading-policy')
+  @Permissions('academics:read')
+  getGradingPolicy(@CurrentAuth() auth: AuthContext) {
+    return this.gradeCalculatorService.getTenantGradingPolicy(auth.tenantId);
   }
 
   @Get('results/preview/student/:studentId')

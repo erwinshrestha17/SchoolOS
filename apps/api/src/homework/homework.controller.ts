@@ -67,6 +67,12 @@ export class HomeworkController {
     return this.homeworkService.createAssignment(dto, auth);
   }
 
+  @Get('templates')
+  @Permissions('homework:read')
+  listHomeworkTemplates(@CurrentAuth() auth: AuthContext) {
+    return this.homeworkService.listTemplates(auth);
+  }
+
   @Get(':id')
   @Permissions('homework:read')
   getHomework(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {

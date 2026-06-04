@@ -113,6 +113,7 @@ export class CreateCanteenPosSaleDto {
 
 export class CompleteCanteenPosSaleDto {
   @IsOptional() @IsString() note?: string;
+  @IsOptional() @IsString() overrideReason?: string;
 }
 
 export class UpsertCanteenSpendingControlDto {

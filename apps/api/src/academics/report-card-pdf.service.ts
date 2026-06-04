@@ -8,7 +8,10 @@ import type { AuthContext } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { GradeCalculatorService } from './grade-calculator.service';
+import {
+  GradeCalculatorService,
+  type TenantGradingPolicy,
+} from './grade-calculator.service';
 import {
   buildReportCardPdf,
   getJpegDimensions,
@@ -192,6 +195,10 @@ export class ReportCardPdfService {
       }
     }
 
+    const gradingPolicy = await this.gradeCalculator.getTenantGradingPolicy(
+      actor.tenantId,
+    );
+
     const pdf = buildReportCardPdf({
       schoolName:
         settingMap.get('school_name') ?? tenant?.name ?? 'SchoolOS School',
@@ -205,7 +212,7 @@ export class ReportCardPdfService {
         sectionName: reportCard.section?.name,
         rollNumber: reportCard.student.rollNumber,
       },
-      subjects: this.buildSubjectRows(marks).map((s) => ({
+      subjects: this.buildSubjectRows(marks, gradingPolicy).map((s) => ({
         name: s.subject,
         theory: s.components.find((c) => c.type === 'THEORY')
           ? {
@@ -302,7 +309,10 @@ export class ReportCardPdfService {
     return pdf;
   }
 
-  private buildSubjectRows(marks: MarkWithRelations[]) {
+  private buildSubjectRows(
+    marks: MarkWithRelations[],
+    gradingPolicy: TenantGradingPolicy,
+  ) {
     const groupedMarks = new Map<string, MarkWithRelations[]>();
 
     for (const mark of marks) {
@@ -315,20 +325,23 @@ export class ReportCardPdfService {
 
     for (const [subjectId, subjectMarks] of groupedMarks.entries()) {
       const firstMark = subjectMarks[0];
-      const result = this.gradeCalculator.calculateWeightedSubjectGrade({
-        subjectId,
-        components: subjectMarks.map((m) => ({
-          componentId: m.assessmentComponentId,
+      const result = this.gradeCalculator.calculateWeightedSubjectGrade(
+        {
           subjectId,
-          maxMarks: Number(m.assessmentComponent.maxMarks),
-          marksObtained: Number(m.marksObtained),
-          status: m.status,
-          passMarks: m.assessmentComponent.passMarks
-            ? Number(m.assessmentComponent.passMarks)
-            : null,
-          weightPercent: Number(m.assessmentComponent.weightPercent),
-        })),
-      });
+          components: subjectMarks.map((m) => ({
+            componentId: m.assessmentComponentId,
+            subjectId,
+            maxMarks: Number(m.assessmentComponent.maxMarks),
+            marksObtained: Number(m.marksObtained),
+            status: m.status,
+            passMarks: m.assessmentComponent.passMarks
+              ? Number(m.assessmentComponent.passMarks)
+              : null,
+            weightPercent: Number(m.assessmentComponent.weightPercent),
+          })),
+        },
+        gradingPolicy,
+      );
 
       rows.push({
         subject: `${firstMark.subject.code} / ${firstMark.subject.name}`,

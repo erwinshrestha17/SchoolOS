@@ -1,5 +1,6 @@
-import { ConflictException, Injectable } from '@nestjs/common';
-import { MarkEntryStatus } from '@prisma/client';
+import { ConflictException, Injectable, Optional } from '@nestjs/common';
+import { MarkEntryStatus, type Prisma } from '@prisma/client';
+import { SettingsService } from '../settings/settings.service';
 
 export type MoestLetterGrade =
   | 'A+'
@@ -105,6 +106,20 @@ export interface GradeScaleEntry {
   passed: boolean;
 }
 
+export type RoundingMode = 'HALF_UP' | 'FLOOR' | 'CEIL';
+
+export interface GradingRoundingPolicy {
+  percentageDecimals: number;
+  gpaDecimals: number;
+  marksDecimals: number;
+  mode: RoundingMode;
+}
+
+export interface TenantGradingPolicy {
+  scale: GradeScaleEntry[];
+  rounding: GradingRoundingPolicy;
+}
+
 const GRADE_SCALE: ReadonlyArray<{
   minInclusive: number;
   grade: MoestLetterGrade;
@@ -120,8 +135,33 @@ const GRADE_SCALE: ReadonlyArray<{
   { minInclusive: 35, grade: 'D', gpa: 1.6, description: 'Basic' },
 ];
 
+const DEFAULT_ROUNDING_POLICY: GradingRoundingPolicy = {
+  percentageDecimals: 2,
+  gpaDecimals: 2,
+  marksDecimals: 2,
+  mode: 'HALF_UP',
+};
+
+function roundNumber(
+  value: number,
+  decimals: number,
+  mode: RoundingMode = 'HALF_UP',
+) {
+  const factor = 10 ** decimals;
+  const adjusted = (value + Number.EPSILON) * factor;
+
+  if (mode === 'FLOOR') {
+    return Math.floor(adjusted) / factor;
+  }
+  if (mode === 'CEIL') {
+    return Math.ceil(adjusted) / factor;
+  }
+
+  return Math.round(adjusted) / factor;
+}
+
 function roundTwo(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
+  return roundNumber(value, 2);
 }
 
 function assertFiniteNonNegative(value: number, fieldName: string) {
@@ -134,11 +174,36 @@ function assertFiniteNonNegative(value: number, fieldName: string) {
 
 @Injectable()
 export class GradeCalculatorService {
-  /**
-   * Returns the Nepal MOEST grading scale in the endpoint-friendly format.
-   * TODO: Make configurable per tenant via Tenant Settings in future.
-   */
-  getGradingScale(): GradeScaleEntry[] {
+  constructor(@Optional() private readonly settingsService?: SettingsService) {}
+
+  async getTenantGradingPolicy(tenantId: string): Promise<TenantGradingPolicy> {
+    if (!this.settingsService) {
+      return this.getDefaultGradingPolicy();
+    }
+
+    const [scaleSetting, roundingSetting] = await Promise.all([
+      this.settingsService.getSetting(tenantId, 'grading_scale'),
+      this.settingsService.getSetting(tenantId, 'grading_rounding_policy'),
+    ]);
+
+    return {
+      scale: this.parseGradingScale(scaleSetting),
+      rounding: this.parseRoundingPolicy(roundingSetting),
+    };
+  }
+
+  getDefaultGradingPolicy(): TenantGradingPolicy {
+    return {
+      scale: this.getDefaultGradingScale(),
+      rounding: { ...DEFAULT_ROUNDING_POLICY },
+    };
+  }
+
+  async getGradingScale(tenantId: string): Promise<GradeScaleEntry[]> {
+    return (await this.getTenantGradingPolicy(tenantId)).scale;
+  }
+
+  getDefaultGradingScale(): GradeScaleEntry[] {
     const entries: GradeScaleEntry[] = [];
     for (let i = 0; i < GRADE_SCALE.length; i++) {
       const current = GRADE_SCALE[i];
@@ -163,12 +228,24 @@ export class GradeCalculatorService {
     return entries;
   }
 
-  getMoestGrade(percentage: number): MoestGradeResult {
+  getMoestGrade(
+    percentage: number,
+    policy = this.getDefaultGradingPolicy(),
+  ): MoestGradeResult {
     assertFiniteNonNegative(percentage, 'percentage');
 
-    const normalized = Math.min(roundTwo(percentage), 100);
-    const matched = GRADE_SCALE.find(
-      (grade) => normalized >= grade.minInclusive,
+    const normalized = Math.min(
+      roundNumber(
+        percentage,
+        policy.rounding.percentageDecimals,
+        policy.rounding.mode,
+      ),
+      100,
+    );
+    const matched = policy.scale.find(
+      (grade) =>
+        normalized >= grade.minPercentage &&
+        normalized <= grade.maxPercentage,
     );
 
     if (!matched) {
@@ -185,19 +262,26 @@ export class GradeCalculatorService {
 
     return {
       percentage: normalized,
-      gpa: matched.gpa,
+      gpa: roundNumber(
+        matched.gradePoint,
+        policy.rounding.gpaDecimals,
+        policy.rounding.mode,
+      ),
       grade: matched.grade,
-      description: matched.description,
-      status: 'PASS',
+      description: matched.label,
+      status: matched.passed ? 'PASS' : 'FAIL',
       honorMention: matched.grade === 'A+',
-      remedialRequired: matched.grade === 'D',
+      remedialRequired: !matched.passed || matched.grade === 'D',
     };
   }
 
   /**
    * Calculate a single component's result status and effective marks.
    */
-  calculateComponentResult(component: ComponentScoreInput): ComponentResult {
+  calculateComponentResult(
+    component: ComponentScoreInput,
+    policy = this.getDefaultGradingPolicy(),
+  ): ComponentResult {
     const isAbsent =
       component.status === MarkEntryStatus.ABSENT ||
       component.status === MarkEntryStatus.EXCUSED;
@@ -245,8 +329,16 @@ export class GradeCalculatorService {
       componentId: component.componentId,
       componentName: component.componentName ?? '',
       type: component.type ?? '',
-      obtainedMarks: roundTwo(obtainedMarks),
-      fullMarks: roundTwo(component.maxMarks),
+      obtainedMarks: roundNumber(
+        obtainedMarks,
+        policy.rounding.marksDecimals,
+        policy.rounding.mode,
+      ),
+      fullMarks: roundNumber(
+        component.maxMarks,
+        policy.rounding.marksDecimals,
+        policy.rounding.mode,
+      ),
       isAbsent,
       isWithheld,
       isMissing,
@@ -256,7 +348,10 @@ export class GradeCalculatorService {
     };
   }
 
-  calculateWeightedSubjectGrade(input: SubjectGradeInput): SubjectGradeResult {
+  calculateWeightedSubjectGrade(
+    input: SubjectGradeInput,
+    policy = this.getDefaultGradingPolicy(),
+  ): SubjectGradeResult {
     if (input.components.length === 0) {
       throw new ConflictException(
         'At least one assessment component is required',
@@ -274,7 +369,7 @@ export class GradeCalculatorService {
 
     for (const component of input.components) {
       this.validateComponent(component);
-      const cr = this.calculateComponentResult(component);
+      const cr = this.calculateComponentResult(component, policy);
       componentResults.push(cr);
 
       if (cr.isWithheld) {
@@ -314,7 +409,7 @@ export class GradeCalculatorService {
 
     const normalizedPercentage =
       weightUsed > 0 ? (weightedScore / weightUsed) * 100 : 0;
-    const grade = this.getMoestGrade(normalizedPercentage);
+    const grade = this.getMoestGrade(normalizedPercentage, policy);
 
     let status: GradeStatus;
     if (withheldComponentCount > 0 && !input.includeIncomplete) {
@@ -341,11 +436,31 @@ export class GradeCalculatorService {
       subjectId: input.subjectId,
       subjectName: input.subjectName ?? '',
       subjectCode: input.subjectCode ?? '',
-      obtainedMarks: roundTwo(totalObtained),
-      fullMarks: roundTwo(totalFull),
-      percentage: roundTwo(normalizedPercentage),
-      weightedScore: roundTwo(weightedScore),
-      weightUsed: roundTwo(weightUsed),
+      obtainedMarks: roundNumber(
+        totalObtained,
+        policy.rounding.marksDecimals,
+        policy.rounding.mode,
+      ),
+      fullMarks: roundNumber(
+        totalFull,
+        policy.rounding.marksDecimals,
+        policy.rounding.mode,
+      ),
+      percentage: roundNumber(
+        normalizedPercentage,
+        policy.rounding.percentageDecimals,
+        policy.rounding.mode,
+      ),
+      weightedScore: roundNumber(
+        weightedScore,
+        policy.rounding.percentageDecimals,
+        policy.rounding.mode,
+      ),
+      weightUsed: roundNumber(
+        weightUsed,
+        policy.rounding.percentageDecimals,
+        policy.rounding.mode,
+      ),
       componentCount: input.components.length,
       missingComponentCount,
       failedComponentCount,
@@ -354,7 +469,10 @@ export class GradeCalculatorService {
     };
   }
 
-  calculateOverallGpa(subjects: SubjectGradeResult[]): OverallResult {
+  calculateOverallGpa(
+    subjects: SubjectGradeResult[],
+    policy = this.getDefaultGradingPolicy(),
+  ): OverallResult {
     if (subjects.length === 0) {
       return {
         totalObtained: 0,
@@ -394,7 +512,7 @@ export class GradeCalculatorService {
           totalWeight
         : 0;
 
-    const grade = this.getMoestGrade(averagePercentage);
+    const grade = this.getMoestGrade(averagePercentage, policy);
 
     let resultStatus: GradeStatus;
     if (withheldSubjectCount > 0) {
@@ -408,10 +526,29 @@ export class GradeCalculatorService {
     }
 
     return {
-      totalObtained: roundTwo(totalObtained),
-      totalFullMarks: roundTwo(totalFullMarks),
-      percentage: roundTwo(averagePercentage),
-      gpa: resultStatus === 'PASS' ? roundTwo(weightedGpa) : 0,
+      totalObtained: roundNumber(
+        totalObtained,
+        policy.rounding.marksDecimals,
+        policy.rounding.mode,
+      ),
+      totalFullMarks: roundNumber(
+        totalFullMarks,
+        policy.rounding.marksDecimals,
+        policy.rounding.mode,
+      ),
+      percentage: roundNumber(
+        averagePercentage,
+        policy.rounding.percentageDecimals,
+        policy.rounding.mode,
+      ),
+      gpa:
+        resultStatus === 'PASS'
+          ? roundNumber(
+              weightedGpa,
+              policy.rounding.gpaDecimals,
+              policy.rounding.mode,
+            )
+          : 0,
       grade: resultStatus === 'PASS' ? grade.grade : 'NG',
       resultStatus,
       subjectCount: subjects.length,
@@ -484,15 +621,97 @@ export class GradeCalculatorService {
    * @deprecated Use getGradingScale() for endpoint-friendly format.
    */
   getGradeScale() {
-    return [
-      ...GRADE_SCALE.map((grade) => ({ ...grade })),
-      {
-        minInclusive: 0,
-        grade: 'NG' as MoestLetterGrade,
-        gpa: 0,
-        description: 'Not Graded',
-      },
-    ];
+    return this.getDefaultGradingScale().map((grade) => ({
+      minInclusive: grade.minPercentage,
+      grade: grade.grade,
+      gpa: grade.gradePoint,
+      description: grade.label,
+    }));
+  }
+
+  private parseGradingScale(value: Prisma.JsonValue | null): GradeScaleEntry[] {
+    if (!Array.isArray(value) || value.length === 0) {
+      return this.getDefaultGradingScale();
+    }
+
+    const entries = value
+      .map((entry) =>
+        this.parseGradingScaleEntry(entry as Prisma.JsonValue | null),
+      )
+      .filter((entry): entry is GradeScaleEntry => entry !== null)
+      .sort((a, b) => b.minPercentage - a.minPercentage);
+
+    return entries.length > 0 ? entries : this.getDefaultGradingScale();
+  }
+
+  private parseGradingScaleEntry(
+    value: Prisma.JsonValue | null,
+  ): GradeScaleEntry | null {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return null;
+    }
+
+    const entry = value as Record<string, Prisma.JsonValue>;
+    if (
+      typeof entry.grade !== 'string' ||
+      typeof entry.minPercentage !== 'number' ||
+      typeof entry.gradePoint !== 'number' ||
+      typeof entry.label !== 'string' ||
+      typeof entry.passed !== 'boolean'
+    ) {
+      return null;
+    }
+
+    const minPercentage = Math.max(0, Math.min(entry.minPercentage, 100));
+    const maxPercentage =
+      typeof entry.maxPercentage === 'number'
+        ? Math.max(minPercentage, Math.min(entry.maxPercentage, 100))
+        : 100;
+
+    return {
+      grade: entry.grade as MoestLetterGrade,
+      minPercentage: roundTwo(minPercentage),
+      maxPercentage: roundTwo(maxPercentage),
+      gradePoint: roundTwo(Math.max(0, Math.min(entry.gradePoint, 4))),
+      label: entry.label,
+      passed: entry.passed,
+    };
+  }
+
+  private parseRoundingPolicy(
+    value: Prisma.JsonValue | null,
+  ): GradingRoundingPolicy {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return { ...DEFAULT_ROUNDING_POLICY };
+    }
+
+    const policy = value as Record<string, Prisma.JsonValue>;
+    const mode =
+      policy.mode === 'FLOOR' || policy.mode === 'CEIL'
+        ? policy.mode
+        : DEFAULT_ROUNDING_POLICY.mode;
+
+    return {
+      percentageDecimals: this.parseDecimalPlaces(
+        policy.percentageDecimals,
+        DEFAULT_ROUNDING_POLICY.percentageDecimals,
+      ),
+      gpaDecimals: this.parseDecimalPlaces(
+        policy.gpaDecimals,
+        DEFAULT_ROUNDING_POLICY.gpaDecimals,
+      ),
+      marksDecimals: this.parseDecimalPlaces(
+        policy.marksDecimals,
+        DEFAULT_ROUNDING_POLICY.marksDecimals,
+      ),
+      mode,
+    };
+  }
+
+  private parseDecimalPlaces(value: Prisma.JsonValue, fallback: number) {
+    return typeof value === 'number' && Number.isInteger(value)
+      ? Math.max(0, Math.min(value, 4))
+      : fallback;
   }
 
   private validateComponent(component: ComponentScoreInput) {

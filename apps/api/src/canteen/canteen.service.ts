@@ -944,6 +944,31 @@ export class CanteenService {
       if (existing.status !== CanteenPosSaleStatus.DRAFT) {
         throw new ConflictException('Only draft POS sales can be completed');
       }
+
+      const dietaryWarning = existing.studentId
+        ? await this.buildPosSaleDietaryWarning(
+            tx,
+            actor.tenantId,
+            existing.studentId,
+            id,
+          )
+        : null;
+      if (dietaryWarning && !dto.overrideReason) {
+        throw new BadRequestException({
+          message: 'Dietary warning detected. Override reason required.',
+          dietaryWarning,
+        });
+      }
+      if (
+        dietaryWarning &&
+        dto.overrideReason &&
+        !actor.permissions.includes('canteen:serving:override')
+      ) {
+        throw new ForbiddenException(
+          'You do not have permission to override dietary warnings',
+        );
+      }
+
       if (existing.paymentMethod === CanteenPaymentMethod.WALLET) {
         if (!existing.walletId || !existing.studentId) {
           throw new ConflictException('Wallet sale is missing wallet linkage');
@@ -992,6 +1017,22 @@ export class CanteenService {
         actor,
         tx,
       );
+      if (dietaryWarning && dto.overrideReason) {
+        await tx.auditLog.create({
+          data: {
+            action: 'override_dietary_warning',
+            resource: 'canteen_pos_sale',
+            resourceId: id,
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            after: {
+              dietaryWarning,
+              overrideReason: dto.overrideReason,
+              studentId: existing.studentId,
+            },
+          },
+        });
+      }
       return tx.canteenPosSale.update({
         where: { id },
         data: {
@@ -1428,6 +1469,48 @@ export class CanteenService {
       student?.medicalConditions,
     ].filter(Boolean);
     return warnings.length > 0 ? warnings.join(' | ') : null;
+  }
+
+  private async buildPosSaleDietaryWarning(
+    tx: Tx,
+    tenantId: string,
+    studentId: string,
+    saleId: string,
+  ) {
+    const [student, saleItems] = await Promise.all([
+      tx.student.findFirst({
+        where: { tenantId, id: studentId },
+        select: { severeAllergies: true, medicalConditions: true },
+      }),
+      tx.canteenPosSaleItem.findMany({
+        where: { tenantId, saleId },
+        include: { menuItem: true },
+      }),
+    ]);
+
+    const studentWarnings = [
+      student?.severeAllergies
+        ? `Severe allergies: ${student.severeAllergies}`
+        : null,
+      student?.medicalConditions
+        ? `Medical conditions: ${student.medicalConditions}`
+        : null,
+    ].filter((warning): warning is string => Boolean(warning));
+
+    if (studentWarnings.length === 0) {
+      return null;
+    }
+
+    const itemAllergens = uniqueStrings(
+      saleItems.flatMap((item) => item.menuItem.allergenTags ?? []),
+    );
+
+    return [
+      ...studentWarnings,
+      itemAllergens.length > 0
+        ? `Sale item allergen tags: ${itemAllergens.join(', ')}`
+        : 'Sale item allergen tags are not configured',
+    ].join(' | ');
   }
 
   private getOrCreateWalletInTx(tx: Tx, tenantId: string, studentId: string) {
@@ -2002,6 +2085,8 @@ export class CanteenService {
   }
 }
 
-// Accounting integration boundary placeholder:
-// Confirmed canteen revenue and wallet liability postings must later flow through AccountingPostingService only.
-// No canteen service should directly write M9 ledger rows.
+function uniqueStrings(values: string[]) {
+  return Array.from(
+    new Set(values.map((value) => value.trim()).filter(Boolean)),
+  );
+}

@@ -22,11 +22,11 @@ export class FinanceProcessor extends WorkerHost {
 
   private async handleCalculateLateFees(input: { tenantId: string }) {
     this.logger.log(`Calculating late fees for tenant ${input.tenantId}...`);
-    // Placeholder logic for the deep dive requirement: "Late fee automatic calculation"
-    // In a real scenario, this would loop through overdue invoices and apply penalties.
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const result = await this.financeService.calculateLateFeesForTenant(
+      input.tenantId,
+    );
     this.logger.log(
-      `Completed late fee calculations for tenant ${input.tenantId}.`,
+      `Completed late fee calculations for tenant ${input.tenantId}: applied=${result.applied}, skipped=${result.skipped}, disabled=${result.disabled}.`,
     );
   }
 }

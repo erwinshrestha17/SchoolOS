@@ -39,6 +39,8 @@ import {
   LegacyReviewHomeworkSubmissionDto,
   LegacySubmitHomeworkDto,
 } from './dto/legacy-submit-homework.dto';
+import type { HomeworkRecurrenceDto } from './dto/create-homework.dto';
+import { randomUUID } from 'node:crypto';
 
 const EDIT_BLOCKED_ASSIGNMENT_STATUSES: readonly HomeworkAssignmentStatus[] = [
   HomeworkAssignmentStatus.CLOSED,
@@ -175,6 +177,22 @@ export class HomeworkService {
     return this.findAssignmentOrThrow(actor, id);
   }
 
+  async listTemplates(actor: AuthContext) {
+    const candidates = await this.prisma.homeworkAssignment.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        attachmentMetadata: { not: Prisma.JsonNull },
+      },
+      include: homeworkAssignmentInclude(),
+      orderBy: [{ updatedAt: 'desc' }],
+      take: 100,
+    });
+
+    return candidates.filter((assignment) =>
+      isHomeworkTemplateMetadata(assignment.attachmentMetadata),
+    );
+  }
+
   async getSubmission(actor: AuthContext, id: string) {
     const studentScope = await this.resolveVisibleStudentIdsForRead(actor);
     const submission = await this.prisma.homeworkSubmission.findFirst({
@@ -250,43 +268,75 @@ export class HomeworkService {
       }
     }
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const assignment = await tx.homeworkAssignment.create({
-        data: {
-          tenantId: actor.tenantId,
-          academicYearId: dto.academicYearId,
-          classId: dto.classId,
-          sectionId: dto.sectionId,
-          subjectId: dto.subjectId,
-          assignedByStaffId: staffId,
-          title: dto.title,
-          description: dto.description,
-          instructions: dto.instructions,
-          dueDate: new Date(dto.dueDate),
-          dueAt: dto.dueAt ? new Date(dto.dueAt) : new Date(dto.dueDate),
-          maxScore: dto.maxScore,
-          submissionRequired: dto.submissionRequired,
-          status: HomeworkAssignmentStatus.DRAFT,
-        },
-      });
+    const occurrences = buildHomeworkOccurrences({
+      assignedDate,
+      dueDate,
+      dueAt: dto.dueAt ? new Date(dto.dueAt) : dueDate,
+      recurrence: dto.recurrence,
+    });
+    const recurrenceSeriesId =
+      occurrences.length > 1 ? cryptoRandomId('hw-series') : null;
 
-      if (dto.attachmentFileIds?.length) {
-        await this.linkAttachments(
-          actor,
-          assignment.id,
-          null,
-          dto.attachmentFileIds,
-          tx,
-        );
+    const result = await this.prisma.$transaction(async (tx) => {
+      const assignments = [];
+
+      for (const [index, occurrence] of occurrences.entries()) {
+        const assignment = await tx.homeworkAssignment.create({
+          data: {
+            tenantId: actor.tenantId,
+            academicYearId: dto.academicYearId,
+            classId: dto.classId,
+            sectionId: dto.sectionId,
+            subjectId: dto.subjectId,
+            assignedByStaffId: staffId,
+            title:
+              occurrences.length > 1
+                ? `${dto.title} (${index + 1}/${occurrences.length})`
+                : dto.title,
+            description: dto.description,
+            instructions: dto.instructions,
+            assignedDate: occurrence.assignedDate,
+            dueDate: occurrence.dueDate,
+            dueAt: occurrence.dueAt,
+            maxScore: dto.maxScore,
+            submissionRequired: dto.submissionRequired,
+            status: HomeworkAssignmentStatus.DRAFT,
+            attachmentMetadata: buildHomeworkMetadata(dto.attachmentMetadata, {
+              saveAsTemplate: dto.saveAsTemplate,
+              templateName: dto.templateName,
+              templateSourceTitle: dto.title,
+              actorUserId: actor.userId,
+              recurrence: dto.recurrence,
+              recurrenceSeriesId,
+              occurrenceIndex: index,
+              occurrenceCount: occurrences.length,
+            }),
+          },
+        });
+
+        if (dto.attachmentFileIds?.length) {
+          await this.linkAttachments(
+            actor,
+            assignment.id,
+            null,
+            dto.attachmentFileIds,
+            tx,
+          );
+        }
+
+        assignments.push(assignment);
       }
 
-      return assignment;
+      return assignments;
     });
 
-    const assignment = await this.findAssignmentOrThrow(actor, result.id);
+    const assignments = await Promise.all(
+      result.map((assignment) => this.findAssignmentOrThrow(actor, assignment.id)),
+    );
+    const assignment = assignments[0];
 
     await this.auditService.record({
-      action: 'create',
+      action: occurrences.length > 1 ? 'create_recurring' : 'create',
       resource: 'homework_assignment',
       tenantId: actor.tenantId,
       userId: actor.userId,
@@ -296,10 +346,19 @@ export class HomeworkService {
         dueDate: assignment.dueDate,
         attachmentCount: dto.attachmentFileIds?.length ?? 0,
         submissionRequired: assignment.submissionRequired,
+        recurrenceSeriesId,
+        occurrenceCount: assignments.length,
+        savedAsTemplate: dto.saveAsTemplate ?? false,
       },
     });
 
-    return assignment;
+    return assignments.length === 1
+      ? assignment
+      : {
+          recurrenceSeriesId,
+          occurrenceCount: assignments.length,
+          items: assignments,
+        };
   }
 
   async updateAssignment(
@@ -1534,6 +1593,136 @@ function parseDate(value: string | undefined, fieldName: string) {
     throw new ConflictException(`${fieldName} must be a valid date`);
   }
   return parsed;
+}
+
+type HomeworkOccurrence = {
+  assignedDate: Date;
+  dueDate: Date;
+  dueAt: Date;
+};
+
+function buildHomeworkOccurrences(args: {
+  assignedDate: Date;
+  dueDate: Date;
+  dueAt: Date;
+  recurrence?: HomeworkRecurrenceDto;
+}): HomeworkOccurrence[] {
+  const { assignedDate, dueDate, dueAt, recurrence } = args;
+  if (!recurrence) {
+    return [{ assignedDate, dueDate, dueAt }];
+  }
+
+  if (!recurrence.occurrenceCount && !recurrence.repeatUntil) {
+    throw new ConflictException(
+      'Recurring homework requires occurrenceCount or repeatUntil',
+    );
+  }
+
+  const interval = recurrence.interval ?? 1;
+  const intervalDays = recurrence.frequency === 'DAILY' ? interval : interval * 7;
+  const repeatUntil = recurrence.repeatUntil
+    ? parseRequiredDate(recurrence.repeatUntil, 'repeatUntil')
+    : null;
+
+  if (repeatUntil && repeatUntil < assignedDate) {
+    throw new ConflictException('repeatUntil cannot be before assignedDate');
+  }
+
+  const maxOccurrences = Math.min(recurrence.occurrenceCount ?? 60, 60);
+  const occurrences: HomeworkOccurrence[] = [];
+
+  for (let index = 0; index < maxOccurrences; index += 1) {
+    const offsetDays = index * intervalDays;
+    const nextAssignedDate = shiftDate(assignedDate, offsetDays);
+
+    if (repeatUntil && nextAssignedDate > repeatUntil) {
+      break;
+    }
+
+    occurrences.push({
+      assignedDate: nextAssignedDate,
+      dueDate: shiftDate(dueDate, offsetDays),
+      dueAt: shiftDate(dueAt, offsetDays),
+    });
+  }
+
+  if (occurrences.length < 2) {
+    throw new ConflictException(
+      'Recurring homework must create at least two assignments',
+    );
+  }
+
+  return occurrences;
+}
+
+function buildHomeworkMetadata(
+  base: Record<string, unknown> | undefined,
+  options: {
+    saveAsTemplate?: boolean;
+    templateName?: string;
+    templateSourceTitle: string;
+    actorUserId: string;
+    recurrence?: HomeworkRecurrenceDto;
+    recurrenceSeriesId: string | null;
+    occurrenceIndex: number;
+    occurrenceCount: number;
+  },
+): Prisma.InputJsonValue | undefined {
+  const metadata = normalizeJsonObject(base);
+
+  if (options.saveAsTemplate && options.occurrenceIndex === 0) {
+    metadata.homeworkTemplate = {
+      isTemplate: true,
+      name: options.templateName?.trim() || options.templateSourceTitle,
+      savedAt: new Date().toISOString(),
+      savedByUserId: options.actorUserId,
+    };
+  }
+
+  if (options.recurrenceSeriesId && options.recurrence) {
+    metadata.homeworkRecurrence = {
+      seriesId: options.recurrenceSeriesId,
+      occurrenceIndex: options.occurrenceIndex + 1,
+      occurrenceCount: options.occurrenceCount,
+      frequency: options.recurrence.frequency,
+      interval: options.recurrence.interval ?? 1,
+      repeatUntil: options.recurrence.repeatUntil ?? null,
+    };
+  }
+
+  return Object.keys(metadata).length
+    ? (metadata as Prisma.InputJsonValue)
+    : undefined;
+}
+
+function isHomeworkTemplateMetadata(value: Prisma.JsonValue | null) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  const template = value.homeworkTemplate;
+  return (
+    !!template &&
+    typeof template === 'object' &&
+    !Array.isArray(template) &&
+    template.isTemplate === true
+  );
+}
+
+function normalizeJsonObject(value: Record<string, unknown> | undefined) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {} as Record<string, unknown>;
+  }
+  return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+}
+
+function shiftDate(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function cryptoRandomId(prefix: string) {
+  return `${prefix}_${randomUUID()}`;
 }
 
 function parseRequiredDate(value: string, fieldName: string) {

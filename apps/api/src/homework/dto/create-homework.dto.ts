@@ -3,14 +3,40 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
+  IsInt,
   IsISO8601,
   IsNumber,
   IsObject,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class HomeworkRecurrenceDto {
+  @IsIn(['DAILY', 'WEEKLY'])
+  frequency!: 'DAILY' | 'WEEKLY';
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  interval?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(2)
+  @Max(60)
+  occurrenceCount?: number;
+
+  @IsOptional()
+  @IsISO8601()
+  repeatUntil?: string;
+}
 
 export class CreateHomeworkDto {
   @IsString()
@@ -79,4 +105,18 @@ export class CreateHomeworkDto {
   @IsNumber()
   @Min(0)
   maxScore?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  saveAsTemplate?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  templateName?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => HomeworkRecurrenceDto)
+  recurrence?: HomeworkRecurrenceDto;
 }

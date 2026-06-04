@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   JournalLineSide,
@@ -18,6 +19,7 @@ import { AccountingPostingService } from '../accounting/accounting-posting.servi
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { buildSalarySlipPdf, buildSimplePdf } from '../common/pdf/simple-pdf';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { CreateStaffContractDto } from '../hr/dto/create-staff-contract.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSalaryStructureDto } from './dto/create-salary-structure.dto';
@@ -43,6 +45,7 @@ export class PayrollService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly accountingPostingService: AccountingPostingService,
+    @Optional() private readonly fileRegistryService?: FileRegistryService,
   ) {}
 
   async listContracts(actor: AuthContext) {
@@ -1364,6 +1367,213 @@ export class PayrollService {
     return this.getPayslipPdf(payslip.payslipNumber, actor);
   }
 
+  async generatePayslipPdfBatch(input: { tenantId: string; month: string }) {
+    if (!this.fileRegistryService) {
+      throw new ConflictException(
+        'File Registry is required for payslip PDF batch generation',
+      );
+    }
+
+    const period = parsePayrollPeriod(input.month);
+    const run = await this.prisma.payrollRun.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        periodMonth: period.month,
+        periodYear: period.year,
+        status: {
+          in: [
+            PayrollRunStatus.APPROVED,
+            PayrollRunStatus.POSTED,
+            PayrollRunStatus.PAID,
+          ],
+        },
+      },
+      include: {
+        tenant: true,
+        payslips: {
+          include: {
+            staff: true,
+            payrollLine: true,
+          },
+          orderBy: { payslipNumber: 'asc' },
+        },
+      },
+    });
+
+    if (!run) {
+      throw new NotFoundException(
+        'Approved payroll run not found for payslip PDF generation',
+      );
+    }
+
+    const existingExports = await this.prisma.reportExport.findMany({
+      where: {
+        tenantId: input.tenantId,
+        reportKey: 'payroll.payslip',
+        format: 'pdf',
+        status: 'COMPLETED',
+      },
+      select: {
+        id: true,
+        filters: true,
+      },
+      take: 1000,
+    });
+    const exportedPayslipIds = new Set(
+      existingExports
+        .filter((exportRecord) =>
+          isPayslipExportForRun(exportRecord.filters, run.id),
+        )
+        .map((exportRecord) => getJsonString(exportRecord.filters, 'payslipId'))
+        .filter((payslipId): payslipId is string => Boolean(payslipId)),
+    );
+
+    let generated = 0;
+    let skipped = 0;
+
+    for (const payslip of run.payslips) {
+      if (exportedPayslipIds.has(payslip.id)) {
+        skipped += 1;
+        continue;
+      }
+
+      const pdf = this.buildBatchPayslipPdf({
+        schoolName: run.tenant.name,
+        periodMonth: run.periodMonth,
+        periodYear: run.periodYear,
+        payslip,
+      });
+      const fileName = `${payslip.payslipNumber}.pdf`;
+      const asset = await this.fileRegistryService.registerGeneratedFile({
+        tenantId: input.tenantId,
+        generatedByUserId: null,
+        originalFilename: fileName,
+        content: pdf,
+        mimeType: 'application/pdf',
+        module: 'payroll',
+        entityId: payslip.id,
+        metadata: {
+          reportKey: 'payroll.payslip',
+          payrollRunId: run.id,
+          payrollLineId: payslip.payrollLineId,
+          payslipId: payslip.id,
+          payslipNumber: payslip.payslipNumber,
+          staffId: payslip.staffId,
+          periodMonth: run.periodMonth,
+          periodYear: run.periodYear,
+          generatedBy: 'payroll_batch_job',
+        },
+      });
+
+      await this.prisma.reportExport.create({
+        data: {
+          tenantId: input.tenantId,
+          reportKey: 'payroll.payslip',
+          format: 'pdf',
+          filters: {
+            payrollRunId: run.id,
+            payrollLineId: payslip.payrollLineId,
+            payslipId: payslip.id,
+            payslipNumber: payslip.payslipNumber,
+            staffId: payslip.staffId,
+            periodMonth: run.periodMonth,
+            periodYear: run.periodYear,
+          },
+          status: 'COMPLETED',
+          fileAssetId: asset.id,
+          requestedBy: null,
+          completedAt: new Date(),
+        },
+      });
+
+      generated += 1;
+      exportedPayslipIds.add(payslip.id);
+    }
+
+    await this.auditService.record({
+      action: 'generate_payslip_pdf_batch',
+      resource: 'payroll_run',
+      resourceId: run.id,
+      tenantId: input.tenantId,
+      userId: null,
+      after: {
+        periodMonth: run.periodMonth,
+        periodYear: run.periodYear,
+        generated,
+        skipped,
+        payslipCount: run.payslips.length,
+      },
+    });
+
+    return {
+      payrollRunId: run.id,
+      periodMonth: run.periodMonth,
+      periodYear: run.periodYear,
+      payslipCount: run.payslips.length,
+      generated,
+      skipped,
+    };
+  }
+
+  private buildBatchPayslipPdf(input: {
+    schoolName: string;
+    periodMonth: number;
+    periodYear: number;
+    payslip: Prisma.PayslipGetPayload<{
+      include: { staff: true; payrollLine: true };
+    }>;
+  }) {
+    const monthLabels = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    const { payslip } = input;
+
+    return buildSalarySlipPdf({
+      schoolName: input.schoolName,
+      payslipNumber: payslip.payslipNumber,
+      period: `${monthLabels[input.periodMonth - 1]} ${input.periodYear}`,
+      staff: {
+        name: `${payslip.staff.firstName} ${payslip.staff.lastName}`,
+        id: payslip.staff.employeeId,
+        bankAccount: maskSensitiveStaffValue(payslip.staff.bankAccount),
+        panNumber: maskSensitiveStaffValue(payslip.staff.panNumber),
+      },
+      earnings: [
+        {
+          name: 'Basic Salary',
+          amount:
+            Number(payslip.payrollLine.grossSalary) -
+            Number(payslip.payrollLine.allowances),
+        },
+        { name: 'Allowances', amount: Number(payslip.payrollLine.allowances) },
+      ],
+      deductions: [
+        {
+          name: 'Statutory Deductions',
+          amount: Number(payslip.deductionAmount),
+        },
+      ],
+      grossSalary: Number(payslip.grossSalary),
+      totalDeductions: Number(payslip.deductionAmount),
+      netSalary: Number(payslip.netSalary),
+      attendance: {
+        present: payslip.payrollLine.attendanceDays,
+        working: payslip.payrollLine.workingDays,
+      },
+    });
+  }
+
   async listStatutoryDeductions(actor: AuthContext) {
     const structures = await this.prisma.salaryStructure.findMany({
       where: {
@@ -2000,6 +2210,72 @@ function normalizePayrollReportFilters(
     staffId: input.staffId,
     status: input.status,
   };
+}
+
+function parsePayrollPeriod(month: string) {
+  const normalized = month.trim();
+  let match = /^(\d{4})-(\d{1,2})$/.exec(normalized);
+  if (match) {
+    return normalizeParsedPayrollPeriod(
+      Number(match[1]),
+      Number(match[2]),
+      month,
+    );
+  }
+
+  match = /^(\d{1,2})\/(\d{4})$/.exec(normalized);
+  if (match) {
+    return normalizeParsedPayrollPeriod(
+      Number(match[2]),
+      Number(match[1]),
+      month,
+    );
+  }
+
+  throw new ConflictException(
+    'Payroll batch month must use YYYY-MM or MM/YYYY format',
+  );
+}
+
+function normalizeParsedPayrollPeriod(
+  year: number,
+  month: number,
+  input: string,
+) {
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    year < 2000 ||
+    year > 2100 ||
+    month < 1 ||
+    month > 12
+  ) {
+    throw new ConflictException(`Invalid payroll batch month: ${input}`);
+  }
+
+  return { year, month };
+}
+
+function isPayslipExportForRun(
+  filters: Prisma.JsonValue,
+  payrollRunId: string,
+) {
+  return getJsonString(filters, 'payrollRunId') === payrollRunId;
+}
+
+function getJsonString(filters: Prisma.JsonValue, key: string) {
+  if (typeof filters !== 'object' || filters === null || Array.isArray(filters)) {
+    return null;
+  }
+
+  const value = (filters as Record<string, Prisma.JsonValue>)[key];
+  return typeof value === 'string' ? value : null;
+}
+
+function maskSensitiveStaffValue(value: string | null | undefined) {
+  if (!value) return value;
+  if (value.length <= 4) return '****';
+  return `${value.slice(0, 2)}****${value.slice(-2)}`;
 }
 
 function csvCell(value: string | number | null | undefined) {

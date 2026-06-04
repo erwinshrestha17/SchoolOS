@@ -150,6 +150,9 @@ export class ResultsService {
     }
 
     // 9. Calculate per-subject results
+    const gradingPolicy = await this.gradeCalculator.getTenantGradingPolicy(
+      actor.tenantId,
+    );
     const subjectResults: Array<
       SubjectGradeResult & { casSummary: CasSubjectSummary | null }
     > = [];
@@ -178,8 +181,10 @@ export class ResultsService {
         components: componentInputs,
       };
 
-      const result =
-        this.gradeCalculator.calculateWeightedSubjectGrade(subjectInput);
+      const result = this.gradeCalculator.calculateWeightedSubjectGrade(
+        subjectInput,
+        gradingPolicy,
+      );
       subjectResults.push({ ...result, casSummary: null });
     }
 
@@ -220,7 +225,10 @@ export class ResultsService {
     }
 
     // 11. Calculate overall result
-    const summary = this.gradeCalculator.calculateOverallGpa(subjectResults);
+    const summary = this.gradeCalculator.calculateOverallGpa(
+      subjectResults,
+      gradingPolicy,
+    );
 
     return {
       student: {

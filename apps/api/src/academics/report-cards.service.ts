@@ -19,6 +19,7 @@ import {
   GradeCalculatorService,
   type ComponentScoreInput,
   type SubjectGradeResult,
+  type TenantGradingPolicy,
 } from './grade-calculator.service';
 import { UsageService } from '../usage/usage.service';
 
@@ -159,8 +160,18 @@ export class ReportCardsService {
       );
     }
 
-    const subjectGrades = this.calculateSubjectGrades(components, marks);
-    const overall = this.gradeCalculator.calculateOverallGpa(subjectGrades);
+    const gradingPolicy = await this.gradeCalculator.getTenantGradingPolicy(
+      actor.tenantId,
+    );
+    const subjectGrades = this.calculateSubjectGrades(
+      components,
+      marks,
+      gradingPolicy,
+    );
+    const overall = this.gradeCalculator.calculateOverallGpa(
+      subjectGrades,
+      gradingPolicy,
+    );
 
     if (overall.resultStatus === 'INCOMPLETE') {
       throw new ConflictException(
@@ -547,8 +558,18 @@ export class ReportCardsService {
       );
     }
 
-    const subjectGrades = this.calculateSubjectGrades(components, marks);
-    const overall = this.gradeCalculator.calculateOverallGpa(subjectGrades);
+    const gradingPolicy = await this.gradeCalculator.getTenantGradingPolicy(
+      actor.tenantId,
+    );
+    const subjectGrades = this.calculateSubjectGrades(
+      components,
+      marks,
+      gradingPolicy,
+    );
+    const overall = this.gradeCalculator.calculateOverallGpa(
+      subjectGrades,
+      gradingPolicy,
+    );
 
     if (overall.resultStatus === 'INCOMPLETE') {
       throw new ConflictException(
@@ -575,6 +596,7 @@ export class ReportCardsService {
   private calculateSubjectGrades(
     components: ComponentWithSubject[],
     marks: MarkWithComponent[],
+    gradingPolicy: TenantGradingPolicy,
   ): SubjectGradeResult[] {
     const marksByComponent = new Map(
       marks.map((mark) => [mark.assessmentComponentId, mark]),
@@ -612,12 +634,15 @@ export class ReportCardsService {
           },
         );
 
-        return this.gradeCalculator.calculateWeightedSubjectGrade({
-          subjectId,
-          subjectName: subjectComponents[0]?.subject.name,
-          subjectCode: subjectComponents[0]?.subject.code,
-          components: componentInputs,
-        });
+        return this.gradeCalculator.calculateWeightedSubjectGrade(
+          {
+            subjectId,
+            subjectName: subjectComponents[0]?.subject.name,
+            subjectCode: subjectComponents[0]?.subject.code,
+            components: componentInputs,
+          },
+          gradingPolicy,
+        );
       },
     );
   }

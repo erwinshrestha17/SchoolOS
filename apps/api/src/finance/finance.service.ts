@@ -2309,6 +2309,129 @@ export class FinanceService {
     return result;
   }
 
+  async calculateLateFeesForTenant(tenantId: string) {
+    const [enabledSetting, graceSetting, lateFeeHead] = await Promise.all([
+      this.prisma.tenantSetting.findUnique({
+        where: { tenantId_key: { tenantId, key: 'late_fee_enabled' } },
+      }),
+      this.prisma.tenantSetting.findUnique({
+        where: { tenantId_key: { tenantId, key: 'late_fee_grace_days' } },
+      }),
+      this.prisma.feeHead.findFirst({
+        where: {
+          tenantId,
+          code: 'LATEFEE',
+          isActive: true,
+        },
+      }),
+    ]);
+
+    if (
+      enabledSetting?.value !== true &&
+      enabledSetting?.value !== 'true'
+    ) {
+      return { disabled: true, applied: 0, skipped: 0 };
+    }
+
+    if (!lateFeeHead || new Prisma.Decimal(lateFeeHead.defaultAmount).lte(0)) {
+      return { disabled: true, applied: 0, skipped: 0 };
+    }
+
+    const graceDays =
+      typeof graceSetting?.value === 'number'
+        ? Math.max(Math.floor(graceSetting.value), 0)
+        : typeof graceSetting?.value === 'string'
+          ? Math.max(Math.floor(Number(graceSetting.value)), 0) || 0
+        : 0;
+    const cutoff = startOfToday();
+    cutoff.setDate(cutoff.getDate() - graceDays);
+
+    const overdueInvoices = await this.prisma.invoice.findMany({
+      where: {
+        tenantId,
+        dueDate: { lt: cutoff },
+        status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
+      },
+      include: {
+        lines: true,
+        payments: { include: { refunds: true } },
+      },
+      orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
+      take: 500,
+    });
+
+    let applied = 0;
+    let skipped = 0;
+    const amount = new Prisma.Decimal(lateFeeHead.defaultAmount);
+
+    for (const invoice of overdueInvoices) {
+      const paidAmount = sumNetPaidAmount(invoice.payments);
+      if (invoice.totalAmount.sub(paidAmount).lte(0)) {
+        skipped += 1;
+        continue;
+      }
+
+      const alreadyApplied = invoice.lines.some(
+        (line) =>
+          line.feeHeadId === lateFeeHead.id &&
+          line.description.startsWith('Automatic late fee'),
+      );
+      if (alreadyApplied) {
+        skipped += 1;
+        continue;
+      }
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.invoiceLine.create({
+          data: {
+            tenantId,
+            invoiceId: invoice.id,
+            feeHeadId: lateFeeHead.id,
+            description: `Automatic late fee for overdue invoice ${invoice.invoiceNumber}`,
+            quantity: 1,
+            unitAmount: amount,
+            vatAmount: new Prisma.Decimal(0),
+            totalAmount: amount,
+          },
+        });
+
+        const newSubtotal = invoice.subtotal.add(amount);
+        const newTotal = invoice.totalAmount.add(amount);
+        await tx.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            subtotal: newSubtotal,
+            totalAmount: newTotal,
+            status: resolveInvoiceStatusAfterAdjustment(
+              invoice.status,
+              paidAmount,
+              newTotal,
+            ),
+          },
+        });
+      });
+
+      applied += 1;
+    }
+
+    await this.auditService.record({
+      action: 'calculate_late_fees',
+      resource: 'invoice',
+      tenantId,
+      userId: null,
+      after: {
+        applied,
+        skipped,
+        graceDays,
+        cutoff: cutoff.toISOString(),
+        lateFeeHeadId: lateFeeHead.id,
+        amount: Number(amount),
+      },
+    });
+
+    return { disabled: false, applied, skipped };
+  }
+
   async listDefaulters(
     actor: AuthContext,
     filters: { classId?: string; feeHeadId?: string } = {},
@@ -5311,6 +5434,12 @@ function buildPaymentMethodReconciliation(
     reversalsAndRefunds: Number(row.reversalsAndRefunds.toFixed(2)),
     netAmount: Number(row.netAmount.toFixed(2)),
   }));
+}
+
+function startOfToday() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
 }
 
 export function resolveInvoiceStatusAfterAdjustment(

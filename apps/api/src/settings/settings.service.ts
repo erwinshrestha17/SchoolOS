@@ -62,6 +62,8 @@ export class SettingsService {
     'attendance_working_days',
     'promotion_rule_mode',
     'grading_scheme_label',
+    'grading_scale',
+    'grading_rounding_policy',
     'active_fee_plan_required',
     'receipt_number_prefix',
     'payment_methods_enabled',
@@ -606,9 +608,135 @@ export class SettingsService {
           );
         }
         break;
+      case 'grading_scale':
+        this.validateGradingScale(value);
+        break;
+      case 'grading_rounding_policy':
+        this.validateGradingRoundingPolicy(value);
+        break;
       default:
         // No specific validation for others yet
         break;
+    }
+  }
+
+  private validateGradingScale(value: unknown): void {
+    if (!Array.isArray(value) || value.length === 0) {
+      throw new BadRequestException(
+        'Invalid value for grading_scale. Expected non-empty array.',
+      );
+    }
+
+    let previousMin = 101;
+    let hasFailingBand = false;
+
+    for (const [index, entry] of value.entries()) {
+      if (typeof entry !== 'object' || entry === null) {
+        throw new BadRequestException(
+          `Invalid grading_scale[${index}]. Expected object.`,
+        );
+      }
+
+      const candidate = entry as Record<string, unknown>;
+      const grade = candidate.grade;
+      const minPercentage = candidate.minPercentage;
+      const maxPercentage = candidate.maxPercentage;
+      const gradePoint = candidate.gradePoint;
+      const label = candidate.label;
+      const passed = candidate.passed;
+
+      if (typeof grade !== 'string' || grade.trim().length === 0) {
+        throw new BadRequestException(
+          `Invalid grading_scale[${index}].grade. Expected string.`,
+        );
+      }
+      if (
+        typeof minPercentage !== 'number' ||
+        minPercentage < 0 ||
+        minPercentage > 100
+      ) {
+        throw new BadRequestException(
+          `Invalid grading_scale[${index}].minPercentage. Expected number between 0 and 100.`,
+        );
+      }
+      if (
+        maxPercentage !== undefined &&
+        (typeof maxPercentage !== 'number' ||
+          maxPercentage < minPercentage ||
+          maxPercentage > 100)
+      ) {
+        throw new BadRequestException(
+          `Invalid grading_scale[${index}].maxPercentage. Expected number between minPercentage and 100.`,
+        );
+      }
+      if (typeof gradePoint !== 'number' || gradePoint < 0 || gradePoint > 4) {
+        throw new BadRequestException(
+          `Invalid grading_scale[${index}].gradePoint. Expected number between 0 and 4.`,
+        );
+      }
+      if (typeof label !== 'string' || label.trim().length === 0) {
+        throw new BadRequestException(
+          `Invalid grading_scale[${index}].label. Expected string.`,
+        );
+      }
+      if (typeof passed !== 'boolean') {
+        throw new BadRequestException(
+          `Invalid grading_scale[${index}].passed. Expected boolean.`,
+        );
+      }
+      if (minPercentage >= previousMin) {
+        throw new BadRequestException(
+          'Invalid grading_scale. Entries must be sorted from highest minimum percentage to lowest.',
+        );
+      }
+
+      previousMin = minPercentage;
+      hasFailingBand = hasFailingBand || !passed;
+    }
+
+    if (!hasFailingBand) {
+      throw new BadRequestException(
+        'Invalid grading_scale. At least one failing band is required.',
+      );
+    }
+  }
+
+  private validateGradingRoundingPolicy(value: unknown): void {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      throw new BadRequestException(
+        'Invalid value for grading_rounding_policy. Expected object.',
+      );
+    }
+
+    const policy = value as Record<string, unknown>;
+    const mode = policy.mode;
+    if (
+      mode !== undefined &&
+      mode !== 'HALF_UP' &&
+      mode !== 'FLOOR' &&
+      mode !== 'CEIL'
+    ) {
+      throw new BadRequestException(
+        'Invalid grading_rounding_policy.mode. Expected HALF_UP, FLOOR, or CEIL.',
+      );
+    }
+
+    for (const field of [
+      'percentageDecimals',
+      'gpaDecimals',
+      'marksDecimals',
+    ]) {
+      const decimalPlaces = policy[field];
+      if (
+        decimalPlaces !== undefined &&
+        (!Number.isInteger(decimalPlaces) ||
+          (decimalPlaces as number) < 0 ||
+          (decimalPlaces as number) > 4)
+      ) {
+        throw new BadRequestException(
+          `Invalid grading_rounding_policy.${field}. Expected integer between 0 and 4.`,
+        );
+      }
     }
   }
 

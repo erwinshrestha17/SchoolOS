@@ -29,11 +29,9 @@ export class PayrollProcessor extends WorkerHost {
     this.logger.log(
       `Generating payslip PDFs for tenant ${input.tenantId} for month ${input.month}...`,
     );
-    // Placeholder logic for batch PDF generation
-    // In reality, this would loop over all generated payroll records and create PDFs via PayrollService
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const result = await this.payrollService.generatePayslipPdfBatch(input);
     this.logger.log(
-      `Completed payslip generation for tenant ${input.tenantId}.`,
+      `Completed payslip generation for tenant ${input.tenantId}: generated=${result.generated}, skipped=${result.skipped}, payrollRunId=${result.payrollRunId}.`,
     );
   }
 }

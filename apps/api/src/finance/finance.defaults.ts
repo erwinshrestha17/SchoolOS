@@ -135,6 +135,13 @@ export const DEFAULT_FEE_HEADS: Array<{
     defaultAmount: '0',
     vatApplicable: false,
   },
+  {
+    code: 'LATEFEE',
+    name: 'Late Fee',
+    frequency: FeeFrequency.ONE_TIME,
+    defaultAmount: '0',
+    vatApplicable: false,
+  },
 ];
 
 export function resolveCashAccountCode(method: PaymentMethod) {

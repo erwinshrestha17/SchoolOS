@@ -2237,6 +2237,8 @@ export type TenantSettingKey =
   | 'attendance_working_days'
   | 'promotion_rule_mode'
   | 'grading_scheme_label'
+  | 'grading_scale'
+  | 'grading_rounding_policy'
   | 'active_fee_plan_required'
   | 'receipt_number_prefix'
   | 'payment_methods_enabled'
@@ -3039,5 +3041,4 @@ export type TransportLogSummary = {
   status: string;
   occurredAt: string;
 };
-
 

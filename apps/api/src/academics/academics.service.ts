@@ -816,6 +816,10 @@ export class AcademicsService {
       throw new ConflictException('Report card is blocked by unpaid fees');
     }
 
+    const gradingPolicy = await this.gradeCalculator.getTenantGradingPolicy(
+      actor.tenantId,
+    );
+
     // Group marks by subject
     const subjectMap = new Map<string, ReportCardPdfSubject>();
 
@@ -844,6 +848,7 @@ export class AcademicsService {
             (Number(mark.marksObtained) /
               Number(mark.assessmentComponent.maxMarks)) *
               100,
+            gradingPolicy,
           ).grade,
         };
       } else if (
@@ -858,6 +863,7 @@ export class AcademicsService {
             (Number(mark.marksObtained) /
               Number(mark.assessmentComponent.maxMarks)) *
               100,
+            gradingPolicy,
           ).grade,
         };
       }
@@ -869,7 +875,10 @@ export class AcademicsService {
     const subjects = Array.from(subjectMap.values()).map((sub) => {
       const percentage =
         sub.totalMax > 0 ? (sub.totalObtained / sub.totalMax) * 100 : 0;
-      const { grade, gpa } = this.gradeCalculator.getMoestGrade(percentage);
+      const { grade, gpa } = this.gradeCalculator.getMoestGrade(
+        percentage,
+        gradingPolicy,
+      );
 
       return {
         name: sub.name,

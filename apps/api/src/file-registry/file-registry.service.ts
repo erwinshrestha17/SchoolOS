@@ -35,7 +35,7 @@ export class FileRegistryService {
 
   async registerFile(input: {
     tenantId: string;
-    uploadedByUserId: string;
+    uploadedByUserId: string | null;
     originalFilename: string;
     objectKey: string;
     mimeType: string;
@@ -98,7 +98,7 @@ export class FileRegistryService {
 
   async registerGeneratedFile(input: {
     tenantId: string;
-    generatedByUserId: string;
+    generatedByUserId: string | null;
     originalFilename: string;
     content: Buffer;
     mimeType: string;

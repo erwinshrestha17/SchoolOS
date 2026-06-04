@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { AccountingModule } from '../accounting/accounting.module';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { HrContractsController } from '../hr/hr-contracts.controller';
 import { PayrollController } from './payroll.controller';
 import { PayrollProcessor } from './payroll.processor';
@@ -14,6 +15,7 @@ import { PayrollService } from './payroll.service';
     AuthModule,
     AuditModule,
     AccountingModule,
+    FileRegistryModule,
     BullModule.registerQueue({
       name: 'payroll',
     }),
