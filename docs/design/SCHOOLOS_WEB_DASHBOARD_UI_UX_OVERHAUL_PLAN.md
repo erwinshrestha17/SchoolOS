@@ -6,6 +6,12 @@
 
 This document is the working plan for polishing and overhauling the SchoolOS web UI/UX. It does not replace backend verification, tenant isolation, RBAC, File Registry, audit logging, or provider-disabled/mock-mode rules.
 
+For component strategy, module color palettes, typography, and font-size decisions, read:
+
+```text
+docs/design/SCHOOLOS_WEB_DESIGN_SYSTEM_DECISIONS.md
+```
+
 ---
 
 ## 1. Research Summary
@@ -26,7 +32,8 @@ Custom shadcn-style UI primitives in apps/web/components/ui
 Research-backed direction:
 
 - Use Tailwind utility classes through a constrained SchoolOS design-token system. Tailwind's official model is utility-first styling from single-purpose classes, which fits a reusable admin dashboard system when tokens and variants are controlled.
-- Use shadcn-style primitives for buttons, cards, dialogs, tabs, forms, sheets, sidebars, tables, skeletons, dropdowns, command/search, badges, toasts, and alert dialogs.
+- Use SchoolOS-owned components built from shadcn-style primitives where accessible interaction behavior is needed.
+- Avoid a heavy external component-provider system as the primary UI layer.
 - Use Next.js App Router patterns carefully: keep layouts/pages server-rendered where possible, and isolate client components only for state, event handlers, browser APIs, charts, filters, forms, and interactive tables.
 - Optimize against Core Web Vitals: LCP, INP, and CLS. Heavy module pages must avoid unnecessary client JavaScript, layout shifts, and large first-load bundles.
 - Use TanStack Query for authenticated client-side server state, caching, background refetch, pagination, mutations, and invalidation where interactivity is required.
@@ -35,8 +42,9 @@ Reference links:
 
 ```text
 Tailwind utility-first docs: https://tailwindcss.com/docs/styling-with-utility-classes
-shadcn/sidebar docs: https://ui.shadcn.com/docs/components/sidebar
+shadcn docs: https://ui.shadcn.com/docs
 Next.js Server and Client Components: https://nextjs.org/docs/app/getting-started/server-and-client-components
+Next.js fonts: https://nextjs.org/docs/app/getting-started/fonts
 Core Web Vitals: https://web.dev/articles/vitals
 TanStack Query overview: https://tanstack.com/query/latest/docs/framework/react/overview
 ```
@@ -61,6 +69,7 @@ Rules:
 8. No fake production data, placeholder metrics, or local-only state for production flows.
 9. All tenant-owned data must remain backend tenant-scoped.
 10. All destructive, financial, publishing, posting, lock, retry, and support actions need confirmation, reason where needed, and auditability.
+11. Follow the design-system decisions before implementing broad UI changes.
 
 ---
 
@@ -108,24 +117,27 @@ The dashboard shell must support:
 
 ## 4. Visual Design System
 
-### Typography
-
-Use a consistent dashboard type scale:
+The final component, color, typography, and font-size decisions are maintained in:
 
 ```text
-Display / dashboard hero: 32-40px, bold
-Page title: 28-32px, bold
-Section title: 18-22px, semibold
-Card title: 14-16px, semibold
-KPI number: 28-36px, bold, tabular numbers
-Body: 14-16px
-Helper / metadata: 12-13px
-Button: 14-15px, semibold
-Table header: 12-13px, uppercase or semibold
-Table cell: 13-14px
+docs/design/SCHOOLOS_WEB_DESIGN_SYSTEM_DECISIONS.md
 ```
 
-Rules:
+Summary:
+
+```text
+Component strategy: SchoolOS-owned custom components built from shadcn-style primitives.
+Primary font: Inter Variable through next/font/google.
+Primary brand: deep blue / indigo.
+Module colors: accents only, not status colors.
+Status colors: success, warning, danger, info, neutral.
+```
+
+### Typography
+
+Use the exact dashboard type scale from `SCHOOLOS_WEB_DESIGN_SYSTEM_DECISIONS.md`.
+
+High-level rules:
 
 - Use high contrast text.
 - Use tabular numbers for money, attendance counts, percentages, and ledger values.
@@ -195,7 +207,7 @@ AuditTimeline
 WorkflowStepper
 ```
 
-If adding shadcn components, prefer copying/adapting primitives into `apps/web/components/ui` and styling them with SchoolOS tokens instead of introducing inconsistent one-off component libraries.
+If adding shadcn components, copy/adapt primitives into `apps/web/components/ui` and style them with SchoolOS tokens instead of introducing inconsistent one-off component libraries.
 
 ---
 
@@ -608,17 +620,18 @@ Start with Dashboard, then shell/components, then modules.
 
 ```text
 0. Remove old shortcut/tap-based language from docs.
-1. Audit current dashboard and platform shell.
-2. Build/standardize UI primitives and design tokens.
-3. Overhaul `/dashboard` first.
-4. Overhaul school operations shell/sidebar/topbar.
-5. Overhaul Platform Control Plane shell/screens.
-6. Module pass 1: M1 Students/Admissions, M2 Attendance, M3 Fees.
-7. Module pass 2: M4 Academics, M6 Homework/Timetable, M10 Notices/Chat.
-8. Module pass 3: M7 HR/Payroll, M9 Accounting.
-9. Module pass 4: M8A Library, M8B Transport, M8C Canteen.
-10. Settings polish and audit/security visibility.
-11. Performance, accessibility, route smoke, and visual regression pass.
+1. Apply design-system decisions: component strategy, palette, typography, font loading, size scale.
+2. Audit current dashboard and platform shell.
+3. Build/standardize UI primitives and design tokens.
+4. Overhaul `/dashboard` first.
+5. Overhaul school operations shell/sidebar/topbar.
+6. Overhaul Platform Control Plane shell/screens.
+7. Module pass 1: M1 Students/Admissions, M2 Attendance, M3 Fees.
+8. Module pass 2: M4 Academics, M6 Homework/Timetable, M10 Notices/Chat.
+9. Module pass 3: M7 HR/Payroll, M9 Accounting.
+10. Module pass 4: M8A Library, M8B Transport, M8C Canteen.
+11. Settings polish and audit/security visibility.
+12. Performance, accessibility, route smoke, and visual regression pass.
 ```
 
 Do not overhaul all pages in one uncontrolled diff. Work module-by-module with tests and screenshots where possible.
