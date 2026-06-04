@@ -15,6 +15,7 @@ docs/project/SCHOOLOS_PLATFORM_AND_SETTINGS.md
 docs/project/SCHOOLOS_STORAGE_AND_FILE_REGISTRY.md
 docs/project/SCHOOLOS_TRANSPORT_REALTIME_READINESS.md
 apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md
+docs/design/SCHOOLOS_WEB_DASHBOARD_UI_UX_OVERHAUL_PLAN.md
 ```
 
 Do not treat this as permission to start broad new scope. Follow the active implementation phase gate first.
@@ -36,6 +37,8 @@ Before adding or expanding visible features:
 8. Keep money flows idempotent and auditable.
 9. Keep private files behind FileRegistryService and StorageService.
 10. Keep AI/ML roadmap-only until reliable production data exists and the owner explicitly approves M11.
+11. Follow the web dashboard overhaul plan before broad visual redesign work.
+12. Each school module should have dedicated web screens/workspaces for its real workflow.
 ```
 
 Enhancement priority order:
@@ -161,6 +164,7 @@ Web frontend:
 - Add QR management UI: generate, revoke, rotate, view audit.
 - Add document checklist with missing/expired/verified status.
 - Add iEMIS readiness panel per student and class.
+- Align Students/Admissions/Profile screens with the dedicated web dashboard overhaul route plan.
 
 Mobile frontend:
 
@@ -195,7 +199,8 @@ Backend:
 
 Web frontend:
 
-- Add teacher-first 3-tap attendance mode: all present, mark exceptions, submit.
+- Add a dedicated attendance workspace with class/section/date context, attendance register, draft/submit states, exception marking, correction queue, and reports.
+- Support bulk present and exception workflows without framing the experience around shortcut or tap-count concepts.
 - Add correction request/review workflow with reason and audit history.
 - Add class/month/student attendance reports and exports.
 - Add attendance anomaly dashboard for principal/admin.
@@ -203,13 +208,13 @@ Web frontend:
 Mobile frontend:
 
 - Add offline attendance draft queue with sync status: pending, synced, failed, retry.
-- Add teacher assigned-class roster and bulk present mode.
+- Add teacher assigned-class roster and bulk present support.
 - Add parent/student monthly attendance calendar with reason display.
 
 Definition of done:
 
 ```text
-Attendance works reliably under poor connectivity and concurrent usage without duplicate or silent overwrite risk.
+Attendance works reliably under poor connectivity and concurrent usage without duplicate or silent overwrite risk, and the web UX is a dedicated School Management System attendance workspace.
 ```
 
 ---
@@ -707,6 +712,7 @@ Mobile supports daily operations and parent engagement through purpose-limited A
 - Add consistent loading, empty, error, forbidden, success, and retry states.
 - Keep dashboards calm, school-office-friendly, and low-bandwidth-aware.
 - Avoid decorative features that do not support real school workflows.
+- Follow the web dashboard overhaul plan for shared typography, shell, Tailwind/shadcn-style primitives, performance rules, and dedicated module screens.
 
 ---
 
