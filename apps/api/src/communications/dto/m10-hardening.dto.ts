@@ -76,6 +76,30 @@ export class RetryDeliveryDto {
   reason?: string;
 }
 
+export class ProviderDeliveryStatusDto {
+  @IsOptional()
+  @IsString()
+  deliveryId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  providerMessageId?: string;
+
+  @IsIn(['SENT', 'DELIVERED', 'FAILED'])
+  status!: 'SENT' | 'DELIVERED' | 'FAILED';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  failureCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  failureReason?: string;
+}
+
 export class ResendNoticeDto {
   @IsOptional()
   @IsString({ each: true })

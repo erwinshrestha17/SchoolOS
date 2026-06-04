@@ -25,6 +25,7 @@ import { StaffLifecycleService } from './staff-lifecycle.service';
 import { StaffLeaveAccrualService } from '../hr/staff-leave-accrual.service';
 import {
   AddStaffDocumentDto,
+  ContractExpiryReminderQueryDto,
   TerminateStaffDto,
   VerifyStaffDocumentDto,
 } from './dto/staff-actions.dto';
@@ -64,6 +65,15 @@ export class HrStaffController {
   @Permissions('hr:staff:create')
   createStaff(@Body() dto: CreateStaffDto, @CurrentAuth() auth: AuthContext) {
     return this.staffService.createStaff(dto, auth);
+  }
+
+  @Get('contract-expiry/reminders')
+  @Permissions('hr:staff:read')
+  listContractExpiryReminders(
+    @Query() query: ContractExpiryReminderQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.staffService.listContractExpiryReminders(auth, query);
   }
 
   @Get(':staffId')

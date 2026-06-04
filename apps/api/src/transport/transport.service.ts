@@ -635,6 +635,24 @@ export class TransportService {
         'Cannot start trip without assigned driver and vehicle',
       );
     }
+    this.assertDriverAssignmentMatchesTrip(
+      driverAssignment,
+      route.id,
+      vehicle.id,
+    );
+
+    const activeForDriver = await this.prisma.transportTrip.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        driverAssignmentId: driverAssignment.id,
+        status: TransportTripStatus.ACTIVE,
+      },
+    });
+
+    if (activeForDriver) {
+      throw new ConflictException('Driver already has an active trip');
+    }
+
     await this.assertDriverCanOperateAssignment(
       actor,
       driverAssignment.id,
@@ -642,6 +660,26 @@ export class TransportService {
     );
 
     const trip = await this.prisma.$transaction(async (tx) => {
+      const activeTripConflict = await tx.transportTrip.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          status: TransportTripStatus.ACTIVE,
+          OR: [
+            { vehicleId: vehicle.id },
+            { driverAssignmentId: driverAssignment.id },
+          ],
+        },
+        select: { vehicleId: true, driverAssignmentId: true },
+      });
+
+      if (activeTripConflict?.vehicleId === vehicle.id) {
+        throw new ConflictException('Vehicle already has an active trip');
+      }
+
+      if (activeTripConflict?.driverAssignmentId === driverAssignment.id) {
+        throw new ConflictException('Driver already has an active trip');
+      }
+
       const created = await tx.transportTrip.create({
         data: {
           tenantId: actor.tenantId,
@@ -1106,7 +1144,13 @@ export class TransportService {
       .get(this.latestLocationKey(actor.tenantId, tripId));
 
     if (cached) {
-      return JSON.parse(cached) as LocationPayload;
+      try {
+        return JSON.parse(cached) as LocationPayload;
+      } catch {
+        await this.redisService
+          .getClient()
+          .del(this.latestLocationKey(actor.tenantId, tripId));
+      }
     }
 
     const latest = await this.prisma.transportLocationPing.findFirst({
@@ -1820,6 +1864,37 @@ export class TransportService {
     }
 
     return assignment;
+  }
+
+  private assertDriverAssignmentMatchesTrip(
+    assignment: {
+      vehicleId: string;
+      routeId: string | null;
+      startsAt: Date;
+      endsAt: Date | null;
+    },
+    routeId: string,
+    vehicleId: string,
+  ) {
+    if (assignment.vehicleId !== vehicleId) {
+      throw new ConflictException(
+        'Driver assignment is not linked to this vehicle',
+      );
+    }
+
+    if (assignment.routeId && assignment.routeId !== routeId) {
+      throw new ConflictException(
+        'Driver assignment is not linked to this route',
+      );
+    }
+
+    const now = new Date();
+    if (
+      assignment.startsAt > now ||
+      (assignment.endsAt && assignment.endsAt < now)
+    ) {
+      throw new ConflictException('Driver assignment is not active');
+    }
   }
 
   private async findActiveDriverAssignment(

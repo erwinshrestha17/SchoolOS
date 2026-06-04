@@ -1,10 +1,14 @@
 import { StaffDocumentKind } from '@prisma/client';
+import { Type } from 'class-transformer';
 import {
   IsEnum,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
+  Min,
 } from 'class-validator';
 
 export class AddStaffDocumentDto {
@@ -37,4 +41,13 @@ export class TerminateStaffDto {
   @IsOptional()
   @IsString()
   effectiveDate?: string;
+}
+
+export class ContractExpiryReminderQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(180)
+  days?: number;
 }

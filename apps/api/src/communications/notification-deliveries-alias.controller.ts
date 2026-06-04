@@ -34,7 +34,7 @@ export class NotificationDeliveriesAliasController {
   }
 
   @Post(':deliveryId/retry')
-  @Permissions('communications:read_deliveries', 'notices:create')
+  @Permissions('communications:retry_deliveries')
   retryDelivery(
     @Param('deliveryId') deliveryId: string,
     @CurrentAuth() auth: AuthContext,
@@ -43,7 +43,7 @@ export class NotificationDeliveriesAliasController {
   }
 
   @Post('retry-failed')
-  @Permissions('communications:read_deliveries', 'notices:create')
+  @Permissions('communications:retry_deliveries')
   retryFailedDeliveries(@CurrentAuth() auth: AuthContext) {
     return this.deliveryRetryService.retryFailedDeliveries(auth);
   }

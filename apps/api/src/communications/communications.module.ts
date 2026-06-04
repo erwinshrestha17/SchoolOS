@@ -37,6 +37,7 @@ import { NoticesController } from './notices.controller';
     NotificationCenterController,
     NotificationCenterAliasController,
     NotificationDeliveriesAliasController,
+    M10HardeningController,
   ],
   providers: [
     CommunicationsService,

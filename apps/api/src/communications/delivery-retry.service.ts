@@ -34,6 +34,10 @@ export interface BulkDeliveryRetryResult {
   results: DeliveryRetryResult[];
 }
 
+export interface RetryDeliveryOptions {
+  reason?: string | null;
+}
+
 export interface DeliveryFailureDashboardItem {
   id: string;
   status: NotificationStatus;
@@ -67,6 +71,7 @@ export class DeliveryRetryService {
   async retryDelivery(
     deliveryId: string,
     actor: AuthContext,
+    options: RetryDeliveryOptions = {},
   ): Promise<DeliveryRetryResult> {
     const delivery = await this.prisma.notificationDelivery.findFirst({
       where: {
@@ -85,7 +90,7 @@ export class DeliveryRetryService {
       );
     }
 
-    const result = await this.dispatchRetry(delivery);
+    const result = await this.dispatchRetry(delivery, actor, options);
 
     await this.auditService.record({
       action: 'retry',
@@ -124,7 +129,7 @@ export class DeliveryRetryService {
     const results: DeliveryRetryResult[] = [];
 
     for (const delivery of deliveries) {
-      results.push(await this.dispatchRetry(delivery));
+      results.push(await this.dispatchRetry(delivery, actor));
     }
 
     await this.auditService.record({
@@ -224,16 +229,36 @@ export class DeliveryRetryService {
 
   private async dispatchRetry(
     delivery: RetryableDelivery,
+    actor: AuthContext,
+    options: RetryDeliveryOptions = {},
   ): Promise<DeliveryRetryResult> {
     const retriedAt = new Date();
 
-    await this.prisma.notificationDelivery.update({
-      where: { id: delivery.id },
+    const claimed = await this.prisma.notificationDelivery.updateMany({
+      where: {
+        id: delivery.id,
+        tenantId: actor.tenantId,
+        status: {
+          in: [
+            NotificationStatus.FAILED,
+            NotificationStatus.QUEUED,
+            NotificationStatus.RETRY_PENDING,
+          ],
+        },
+      },
       data: {
-        status: NotificationStatus.QUEUED,
+        status: NotificationStatus.RETRY_PENDING,
         errorMessage: null,
+        retryCount: { increment: 1 },
+        lastRetryAt: retriedAt,
+        retryReason: options.reason ?? null,
+        requestedById: actor.userId,
       },
     });
+
+    if (claimed.count === 0) {
+      throw new BadRequestException('Delivery is no longer retryable');
+    }
 
     try {
       if (!delivery.destination) {
@@ -270,18 +295,9 @@ export class DeliveryRetryService {
         });
       }
 
-      await this.prisma.notificationDelivery.update({
-        where: { id: delivery.id },
-        data: {
-          status: NotificationStatus.SENT,
-          errorMessage: null,
-          sentAt: new Date(),
-        },
-      });
-
       return {
         deliveryId: delivery.id,
-        status: NotificationStatus.SENT,
+        status: NotificationStatus.RETRY_PENDING,
         errorMessage: null,
         retriedAt: retriedAt.toISOString(),
       };
@@ -294,6 +310,7 @@ export class DeliveryRetryService {
         data: {
           status: NotificationStatus.FAILED,
           errorMessage,
+          failedAt: new Date(),
         },
       });
 

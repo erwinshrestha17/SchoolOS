@@ -17,6 +17,7 @@ import {
   CommunicationAuditQueryDto,
   CommunicationPreferenceDto,
   CreateConsentTemplateDto,
+  ProviderDeliveryStatusDto,
   ResendNoticeDto,
   RetryDeliveryDto,
   UpdateConsentTemplateDto,
@@ -92,6 +93,15 @@ export class M10HardeningController {
       dto,
       auth,
     );
+  }
+
+  @Patch('communications/deliveries/provider-status')
+  @Permissions('communications:retry_deliveries')
+  recordProviderDeliveryStatus(
+    @Body() dto: ProviderDeliveryStatusDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.m10HardeningService.recordProviderDeliveryStatus(dto, auth);
   }
 
   @Post('communications/consent/templates')

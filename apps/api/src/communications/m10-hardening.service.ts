@@ -13,6 +13,7 @@ import {
   CommunicationAuditQueryDto,
   CommunicationPreferenceDto,
   CreateConsentTemplateDto,
+  ProviderDeliveryStatusDto,
   ResendNoticeDto,
   RetryDeliveryDto,
   UpdateConsentTemplateDto,
@@ -367,20 +368,133 @@ export class M10HardeningService {
     dto: RetryDeliveryDto,
     actor: AuthContext,
   ) {
-    await this.prisma.$executeRaw(Prisma.sql`
-      UPDATE "NotificationDelivery"
-      SET
-        "status" = 'RETRY_PENDING',
-        "retryCount" = "retryCount" + 1,
-        "lastRetryAt" = NOW(),
-        "retryReason" = ${dto.reason ?? null},
-        "requestedById" = ${actor.userId}
-      WHERE "id" = ${deliveryId}
-        AND "tenantId" = ${actor.tenantId}
-        AND "status" IN ('FAILED', 'QUEUED', 'RETRY_PENDING')
-    `);
+    return this.deliveryRetryService.retryDelivery(deliveryId, actor, {
+      reason: dto.reason ?? null,
+    });
+  }
 
-    return this.deliveryRetryService.retryDelivery(deliveryId, actor);
+  async recordProviderDeliveryStatus(
+    dto: ProviderDeliveryStatusDto,
+    actor: AuthContext,
+  ) {
+    if (!dto.deliveryId && !dto.providerMessageId) {
+      throw new BadRequestException(
+        'deliveryId or providerMessageId is required',
+      );
+    }
+
+    const delivery = await this.prisma.notificationDelivery.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        OR: [
+          ...(dto.deliveryId ? [{ id: dto.deliveryId }] : []),
+          ...(dto.providerMessageId
+            ? [{ providerMessageId: dto.providerMessageId }]
+            : []),
+        ],
+      },
+    });
+
+    if (!delivery) {
+      throw new NotFoundException('Delivery record not found in this tenant');
+    }
+
+    if (
+      dto.providerMessageId &&
+      delivery.providerMessageId &&
+      delivery.providerMessageId !== dto.providerMessageId
+    ) {
+      throw new BadRequestException(
+        'Provider message id does not match delivery record',
+      );
+    }
+
+    const incomingStatus = dto.status as NotificationStatus;
+    const decision = resolveDeliveryStatusTransition(
+      delivery.status,
+      incomingStatus,
+    );
+
+    if (!decision.apply) {
+      await this.auditService.record({
+        action: 'provider_status_ignored',
+        resource: 'notification_delivery',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: delivery.id,
+        before: { status: delivery.status },
+        after: {
+          attemptedStatus: incomingStatus,
+          providerMessageId: dto.providerMessageId ?? null,
+          reason: decision.reason,
+        },
+      });
+
+      return {
+        deliveryId: delivery.id,
+        status: delivery.status,
+        ignored: true,
+        reason: decision.reason,
+      };
+    }
+
+    const updated = await this.prisma.notificationDelivery.update({
+      where: { id: delivery.id },
+      data: {
+        status: incomingStatus,
+        providerMessageId:
+          dto.providerMessageId ?? delivery.providerMessageId ?? undefined,
+        failureCode:
+          incomingStatus === NotificationStatus.FAILED
+            ? (dto.failureCode ?? null)
+            : null,
+        failureReason:
+          incomingStatus === NotificationStatus.FAILED
+            ? (dto.failureReason ?? null)
+            : null,
+        errorMessage:
+          incomingStatus === NotificationStatus.FAILED
+            ? (dto.failureReason ?? dto.failureCode ?? 'Provider failed')
+            : null,
+        sentAt:
+          (incomingStatus === NotificationStatus.SENT ||
+            incomingStatus === NotificationStatus.DELIVERED) &&
+          !delivery.sentAt
+            ? new Date()
+            : undefined,
+        deliveredAt:
+          incomingStatus === NotificationStatus.DELIVERED
+            ? new Date()
+            : undefined,
+        failedAt:
+          incomingStatus === NotificationStatus.FAILED ? new Date() : null,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'provider_status_update',
+      resource: 'notification_delivery',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: delivery.id,
+      before: {
+        status: delivery.status,
+        providerMessageId: delivery.providerMessageId,
+      },
+      after: {
+        status: updated.status,
+        providerMessageId: updated.providerMessageId,
+        failureCode: updated.failureCode,
+        failureReason: updated.failureReason,
+      },
+    });
+
+    return {
+      deliveryId: updated.id,
+      status: updated.status,
+      providerMessageId: updated.providerMessageId,
+      updatedAt: new Date().toISOString(),
+    };
   }
 
   async resendNoticeFailed(
@@ -649,4 +763,33 @@ function daysAgo(now: Date, days: number) {
   const date = new Date(now);
   date.setDate(date.getDate() - days);
   return date;
+}
+
+function resolveDeliveryStatusTransition(
+  current: NotificationStatus,
+  incoming: NotificationStatus,
+) {
+  if (current === incoming) {
+    return { apply: false, reason: 'duplicate_status' };
+  }
+
+  if (current === NotificationStatus.DELIVERED) {
+    return { apply: false, reason: 'delivered_is_terminal' };
+  }
+
+  if (
+    current === NotificationStatus.CANCELLED ||
+    current === NotificationStatus.SKIPPED
+  ) {
+    return { apply: false, reason: 'delivery_not_provider_retryable' };
+  }
+
+  if (
+    current === NotificationStatus.FAILED &&
+    incoming === NotificationStatus.SENT
+  ) {
+    return { apply: false, reason: 'sent_status_cannot_clear_failure' };
+  }
+
+  return { apply: true, reason: null };
 }

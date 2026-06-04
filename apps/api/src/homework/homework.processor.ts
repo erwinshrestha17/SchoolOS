@@ -1,10 +1,8 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
-import { AuthMethod } from '@prisma/client';
 import { Job } from 'bullmq';
 import { HomeworkService } from './homework.service';
 import { HomeworkReminderJobData } from './homework.cron';
-import { AuthContext } from '../auth/auth.types';
 
 @Processor('homework')
 export class HomeworkProcessor extends WorkerHost {
@@ -28,19 +26,10 @@ export class HomeworkProcessor extends WorkerHost {
     );
 
     try {
-      // Reconstruct minimal actor for system-triggered reminder
-      const actor: AuthContext = {
-        ...actorPayload,
-        tenantSlug: 'system',
-        authMethod: AuthMethod.PASSWORD,
-        roles: ['admin'],
-        permissions: ['homework:manage'],
-      };
-
       await this.homeworkService.sendHomeworkReminder(
         homeworkId,
         { reminderType, force },
-        actor,
+        actorPayload,
       );
     } catch (error) {
       this.logger.error(

@@ -13,6 +13,7 @@ import { StaffLifecycleDto } from './dto/staff-lifecycle.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { StaffLifecycleService } from './staff-lifecycle.service';
 import { UsageService } from '../usage/usage.service';
+import type { ContractExpiryReminderQueryDto } from './dto/staff-actions.dto';
 
 @Injectable()
 export class StaffService {
@@ -450,6 +451,112 @@ export class StaffService {
     }));
   }
 
+  async listContractExpiryReminders(
+    actor: AuthContext,
+    query: ContractExpiryReminderQueryDto = {},
+  ) {
+    const days = clampReminderWindow(query.days);
+    const now = startOfDay(new Date());
+    const cutoff = addDays(now, days);
+
+    const [contracts, probationStaff] = await Promise.all([
+      this.prisma.staffContract.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          status: 'ACTIVE',
+          endDate: {
+            gte: now,
+            lte: cutoff,
+          },
+          staff: {
+            tenantId: actor.tenantId,
+            status: StaffStatus.ACTIVE,
+          },
+        },
+        include: {
+          staff: {
+            select: {
+              id: true,
+              employeeId: true,
+              firstName: true,
+              lastName: true,
+              department: true,
+              designation: true,
+            },
+          },
+        },
+        orderBy: [{ endDate: 'asc' }, { contractNumber: 'asc' }],
+        take: 100,
+      }),
+      this.prisma.staff.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          status: StaffStatus.ACTIVE,
+          probationEndDate: {
+            gte: now,
+            lte: cutoff,
+          },
+        },
+        select: {
+          id: true,
+          employeeId: true,
+          firstName: true,
+          lastName: true,
+          department: true,
+          designation: true,
+          probationEndDate: true,
+        },
+        orderBy: [{ probationEndDate: 'asc' }, { employeeId: 'asc' }],
+        take: 100,
+      }),
+    ]);
+
+    const items = [
+      ...contracts.map((contract) => ({
+        type: 'CONTRACT_EXPIRY' as const,
+        staffId: contract.staffId,
+        employeeId: contract.staff.employeeId,
+        staffName: `${contract.staff.firstName} ${contract.staff.lastName}`,
+        department: contract.staff.department,
+        designation: contract.staff.designation,
+        contractId: contract.id,
+        contractNumber: contract.contractNumber,
+        position: contract.position,
+        expiresAt: contract.endDate,
+        daysRemaining: contract.endDate
+          ? daysBetween(now, contract.endDate)
+          : null,
+      })),
+      ...probationStaff.map((staff) => ({
+        type: 'PROBATION_END' as const,
+        staffId: staff.id,
+        employeeId: staff.employeeId,
+        staffName: `${staff.firstName} ${staff.lastName}`,
+        department: staff.department,
+        designation: staff.designation,
+        contractId: null,
+        contractNumber: null,
+        position: staff.designation,
+        expiresAt: staff.probationEndDate,
+        daysRemaining: staff.probationEndDate
+          ? daysBetween(now, staff.probationEndDate)
+          : null,
+      })),
+    ].sort((a, b) => {
+      const aTime = a.expiresAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const bTime = b.expiresAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      return aTime - bTime;
+    });
+
+    return {
+      windowDays: days,
+      from: now,
+      to: cutoff,
+      total: items.length,
+      items,
+    };
+  }
+
   private async generateEmployeeId(actor: AuthContext) {
     const count = await this.prisma.staff.count({
       where: { tenantId: actor.tenantId },
@@ -523,6 +630,27 @@ export class StaffService {
 
 function normalizeSlug(slug: string) {
   return slug.replace(/[^a-z0-9]/gi, '').toUpperCase();
+}
+
+function startOfDay(date: Date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function daysBetween(from: Date, to: Date) {
+  return Math.ceil((to.getTime() - from.getTime()) / 86_400_000);
+}
+
+function clampReminderWindow(days: number | undefined) {
+  if (!days || !Number.isFinite(days)) return 30;
+  return Math.min(Math.max(Math.trunc(days), 1), 180);
 }
 
 function buildStaffUpdateData(dto: UpdateStaffDto): Prisma.StaffUpdateInput {

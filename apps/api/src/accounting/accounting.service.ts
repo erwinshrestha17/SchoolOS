@@ -811,6 +811,66 @@ export class AccountingService {
     };
   }
 
+  async getSourceLedgerReconciliation(actor: AuthContext) {
+    const [groups, missingSourceEntries, totalPosted] = await Promise.all([
+      this.prisma.journalEntry.groupBy({
+        by: ['sourceModule', 'sourceType', 'status'],
+        where: { tenantId: actor.tenantId },
+        _count: { _all: true },
+      }),
+      this.prisma.journalEntry.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          status: JournalEntryStatus.POSTED,
+          sourceType: {
+            notIn: [
+              JournalSourceType.MANUAL,
+              JournalSourceType.OPENING_BALANCE,
+              JournalSourceType.REVERSAL,
+              JournalSourceType.CORRECTION,
+            ],
+          },
+          OR: [{ sourceModule: null }, { sourceId: null }],
+        },
+        select: {
+          id: true,
+          entryNumber: true,
+          entryDate: true,
+          sourceModule: true,
+          sourceType: true,
+          sourceId: true,
+          postingType: true,
+          status: true,
+        },
+        orderBy: [{ entryDate: 'desc' }, { createdAt: 'desc' }],
+        take: 100,
+      }),
+      this.prisma.journalEntry.count({
+        where: { tenantId: actor.tenantId, status: JournalEntryStatus.POSTED },
+      }),
+    ]);
+
+    const sourceSummary = groups.map((group) => ({
+      sourceModule: group.sourceModule ?? 'UNSPECIFIED',
+      sourceType: group.sourceType,
+      status: group.status,
+      count: group._count._all,
+    }));
+
+    const moduleCoverage = summarizeSourceModuleCoverage(sourceSummary);
+
+    return {
+      totalPosted,
+      sourceSummary,
+      moduleCoverage,
+      missingSourceId: {
+        total: missingSourceEntries.length,
+        items: missingSourceEntries,
+      },
+      isClean: missingSourceEntries.length === 0,
+    };
+  }
+
   async closePeriod(id: string, actor: AuthContext) {
     const period = await this.prisma.accountingPeriod.findFirst({
       where: { id, tenantId: actor.tenantId },
@@ -2275,6 +2335,34 @@ function buildMatchReason(
   ]
     .filter(Boolean)
     .join(', ');
+}
+
+function summarizeSourceModuleCoverage(
+  sourceSummary: Array<{
+    sourceModule: string;
+    sourceType: JournalSourceType;
+    status: JournalEntryStatus;
+    count: number;
+  }>,
+) {
+  const coverage = new Map<string, { posted: number; total: number }>();
+
+  for (const row of sourceSummary) {
+    const current = coverage.get(row.sourceModule) ?? { posted: 0, total: 0 };
+    current.total += row.count;
+    if (row.status === JournalEntryStatus.POSTED) {
+      current.posted += row.count;
+    }
+    coverage.set(row.sourceModule, current);
+  }
+
+  return Array.from(coverage.entries())
+    .map(([sourceModule, counts]) => ({
+      sourceModule,
+      postedCount: counts.posted,
+      totalCount: counts.total,
+    }))
+    .sort((a, b) => a.sourceModule.localeCompare(b.sourceModule));
 }
 
 function getDefaultSchoolChartAccounts() {

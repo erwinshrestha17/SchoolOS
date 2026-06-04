@@ -606,12 +606,16 @@ export class LibraryService {
 
     let calculatedFine = 0;
     const now = new Date();
-    if (now > issue.dueAt && !dto.markLost) {
+    if (dto.fineAmount === undefined && dto.markLost) {
       const settings = await this.getLibrarySettings(actor);
-      const daysOverdue = Math.ceil(
-        (now.getTime() - issue.dueAt.getTime()) / (1000 * 60 * 60 * 24),
+      calculatedFine = calculateLostReplacementCharge(
+        issue.copy.replacementCost,
+        issue.copy.book.purchasePrice,
+        settings.lostBookChargeMultiplier,
       );
-      calculatedFine = daysOverdue * Number(settings.finePerDay);
+    } else if (dto.fineAmount === undefined && now > issue.dueAt) {
+      const settings = await this.getLibrarySettings(actor);
+      calculatedFine = calculateOverdueFine(issue.dueAt, now, settings);
     }
 
     const fineAmount = new Prisma.Decimal(dto.fineAmount ?? calculatedFine);
@@ -1493,4 +1497,41 @@ export class LibraryService {
     const count = await tx.invoice.count({ where: { tenantId } });
     return `INV-${String(count + 1).padStart(6, '0')}`;
   }
+}
+
+function calculateLostReplacementCharge(
+  copyReplacementCost: Prisma.Decimal | null,
+  bookPurchasePrice: Prisma.Decimal | null,
+  multiplier: Prisma.Decimal,
+) {
+  const base = copyReplacementCost ?? bookPurchasePrice;
+  if (!base) return 0;
+  return Number(new Prisma.Decimal(base).mul(multiplier).toDecimalPlaces(2));
+}
+
+function calculateOverdueFine(
+  dueAt: Date,
+  returnedAt: Date,
+  settings: {
+    finePerDay: Prisma.Decimal;
+    maxFineAmount: Prisma.Decimal | null;
+    gracePeriodDays: number;
+  },
+) {
+  const rawDaysOverdue = Math.ceil(
+    (returnedAt.getTime() - dueAt.getTime()) / 86_400_000,
+  );
+  const billableDays = Math.max(
+    0,
+    rawDaysOverdue - settings.gracePeriodDays,
+  );
+  const rawFine = new Prisma.Decimal(settings.finePerDay)
+    .mul(billableDays)
+    .toDecimalPlaces(2);
+
+  if (settings.maxFineAmount && rawFine.gt(settings.maxFineAmount)) {
+    return Number(settings.maxFineAmount);
+  }
+
+  return Number(rawFine);
 }

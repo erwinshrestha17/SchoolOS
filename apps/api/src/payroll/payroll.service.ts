@@ -133,12 +133,16 @@ export class PayrollService {
       throw new NotFoundException('Staff member not found in this tenant');
     }
 
+    const effectiveFrom = new Date(dto.effectiveFrom);
+    const effectiveTo = dto.effectiveTo ? new Date(dto.effectiveTo) : null;
+    assertSalaryStructureDateRange(effectiveFrom, effectiveTo);
+
     const structure = await this.prisma.salaryStructure.create({
       data: {
         tenantId: actor.tenantId,
         staffId: dto.staffId,
-        effectiveFrom: new Date(dto.effectiveFrom),
-        effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null,
+        effectiveFrom,
+        effectiveTo,
         basicSalary: new Prisma.Decimal(dto.basicSalary),
         allowances: new Prisma.Decimal(dto.allowances ?? 0),
         deductions: new Prisma.Decimal(dto.deductions ?? 0),
@@ -242,13 +246,19 @@ export class PayrollService {
       }
     }
 
+    const effectiveFrom = dto.effectiveFrom
+      ? new Date(dto.effectiveFrom)
+      : existing.effectiveFrom;
+    const effectiveTo = dto.effectiveTo
+      ? new Date(dto.effectiveTo)
+      : existing.effectiveTo;
+    assertSalaryStructureDateRange(effectiveFrom, effectiveTo);
+
     const updated = await this.prisma.salaryStructure.update({
       where: { id: existing.id },
       data: {
-        effectiveFrom: dto.effectiveFrom
-          ? new Date(dto.effectiveFrom)
-          : undefined,
-        effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : undefined,
+        effectiveFrom: dto.effectiveFrom ? effectiveFrom : undefined,
+        effectiveTo: dto.effectiveTo ? effectiveTo : undefined,
         basicSalary:
           dto.basicSalary !== undefined
             ? new Prisma.Decimal(dto.basicSalary)
@@ -296,6 +306,11 @@ export class PayrollService {
       throw new NotFoundException('Salary structure not found');
     }
 
+    assertSalaryStructureDateRange(
+      structure.effectiveFrom,
+      structure.effectiveTo,
+    );
+
     const overlapping = await this.prisma.salaryStructure.findFirst({
       where: {
         tenantId: actor.tenantId,
@@ -319,13 +334,19 @@ export class PayrollService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      // Archive current active structure
       await tx.salaryStructure.updateMany({
         where: {
           tenantId: actor.tenantId,
           staffId: structure.staffId,
           status: SalaryStructureStatus.ACTIVE,
           id: { not: structure.id },
+          effectiveFrom: {
+            lte: structure.effectiveTo ?? structure.effectiveFrom,
+          },
+          OR: [
+            { effectiveTo: null },
+            { effectiveTo: { gte: structure.effectiveFrom } },
+          ],
         },
         data: {
           status: SalaryStructureStatus.ARCHIVED,
@@ -685,13 +706,17 @@ export class PayrollService {
       const approvedUnpaidLeaveDays =
         unpaidLeaveByStaff.get(source.staffId) ?? 0;
 
-      const totalEffectiveDays = presentDays + approvedPaidLeaveDays;
+      const totalEffectiveDays = Math.min(
+        workingDays,
+        presentDays + approvedPaidLeaveDays,
+      );
       const unpaidLeaveDays = Math.max(0, workingDays - totalEffectiveDays);
       // Ensure we count explicit unpaid leave if it exceeds the working day gap
       const finalUnpaidDays = Math.max(
         unpaidLeaveDays,
         approvedUnpaidLeaveDays,
       );
+      const payrollPaidDays = Math.max(0, workingDays - finalUnpaidDays);
 
       const baseSalary = new Prisma.Decimal(source.baseSalary);
       const allowances = new Prisma.Decimal(source.allowances);
@@ -701,7 +726,7 @@ export class PayrollService {
         baseSalary,
         allowances,
         contractDeductions,
-        attendanceDays: totalEffectiveDays,
+        attendanceDays: payrollPaidDays,
         workingDays,
         pfEnabled: source.pfEnabled,
         tdsEnabled: source.tdsEnabled,
@@ -725,8 +750,8 @@ export class PayrollService {
         workingDays,
         presentDays,
         approvedPaidLeaveDays,
-        unpaidLeaveDays,
-        attendanceDays: totalEffectiveDays,
+        unpaidLeaveDays: finalUnpaidDays,
+        attendanceDays: payrollPaidDays,
       };
     });
 
@@ -2158,6 +2183,23 @@ export function getPayrollRunActions(status: string) {
       status === PayrollRunStatus.CANCELLED ||
       status === PayrollRunStatus.VOID,
   };
+}
+
+function assertSalaryStructureDateRange(
+  effectiveFrom: Date,
+  effectiveTo: Date | null,
+) {
+  if (Number.isNaN(effectiveFrom.getTime())) {
+    throw new ConflictException('effectiveFrom must be a valid date');
+  }
+
+  if (effectiveTo && Number.isNaN(effectiveTo.getTime())) {
+    throw new ConflictException('effectiveTo must be a valid date');
+  }
+
+  if (effectiveTo && effectiveTo < effectiveFrom) {
+    throw new ConflictException('effectiveTo cannot be before effectiveFrom');
+  }
 }
 
 function getPayrollPeriod(periodYear: number, periodMonth: number) {

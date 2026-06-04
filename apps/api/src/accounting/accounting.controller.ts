@@ -270,6 +270,12 @@ export class AccountingController {
     return this.financeService.exportReconciliation(query, auth);
   }
 
+  @Get('reports/source-ledger/reconciliation')
+  @Permissions('accounting:reports:read')
+  sourceLedgerReconciliation(@CurrentAuth() auth: AuthContext) {
+    return this.accountingService.getSourceLedgerReconciliation(auth);
+  }
+
   @Get('journals')
   @Permissions('accounting:journals:read')
   listJournalEntries(@CurrentAuth() auth: AuthContext) {
