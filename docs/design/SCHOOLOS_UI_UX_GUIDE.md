@@ -1,10 +1,16 @@
 # SchoolOS UI/UX Guide
 
-**Last updated:** 2026-06-02
+**Last updated:** 2026-06-04
 
 This is the active UI/UX source of truth for the SchoolOS web admin, platform control plane, mobile companion app, and future public website.
 
-It replaces these older active UI docs:
+For the full web dashboard overhaul research and module-screen plan, also read:
+
+```text
+docs/design/SCHOOLOS_WEB_DASHBOARD_UI_UX_OVERHAUL_PLAN.md
+```
+
+This guide replaces these older active UI docs:
 
 ```text
 docs/design/SCHOOLOS_FINAL_UI_UX_DIRECTION.md
@@ -31,7 +37,7 @@ What is the user trying to finish here?
 
 Anything that does not support that job should move to a secondary tab, details page, report page, action menu, or separate route.
 
-SchoolOS must feel like a modern, trustworthy, Nepal-ready school operating system. It should not feel like a complicated ERP or a generic CRUD dashboard.
+SchoolOS must feel like a modern, trustworthy, Nepal-ready School Management System. It should not feel like a complicated ERP, a generic CRUD dashboard, or a shortcut-action prototype.
 
 ---
 
@@ -39,7 +45,7 @@ SchoolOS must feel like a modern, trustworthy, Nepal-ready school operating syst
 
 SchoolOS UI/UX must be:
 
-- **Simple:** common tasks should be reachable in 1-3 clicks/taps.
+- **Simple:** common tasks should be easy to find, clearly labeled, and supported by dedicated screens.
 - **Role-aware:** admins, teachers, accountants, admission staff, principals, parents, students, drivers, and platform operators should only see what they need.
 - **Trustworthy:** finance, attendance, student records, medical data, documents, communication, and accounting actions must feel secure and auditable.
 - **School-friendly:** labels, navigation, icons, and workflows must match real school operations.
@@ -47,6 +53,7 @@ SchoolOS UI/UX must be:
 - **Mobile-first for parents, teachers, students, and drivers:** mobile screens should be card-based, quick-action focused, and not table-heavy.
 - **Nepal-ready:** support NPR, class/section conventions, guardian structures, Nepali phone patterns, receipt printing, local payment labels, and future Bikram Sambat support.
 - **Safe for children:** student and parent experiences must be scoped, controlled, age-aware, and privacy-preserving.
+- **Fast:** dashboard and module pages should use server/client boundaries, skeletons, pagination, caching, and code-splitting where appropriate.
 
 ---
 
@@ -86,6 +93,8 @@ Rules:
 - Preserve cookie-first auth behavior.
 - Keep tenant-owned workflows tenant-scoped by backend APIs.
 - Keep school operations under `/dashboard/*`.
+- Every module must have dedicated workspace/screens for its main workflow.
+- Start web overhaul work with the Dashboard before moving module-by-module.
 
 ### Platform Control Plane
 
@@ -109,7 +118,7 @@ Current target: `apps/schoolos_mobile` Flutter app.
 
 Purpose:
 
-- Provide quick answers and quick actions.
+- Provide quick answers and focused role-specific actions.
 - Avoid dense dashboards and complex tables.
 - Give role-specific parent, student, teacher, staff, driver, and admin flows.
 
@@ -135,7 +144,7 @@ Recommended style:
 - Shadows: soft and minimal.
 - Icons: rounded education-style line icons.
 - Spacing: generous, especially on dashboards and mobile.
-- Typography: clear, high contrast, and readable.
+- Typography: clear, high contrast, readable, and consistent across all modules.
 
 Recommended design tokens:
 
@@ -163,12 +172,15 @@ textMuted: '#94A3B8'
 
 Typography:
 
+- Display / dashboard hero: 32px-40px / bold.
 - Page title: 28px-32px / bold.
 - Section title: 18px-22px / semibold.
-- Card number: 26px-34px / bold.
+- Card number: 26px-36px / bold / tabular numbers.
 - Body text: 14px-16px.
 - Helper text: 12px-13px.
 - Button text: 14px-15px / semibold.
+- Table header: 12px-13px / semibold.
+- Table cell: 13px-14px.
 
 Rules:
 
@@ -176,6 +188,7 @@ Rules:
 - Avoid very light grey text for important information.
 - Use short labels on mobile.
 - Use descriptive headings on web admin screens.
+- Use tabular numbers for money, counts, percentages, and ledger values.
 
 ---
 
@@ -187,6 +200,7 @@ Every web admin page should follow this structure:
 Topbar
 Left Sidebar
 Page Header
+Context Bar / Filters
 Summary Cards
 Main Work Area
 Optional Right Insight Panel
@@ -217,15 +231,15 @@ Students
 Admissions
 Attendance
 Fees
-Communications
+Academics
 Activity Feed
-Exams, CAS & Reports
 Homework & Timetable
 HR & Payroll
-Accounting
 Library
 Transport
 Canteen
+Accounting
+Notices & Chat
 Reports
 Settings
 ```
@@ -238,6 +252,7 @@ Rules:
 - No phase labels.
 - Permission-hidden items should not appear for users without access.
 - Platform pages must remain outside normal school operations navigation.
+- Each sidebar item opens a dedicated module screen or workspace.
 
 ### Page Header
 
@@ -348,24 +363,34 @@ Reuse shared components before redesigning screens.
 Core web components:
 
 ```text
-DashboardShell
+AppShell
+PlatformShell
 Sidebar
 Topbar
 PageHeader
+ModuleHeader
+ContextBar
 SectionCard
 StatCard
+InsightCard
 StatusBadge
+Badge
 DataTable
 FilterBar
 SearchInput
+CommandSearch
 ActionMenu
+DropdownMenu
 ConfirmDialog
+AlertDialog
+Sheet / Drawer
 Toast
 EmptyState
-LoadingState
+LoadingState / Skeleton
 ErrorState
 PermissionState
 AuditInfo
+AuditTimeline
 StudentAvatar
 MoneyDisplay
 DateDisplay
@@ -399,6 +424,7 @@ Component rules:
 - Keep variants explicit: `success`, `warning`, `danger`, `info`, `neutral`.
 - Use semantic states instead of raw colors.
 - All loading, empty, error, and permission-denied states must be reusable.
+- Prefer shadcn-style primitives adapted under `apps/web/components/ui` with SchoolOS tokens.
 
 ---
 
@@ -411,72 +437,93 @@ Main job: help the school admin understand what needs attention today.
 Recommended sections:
 
 ```text
-Welcome header
+School day header
 Today KPI cards
-Today tasks
+Attention required panel
 Attendance snapshot
 Fee collection snapshot
-Recent activity
-Notices
-Quick actions
+Admissions / student movement snapshot
+Notices and communication health
+Recent activity and audit-safe timeline
+Quick links to dedicated module screens
 ```
 
 Dashboard should be summary-only, not a full reports page.
 
-### Students and Admissions
+### M1 Admissions / Students / Student Profiles
 
 - Student directory should support quick search, class/section/status filters, clear action menus, and safe lifecycle actions.
-- Student profile should group Overview, Attendance, Fees, Documents, Activity, Academics, Guardians, and History.
+- Student profile should group Overview, Guardians, Attendance, Fees, Academics, Documents, Activity, and History.
 - Admissions should use a clear pipeline/stepper with document checklist and one main next action.
+- Admissions, students, and profiles should have dedicated screens, not be hidden inside a single generic dashboard card.
 
-### Attendance
+### M2 Attendance
 
-- Class → Section → Date selection.
-- One-click `Auto Fill Present` and exception marking.
-- Sticky bottom actions for `Save Draft` and `Submit`.
-- Offline local draft recovery and conflict handling.
+- Class, section, and date selection must be clear.
+- Attendance register should support bulk present and exception marking without using shortcut/tap-count language.
+- Sticky bottom actions may be used for `Save Draft` and `Submit`.
+- Offline local draft recovery and conflict handling should be visible.
+- Attendance reports and correction queues should be separate screens.
 
-### Fees, Receipts, Accounting
+### M3 Fees, Receipts, and Accounting-facing finance
 
 - Split cashier collection from accountant/ledger controls.
 - Payment, reversal, cashier close, and journal posting must be confirmation-driven and audited.
 - Reports must display backend-calculated totals, not frontend-derived official totals.
+- Gateway/payment mode must visibly show disabled/mock/sandbox/ready state.
 
-### Academics
+### M4 Academics
 
 - Exams should follow a workflow: Enter → Validate → Lock → Publish → Generate Reports.
 - Marks/CAS entry should support keyboard-friendly grids.
 - Report-card correction/regeneration must require context and audit reason.
 
-### Activity, Notices, Communication
+### M5 Activity Feed
 
 - Activity Feed is classroom/social updates.
-- Notices are official announcements.
+- Notices are official announcements and belong in M10.
 - Photo-consent and media privacy must be visible and enforced.
 - Delivery failures and unread-recipient follow-up should be visible to admins.
 
-### Homework and Timetable
+### M6 Homework and Timetable
 
-- Homework should group work by status: Due Today, Upcoming, Overdue, Checked.
+- Homework should group work by status: Due Today, Upcoming, Overdue, Checked, Closed.
 - Timetable should show visual period/room/teacher conflicts.
 - Teacher absence/substitution flows should be clear and action-oriented.
+- Timetable builder, published timetable, substitutions, and conflicts should have dedicated screens or tabs.
 
-### HR and Payroll
+### M7 HR and Payroll
 
 - HR needs staff lifecycle visibility and sensitive-field masking.
 - Payroll should use status stepper: Draft → Approved → Posted → Paid.
 - Payroll reversals and payslip access must be permissioned and audited.
 
-### Library, Transport, Canteen
+### M8A Library, M8B Transport, M8C Canteen
 
 - Library should favor scanner-first issue/return flows.
 - Transport should show route/vehicle/trip status and location freshness before raw coordinates.
 - Canteen should show wallet balance, allergy warnings, spending warnings, QR scan context, and POS/serving readiness clearly.
+- Each operations vertical should have its own dedicated screens for setup, daily workflow, reports, and exception handling.
+
+### M9 Accounting
+
+- Accounting should provide dedicated screens for chart of accounts, journals, fiscal periods, reconciliation, reports, and audit.
+- Bank statement import/reconciliation needs validation feedback, review, matching suggestions, and confirmation.
+- Posted accounting records must look immutable; corrections must appear as reversal/correction workflows.
+
+### M10 Notices and Chat
+
+- Notices are official announcements; chat is conversation.
+- Notice audience preview is required before high-impact sending.
+- Delivery failures, unread recipients, provider mode, and retry state must be visible.
+- Chat moderation/report/block/escalation states must be explicit.
 
 ### Settings
 
 - School settings should be grouped by operational domains.
 - Developer/platform settings must be hidden from regular school admins.
+- Audit-log visibility must be permissioned.
+- Dangerous school configuration changes require confirmation and reason.
 
 ---
 
@@ -487,7 +534,8 @@ Current status:
 ```text
 Admin web global polish is implemented for the current modular-monolith scope.
 Dashboard shell polish, accounting audit context, transport location freshness, scanner-first Library/Canteen QR flows, report-card correction review, and app-controlled toasts/confirmation dialogs are present.
-Next UI work is staging/browser QA for authenticated dashboard routes, delivery failures, retry/resend, QR/POS scan speed, provider/queue mutation states, and permission/error states.
+A full web dashboard UI/UX overhaul direction has been added in docs/design/SCHOOLOS_WEB_DASHBOARD_UI_UX_OVERHAUL_PLAN.md.
+Next UI work should start with `/dashboard`, then shared shell/components, then platform and module workspaces.
 ```
 
 Implemented highlights:
@@ -503,8 +551,8 @@ Implemented highlights:
 Verification snapshot:
 
 ```text
-- Web contract tests passed for app-controlled feedback coverage.
-- Web typecheck has passed in targeted polish runs.
+- Web contract tests passed for app-controlled feedback coverage in prior targeted polish runs.
+- Web typecheck has passed in prior targeted polish runs.
 - Browser/staging smoke still needs execution in an environment that can bind local ports and has Postgres, Redis, API, and web running.
 ```
 
@@ -518,4 +566,8 @@ Required:
 - `aria-label` for icon-only buttons.
 - Skeleton/loading frames instead of confusing blank areas.
 - Empty, error, and permission-denied states for all important routes.
-- Smoke tests should verify core route loading and fatal-error absence without becoming brittle.
+- No layout shift on dashboard cards/tables.
+- No console errors.
+- No fake data.
+- API calls are permission-safe and tenant-safe.
+- Core Web Vitals should be checked before claiming UI overhaul completion.
