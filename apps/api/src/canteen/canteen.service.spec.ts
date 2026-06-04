@@ -557,6 +557,9 @@ function buildService(
       findFirst: jest.fn().mockResolvedValue(options.duplicateServing ?? null),
       create: jest.fn().mockResolvedValue({ id: 'serving-1' }),
     },
+    canteenPosSaleItem: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     canteenStudentEnrollment: {
       create: jest.fn().mockResolvedValue({ id: 'enrollment-1' }),
       findFirst: jest.fn().mockImplementation(

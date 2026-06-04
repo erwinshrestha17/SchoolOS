@@ -244,8 +244,7 @@ export class GradeCalculatorService {
     );
     const matched = policy.scale.find(
       (grade) =>
-        normalized >= grade.minPercentage &&
-        normalized <= grade.maxPercentage,
+        normalized >= grade.minPercentage && normalized <= grade.maxPercentage,
     );
 
     if (!matched) {

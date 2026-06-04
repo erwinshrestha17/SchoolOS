@@ -1521,10 +1521,7 @@ function calculateOverdueFine(
   const rawDaysOverdue = Math.ceil(
     (returnedAt.getTime() - dueAt.getTime()) / 86_400_000,
   );
-  const billableDays = Math.max(
-    0,
-    rawDaysOverdue - settings.gracePeriodDays,
-  );
+  const billableDays = Math.max(0, rawDaysOverdue - settings.gracePeriodDays);
   const rawFine = new Prisma.Decimal(settings.finePerDay)
     .mul(billableDays)
     .toDecimalPlaces(2);

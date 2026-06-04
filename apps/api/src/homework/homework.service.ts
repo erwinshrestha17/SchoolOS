@@ -5,6 +5,7 @@ import {
   HomeworkSubmissionStatus,
   NotificationChannel,
   Prisma,
+  HomeworkAssignment,
 } from '@prisma/client';
 import {
   ConflictException,
@@ -278,7 +279,7 @@ export class HomeworkService {
       occurrences.length > 1 ? cryptoRandomId('hw-series') : null;
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const assignments = [];
+      const assignments: HomeworkAssignment[] = [];
 
       for (const [index, occurrence] of occurrences.entries()) {
         const assignment = await tx.homeworkAssignment.create({
@@ -331,7 +332,9 @@ export class HomeworkService {
     });
 
     const assignments = await Promise.all(
-      result.map((assignment) => this.findAssignmentOrThrow(actor, assignment.id)),
+      result.map((assignment) =>
+        this.findAssignmentOrThrow(actor, assignment.id),
+      ),
     );
     const assignment = assignments[0];
 
@@ -1619,7 +1622,8 @@ function buildHomeworkOccurrences(args: {
   }
 
   const interval = recurrence.interval ?? 1;
-  const intervalDays = recurrence.frequency === 'DAILY' ? interval : interval * 7;
+  const intervalDays =
+    recurrence.frequency === 'DAILY' ? interval : interval * 7;
   const repeatUntil = recurrence.repeatUntil
     ? parseRequiredDate(recurrence.repeatUntil, 'repeatUntil')
     : null;

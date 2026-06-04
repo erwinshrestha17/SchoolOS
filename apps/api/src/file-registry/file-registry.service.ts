@@ -214,7 +214,7 @@ export class FileRegistryService {
     };
   }
 
-  async markUploaded(tenantId: string, assetId: string, userId: string) {
+  async markUploaded(tenantId: string, assetId: string, userId: string | null) {
     const asset = await this.getFileMetadata(tenantId, assetId);
 
     if (asset.status === FileStatus.UPLOADED) {

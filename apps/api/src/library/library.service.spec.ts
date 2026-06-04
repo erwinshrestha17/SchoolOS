@@ -409,6 +409,8 @@ describe('LibraryService Phase 3A foundation', () => {
     prisma.libraryIssue.findFirst.mockResolvedValue(issue);
     prisma.librarySetting.findUnique.mockResolvedValue({
       finePerDay: new Prisma.Decimal(10),
+      gracePeriodDays: 0,
+      maxFineAmount: null,
     });
 
     await service.returnCopy('issue-1', { returnCondition: 'Good' }, actor);

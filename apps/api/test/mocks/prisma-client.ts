@@ -423,8 +423,11 @@ export const NotificationChannel = {
 
 export const NotificationStatus = {
   QUEUED: 'QUEUED',
+  RETRY_PENDING: 'RETRY_PENDING',
   SENT: 'SENT',
+  DELIVERED: 'DELIVERED',
   FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED',
   SKIPPED: 'SKIPPED',
 } as const;
 

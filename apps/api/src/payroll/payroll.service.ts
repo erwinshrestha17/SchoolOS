@@ -2306,7 +2306,11 @@ function isPayslipExportForRun(
 }
 
 function getJsonString(filters: Prisma.JsonValue, key: string) {
-  if (typeof filters !== 'object' || filters === null || Array.isArray(filters)) {
+  if (
+    typeof filters !== 'object' ||
+    filters === null ||
+    Array.isArray(filters)
+  ) {
     return null;
   }
 

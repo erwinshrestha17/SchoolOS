@@ -173,7 +173,7 @@ describe('Homework Workflow', () => {
         attachmentFileIds: ['file-1'],
       };
 
-      const result = await service.createAssignment(dto, mockActor);
+      const result = (await service.createAssignment(dto, mockActor)) as any;
 
       expect(result.id).toBe('new-hw');
       expect(prisma.homeworkAttachment.createMany).toHaveBeenCalled();

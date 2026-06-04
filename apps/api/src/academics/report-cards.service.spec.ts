@@ -68,7 +68,10 @@ describe('ReportCardsService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AuditService, useValue: auditService },
         { provide: FinanceService, useValue: financeService },
-        { provide: SettingsService, useValue: {} },
+        {
+          provide: SettingsService,
+          useValue: { getSetting: jest.fn().mockResolvedValue(null) },
+        },
         {
           provide: UsageService,
           useValue: {

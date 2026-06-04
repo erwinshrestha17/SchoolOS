@@ -32,8 +32,8 @@ describe('GradeCalculatorService', () => {
       },
     );
 
-    it('returns the full grading scale for endpoint display', () => {
-      const scale = service.getGradingScale();
+    it('returns the full grading scale for endpoint display', async () => {
+      const scale = await service.getGradingScale('tenant-1');
       expect(scale).toHaveLength(8);
       expect(scale[0].grade).toBe('A+');
       expect(scale[7].grade).toBe('NG');

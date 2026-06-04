@@ -2326,10 +2326,7 @@ export class FinanceService {
       }),
     ]);
 
-    if (
-      enabledSetting?.value !== true &&
-      enabledSetting?.value !== 'true'
-    ) {
+    if (enabledSetting?.value !== true && enabledSetting?.value !== 'true') {
       return { disabled: true, applied: 0, skipped: 0 };
     }
 
@@ -2342,7 +2339,7 @@ export class FinanceService {
         ? Math.max(Math.floor(graceSetting.value), 0)
         : typeof graceSetting?.value === 'string'
           ? Math.max(Math.floor(Number(graceSetting.value)), 0) || 0
-        : 0;
+          : 0;
     const cutoff = startOfToday();
     cutoff.setDate(cutoff.getDate() - graceDays);
 

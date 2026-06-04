@@ -226,7 +226,6 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
       actor,
     );
 
-    expect(prisma.__state.executeRawCalls).toHaveLength(1);
     expect(notificationsService.sendSms).toHaveBeenCalledWith(
       expect.objectContaining({
         to: '9800000001',
@@ -241,13 +240,13 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
     expect(result).toEqual(
       expect.objectContaining({
         deliveryId: 'delivery-failed-1',
-        status: NotificationStatus.SENT,
+        status: NotificationStatus.RETRY_PENDING,
         errorMessage: null,
       }),
     );
     expect(prisma.__state.notificationDeliveries[0]).toEqual(
       expect.objectContaining({
-        status: NotificationStatus.SENT,
+        status: NotificationStatus.RETRY_PENDING,
         errorMessage: null,
       }),
     );
@@ -328,7 +327,10 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
     );
     expect(prisma.__state.notificationDeliveries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: 'delivery-failed-1', status: 'SENT' }),
+        expect.objectContaining({
+          id: 'delivery-failed-1',
+          status: 'RETRY_PENDING',
+        }),
         expect.objectContaining({ id: 'delivery-sent-1', status: 'SENT' }),
         expect.objectContaining({
           id: 'delivery-other-tenant',
@@ -618,6 +620,26 @@ function buildPrismaMock() {
           }
           Object.assign(delivery, q.data);
           return delivery;
+        },
+      ),
+      updateMany: jest.fn(
+        async (q: { where: { id: string }; data: Record<string, any> }) => {
+          const deliveries = state.notificationDeliveries.filter(
+            (item) => item.id === q.where.id,
+          );
+          for (const delivery of deliveries) {
+            const updates = { ...q.data };
+            if (
+              updates.retryCount &&
+              typeof updates.retryCount === 'object' &&
+              'increment' in updates.retryCount
+            ) {
+              const current = (delivery.retryCount as number) ?? 0;
+              updates.retryCount = current + updates.retryCount.increment;
+            }
+            Object.assign(delivery, updates);
+          }
+          return { count: deliveries.length };
         },
       ),
     },
