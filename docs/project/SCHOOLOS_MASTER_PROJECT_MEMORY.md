@@ -1,6 +1,6 @@
 # SchoolOS Master Project Memory
 
-**Status:** M0 Platform Core Provider/Queue Hardening + M10 Provider/Attachment Depth + Phase 2 Academics/Accounting Production Polish + Student QR Foundation + M2 Attendance Hardening Slice + M3 Fees/Receipts Hardening Slice + Active Finance Analysis Exports + Phase 3/4 Operations Depth Hardened  
+**Status:** 2026-06-04 implementation updates recorded: AGENTS operating rules, demo request backend/web integration, M9 bank import validation, M3 payment webhook signature hardening, M7 statutory deduction refinement, M0 platform DTO hardening, M2 mobile attendance query validation, settings audit-log depth, M6 substitution UI polish, M8C canteen UI polish, and module enhancement planning  
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard, Flutter companion app
 
@@ -13,6 +13,7 @@ This is the consolidated source of truth for SchoolOS project memory. It records
 ```text
 README.md
 DEVELOPMENT_RULES.md
+AGENTS.md
 
 docs/product/SCHOOLOS_PRD_COMBINED_MASTER_2026.md
 docs/business/SCHOOLOS_BRD_2026.md
@@ -47,19 +48,21 @@ Do not recreate the old split PRD, repo-analysis, remaining-plan, deployment-che
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
-M0 Platform Core: Foundation complete; provider/queue/API-key/File Registry hardening implemented; staging/object-storage/browser coverage remains
+M0 Platform Core: Foundation complete; provider/queue/API-key/File Registry hardening implemented; platform DTO validation and status/support-override request shaping refined on 2026-06-04; staging/object-storage/browser coverage remains
 M1 Admissions & Student Profiles: Pilot-ready plus Student QR, storage/photo/logo, iEMIS artifact registration, duplicate candidate review, document audit, and mobile child profile foundation
-M2 Smart Attendance: Pilot-ready plus correction/offline-draft, rejected replay regressions, correction-review UI, mobile teacher scope, and real-data teacher dashboard
-M3 Fees & Receipts: Pilot-ready plus receipt reprint, reversal, cashier close, reconciliation, Analysis CSV exports, protected day-end PDF snapshots, and transaction-race coverage
+M2 Smart Attendance: Pilot-ready plus correction/offline-draft, rejected replay regressions, correction-review UI, mobile teacher scope, real-data teacher dashboard, and mobile parent attendance summary query validation
+M3 Fees & Receipts: Pilot-ready plus receipt reprint, reversal, cashier close, reconciliation, Analysis CSV exports, protected day-end PDF snapshots, transaction-race coverage, and secure online payment webhook signature verification
 M4 Academics / Exams / CAS / Report Cards: Completed / Pilot-Ready with PDF/report/correction/snapshot polish
 M5 Activity Feed & Milestones: Strong foundation with media privacy, consent-aware blocking, optimized previews, moderation controls, and teacher media gallery
-M6 Homework / Timetable: Completed / Pilot-Ready with File Registry attachments, reminder hardening, absence/substitution conflict coverage, and mobile homework/timetable views
-M7 HR / Payroll: Completed / Pilot-Ready with posting locks, accounting integration, reversals, PII masking, payroll reports, and mobile staff self-service
+M6 Homework / Timetable: Completed / Pilot-Ready with File Registry attachments, reminder hardening, absence/substitution conflict coverage, mobile homework/timetable views, and improved substitution slot selection / absence recording UI
+M7 HR / Payroll: Completed / Pilot-Ready with posting locks, accounting integration, reversals, PII masking, payroll reports, mobile staff self-service, and active-salary-structure statutory deduction retrieval
 M8A Library: Admin/backend foundation plus QR lookup, fines, staff borrowers, fine-to-fees/accounting tests, scanner-first UI, and reports/export polish
 M8B Transport: Admin/trip/location/report foundation plus Redis GPS/cache/pressure/retention hardening, driver mobile surfaces, parent latest-GPS view, and trip-history exports
-M8C Canteen: Admin/wallet/POS/inventory/vendor/report foundation plus receipt JSON/PDF, stock hardening, wallet guards, linked invoice handoff, and parent mobile views
-M9 Accounting: Production-candidate / Pilot-Ready with PDFs, snapshots, audit trail, reconciliation suggestions, and File Registry export support
+M8C Canteen: Admin/wallet/POS/inventory/vendor/report foundation plus receipt JSON/PDF, stock hardening, wallet guards, linked invoice handoff, parent mobile views, and canteen workspace UI polish
+M9 Accounting: Production-candidate / Pilot-Ready with PDFs, snapshots, audit trail, reconciliation suggestions, File Registry export support, and validated bank statement import DTO/service hardening
 M10 Notices / Communication / Chat: Strong foundation with provider modes, attachments, failure dashboard, moderation/escalation, unread-recipient follow-up, and mobile notification/chat surfaces
+Public marketing/demo intake: Backend-persisted demo request API, Prisma model/migration, CSRF public allow-list, web form integration, API helper, and tests added on 2026-06-04
+Settings / audit visibility: Settings audit-log access and UI depth added on 2026-06-04
 M11 School Intelligence / AI: Roadmap only
 SchoolOS Flutter Mobile: Active companion app with scoped parent/student/teacher/staff/driver/admin surfaces where APIs exist
 ```
@@ -72,6 +75,34 @@ Internal QA-ready: Yes
 Controlled pilot-ready: Yes, after staging checks and smoke verification
 Multi-school production-ready: Not yet
 Full SchoolOS product complete: No
+```
+
+---
+
+## 2.1 2026-06-04 Implementation Update
+
+Today's commits added or updated the following:
+
+```text
+- AGENTS.md production-implementation operating instructions.
+- M9 Accounting: bank statement import DTOs, reconciliation DTO, empty/invalid amount validation, UUID import batch IDs, and tests.
+- M3 Finance: HMAC verification for online payment webhooks, adapter-aware gateway status, and webhook/signature tests.
+- M7 Payroll: statutory deductions now derive from active salary structures, with controller delegation and tests.
+- M0 Platform: structured DTOs for provider status updates, support override entry, and tenant billing status reason payloads, with validation tests.
+- M2 Mobile/Attendance: parent attendance summary query DTO with month/year validation and tests.
+- Web security: browser API request IDs now use secure randomness instead of Math.random.
+- Public demo requests: DemoRequest Prisma model/migration, public POST API, CSRF public allow-list, backend service/controller/DTO/tests, web form API integration, marketing API helper, and public smoke/contract tests.
+- Settings: settings audit-log API/UI depth and access-control tests.
+- User management: web API helper foundation for school user management.
+- M6 Timetable/Substitutions: substitution modal and substitutions list improved for timetable slot selection and absence recording.
+- M8C Canteen: canteen workspace UI/API handling polish.
+- Documentation: module-wise enhancement plan created and linked from active project docs.
+```
+
+Verification note:
+
+```text
+These updates are recorded from commit inspection. Full local/staging verification must still be run before changing readiness claims: db generate/validate, OpenAPI gate, lint, typecheck, unit tests, API E2E, web E2E, build, verify:production, and smoke:phase1.
 ```
 
 ---
@@ -109,12 +140,14 @@ Rules:
 | Platform Control Plane | SchoolOS company/operator administration | `/platform/*` | `/platform/*` |
 | Tenant Configuration Plane | School-owned settings/configuration | `/dashboard/settings/*` | `/settings/*` or `/tenant-settings/*` |
 | School Operations Plane | Daily school workflows | `/dashboard/*` | Module APIs such as `/students`, `/attendance`, `/finance`, `/notices`, `/academics`, `/homework`, `/timetable`, `/payroll`, `/accounting`, `/library`, `/transport`, `/canteen` |
+| Public Marketing / Demo Intake | Public lead capture and sales/demo request intake | `/request-demo` | `/demo-requests` |
 
 Rules:
 
 - Do not mix SchoolOS SaaS billing with school fee collection.
 - School users must not access platform settings.
 - Platform support/tenant override must require explicit reason and audit log.
+- Keep public marketing/demo intake separate from tenant school operations.
 - Keep all planes inside the modular monolith for now.
 
 ---
@@ -215,6 +248,7 @@ Do not claim verification passed unless the commands were actually run.
 ```text
 Read these first:
 - DEVELOPMENT_RULES.md
+- AGENTS.md
 - docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 - docs/project/SCHOOLOS_IMPLEMENTATION_STATUS_AND_PLAN.md
 - docs/project/SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md when planning or enhancing module features
@@ -231,7 +265,7 @@ Constraints:
 - Keep NestJS modular monolith.
 - Keep tenantId as the tenant/school boundary.
 - Keep all tenant-owned reads/writes tenant-scoped.
-- Keep platform, tenant settings, and school operations route boundaries separate.
+- Keep platform, tenant settings, public marketing/demo intake, and school operations route boundaries separate.
 - Add pagination/filtering for growing lists.
 - Review/add indexes for high-volume queries.
 - Move slow/retryable/provider/report/PDF/intelligence jobs to BullMQ where appropriate.
