@@ -422,6 +422,8 @@ describe('AcademicsController M4 contracts', () => {
     gradeCalculatorService.getGradingScale.mockReturnValue([{ grade: 'A+' }]);
 
     expect(controller.getGradingScale(actor)).toEqual([{ grade: 'A+' }]);
-    expect(gradeCalculatorService.getGradingScale).toHaveBeenCalledWith(actor.tenantId);
+    expect(gradeCalculatorService.getGradingScale).toHaveBeenCalledWith(
+      actor.tenantId,
+    );
   });
 });
