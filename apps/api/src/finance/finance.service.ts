@@ -7,6 +7,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import {
   AccountingPeriodStatus,
   AudienceType,
@@ -39,6 +40,11 @@ import { CommunicationsService } from '../communications/communications.service'
 import { PrismaService } from '../prisma/prisma.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { EntitlementsService } from '../plans/entitlements.service';
+import { ConfigService } from '../config/config.service';
+import {
+  decryptSensitiveField,
+  isEncryptedSensitiveField,
+} from '../common/security/field-encryption';
 import { CashierCloseWindowDto } from './dto/cashier-close-window.dto';
 import { CollectPaymentDto } from './dto/collect-payment.dto';
 import { InitiateOnlinePaymentDto } from './dto/initiate-online-payment.dto';
@@ -158,6 +164,8 @@ export class FinanceService {
     private readonly accountingPostingService: AccountingPostingService,
     private readonly eventEmitter: EventEmitter2,
     private readonly usageService: UsageService,
+    @Optional()
+    private readonly configService?: ConfigService,
     @Optional()
     private readonly fileRegistryService?: FileRegistryService,
     @Optional()
@@ -3778,21 +3786,24 @@ export class FinanceService {
 
     const config = normalizeJsonObject(provider.configEncrypted);
     const webhookReady = Boolean(config?.webhookUrl || config?.webhookPath);
-    const paymentIntentReady = Boolean(
+    const paymentIntentConfigured = Boolean(
       config?.initiateUrl || config?.intentUrl,
     );
+    const paymentIntentReady = false;
+    const providerAdapterReady = false;
 
     return {
       enabled: Boolean(
         provider.enabled &&
         provider.validationStatus === 'VALID' &&
         webhookReady &&
-        paymentIntentReady,
+        paymentIntentReady &&
+        providerAdapterReady,
       ),
       status:
         provider.validationStatus === 'VALID'
-          ? webhookReady && paymentIntentReady
-            ? 'ready'
+          ? webhookReady && paymentIntentConfigured
+            ? 'adapter_not_implemented'
             : 'configuration_incomplete'
           : (provider.validationStatus ?? 'not_validated'),
       provider: {
@@ -3804,11 +3815,13 @@ export class FinanceService {
       supportedPaymentMethods: ['MOBILE', 'TRANSFER'],
       webhookReady,
       paymentIntentReady,
+      paymentIntentConfigured,
+      providerAdapterReady,
       idempotencyRequired: true,
       settlementTrackingReady: Boolean(config?.settlementStatusUrl),
       message:
-        webhookReady && paymentIntentReady
-          ? 'Online payment gateway readiness is configured. Payments must still be marked paid only after trusted server-side verification.'
+        webhookReady && paymentIntentConfigured
+          ? 'Online payment gateway configuration exists, but no approved server-side provider adapter is implemented. Use manual/cash/bank collection until gateway integration is approved.'
           : 'Online payments are not enabled for this school.',
     };
   }
@@ -3838,14 +3851,9 @@ export class FinanceService {
       throw new BadRequestException('Invalid payment amount.');
     }
 
-    return {
-      success: true,
-      provider: dto.provider.toLowerCase(),
-      paymentIntentId: `pi_${Math.random().toString(36).substring(2, 15)}`,
-      clientSecret: `sec_${Math.random().toString(36).substring(2, 15)}`,
-      amount: dto.amount,
-      currency: 'NPR',
-    };
+    throw new BadRequestException(
+      'Online payment initiation is disabled until an approved server-side payment provider adapter is implemented.',
+    );
   }
 
   async handleOnlinePaymentWebhook(
@@ -3874,6 +3882,9 @@ export class FinanceService {
       );
     }
 
+    const config = normalizeJsonObject(activeProvider.configEncrypted);
+    const signingSecret = this.getWebhookSigningSecret(config);
+
     const sigHeaderName = `${provider.toLowerCase()}-signature`;
     const signature =
       headers[sigHeaderName] ||
@@ -3884,7 +3895,7 @@ export class FinanceService {
       throw new BadRequestException('Missing signature header.');
     }
 
-    if (signature === 'invalid_sig') {
+    if (!this.verifyWebhookSignature(payload, signature, signingSecret)) {
       throw new ForbiddenException('Invalid signature.');
     }
 
@@ -3927,6 +3938,53 @@ export class FinanceService {
       message:
         'Payment verification succeeded but ledger posting is deferred until settlement confirmation rules are met.',
     };
+  }
+
+  private getWebhookSigningSecret(config: Record<string, unknown> | null) {
+    const encryptedSecret = firstStringValue(config, [
+      'webhookSigningSecret',
+      'signingSecret',
+      'webhookSecret',
+    ]);
+
+    if (!encryptedSecret) {
+      throw new BadRequestException(
+        'Webhook signing secret is not configured for this payment provider.',
+      );
+    }
+
+    if (isEncryptedSensitiveField(encryptedSecret) && !this.configService) {
+      throw new BadRequestException(
+        'Webhook signing secret cannot be verified without runtime configuration.',
+      );
+    }
+
+    return decryptSensitiveField(
+      encryptedSecret,
+      this.configService?.jwtSecret ?? '',
+    );
+  }
+
+  private verifyWebhookSignature(
+    payload: Record<string, unknown>,
+    signature: string,
+    signingSecret: string | null,
+  ) {
+    if (!signingSecret) {
+      return false;
+    }
+
+    const expected = createHmac('sha256', signingSecret)
+      .update(JSON.stringify(payload ?? {}))
+      .digest('hex');
+    const normalizedSignature = signature.trim().replace(/^sha256=/i, '');
+    const expectedBuffer = Buffer.from(expected, 'hex');
+    const actualBuffer = Buffer.from(normalizedSignature, 'hex');
+
+    return (
+      actualBuffer.length === expectedBuffer.length &&
+      timingSafeEqual(actualBuffer, expectedBuffer)
+    );
   }
 
   async listReceipts(actor: AuthContext) {
@@ -5124,6 +5182,20 @@ function normalizeJsonObject(
   }
 
   return value;
+}
+
+function firstStringValue(
+  config: Record<string, unknown> | null,
+  keys: string[],
+) {
+  for (const key of keys) {
+    const value = config?.[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+  }
+
+  return null;
 }
 
 function escapeCsv(value: string) {

@@ -342,7 +342,7 @@ export default function RedesignedLandingPage() {
                   <span className="h-3 w-3 rounded-full bg-slate-700" />
                   <span className="h-3 w-3 rounded-full bg-slate-700" />
                 </div>
-                <div className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">SchoolOS Admin Engine</div>
+                <div className="text-[10px] text-slate-500 tracking-widest uppercase">SchoolOS Admin Engine</div>
                 <div className="h-2 w-8 bg-transparent" />
               </div>
 

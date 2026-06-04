@@ -16,6 +16,7 @@ import {
   Matches,
   Min,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -419,6 +420,40 @@ export class UpsertProviderConfigDto {
   @IsArray()
   @IsString({ each: true })
   secretKeys?: string[];
+}
+
+export class UpdateProviderStatusDto {
+  @IsBoolean()
+  enabled!: boolean;
+
+  @ValidateIf(
+    (dto: UpdateProviderStatusDto) => !dto.enabled || dto.reason !== undefined,
+  )
+  @IsString()
+  @MinLength(5)
+  reason?: string;
+}
+
+export class EnterSupportOverrideDto {
+  @IsString()
+  @IsNotEmpty()
+  tenantId!: string;
+
+  @IsString()
+  @MinLength(5)
+  reason!: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  durationMinutes?: number;
+}
+
+export class PlatformTenantBillingStatusReasonDto {
+  @IsString()
+  @MinLength(5)
+  reason!: string;
 }
 
 export class RetryFailedJobDto {

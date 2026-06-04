@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { AccountingService } from './accounting.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -536,7 +540,11 @@ describe('AccountingService - Slices 2-5', () => {
       );
 
       expect(result.count).toBe(2);
-      expect(result.importBatchId).toMatch(/^IMPORT-/);
+      expect(result.importBatchId).toMatch(
+        /^IMPORT-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+      );
+      const transactionCalls = prisma.$transaction.mock.calls[0][0];
+      expect(transactionCalls).toHaveLength(2);
       expect(auditService.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'import',
@@ -549,8 +557,49 @@ describe('AccountingService - Slices 2-5', () => {
       prisma.chartAccount.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.importBankStatement('bad-acc', [], actor),
+        service.importBankStatement(
+          'bad-acc',
+          [
+            {
+              statementDate: '2026-04-01',
+              description: 'Payment received',
+              debitAmount: 5000,
+            },
+          ],
+          actor,
+        ),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should reject empty bank statement imports before persistence', async () => {
+      await expect(
+        service.importBankStatement('bank-acc', [], actor),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.chartAccount.findFirst).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(auditService.record).not.toHaveBeenCalled();
+    });
+
+    it('should reject invalid bank statement amounts before persistence', async () => {
+      await expect(
+        service.importBankStatement(
+          'bank-acc',
+          [
+            {
+              statementDate: '2026-04-01',
+              description: 'Ambiguous line',
+              debitAmount: 5000,
+              creditAmount: 1000,
+            },
+          ],
+          actor,
+        ),
+      ).rejects.toThrow('cannot include both debit and credit amounts');
+
+      expect(prisma.chartAccount.findFirst).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(auditService.record).not.toHaveBeenCalled();
     });
   });
 

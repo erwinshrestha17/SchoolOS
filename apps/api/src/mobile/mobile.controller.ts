@@ -14,6 +14,7 @@ import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { FEATURE_KEYS } from '@schoolos/core';
 import { MobileService } from './mobile.service';
+import { ParentAttendanceSummaryQueryDto } from './dto/parent-attendance-summary-query.dto';
 
 @Controller('mobile')
 @UseGuards(JwtAuthGuard, EntitlementGuard)
@@ -59,12 +60,11 @@ export class MobileController {
   getStudentAttendanceSummary(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,
-    @Query('month') month?: number,
-    @Query('year') year?: number,
+    @Query() query: ParentAttendanceSummaryQueryDto,
   ) {
     return this.mobileService.getStudentAttendanceSummary(studentId, auth, {
-      month: month ? Number(month) : undefined,
-      year: year ? Number(year) : undefined,
+      month: query.month,
+      year: query.year,
     });
   }
 

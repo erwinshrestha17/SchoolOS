@@ -224,8 +224,8 @@ export class PayrollController {
 
   @Get('statutory-deductions')
   @Permissions('payroll:salary:read')
-  listStatutoryDeductions() {
-    return this.payrollService.listStatutoryDeductions();
+  listStatutoryDeductions(@CurrentAuth() auth: AuthContext) {
+    return this.payrollService.listStatutoryDeductions(auth);
   }
 
   @Post('salary-structures')

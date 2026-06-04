@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { ReportsQueryDto } from './dto/reports-query.dto';
 
 import {
@@ -33,6 +35,7 @@ import { PostJournalDto } from './dto/post-journal.dto';
 import { CancelJournalDto } from './dto/cancel-journal.dto';
 import { AccountingPostingService } from './accounting-posting.service';
 import { CreateOpeningBalanceDto } from './dto/opening-balance.dto';
+import { ImportBankStatementLineDto } from './dto/import-bank-statement.dto';
 import {
   ExpenseVoucherDto,
   PaymentVoucherDto,
@@ -1753,34 +1756,16 @@ export class AccountingService {
 
   // ─── Slice 5: Bank Reconciliation ──────────────────────────────────
 
-  /**
-   * BankStatement model accessor — the Prisma client must be regenerated
-   * (prisma generate) after the BankStatement model was added to the schema.
-   * Until then, we access it via bracket notation to avoid TS errors.
-   * After regeneration, replace all usages with this.prisma.bankStatement.
-   */
-  /**
-   * BankStatement model accessor — the Prisma client must be regenerated
-   * (prisma generate) after the BankStatement model was added to the schema.
-   * Until then, we access it via bracket notation to avoid TS errors.
-   * After regeneration, replace all usages with this.prisma.bankStatement.
-   */
-  private get bankStatements(): Record<string, (...args: unknown[]) => any> {
-    const p = this.prisma as unknown as Record<string, unknown>;
-    return p.bankStatement as Record<string, (...args: unknown[]) => any>;
+  private get bankStatements() {
+    return this.prisma.bankStatement;
   }
 
   async importBankStatement(
     accountId: string,
-    lines: Array<{
-      statementDate: string;
-      description: string;
-      reference?: string;
-      debitAmount?: number;
-      creditAmount?: number;
-    }>,
+    lines: ImportBankStatementLineDto[],
     actor: AuthContext,
   ) {
+    const sanitizedLines = this.validateBankStatementImportLines(lines);
     const account = await this.prisma.chartAccount.findFirst({
       where: { id: accountId, tenantId: actor.tenantId },
     });
@@ -1789,10 +1774,10 @@ export class AccountingService {
       throw new NotFoundException('Account not found in this tenant');
     }
 
-    const importBatchId = `IMPORT-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const importBatchId = `IMPORT-${randomUUID()}`;
 
     const statements = (await this.prisma.$transaction(
-      lines.map((line) =>
+      sanitizedLines.map((line) =>
         this.bankStatements.create({
           data: {
             tenantId: actor.tenantId,
@@ -1828,6 +1813,60 @@ export class AccountingService {
         isReconciled: false,
       },
       orderBy: { statementDate: 'asc' },
+    });
+  }
+
+  private validateBankStatementImportLines(
+    lines: ImportBankStatementLineDto[],
+  ) {
+    if (!Array.isArray(lines) || lines.length === 0) {
+      throw new BadRequestException(
+        'Bank statement import requires at least one line',
+      );
+    }
+
+    return lines.map((line, index) => {
+      const description = line.description?.trim();
+      const statementDate = new Date(line.statementDate);
+      const debitAmount = line.debitAmount ?? 0;
+      const creditAmount = line.creditAmount ?? 0;
+
+      if (!description) {
+        throw new BadRequestException(
+          `Bank statement line ${index + 1} requires a description`,
+        );
+      }
+
+      if (Number.isNaN(statementDate.getTime())) {
+        throw new BadRequestException(
+          `Bank statement line ${index + 1} has an invalid statement date`,
+        );
+      }
+
+      if (debitAmount < 0 || creditAmount < 0) {
+        throw new BadRequestException(
+          `Bank statement line ${index + 1} cannot have negative amounts`,
+        );
+      }
+
+      if (debitAmount === 0 && creditAmount === 0) {
+        throw new BadRequestException(
+          `Bank statement line ${index + 1} requires a debit or credit amount`,
+        );
+      }
+
+      if (debitAmount > 0 && creditAmount > 0) {
+        throw new BadRequestException(
+          `Bank statement line ${index + 1} cannot include both debit and credit amounts`,
+        );
+      }
+
+      return {
+        ...line,
+        description,
+        debitAmount,
+        creditAmount,
+      };
     });
   }
 

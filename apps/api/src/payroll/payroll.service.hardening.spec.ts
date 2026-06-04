@@ -3,6 +3,7 @@ import {
   PayrollLineStatus,
   PayrollRunStatus,
   Prisma,
+  SalaryComponentType,
   SalaryStructureStatus,
 } from '@prisma/client';
 import { PayrollService } from './payroll.service';
@@ -247,11 +248,89 @@ describe('PayrollService hardening boundaries', () => {
       netPayable: 49000,
     });
   });
+
+  it('lists statutory deductions from tenant-scoped active salary structures only', async () => {
+    const { service, prisma } = buildService({
+      salaryStructures: [
+        buildSalaryStructure({
+          pfEnabled: true,
+          tdsEnabled: true,
+          components: [
+            {
+              name: 'CIT contribution',
+              amount: new Prisma.Decimal(1500),
+              taxable: false,
+            },
+          ],
+        }),
+        buildSalaryStructure({
+          id: 'salary-2',
+          pfEnabled: false,
+          tdsEnabled: true,
+          components: [
+            {
+              name: 'CIT contribution',
+              amount: new Prisma.Decimal(1000),
+              taxable: false,
+            },
+          ],
+        }),
+      ],
+    });
+
+    await expect(
+      service.listStatutoryDeductions(actor as never),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        code: 'PF',
+        configuredStructureCount: 1,
+        source: 'salary_structure_pf_enabled',
+      }),
+      expect.objectContaining({
+        code: 'TDS',
+        configuredStructureCount: 2,
+        source: 'salary_structure_tds_enabled',
+      }),
+      expect.objectContaining({
+        code: 'DEDUCTION_CIT_CONTRIBUTION',
+        name: 'CIT contribution',
+        amount: 2500,
+        configuredStructureCount: 2,
+        source: 'salary_structure_component',
+      }),
+    ]);
+
+    expect(prisma.salaryStructure.findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        status: SalaryStructureStatus.ACTIVE,
+      },
+      select: {
+        pfEnabled: true,
+        tdsEnabled: true,
+        components: {
+          where: { componentType: SalaryComponentType.DEDUCTION },
+          select: { name: true, amount: true, taxable: true },
+        },
+      },
+      orderBy: [{ effectiveFrom: 'desc' }],
+      take: 100,
+    });
+  });
+
+  it('does not return fake statutory deductions when no tenant payroll policy is configured', async () => {
+    const { service } = buildService({ salaryStructures: [] });
+
+    await expect(
+      service.listStatutoryDeductions(actor as never),
+    ).resolves.toEqual([]);
+  });
 });
 
 function buildService(options: {
   staff?: unknown;
   salaryStructureFindFirstQueue?: unknown[];
+  salaryStructures?: unknown[];
   payrollLineCount?: number;
   payrollRun?: unknown;
   payrollRuns?: unknown[];
@@ -297,7 +376,7 @@ function buildService(options: {
 
         return salaryStructureFindFirstQueue.shift();
       }),
-      findMany: jest.fn().mockResolvedValue([]),
+      findMany: jest.fn().mockResolvedValue(options.salaryStructures ?? []),
       update: jest.fn().mockResolvedValue(buildSalaryStructure()),
       create: jest.fn().mockResolvedValue(buildSalaryStructure()),
     },

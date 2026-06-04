@@ -38,7 +38,9 @@ import {
   CreatePlatformPlanDto,
   CreatePlatformWebhookEndpointDto,
   CreateSaaSInvoiceDto,
+  EnterSupportOverrideDto,
   OnboardingOverrideDto,
+  PlatformTenantBillingStatusReasonDto,
   RecordPlatformWebhookDeliveryDto,
   RecordSaaSPaymentDto,
   RevokePlatformApiKeyDto,
@@ -47,6 +49,7 @@ import {
   UpdateBillingProfileDto,
   UpdatePlatformPlanDto,
   UpdatePlatformWebhookEndpointDto,
+  UpdateProviderStatusDto,
   UpsertProviderConfigDto,
   UsageIncrementDto,
 } from './dto/platform-core.dto';
@@ -378,7 +381,7 @@ export class PlatformController {
   @Permissions('platform:providers:manage')
   async updateProviderStatus(
     @Param('id') id: string,
-    @Body() body: { enabled: boolean; reason?: string },
+    @Body() body: UpdateProviderStatusDto,
     @Req() req: AuthenticatedRequest,
   ) {
     return this.platformService.updateProviderStatus(
@@ -541,8 +544,7 @@ export class PlatformController {
   @Post('support/override/enter')
   @Permissions('platform:support:override')
   async enterSupportOverride(
-    @Body()
-    body: { tenantId: string; reason: string; durationMinutes?: number },
+    @Body() body: EnterSupportOverrideDto,
     @Req() req: AuthenticatedRequest,
   ) {
     return this.platformService.enterSupportOverride(
@@ -668,7 +670,7 @@ export class PlatformController {
   @Permissions('platform:tenants:status')
   async suspendSchoolForBilling(
     @Param('tenantId') tenantId: string,
-    @Body() body: { reason: string },
+    @Body() body: PlatformTenantBillingStatusReasonDto,
     @Req() req: AuthenticatedRequest,
   ) {
     return this.platformService.suspendTenantForBilling(
@@ -682,7 +684,7 @@ export class PlatformController {
   @Permissions('platform:tenants:status')
   async reactivateSchoolAfterPayment(
     @Param('tenantId') tenantId: string,
-    @Body() body: { reason: string },
+    @Body() body: PlatformTenantBillingStatusReasonDto,
     @Req() req: AuthenticatedRequest,
   ) {
     return this.platformService.reactivateTenantAfterPayment(

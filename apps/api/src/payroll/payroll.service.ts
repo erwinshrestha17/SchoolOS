@@ -10,6 +10,7 @@ import {
   PayrollPaymentStatus,
   PayrollRunStatus,
   Prisma,
+  SalaryComponentType,
   SalaryStructureStatus,
 } from '@prisma/client';
 import type { PayrollPreviewResult } from '@schoolos/core';
@@ -1363,14 +1364,114 @@ export class PayrollService {
     return this.getPayslipPdf(payslip.payslipNumber, actor);
   }
 
-  listStatutoryDeductions() {
-    return [
-      {
-        code: 'SSF_DEMO',
-        name: 'Social security demo deduction',
-        ratePercent: 1,
-        note: 'Demo-ready placeholder; final statutory rates remain configurable by policy.',
+  async listStatutoryDeductions(actor: AuthContext) {
+    const structures = await this.prisma.salaryStructure.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        status: SalaryStructureStatus.ACTIVE,
       },
+      select: {
+        pfEnabled: true,
+        tdsEnabled: true,
+        components: {
+          where: { componentType: SalaryComponentType.DEDUCTION },
+          select: { name: true, amount: true, taxable: true },
+        },
+      },
+      orderBy: [{ effectiveFrom: 'desc' }],
+      take: 100,
+    });
+
+    const activeStructureCount = structures.length;
+    const pfStructureCount = structures.filter(
+      (structure) => structure.pfEnabled,
+    ).length;
+    const tdsStructureCount = structures.filter(
+      (structure) => structure.tdsEnabled,
+    ).length;
+    const configuredComponentMap = new Map<
+      string,
+      {
+        name: string;
+        totalAmount: Prisma.Decimal;
+        structureCount: number;
+        taxable: boolean;
+      }
+    >();
+
+    for (const structure of structures) {
+      const seenNames = new Set<string>();
+      for (const component of structure.components) {
+        const name = component.name.trim();
+        if (!name) {
+          continue;
+        }
+
+        const key = name.toLowerCase();
+        const existing = configuredComponentMap.get(key);
+        if (existing) {
+          existing.totalAmount = existing.totalAmount.add(component.amount);
+          existing.taxable = existing.taxable || component.taxable;
+          if (!seenNames.has(key)) {
+            existing.structureCount += 1;
+          }
+        } else {
+          configuredComponentMap.set(key, {
+            name,
+            totalAmount: component.amount,
+            structureCount: 1,
+            taxable: component.taxable,
+          });
+        }
+        seenNames.add(key);
+      }
+    }
+
+    const configuredDeductions = Array.from(
+      configuredComponentMap.values(),
+    ).map((component) => ({
+      code: `DEDUCTION_${component.name
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')}`,
+      name: component.name,
+      ratePercent: null,
+      amount: Number(component.totalAmount),
+      activeStructureCount,
+      configuredStructureCount: component.structureCount,
+      taxable: component.taxable,
+      source: 'salary_structure_component',
+      note: 'Configured deduction component from active tenant salary structures.',
+    }));
+
+    return [
+      ...(pfStructureCount > 0
+        ? [
+            {
+              code: 'PF',
+              name: 'Provident fund',
+              ratePercent: 10,
+              activeStructureCount,
+              configuredStructureCount: pfStructureCount,
+              source: 'salary_structure_pf_enabled',
+              note: 'Enabled on active tenant salary structures. Rate follows the current payroll calculation policy.',
+            },
+          ]
+        : []),
+      ...(tdsStructureCount > 0
+        ? [
+            {
+              code: 'TDS',
+              name: 'Tax deducted at source',
+              ratePercent: 1,
+              activeStructureCount,
+              configuredStructureCount: tdsStructureCount,
+              source: 'salary_structure_tds_enabled',
+              note: 'Enabled on active tenant salary structures. Rate follows the current payroll calculation policy.',
+            },
+          ]
+        : []),
+      ...configuredDeductions,
     ];
   }
 

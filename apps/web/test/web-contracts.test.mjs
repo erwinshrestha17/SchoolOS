@@ -449,6 +449,14 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(apiClient, /getAccessToken/);
   });
 
+  it('uses secure browser randomness for API request IDs', () => {
+    const apiClient = read('lib/api/client.ts');
+
+    assert.match(apiClient, /crypto\?\.randomUUID/);
+    assert.match(apiClient, /crypto\?\.getRandomValues/);
+    assert.doesNotMatch(apiClient, /Math\.random/);
+  });
+
   it('keeps Phase 1 pilot navigation permission-gated and prominent', () => {
     const sidebar = read('components/layout/sidebar.tsx');
     const requiredPhaseOneLabels = [

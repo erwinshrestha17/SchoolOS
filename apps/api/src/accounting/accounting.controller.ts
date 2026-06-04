@@ -39,6 +39,10 @@ import { PostJournalDto } from './dto/post-journal.dto';
 import { CancelJournalDto } from './dto/cancel-journal.dto';
 import { CreateOpeningBalanceDto } from './dto/opening-balance.dto';
 import {
+  ImportBankStatementDto,
+  ReconcileBankStatementDto,
+} from './dto/import-bank-statement.dto';
+import {
   ExpenseVoucherDto,
   PaymentVoucherDto,
   ReceiptVoucherDto,
@@ -473,16 +477,7 @@ export class AccountingController {
   @Permissions('accounting:settings:update')
   importBankStatement(
     @Param('accountId') accountId: string,
-    @Body()
-    body: {
-      lines: Array<{
-        statementDate: string;
-        description: string;
-        reference?: string;
-        debitAmount?: number;
-        creditAmount?: number;
-      }>;
-    },
+    @Body() body: ImportBankStatementDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.accountingService.importBankStatement(
@@ -516,7 +511,7 @@ export class AccountingController {
   @Post('bank-reconciliation/reconcile')
   @Permissions('accounting:settings:update')
   reconcileStatement(
-    @Body() body: { statementId: string; journalLineId: string },
+    @Body() body: ReconcileBankStatementDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.accountingService.reconcileStatement(

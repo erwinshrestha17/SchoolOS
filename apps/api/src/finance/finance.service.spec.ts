@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import {
   AuthMethod,
@@ -1358,7 +1359,7 @@ describe('finance production controls', () => {
     );
   });
 
-  it('marks configured payment gateways ready only when webhook and intent config exist', async () => {
+  it('keeps configured payment gateways disabled until a server adapter exists', async () => {
     const { service } = buildService({
       invoice: null,
       feeHead: null,
@@ -1381,13 +1382,118 @@ describe('finance production controls', () => {
 
     expect(result).toEqual(
       expect.objectContaining({
-        enabled: true,
-        status: 'ready',
+        enabled: false,
+        status: 'adapter_not_implemented',
         webhookReady: true,
-        paymentIntentReady: true,
+        paymentIntentConfigured: true,
+        paymentIntentReady: false,
+        providerAdapterReady: false,
         settlementTrackingReady: true,
+        message:
+          'Online payment gateway configuration exists, but no approved server-side provider adapter is implemented. Use manual/cash/bank collection until gateway integration is approved.',
       }),
     );
+  });
+
+  it('does not create fake online payment intents when no adapter is implemented', async () => {
+    const { service } = buildService({
+      invoice: buildInvoice(),
+      feeHead: null,
+      gatewayProvider: {
+        id: 'provider-1',
+        name: 'Nepal Gateway',
+        enabled: true,
+        environment: 'TEST',
+        validationStatus: 'VALID',
+        lastValidatedAt: new Date('2026-05-01T00:00:00.000Z'),
+        configEncrypted: {
+          webhookPath: '/payments/webhooks/nepal-gateway',
+          intentUrl: 'https://gateway.test/intent',
+        },
+      },
+    });
+
+    await expect(
+      service.initiateOnlinePayment(
+        {
+          invoiceId: 'invoice-1',
+          provider: 'Nepal Gateway',
+          amount: 500,
+        },
+        actor as never,
+      ),
+    ).rejects.toThrow('Online payment provider is disabled or not configured.');
+  });
+
+  it('verifies online payment webhooks with configured HMAC signatures before audit', async () => {
+    const payload = {
+      event: 'payment.success',
+      reference: 'INV-001',
+      amount: 500,
+    };
+    const signature = createHmac('sha256', 'webhook-secret')
+      .update(JSON.stringify(payload))
+      .digest('hex');
+    const { service, auditService } = buildService({
+      invoice: buildInvoice({ invoiceNumber: 'INV-001' }),
+      feeHead: null,
+      gatewayProvider: {
+        id: 'provider-1',
+        name: 'NEPAL_GATEWAY',
+        enabled: true,
+        environment: 'TEST',
+        validationStatus: 'VALID',
+        configEncrypted: {
+          webhookSigningSecret: 'webhook-secret',
+        },
+      },
+    });
+
+    await expect(
+      service.handleOnlinePaymentWebhook('nepal_gateway', payload, {
+        'nepal_gateway-signature': `sha256=${signature}`,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        status: 'verified',
+        postedToLedger: false,
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'webhook_received',
+        tenantId: actor.tenantId,
+      }),
+    );
+  });
+
+  it('rejects unsigned or invalid online payment webhooks without audit', async () => {
+    const payload = {
+      event: 'payment.success',
+      reference: 'INV-001',
+      amount: 500,
+    };
+    const { service, auditService } = buildService({
+      invoice: buildInvoice({ invoiceNumber: 'INV-001' }),
+      feeHead: null,
+      gatewayProvider: {
+        id: 'provider-1',
+        name: 'NEPAL_GATEWAY',
+        enabled: true,
+        environment: 'TEST',
+        validationStatus: 'VALID',
+        configEncrypted: {
+          webhookSigningSecret: 'webhook-secret',
+        },
+      },
+    });
+
+    await expect(
+      service.handleOnlinePaymentWebhook('nepal_gateway', payload, {
+        'nepal_gateway-signature': 'sha256=deadbeef',
+      }),
+    ).rejects.toThrow('Invalid signature.');
+    expect(auditService.record).not.toHaveBeenCalled();
   });
 
   it('rejects missing invoices, fee heads, and source journals', async () => {
@@ -1763,6 +1869,7 @@ function buildService(options: {
         checkLimit: jest.fn().mockResolvedValue(undefined),
         incrementUsage: jest.fn().mockResolvedValue(undefined),
       } as any,
+      { jwtSecret: 'finance-test-secret' } as never,
       options.fileRegistryService as never,
     ),
     prisma,

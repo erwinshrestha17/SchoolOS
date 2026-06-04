@@ -193,6 +193,18 @@ describe('PayrollController M7 contracts', () => {
     );
   });
 
+  it('delegates statutory deductions with tenant auth context', () => {
+    const { controller, payrollService } = createController();
+    payrollService.listStatutoryDeductions.mockReturnValue([
+      { code: 'TDS', source: 'salary_structure_tds_enabled' },
+    ]);
+
+    expect(controller.listStatutoryDeductions(actor)).toEqual([
+      { code: 'TDS', source: 'salary_structure_tds_enabled' },
+    ]);
+    expect(payrollService.listStatutoryDeductions).toHaveBeenCalledWith(actor);
+  });
+
   it('delegates payslip access through staff/HR scoped service methods', () => {
     const { controller, payrollService, salarySlipService } =
       createController();

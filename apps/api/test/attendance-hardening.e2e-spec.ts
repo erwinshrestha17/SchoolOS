@@ -368,8 +368,7 @@ describe('Attendance Hardening (E2E)', () => {
       const summary = await mobileController.getStudentAttendanceSummary(
         'student-1',
         parentActor,
-        5,
-        2026,
+        { month: 5, year: 2026 },
       );
 
       expect(summary.studentId).toBe('student-1');
@@ -380,8 +379,7 @@ describe('Attendance Hardening (E2E)', () => {
         mobileController.getStudentAttendanceSummary(
           'student-2', // student-2 is child of guardian-2 / parent-2
           parentActor,
-          5,
-          2026,
+          { month: 5, year: 2026 },
         ),
       ).rejects.toThrow(ForbiddenException);
     });
@@ -391,8 +389,7 @@ describe('Attendance Hardening (E2E)', () => {
         mobileController.getStudentAttendanceSummary(
           'student-other-tenant',
           parentActor,
-          5,
-          2026,
+          { month: 5, year: 2026 },
         ),
       ).rejects.toThrow(NotFoundException);
     });

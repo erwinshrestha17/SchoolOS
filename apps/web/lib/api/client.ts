@@ -330,7 +330,15 @@ export function createRequestId() {
     return globalThis.crypto.randomUUID();
   }
 
-  return `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  if (typeof globalThis.crypto?.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(bytes);
+    return `web-${Array.from(bytes, (byte) =>
+      byte.toString(16).padStart(2, '0'),
+    ).join('')}`;
+  }
+
+  throw new Error('Secure random request IDs are unavailable');
 }
 
 export function readFileAsBase64(file: File) {
