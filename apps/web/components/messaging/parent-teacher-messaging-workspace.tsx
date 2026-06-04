@@ -25,7 +25,8 @@ import { useSession } from '@/components/session-provider';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { LoadingState } from '@/components/ui/loading-state';
-import { PageHeader } from '@/components/ui/page-header';
+import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
+import { ModuleHero } from '@/components/dashboard/module-hero';
 import { SectionCard } from '@/components/ui/section-card';
 
 type Props = {
@@ -164,10 +165,15 @@ export function ParentTeacherMessagingWorkspace({ threadId }: Props) {
   );
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <DashboardPageShell>
+      <ModuleHero
         title="Messages"
-        description="Parent and class-teacher communication with school moderation and quiet-hours controls."
+        subtitle="Parent and class-teacher communication with school moderation and quiet-hours controls."
+        badge="Messages"
+        category="School Operations"
+        icon={<MessageSquare size={32} className="text-indigo-400" />}
+        accentColor="indigo"
+        variant="dark"
       />
 
       <AvailabilityBanner
@@ -391,7 +397,7 @@ export function ParentTeacherMessagingWorkspace({ threadId }: Props) {
           ) : null}
         </SectionCard>
       </div>
-    </div>
+    </DashboardPageShell>
   );
 }
 

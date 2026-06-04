@@ -174,14 +174,16 @@ export function StudentDirectory({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Records" value={totalStudents} icon={<Users size={20} />} />
-        <StatCard title="Active Enrollment" value={students.filter(s => s.lifecycleStatus === 'ACTIVE').length} icon={<UserCheck size={20} />} className="border-success-100 bg-success-50/20" />
-        <StatCard title="Current Page" value={currentPage} icon={<Filter size={20} />} className="border-primary-100 bg-primary-50/20" />
-        <div className="flex items-center justify-end px-2 gap-2">
-           <button
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="grid gap-4 flex-1 grid-cols-1 sm:grid-cols-3">
+          <StatCard title="Total Records" value={totalStudents} icon={<Users size={20} />} />
+          <StatCard title="Active Enrollment" value={students.filter(s => s.lifecycleStatus === 'ACTIVE').length} icon={<UserCheck size={20} />} className="border-success-100 bg-success-50/20" />
+          <StatCard title="Current Page" value={currentPage} icon={<Filter size={20} />} className="border-primary-100 bg-primary-50/20" />
+        </div>
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end shrink-0">
+          <button
             type="button"
-            className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 shrink-0"
             onClick={() => onExportRoster('csv', { academicYearId, classId, sectionId })}
           >
             <Download size={18} />
@@ -189,16 +191,16 @@ export function StudentDirectory({
           </button>
           <button
             type="button"
-            className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 shrink-0"
             onClick={onExportIemis}
             disabled={!canExportIemis || isExportingIemis}
           >
             <Download size={18} />
             {isExportingIemis ? 'Exporting...' : 'iEMIS'}
           </button>
-           <Link
+          <Link
             href="/dashboard/admissions"
-            className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800"
+            className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800 shrink-0"
           >
             <UserPlus size={18} />
             Enroll Student
