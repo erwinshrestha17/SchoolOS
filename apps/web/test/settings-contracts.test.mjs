@@ -120,4 +120,41 @@ describe('SchoolOS Settings Page Contracts', () => {
     assert.match(apiClient, /getSchoolLogoDownload:/);
     assert.match(apiClient, /removeSchoolLogo:/);
   });
+
+  it('connects Users & Access settings to live tenant user APIs', () => {
+    const page = read('app/dashboard/settings/page.tsx');
+    const usersApi = read('lib/api/users.ts');
+    const apiBarrel = read('lib/api.ts');
+
+    assert.match(page, /api\.listUsers/);
+    assert.match(page, /api\.createUser/);
+    assert.match(page, /api\.updateUserStatus/);
+    assert.match(page, /api\.resetUserPassword/);
+    assert.match(page, /api\.forceLogoutUser/);
+    assert.match(page, /Tenant-scoped user management is active/);
+    assert.doesNotMatch(page, /User management backend pending/);
+    assert.doesNotMatch(page, /Backend route pending/);
+    assert.doesNotMatch(page, /API pending/);
+    assert.match(usersApi, /request<SchoolUserSummary\[\]>\('\/users'\)/);
+    assert.match(usersApi, /\/users\/\$\{encodeURIComponent\(userId\)\}\/status/);
+    assert.match(usersApi, /\/users\/\$\{encodeURIComponent\(userId\)\}\/reset-password/);
+    assert.match(usersApi, /\/users\/\$\{encodeURIComponent\(userId\)\}\/force-logout/);
+    assert.match(apiBarrel, /usersApi/);
+  });
+
+  it('connects the Settings audit panel to tenant-scoped audit logs', () => {
+    const page = read('app/dashboard/settings/page.tsx');
+    const apiClient = read('lib/api/platform.ts');
+
+    assert.match(page, /api\.listTenantAuditLogs/);
+    assert.match(page, /settings-audit-logs/);
+    assert.match(page, /tenant-scoped audit API/);
+    assert.match(page, /Loading audit logs/);
+    assert.match(page, /No audit logs found/);
+    assert.match(apiClient, /listTenantAuditLogs:/);
+    assert.match(apiClient, /\/settings\/audit-logs/);
+    assert.doesNotMatch(page, /Log Filters \(Coming Soon\)/);
+    assert.doesNotMatch(page, /Request Audit Archive/);
+    assert.doesNotMatch(page, /Audit export will be available/);
+  });
 });

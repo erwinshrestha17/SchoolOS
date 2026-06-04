@@ -28,6 +28,10 @@ function buildService() {
       upsert: jest.fn(),
       deleteMany: jest.fn(),
     },
+    auditLog: {
+      findMany: jest.fn(),
+      count: jest.fn(),
+    },
   };
   const auditService = { record: jest.fn() };
   const storageService = { saveBufferObject: jest.fn() };
@@ -213,5 +217,59 @@ describe('SettingsService school logo uploads', () => {
       expect.objectContaining({ action: 'school_logo_removed' }),
     );
     expect(result).toEqual({ success: true, removed: true });
+  });
+
+  it('lists only tenant-scoped audit logs with filters and pagination', async () => {
+    const { service, prisma } = buildService();
+    prisma.auditLog.findMany.mockResolvedValue([
+      {
+        id: 'audit-1',
+        action: 'setting_updated',
+        resource: 'settings',
+        resourceId: 'school_name',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        before: { value: 'Old School' },
+        after: { value: 'New School' },
+        ipAddress: null,
+        userAgent: null,
+        requestId: 'req-1',
+        createdAt: new Date('2026-06-04T00:00:00.000Z'),
+        user: {
+          id: actor.userId,
+          email: actor.email,
+          phone: null,
+        },
+      },
+    ]);
+    prisma.auditLog.count.mockResolvedValue(1);
+
+    const result = await service.listTenantAuditLogs({
+      tenantId: actor.tenantId,
+      action: ' setting_updated ',
+      resource: 'settings',
+      page: '1',
+      limit: '10',
+    });
+
+    expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: actor.tenantId,
+          action: 'setting_updated',
+          resource: 'settings',
+        },
+        skip: 0,
+        take: 10,
+      }),
+    );
+    expect(result.items[0]).toMatchObject({
+      id: 'audit-1',
+      tenantId: actor.tenantId,
+      action: 'setting_updated',
+      resource: 'settings',
+      createdAt: '2026-06-04T00:00:00.000Z',
+    });
+    expect(result.total).toBe(1);
   });
 });

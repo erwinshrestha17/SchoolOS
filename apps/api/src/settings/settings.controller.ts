@@ -3,6 +3,7 @@ import {
   Get,
   Patch,
   Param,
+  Query,
   Body,
   UseGuards,
   Req,
@@ -12,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import { PlatformService } from '../platform/platform.service';
+import type { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
@@ -63,6 +65,35 @@ export class SettingsController {
     return this.platformService.getOnboardingChecklist(req.auth.tenantId);
   }
 
+  @Get('audit-logs')
+  @Permissions('settings:manage')
+  async listTenantAuditLogs(
+    @Req() req: AuthenticatedRequest,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('action') action?: string,
+    @Query('resource') resource?: string,
+    @Query('resourceId') resourceId?: string,
+    @Query('userId') userId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    if (!req.auth) {
+      throw new UnauthorizedException('Authentication context required');
+    }
+    return this.settingsService.listTenantAuditLogs({
+      tenantId: req.auth.tenantId,
+      page,
+      limit,
+      action,
+      resource,
+      resourceId,
+      userId,
+      startDate,
+      endDate,
+    });
+  }
+
   @Post('branding/logo')
   @Permissions('settings:manage')
   uploadSchoolLogo(
@@ -103,7 +134,7 @@ export class SettingsController {
     await this.settingsService.updateSetting(
       req.auth.tenantId,
       key,
-      payload.value,
+      payload.value as Prisma.InputJsonValue,
       req.auth.userId,
     );
     return { success: true };

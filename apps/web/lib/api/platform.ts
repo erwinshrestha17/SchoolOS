@@ -295,6 +295,16 @@ export const platformApi = {
     request<TenantSettingSummary[]>('/settings/public'),
   getSchoolOnboardingChecklist: () =>
     request<PlatformOnboardingChecklist>('/settings/onboarding'),
+  listTenantAuditLogs: (
+    params?: Omit<PlatformAuditLogFilters, 'tenantId'>,
+  ) =>
+    request<PaginatedResult<PlatformAuditLog>>(
+      withQuery('/settings/audit-logs', {
+        ...params,
+        page: params?.page?.toString(),
+        limit: params?.limit?.toString(),
+      }),
+    ),
   updateTenantSetting: (key: string, value: any) =>
     request<{ success: true }>(`/settings/${encodeURIComponent(key)}`, {
       method: 'PATCH',

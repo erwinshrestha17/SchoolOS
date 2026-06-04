@@ -159,19 +159,19 @@ export function FinanceForm() {
   const [invoiceSearch, setInvoiceSearch] = useState('');
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [feeHead, setFeeHead] = useState({
-    code: 'TUITION-P1',
-    name: 'Class 1 Tuition',
+    code: '',
+    name: '',
     frequency: 'MONTHLY',
-    defaultAmount: 3500,
-    vatApplicable: true,
+    defaultAmount: 0,
+    vatApplicable: false,
   });
   const [feePlan, setFeePlan] = useState({
     academicYearId: '',
     classId: '',
     feeHeadId: '',
-    code: 'PLAN-P1',
-    name: 'Primary monthly plan',
-    amount: 3500,
+    code: '',
+    name: '',
+    amount: 0,
   });
   const [billingRun, setBillingRun] = useState({
     academicYearId: '',
@@ -182,25 +182,25 @@ export function FinanceForm() {
   });
   const [payment, setPayment] = useState({
     invoiceId: '',
-    amount: 1000,
+    amount: 0,
     method: 'CASH' as PaymentMethod,
     referenceNumber: '',
   });
   const [discount, setDiscount] = useState({
-    name: 'Sibling discount',
-    reason: 'Approved sibling discount policy',
+    name: '',
+    reason: '',
     type: 'SIBLING',
     feeHeadId: '',
     classId: '',
     feePlanId: '',
-    percentOff: 10,
+    percentOff: 0,
     amountOff: 0,
   });
   const [waiver, setWaiver] = useState({
     invoiceId: '',
     feeHeadId: '',
-    amount: 500,
-    reason: 'Manual approved waiver',
+    amount: 0,
+    reason: '',
   });
   const [defaulterFilters, setDefaulterFilters] = useState({
     classId: '',
@@ -344,7 +344,14 @@ export function FinanceForm() {
       setWaiver((current) =>
         current.invoiceId
           ? current
-          : { ...current, invoiceId: firstInvoice.id, amount: Math.min(500, remaining || 500) },
+          : {
+              ...current,
+              invoiceId: firstInvoice.id,
+              amount:
+                current.amount > 0 && current.amount <= remaining
+                  ? current.amount
+                  : 0,
+            },
       );
     }
   }, [invoicesQuery.data]);
@@ -1626,11 +1633,11 @@ function FeeSetupSection({
           <div className="grid gap-3 sm:grid-cols-2">
             <input
               type="number"
-              value={feeHead.defaultAmount}
+              value={feeHead.defaultAmount > 0 ? feeHead.defaultAmount : ''}
               onChange={(event) =>
                 setFeeHead((current) => ({
                   ...current,
-                  defaultAmount: Number(event.target.value),
+                  defaultAmount: Number(event.target.value || 0),
                 }))
               }
               placeholder="Default amount"
@@ -1648,8 +1655,14 @@ function FeeSetupSection({
           </div>
           <button
             className="rounded-2xl bg-[var(--accent)] px-5 py-3 font-semibold text-white disabled:opacity-50"
-            disabled={!feeHead.code || !feeHead.name || feeHeadMutation.isPending}
-            onClick={() => feeHeadMutation.mutate(feeHead)}
+            disabled={!feeHead.code.trim() || !feeHead.name.trim() || feeHeadMutation.isPending}
+            onClick={() =>
+              feeHeadMutation.mutate({
+                ...feeHead,
+                code: feeHead.code.trim(),
+                name: feeHead.name.trim(),
+              })
+            }
           >
             {feeHeadMutation.isPending ? 'Saving...' : 'Create fee head'}
           </button>
@@ -1709,22 +1722,22 @@ function FeeSetupSection({
             />
             <input
               type="number"
-              value={feePlan.amount}
+              value={feePlan.amount > 0 ? feePlan.amount : ''}
               onChange={(event) =>
-                setFeePlan((current) => ({ ...current, amount: Number(event.target.value) }))
+                setFeePlan((current) => ({ ...current, amount: Number(event.target.value || 0) }))
               }
               placeholder="Amount"
             />
           </div>
           <button
             className="rounded-2xl bg-[var(--teal)] px-5 py-3 font-semibold text-white disabled:opacity-50"
-            disabled={!feePlan.academicYearId || !feePlan.feeHeadId || feePlanMutation.isPending}
+            disabled={!feePlan.academicYearId || !feePlan.feeHeadId || !feePlan.code.trim() || !feePlan.name.trim() || feePlanMutation.isPending}
             onClick={() =>
               feePlanMutation.mutate({
                 academicYearId: feePlan.academicYearId,
                 classId: feePlan.classId || null,
-                code: feePlan.code,
-                name: feePlan.name,
+                code: feePlan.code.trim(),
+                name: feePlan.name.trim(),
                 items: [{ feeHeadId: feePlan.feeHeadId, amount: feePlan.amount }],
               })
             }
@@ -1952,11 +1965,11 @@ function DiscountsAndWaiversSection({
             <input
               type="number"
               min={0}
-              value={discount.percentOff}
+              value={discount.percentOff > 0 ? discount.percentOff : ''}
               onChange={(event) =>
                 setDiscount((current) => ({
                   ...current,
-                  percentOff: Number(event.target.value),
+                  percentOff: Number(event.target.value || 0),
                 }))
               }
               placeholder="Percent off"
@@ -1964,11 +1977,11 @@ function DiscountsAndWaiversSection({
             <input
               type="number"
               min={0}
-              value={discount.amountOff}
+              value={discount.amountOff > 0 ? discount.amountOff : ''}
               onChange={(event) =>
                 setDiscount((current) => ({
                   ...current,
-                  amountOff: Number(event.target.value),
+                  amountOff: Number(event.target.value || 0),
                 }))
               }
               placeholder="Amount off"
@@ -1977,15 +1990,16 @@ function DiscountsAndWaiversSection({
           <button
             className="rounded-2xl bg-[var(--accent)] px-5 py-3 font-semibold text-white disabled:opacity-50"
             disabled={
-              !discount.name ||
-              !discount.reason ||
+              !discount.name.trim() ||
+              !discount.reason.trim() ||
               (!discount.feeHeadId && !discount.classId && !discount.feePlanId) ||
+              (discount.percentOff <= 0 && discount.amountOff <= 0) ||
               discountMutation.isPending
             }
             onClick={() =>
               discountMutation.mutate({
-                name: discount.name,
-                reason: discount.reason,
+                name: discount.name.trim(),
+                reason: discount.reason.trim(),
                 type: discount.type,
                 feeHeadId: discount.feeHeadId || null,
                 classId: discount.classId || null,
@@ -2016,7 +2030,10 @@ function DiscountsAndWaiversSection({
               setWaiver((current) => ({
                 ...current,
                 invoiceId: event.target.value,
-                amount: Math.min(current.amount || 500, remaining || current.amount),
+                amount:
+                  current.amount > 0 && current.amount <= remaining
+                    ? current.amount
+                    : 0,
               }));
             }}
           >
@@ -2043,9 +2060,9 @@ function DiscountsAndWaiversSection({
           <input
             type="number"
             min={1}
-            value={waiver.amount}
+            value={waiver.amount > 0 ? waiver.amount : ''}
             onChange={(event) =>
-              setWaiver((current) => ({ ...current, amount: Number(event.target.value) }))
+              setWaiver((current) => ({ ...current, amount: Number(event.target.value || 0) }))
             }
             placeholder="Waiver amount"
           />
@@ -2064,14 +2081,14 @@ function DiscountsAndWaiversSection({
           ) : null}
           <button
             className="rounded-2xl bg-[var(--ink)] px-5 py-3 font-semibold text-white disabled:opacity-50"
-            disabled={!selectedWaiverInvoice?.student?.id || waiver.amount <= 0 || waiverMutation.isPending}
+            disabled={!selectedWaiverInvoice?.student?.id || waiver.amount <= 0 || !waiver.reason.trim() || waiverMutation.isPending}
             onClick={() =>
               waiverMutation.mutate({
                 studentId: selectedWaiverInvoice?.student?.id,
                 invoiceId: waiver.invoiceId || null,
                 feeHeadId: waiver.feeHeadId || null,
                 amount: waiver.amount,
-                reason: waiver.reason,
+                reason: waiver.reason.trim(),
               })
             }
           >

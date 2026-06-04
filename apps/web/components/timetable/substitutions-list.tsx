@@ -29,6 +29,12 @@ export function SubstitutionsList({ filters }: { filters: any }) {
     queryKey: ['timetable-substitutions', filters],
     queryFn: () => api.listSubstitutions(filters),
   });
+  const slotQuery = useQuery({
+    queryKey: ['timetable-substitution-slots', filters.classId],
+    queryFn: () => api.listTimetable({ classId: filters.classId }),
+    enabled: Boolean(filters.classId),
+  });
+  const slotOptions = slotQuery.data ?? [];
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => api.cancelSubstitution(id),
@@ -161,11 +167,30 @@ export function SubstitutionsList({ filters }: { filters: any }) {
           <h2 className="text-lg font-black uppercase italic tracking-tight text-slate-900">Teacher Substitutions</h2>
           <p className="text-sm text-slate-500 font-medium">Manage faculty absences and assign replacement teachers.</p>
         </div>
-        <Button className="rounded-2xl font-bold">
+        <Button
+          className="rounded-2xl font-bold"
+          disabled={!filters.classId || slotQuery.isLoading || slotOptions.length === 0}
+          title={
+            !filters.classId
+              ? 'Select a class before recording an absence.'
+              : slotOptions.length === 0
+                ? 'No timetable slots are available for the selected class.'
+                : undefined
+          }
+          onClick={() => {
+            setSelectedSub(null);
+            setIsModalOpen(true);
+          }}
+        >
           <Plus className="mr-2 h-4 w-4" />
-          Record Absence
+          {slotQuery.isLoading ? 'Loading slots...' : 'Record Absence'}
         </Button>
       </div>
+      {!filters.classId ? (
+        <p className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs font-semibold text-indigo-700">
+          Select a class in the timetable filters to record an absence from a real published slot.
+        </p>
+      ) : null}
 
       {substitutionsQuery.data?.length === 0 ? (
         <EmptyState 
@@ -183,8 +208,9 @@ export function SubstitutionsList({ filters }: { filters: any }) {
           setIsModalOpen(false);
           setSelectedSub(null);
         }}
+        slots={slotOptions}
         substitution={selectedSub}
-        mode="assign"
+        mode={selectedSub ? 'assign' : 'create'}
       />
 
       <ConfirmDialog

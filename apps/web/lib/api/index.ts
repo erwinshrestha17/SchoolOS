@@ -9,8 +9,9 @@ export * from './payroll';
 export * from './communications';
 export * from './messaging';
 export * from './activity';
+export * from './marketing';
 export * from './platform';
+export * from './users';
 export * from './canteen';
 export * from './library';
 export * from './transport';
-

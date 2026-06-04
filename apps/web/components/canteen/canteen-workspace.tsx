@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { AlertTriangle, Ban, Download, Package, QrCode, Soup, Utensils, Wallet } from 'lucide-react';
+import { AlertTriangle, Download, Package, QrCode, Soup, Utensils, Wallet } from 'lucide-react';
 import type { StudentProfile } from '@schoolos/core';
 import { api } from '../../lib/api';
 import { canteenApi, type CanteenEnrollmentPayload, type CanteenInventoryItemPayload, type CanteenMealPlanPayload, type CanteenMealServingPayload, type CanteenMenuItemPayload, type CanteenPaymentMethod, type CanteenPosReceipt, type CanteenPosSalePayload, type CanteenPurchaseBillPayload, type CanteenSpendingControlPayload, type CanteenStockAdjustmentPayload, type CanteenSupplierPayload, type CanteenTopUpPayload, type CanteenWastagePayload } from '../../lib/canteen-api';
@@ -95,8 +95,6 @@ const emptyPosForm: CanteenPosSalePayload = {
 };
 const emptyControlForm: CanteenSpendingControlPayload = {
   studentId: '',
-  dailySpendingLimit: 200,
-  lowBalanceThreshold: 100,
   isActive: true,
 };
 const emptySupplierForm: CanteenSupplierPayload = {
@@ -151,6 +149,12 @@ const moneyFormatter = new Intl.NumberFormat('en-NP', {
   currency: 'NPR',
   maximumFractionDigits: 0,
 });
+
+function optionalNumber(value: string | number | null | undefined) {
+  if (value === null || value === undefined || value === '') return undefined;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
 
 export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<CanteenTab>(initialTab);
@@ -256,6 +260,13 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
     void queryClient.invalidateQueries({ queryKey: ['canteen-item-sales'] });
     void queryClient.invalidateQueries({
       queryKey: ['canteen-spending-summary'],
+    });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-control'] });
+    void queryClient.invalidateQueries({
+      queryKey: ['canteen-control-preview'],
+    });
+    void queryClient.invalidateQueries({
+      queryKey: ['canteen-serving-control-preview'],
     });
     void queryClient.invalidateQueries({ queryKey: ['canteen-wallet'] });
     void queryClient.invalidateQueries({
@@ -437,7 +448,6 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
     activeMealPlans: plans.filter((plan) => plan.status === 'ACTIVE').length,
     mealsServedToday: servings.filter((serving) => serving.status === 'SERVED').length,
     walletLow: lowBalanceWallets.length,
-    blockedByLimit: 0,
     allergyWarnings: allergyWarnings.length,
   };
 
@@ -461,6 +471,38 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
     enabled: Boolean(selectedPosStudent),
   });
 
+  const selectedControlStudent = controlForm.studentId;
+  const controlStudentQuery = useQuery({
+    queryKey: ['canteen-control', selectedControlStudent],
+    queryFn: () => canteenApi.getSpendingControl(selectedControlStudent!),
+    enabled: activeTab === 'controls' && Boolean(selectedControlStudent),
+  });
+
+  useEffect(() => {
+    if (!selectedControlStudent || !controlStudentQuery.isSuccess) return;
+
+    const savedControl = controlStudentQuery.data;
+    setControlForm((current) => {
+      if (current.studentId !== selectedControlStudent) return current;
+      if (!savedControl) {
+        return { ...emptyControlForm, studentId: selectedControlStudent };
+      }
+
+      return {
+        studentId: savedControl.studentId,
+        dailySpendingLimit: optionalNumber(savedControl.dailySpendingLimit),
+        blockedCategories: savedControl.blockedCategories ?? [],
+        blockedMenuItemIds: savedControl.blockedMenuItemIds ?? [],
+        lowBalanceThreshold: optionalNumber(savedControl.lowBalanceThreshold),
+        isActive: savedControl.isActive,
+      };
+    });
+  }, [
+    selectedControlStudent,
+    controlStudentQuery.data,
+    controlStudentQuery.isSuccess,
+  ]);
+
   const firstError = menuQuery.error || plansQuery.error || enrollmentsQuery.error || servingsQuery.error || salesQuery.error || lowBalanceQuery.error || suppliersQuery.error || inventoryItemsQuery.error || stockLedgerQuery.error;
 
   function normalizeScannedStudent(data: CanteenQrStudent) {
@@ -482,15 +524,13 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
             <StatCard title="Active Meal Plans" value={stats.activeMealPlans} icon={<Soup size={18} />} loading={plansQuery.isLoading} />
             <StatCard title="Meals Served Today" value={stats.mealsServedToday} icon={<Soup size={18} />} loading={servingsQuery.isLoading} />
             <StatCard title="Wallet Low" value={stats.walletLow} icon={<Wallet size={18} />} loading={lowBalanceQuery.isLoading} />
-            <StatCard title="Blocked by Limit" value={stats.blockedByLimit} icon={<Ban size={18} />} loading={salesQuery.isLoading} />
             <StatCard title="Allergy Warnings" value={stats.allergyWarnings} icon={<AlertTriangle size={18} />} loading={servingsQuery.isLoading} />
           </div>
           <div className="flex flex-wrap gap-2">
             {stats.walletLow > 0 ? <CanteenStatusBadge status="WALLET_LOW" /> : null}
-            {stats.blockedByLimit > 0 ? <CanteenStatusBadge status="BLOCKED_BY_PARENT_LIMIT" /> : null}
             {stats.allergyWarnings > 0 ? <CanteenStatusBadge status="ALLERGY_WARNING" /> : null}
           </div>
-          <InfoCard lines={['All wallet, POS, and meal-plan fee totals come from backend responses; frontend does not calculate financial truth.', 'Blocked-by-limit count needs a backend report/event feed; this overview shows 0 until that exists.', 'Canteen revenue and meal-plan fee effects stay backend-controlled through AccountingPostingService and FinanceService boundaries.', 'Allergy and dietary warnings are shown when backend serving responses include warning data.']} />
+          <InfoCard lines={['All wallet, POS, and meal-plan fee totals come from backend responses; frontend does not calculate financial truth.', 'Canteen revenue and meal-plan fee effects stay backend-controlled through AccountingPostingService and FinanceService boundaries.', 'Allergy and dietary warnings are shown when backend serving responses include warning data.']} />
           <LowBalanceList wallets={lowBalanceWallets.slice(0, 5)} />
           <SaleList sales={sales.slice(0, 5)} emptyTitle="No recent POS sales" />
         </div>
@@ -922,7 +962,7 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
 
               {posStudentWalletQuery.data ? <div className={cn('rounded-xl border p-3 text-sm font-bold', isWalletLow(posStudentWalletQuery.data.balance, posStudentWalletQuery.data.lowBalanceThreshold) ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-100 bg-emerald-50 text-emerald-800')}>Wallet Balance: {money(posStudentWalletQuery.data.balance)}</div> : null}
 
-              {posStudentControlQuery.data?.blockedCategories?.length ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-800">Warning: Parent blocked categories: {posStudentControlQuery.data.blockedCategories.join(', ')}</div> : null}
+              {posStudentControlQuery.data?.blockedCategories?.length ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-800">Warning: blocked categories: {posStudentControlQuery.data.blockedCategories.join(', ')}</div> : null}
 
               <button
                 type="submit"
@@ -1277,16 +1317,26 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
 
       {activeTab === 'controls' && (
         <TwoColumn>
-          <Panel title="Spending controls" description="Apply daily limits, category blocks, item blocks, and low-balance thresholds.">
-            <InfoCard lines={['Controls are applied by backend during wallet and POS workflows.', 'Use comma-separated blocked categories for now.', 'Parent-facing control UI will come later.']} />
-            <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <CanteenStatusBadge status={controlForm.isActive ? 'ACTIVE' : 'INACTIVE'} />
-                {(controlForm.blockedCategories ?? []).length > 0 ? <CanteenStatusBadge status="BLOCKED_BY_PARENT_LIMIT" /> : null}
+          <Panel title="Saved spending control" description="Shows the tenant-scoped backend control for the selected student.">
+            <InfoCard lines={['Controls are loaded from the backend and applied server-side during POS workflows.', 'Use comma-separated blocked categories for category rules.']} />
+            {!selectedControlStudent ? <EmptyState title="Select a student" description="Choose a student in the form to load their saved spending control." /> : null}
+            {selectedControlStudent && controlStudentQuery.isLoading ? <LoadingState label="Loading saved control..." /> : null}
+            {controlStudentQuery.error ? <InlineError message={(controlStudentQuery.error as Error).message} /> : null}
+            {selectedControlStudent && controlStudentQuery.isSuccess && !controlStudentQuery.data ? (
+              <EmptyState title="No saved control" description="This student does not have a canteen spending control yet." />
+            ) : null}
+            {controlStudentQuery.data ? (
+              <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <CanteenStatusBadge status={controlStudentQuery.data.isActive ? 'ACTIVE' : 'INACTIVE'} />
+                  {controlStudentQuery.data.blockedCategories.length || controlStudentQuery.data.blockedMenuItemIds.length ? <CanteenStatusBadge status="BLOCKED_BY_PARENT_LIMIT" /> : null}
+                </div>
+                <p className="mt-3 text-sm text-slate-600">Daily limit: {controlStudentQuery.data.dailySpendingLimit ? money(controlStudentQuery.data.dailySpendingLimit) : 'Not set'}</p>
+                <p className="mt-1 text-sm text-slate-600">Low balance threshold: {controlStudentQuery.data.lowBalanceThreshold ? money(controlStudentQuery.data.lowBalanceThreshold) : 'Not set'}</p>
+                <p className="mt-1 text-sm text-slate-600">Blocked categories: {controlStudentQuery.data.blockedCategories.join(', ') || 'None selected'}</p>
+                <p className="mt-1 text-sm text-slate-600">Blocked item IDs: {controlStudentQuery.data.blockedMenuItemIds.join(', ') || 'None selected'}</p>
               </div>
-              <p className="mt-3 text-sm text-slate-600">Daily limit: {controlForm.dailySpendingLimit ? money(controlForm.dailySpendingLimit) : 'Not set'}</p>
-              <p className="mt-1 text-sm text-slate-600">Blocked categories: {(controlForm.blockedCategories ?? []).join(', ') || 'None selected'}</p>
-            </div>
+            ) : null}
           </Panel>
           <Panel title="Save control" description="Server-side controls protect canteen spending rules.">
             <form
@@ -1315,6 +1365,16 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
                   setControlForm({
                     ...controlForm,
                     blockedCategories: splitCsv(value),
+                  })
+                }
+              />
+              <TextInput
+                label="Blocked menu item IDs"
+                value={controlForm.blockedMenuItemIds?.join(', ') ?? ''}
+                onChange={(value) =>
+                  setControlForm({
+                    ...controlForm,
+                    blockedMenuItemIds: splitCsv(value),
                   })
                 }
               />

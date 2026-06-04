@@ -299,6 +299,25 @@ describe('SchoolOS web production contracts', () => {
     );
   });
 
+  it('keeps timetable dashboard summary cards backend-backed', () => {
+    const timetablePage = read('app/dashboard/timetable/page.tsx');
+
+    assert.match(timetablePage, /validateTimetableVersion/);
+    assert.match(timetablePage, /listSubstitutions/);
+    assert.match(timetablePage, /timetable-validation-summary/);
+    assert.match(timetablePage, /timetable-substitutions-summary/);
+    assert.match(timetablePage, /validationQuery\.data\.errors\.length/);
+    assert.match(timetablePage, /substitutionStatsQuery\.data\?\.length/);
+    assert.doesNotMatch(
+      timetablePage,
+      /title:\s*'Conflicts'[\s\S]*?value:\s*0/,
+    );
+    assert.doesNotMatch(
+      timetablePage,
+      /title:\s*'Substitutions'[\s\S]*?value:\s*0/,
+    );
+  });
+
   it('uses in-app feedback for timetable, report export, and accounting safety actions', () => {
     const polishedSurfaces = readMany([
       'components/timetable/versions-list.tsx',
@@ -313,6 +332,11 @@ describe('SchoolOS web production contracts', () => {
       'Toast',
       'Version published',
       'Export ready',
+      'Record Absence',
+      'timetable-substitution-slots',
+      'api.listTimetable',
+      "mode={selectedSub ? 'assign' : 'create'}",
+      'Select a class before recording an absence',
       'Seed default chart accounts?',
       'Cancel substitution?',
       'Open fiscal year required',
@@ -439,6 +463,24 @@ describe('SchoolOS web production contracts', () => {
       apiClient,
       /throw new Error\(text \|\| `Request failed/,
     );
+  });
+
+  it('submits public demo requests through the backend API instead of a local placeholder flow', () => {
+    const requestDemoForm = read('components/forms/request-demo-form.tsx');
+    const marketingApi = read('lib/api/marketing.ts');
+    const apiIndex = read('lib/api.ts');
+
+    assert.match(requestDemoForm, /api\.submitDemoRequest/);
+    assert.match(requestDemoForm, /Demo request submitted\./);
+    assert.match(requestDemoForm, /submittedRequestId/);
+    assert.doesNotMatch(requestDemoForm, /console\.log/);
+    assert.doesNotMatch(requestDemoForm, /setTimeout/);
+    assert.doesNotMatch(requestDemoForm, /TODO/);
+
+    assert.match(marketingApi, /\/demo-requests/);
+    assert.match(marketingApi, /method:\s*'POST'/);
+    assert.match(marketingApi, /auth:\s*false/);
+    assert.match(apiIndex, /marketingApi/);
   });
 
   it('uses cookie credentials instead of bearer tokens for browser API calls', () => {
@@ -1047,6 +1089,25 @@ describe('SchoolOS web production contracts', () => {
     assert.match(financeForm, /Confirm Payment & Generate Receipt/);
     assert.match(financeForm, /No fake production IDs are used/);
     assert.doesNotMatch(financeForm, /replace-me/i);
+    for (const sampleValue of [
+      /TUITION-P1/,
+      /Class 1 Tuition/,
+      /PLAN-P1/,
+      /Primary monthly plan/,
+      /Sibling discount/,
+      /Approved sibling discount policy/,
+      /Manual approved waiver/,
+      /defaultAmount:\s*3500/,
+      /amount:\s*3500/,
+      /amount:\s*1000/,
+      /Math\.min\(500/,
+    ]) {
+      assert.doesNotMatch(financeForm, sampleValue);
+    }
+    assert.match(financeForm, /!feePlan\.code\.trim\(\)/);
+    assert.match(financeForm, /!feePlan\.name\.trim\(\)/);
+    assert.match(financeForm, /discount\.percentOff <= 0 && discount\.amountOff <= 0/);
+    assert.match(financeForm, /!waiver\.reason\.trim\(\)/);
   });
 
   it('keeps cashier close day-end workflow wired to backend close endpoints', () => {
@@ -1273,6 +1334,22 @@ describe('SchoolOS web production contracts', () => {
     assert.match(canteenWorkspace, /ReceiptPreview/);
     assert.match(canteenWorkspace, /onReceiptPdf/);
     assert.doesNotMatch(canteenWorkspace, /window\.print/);
+  });
+
+  it('keeps canteen spending controls loaded from backend data', () => {
+    const canteenClient = read('lib/api/canteen.ts');
+    const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
+
+    assert.match(canteenClient, /getSpendingControl:/);
+    assert.match(canteenClient, /\/canteen\/spending-controls\/student\//);
+    assert.match(canteenWorkspace, /queryKey: \['canteen-control'/);
+    assert.match(canteenWorkspace, /controlStudentQuery\.data/);
+    assert.match(canteenWorkspace, /No saved control/);
+    assert.match(canteenWorkspace, /Blocked menu item IDs/);
+    assert.doesNotMatch(canteenWorkspace, /dailySpendingLimit: 200/);
+    assert.doesNotMatch(canteenWorkspace, /Blocked by Limit/);
+    assert.doesNotMatch(canteenWorkspace, /shows 0 until/);
+    assert.doesNotMatch(canteenWorkspace, /Parent-facing control UI/);
   });
 
   it('keeps canteen reports and CSV exports wired to backend report routes', () => {

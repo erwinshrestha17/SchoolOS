@@ -64,6 +64,32 @@ test.describe('Public route smoke', () => {
   });
 
   test('request-demo page renders expected UI and can be submitted', async ({ page }) => {
+    await page.route('**/api/v1/demo-requests', async (route) => {
+      const request = route.request();
+      expect(request.method()).toBe('POST');
+      expect(await request.postDataJSON()).toMatchObject({
+        schoolName: 'Shree Janata Secondary School',
+        contactName: 'Ram Bahadur',
+        email: 'ram@janataschool.edu.np',
+        interestedModules: ['Admissions', 'Fees & Receipts', 'Accounting'],
+      });
+
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          message: 'Demo request submitted',
+          data: {
+            id: 'demo-request-e2e',
+            status: 'NEW',
+            createdAt: '2026-06-04T00:00:00.000Z',
+          },
+          meta: null,
+        }),
+      });
+    });
+
     await page.goto('/request-demo');
 
     await expect(page).toHaveURL(/\/request-demo(?:$|[?#])/);
@@ -108,11 +134,12 @@ test.describe('Public route smoke', () => {
     // Submit form
     await page.getByRole('button', { name: /^Submit Demo Request$/i }).click();
 
-    // Verify local B2B success state
+    // Verify API-backed B2B success state
     await expect(
-      page.getByRole('heading', { name: /^Demo request prepared\.$/i }),
+      page.getByRole('heading', { name: /^Demo request submitted\.$/i }),
     ).toBeVisible();
     await expect(page.getByText(/Shree Janata Secondary School/i)).toBeVisible();
     await expect(page.getByText(/Ram Bahadur/i)).toBeVisible();
+    await expect(page.getByText(/demo-request-e2e/i)).toBeVisible();
   });
 });

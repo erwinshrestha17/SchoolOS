@@ -27,7 +27,6 @@ import { StaffModule } from './staff/staff.module';
 import { StorageModule } from './storage/storage.module';
 import { StudentRecordsModule } from './student-records/student-records.module';
 import { AttendanceModule } from './attendance/attendance.module';
-import { APP_RATE_LIMIT, APP_RATE_TTL_MS } from './auth/auth.constants';
 import { FinanceModule } from './finance/finance.module';
 import { CommunicationsModule } from './communications/communications.module';
 import { TimetableModule } from './timetable/timetable.module';
@@ -47,6 +46,7 @@ import { FileRegistryModule } from './file-registry/file-registry.module';
 import { ReportsModule } from './reports/reports.module';
 import { UsageModule } from './usage/usage.module';
 import { PlansModule } from './plans/plans.module';
+import { DemoRequestsModule } from './demo-requests/demo-requests.module';
 import { UsageInterceptor } from './usage/usage.interceptor';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 import { CsrfGuard } from './auth/guards/csrf.guard';
@@ -119,6 +119,7 @@ import { AppThrottlerGuard } from './auth/guards/app-throttler.guard';
     ReportsModule,
     UsageModule,
     PlansModule,
+    DemoRequestsModule,
     TenantsModule,
     RedisModule,
     NotificationsModule,

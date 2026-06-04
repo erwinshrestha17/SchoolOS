@@ -2,7 +2,12 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { Prisma } from '@prisma/client';
-import { TenantSettingKey, TenantSettingSummary } from '@schoolos/core';
+import {
+  TenantSettingKey,
+  type PaginatedResponse,
+  type PlatformAuditLog,
+  type TenantSettingSummary,
+} from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
 import { validateImageUpload } from '../common/files/image-upload-validation';
 import { FileRegistryService } from '../file-registry/file-registry.service';
@@ -147,6 +152,102 @@ export class SettingsService {
       value: s.value,
       updatedAt: s.updatedAt.toISOString(),
     }));
+  }
+
+  async listTenantAuditLogs(query: {
+    tenantId: string;
+    action?: string;
+    resource?: string;
+    resourceId?: string;
+    userId?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number | string;
+    limit?: number | string;
+  }): Promise<PaginatedResponse<PlatformAuditLog>> {
+    const page = normalizePositiveInt(query.page, 1);
+    const limit = Math.min(normalizePositiveInt(query.limit, 25), 100);
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.AuditLogWhereInput = {
+      tenantId: query.tenantId,
+    };
+
+    if (query.action?.trim()) {
+      where.action = query.action.trim();
+    }
+    if (query.resource?.trim()) {
+      where.resource = query.resource.trim();
+    }
+    if (query.resourceId?.trim()) {
+      where.resourceId = query.resourceId.trim();
+    }
+    if (query.userId?.trim()) {
+      where.userId = query.userId.trim();
+    }
+    if (query.startDate || query.endDate) {
+      where.createdAt = {
+        ...(query.startDate
+          ? { gte: parseAuditDate(query.startDate, 'startDate') }
+          : {}),
+        ...(query.endDate
+          ? { lte: parseAuditDate(query.endDate, 'endDate') }
+          : {}),
+      };
+    }
+
+    const [logs, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          action: true,
+          resource: true,
+          resourceId: true,
+          tenantId: true,
+          userId: true,
+          before: true,
+          after: true,
+          ipAddress: true,
+          userAgent: true,
+          requestId: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              phone: true,
+            },
+          },
+        },
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    return {
+      items: logs.map((log) => ({
+        id: log.id,
+        action: log.action,
+        resource: log.resource,
+        resourceId: log.resourceId,
+        tenantId: log.tenantId,
+        userId: log.userId,
+        before: log.before,
+        after: log.after,
+        ipAddress: log.ipAddress,
+        userAgent: log.userAgent,
+        requestId: log.requestId,
+        createdAt: log.createdAt.toISOString(),
+        user: log.user,
+      })),
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
   }
 
   async getSetting(
@@ -518,4 +619,20 @@ export class SettingsService {
 
     return UUID_PATTERN.test(value) ? value : null;
   }
+}
+
+function normalizePositiveInt(
+  value: number | string | undefined,
+  fallback: number,
+) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseAuditDate(value: string, label: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException(`Invalid audit ${label}.`);
+  }
+  return parsed;
 }

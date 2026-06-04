@@ -41,6 +41,11 @@ describe('CsrfGuard', () => {
         createContext({ method: 'POST', path: '/api/v1/tenants/register' }),
       ),
     ).toBe(true);
+    expect(
+      guard.canActivate(
+        createContext({ method: 'POST', path: '/api/v1/demo-requests' }),
+      ),
+    ).toBe(true);
   });
 
   it('requires the development CSRF cookie and matching header for browser mutations', () => {

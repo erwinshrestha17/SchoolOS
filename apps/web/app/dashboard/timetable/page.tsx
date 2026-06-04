@@ -57,27 +57,58 @@ export default function TimetablePage() {
 
   const activeVersion = versionsQuery.data?.find(v => v.status === 'PUBLISHED');
   const draftVersions = versionsQuery.data?.filter(v => v.status === 'DRAFT');
+  const validationQuery = useQuery({
+    queryKey: ['timetable-validation-summary', activeVersion?.id],
+    queryFn: () => api.validateTimetableVersion(activeVersion!.id),
+    enabled: Boolean(activeVersion?.id),
+  });
+  const substitutionStatsQuery = useQuery({
+    queryKey: [
+      'timetable-substitutions-summary',
+      filters.classId,
+      filters.sectionId,
+      filters.teacherId,
+      filters.status,
+    ],
+    queryFn: () =>
+      api.listSubstitutions({
+        classId: filters.classId || undefined,
+        sectionId: filters.sectionId || undefined,
+        teacherId: filters.teacherId || undefined,
+        status: filters.status || undefined,
+        limit: 200,
+      }),
+  });
+  const conflictCount = validationQuery.data
+    ? validationQuery.data.errors.length + validationQuery.data.warnings.length
+    : activeVersion
+      ? '—'
+      : '—';
 
   const stats = [
     {
       title: 'Active Version',
       value: activeVersion?.versionName || 'None',
       icon: <Calendar className="h-5 w-5" />,
+      loading: versionsQuery.isLoading,
     },
     {
       title: 'Draft Versions',
       value: draftVersions?.length ?? 0,
       icon: <Settings className="h-5 w-5" />,
+      loading: versionsQuery.isLoading,
     },
     {
       title: 'Conflicts',
-      value: 0,
+      value: conflictCount,
       icon: <FileWarning className="h-5 w-5" />,
+      loading: validationQuery.isLoading,
     },
     {
       title: 'Substitutions',
-      value: 0,
+      value: substitutionStatsQuery.data?.length ?? 0,
       icon: <Users className="h-5 w-5" />,
+      loading: substitutionStatsQuery.isLoading,
     },
   ];
 
@@ -118,7 +149,7 @@ export default function TimetablePage() {
             title={stat.title}
             value={stat.value}
             icon={stat.icon}
-            loading={versionsQuery.isLoading}
+            loading={stat.loading}
           />
         ))}
       </div>

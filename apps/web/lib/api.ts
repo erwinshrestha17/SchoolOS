@@ -10,7 +10,9 @@ export * from './api/payroll';
 export * from './api/communications';
 export * from './api/messaging';
 export * from './api/activity';
+export * from './api/marketing';
 export * from './api/platform';
+export * from './api/users';
 export * from './api/canteen';
 export * from './api/library';
 export * from './api/transport';
@@ -25,7 +27,9 @@ import { payrollApi } from './api/payroll';
 import { communicationsApi } from './api/communications';
 import { messagingApi } from './api/messaging';
 import { activityApi } from './api/activity';
+import { marketingApi } from './api/marketing';
 import { platformApi } from './api/platform';
+import { usersApi } from './api/users';
 import { canteenApi } from './api/canteen';
 import { libraryApi } from './api/library';
 import { transportApi } from './api/transport';
@@ -42,10 +46,11 @@ export const api = {
   ...communicationsApi,
   ...messagingApi,
   ...activityApi,
+  ...marketingApi,
   ...platformApi,
+  ...usersApi,
   ...canteenApi,
   ...libraryApi,
   ...transportApi,
   ...filesApi,
 };
-

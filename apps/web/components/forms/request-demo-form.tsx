@@ -23,6 +23,7 @@ import { Input } from '../ui/input';
 import { Select } from '../ui/select';
 import { Textarea } from '../ui/textarea';
 import { Progress } from '../ui/progress';
+import { api } from '../../lib/api';
 
 const MODULES = [
   'Admissions',
@@ -61,6 +62,7 @@ export function RequestDemoForm() {
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submittedRequestId, setSubmittedRequestId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleInputChange = (
@@ -113,20 +115,25 @@ export function RequestDemoForm() {
     if (!validate()) return;
 
     setIsSubmitting(true);
+    setErrors({});
 
-    // TODO: Connect this with backend CRM or lead ingestion endpoint when available.
-    const payload = {
-      ...formData,
-      interestedModules: selectedModules,
-      submittedAt: new Date().toISOString(),
-    };
-    console.log('SchoolOS Demo Request Payload Prepared:', payload);
-
-    // Simulate ingestion delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    setIsSubmitting(false);
-    setIsSubmitted(true);
+    try {
+      const result = await api.submitDemoRequest({
+        ...formData,
+        interestedModules: selectedModules,
+      });
+      setSubmittedRequestId(result.id);
+      setIsSubmitted(true);
+    } catch (error) {
+      setErrors({
+        form:
+          error instanceof Error
+            ? error.message
+            : 'Could not submit the demo request. Please try again.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Compute form completion progress
@@ -153,7 +160,7 @@ export function RequestDemoForm() {
         
         <div className="space-y-2">
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Demo request prepared.
+            Demo request submitted.
           </h1>
           <p className="text-slate-500 max-w-md mx-auto text-xs leading-relaxed">
             Thank you. The SchoolOS team will contact you for verification and onboarding planning.
@@ -179,6 +186,12 @@ export function RequestDemoForm() {
             <span className="text-slate-400 font-semibold">Expected Timeline:</span>
             <span className="text-slate-900 font-bold">{formData.expectedTimeline}</span>
           </div>
+          {submittedRequestId && (
+            <div className="flex justify-between border-t border-slate-200/50 pt-2">
+              <span className="text-slate-400 font-semibold">Request ID:</span>
+              <span className="text-slate-900 font-bold">{submittedRequestId}</span>
+            </div>
+          )}
         </div>
 
         <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
@@ -218,6 +231,11 @@ export function RequestDemoForm() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {errors.form && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
+              {errors.form}
+            </div>
+          )}
           
           {/* Section 1: School Information */}
           <div className="space-y-3.5">

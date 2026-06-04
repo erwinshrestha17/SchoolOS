@@ -241,6 +241,31 @@ model PlatformApiKey {
   @@index([expiresAt])
 }
 
+model DemoRequest {
+  id                String   @id @default(uuid())
+  schoolName        String
+  schoolType        String
+  location          String
+  studentsCount     String
+  branchesCount     String?
+  contactName       String
+  role              String
+  phone             String
+  email             String
+  preferredContact  String?
+  currentSystem     String?
+  expectedTimeline  String
+  interestedModules String[] @default([])
+  message           String?
+  status            String   @default("NEW")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([email, createdAt])
+  @@index([schoolName])
+}
+
 model ReportExport {
   id           String             @id @default(uuid())
   tenantId     String?

@@ -39,6 +39,7 @@ export class CsrfGuard implements CanActivate {
       '/api/v1/auth/otp/',
       '/api/v1/auth/password-recovery/',
       '/api/v1/tenants/register',
+      '/api/v1/demo-requests',
     ];
     if (publicPrefixes.some((prefix) => path.startsWith(prefix))) {
       return true;

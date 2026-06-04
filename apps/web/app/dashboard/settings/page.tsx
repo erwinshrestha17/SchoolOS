@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Suspense, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -46,10 +46,14 @@ import { ConfirmDialog } from '../../../components/ui/confirm-dialog';
 import { SetupForm } from '../../../components/forms/setup-form';
 import { Badge } from '../../../components/ui/badge';
 import { useEntitlements } from '../../../components/entitlements-provider';
-import { api, type TenantLogoAccess } from '../../../lib/api';
+import { api, type SchoolUserSummary, type TenantLogoAccess } from '../../../lib/api';
 import { cn } from '../../../lib/utils';
 import { systemRoleDefinitions, systemRolePermissions } from '@schoolos/core';
-import type { TenantSettingKey, TenantSettingSummary } from '@schoolos/core';
+import type {
+  PlatformAuditLog,
+  TenantSettingKey,
+  TenantSettingSummary,
+} from '@schoolos/core';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1715,9 +1719,9 @@ function OverviewPanel({
     },
     {
       label: 'Users & Access',
-      description: 'User management — coming soon',
+      description: 'Tenant users connected to the Users API',
       sectionId: 'users-access',
-      status: 'pending',
+      status: 'ok',
     },
     {
       label: 'Roles & Permissions',
@@ -2313,83 +2317,177 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
 // ─── Users & Access Panel ─────────────────────────────────────────────────────
 
 function UsersAccessPanel() {
+  const queryClient = useQueryClient();
+  const [createDraft, setCreateDraft] = useState({
+    email: '',
+    phone: '',
+    password: '',
+    roleIds: [] as string[],
+  });
+  const [resetUserId, setResetUserId] = useState<string | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const usersQuery = useQuery({
+    queryKey: ['settings', 'users'],
+    queryFn: api.listUsers,
+  });
+  const rolesQuery = useQuery({
+    queryKey: ['settings', 'roles'],
+    queryFn: api.listRoles,
+  });
+
+  const createUserMutation = useMutation({
+    mutationFn: api.createUser,
+    onSuccess: async () => {
+      setCreateDraft({ email: '', phone: '', password: '', roleIds: [] });
+      setActionNotice({ type: 'success', text: 'User account created and role assignments saved.' });
+      await queryClient.invalidateQueries({ queryKey: ['settings', 'users'] });
+    },
+    onError: (error) => {
+      setActionNotice({ type: 'error', text: getActionError(error, 'Failed to create user account.') });
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ userId, status }: { userId: string; status: 'ACTIVE' | 'SUSPENDED' }) =>
+      api.updateUserStatus(userId, { status }),
+    onSuccess: async () => {
+      setActionNotice({ type: 'success', text: 'User status updated and active sessions were handled by the API.' });
+      await queryClient.invalidateQueries({ queryKey: ['settings', 'users'] });
+    },
+    onError: (error) => {
+      setActionNotice({ type: 'error', text: getActionError(error, 'Failed to update user status.') });
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: ({ userId, password }: { userId: string; password: string }) =>
+      api.resetUserPassword(userId, password),
+    onSuccess: () => {
+      setResetUserId(null);
+      setResetPassword('');
+      setActionNotice({ type: 'success', text: 'Password reset and existing sessions revoked.' });
+    },
+    onError: (error) => {
+      setActionNotice({ type: 'error', text: getActionError(error, 'Failed to reset password.') });
+    },
+  });
+
+  const forceLogoutMutation = useMutation({
+    mutationFn: api.forceLogoutUser,
+    onSuccess: () => {
+      setActionNotice({ type: 'success', text: 'Active sessions revoked for this user.' });
+    },
+    onError: (error) => {
+      setActionNotice({ type: 'error', text: getActionError(error, 'Failed to revoke sessions.') });
+    },
+  });
+
+  const users = usersQuery.data ?? [];
+  const roles = rolesQuery.data ?? [];
+
   const userCategories = [
     {
       title: 'Admin & Staff',
       description: 'School administrators, teachers, subject teachers, support staff, and accountants.',
       icon: UserCog,
       accent: 'bg-blue-50 text-blue-700 border-blue-100',
-      count: null,
+      count: users.filter((user) => user.profileType === 'staff' || hasAnyRole(user, ['admin', 'principal', 'teacher', 'subject_teacher', 'accountant', 'librarian', 'driver'])).length,
     },
     {
       title: 'Parent Accounts',
       description: 'Parents and guardians with access to student records, notices, and messaging.',
       icon: Users,
       accent: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-      count: null,
+      count: users.filter((user) => hasAnyRole(user, ['parent'])).length,
     },
     {
       title: 'Student Accounts',
       description: 'Students with portal access for timetable, homework, activity, and notices.',
       icon: BookOpen,
       accent: 'bg-violet-50 text-violet-700 border-violet-100',
-      count: null,
+      count: users.filter((user) => user.profileType === 'student' || hasAnyRole(user, ['student'])).length,
     },
     {
       title: 'Pending Invitations',
-      description: 'Invitations sent and awaiting user acceptance.',
+      description: 'Accounts created but not activated yet.',
       icon: Key,
       accent: 'bg-amber-50 text-amber-700 border-amber-100',
-      count: null,
+      count: users.filter((user) => user.status === 'PENDING').length,
     },
     {
       title: 'Disabled Accounts',
-      description: 'Suspended or deactivated user accounts. Records preserved.',
+      description: 'Suspended accounts. Records preserved and sessions revoked.',
       icon: Lock,
       accent: 'bg-rose-50 text-rose-700 border-rose-100',
-      count: null,
+      count: users.filter((user) => user.status === 'SUSPENDED').length,
     },
   ];
 
+  function toggleRole(roleId: string) {
+    setCreateDraft((current) => ({
+      ...current,
+      roleIds: current.roleIds.includes(roleId)
+        ? current.roleIds.filter((id) => id !== roleId)
+        : [...current.roleIds, roleId],
+    }));
+  }
+
+  function submitCreateUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setActionNotice(null);
+
+    if (createDraft.roleIds.length === 0) {
+      setActionNotice({ type: 'error', text: 'Select at least one tenant role before creating the account.' });
+      return;
+    }
+
+    createUserMutation.mutate({
+      email: createDraft.email.trim(),
+      phone: createDraft.phone.trim() || undefined,
+      password: createDraft.password,
+      roleIds: createDraft.roleIds,
+    });
+  }
+
+  function submitPasswordReset(userId: string) {
+    setActionNotice(null);
+
+    if (resetPassword.length < 8) {
+      setActionNotice({ type: 'error', text: 'New password must be at least 8 characters.' });
+      return;
+    }
+
+    resetPasswordMutation.mutate({ userId, password: resetPassword });
+  }
+
   return (
     <div className="space-y-5">
-      {/* Status notice */}
-      <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-        <Lock size={15} className="mt-0.5 shrink-0 text-slate-500" />
+      <div className="flex items-start gap-3 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3">
+        <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600" />
         <div>
-          <p className="text-sm font-semibold text-slate-700">User management backend pending</p>
-          <p className="mt-0.5 text-xs leading-5 text-slate-500">
-            User invitation, password reset, and account management actions will be available once the Users API routes are deployed.
-            All role assignments and permission scoping are already defined in the role catalog.
+          <p className="text-sm font-semibold text-emerald-800">Tenant-scoped user management is active</p>
+          <p className="mt-0.5 text-xs leading-5 text-emerald-700">
+            Reads and writes use the authenticated school tenant, RBAC permissions, backend validation, session revocation, and audit logging.
           </p>
         </div>
       </div>
 
-      {/* Action buttons (disabled — pending backend) */}
-      <div className="flex flex-wrap gap-2">
-        {[
-          { label: 'Invite User', icon: Users },
-          { label: 'Manage Parent Access', icon: Key },
-          { label: 'Reset Password', icon: Lock },
-          { label: 'Disable Account', icon: Shield },
-        ].map(({ label, icon: Icon }) => (
-          <button
-            key={label}
-            type="button"
-            disabled
-            title="Backend route pending"
-            className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-400 opacity-60"
-          >
-            <Icon size={14} />
-            {label}
-            <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-              Pending
-            </span>
-          </button>
-        ))}
-      </div>
+      {actionNotice && (
+        <div
+          className={cn(
+            'flex items-start gap-2 rounded-lg border px-3 py-2 text-xs font-semibold',
+            actionNotice.type === 'success'
+              ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+              : 'border-rose-100 bg-rose-50 text-rose-700',
+          )}
+        >
+          {actionNotice.type === 'success' ? <Check size={14} /> : <AlertCircle size={14} />}
+          <span>{actionNotice.text}</span>
+        </div>
+      )}
 
-      {/* User category cards */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {userCategories.map((cat) => {
           const Icon = cat.icon;
@@ -2405,35 +2503,259 @@ function UsersAccessPanel() {
                 </div>
               </div>
               <div className="flex items-center justify-between rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2">
-                <span className="text-xs text-slate-400">Count unavailable</span>
-                <span className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                  API pending
-                </span>
+                <span className="text-xs font-semibold text-slate-500">Live count</span>
+                <span className="text-lg font-black text-slate-900">{cat.count}</span>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* MFA / security readiness */}
+      <form onSubmit={submitCreateUser} className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Create Tenant User</p>
+            <p className="mt-0.5 text-xs text-slate-500">Assign one or more existing tenant roles at creation time.</p>
+          </div>
+          <button
+            type="submit"
+            disabled={createUserMutation.isPending || rolesQuery.isLoading}
+            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {createUserMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            Create User
+          </button>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="space-y-1">
+            <span className="text-xs font-semibold text-slate-600">Email</span>
+            <input
+              type="email"
+              required
+              value={createDraft.email}
+              onChange={(event) => setCreateDraft((current) => ({ ...current, email: event.target.value }))}
+              className="input-control"
+              placeholder="user@school.edu.np"
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-semibold text-slate-600">Phone</span>
+            <input
+              type="tel"
+              value={createDraft.phone}
+              onChange={(event) => setCreateDraft((current) => ({ ...current, phone: event.target.value }))}
+              className="input-control"
+              placeholder="98XXXXXXXX"
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-semibold text-slate-600">Initial Password</span>
+            <input
+              type="password"
+              required
+              minLength={8}
+              value={createDraft.password}
+              onChange={(event) => setCreateDraft((current) => ({ ...current, password: event.target.value }))}
+              className="input-control"
+              placeholder="Minimum 8 characters"
+            />
+          </label>
+        </div>
+
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-semibold text-slate-600">Roles</p>
+          {rolesQuery.isLoading ? (
+            <div className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+              <Loader2 size={13} className="animate-spin" />
+              Loading tenant roles...
+            </div>
+          ) : roles.length === 0 ? (
+            <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+              No tenant roles are available. Sync the seeded role catalog before creating users.
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {roles.map((role) => (
+                <label key={role.id} className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white">
+                  <input
+                    type="checkbox"
+                    checked={createDraft.roleIds.includes(role.id)}
+                    onChange={() => toggleRole(role.id)}
+                    className="h-3.5 w-3.5 rounded border-slate-300"
+                  />
+                  {role.name.replace(/_/g, ' ')}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      </form>
+
+      <div className="rounded-xl border border-slate-200 bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Tenant Users</p>
+            <p className="mt-0.5 text-xs text-slate-500">Status changes, password resets, and forced logout actions are persisted by the API.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void usersQuery.refetch()}
+            disabled={usersQuery.isFetching}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {usersQuery.isFetching ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+            Refresh
+          </button>
+        </div>
+
+        {usersQuery.isLoading ? (
+          <div className="flex items-center gap-2 px-4 py-6 text-sm font-semibold text-slate-500">
+            <Loader2 size={15} className="animate-spin" />
+            Loading tenant users...
+          </div>
+        ) : usersQuery.isError ? (
+          <div className="flex items-start gap-2 px-4 py-6 text-sm font-semibold text-rose-700">
+            <AlertCircle size={15} />
+            {getActionError(usersQuery.error, 'Failed to load tenant users.')}
+          </div>
+        ) : users.length === 0 ? (
+          <div className="px-4 py-6 text-sm text-slate-500">No tenant users exist yet. Create the first school admin account above.</div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {users.map((user) => (
+              <div key={user.id} className="px-4 py-3">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate text-sm font-semibold text-slate-900">{user.email ?? 'No email on record'}</p>
+                      <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-bold uppercase', userStatusClass(user.status))}>
+                        {user.status}
+                      </span>
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-500">
+                        {user.profileType}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                      <span>{user.phone ?? 'No phone'}</span>
+                      <span>Created {formatUserDate(user.createdAt)}</span>
+                      <span>Last login {user.lastLoginAt ? formatUserDate(user.lastLoginAt) : 'not recorded'}</span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {user.roles.map((role) => (
+                        <span key={role.id} className="rounded bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 ring-1 ring-slate-100">
+                          {role.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => statusMutation.mutate({ userId: user.id, status: user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' })}
+                      disabled={statusMutation.isPending}
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {user.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResetUserId(user.id);
+                        setResetPassword('');
+                      }}
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                    >
+                      Reset Password
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => forceLogoutMutation.mutate(user.id)}
+                      disabled={forceLogoutMutation.isPending}
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Force Logout
+                    </button>
+                  </div>
+                </div>
+
+                {resetUserId === user.id && (
+                  <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-100 bg-amber-50 p-3 sm:flex-row sm:items-center">
+                    <input
+                      type="password"
+                      minLength={8}
+                      value={resetPassword}
+                      onChange={(event) => setResetPassword(event.target.value)}
+                      className="input-control bg-white"
+                      placeholder="New password, minimum 8 characters"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => submitPasswordReset(user.id)}
+                      disabled={resetPasswordMutation.isPending}
+                      className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {resetPasswordMutation.isPending ? 'Resetting...' : 'Confirm Reset'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResetUserId(null);
+                        setResetPassword('');
+                      }}
+                      className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div>
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Security Readiness</p>
         <div className="grid gap-2 sm:grid-cols-2">
           {[
-            { label: 'MFA enforcement status', value: 'Not configured' },
-            { label: 'Last login review', value: 'API pending' },
+            { label: 'Role assignments', value: roles.length > 0 ? `${roles.length} tenant role(s) available` : 'No roles loaded' },
+            { label: 'Last login review', value: users.some((user) => user.lastLoginAt) ? 'Login timestamps available' : 'No login timestamps yet' },
             { label: 'Session timeout', value: 'Configured in Security & Privacy' },
             { label: 'Sensitive field masking', value: 'Configured in Security & Privacy' },
           ].map((item) => (
             <div key={item.label} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
               <span className="text-xs font-medium text-slate-600">{item.label}</span>
-              <span className="text-xs text-slate-400">{item.value}</span>
+              <span className="text-xs text-slate-500">{item.value}</span>
             </div>
           ))}
         </div>
       </div>
     </div>
   );
+}
+
+function hasAnyRole(user: SchoolUserSummary, roleNames: string[]) {
+  return user.roles.some((role) => roleNames.includes(role.name));
+}
+
+function userStatusClass(status: SchoolUserSummary['status']) {
+  if (status === 'ACTIVE') return 'bg-emerald-50 text-emerald-700';
+  if (status === 'SUSPENDED') return 'bg-rose-50 text-rose-700';
+  return 'bg-amber-50 text-amber-700';
+}
+
+function formatUserDate(value: string) {
+  return new Intl.DateTimeFormat('en', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(value));
+}
+
+function getActionError(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 // ─── Roles & Permissions Panel ────────────────────────────────────────────────
@@ -2476,28 +2798,9 @@ function RolesPermissionsPanel() {
         <div>
           <p className="text-sm font-semibold text-slate-700">Read-only permissions overview</p>
           <p className="mt-0.5 text-xs leading-5 text-slate-500">
-            All roles are preset by SchoolOS. Custom role creation and permission editing will be available once the Roles API routes are deployed.
-            Role assignments are managed through the HR Staff module.
+            All roles are preset by SchoolOS for the pilot scope. Use Users & Access or HR Staff workflows for role assignments; this panel reviews permission coverage.
           </p>
         </div>
-      </div>
-
-      {/* Action buttons (disabled) */}
-      <div className="flex flex-wrap gap-2">
-        {['Create Custom Role', 'Edit Permissions', 'Preview Access'].map((label) => (
-          <button
-            key={label}
-            type="button"
-            disabled
-            title="Backend route pending"
-            className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-400 opacity-60"
-          >
-            {label}
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-              Pending
-            </span>
-          </button>
-        ))}
       </div>
 
       {/* Tenant roles */}
@@ -2720,7 +3023,7 @@ function DataOpColumn({
                 <Lock size={12} className="ml-2 mt-0.5 shrink-0 text-slate-300" />
               </div>
               <span className="mt-2 inline-flex items-center rounded-md bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                Coming soon
+                Planned
               </span>
             </div>
           ),
@@ -2733,6 +3036,27 @@ function DataOpColumn({
 // ─── Audit Panel ──────────────────────────────────────────────────────────────
 
 function AuditPanel() {
+  const [filters, setFilters] = useState({
+    action: '',
+    resource: '',
+    startDate: '',
+    endDate: '',
+  });
+
+  const auditQuery = useQuery({
+    queryKey: ['settings-audit-logs', filters],
+    queryFn: () =>
+      api.listTenantAuditLogs({
+        limit: 25,
+        action: filters.action.trim() || undefined,
+        resource: filters.resource.trim() || undefined,
+        startDate: filters.startDate || undefined,
+        endDate: filters.endDate || undefined,
+      }),
+  });
+
+  const logs = auditQuery.data?.items ?? [];
+
   return (
     <div className="space-y-5">
       <div className="flex items-start gap-4 rounded-xl border border-orange-100 bg-orange-50 p-4">
@@ -2742,42 +3066,161 @@ function AuditPanel() {
         <div>
           <h3 className="text-sm font-semibold text-slate-900">Audit Trail Active</h3>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            Sensitive admin actions (user creation, setting changes, fee waivers, payroll approvals) are being recorded in real time. Detailed log browsing and filtering will be available in an upcoming dedicated audit release.
+            Sensitive admin actions are recorded in the database and shown here from the tenant-scoped audit API.
           </p>
         </div>
       </div>
 
-      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Log Filters (Coming Soon)</p>
-        <div className="flex flex-wrap gap-2 opacity-40">
-          {['Date range', 'Actor', 'Action type', 'Resource', 'Severity'].map((f) => (
-            <div key={f} className="h-8 w-24 animate-pulse rounded-lg bg-slate-200" />
-          ))}
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end">
+          <div className="flex-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Action
+            </label>
+            <input
+              value={filters.action}
+              onChange={(event) =>
+                setFilters((prev) => ({ ...prev, action: event.target.value }))
+              }
+              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
+              placeholder="setting_updated"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Resource
+            </label>
+            <input
+              value={filters.resource}
+              onChange={(event) =>
+                setFilters((prev) => ({ ...prev, resource: event.target.value }))
+              }
+              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
+              placeholder="settings"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              From
+            </label>
+            <input
+              type="date"
+              value={filters.startDate}
+              onChange={(event) =>
+                setFilters((prev) => ({ ...prev, startDate: event.target.value }))
+              }
+              className="mt-1 h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              To
+            </label>
+            <input
+              type="date"
+              value={filters.endDate}
+              onChange={(event) =>
+                setFilters((prev) => ({ ...prev, endDate: event.target.value }))
+              }
+              className="mt-1 h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
+            />
+          </div>
+          <Button
+            variant="outline"
+            className="h-10 rounded-lg"
+            onClick={() =>
+              setFilters({ action: '', resource: '', startDate: '', endDate: '' })
+            }
+          >
+            Clear
+          </Button>
         </div>
-        <div className="mt-4 space-y-2 opacity-40">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <div className="h-4 w-4 rounded-full bg-slate-200" />
-              <div className="h-3 flex-1 rounded-full bg-slate-200" />
-              <div className="h-3 w-20 rounded-full bg-slate-200" />
-            </div>
-          ))}
-        </div>
-      </div>
 
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          disabled
-          className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-400 opacity-60"
-        >
-          <Download size={14} />
-          Request Audit Archive
-        </button>
-        <p className="text-xs text-slate-400">Audit export will be available after the audit module release.</p>
+        {auditQuery.isLoading ? (
+          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+            <Loader2 size={16} className="animate-spin" />
+            Loading audit logs...
+          </div>
+        ) : auditQuery.isError ? (
+          <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-sm font-medium text-red-700">
+            {auditQuery.error instanceof Error
+              ? auditQuery.error.message
+              : 'Failed to load audit logs.'}
+          </div>
+        ) : logs.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
+            <p className="text-sm font-semibold text-slate-700">No audit logs found.</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Change filters or complete an audited action such as updating a school setting.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-slate-200">
+            <div className="grid grid-cols-[1.1fr_1fr_1fr_1.2fr] gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+              <span>Time</span>
+              <span>Actor</span>
+              <span>Action</span>
+              <span>Resource</span>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {logs.map((log) => (
+                <div
+                  key={log.id}
+                  className="grid grid-cols-[1.1fr_1fr_1fr_1.2fr] gap-3 px-3 py-3 text-sm"
+                >
+                  <span className="text-xs font-medium text-slate-500">
+                    {formatAuditTimestamp(log.createdAt)}
+                  </span>
+                  <span className="min-w-0 truncate font-medium text-slate-700">
+                    {formatAuditActor(log)}
+                  </span>
+                  <span className="min-w-0 truncate font-semibold text-slate-900">
+                    {log.action}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium text-slate-700">
+                      {log.resource}
+                    </span>
+                    <span className="block truncate text-xs text-slate-400">
+                      {formatAuditResource(log)}
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+          <span>
+            Showing {logs.length} of {auditQuery.data?.total ?? 0} tenant audit logs.
+          </span>
+          <Button
+            variant="outline"
+            className="h-8 rounded-lg px-3 text-xs"
+            onClick={() => void auditQuery.refetch()}
+          >
+            Refresh
+          </Button>
+        </div>
       </div>
     </div>
   );
+}
+
+function formatAuditTimestamp(value: string) {
+  return new Intl.DateTimeFormat('en-NP', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+}
+
+function formatAuditActor(log: PlatformAuditLog) {
+  return log.user?.email ?? log.user?.phone ?? log.userId ?? 'System';
+}
+
+function formatAuditResource(log: PlatformAuditLog) {
+  return log.resourceId ? `ID: ${log.resourceId}` : 'Tenant scoped';
 }
 
 // ─── Subscription Panel ───────────────────────────────────────────────────────
@@ -2878,4 +3321,3 @@ function SettingsLoading() {
     </div>
   );
 }
-
