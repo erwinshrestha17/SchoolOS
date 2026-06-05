@@ -9,6 +9,7 @@ import {
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { PageHeader } from '@/components/ui/page-header';
 import {
   ArrowLeft,
   CalendarClock,
@@ -38,8 +39,8 @@ export default function NoticeDetailPage() {
     return (
       <NoticePageShell>
         <div className="grid gap-4">
-          <div className="h-40 animate-pulse rounded-[32px] bg-gray-100" />
-          <div className="h-80 animate-pulse rounded-[32px] bg-gray-100" />
+          <div className="h-40 animate-pulse rounded-2xl bg-gray-100" />
+          <div className="h-80 animate-pulse rounded-2xl bg-gray-100" />
         </div>
       </NoticePageShell>
     );
@@ -48,7 +49,7 @@ export default function NoticeDetailPage() {
   if (noticeQuery.isError) {
     return (
       <NoticePageShell>
-        <div className="rounded-[32px] border border-danger-200 bg-danger-50 p-8 text-danger-700">
+        <div className="rounded-2xl border border-danger-200 bg-danger-50 p-8 text-danger-700">
           <p className="text-sm font-semibold uppercase tracking-[0.18em]">
             Could not load notice
           </p>
@@ -65,7 +66,7 @@ export default function NoticeDetailPage() {
   if (!notice) {
     return (
       <NoticePageShell>
-        <div className="rounded-[32px] border border-[var(--line)] bg-white p-8 text-center shadow-sm">
+        <div className="rounded-2xl border border-[var(--line)] bg-white p-8 text-center shadow-sm">
           <h1 className="text-2xl font-bold text-gray-950">Notice not found</h1>
           <p className="mt-2 text-sm text-gray-500">
             The notice may have been removed or is not available for this school.
@@ -78,30 +79,24 @@ export default function NoticeDetailPage() {
 
   return (
     <NoticePageShell>
-      <section className="relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 text-white shadow-sm sm:p-8">
-        <div className="absolute -right-12 -top-12 h-56 w-56 rounded-full bg-cyan-400/15 blur-3xl" />
-        <div className="relative">
-          <BackLink light />
-          <div className="mt-6 flex flex-wrap items-center gap-2">
-            <PriorityBadge priority={notice.priority} />
-            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/80">
-              {formatEnumLabel(notice.audienceType)} audience
-            </span>
-            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/80">
-              {resolveNoticeState(notice)}
-            </span>
-          </div>
-          <h1 className="mt-5 max-w-4xl text-3xl font-bold tracking-tight sm:text-4xl">
-            {notice.title}
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-white/70">
-            {getAudienceSummary(notice)}
-          </p>
-        </div>
-      </section>
+      <PageHeader
+        title={notice.title}
+        description={getAudienceSummary(notice)}
+        actions={<BackLink className="mt-0" />}
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <PriorityBadge priority={notice.priority} />
+        <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-600">
+          {formatEnumLabel(notice.audienceType)} audience
+        </span>
+        <span className="rounded-full border border-info-100 bg-info-50 px-3 py-1 text-xs font-semibold text-info-700">
+          {resolveNoticeState(notice)}
+        </span>
+      </div>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <article className="rounded-[32px] border border-[var(--line)] bg-white p-6 shadow-sm sm:p-8">
+        <article className="rounded-2xl border border-[var(--line)] bg-white p-6 shadow-sm sm:p-8">
           <div className="flex items-center gap-3 border-b border-gray-100 pb-5">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
               <Megaphone size={20} />
@@ -179,15 +174,21 @@ function NoticePageShell({ children }: { children: React.ReactNode }) {
   return <div className="space-y-6">{children}</div>;
 }
 
-function BackLink({ light = false }: { light?: boolean }) {
+function BackLink({
+  light = false,
+  className = '',
+}: {
+  light?: boolean;
+  className?: string;
+}) {
   return (
     <Link
       href="/dashboard/notices"
-      className={`inline-flex min-h-10 items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold transition ${
+      className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
         light
           ? 'bg-white/10 text-white hover:bg-white/15'
           : 'mt-6 bg-gray-100 text-gray-700 hover:bg-gray-200'
-      }`}
+      } ${className}`}
     >
       <ArrowLeft size={16} />
       Back to notices
@@ -264,7 +265,7 @@ function UnreadRecipientsPanel({
   ).length;
 
   return (
-    <section className="rounded-[32px] border border-[var(--line)] bg-white p-6 shadow-sm sm:p-8">
+    <section className="rounded-2xl border border-[var(--line)] bg-white p-6 shadow-sm sm:p-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
@@ -343,7 +344,7 @@ function UnreadRecipientsPanel({
         </div>
       ) : null}
 
-      <div className="mt-6 overflow-hidden rounded-3xl border border-gray-100">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-gray-100">
         {isLoading ? (
           <div className="p-6 text-sm text-gray-500">Loading unread recipients...</div>
         ) : error ? (
@@ -443,7 +444,7 @@ function InfoCard({
   items: Array<[string, string]>;
 }) {
   return (
-    <div className="rounded-[28px] border border-[var(--line)] bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-[var(--line)] bg-white p-5 shadow-sm">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gray-100 text-gray-700">
           {icon}

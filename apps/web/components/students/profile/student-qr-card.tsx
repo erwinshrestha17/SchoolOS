@@ -106,7 +106,7 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
           {!isActive && !generateMutation.isPending && (
             <button
               onClick={() => generateMutation.mutate()}
-              className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-slate-800"
+              className="rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)]"
             >
               Generate Identity
             </button>
@@ -136,11 +136,11 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
                 className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
                 onClick={() => onOpenIdCard(rawToken ?? undefined)}
                >
-                 <FileText size={14} className="text-primary-500" />
+                 <FileText size={14} className="text-[var(--color-mod-admissions-accent)]" />
                  Print ID Card
                </button>
                <button 
-                className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-slate-800"
+                className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)]"
                 onClick={() => {
                   setQrSvg(null);
                   setRawToken(null);
@@ -165,7 +165,7 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
                 onClick={() => setShowConfirmRotate(true)}
                 className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
               >
-                <RefreshCw size={16} className="text-primary-500" />
+                <RefreshCw size={16} className="text-[var(--color-mod-admissions-accent)]" />
                 Rotate (Lost Card)
               </button>
               <button

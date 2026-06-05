@@ -222,7 +222,7 @@ export function ResultPublishingTab({
       ) : null}
 
       {/* Configuration & High-Level Actions */}
-      <section className="rounded-[2.5rem] border border-slate-200 bg-white/50 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between mb-8">
            <div>
               <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Results Delivery</h2>
@@ -240,7 +240,7 @@ export function ResultPublishingTab({
               <button 
                 onClick={handleBatchPublish}
                 disabled={selectedIds.size === 0 || publishMut.isPending}
-                className="h-12 px-8 rounded-2xl bg-slate-900 text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-slate-900/10 hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-30"
+                className="h-12 px-8 rounded-2xl bg-[var(--color-mod-academics-accent)] text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-[var(--color-mod-academics-text)] transition-all active:scale-95 disabled:opacity-30"
               >
                 {publishMut.isPending ? <Loader2 className="animate-spin" size={16} /> : <Zap size={16} />}
                 Publish Visibility ({selectedIds.size})
@@ -289,10 +289,10 @@ export function ResultPublishingTab({
 
       {/* Roster & Visibility Control */}
       {selection.examTermId ? (
-        <section className="rounded-[2.5rem] border border-slate-200 bg-white overflow-hidden shadow-2xl shadow-slate-200/20">
+        <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
           <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
              <div className="flex items-center gap-4">
-                <div className="h-10 w-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-2xl bg-[var(--color-mod-academics-surface)] text-[var(--color-mod-academics-accent)] flex items-center justify-center">
                    <ShieldCheck size={20} />
                 </div>
                 <div>
@@ -323,7 +323,7 @@ export function ResultPublishingTab({
                         type="checkbox" 
                         checked={selectedIds.size === records.length && records.length > 0} 
                         onChange={toggleSelectAll}
-                        className="h-5 w-5 rounded-lg border-slate-200 text-primary-600 focus:ring-primary-500"
+                        className="h-5 w-5 rounded-lg border-slate-200 text-[var(--color-mod-academics-accent)] focus:ring-[var(--color-mod-academics-accent)]"
                       />
                    </th>
                    <th className="py-4 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400">Student Identity</th>
@@ -337,7 +337,7 @@ export function ResultPublishingTab({
                  {publishingQuery.isLoading ? (
                    <tr>
                       <td colSpan={6} className="py-20 text-center">
-                         <Loader2 className="h-10 w-10 animate-spin text-primary-500 mx-auto opacity-20" />
+                         <Loader2 className="h-10 w-10 animate-spin text-[var(--color-mod-academics-accent)] mx-auto opacity-30" />
                          <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Analyzing Delivery Readiness</p>
                       </td>
                    </tr>
@@ -354,14 +354,14 @@ export function ResultPublishingTab({
                    return (
                      <tr key={r.reportCardId} className={cn(
                        "group transition-all hover:bg-slate-50/50",
-                       selectedIds.has(r.reportCardId) && "bg-emerald-50/30"
+                       selectedIds.has(r.reportCardId) && "bg-[var(--color-mod-academics-surface)]"
                      )}>
                        <td className="py-4 px-8">
                           <input 
                             type="checkbox" 
                             checked={selectedIds.has(r.reportCardId)} 
                             onChange={() => toggleSelect(r.reportCardId)}
-                            className="h-5 w-5 rounded-lg border-slate-200 text-primary-600 focus:ring-primary-500"
+                            className="h-5 w-5 rounded-lg border-slate-200 text-[var(--color-mod-academics-accent)] focus:ring-[var(--color-mod-academics-accent)]"
                           />
                        </td>
                        <td className="py-4 px-6">
@@ -395,7 +395,7 @@ export function ResultPublishingTab({
                           <div className="flex flex-col items-end gap-1">
                              <div className={cn(
                                "inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest",
-                               isPublished ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : "bg-slate-100 text-slate-400"
+                               isPublished ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-slate-100 text-slate-400"
                              )}>
                                 {isPublished ? <Eye size={10} /> : <EyeOff size={10} />}
                                 {r.publishStatus}
@@ -412,15 +412,15 @@ export function ResultPublishingTab({
              </table>
           </div>
           
-          <div className="bg-slate-900 p-6 flex items-center justify-between text-white">
+          <div className="border-t border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-surface)] p-6 flex flex-col gap-4 text-[var(--color-mod-academics-text)] md:flex-row md:items-center md:justify-between">
              <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
-                   <div className="h-2 w-2 rounded-full bg-primary-500" />
-                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Published: {records.filter(r => r.publishStatus === 'PUBLISHED').length}</span>
+                   <div className="h-2 w-2 rounded-full bg-[var(--color-mod-academics-accent)]" />
+                   <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-mod-academics-accent)]">Total Published: {records.filter(r => r.publishStatus === 'PUBLISHED').length}</span>
                 </div>
                 <div className="flex items-center gap-2">
                    <div className="h-2 w-2 rounded-full bg-amber-500" />
-                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Awaiting Lock: {records.filter(r => r.reportStatus !== 'LOCKED').length}</span>
+                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Awaiting Lock: {records.filter(r => r.reportStatus !== 'LOCKED').length}</span>
                 </div>
              </div>
              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 italic">
@@ -429,8 +429,8 @@ export function ResultPublishingTab({
           </div>
         </section>
       ) : (
-        <section className="rounded-[3rem] border-2 border-dashed border-slate-200 bg-white/50 p-20 text-center">
-          <div className="h-20 w-20 rounded-[2.5rem] bg-white shadow-xl flex items-center justify-center text-slate-300 mx-auto mb-8 border border-slate-50">
+        <section className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-16 text-center shadow-sm">
+          <div className="h-16 w-16 rounded-2xl bg-[var(--color-mod-academics-surface)] flex items-center justify-center text-[var(--color-mod-academics-accent)] mx-auto mb-8 border border-[var(--color-mod-academics-border)]">
              <Megaphone size={40} />
           </div>
           <h3 className="text-2xl font-black text-slate-900 italic uppercase tracking-tight">Delivery Hub</h3>

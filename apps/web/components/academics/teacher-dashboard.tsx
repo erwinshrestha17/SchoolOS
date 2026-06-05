@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { useSession } from '../session-provider';
 import { Card } from '@/components/ui/card';
 import { LoadingState } from '@/components/ui/loading-state';
-import { BookOpen, Clock, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react';
+import { BookOpen, Clock, CheckCircle2, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
 export function TeacherDashboard() {
@@ -41,7 +41,7 @@ export function TeacherDashboard() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Today's Schedule */}
-        <Card className="flex flex-col rounded-[2.5rem] border-slate-200 shadow-sm overflow-hidden">
+        <Card className="flex flex-col overflow-hidden rounded-2xl border-slate-200 shadow-sm">
           <div className="bg-slate-50 px-8 py-6 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="bg-indigo-500 p-2 rounded-xl">
@@ -92,7 +92,7 @@ export function TeacherDashboard() {
         </Card>
 
         {/* Homework Review */}
-        <Card className="flex flex-col rounded-[2.5rem] border-slate-200 shadow-sm overflow-hidden">
+        <Card className="flex flex-col overflow-hidden rounded-2xl border-slate-200 shadow-sm">
           <div className="bg-slate-50 px-8 py-6 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="bg-amber-500 p-2 rounded-xl">
@@ -148,27 +148,6 @@ export function TeacherDashboard() {
               Manage Assignments <ChevronRight className="h-3 w-3" />
             </Link>
           </div>
-        </Card>
-      </div>
-
-      {/* Staff Quick Stats */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="p-6 rounded-[2rem] border-slate-200 shadow-sm bg-indigo-600 text-white border-none relative overflow-hidden">
-          <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
-          <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Current Month</p>
-          <p className="mt-1 text-3xl font-black italic uppercase tracking-tighter">Attendance</p>
-          <p className="mt-4 text-sm font-bold text-indigo-100">92% presence rate</p>
-        </Card>
-
-        <Card className="p-6 rounded-[2rem] border-slate-200 shadow-sm bg-white hover:border-indigo-100 transition">
-          <div className="flex items-center justify-between mb-4">
-            <div className="h-10 w-10 bg-indigo-50 rounded-xl flex items-center justify-center">
-              <AlertCircle className="h-5 w-5 text-indigo-600" />
-            </div>
-          </div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Leaves</p>
-          <p className="mt-1 text-2xl font-black text-slate-900 italic uppercase tracking-tight">4.5 Days</p>
-          <p className="mt-1 text-xs font-bold text-slate-500">Available Balance</p>
         </Card>
       </div>
     </div>

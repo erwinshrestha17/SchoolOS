@@ -16,9 +16,10 @@ import { Select } from '../ui/select';
 import { FormField } from '../ui/form-field';
 import { LoadingState } from '../ui/loading-state';
 import { EmptyState } from '../ui/empty-state';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
+import { Tabs, TabsContent } from '../ui/tabs';
 import { Badge } from '../ui/badge';
 import { FileUploader } from '../ui/file-uploader';
+import { ModuleTabs } from '../dashboard/module-tabs';
 import { cn } from '../../lib/utils';
 import { RefreshCcw, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 
@@ -123,10 +124,14 @@ const sectionMeta: Record<
   },
 };
 
-export function CommunicationsForm() {
+export function CommunicationsForm({
+  initialSection = 'Notices',
+}: {
+  initialSection?: CommunicationSection;
+}) {
   const queryClient = useQueryClient();
   const [activeSection, setActiveSection] =
-    useState<CommunicationSection>('Notices');
+    useState<CommunicationSection>(initialSection);
   const [notice, setNotice] = useState<NoticeState>({
     title: '',
     body: '',
@@ -258,6 +263,10 @@ export function CommunicationsForm() {
   }, [deliveriesQuery.data]);
 
   const activeMeta = sectionMeta[activeSection];
+
+  useEffect(() => {
+    setActiveSection(initialSection);
+  }, [initialSection]);
 
   const noticeMutation = useMutation({
     mutationFn: api.createNotice,
@@ -414,24 +423,21 @@ export function CommunicationsForm() {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[2.5rem] border border-slate-200 bg-slate-900 p-8 text-white shadow-xl shadow-slate-900/10">
-        <div className="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-primary-500/10 blur-3xl" />
-        <div className="absolute -left-10 -bottom-10 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
-
-        <div className="relative flex flex-col gap-8 xl:flex-row xl:items-center xl:justify-between">
-          <div className="max-w-xl">
-            <span className="inline-flex rounded-full bg-white/10 px-4 py-1.5 text-[0.65rem] font-black uppercase tracking-widest text-white/60 border border-white/5 backdrop-blur-sm">
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-rose-700">
               {activeMeta.badge}
-            </span>
-            <h1 className="mt-6 text-4xl font-black tracking-tight text-white sm:text-5xl">
+            </p>
+            <h2 className="mt-2 text-xl font-black text-slate-950">
               {activeMeta.title}
-            </h1>
-            <p className="mt-4 text-sm font-medium leading-relaxed text-slate-400">
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
               {activeMeta.description}
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:min-w-[500px]">
+          <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[440px]">
             <CommunicationMetric
               label="Notices"
               value={String(noticesQuery.data?.length ?? 0)}
@@ -443,12 +449,12 @@ export function CommunicationsForm() {
               tone="info"
             />
             <CommunicationMetric
-              label="Sent Successfully"
+              label="Sent"
               value={String(deliveryStats.sent)}
               tone="success"
             />
             <CommunicationMetric
-              label="Delivery Gaps"
+              label="Failed"
               value={String(deliveryStats.failed)}
               tone="danger"
             />
@@ -461,18 +467,19 @@ export function CommunicationsForm() {
         onValueChange={(val) => setActiveSection(val as CommunicationSection)}
         className="space-y-8"
       >
-        <div className="sticky top-4 z-20 flex justify-center">
-          <TabsList className="bg-white/80 backdrop-blur-xl border border-slate-200 p-1.5 rounded-3xl shadow-lg shadow-slate-900/5">
-            {communicationSections.map((section) => (
-              <TabsTrigger
-                key={section}
-                value={section}
-                className="px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest data-[state=active]:bg-slate-900 data-[state=active]:text-white transition-all"
-              >
-                {section}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        <div className="sticky top-4 z-20 rounded-2xl border border-slate-200 bg-white/90 p-2 shadow-sm backdrop-blur">
+          <ModuleTabs
+            items={communicationSections.map((section) => ({
+              value: section,
+              label: section,
+            }))}
+            activeValue={activeSection}
+            onValueChange={(value) =>
+              setActiveSection(value as CommunicationSection)
+            }
+            accentColor="rose"
+            variant="light"
+          />
         </div>
 
         {deliveryStats.pending > 0 && (
@@ -1485,18 +1492,18 @@ function CommunicationMetric({
   tone?: 'neutral' | 'info' | 'success' | 'danger';
 }) {
   const toneClass = {
-    neutral: 'bg-white/10 text-white ring-white/15',
-    info: 'bg-cyan-400/15 text-cyan-100 ring-cyan-300/20',
-    success: 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/20',
-    danger: 'bg-red-400/15 text-red-100 ring-red-300/20',
+    neutral: 'border-slate-200 bg-slate-50 text-slate-700',
+    info: 'border-blue-200 bg-blue-50 text-blue-700',
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    danger: 'border-rose-200 bg-rose-50 text-rose-700',
   }[tone];
 
   return (
-    <div className={`rounded-2xl p-4 ring-1 ${toneClass}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-75">
+    <div className={`rounded-2xl border p-4 ${toneClass}`}>
+      <p className="text-[11px] font-bold uppercase tracking-wider opacity-70">
         {label}
       </p>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
+      <p className="mt-2 text-2xl font-black tabular-nums">{value}</p>
     </div>
   );
 }

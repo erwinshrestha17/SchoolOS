@@ -11,6 +11,7 @@ import { HomeworkTab } from './tabs/homework-tab';
 import { StudentHomeworkTab } from './tabs/student-homework-tab';
 import { StudentTimetableTab } from './tabs/student-timetable-tab';
 import { StatCard } from '../ui/stat-card';
+import { PageHeader } from '../ui/page-header';
 import {
   Tabs,
   TabsList,
@@ -110,56 +111,50 @@ export function TimetableWorkspace({ initialSection }: TimetableWorkspaceProps =
 
   const slotCount = timetableQuery.data?.length ?? 0;
   const staffCount = staffQuery.data?.length ?? 0;
+  const ActiveIcon = activeMeta.icon;
 
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-[2.5rem] border border-slate-200 bg-slate-900 p-8 text-white shadow-xl">
-        <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-indigo-500/10 blur-[100px]" />
-        <div className="absolute bottom-0 left-1/4 h-64 w-64 rounded-full bg-amber-500/10 blur-[100px]" />
+      <PageHeader
+        title={activeMeta.title}
+        description={activeMeta.description}
+        actions={
+          <span className="flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)]">
+            <ActiveIcon className="h-5 w-5" />
+          </span>
+        }
+      />
 
-        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-2xl">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-md ring-1 ring-white/20">
-                <activeMeta.icon className="h-6 w-6 text-indigo-400" />
-              </div>
-              <h1 className="text-3xl font-black tracking-tight sm:text-4xl uppercase italic">
-                {activeMeta.title}
-              </h1>
-            </div>
-            <p className="mt-4 text-lg font-medium leading-relaxed text-slate-300">
-              {activeMeta.description}
-            </p>
-          </div>
-
-          {!isStudent && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:w-[400px]">
-              <StatCard
-                title="Class Slots"
-                value={classId ? slotCount : '—'}
-                className="bg-white/5 border-white/10"
-              />
-              <StatCard
-                title="Total Faculty"
-                value={staffCount}
-                className="bg-white/5 border-white/10"
-              />
-            </div>
-          )}
+      {!isStudent && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <StatCard
+            title="Class Slots"
+            value={classId ? slotCount : '—'}
+            description={classId ? 'Slots in the selected class timetable.' : 'Select a class to load timetable slots.'}
+            icon={<Calendar size={18} />}
+            tone="info"
+          />
+          <StatCard
+            title="Total Faculty"
+            value={staffCount}
+            description="Teachers available for workload and substitution planning."
+            icon={<Users size={18} />}
+            tone="neutral"
+          />
         </div>
-      </section>
+      )}
 
       <Tabs
         value={activeSection}
         onValueChange={(val) => setActiveSection(val as Section)}
         className="space-y-8"
       >
-        <TabsList className="bg-slate-100 p-1.5 rounded-[1.5rem] inline-flex h-auto">
+        <TabsList className="inline-flex h-auto rounded-2xl bg-slate-100 p-1.5">
           {sections.map((section) => (
             <TabsTrigger
               key={section}
               value={section}
-              className="rounded-[1.2rem] px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 font-black uppercase tracking-widest text-[10px]"
+              className="rounded-xl px-6 py-2.5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
             >
               {section}
             </TabsTrigger>

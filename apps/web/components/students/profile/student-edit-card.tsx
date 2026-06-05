@@ -45,7 +45,7 @@ export function StudentEditCard({
   const [firstNameEn, setFirstNameEn] = useState(student.firstNameEn ?? '');
   const [lastNameEn, setLastNameEn] = useState(student.lastNameEn ?? '');
   const [dateOfBirth, setDateOfBirth] = useState(student.dateOfBirth ? student.dateOfBirth.slice(0, 10) : '');
-  const [gender, setGender] = useState(student.gender ?? 'FEMALE');
+  const [gender, setGender] = useState(student.gender ?? '');
   const [nationalStudentId, setNationalStudentId] = useState(student.nationalStudentId ?? '');
   const [disabilityStatus, setDisabilityStatus] = useState(student.disabilityFlag ? 'yes' : 'no');
   const [disabilityFlag, setDisabilityFlag] = useState(student.disabilityFlag ?? '');
@@ -94,7 +94,7 @@ export function StudentEditCard({
       firstNameEn: firstNameEn.trim(),
       lastNameEn: lastNameEn.trim(),
       dateOfBirth,
-      gender,
+      ...(gender ? { gender } : {}),
       nationalStudentId: nationalStudentId.trim() || null,
       disabilityFlag: disabilityStatus === 'yes' ? disabilityFlag.trim() : null,
       confirmNoDisability: disabilityStatus === 'no',
@@ -141,7 +141,7 @@ export function StudentEditCard({
             </div>
             <div className="flex flex-wrap gap-2">
               <label className={cn(
-                'inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800',
+                'inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[var(--color-mod-admissions-text)]',
                 isPhotoBusy && 'cursor-not-allowed opacity-50',
               )}>
                 <ImageUp size={16} />
@@ -197,6 +197,7 @@ export function StudentEditCard({
            </FormField>
            <FormField label="Gender">
              <select className="premium-input" value={gender} onChange={(e) => setGender(e.target.value)}>
+               <option value="">Select gender</option>
                <option value="FEMALE">Female</option>
                <option value="MALE">Male</option>
                <option value="OTHER">Other</option>
@@ -263,7 +264,7 @@ export function StudentEditCard({
              type="button" 
              onClick={handleSave} 
              disabled={isSaving}
-             className="flex items-center gap-2 rounded-xl bg-slate-900 px-8 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800 disabled:opacity-50"
+             className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-8 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] disabled:opacity-50"
             >
              <Save size={18} />
              {isSaving ? 'Saving...' : 'Save Changes'}

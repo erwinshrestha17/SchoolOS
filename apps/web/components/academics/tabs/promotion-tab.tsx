@@ -17,7 +17,8 @@ import {
   Calendar,
   Layers,
   Zap,
-  Users
+  Users,
+  Lock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -153,7 +154,7 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
       ) : null}
 
       {/* Promotion Config */}
-      <section className="rounded-[2.5rem] border border-slate-200 bg-white/50 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between mb-8">
            <div>
               <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Year-End Promotion</h2>
@@ -162,7 +163,7 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
            <button 
             onClick={handleBatchPromote}
             disabled={selectedIds.size === 0 || batchPromoteMut.isPending}
-            className="h-12 px-8 rounded-2xl bg-slate-900 text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-slate-900/10 hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-30"
+            className="h-12 px-8 rounded-2xl bg-[var(--color-mod-academics-accent)] text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-[var(--color-mod-academics-text)] transition-all active:scale-95 disabled:opacity-30"
            >
               {batchPromoteMut.isPending ? <Loader2 className="animate-spin" size={16} /> : <Zap size={16} />}
               Execute Promotion ({selectedIds.size})
@@ -194,12 +195,12 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
               </div>
            </div>
 
-           <div className="space-y-6 p-8 rounded-[2rem] bg-primary-50/30 border border-primary-100 shadow-sm shadow-primary-500/5">
+           <div className="space-y-6 p-8 rounded-2xl bg-[var(--color-mod-academics-surface)] border border-[var(--color-mod-academics-border)] shadow-sm">
               <div className="flex items-center gap-2 mb-2">
-                 <div className="h-6 w-6 rounded-lg bg-primary-500 text-white flex items-center justify-center shadow-lg shadow-primary-500/20">
+                 <div className="h-6 w-6 rounded-lg bg-[var(--color-mod-academics-accent)] text-white flex items-center justify-center shadow-sm">
                     <ArrowRight size={14} />
                  </div>
-                 <span className="text-[10px] font-black uppercase tracking-widest text-primary-400">Destination Target</span>
+                 <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-mod-academics-accent)]">Destination Target</span>
               </div>
               <div className="grid gap-4 md:grid-cols-3">
                  <div className="space-y-2">
@@ -229,10 +230,10 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
 
       {/* Readiness Roster */}
       {promo.fromClassId ? (
-        <section className="rounded-[2.5rem] border border-slate-200 bg-white overflow-hidden shadow-2xl shadow-slate-200/20">
+        <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
           <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
              <div className="flex items-center gap-4">
-                <div className="h-10 w-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-2xl bg-[var(--color-mod-academics-surface)] text-[var(--color-mod-academics-accent)] flex items-center justify-center">
                    <ShieldCheck size={20} />
                 </div>
                 <div>
@@ -273,7 +274,7 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
                         type="checkbox" 
                         checked={selectedIds.size === students.length && students.length > 0} 
                         onChange={toggleSelectAll}
-                        className="h-5 w-5 rounded-lg border-slate-200 text-primary-600 focus:ring-primary-500"
+                        className="h-5 w-5 rounded-lg border-slate-200 text-[var(--color-mod-academics-accent)] focus:ring-[var(--color-mod-academics-accent)]"
                       />
                    </th>
                    <th className="py-4 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400">Student Identity</th>
@@ -303,14 +304,14 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
                    return (
                      <tr key={s.studentId} className={cn(
                        "group transition-all hover:bg-slate-50/50",
-                       selectedIds.has(s.studentId) && "bg-indigo-50/30"
+                       selectedIds.has(s.studentId) && "bg-[var(--color-mod-academics-surface)]"
                      )}>
                        <td className="py-4 px-8">
                           <input 
                             type="checkbox" 
                             checked={selectedIds.has(s.studentId)} 
                             onChange={() => toggleSelect(s.studentId)}
-                            className="h-5 w-5 rounded-lg border-slate-200 text-primary-600 focus:ring-primary-500"
+                            className="h-5 w-5 rounded-lg border-slate-200 text-[var(--color-mod-academics-accent)] focus:ring-[var(--color-mod-academics-accent)]"
                           />
                        </td>
                        <td className="py-4 px-6">
@@ -362,7 +363,7 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
                                </div>
                              )}
                              <button 
-                              className="h-8 px-4 rounded-xl bg-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-900 hover:text-white transition-all active:scale-95"
+                              className="h-8 px-4 rounded-xl bg-[var(--color-mod-academics-surface)] text-[10px] font-black uppercase tracking-widest text-[var(--color-mod-academics-accent)] hover:bg-[var(--color-mod-academics-accent)] hover:text-white transition-all active:scale-95"
                               onClick={() => {
                                 // Scroll to marks/results if review needed
                               }}
@@ -378,15 +379,15 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
              </table>
           </div>
           
-          <div className="bg-slate-900 p-6 flex items-center justify-between text-white">
+          <div className="border-t border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-surface)] p-6 flex flex-col gap-4 text-[var(--color-mod-academics-text)] md:flex-row md:items-center md:justify-between">
              <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
-                   <div className="h-2 w-2 rounded-full bg-primary-500" />
-                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Eligible: {students.filter(s => s.status === 'READY').length}</span>
+                   <div className="h-2 w-2 rounded-full bg-[var(--color-mod-academics-accent)]" />
+                   <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-mod-academics-accent)]">Total Eligible: {students.filter(s => s.status === 'READY').length}</span>
                 </div>
                 <div className="flex items-center gap-2">
                    <div className="h-2 w-2 rounded-full bg-rose-500" />
-                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Blocked: {students.filter(s => s.status === 'BLOCKED').length}</span>
+                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Blocked: {students.filter(s => s.status === 'BLOCKED').length}</span>
                 </div>
              </div>
              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 italic">
@@ -395,8 +396,8 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
           </div>
         </section>
       ) : (
-        <section className="rounded-[3rem] border-2 border-dashed border-slate-200 bg-white/50 p-20 text-center">
-          <div className="h-20 w-20 rounded-[2.5rem] bg-white shadow-xl flex items-center justify-center text-slate-300 mx-auto mb-8 border border-slate-50">
+        <section className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-16 text-center shadow-sm">
+          <div className="h-16 w-16 rounded-2xl bg-[var(--color-mod-academics-surface)] flex items-center justify-center text-[var(--color-mod-academics-accent)] mx-auto mb-8 border border-[var(--color-mod-academics-border)]">
              <GraduationCap size={40} />
           </div>
           <h3 className="text-2xl font-black text-slate-900 italic uppercase tracking-tight">Readiness Map</h3>
@@ -421,24 +422,5 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
         onClose={() => setConfirmOpen(false)}
       />
     </div>
-  );
-}
-
-function Lock({ size, className }: { size?: number, className?: string }) {
-  return (
-    <svg 
-      className={cn(className)} 
-      width={size} 
-      height={size} 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="3" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
   );
 }

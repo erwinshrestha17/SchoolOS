@@ -54,16 +54,16 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
   const currentYear = academicYears.find((y: any) => y.isCurrent) ?? academicYears[0];
 
   return (
-    <div className="space-y-12">
-      <div className="grid gap-8 lg:grid-cols-2">
+    <div className="space-y-8">
+      <div className="grid gap-6 lg:grid-cols-2">
         {/* Create Exam Term */}
-        <div className="group relative rounded-[2.5rem] border border-slate-200 bg-white p-8 transition-all hover:shadow-xl hover:shadow-slate-200/50">
-          <div className="mb-8">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 mb-4 transition-transform group-hover:rotate-12">
+        <div className="group relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[var(--color-mod-academics-border)]">
+          <div className="mb-6">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-academics-bg)] text-[var(--color-mod-academics-accent)]">
               <Calendar size={24} />
             </div>
-            <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Create Exam Term</h2>
-            <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-widest">Setup terminal boundaries</p>
+            <h2 className="text-xl font-black tracking-tight text-slate-900">Create Exam Term</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">Set up terminal boundaries.</p>
           </div>
 
           <div className="grid gap-4">
@@ -122,7 +122,7 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
 
             <button 
               type="button" 
-              className="mt-4 flex items-center justify-center gap-3 rounded-[1.5rem] bg-slate-900 px-5 py-4 font-black uppercase tracking-widest text-white transition hover:bg-slate-800 disabled:opacity-50 shadow-xl shadow-slate-900/10 active:scale-95" 
+              className="mt-4 flex min-h-12 items-center justify-center gap-3 rounded-xl bg-[var(--color-mod-academics-accent)] px-5 py-3 text-sm font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-[var(--color-mod-academics-text)] disabled:opacity-50"
               disabled={!exam.name || examMut.isPending} 
               onClick={() => examMut.mutate({ ...exam, academicYearId: exam.academicYearId || currentYear?.id, startsOn: new Date(exam.startsOn).toISOString(), endsOn: new Date(exam.endsOn).toISOString() })}
             >
@@ -134,13 +134,13 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
         </div>
 
         {/* Add Assessment Component */}
-        <div className="group relative rounded-[2.5rem] border border-slate-200 bg-white p-8 transition-all hover:shadow-xl hover:shadow-slate-200/50">
-          <div className="mb-8">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 mb-4 transition-transform group-hover:rotate-12">
+        <div className="group relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[var(--color-mod-academics-border)]">
+          <div className="mb-6">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-academics-bg)] text-[var(--color-mod-academics-accent)]">
               <Layers size={24} />
             </div>
-            <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Add Component</h2>
-            <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-widest">Define evaluation metrics</p>
+            <h2 className="text-xl font-black tracking-tight text-slate-900">Add Component</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">Define evaluation metrics.</p>
           </div>
 
           <div className="grid gap-4">
@@ -204,7 +204,7 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
 
             <button 
               type="button" 
-              className="mt-4 flex items-center justify-center gap-3 rounded-[1.5rem] bg-violet-700 px-5 py-4 font-black uppercase tracking-widest text-white transition hover:bg-violet-600 disabled:opacity-50 shadow-xl shadow-violet-700/10 active:scale-95" 
+              className="mt-4 flex min-h-12 items-center justify-center gap-3 rounded-xl bg-[var(--color-mod-academics-accent)] px-5 py-3 text-sm font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-[var(--color-mod-academics-text)] disabled:opacity-50"
               disabled={!comp.examTermId || !comp.subjectId || !comp.name || compMut.isPending} 
               onClick={() => compMut.mutate(comp)}
             >
@@ -231,13 +231,13 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {exams.length === 0 ? (
-            <div className="col-span-full py-20 border-2 border-dashed border-slate-100 rounded-[3rem] flex flex-col items-center justify-center text-slate-400">
+            <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-100 py-20 text-slate-400">
                <Info className="h-12 w-12 mb-4 opacity-10" />
                <p className="text-xs font-black uppercase tracking-widest">No Exam Terms Found</p>
                <p className="mt-2 text-[10px] font-bold">Initialize your first exam term above to begin.</p>
             </div>
           ) : exams.map((e: any) => (
-            <div key={e.id} className="group relative rounded-[2.5rem] border border-slate-200 bg-white p-8 transition-all hover:scale-[1.02] hover:shadow-2xl hover:shadow-slate-200">
+            <div key={e.id} className="group relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[var(--color-mod-academics-border)]">
               <div className="flex items-start justify-between mb-6">
                 <div className="space-y-1">
                   <h4 className="text-xl font-black uppercase tracking-tight text-slate-900 italic leading-none">{e.name}</h4>

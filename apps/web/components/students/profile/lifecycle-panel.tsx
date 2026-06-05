@@ -51,7 +51,7 @@ export function LifecyclePanel({
            <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-5">
               <p className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 mb-4">Current Operational Status</p>
               <div className="flex flex-wrap items-center gap-3">
-                 <Badge className="bg-slate-900 text-white border-none">{status}</Badge>
+                 <Badge className="border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-bg)] text-[var(--color-mod-admissions-text)]">{status}</Badge>
                  {clearance ? (
                    <Badge variant={clearance.cleared ? 'success' : 'destructive'}>
                      {clearance.cleared ? 'Fee Cleared' : `Outstanding ${formatMoney(outstanding)}`}

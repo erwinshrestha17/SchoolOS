@@ -4,9 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { LoadingState } from '@/components/ui/loading-state';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Badge } from '@/components/ui/badge';
-import { Clock, MapPin, User, AlertCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Clock, MapPin, User } from 'lucide-react';
 import { useState } from 'react';
 import { TimetableSubstitutionModal } from '@/components/timetable/substitution-modal';
 
@@ -63,21 +61,8 @@ export function TimetableGrid({ filters, activeVersionId }: { filters: any, acti
     );
   }
 
-  const gridData = daysOfWeek.map(day => {
-    return {
-      day,
-      slots: periods.map(period => {
-        const slot = timetable.find(s => 
-          s.dayOfWeek === day.value && 
-          (s.periodId === period.id || (s.startsAt === period.startsAt && s.endsAt === period.endsAt))
-        );
-        return { period, slot };
-      })
-    };
-  });
-
   return (
-    <div className="overflow-x-auto rounded-[2.5rem] border border-slate-200 bg-white shadow-xl">
+    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
       <table className="w-full border-collapse">
         <thead>
           <tr className="bg-slate-50">
@@ -92,7 +77,7 @@ export function TimetableGrid({ filters, activeVersionId }: { filters: any, acti
           </tr>
         </thead>
         <tbody>
-          {periods.map((period, pIndex) => (
+          {periods.map((period) => (
             <tr key={period.id} className="group">
               <td className="border-b border-r border-slate-200 p-6 bg-slate-50/30">
                 <div className="flex flex-col gap-1">
@@ -113,14 +98,14 @@ export function TimetableGrid({ filters, activeVersionId }: { filters: any, acti
                   <td key={`${day.value}-${period.id}`} className="border-b border-slate-200 p-3">
                     {slot ? (
                       <div 
-                        className="h-full min-h-[100px] rounded-2xl p-4 transition-all hover:shadow-md border bg-primary-50/30 border-primary-100 cursor-pointer hover:bg-primary-50"
+                        className="h-full min-h-[100px] cursor-pointer rounded-2xl border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-soft)]/40 p-4 transition-all hover:bg-[var(--color-mod-homework-soft)] hover:shadow-sm"
                         onClick={() => {
                           setSelectedSlot(slot);
                           setIsModalOpen(true);
                         }}
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <span className="text-xs font-black uppercase tracking-tight text-primary-900">
+                          <span className="text-xs font-black uppercase tracking-tight text-[var(--color-mod-homework-text)]">
                             {slot.subject?.name}
                           </span>
                         </div>
@@ -137,8 +122,8 @@ export function TimetableGrid({ filters, activeVersionId }: { filters: any, acti
                         </div>
 
                         {slot.section && (
-                          <div className="mt-2 pt-2 border-t border-primary-100/50">
-                            <span className="text-[9px] font-black uppercase tracking-widest text-primary-400">
+                          <div className="mt-2 border-t border-[var(--color-mod-homework-border)]/60 pt-2">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-[var(--color-mod-homework-text)]">
                               Section {slot.section.name}
                             </span>
                           </div>

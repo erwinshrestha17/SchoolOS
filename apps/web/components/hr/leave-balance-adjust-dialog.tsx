@@ -70,7 +70,8 @@ export function LeaveBalanceAdjustDialog({
       setToastError('Adjustment amount cannot be 0.');
       return;
     }
-    if (!reason) {
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) {
       setToastError('Please provide a reason for this adjustment.');
       return;
     }
@@ -80,7 +81,7 @@ export function LeaveBalanceAdjustDialog({
       leaveType,
       year,
       adjustment,
-      reason,
+      reason: trimmedReason,
     });
   };
 
@@ -88,11 +89,11 @@ export function LeaveBalanceAdjustDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md rounded-[2.5rem]">
+      <DialogContent className="max-w-md rounded-2xl">
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle className="flex items-center gap-2">
-              <Sliders size={20} className="text-blue-500" />
+              <Sliders size={20} className="text-[var(--color-mod-hr-text)]" />
               Adjust Leave Balance
             </DialogTitle>
             <p className="text-xs text-slate-500 mt-1">Manually credit or debit leave days for staff.</p>
@@ -186,6 +187,7 @@ export function LeaveBalanceAdjustDialog({
             onClick={handleSubmit}
             disabled={adjustMutation.isPending}
             isLoading={adjustMutation.isPending}
+            className="bg-[var(--color-mod-hr-accent)] hover:bg-[var(--color-mod-hr-text)]"
           >
             Adjust Balance
           </Button>

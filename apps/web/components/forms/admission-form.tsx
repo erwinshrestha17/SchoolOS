@@ -211,13 +211,13 @@ export function AdmissionForm() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard title="Total Admissions" value={admissionsQuery.data?.total ?? 0} icon={<UserPlus size={20} />} tone="info" />
         <StatCard title="Active Students" value={studentsQuery.data?.total ?? 0} icon={<Users size={20} />} tone="success" />
-        <Link href="/dashboard/students" className="group relative overflow-hidden rounded-xl bg-slate-900 p-6 text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2">
-          <div className="relative flex items-center justify-between">
+        <Link href="/dashboard/students" className="group rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--color-mod-admissions-border)] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Manage Records</p>
-              <h3 className="mt-1 text-xl font-bold">Student Directory</h3>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Manage Records</p>
+              <h3 className="mt-1 text-xl font-bold text-slate-950">Student Directory</h3>
             </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm transition group-hover:bg-primary-500">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-admissions-soft)] text-[var(--color-mod-admissions-text)] transition group-hover:bg-[var(--color-mod-admissions-accent)] group-hover:text-white">
               <ChevronRight size={24} />
             </div>
           </div>
@@ -459,25 +459,25 @@ export function AdmissionForm() {
                      )}
                   </div>
 
-                  <div className="relative overflow-hidden rounded-xl bg-slate-900 p-8 text-white shadow-sm">
-                    <h4 className="text-xs font-bold uppercase tracking-widest text-primary-400 mb-8">Enrollment Summary</h4>
+                  <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+                    <h4 className="mb-8 text-xs font-bold uppercase tracking-widest text-[var(--color-mod-admissions-text)]">Enrollment Summary</h4>
                     <div className="space-y-5">
                        <SummaryItem label="Full Name" value={`${watchedFirstNameEn} ${watchedLastNameEn}`} />
                        <SummaryItem label="Gender" value={form.getValues('gender')} />
                        <SummaryItem label="Date of Birth" value={watchedDateOfBirth ? new Date(watchedDateOfBirth).toLocaleDateString() : 'N/A'} />
-                       <div className="h-px bg-white/10 my-2" />
+                       <div className="my-2 h-px bg-slate-100" />
                        <SummaryItem label="Class" value={classesQuery.data?.find(c => c.id === selectedClassId)?.name ?? 'N/A'} />
                        <SummaryItem label="Section" value={availableSections.find(s => s.id === selectedSectionId)?.name ?? 'None'} />
                        <SummaryItem label="Admission Date" value={new Date(form.getValues('admissionDate')).toLocaleDateString()} />
-                       <div className="h-px bg-white/10 my-2" />
+                       <div className="my-2 h-px bg-slate-100" />
                        <SummaryItem label="Primary Guardian" value={watchedGuardians.find(g => g.isPrimary)?.fullName ?? 'Not set'} />
                        <SummaryItem label="Contact" value={watchedGuardians.find(g => g.isPrimary)?.primaryPhone ?? 'N/A'} />
-                       <div className="h-px bg-white/10 my-2" />
+                       <div className="my-2 h-px bg-slate-100" />
                        <SummaryItem label="Documents" value={documentFile ? `1 File (${documentKind.replace('_', ' ')})` : 'None attached'} />
                     </div>
-                    <div className="mt-8 flex items-center gap-3 rounded-2xl bg-white/5 p-4 border border-white/10">
-                       <ShieldCheck className="text-primary-400" size={20} />
-                       <p className="text-[0.65rem] text-slate-400 leading-relaxed">
+                    <div className="mt-8 flex items-center gap-3 rounded-2xl border border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-soft)] p-4">
+                       <ShieldCheck className="text-[var(--color-mod-admissions-text)]" size={20} />
+                       <p className="text-[0.65rem] leading-relaxed text-[var(--color-mod-admissions-text)]">
                          By clicking &quot;Complete Enrollment&quot;, a student record will be created and a ledger will be initialized.
                        </p>
                     </div>
@@ -641,8 +641,8 @@ function FormField({ label, children, error }: { label: string; children: React.
 function SummaryItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-xs text-slate-500 font-medium">{label}</span>
-      <span className="text-xs font-bold text-white">{value}</span>
+      <span className="text-xs font-medium text-slate-500">{label}</span>
+      <span className="text-right text-xs font-bold text-slate-900">{value}</span>
     </div>
   );
 }

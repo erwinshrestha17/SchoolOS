@@ -527,22 +527,23 @@ function CreateHomeworkModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl overflow-hidden rounded-[2.5rem] bg-white shadow-2xl animate-in fade-in zoom-in duration-300">
-        <div className="relative bg-slate-900 p-8 text-white">
+      <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl animate-in fade-in zoom-in duration-300">
+        <div className="relative border-b border-slate-100 bg-white p-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20">
-              <Plus className="h-5 w-5 text-indigo-400" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)]">
+              <Plus className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-xl font-black uppercase italic tracking-tight">New Homework</h2>
-              <p className="mt-1 text-xs font-bold uppercase tracking-widest text-slate-400">Academics / Assignments</p>
+              <h2 className="text-xl font-black tracking-tight text-slate-950">New Homework</h2>
+              <p className="mt-1 text-xs font-bold uppercase tracking-widest text-slate-500">Academics / Assignments</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="absolute right-8 top-8 flex h-10 w-10 items-center justify-center rounded-full bg-white/5 transition-colors hover:bg-white/10"
+            aria-label="Close homework form"
+            className="absolute right-8 top-8 flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
           >
-            <X className="h-5 w-5 text-white" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
@@ -657,7 +658,7 @@ function CreateHomeworkModal({
           <button
             onClick={() => onSave(formData)}
             disabled={isPending || !formData.classId || !formData.subjectId || !formData.title || !formData.dueDate}
-            className="h-12 rounded-2xl bg-slate-900 px-8 text-[10px] font-black uppercase tracking-widest text-white shadow-xl shadow-slate-200 transition-all hover:-translate-y-1 disabled:opacity-50"
+            className="h-12 rounded-2xl bg-[var(--color-mod-homework-accent)] px-8 text-[10px] font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-[var(--color-mod-homework-text)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isPending ? 'Publishing...' : 'Assign Homework'}
           </button>

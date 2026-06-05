@@ -29,10 +29,10 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
     password: '',
     phone: '',
     dateOfBirth: '',
-    gender: 'MALE',
+    gender: '',
     address: '',
     joiningDate: new Date().toISOString().slice(0, 10),
-    contractType: 'PERMANENT',
+    contractType: '',
     teacherRegistryId: '',
     citizenshipNo: '',
     panNumber: '',
@@ -82,12 +82,18 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
     e.preventDefault();
     setToastError(null);
 
-    // Validation
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.dateOfBirth || !formData.address) {
+    const requiredText = [
+      formData.firstName,
+      formData.lastName,
+      formData.email,
+      formData.password,
+      formData.address,
+    ];
+    if (requiredText.some((value) => value.trim().length === 0) || !formData.dateOfBirth || !formData.gender || !formData.joiningDate || !formData.contractType) {
       setToastError('Please fill out all required fields.');
       return;
     }
-    if (formData.password.length < 8) {
+    if (formData.password.trim().length < 8) {
       setToastError('Password must be at least 8 characters long.');
       return;
     }
@@ -96,19 +102,28 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
       return;
     }
 
-    // Prepare payload
+    const optionalTrim = (value: string) => {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : undefined;
+    };
+
     const payload = {
       ...formData,
-      employeeId: formData.employeeId || undefined,
-      phone: formData.phone || undefined,
-      teacherRegistryId: formData.teacherRegistryId || undefined,
-      citizenshipNo: formData.citizenshipNo || undefined,
-      panNumber: formData.panNumber || undefined,
-      bankAccount: formData.bankAccount || undefined,
-      bankName: formData.bankName || undefined,
-      qualifications: formData.qualifications || undefined,
-      experience: formData.experience || undefined,
-      probationEndDate: formData.probationEndDate || undefined,
+      employeeId: optionalTrim(formData.employeeId),
+      firstName: formData.firstName.trim(),
+      lastName: formData.lastName.trim(),
+      email: formData.email.trim(),
+      password: formData.password.trim(),
+      address: formData.address.trim(),
+      phone: optionalTrim(formData.phone),
+      teacherRegistryId: optionalTrim(formData.teacherRegistryId),
+      citizenshipNo: optionalTrim(formData.citizenshipNo),
+      panNumber: optionalTrim(formData.panNumber),
+      bankAccount: optionalTrim(formData.bankAccount),
+      bankName: optionalTrim(formData.bankName),
+      qualifications: optionalTrim(formData.qualifications),
+      experience: optionalTrim(formData.experience),
+      probationEndDate: optionalTrim(formData.probationEndDate),
     };
 
     createMutation.mutate(payload);
@@ -145,7 +160,7 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
           {/* Section: Credentials */}
           <div className="space-y-4">
             <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 border-b pb-2 flex items-center gap-2">
-              <Shield size={14} className="text-blue-500" />
+              <Shield size={14} className="text-[var(--color-mod-hr-text)]" />
               Credentials & Security
             </h4>
             <div className="grid md:grid-cols-3 gap-4">
@@ -215,6 +230,7 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
                   value={formData.gender}
                   onChange={(e) => handleChange('gender', e.target.value)}
                 >
+                  <option value="">Select gender</option>
                   <option value="MALE">Male</option>
                   <option value="FEMALE">Female</option>
                   <option value="OTHER">Other</option>
@@ -259,6 +275,7 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
                   value={formData.contractType}
                   onChange={(e) => handleChange('contractType', e.target.value)}
                 >
+                  <option value="">Select contract type</option>
                   <option value="PERMANENT">Permanent</option>
                   <option value="CONTRACT">Contract</option>
                   <option value="PROBATION">Probation</option>
@@ -340,7 +357,7 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
                     key={role.id}
                     className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer select-none ${
                       formData.roleIds.includes(role.id)
-                        ? 'border-blue-500 bg-blue-50/30 text-blue-900 font-bold'
+                        ? 'border-[var(--color-mod-hr-border)] bg-[var(--color-mod-hr-soft)]/60 font-bold text-[var(--color-mod-hr-text)]'
                         : 'border-slate-100 hover:bg-slate-50 text-slate-700'
                     }`}
                   >
@@ -348,7 +365,7 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
                       type="checkbox"
                       checked={formData.roleIds.includes(role.id)}
                       onChange={() => handleRoleToggle(role.id)}
-                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 h-4 w-4"
+                      className="h-4 w-4 rounded border-slate-300 text-[var(--color-mod-hr-accent)] focus:ring-[var(--color-mod-hr-border)]/50"
                     />
                     <span className="text-xs font-medium uppercase tracking-tight">{role.name}</span>
                   </label>
@@ -394,6 +411,7 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
             onClick={handleSubmit}
             isLoading={createMutation.isPending}
             disabled={createMutation.isPending}
+            className="bg-[var(--color-mod-hr-accent)] hover:bg-[var(--color-mod-hr-text)]"
           >
             Create Staff Member
           </Button>

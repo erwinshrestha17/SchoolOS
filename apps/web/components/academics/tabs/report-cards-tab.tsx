@@ -140,7 +140,7 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
       ) : null}
 
       {/* Configuration & Generation */}
-      <section className="rounded-[2.5rem] border border-slate-200 bg-white/50 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between mb-8">
            <div>
               <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Document Generation</h2>
@@ -158,7 +158,7 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
               </button>
               <button
                 type="button"
-                className="h-12 px-6 rounded-2xl bg-slate-900 text-white flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-slate-900/10 hover:bg-slate-800 transition-all disabled:opacity-30"
+                className="h-12 px-6 rounded-2xl bg-[var(--color-mod-academics-accent)] text-white flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-[var(--color-mod-academics-text)] transition-all disabled:opacity-30"
                 disabled={!report.academicYearId || !report.examTermId || !report.studentId || generateMut.isPending}
                 onClick={() => generateMut.mutate(report)}
               >
@@ -209,13 +209,13 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
                 className="premium-input bg-white py-4 text-xs font-medium min-h-[56px]"
               />
            </div>
-           <div className="flex h-14 items-center gap-4 px-6 rounded-2xl bg-slate-900/5 border border-slate-100">
+           <div className="flex h-14 items-center gap-4 px-6 rounded-2xl bg-[var(--color-mod-academics-surface)] border border-[var(--color-mod-academics-border)]">
               <label className="flex items-center gap-2 cursor-pointer group">
                 <input 
                   type="checkbox" 
                   checked={report.lock} 
                   onChange={(e) => setReport(c => ({ ...c, lock: e.target.checked }))} 
-                  className="h-5 w-5 rounded-lg border-slate-200 text-primary-600 focus:ring-primary-500 transition-all"
+                  className="h-5 w-5 rounded-lg border-slate-200 text-[var(--color-mod-academics-accent)] focus:ring-[var(--color-mod-academics-accent)] transition-all"
                 />
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover:text-slate-900 transition-colors">Lock marks after generation</span>
               </label>
@@ -231,7 +231,7 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
       </section>
 
       {/* Generated List */}
-      <section className="rounded-[2.5rem] border border-slate-200 bg-white overflow-hidden shadow-2xl shadow-slate-200/20">
+      <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
          <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
             <div>
                <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic text-[18px]">Operational History</h3>
@@ -310,7 +310,7 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
                         <td className="py-4 px-8 text-right">
                            <button 
                             onClick={() => openPdf(r.id)}
-                            className="h-10 px-4 rounded-xl bg-slate-900 text-white flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-slate-900/10 hover:bg-slate-800 transition-all active:scale-95"
+                            className="h-10 px-4 rounded-xl bg-[var(--color-mod-academics-accent)] text-white flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-[var(--color-mod-academics-text)] transition-all active:scale-95"
                            >
                               <Eye size={14} />
                               Open
@@ -325,15 +325,15 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
          </div>
          
          {reports.length > 0 && (
-           <div className="bg-slate-900 p-6 flex items-center justify-between text-white">
+           <div className="border-t border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-surface)] p-6 flex flex-col gap-4 text-[var(--color-mod-academics-text)] md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-6">
                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-primary-500" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">MoEST Compliance: Active</span>
+                    <div className="h-2 w-2 rounded-full bg-[var(--color-mod-academics-accent)]" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-mod-academics-accent)]">MoEST Compliance: Active</span>
                  </div>
                  <div className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Digital Signatures: Enabled</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Digital Signatures: Enabled</span>
                  </div>
               </div>
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">

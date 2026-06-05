@@ -45,6 +45,7 @@ import { Button } from '../../../components/ui/button';
 import { ConfirmDialog } from '../../../components/ui/confirm-dialog';
 import { SetupForm } from '../../../components/forms/setup-form';
 import { Badge } from '../../../components/ui/badge';
+import { PageHeader } from '../../../components/ui/page-header';
 import { useEntitlements } from '../../../components/entitlements-provider';
 import { api, type SchoolUserSummary, type TenantLogoAccess } from '../../../lib/api';
 import { cn } from '../../../lib/utils';
@@ -719,14 +720,11 @@ function TenantSettingsContent() {
   return (
     <div className="min-h-screen pb-20">
       {/* ── Compact Page Header ─────────────────────────────── */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Settings</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Manage school profile, rules, permissions, documents, and tenant configuration.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+      <PageHeader
+        title="Settings"
+        description="Manage school profile, rules, permissions, documents, and tenant configuration."
+        actions={
+          <>
           <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500">
             Tenant-scoped
           </span>
@@ -736,8 +734,9 @@ function TenantSettingsContent() {
               {changedKeys.length} unsaved
             </span>
           )}
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* ── Mobile Section Selector (visible on < xl screens) ── */}
       <div className="mb-4 xl:hidden">

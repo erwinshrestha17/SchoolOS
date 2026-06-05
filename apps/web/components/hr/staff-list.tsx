@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Search, UserPlus, Mail, Briefcase, Filter, ChevronLeft, ChevronRight, UserMinus } from 'lucide-react';
+import { Search, UserPlus, Mail, Briefcase, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useMemo } from 'react';
 import { Input } from '../ui/input';
@@ -95,7 +95,7 @@ export function StaffList() {
         </div>
         <button
           onClick={() => setIsCreateOpen(true)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-sm hover:bg-blue-600 transition-all hover:shadow-md active:scale-[0.98]"
+          className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-hr-accent)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-hr-text)] active:scale-[0.98]"
         >
           <UserPlus size={18} />
           Add Staff Member
@@ -103,7 +103,7 @@ export function StaffList() {
       </div>
 
       {/* Advanced Filters */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-4 bg-white border border-slate-200 p-5 rounded-[2rem] shadow-sm">
+      <div className="grid grid-cols-2 gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-4">
         <div>
           <label className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 block mb-1.5 ml-1">
             Status
@@ -152,7 +152,7 @@ export function StaffList() {
       </div>
 
       {/* Directory Table */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -188,7 +188,7 @@ export function StaffList() {
                   <tr key={staff.id} className="hover:bg-slate-50/30 transition-all group">
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-5">
-                        <div className="h-14 w-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center font-black text-lg border border-slate-200 shadow-inner group-hover:bg-blue-50 group-hover:text-blue-500 group-hover:border-blue-100 transition-colors">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 text-lg font-black text-slate-400 shadow-inner transition-colors group-hover:border-[var(--color-mod-hr-border)] group-hover:bg-[var(--color-mod-hr-soft)] group-hover:text-[var(--color-mod-hr-text)]">
                           {staff.firstName[0]}
                           {staff.lastName[0]}
                         </div>
@@ -238,7 +238,7 @@ export function StaffList() {
                     <td className="px-8 py-6 text-right">
                       <Link
                         href={`/dashboard/hr/staff/${staff.id}`}
-                        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-blue-600 transition-all shadow-lg shadow-slate-900/10 active:scale-95"
+                        className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-hr-accent)] px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-hr-text)] active:scale-95"
                       >
                         Profile
                       </Link>

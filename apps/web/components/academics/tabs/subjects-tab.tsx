@@ -90,15 +90,15 @@ export function SubjectsTab({ academicYears, classes, allSections, staff, subjec
          )}
       </div>
 
-      <div className="grid gap-10 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
          {/* Define Subject */}
-         <section className="group relative rounded-[2.5rem] border border-slate-200 bg-white p-8 transition-all hover:shadow-xl hover:shadow-slate-200/50">
-            <div className="mb-8">
-               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 mb-4 transition-transform group-hover:rotate-12">
+         <section className="group relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[var(--color-mod-academics-border)]">
+            <div className="mb-6">
+               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-academics-bg)] text-[var(--color-mod-academics-accent)]">
                   <BookOpen size={24} />
                </div>
-               <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">New Subject</h3>
-               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Add to the master curriculum</p>
+               <h3 className="text-xl font-black tracking-tight text-slate-900">New Subject</h3>
+               <p className="mt-1 text-sm font-semibold text-slate-500">Add to the master curriculum.</p>
             </div>
 
             <div className="space-y-4">
@@ -125,7 +125,7 @@ export function SubjectsTab({ academicYears, classes, allSections, staff, subjec
                <button 
                 onClick={() => subjectMut.mutate(subject)}
                 disabled={!subject.classId || !subject.code || !subject.name || subjectMut.isPending}
-                className="w-full h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs shadow-xl shadow-slate-900/10 active:scale-95 transition-all disabled:opacity-30"
+                className="flex h-12 w-full items-center justify-center gap-3 rounded-xl bg-[var(--color-mod-academics-accent)] text-xs font-black uppercase tracking-widest text-white shadow-sm transition-all hover:bg-[var(--color-mod-academics-text)] disabled:opacity-30"
                >
                  {subjectMut.isPending ? <Loader2 className="animate-spin" size={18} /> : <Plus size={18} />}
                  Register Subject
@@ -134,13 +134,13 @@ export function SubjectsTab({ academicYears, classes, allSections, staff, subjec
          </section>
 
          {/* Assign Teacher */}
-         <section className="group relative rounded-[2.5rem] border border-slate-200 bg-white p-8 transition-all hover:shadow-xl hover:shadow-slate-200/50">
-            <div className="mb-8">
-               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 mb-4 transition-transform group-hover:-rotate-12">
+         <section className="group relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[var(--color-mod-academics-border)]">
+            <div className="mb-6">
+               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-academics-bg)] text-[var(--color-mod-academics-accent)]">
                   <UserPlus size={24} />
                </div>
-               <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">Faculty Assignment</h3>
-               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Delegate instructional responsibility</p>
+               <h3 className="text-xl font-black tracking-tight text-slate-900">Faculty Assignment</h3>
+               <p className="mt-1 text-sm font-semibold text-slate-500">Delegate instructional responsibility.</p>
             </div>
 
             <div className="space-y-4">
@@ -167,7 +167,7 @@ export function SubjectsTab({ academicYears, classes, allSections, staff, subjec
                <button 
                 onClick={() => assignMut.mutate({ ...assign, academicYearId: assign.academicYearId || currentYear?.id, sectionId: assign.sectionId || null })}
                 disabled={!assign.subjectId || !assign.staffId || assignMut.isPending}
-                className="w-full h-14 rounded-2xl bg-violet-700 text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs shadow-xl shadow-violet-700/10 active:scale-95 transition-all disabled:opacity-30"
+                className="flex h-12 w-full items-center justify-center gap-3 rounded-xl bg-[var(--color-mod-academics-accent)] text-xs font-black uppercase tracking-widest text-white shadow-sm transition-all hover:bg-[var(--color-mod-academics-text)] disabled:opacity-30"
                >
                  {assignMut.isPending ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
                  Activate Assignment
@@ -177,7 +177,7 @@ export function SubjectsTab({ academicYears, classes, allSections, staff, subjec
       </div>
 
       {/* Catalog Grid */}
-      <section className="rounded-[2.5rem] border border-slate-200 bg-white overflow-hidden shadow-2xl shadow-slate-200/20">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
          <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
             <div>
                <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic text-[18px]">Curriculum Roster</h3>

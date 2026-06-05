@@ -89,7 +89,7 @@ export function PayrollPreview() {
         <button 
           onClick={() => previewQuery.refetch()}
           disabled={previewQuery.isLoading}
-          className="flex items-center gap-2 px-6 py-2.5 bg-primary-600 text-white rounded-xl font-bold shadow-lg shadow-primary-500/20 hover:bg-primary-700 transition-all disabled:opacity-50"
+          className="flex items-center gap-2 px-6 py-2.5 bg-[var(--color-mod-hr-accent)] text-white rounded-xl font-bold shadow-sm hover:bg-[var(--color-mod-hr-text)] transition-all disabled:opacity-50"
         >
           {previewQuery.isLoading ? <Loader2 size={18} className="animate-spin" /> : <Calculator size={18} />}
           Calculate Preview
@@ -132,7 +132,7 @@ export function PayrollPreview() {
                 <th className="px-6 py-4 font-semibold text-gray-500 text-right">Gross Pay</th>
                 <th className="px-6 py-4 font-semibold text-gray-500 text-center">Days (P+L/W)</th>
                 <th className="px-6 py-4 font-semibold text-gray-500 text-right">Deductions</th>
-                <th className="px-6 py-4 font-semibold text-primary-600 text-right">Net Preview Pay</th>
+                <th className="px-6 py-4 font-semibold text-[var(--color-mod-hr-text)] text-right">Net Preview Pay</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -185,7 +185,7 @@ export function PayrollPreview() {
                         <div className="flex gap-1 mt-1">
                           <span className="px-1.5 py-0.5 rounded bg-success-50 text-success-700 text-[9px] font-bold">{row.presentDays}P</span>
                           {row.approvedPaidLeaveDays > 0 && (
-                            <span className="px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 text-[9px] font-bold">{row.approvedPaidLeaveDays}L</span>
+                            <span className="px-1.5 py-0.5 rounded bg-[var(--color-mod-hr-soft)] text-[var(--color-mod-hr-text)] text-[9px] font-bold">{row.approvedPaidLeaveDays}L</span>
                           )}
                           {row.unpaidLeaveDays > 0 && (
                             <span className="px-1.5 py-0.5 rounded bg-danger-50 text-danger-700 text-[9px] font-bold">{row.unpaidLeaveDays}U</span>
@@ -197,7 +197,7 @@ export function PayrollPreview() {
                       -{row.deductions.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <span className="text-lg font-bold text-primary-700">
+                      <span className="text-lg font-bold text-[var(--color-mod-hr-text)]">
                         {row.netPay.toLocaleString()}
                       </span>
                     </td>

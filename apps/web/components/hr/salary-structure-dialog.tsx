@@ -141,13 +141,14 @@ export function SalaryStructureDialog({
   });
 
   const handleAddComponent = () => {
-    if (!newCompName) return;
+    const trimmedName = newCompName.trim();
+    if (!trimmedName) return;
     if (newCompAmount <= 0) return;
 
     setComponents((prev) => [
       ...prev,
       {
-        name: newCompName,
+        name: trimmedName,
         componentType: newCompType,
         amount: newCompAmount,
         taxable: newCompTaxable,
@@ -182,6 +183,11 @@ export function SalaryStructureDialog({
       return;
     }
 
+    const optionalTrim = (value: string) => {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : undefined;
+    };
+
     const payload = {
       staffId: activeStaffId,
       effectiveFrom: new Date(effectiveFrom).toISOString(),
@@ -192,9 +198,9 @@ export function SalaryStructureDialog({
       pfEnabled,
       tdsEnabled,
       paymentMethod,
-      bankName: paymentMethod === 'BANK' ? bankName : undefined,
-      bankAccount: paymentMethod === 'BANK' ? bankAccount : undefined,
-      notes: notes || undefined,
+      bankName: paymentMethod === 'BANK' ? optionalTrim(bankName) : undefined,
+      bankAccount: paymentMethod === 'BANK' ? optionalTrim(bankAccount) : undefined,
+      notes: optionalTrim(notes),
       components,
     };
 
@@ -205,11 +211,11 @@ export function SalaryStructureDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[85vh] rounded-[2.5rem]">
+      <DialogContent className="max-w-4xl max-h-[85vh] rounded-2xl">
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle className="flex items-center gap-2">
-              <Calculator size={20} className="text-blue-500" />
+              <Calculator size={20} className="text-[var(--color-mod-hr-text)]" />
               {isEdit ? 'Update Salary Structure' : 'Create Salary Structure'}
             </DialogTitle>
             <p className="text-xs text-slate-500 mt-1">
@@ -289,7 +295,7 @@ export function SalaryStructureDialog({
                     type="checkbox"
                     checked={pfEnabled}
                     onChange={(e) => setPfEnabled(e.target.checked)}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 h-4 w-4"
+                    className="rounded border-slate-300 text-[var(--color-mod-hr-accent)] focus:ring-[var(--color-mod-hr-border)]/50 h-4 w-4"
                   />
                   <div>
                     <p className="text-xs font-black uppercase tracking-wider text-slate-900">PF Contribution</p>
@@ -302,7 +308,7 @@ export function SalaryStructureDialog({
                     type="checkbox"
                     checked={tdsEnabled}
                     onChange={(e) => setTdsEnabled(e.target.checked)}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 h-4 w-4"
+                    className="rounded border-slate-300 text-[var(--color-mod-hr-accent)] focus:ring-[var(--color-mod-hr-border)]/50 h-4 w-4"
                   />
                   <div>
                     <p className="text-xs font-black uppercase tracking-wider text-slate-900">TDS Deduction</p>
@@ -357,14 +363,14 @@ export function SalaryStructureDialog({
                     type="checkbox"
                     checked={newCompTaxable}
                     onChange={(e) => setNewCompTaxable(e.target.checked)}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 h-4 w-4"
+                    className="rounded border-slate-300 text-[var(--color-mod-hr-accent)] focus:ring-[var(--color-mod-hr-border)]/50 h-4 w-4"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={handleAddComponent}
-                  disabled={!newCompName || newCompAmount <= 0}
-                  className="h-12 w-full rounded-2xl bg-slate-900 hover:bg-blue-600 text-white font-bold flex items-center justify-center transition-all disabled:opacity-50"
+                  disabled={!newCompName.trim() || newCompAmount <= 0}
+                  className="h-12 w-full rounded-2xl bg-[var(--color-mod-hr-accent)] hover:bg-[var(--color-mod-hr-text)] text-white font-bold flex items-center justify-center transition-all disabled:opacity-50"
                 >
                   <Plus size={18} />
                 </button>
@@ -400,7 +406,7 @@ export function SalaryStructureDialog({
                             NPR {c.amount.toLocaleString()}
                           </td>
                           <td className="px-4 py-3 text-center">
-                            {c.taxable ? <Percent size={12} className="text-blue-500 mx-auto" /> : '-'}
+                            {c.taxable ? <Percent size={12} className="text-[var(--color-mod-hr-text)] mx-auto" /> : '-'}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <button
@@ -438,7 +444,7 @@ export function SalaryStructureDialog({
                 </div>
                 <div className="border-l pl-4 border-slate-200">
                   <p className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Est. Net Pay</p>
-                  <p className="text-primary-600 text-sm mt-0.5">NPR {totalNet.toLocaleString()}</p>
+                  <p className="text-[var(--color-mod-hr-text)] text-sm mt-0.5">NPR {totalNet.toLocaleString()}</p>
                 </div>
               </div>
             </div>
@@ -496,6 +502,7 @@ export function SalaryStructureDialog({
             onClick={handleSubmit}
             isLoading={saveMutation.isPending}
             disabled={saveMutation.isPending}
+            className="bg-[var(--color-mod-hr-accent)] hover:bg-[var(--color-mod-hr-text)]"
           >
             {isEdit ? 'Update Structure' : 'Create Salary Structure'}
           </Button>

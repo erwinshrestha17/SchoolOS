@@ -66,7 +66,7 @@ export function LeaveBalanceList() {
         </div>
       </div>
 
-      <div className="shell-card overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+      <div className="shell-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -76,7 +76,7 @@ export function LeaveBalanceList() {
                 <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400 text-center">Entitlement</th>
                 <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400 text-center">Used</th>
                 <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400 text-center">Pending</th>
-                <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400 text-center text-primary-600">Remaining</th>
+                <th className="px-6 py-4 text-center text-[0.65rem] font-bold uppercase tracking-wider text-[var(--color-mod-hr-text)]">Remaining</th>
                 <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400 text-right">Status</th>
               </tr>
             </thead>

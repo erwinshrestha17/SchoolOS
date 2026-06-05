@@ -308,7 +308,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
   return (
     <div className="space-y-10 animate-fade-in">
       {/* Search & Feedback */}
-      <section className="rounded-[2.5rem] border border-slate-200 bg-white/50 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between mb-8">
            <div>
               <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Continuous Assessment</h2>
@@ -364,9 +364,9 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
       <div className="grid gap-10 lg:grid-cols-12">
          {/* Entry Area */}
          <div className="lg:col-span-4 space-y-8">
-            <section className="group relative rounded-[2.5rem] border border-slate-200 bg-white p-8 transition-all hover:shadow-xl hover:shadow-slate-200/50">
+            <section className="group relative rounded-2xl border border-slate-200 bg-white p-8 transition-all hover:border-[var(--color-mod-academics-border)] hover:shadow-sm">
                <div className="mb-8">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-50 text-teal-600 mb-4 transition-transform group-hover:rotate-12">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-academics-surface)] text-[var(--color-mod-academics-accent)] mb-4 transition-transform group-hover:rotate-12">
                      <Edit3 size={24} />
                   </div>
                   <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">{editingId ? 'Modify Record' : 'Single Entry'}</h3>
@@ -393,7 +393,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Observation Category</label>
-                    <select value={cas.category} onChange={(e) => applyTemplate(e.target.value)} className="premium-input bg-slate-900 text-white border-none shadow-lg">
+                    <select value={cas.category} onChange={(e) => applyTemplate(e.target.value)} className="premium-input border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-surface)] text-[var(--color-mod-academics-text)] shadow-sm">
                       {casTemplates.map((template) => <option key={template.category} value={template.category}>{template.category}</option>)}
                     </select>
                   </div>
@@ -419,7 +419,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
                   <button 
                     onClick={saveSingle}
                     disabled={!cas.studentId || !cas.subjectId || invalidSingleScore || createMutation.isPending || updateMutation.isPending}
-                    className="w-full h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs shadow-xl shadow-slate-900/10 active:scale-95 transition-all disabled:opacity-30"
+                    className="w-full h-14 rounded-2xl bg-[var(--color-mod-academics-accent)] text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs shadow-sm hover:bg-[var(--color-mod-academics-text)] active:scale-95 transition-all disabled:opacity-30"
                   >
                     {createMutation.isPending || updateMutation.isPending ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
                     {editingId ? 'Update Record' : 'Record Now'}
@@ -439,7 +439,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
 
          {/* Batch Area */}
          <div className="lg:col-span-8 space-y-8">
-            <section className="rounded-[2.5rem] border border-slate-200 bg-white overflow-hidden shadow-2xl shadow-slate-200/20">
+            <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
                <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                   <div>
                     <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">Batch Roster</h3>
@@ -450,7 +450,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
                     disabled={batchEntries.length === 0 || invalidBatchEntries.length > 0 || batchMutation.isPending}
                     className={cn(
                       "h-12 px-6 rounded-2xl flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] transition-all active:scale-95",
-                      batchEntries.length > 0 ? "bg-primary-600 text-white shadow-xl shadow-primary-600/20" : "bg-slate-100 text-slate-300 pointer-events-none"
+                      batchEntries.length > 0 ? "bg-[var(--color-mod-academics-accent)] text-white shadow-sm hover:bg-[var(--color-mod-academics-text)]" : "bg-slate-100 text-slate-300 pointer-events-none"
                     )}
                   >
                     {batchMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Layers size={16} />}
@@ -519,9 +519,9 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
       </div>
 
       {/* History */}
-      <section className="rounded-[2.5rem] border border-slate-200 bg-white overflow-hidden shadow-2xl shadow-slate-200/20">
+      <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
          <div className="p-8 border-b border-slate-100 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-2xl bg-[var(--color-mod-academics-surface)] text-[var(--color-mod-academics-accent)] flex items-center justify-center">
                <Clock size={20} />
             </div>
             <div>
@@ -562,7 +562,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
                        <div className="inline-flex flex-col items-center px-4 py-2 rounded-2xl bg-slate-50 border border-slate-100 group-hover:bg-white transition-colors">
                           <span className="text-sm font-black text-slate-900 tracking-tighter">{Number(record.score)} / {Number(record.maxScore)}</span>
                           <div className="w-12 h-1 bg-slate-100 rounded-full mt-1 overflow-hidden">
-                             <div className="h-full bg-primary-500" style={{ width: `${(Number(record.score) / Number(record.maxScore)) * 100}%` }} />
+                             <div className="h-full bg-[var(--color-mod-academics-accent)]" style={{ width: `${(Number(record.score) / Number(record.maxScore)) * 100}%` }} />
                           </div>
                        </div>
                     </td>
@@ -576,7 +576,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
                        <div className="flex items-center justify-end gap-2">
                           <button 
                             onClick={() => { setEditingId(record.id); startEdit(record); }}
-                            className="h-8 w-8 rounded-xl flex items-center justify-center bg-slate-100 text-slate-500 hover:bg-slate-900 hover:text-white transition-all active:scale-90"
+                            className="h-8 w-8 rounded-xl flex items-center justify-center bg-[var(--color-mod-academics-surface)] text-[var(--color-mod-academics-accent)] hover:bg-[var(--color-mod-academics-accent)] hover:text-white transition-all active:scale-90"
                           >
                              <Edit3 size={14} />
                           </button>

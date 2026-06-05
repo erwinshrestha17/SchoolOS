@@ -11,11 +11,7 @@ import {
   Landmark,
   ClipboardCheck,
   ShieldCheck,
-  MapPin,
-  Mail,
   Phone,
-  Banknote,
-  Upload,
   UserCheck,
   Edit2,
   FileText,
@@ -29,7 +25,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { cn } from '../../lib/utils';
 import { Badge } from '../ui/badge';
 import { Toast } from '../ui/toast';
-import { FormField, Input, Select, TextArea } from '../ui/form-field';
+import { FormField, Input, TextArea } from '../ui/form-field';
 
 // Dialog Modals
 import { StaffLifecycleDialog } from './staff-lifecycle-dialog';
@@ -110,25 +106,31 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
   }, [staff]);
 
   const updateMutation = useMutation({
-    mutationFn: () => 
-      api.updateStaffDetail(staffId, {
-        firstName: draft.firstName,
-        lastName: draft.lastName,
-        email: draft.email,
-        address: draft.address,
-        department: draft.department,
-        designation: draft.designation,
-        bankName: draft.bankName,
-        bankAccount: draft.bankAccount,
-        emergencyContactName: draft.emergencyName,
-        emergencyContactPhone: draft.emergencyPhone,
-        emergencyContactRelation: draft.emergencyRelation,
-        qualifications: draft.qualifications,
-        experience: draft.experience,
-        teacherRegistryId: draft.teacherRegistryId,
-        citizenshipNo: draft.citizenshipNo,
-        panNumber: draft.panNumber,
-      }),
+    mutationFn: () => {
+      const optionalTrim = (value: string) => {
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : undefined;
+      };
+
+      return api.updateStaffDetail(staffId, {
+        firstName: draft.firstName.trim(),
+        lastName: draft.lastName.trim(),
+        email: draft.email.trim(),
+        address: draft.address.trim(),
+        department: optionalTrim(draft.department),
+        designation: optionalTrim(draft.designation),
+        bankName: optionalTrim(draft.bankName),
+        bankAccount: optionalTrim(draft.bankAccount),
+        emergencyContactName: optionalTrim(draft.emergencyName),
+        emergencyContactPhone: optionalTrim(draft.emergencyPhone),
+        emergencyContactRelation: optionalTrim(draft.emergencyRelation),
+        qualifications: optionalTrim(draft.qualifications),
+        experience: optionalTrim(draft.experience),
+        teacherRegistryId: optionalTrim(draft.teacherRegistryId),
+        citizenshipNo: optionalTrim(draft.citizenshipNo),
+        panNumber: optionalTrim(draft.panNumber),
+      });
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['staff-detail', staffId] });
       void queryClient.invalidateQueries({ queryKey: ['staff'] });
@@ -172,10 +174,24 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
     },
   });
 
+  const handleSaveProfile = () => {
+    const requiredText = [draft.firstName, draft.lastName, draft.email, draft.address];
+    if (requiredText.some((value) => value.trim().length === 0)) {
+      setToastMsg({
+        title: 'Validation Error',
+        desc: 'Please fill out first name, last name, email, and residential address before saving.',
+        tone: 'danger',
+      });
+      return;
+    }
+
+    updateMutation.mutate();
+  };
+
   if (staffQuery.isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <div className="h-12 w-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[var(--color-mod-hr-soft)] border-t-[var(--color-mod-hr-accent)]" />
         <p className="text-sm font-bold text-slate-500 uppercase tracking-widest animate-pulse">
           Hydrating Staff Profile...
         </p>
@@ -185,11 +201,13 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
 
   if (!staff) {
     return (
-      <div className="bg-rose-50 border border-rose-100 p-8 rounded-[2rem] text-center">
+      <div className="bg-rose-50 border border-rose-100 p-8 rounded-2xl text-center">
         <p className="text-rose-600 font-bold">Staff member not found or access denied.</p>
       </div>
     );
   }
+
+  const activeSalaryStructure = staff.salaryStructures?.find((ss) => ss.status === 'ACTIVE');
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -199,13 +217,12 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
           description={toastMsg.desc}
           tone={toastMsg.tone}
           onDismiss={() => setToastMsg(null)}
-          className="fixed bottom-6 right-6 z-50 shadow-2xl"
+          className="fixed bottom-6 right-6 z-50 shadow-lg"
         />
       )}
 
       {/* Header Profile Card */}
-      <section className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-sm relative overflow-hidden">
-        <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-blue-500/5 blur-3xl" />
+      <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm relative overflow-hidden">
         <div className="relative flex flex-col md:flex-row gap-8 items-start md:items-center">
           <div className="h-24 w-24 rounded-3xl bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 shadow-inner">
             <User size={48} />
@@ -228,7 +245,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
             </div>
             <div className="flex flex-wrap gap-6 text-sm text-slate-500 font-medium">
               <span className="flex items-center gap-2">
-                <ShieldCheck size={16} className="text-blue-500" />
+                <ShieldCheck size={16} className="text-[var(--color-mod-hr-text)]" />
                 {staff.employeeId}
               </span>
               <span className="flex items-center gap-2">
@@ -252,9 +269,9 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
             </button>
             <button
               type="button"
-              onClick={() => updateMutation.mutate()}
+              onClick={handleSaveProfile}
               disabled={updateMutation.isPending || staff.status === 'TERMINATED'}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-slate-900 text-white font-bold hover:bg-blue-600 transition-all shadow-lg shadow-slate-900/10 disabled:opacity-50 text-sm"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[var(--color-mod-hr-accent)] text-white font-bold hover:bg-[var(--color-mod-hr-text)] transition-all shadow-sm disabled:opacity-50 text-sm"
             >
               <Save size={18} />
               {updateMutation.isPending ? 'Saving...' : 'Save Profile'}
@@ -308,9 +325,9 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
           <div className="space-y-8">
             {/* Tab: Overview */}
             <TabsContent value="overview" className="m-0 outline-none">
-              <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-8">
+              <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm space-y-8">
                 <h3 className="text-xl font-bold flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center">
+                  <div className="h-8 w-8 rounded-lg bg-[var(--color-mod-hr-soft)] text-[var(--color-mod-hr-text)] flex items-center justify-center">
                     <User size={18} />
                   </div>
                   Personal Details
@@ -398,7 +415,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
 
             {/* Tab: Employment */}
             <TabsContent value="employment" className="m-0 outline-none">
-              <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-8">
+              <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm space-y-8">
                 <h3 className="text-xl font-bold flex items-center gap-3">
                   <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-500 flex items-center justify-center">
                     <Briefcase size={18} />
@@ -476,7 +493,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
 
             {/* Tab: Attendance */}
             <TabsContent value="attendance" className="m-0 outline-none">
-              <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-6">
+              <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm space-y-6">
                 <h3 className="text-xl font-bold flex items-center gap-3">
                   <div className="h-8 w-8 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center">
                     <ClipboardCheck size={18} />
@@ -522,7 +539,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                                 type="button"
                                 disabled={staff.status === 'TERMINATED'}
                                 onClick={() => setSelectedAttendanceRecord(item)}
-                                className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-blue-600 border border-blue-100 rounded-lg hover:bg-blue-50 transition-colors"
+                                className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[var(--color-mod-hr-text)] border border-[var(--color-mod-hr-border)] rounded-lg hover:bg-[var(--color-mod-hr-soft)] transition-colors"
                               >
                                 Correct
                               </button>
@@ -543,7 +560,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
             {/* Tab: Leave */}
             <TabsContent value="leave" className="m-0 outline-none space-y-8">
               {/* Leave Balances */}
-              <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-6">
+              <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm space-y-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-xl font-bold flex items-center gap-3">
                     <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center">
@@ -564,7 +581,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                       type="button"
                       disabled={staff.status === 'TERMINATED'}
                       onClick={() => setIsRequestLeaveOpen(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--color-mod-hr-accent)] hover:bg-[var(--color-mod-hr-text)] text-white font-bold text-xs transition-colors"
                     >
                       Request Leave
                     </button>
@@ -579,7 +596,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                           <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center">Entitlement</th>
                           <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center">Used</th>
                           <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center">Pending</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center text-primary-600">Remaining</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center text-[var(--color-mod-hr-text)]">Remaining</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
@@ -603,7 +620,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
               </section>
 
               {/* Leave History / Requests */}
-              <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-6">
+              <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm space-y-6">
                 <h3 className="text-xl font-bold flex items-center gap-3">
                   <div className="h-8 w-8 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center">
                     <CalendarDays size={18} />
@@ -646,7 +663,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                                   type="button"
                                   disabled={staff.status === 'TERMINATED'}
                                   onClick={() => setSelectedLeaveRequest(req)}
-                                  className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-blue-600 border border-blue-100 rounded-lg hover:bg-blue-50 transition-colors"
+                                  className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[var(--color-mod-hr-text)] border border-[var(--color-mod-hr-border)] rounded-lg hover:bg-[var(--color-mod-hr-soft)] transition-colors"
                                 >
                                   Review
                                 </button>
@@ -668,7 +685,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
             {/* Tab: Payroll */}
             <TabsContent value="payroll" className="m-0 outline-none space-y-8">
               {/* Salary Structures */}
-              <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-6">
+              <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm space-y-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-xl font-bold flex items-center gap-3">
                     <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-500 flex items-center justify-center">
@@ -683,7 +700,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                       setSelectedSalaryStructure(null);
                       setIsSalaryStructureOpen(true);
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--color-mod-hr-accent)] hover:bg-[var(--color-mod-hr-text)] text-white font-bold text-xs transition-colors"
                   >
                     Add Structure
                   </button>
@@ -764,7 +781,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
               </section>
 
               {/* Payroll History */}
-              <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-6">
+              <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm space-y-6">
                 <h3 className="text-xl font-bold flex items-center gap-3">
                   <div className="h-8 w-8 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center">
                     <Receipt size={18} />
@@ -824,29 +841,29 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
           </div>
 
           <aside className="space-y-6">
-            <div className="bg-slate-900 rounded-[2rem] p-6 text-white shadow-xl">
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
               <h4 className="font-bold mb-4 text-slate-400 uppercase tracking-widest text-[10px]">Staff Summary</h4>
               <div className="space-y-4">
-                <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <div className="flex justify-between items-center gap-4 py-2 border-b border-slate-100">
                   <span className="text-xs text-slate-400 font-medium">Joined Date</span>
-                  <span className="text-xs font-bold">{staff.employment?.joiningDate ? new Date(staff.employment.joiningDate).toLocaleDateString() : new Date(staff.joiningDate).toLocaleDateString()}</span>
+                  <span className="text-xs font-bold text-slate-900">{staff.employment?.joiningDate ? new Date(staff.employment.joiningDate).toLocaleDateString() : new Date(staff.joiningDate).toLocaleDateString()}</span>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <div className="flex justify-between items-center gap-4 py-2 border-b border-slate-100">
                   <span className="text-xs text-slate-400 font-medium">Contract Type</span>
-                  <span className="text-xs font-bold uppercase tracking-widest text-blue-400">{staff.contractType ?? 'PERMANENT'}</span>
+                  <span className="text-xs font-bold uppercase tracking-widest text-[var(--color-mod-hr-text)]">{staff.contractType ?? 'Not set'}</span>
                 </div>
-                <div className="flex justify-between items-center py-2">
+                <div className="flex justify-between items-center gap-4 py-2">
                   <span className="text-xs text-slate-400 font-medium">Active Salary Structure</span>
-                  <span className="text-xs font-bold text-emerald-400">
-                    NPR {staff.salaryStructures?.find((ss) => ss.status === 'ACTIVE')?.basicSalary?.toLocaleString() ?? 0}
+                  <span className="text-xs font-bold text-emerald-600">
+                    {activeSalaryStructure ? `NPR ${activeSalaryStructure.basicSalary.toLocaleString()}` : 'Not configured'}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-blue-50 border border-blue-100 rounded-[2rem] p-6">
-              <h4 className="font-bold mb-2 text-blue-900 text-sm">HR Note</h4>
-              <p className="text-xs text-blue-700 leading-relaxed font-medium">
+            <div className="bg-[var(--color-mod-hr-soft)]/70 border border-[var(--color-mod-hr-border)] rounded-2xl p-6">
+              <h4 className="font-bold mb-2 text-[var(--color-mod-hr-text)] text-sm">HR Note</h4>
+              <p className="text-xs text-slate-600 leading-relaxed font-medium">
                 Profile updates are audited and synced with user authentication records. 
                 Sensitive financial changes require a separate salary structure update.
               </p>
@@ -916,41 +933,9 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
   );
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  icon: Icon,
-  disabled
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  icon?: any;
-  disabled?: boolean;
-}) {
-  return (
-    <label className="grid gap-2">
-      <span className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">{label}</span>
-      <div className="relative">
-        {Icon && <Icon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />}
-        <input
-          value={value}
-          disabled={disabled}
-          onChange={(event) => onChange(event.target.value)}
-          className={cn(
-            "w-full rounded-2xl border border-slate-200 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50",
-            Icon ? "pl-11 pr-4" : "px-4"
-          )}
-        />
-      </div>
-    </label>
-  );
-}
-
 function LifecycleHistoryPanel({ events, loading, error }: { events: StaffLifecycleHistoryEvent[]; loading: boolean; error: Error | null }) {
   return (
-    <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-6">
+    <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm space-y-6">
       <h3 className="text-xl font-bold flex items-center gap-3">
         <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center">
           <History size={18} />

@@ -51,10 +51,10 @@ export function FeesTab({ studentId, invoices }: FeesTabProps) {
                <div className="space-y-3 pt-4 border-t border-slate-100">
                   <Link 
                     href={`/dashboard/finance?studentId=${encodeURIComponent(studentId)}`}
-                    className="flex items-center justify-between group rounded-xl bg-slate-900 p-4 text-white transition hover:bg-slate-800"
+                    className="group flex min-h-12 items-center justify-between rounded-xl border border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-bg)] p-4 text-[var(--color-mod-admissions-text)] transition hover:border-[var(--color-mod-admissions-accent)] hover:bg-white"
                   >
                     <div className="flex items-center gap-3">
-                       <Wallet size={18} className="text-primary-400" />
+                       <Wallet size={18} className="text-[var(--color-mod-admissions-accent)]" />
                        <span className="text-sm font-bold">Collect Payment</span>
                     </div>
                     <ChevronRight size={18} className="transition group-hover:translate-x-1" />

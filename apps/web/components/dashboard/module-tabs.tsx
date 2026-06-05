@@ -107,14 +107,19 @@ export function ModuleTabs({
 }: ModuleTabsProps) {
   const pathname = usePathname();
   const styles = tabAccentStyles[accentColor];
+  const hasExactHref = items.some((item) => item.href === pathname);
 
   const getIsActive = (item: TabItem) => {
     if (onValueChange && item.value !== undefined) {
       return activeValue === item.value;
     }
     if (item.href) {
-      // Direct path match or parent path match
-      return pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith(item.href));
+      return (
+        pathname === item.href ||
+        (!hasExactHref &&
+          item.href !== '/dashboard' &&
+          pathname?.startsWith(item.href))
+      );
     }
     return false;
   };

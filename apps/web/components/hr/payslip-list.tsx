@@ -2,9 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { FileText, Download, Search, Loader2 } from 'lucide-react';
+import { Download, Search } from 'lucide-react';
 import { useState } from 'react';
-import { cn } from '../../lib/utils';
 
 export function PayslipList() {
   const [search, setSearch] = useState('');
@@ -35,12 +34,12 @@ export function PayslipList() {
             placeholder="Search payslips by number or staff..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-2xl border border-slate-200 pl-11 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+            className="w-full rounded-2xl border border-slate-200 py-3 pl-11 pr-4 text-sm transition-all focus:border-[var(--color-mod-hr-border)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-hr-border)]/50"
           />
         </div>
       </div>
 
-      <div className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -78,7 +77,7 @@ export function PayslipList() {
               ) : (
                 filteredPayslips?.map((payslip) => (
                   <tr key={payslip.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-blue-600">
+                    <td className="px-6 py-4 font-bold text-[var(--color-mod-hr-text)]">
                       {payslip.payslipNumber}
                     </td>
                     <td className="px-6 py-4">
@@ -94,7 +93,7 @@ export function PayslipList() {
                     <td className="px-6 py-4 text-right">
                       <button
                         onClick={() => api.openPayslipPdf(payslip.payslipNumber)}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all font-bold"
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 font-bold text-slate-600 transition-all hover:bg-[var(--color-mod-hr-soft)] hover:text-[var(--color-mod-hr-text)]"
                       >
                         <Download size={14} />
                         PDF

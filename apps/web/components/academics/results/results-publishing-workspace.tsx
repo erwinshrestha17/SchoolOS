@@ -112,7 +112,7 @@ export function ResultsPublishingWorkspace() {
           title="Previewed Students"
           value={previewQuery.data?.meta.total ?? 0}
           icon={<FileText size={20} />}
-          className="bg-primary-50/50 border-primary-100"
+          className="border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-surface)]"
         />
         <StatCard
           title="Ready for Lock"
@@ -141,7 +141,7 @@ export function ResultsPublishingWorkspace() {
           <Link
             href="/dashboard/academics/locks"
             aria-disabled={!examTermId}
-            className={`inline-flex h-11 items-center justify-center rounded-2xl bg-slate-900 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 active:scale-[0.98] ${
+            className={`inline-flex h-11 items-center justify-center rounded-2xl bg-[var(--color-mod-academics-accent)] px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-academics-text)] active:scale-[0.98] ${
               !examTermId ? 'pointer-events-none opacity-50' : ''
             }`}
           >
@@ -195,7 +195,7 @@ export function ResultsPublishingWorkspace() {
             type="checkbox"
             checked={includeCas}
             onChange={(event) => setIncludeCas(event.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+            className="h-4 w-4 rounded border-slate-300 text-[var(--color-mod-academics-accent)] focus:ring-[var(--color-mod-academics-accent)]"
           />
           Include CAS
         </label>

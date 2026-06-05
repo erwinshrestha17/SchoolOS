@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
@@ -31,6 +31,12 @@ export function StaffLifecycleDialog({
   const [reason, setReason] = useState('');
   const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().slice(0, 10));
 
+  useEffect(() => {
+    if (currentStatus === 'ACTIVE' || currentStatus === 'INACTIVE' || currentStatus === 'TERMINATED') {
+      setStatus(currentStatus);
+    }
+  }, [currentStatus, isOpen]);
+
   const transitionMutation = useMutation({
     mutationFn: (payload: { status: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'; reason: string; effectiveDate?: string }) => {
       if (payload.status === 'TERMINATED') {
@@ -56,21 +62,22 @@ export function StaffLifecycleDialog({
     e.preventDefault();
     setToastError(null);
 
-    if (!reason) {
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) {
       setToastError('Please provide a reason for this lifecycle transition.');
       return;
     }
 
     transitionMutation.mutate({
       status,
-      reason,
+      reason: trimmedReason,
       effectiveDate: status === 'TERMINATED' ? effectiveDate : undefined,
     });
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md rounded-[2.5rem]">
+      <DialogContent className="max-w-md rounded-2xl">
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle>Update Lifecycle Status</DialogTitle>

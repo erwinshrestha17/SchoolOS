@@ -210,7 +210,7 @@ export function MarksEntryWorkspace() {
           disabled={isExamLocked || statuses[student.id] === 'ABSENT' || statuses[student.id] === 'EXCUSED'}
           max={maxMarks}
           min={0}
-          className="h-10 rounded-xl text-center font-bold transition-all focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500"
+          className="h-10 rounded-xl text-center font-bold transition-all focus:border-[var(--color-mod-academics-accent)] focus:ring-4 focus:ring-[var(--color-mod-academics-accent)]/10"
         />
       ),
     },
@@ -310,7 +310,7 @@ export function MarksEntryWorkspace() {
             <Button 
               onClick={handleSave} 
               disabled={!ready || isExamLocked || batchMutation.isPending}
-              className="shadow-lg shadow-primary-600/20"
+              className="bg-[var(--color-mod-academics-accent)] shadow-sm hover:bg-[var(--color-mod-academics-text)]"
             >
               <Save size={16} className="mr-2" />
               {batchMutation.isPending ? 'Saving...' : 'Save Changes'}
@@ -407,8 +407,8 @@ export function MarksEntryWorkspace() {
           </SectionCard>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-24 rounded-[3rem] border-4 border-dashed border-slate-100 bg-slate-50/50">
-          <div className="h-20 w-20 rounded-full bg-white shadow-xl flex items-center justify-center text-slate-300 mb-6">
+        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white px-6 py-20 text-center shadow-sm">
+          <div className="h-16 w-16 rounded-2xl border border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-surface)] flex items-center justify-center text-[var(--color-mod-academics-accent)] mb-6">
             <Search size={32} />
           </div>
           <p className="text-xl font-black italic uppercase tracking-tight text-slate-400">Select context to begin</p>

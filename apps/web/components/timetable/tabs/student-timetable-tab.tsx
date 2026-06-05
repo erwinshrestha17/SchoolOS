@@ -12,9 +12,7 @@ import {
   User, 
   MapPin, 
   BookOpen,
-  GraduationCap
 } from 'lucide-react';
-import { cn } from '../../../lib/utils';
 
 const daysOfWeek = [
   { value: 1, label: 'Monday' },
@@ -33,6 +31,7 @@ export function StudentTimetableTab() {
   });
 
   const timetable = timetableQuery.data ?? [];
+  const daysWithSlots = new Set(timetable.map((slot: any) => slot.dayOfWeek)).size;
 
   // Group timetable by day
   const gridByDay = daysOfWeek.reduce((acc, day) => {
@@ -122,24 +121,24 @@ export function StudentTimetableTab() {
       </SectionCard>
       
       <div className="grid gap-6 md:grid-cols-2">
-         <div className="rounded-[2.5rem] bg-slate-900 p-8 text-white flex items-center gap-6 shadow-xl shadow-slate-200">
-            <div className="h-14 w-14 rounded-3xl bg-white/10 flex items-center justify-center ring-1 ring-white/20 shrink-0">
-               <GraduationCap className="h-7 w-7 text-indigo-400" />
+         <div className="flex items-center gap-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
+               <Calendar className="h-7 w-7" />
             </div>
             <div>
-               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Academic Status</p>
-               <h3 className="text-xl font-black uppercase italic tracking-tight">Active Enrollment</h3>
-               <p className="text-xs text-slate-500 font-medium mt-1">2081 BS Academic Session</p>
+               <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Published Days</p>
+               <h3 className="text-xl font-black tracking-tight text-slate-950">{daysWithSlots} Days</h3>
+               <p className="mt-1 text-xs font-medium text-slate-500">Days with at least one scheduled class.</p>
             </div>
          </div>
-         <div className="rounded-[2.5rem] border border-slate-200 bg-white p-8 flex items-center gap-6 shadow-sm">
-            <div className="h-14 w-14 rounded-3xl bg-indigo-50 flex items-center justify-center shrink-0">
+         <div className="flex items-center gap-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-50">
                <BookOpen className="h-7 w-7 text-indigo-600" />
             </div>
             <div>
-               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Weekly Load</p>
-               <h3 className="text-xl font-black uppercase italic tracking-tight">{timetable.length} Active Classes</h3>
-               <p className="text-xs text-slate-500 font-medium mt-1">Full attendance is mandatory</p>
+               <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Weekly Load</p>
+               <h3 className="text-xl font-black tracking-tight text-slate-950">{timetable.length} Scheduled Classes</h3>
+               <p className="mt-1 text-xs font-medium text-slate-500">Slots currently published for the student.</p>
             </div>
          </div>
       </div>

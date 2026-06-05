@@ -179,12 +179,12 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
       />
 
       <Tabs value={activeDetailTab} onValueChange={(value) => setActiveDetailTab(value as DetailTab)} className="space-y-8">
-        <TabsList className="flex h-auto flex-wrap gap-2 rounded-[2rem] border border-slate-200 bg-white/50 p-2 backdrop-blur-sm w-full justify-start">
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 rounded-2xl border border-[var(--color-mod-admissions-border)] bg-white p-2 shadow-sm">
           {detailTabs.map((tab) => (
             <TabsTrigger
               key={tab}
               value={tab}
-              className="flex-1 min-h-[3rem] rounded-[1.5rem] px-6 text-sm font-bold transition-all data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 bg-transparent shadow-none"
+              className="min-h-11 flex-1 rounded-xl bg-transparent px-4 text-sm font-bold text-slate-500 shadow-none transition-all hover:bg-[var(--color-mod-admissions-bg)] hover:text-[var(--color-mod-admissions-text)] data-[state=active]:bg-[var(--color-mod-admissions-accent)] data-[state=active]:text-white data-[state=active]:shadow-sm"
             >
               {tab}
             </TabsTrigger>

@@ -21,7 +21,7 @@ export function SalaryStructureList() {
   });
 
   return (
-      <div className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>

@@ -35,17 +35,20 @@ export function PayrollActionDialog({
 
   const actionMutation = useMutation({
     mutationFn: async () => {
+      const trimmedReason = reason.trim();
+      const trimmedPaymentAccountCode = paymentAccountCode.trim();
+
       switch (actionType) {
         case 'SUBMIT_REVIEW':
           return api.submitPayrollRunReview(runId);
         case 'APPROVE':
           return api.approvePayrollRun(runId);
         case 'REJECT':
-          return api.rejectPayrollRun(runId, { reason });
+          return api.rejectPayrollRun(runId, { reason: trimmedReason });
         case 'POST':
           return api.postPayrollRun(runId);
         case 'MARK_PAID':
-          return api.markPayrollRunPaid(runId, { paymentAccountCode, reason });
+          return api.markPayrollRunPaid(runId, { paymentAccountCode: trimmedPaymentAccountCode, reason: trimmedReason });
         default:
           throw new Error('Unsupported payroll action');
       }
@@ -68,7 +71,7 @@ export function PayrollActionDialog({
         return {
           title: 'Submit for Review',
           description: 'Submit this payroll run for administrative review.',
-          icon: <ShieldAlert size={20} className="text-blue-500" />,
+          icon: <ShieldAlert size={20} className="text-[var(--color-mod-hr-text)]" />,
           warning: 'This will lock the draft and alert reviewers. No direct edits are allowed during review.',
           requiresReason: false,
           requiresAccount: false,
@@ -142,7 +145,7 @@ export function PayrollActionDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md rounded-[2.5rem]">
+      <DialogContent className="max-w-md rounded-2xl">
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle className="flex items-center gap-2">

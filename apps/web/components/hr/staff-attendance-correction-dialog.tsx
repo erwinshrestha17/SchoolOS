@@ -60,7 +60,8 @@ export function StaffAttendanceCorrectionDialog({
     e.preventDefault();
     setToastError(null);
 
-    if (!reason) {
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) {
       setToastError('Please provide a reason for this correction.');
       return;
     }
@@ -74,20 +75,20 @@ export function StaffAttendanceCorrectionDialog({
 
     correctMutation.mutate({
       status,
-      reason,
+      reason: trimmedReason,
       checkInAt,
       leaveType: status === 'LEAVE' && leaveType ? leaveType : undefined,
-      note: note || undefined,
+      note: note.trim() || undefined,
     });
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md rounded-[2.5rem]">
+      <DialogContent className="max-w-md rounded-2xl">
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle className="flex items-center gap-2">
-              <ClipboardCheck size={20} className="text-blue-500" />
+              <ClipboardCheck size={20} className="text-[var(--color-mod-hr-text)]" />
               Correct Attendance Record
             </DialogTitle>
             <p className="text-xs text-slate-500 mt-1">
@@ -185,6 +186,7 @@ export function StaffAttendanceCorrectionDialog({
             onClick={handleSubmit}
             isLoading={correctMutation.isPending}
             disabled={correctMutation.isPending}
+            className="bg-[var(--color-mod-hr-accent)] hover:bg-[var(--color-mod-hr-text)]"
           >
             Save Correction
           </Button>

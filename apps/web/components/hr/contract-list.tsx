@@ -28,7 +28,7 @@ export function ContractList() {
   const [isCreating, setIsCreating] = useState(false);
   const [newContract, setNewContract] = useState({
     staffId: '',
-    contractNumber: `CTR-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+    contractNumber: '',
     position: '',
     startDate: new Date().toISOString().split('T')[0],
     baseSalary: 0,
@@ -48,7 +48,7 @@ export function ContractList() {
       setIsCreating(false);
       setNewContract({
         staffId: '',
-        contractNumber: `CTR-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+        contractNumber: '',
         position: '',
         startDate: new Date().toISOString().split('T')[0],
         baseSalary: 0,
@@ -77,7 +77,7 @@ export function ContractList() {
         </div>
         <button 
           onClick={() => setIsCreating(true)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white rounded-xl font-bold text-sm shadow-sm hover:bg-primary-700 transition-all hover:shadow-md active:scale-[0.98]"
+          className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-hr-accent)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-hr-text)] active:scale-[0.98]"
         >
           <Plus size={18} />
           New Contract
@@ -86,8 +86,8 @@ export function ContractList() {
 
       {isCreating && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl border border-slate-200/50 p-8 animate-in zoom-in-95 duration-300">
-            <h3 className="text-2xl font-black text-slate-900 mb-6">Create Staff Contract</h3>
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-sm animate-in zoom-in-95 duration-300 sm:p-8">
+            <h3 className="mb-6 text-xl font-black uppercase tracking-tight text-slate-900">Create Staff Contract</h3>
             
             <div className="grid gap-6">
               <FormField label="Staff Member">
@@ -164,12 +164,13 @@ export function ContractList() {
                 </button>
                 <button
                   type="button"
-                  disabled={!newContract.staffId || !newContract.position || createMutation.isPending}
+                  disabled={!newContract.staffId || !newContract.contractNumber.trim() || !newContract.position || createMutation.isPending}
                   onClick={() => createMutation.mutate({
                     ...newContract,
+                    contractNumber: newContract.contractNumber.trim(),
                     startDate: new Date(newContract.startDate).toISOString(),
                   })}
-                  className="flex-1 px-5 py-3 rounded-2xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-slate-900/10"
+                  className="flex-1 rounded-2xl bg-[var(--color-mod-hr-accent)] px-5 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-hr-text)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {createMutation.isPending ? 'Saving...' : 'Create Contract'}
                 </button>
@@ -179,7 +180,7 @@ export function ContractList() {
         </div>
       )}
 
-      <div className="shell-card overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+      <div className="shell-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -189,13 +190,12 @@ export function ContractList() {
                 <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">Base Salary</th>
                 <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">Allowances</th>
                 <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">Status</th>
-                <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {contractsQuery.isLoading ? (
                 <tr>
-                  <td colSpan={6} className="p-0">
+                  <td colSpan={5} className="p-0">
                     <LoadingState variant="spinner" label="Loading contracts..." />
                   </td>
                 </tr>
@@ -206,7 +206,9 @@ export function ContractList() {
                     <td className="px-6 py-4">
                       <div>
                         <p className="font-bold text-slate-900">{contract.position}</p>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">ID: {contract.staffId.slice(0, 8)}...</p>
+                        <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                          Starts {new Date(contract.startDate).toLocaleDateString()}
+                        </p>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm font-bold text-slate-900">
@@ -224,14 +226,11 @@ export function ContractList() {
                         {contract.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="text-primary-600 hover:text-primary-700 font-bold text-sm transition-colors">Edit</button>
-                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="p-0">
+                  <td colSpan={5} className="p-0">
                     <EmptyState 
                       title="No contracts found" 
                       description={search ? `No results for "${search}"` : "Create a new contract to get started."}

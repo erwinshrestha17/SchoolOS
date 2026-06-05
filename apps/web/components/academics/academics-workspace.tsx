@@ -2,17 +2,11 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { 
-  BookOpen, 
   GraduationCap, 
-  Users, 
-  Calendar, 
-  Trophy, 
   FileText, 
   Settings, 
   Lock, 
-  CheckCircle2, 
   Megaphone, 
-  Layers,
   ArrowRight,
   ClipboardList
 } from 'lucide-react';
@@ -27,9 +21,9 @@ import { CasRecordsTab } from './tabs/cas-records-tab';
 import { PromotionTab } from './tabs/promotion-tab';
 import { ResultPublishingTab } from './tabs/result-publishing-tab';
 import { StatCard } from '../ui/stat-card';
+import { PageHeader } from '../ui/page-header';
 import { cn } from '@/lib/utils';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { useEffect } from 'react';
 
 const workflowSteps = [
   { id: 'Setup', label: 'Setup', icon: Settings, description: 'Terms & Components' },
@@ -84,47 +78,44 @@ export function AcademicsWorkspace({ initialSection }: AcademicsWorkspaceProps) 
   const academicYear = academicYearsQuery.data?.find(y => y.isCurrent);
   const subjectCount = subjectsQuery.data?.length ?? 0;
   const examCount = examsQuery.data?.length ?? 0;
-
-  // Completeness Indicators (Mock/Calculated)
-  const isSetupComplete = examCount > 0 && subjectCount > 0;
-  const isEntryStarted = (reportsQuery.data?.length ?? 0) > 0; // Simple heuristic
+  const reportCardCount = reportsQuery.data?.length ?? 0;
 
   return (
     <div className="space-y-10 animate-fade-in">
-      {/* Workflow Header */}
-      <section className="relative overflow-hidden rounded-[3rem] bg-slate-900 p-10 text-white shadow-2xl">
-        <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-xl">
-            <div className="mb-4 flex items-center gap-2">
-              <span className="rounded-full bg-primary-500/20 px-4 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-primary-300 backdrop-blur-md border border-primary-500/30">
-                Academics Workflow
-              </span>
-              <div className="h-1 w-1 rounded-full bg-white/30" />
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                {academicYear?.name || 'Academic Year'}
-              </span>
-            </div>
-            <h1 className="text-4xl font-black tracking-tight sm:text-6xl italic uppercase">
-              Academic <span className="text-primary-400">Workflow</span>
-            </h1>
-            <p className="mt-4 text-lg font-medium text-slate-300 leading-relaxed">
-              Step-by-step academic management from curriculum setup to result delivery.
-            </p>
-          </div>
+      <PageHeader
+        title="Academics Workflow"
+        description="Manage exam setup, marks and CAS entry, locks, report cards, promotion readiness, and publishing."
+        actions={
+          <span className="rounded-lg border border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-bg)] px-3 py-2 text-xs font-bold uppercase tracking-wide text-[var(--color-mod-academics-text)]">
+            {academicYear?.name ?? 'Academic Year'}
+          </span>
+        }
+      />
 
-          <div className="grid grid-cols-2 gap-4">
-             <StatBox label="Subjects" value={subjectCount} />
-             <StatBox label="Exams" value={examCount} />
-          </div>
-        </div>
-
-        <div className="absolute -right-20 -top-20 h-96 w-96 rounded-full bg-primary-500/10 blur-[120px]" />
-        <div className="absolute -bottom-40 left-1/4 h-80 w-80 rounded-full bg-blue-500/10 blur-[100px]" />
-      </section>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          title="Subjects"
+          value={subjectCount}
+          icon={<Settings size={18} />}
+          tone="neutral"
+        />
+        <StatCard
+          title="Exam Terms"
+          value={examCount}
+          icon={<ClipboardList size={18} />}
+          tone="info"
+        />
+        <StatCard
+          title="Report Cards"
+          value={reportCardCount}
+          icon={<FileText size={18} />}
+          tone="success"
+        />
+      </div>
 
       {/* Workflow Stepper */}
       <section className="sticky top-4 z-30">
-        <div className="rounded-[2.5rem] border border-slate-200 bg-white/90 p-3 shadow-2xl shadow-slate-200/50 backdrop-blur-xl">
+        <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm backdrop-blur-xl">
           <Tabs value={currentTab} onValueChange={setTab} className="w-full">
             <TabsList className="grid h-auto w-full grid-cols-3 gap-2 bg-transparent p-0 lg:grid-cols-6">
               {workflowSteps.map((step, idx) => (
@@ -132,15 +123,15 @@ export function AcademicsWorkspace({ initialSection }: AcademicsWorkspaceProps) 
                   key={step.id}
                   value={step.id}
                   className={cn(
-                    "group relative flex flex-col items-center gap-1 rounded-2xl py-4 transition-all",
-                    "data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-xl",
-                    "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                    "group relative flex flex-col items-center gap-1 rounded-xl py-4 transition-all",
+                    "data-[state=active]:bg-[var(--color-mod-academics-accent)] data-[state=active]:text-white data-[state=active]:shadow-sm",
+                    "text-slate-500 hover:bg-[var(--color-mod-academics-bg)] hover:text-[var(--color-mod-academics-text)]"
                   )}
                 >
                   <div className={cn(
                     "flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
-                    "group-data-[state=active]:bg-primary-500 group-data-[state=active]:text-white",
-                    "bg-slate-100 text-slate-400 group-hover:bg-slate-200"
+                    "group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white",
+                    "bg-slate-100 text-slate-400 group-hover:bg-white group-hover:text-[var(--color-mod-academics-accent)]"
                   )}>
                     <step.icon size={18} />
                   </div>
@@ -235,15 +226,6 @@ export function AcademicsWorkspace({ initialSection }: AcademicsWorkspaceProps) 
           </TabsContent>
         </Tabs>
       </div>
-    </div>
-  );
-}
-
-function StatBox({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-3xl bg-white/5 p-6 backdrop-blur-xl border border-white/10 shadow-inner min-w-[120px]">
-      <span className="text-3xl font-black tracking-tighter text-white">{value}</span>
-      <span className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
     </div>
   );
 }

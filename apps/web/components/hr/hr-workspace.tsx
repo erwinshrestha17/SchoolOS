@@ -1,15 +1,11 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../../lib/api';
 import {
   Users,
   FileText,
   CalendarDays,
   ClipboardCheck,
   Calculator,
-  Briefcase,
-  AlertCircle,
   FolderOpen,
   Receipt,
   BarChart3,
@@ -60,12 +56,12 @@ export function HRWorkspace() {
     <div className="space-y-8">
       <Tabs defaultValue="overview" className="space-y-8">
         <div className="sticky top-4 z-20 flex justify-center">
-          <TabsList className="bg-white/80 backdrop-blur-xl border border-slate-200 p-1.5 rounded-3xl shadow-lg shadow-slate-900/5 max-w-full overflow-x-auto flex-wrap h-auto">
+          <TabsList className="flex h-auto max-w-full flex-wrap overflow-x-auto rounded-2xl border border-[var(--color-mod-hr-border)] bg-white/90 p-1.5 shadow-sm backdrop-blur-xl">
             {tabs.map((tab) => (
               <TabsTrigger
                 key={tab.id}
                 value={tab.id}
-                className="px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-slate-900 data-[state=active]:text-white transition-all flex items-center gap-1.5"
+                className="flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all data-[state=active]:bg-[var(--color-mod-hr-accent)] data-[state=active]:text-white"
               >
                 <tab.icon size={13} />
                 {tab.label}

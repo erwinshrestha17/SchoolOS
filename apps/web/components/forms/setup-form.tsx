@@ -3,6 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { api } from '../../lib/api';
+import { PageHeader } from '../ui/page-header';
+import { StatCard } from '../ui/stat-card';
 
 const currentYear = new Date().getFullYear();
 
@@ -15,13 +17,13 @@ export function SetupForm() {
     isCurrent: true,
   });
   const [classroom, setClassroom] = useState({
-    name: 'Class 1',
-    level: 3,
+    name: '',
+    level: 0,
   });
   const [section, setSection] = useState({
     classId: '',
-    name: 'A',
-    capacity: 32,
+    name: '',
+    capacity: 0,
   });
 
   const academicYearsQuery = useQuery({
@@ -102,34 +104,24 @@ export function SetupForm() {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-gradient-to-br from-gray-950 via-gray-900 to-gray-800 p-6 text-white shadow-sm sm:p-8">
-        <div className="absolute right-0 top-0 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute bottom-0 left-1/4 h-36 w-36 rounded-full bg-emerald-400/20 blur-3xl" />
+      <PageHeader
+        title="Academic structure setup"
+        description="Configure academic years, classes, and sections before admissions, attendance, exams, and fee billing workflows begin."
+        actions={
+          <span className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600">
+            School Setup
+          </span>
+        }
+      />
 
-        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80 ring-1 ring-white/15">
-              School Setup
-            </span>
-            <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-              Academic structure setup
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
-              Configure academic years, classes, and sections before admissions, attendance,
-              exams, and fee billing workflows begin.
-            </p>
-          </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard title="Academic Years" value={academicYears.length} tone="neutral" />
+        <StatCard title="Classes" value={classes.length} tone="success" />
+        <StatCard title="Sections" value={sections.length} tone="warning" />
+        <StatCard title="Students" value={totalStudents} tone="info" />
+      </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[640px] xl:grid-cols-4">
-            <SetupMetricCard label="Academic Years" value={String(academicYears.length)} />
-            <SetupMetricCard label="Classes" value={String(classes.length)} tone="success" />
-            <SetupMetricCard label="Sections" value={String(sections.length)} tone="warning" />
-            <SetupMetricCard label="Students" value={String(totalStudents)} tone="accent" />
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-4 rounded-[28px] border border-[var(--line)] bg-white/85 p-4 shadow-sm backdrop-blur-xl lg:grid-cols-3">
+      <section className="grid gap-4 rounded-2xl border border-[var(--line)] bg-white/85 p-4 shadow-sm backdrop-blur-xl lg:grid-cols-3">
         <SetupStatusCard
           title="Current academic year"
           value={currentAcademicYear?.name ?? 'Not selected'}
@@ -388,22 +380,19 @@ function SetupFormCard({
 }) {
   return (
     <form
-      className="group relative overflow-hidden rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      className="rounded-2xl border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-md"
       onSubmit={onSubmit}
     >
-      <div className="absolute right-0 top-0 h-24 w-24 rounded-full bg-gray-100 opacity-80 blur-2xl transition group-hover:bg-emerald-100" />
-      <div className="relative">
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div>
-            <p className="label">{title}</p>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{subtitle}</p>
-          </div>
-          <span className="shrink-0 rounded-full bg-gray-950 px-3 py-1 text-xs font-semibold text-white">
-            {badge}
-          </span>
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <p className="label">{title}</p>
+          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{subtitle}</p>
         </div>
-        {children}
+        <span className="shrink-0 rounded-full bg-gray-950 px-3 py-1 text-xs font-semibold text-white">
+          {badge}
+        </span>
       </div>
+      {children}
     </form>
   );
 }
@@ -448,30 +437,6 @@ function ActionButton({
   );
 }
 
-function SetupMetricCard({
-  label,
-  value,
-  tone = 'neutral',
-}: {
-  label: string;
-  value: string;
-  tone?: 'neutral' | 'success' | 'warning' | 'accent';
-}) {
-  const toneClass = {
-    neutral: 'bg-white/10 text-white ring-white/15',
-    success: 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/20',
-    warning: 'bg-amber-400/15 text-amber-100 ring-amber-300/20',
-    accent: 'bg-sky-400/15 text-sky-100 ring-sky-300/20',
-  }[tone];
-
-  return (
-    <div className={`rounded-2xl p-4 ring-1 ${toneClass}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-75">{label}</p>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
-    </div>
-  );
-}
-
 function SetupStatusCard({
   description,
   title,
@@ -482,7 +447,7 @@ function SetupStatusCard({
   value: string;
 }) {
   return (
-    <article className="rounded-3xl border border-[var(--line)] bg-white p-5 shadow-sm">
+    <article className="rounded-2xl border border-[var(--line)] bg-white p-5 shadow-sm">
       <p className="label">{title}</p>
       <h3 className="mt-2 text-xl font-bold text-gray-950">{value}</h3>
       <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{description}</p>
@@ -500,7 +465,7 @@ function SetupList({
   items: Array<{ id: string; primary: string; secondary: string; badge?: string }>;
 }) {
   return (
-    <section className="rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+    <section className="rounded-2xl border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
           <p className="label">{title}</p>
@@ -515,7 +480,7 @@ function SetupList({
           items.slice(0, 8).map((item) => (
             <div
               key={item.id}
-              className="rounded-3xl border border-[var(--line)] bg-white p-4 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-sm"
+              className="rounded-2xl border border-[var(--line)] bg-white p-4 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -540,7 +505,7 @@ function SetupList({
 
 function EmptySetupState({ title }: { title: string }) {
   return (
-    <div className="rounded-3xl border border-dashed border-[var(--line)] bg-gray-50/80 p-6 text-center">
+    <div className="rounded-2xl border border-dashed border-[var(--line)] bg-gray-50/80 p-6 text-center">
       <p className="font-semibold text-gray-950">{title}</p>
       <p className="mt-1 text-sm text-[var(--muted)]">
         New records will appear here immediately after creation.
@@ -551,11 +516,11 @@ function EmptySetupState({ title }: { title: string }) {
 
 function SetupListSkeleton() {
   return (
-    <section className="rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm">
+    <section className="rounded-2xl border border-[var(--line)] bg-white/90 p-6 shadow-sm">
       <div className="h-4 w-32 animate-pulse rounded-full bg-gray-200" />
       <div className="mt-5 grid gap-3">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="rounded-3xl border border-[var(--line)] bg-white p-4">
+          <div key={index} className="rounded-2xl border border-[var(--line)] bg-white p-4">
             <div className="h-4 w-40 animate-pulse rounded-full bg-gray-200" />
             <div className="mt-3 h-3 w-28 animate-pulse rounded-full bg-gray-100" />
           </div>

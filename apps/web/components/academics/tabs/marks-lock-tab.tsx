@@ -116,7 +116,7 @@ export function MarksLockTab({ exams }: Props) {
   return (
     <div className="space-y-10 animate-fade-in">
       {/* Security Overview */}
-      <section className="rounded-[2.5rem] border border-slate-200 bg-white/50 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between mb-8">
            <div>
               <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Security & Locks</h2>
@@ -157,13 +157,13 @@ export function MarksLockTab({ exams }: Props) {
                  <p className="text-xl font-black text-amber-900 tracking-tighter italic">{pendingRequests.length}</p>
               </div>
            </div>
-           <div className="p-4 rounded-2xl bg-slate-900 text-white flex items-center gap-4 shadow-xl shadow-slate-900/10">
-              <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center">
+           <div className="p-4 rounded-2xl border border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-surface)] flex items-center gap-4">
+              <div className="h-10 w-10 rounded-xl bg-[var(--color-mod-academics-accent)] text-white flex items-center justify-center shadow-sm">
                  <Lock size={20} />
               </div>
               <div>
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Locked Terms</p>
-                 <p className="text-xl font-black text-white tracking-tighter italic">{exams.filter(e => e.isLocked).length}</p>
+                 <p className="text-[10px] font-black text-[var(--color-mod-academics-accent)] uppercase tracking-widest">Locked Terms</p>
+                 <p className="text-xl font-black text-[var(--color-mod-academics-text)] tracking-tighter italic">{exams.filter(e => e.isLocked).length}</p>
               </div>
            </div>
         </div>
@@ -171,12 +171,12 @@ export function MarksLockTab({ exams }: Props) {
 
       <div className="grid gap-10 lg:grid-cols-2">
          {/* Request Review */}
-         <section className="group relative rounded-[2.5rem] border border-slate-200 bg-white p-8 transition-all hover:shadow-xl hover:shadow-slate-200/50 overflow-hidden">
+         <section className="group relative rounded-2xl border border-slate-200 bg-white p-8 transition-all hover:border-[var(--color-mod-academics-border)] hover:shadow-sm overflow-hidden">
             <div className="absolute top-0 right-0 p-8 opacity-5">
                <ShieldCheck size={120} />
             </div>
             <div className="mb-8">
-               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 mb-4 transition-transform group-hover:rotate-12">
+               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-academics-surface)] text-[var(--color-mod-academics-accent)] mb-4 transition-transform group-hover:rotate-12">
                   <ShieldCheck size={24} />
                </div>
                <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">Request Integrity Check</h3>
@@ -210,7 +210,7 @@ export function MarksLockTab({ exams }: Props) {
                <button 
                 onClick={() => createMutation.mutate(requestForm)}
                 disabled={!requestForm.examTermId || !requestForm.reason.trim() || createMutation.isPending}
-                className="w-full h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs shadow-xl shadow-slate-900/10 active:scale-95 transition-all disabled:opacity-30"
+                className="w-full h-14 rounded-2xl bg-[var(--color-mod-academics-accent)] text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs shadow-sm hover:bg-[var(--color-mod-academics-text)] active:scale-95 transition-all disabled:opacity-30"
                >
                  {createMutation.isPending ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
                  Submit for Audit
@@ -219,7 +219,7 @@ export function MarksLockTab({ exams }: Props) {
          </section>
 
          {/* Unlock Bypass */}
-         <section className="group relative rounded-[2.5rem] border border-slate-200 bg-white p-8 transition-all hover:shadow-xl hover:shadow-slate-200/50 overflow-hidden">
+         <section className="group relative rounded-2xl border border-slate-200 bg-white p-8 transition-all hover:border-amber-200 hover:shadow-sm overflow-hidden">
             <div className="absolute top-0 right-0 p-8 opacity-5">
                <Unlock size={120} className="text-amber-500" />
             </div>
@@ -248,7 +248,7 @@ export function MarksLockTab({ exams }: Props) {
                <button 
                 onClick={() => unlockMutation.mutate({ id: unlockForm.examTermId, reason: unlockForm.reason || undefined })}
                 disabled={!unlockForm.examTermId || !unlockForm.reason.trim() || unlockMutation.isPending}
-                className="w-full h-14 rounded-2xl border border-amber-200 bg-amber-50 text-amber-700 flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs shadow-xl shadow-amber-500/5 active:scale-95 transition-all disabled:opacity-30"
+                className="w-full h-14 rounded-2xl border border-amber-200 bg-amber-50 text-amber-700 flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs shadow-sm hover:bg-amber-100 active:scale-95 transition-all disabled:opacity-30"
                >
                  {unlockMutation.isPending ? <Loader2 className="animate-spin" size={18} /> : <Shield size={18} />}
                  Bypass Security Lock
@@ -258,9 +258,9 @@ export function MarksLockTab({ exams }: Props) {
       </div>
 
       {/* Audit History */}
-      <section className="rounded-[2.5rem] border border-slate-200 bg-white overflow-hidden shadow-2xl shadow-slate-200/20">
+      <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
          <div className="p-8 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
-            <div className="h-10 w-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg shadow-slate-900/10">
+            <div className="h-10 w-10 rounded-2xl bg-[var(--color-mod-academics-accent)] text-white flex items-center justify-center shadow-sm">
                <History size={20} />
             </div>
             <div>
@@ -280,7 +280,7 @@ export function MarksLockTab({ exams }: Props) {
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No security events recorded</p>
                </div>
             ) : (requestsQuery.data ?? []).map((request) => (
-               <article key={request.id} className="group relative rounded-[2rem] border border-slate-100 bg-white p-6 transition-all hover:border-primary-200 hover:shadow-xl hover:shadow-primary-500/5">
+               <article key={request.id} className="group relative rounded-2xl border border-slate-100 bg-white p-6 transition-all hover:border-[var(--color-mod-academics-border)] hover:shadow-sm">
                   <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                      <div className="flex-1 space-y-4">
                         <div className="flex items-center gap-3">

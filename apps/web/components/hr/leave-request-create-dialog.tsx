@@ -81,7 +81,8 @@ export function LeaveRequestCreateDialog({
       setToastError('Leave end date cannot precede the start date.');
       return;
     }
-    if (!reason) {
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) {
       setToastError('Please provide a reason for the leave.');
       return;
     }
@@ -91,7 +92,7 @@ export function LeaveRequestCreateDialog({
       leaveType,
       startsOn,
       endsOn,
-      reason,
+      reason: trimmedReason,
     });
   };
 
@@ -99,11 +100,11 @@ export function LeaveRequestCreateDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md rounded-[2.5rem]">
+      <DialogContent className="max-w-md rounded-2xl">
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle className="flex items-center gap-2">
-              <Calendar size={20} className="text-blue-500" />
+              <Calendar size={20} className="text-[var(--color-mod-hr-text)]" />
               Request Leave
             </DialogTitle>
             <p className="text-xs text-slate-500 mt-1">Submit a leave request for processing.</p>
@@ -192,6 +193,7 @@ export function LeaveRequestCreateDialog({
             onClick={handleSubmit}
             disabled={requestMutation.isPending}
             isLoading={requestMutation.isPending}
+            className="bg-[var(--color-mod-hr-accent)] hover:bg-[var(--color-mod-hr-text)]"
           >
             Submit Request
           </Button>

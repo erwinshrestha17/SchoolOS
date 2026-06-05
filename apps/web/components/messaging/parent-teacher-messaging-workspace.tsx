@@ -26,18 +26,25 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { LoadingState } from '@/components/ui/loading-state';
 import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
-import { ModuleHero } from '@/components/dashboard/module-hero';
+import { ModuleTabs } from '@/components/dashboard/module-tabs';
+import { PageHeader } from '@/components/ui/page-header';
 import { SectionCard } from '@/components/ui/section-card';
+
+type MessageStatusFilter = '' | 'OPEN' | 'ESCALATED' | 'CLOSED';
 
 type Props = {
   threadId?: string;
+  initialStatusFilter?: MessageStatusFilter;
 };
 
-export function ParentTeacherMessagingWorkspace({ threadId }: Props) {
+export function ParentTeacherMessagingWorkspace({
+  threadId,
+  initialStatusFilter = '',
+}: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { session } = useSession();
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [search, setSearch] = useState('');
   const [studentId, setStudentId] = useState('');
   const [message, setMessage] = useState('');
@@ -53,6 +60,10 @@ export function ParentTeacherMessagingWorkspace({ threadId }: Props) {
     !roles.some((role) =>
       ['super_admin', 'admin', 'principal', 'teacher', 'subject_teacher'].includes(role),
     );
+
+  useEffect(() => {
+    setStatusFilter(initialStatusFilter);
+  }, [initialStatusFilter]);
 
   const availabilityQuery = useQuery({
     queryKey: ['parent-teacher-availability-status'],
@@ -166,15 +177,23 @@ export function ParentTeacherMessagingWorkspace({ threadId }: Props) {
 
   return (
     <DashboardPageShell>
-      <ModuleHero
+      <PageHeader
         title="Messages"
-        subtitle="Parent and class-teacher communication with school moderation and quiet-hours controls."
-        badge="Messages"
-        category="School Operations"
-        icon={<MessageSquare size={32} className="text-indigo-400" />}
-        accentColor="indigo"
-        variant="dark"
+        description="Parent and class-teacher conversations with school moderation, reporting, escalation, and quiet-hours controls."
       />
+
+      <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+        <ModuleTabs
+          items={[
+            { href: '/dashboard/messages', label: 'Messages' },
+            { href: '/dashboard/messages/threads', label: 'Threads' },
+            { href: '/dashboard/messages/moderation', label: 'Moderation' },
+            { href: '/dashboard/notices', label: 'Notices' },
+          ]}
+          accentColor="rose"
+          variant="light"
+        />
+      </div>
 
       <AvailabilityBanner
         isLoading={availabilityQuery.isLoading}
@@ -189,7 +208,11 @@ export function ParentTeacherMessagingWorkspace({ threadId }: Props) {
             <FilterBar label="Inbox Filters">
               <select
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
+                onChange={(event) =>
+                  setStatusFilter(
+                    event.target.value as MessageStatusFilter,
+                  )
+                }
                 className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm"
               >
                 <option value="">All status</option>

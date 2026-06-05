@@ -902,12 +902,12 @@ function ReviewPanel({
   category: string;
 }) {
   return (
-    <div className="sticky top-28 space-y-6 rounded-xl bg-slate-900 p-8 text-white shadow-sm">
+    <div className="sticky top-28 space-y-6 rounded-2xl border border-[var(--line)] bg-white p-8 shadow-sm">
       <div>
-        <h3 className="text-lg font-bold text-white">
+        <h3 className="text-lg font-bold text-slate-950">
           Review Summary
         </h3>
-        <p className="mt-1 text-xs font-bold text-slate-400">
+        <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">
           Verify before publishing
         </p>
       </div>
@@ -925,11 +925,11 @@ function ReviewPanel({
         />
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-white/5 p-5">
-        <p className="mb-2 text-xs font-bold text-slate-400">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+        <p className="mb-2 text-xs font-bold text-slate-500">
           Tagged Students
         </p>
-        <p className="text-xs leading-relaxed font-medium">
+        <p className="text-xs font-medium leading-relaxed text-slate-700">
           {selectedStudents.length > 0
             ? selectedStudents.map(studentDisplayName).join(', ')
             : 'No specific students tagged; audience follows class/section selection.'}
@@ -2018,11 +2018,11 @@ function HistoryCard({
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-1 border-b border-white/5 last:border-0">
+    <div className="flex items-center justify-between border-b border-slate-100 py-1 last:border-0">
       <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
         {label}
       </span>
-      <span className="text-[11px] font-bold text-slate-200">{value}</span>
+      <span className="text-right text-[11px] font-bold text-slate-800">{value}</span>
     </div>
   );
 }

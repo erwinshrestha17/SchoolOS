@@ -124,7 +124,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
   return (
     <div className="space-y-10 animate-fade-in">
       {/* Quick Filter Bar */}
-      <section className="rounded-[2.5rem] border border-slate-200 bg-white/50 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5 items-end">
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Exam Term</label>
@@ -176,7 +176,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
           </div>
           <div className="flex gap-2">
              <button 
-              className="h-12 w-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10"
+              className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-mod-academics-accent)] text-white shadow-sm transition-colors hover:bg-[var(--color-mod-academics-text)]"
               onClick={() => queryClient.invalidateQueries({ queryKey: ['marks', filters] })}
              >
                 <Search size={20} />
@@ -184,7 +184,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
              <button 
               className={cn(
                 "flex-1 h-12 rounded-2xl flex items-center justify-center gap-2 font-black uppercase tracking-widest text-xs transition-all active:scale-95",
-                canSave ? "bg-primary-600 text-white shadow-xl shadow-primary-600/20" : "bg-slate-100 text-slate-300 pointer-events-none"
+                canSave ? "bg-[var(--color-mod-academics-accent)] text-white shadow-sm hover:bg-[var(--color-mod-academics-text)]" : "bg-slate-100 text-slate-300 pointer-events-none"
               )}
               onClick={handleSave}
              >
@@ -226,7 +226,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
       )}
 
       {filters.assessmentComponentId ? (
-        <div className="rounded-[2.5rem] border border-slate-200 bg-white overflow-hidden shadow-2xl shadow-slate-200/20">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -369,32 +369,32 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
             </table>
           </div>
           
-          <div className="bg-slate-900 p-4 flex items-center justify-between text-white">
+          <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 p-4">
              <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
-                   <div className="h-2 w-2 rounded-full bg-primary-500" />
-                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Roster: {studentsForClass.length}</span>
+                   <div className="h-2 w-2 rounded-full bg-[var(--color-mod-academics-accent)]" />
+                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Total Roster: {studentsForClass.length}</span>
                 </div>
                 <div className="flex items-center gap-2">
                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Draft Entries: {changedEntries.length}</span>
+                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Draft Entries: {changedEntries.length}</span>
                 </div>
              </div>
              
              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 text-[10px] font-black uppercase tracking-widest">
-                   <Zap size={14} className="text-amber-400" />
+                <div className="flex items-center gap-2 rounded-xl border border-[var(--color-mod-academics-border)] bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-[var(--color-mod-academics-text)]">
+                   <Zap size={14} className="text-[var(--color-mod-academics-accent)]" />
                    Keyboard Mode Active
                 </div>
              </div>
           </div>
         </div>
       ) : (
-        <section className="rounded-[3rem] border-2 border-dashed border-slate-200 bg-white/50 p-20 text-center">
-          <div className="h-20 w-20 rounded-[2.5rem] bg-white shadow-xl flex items-center justify-center text-slate-300 mx-auto mb-8 border border-slate-50">
+        <section className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-16 text-center">
+          <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 text-slate-300">
              <Trophy size={40} />
           </div>
-          <h3 className="text-2xl font-black text-slate-900 italic uppercase tracking-tight">Roster Ready</h3>
+          <h3 className="text-2xl font-black tracking-tight text-slate-900">Roster Ready</h3>
           <p className="mt-2 text-sm font-bold text-slate-400 max-w-sm mx-auto leading-relaxed">
             Select context to begin. Choose an exam term, class, and assessment component above to load the mark entry grid.
           </p>
