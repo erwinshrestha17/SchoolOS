@@ -95,7 +95,7 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
 
       {open && (
         <div
-          className="absolute right-0 top-full z-50 mt-2 w-[min(380px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl"
+          className="absolute right-0 top-full z-50 mt-2 w-[min(380px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg"
           data-testid="notification-panel"
           role="dialog"
           aria-label="Notification center"
@@ -128,7 +128,7 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
                 </button>
                 <button
                   type="button"
-                  className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-primary-700 transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-[var(--primary-dark)] transition hover:bg-[var(--primary-soft)] disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={unreadCount === 0 || markAllReadMutation.isPending}
                   onClick={() => markAllReadMutation.mutate()}
                 >
@@ -185,7 +185,7 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
                   key={item.id}
                   href={item.linkHref}
                   className={`group block border-b border-gray-50 px-4 py-3 transition-colors last:border-b-0 hover:bg-gray-50 ${
-                    item.isRead ? 'bg-white' : 'bg-primary-50/60'
+                    item.isRead ? 'bg-white' : 'bg-[var(--primary-soft)]'
                   }`}
                   onClick={() => {
                     if (!item.isRead && !markReadMutation.isPending) {
@@ -197,7 +197,7 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
                   <div className="flex gap-3">
                     <span
                       className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
-                        item.isRead ? 'bg-gray-200' : 'bg-primary-500'
+                        item.isRead ? 'bg-gray-200' : 'bg-[var(--primary)]'
                       }`}
                       aria-hidden="true"
                     />
@@ -215,7 +215,7 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
                       </p>
                       <div className="mt-2 flex items-center justify-between gap-2 text-[0.68rem] text-gray-400">
                         <span>{formatDateTime(item.createdAt)}</span>
-                        <span className="inline-flex items-center gap-1 font-medium text-primary-700 opacity-0 transition group-hover:opacity-100">
+                        <span className="inline-flex items-center gap-1 font-medium text-[var(--primary-dark)] opacity-0 transition group-hover:opacity-100">
                           Open
                           <ExternalLink size={11} />
                         </span>
@@ -230,7 +230,7 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
           <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
             <Link
               href="/dashboard/notices"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-primary-700 shadow-sm ring-1 ring-gray-200 transition hover:bg-primary-50 hover:text-primary-800"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-[var(--primary-dark)] shadow-sm ring-1 ring-gray-200 transition hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
               onClick={() => setOpen(false)}
             >
               View notices and deliveries

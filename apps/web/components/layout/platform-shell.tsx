@@ -176,14 +176,14 @@ export function PlatformShell({ children }: { children: ReactNode }) {
       {mobileOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
           aria-label="Close platform navigation"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[304px] flex-col border-r border-white/10 bg-slate-950 text-white shadow-xl shadow-slate-950/20 transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[304px] flex-col border-r border-white/10 bg-[var(--color-mod-platform-text)] text-white shadow-lg shadow-black/20 transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -280,7 +280,7 @@ export function PlatformShell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="hidden items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 sm:flex">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-mod-platform-text)] text-xs font-bold text-white">
               {displayName.slice(0, 2).toUpperCase()}
             </div>
             <div className="min-w-0">

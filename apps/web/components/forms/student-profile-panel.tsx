@@ -63,7 +63,7 @@ export function StudentProfilePanel({
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-lg font-bold text-primary-700">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--primary-soft)] text-lg font-bold text-[var(--primary-dark)]">
             {initials(studentName)}
           </div>
           <div>

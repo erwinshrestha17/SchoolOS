@@ -145,7 +145,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(sharedPrimitives, /peer-focus-visible:ring-\[var\(--primary-soft\)\]/);
     assert.doesNotMatch(
       sharedPrimitives,
-      /<svg|rounded-\[(?:2rem|28px)\]|shadow-xl|shadow-2xl|bg-slate-900|bg-slate-950|focus:border-primary|focus:ring-primary|border-primary|bg-primary|text-primary|from-primary|to-primary|hidden"/,
+      /<svg|rounded-\[(?:2rem|28px)\]|rounded-3xl|shadow-xl|shadow-2xl|bg-slate-900|bg-slate-950|focus:border-primary|focus:ring-primary|border-primary|bg-primary|text-primary|from-primary|to-primary|hidden"/,
     );
   });
 
@@ -159,6 +159,78 @@ describe('SchoolOS web production contracts', () => {
         `${file} should use Toast, ConfirmDialog, or inline status UI instead of alert/confirm`,
       );
     }
+  });
+
+  it('keeps the shared student selector tokenized for reused dashboard workflows', () => {
+    const selector = read('components/students/student-selector.tsx');
+
+    assert.match(selector, /focus:border-\[var\(--primary\)\]/);
+    assert.match(selector, /focus:ring-\[var\(--primary-soft\)\]/);
+    assert.match(selector, /bg-\[var\(--primary-soft\)\]/);
+    assert.match(selector, /text-\[var\(--primary-dark\)\]/);
+    assert.doesNotMatch(
+      selector,
+      /primary-(50|100|200|300|400|500|600|700|800|900)|shadow-xl|shadow-2xl|bg-slate-900|bg-slate-950|rounded-3xl|rounded-\[/,
+    );
+  });
+
+  it('keeps homework creation controls on the shared design tokens', () => {
+    const form = read('components/homework/homework-create-form.tsx');
+
+    assert.match(form, /text-\[var\(--primary\)\]/);
+    assert.match(form, /focus:ring-\[var\(--primary-soft\)\]/);
+    assert.match(form, /api\.createHomework/);
+    assert.match(form, /api\.listAcademicYears/);
+    assert.match(form, /api\.listClasses/);
+    assert.match(form, /api\.listSections/);
+    assert.match(form, /api\.listSubjects/);
+    assert.doesNotMatch(
+      form,
+      /text-primary-(50|100|200|300|400|500|600|700|800|900)|focus:ring-primary-(50|100|200|300|400|500|600|700|800|900)|shadow-xl|shadow-2xl|bg-slate-900|bg-slate-950|rounded-3xl|rounded-\[/,
+    );
+  });
+
+  it('keeps the staff self-service profile shell tokenized and API-backed', () => {
+    const staffDashboard = read('components/staff/staff-dashboard.tsx');
+
+    assert.match(staffDashboard, /api\.getMyProfile/);
+    assert.match(staffDashboard, /useSession/);
+    assert.match(staffDashboard, /bg-\[var\(--primary-soft\)\]/);
+    assert.match(staffDashboard, /text-\[var\(--primary-dark\)\]/);
+    assert.match(staffDashboard, /text-\[var\(--primary\)\]/);
+    assert.doesNotMatch(
+      staffDashboard,
+      /primary-(50|100|200|300|400|500|600|700|800|900)|bg-primary\/10|text-primary\b|shadow-xl|shadow-2xl|bg-slate-900|bg-slate-950|rounded-3xl|rounded-\[/,
+    );
+  });
+
+  it('keeps the student profile panel tokenized and connected to real student context', () => {
+    const panel = read('components/forms/student-profile-panel.tsx');
+
+    assert.match(panel, /StudentProfilePanelProps/);
+    assert.match(panel, /student:\s*StudentProfile/);
+    assert.match(panel, /onOpenPdf\(student\.id, kind\)/);
+    assert.match(panel, /href="\/dashboard\/finance"/);
+    assert.match(panel, /bg-\[var\(--primary-soft\)\]/);
+    assert.match(panel, /text-\[var\(--primary-dark\)\]/);
+    assert.doesNotMatch(
+      panel,
+      /primary-(50|100|200|300|400|500|600|700|800|900)|bg-primary\/10|text-primary\b|shadow-xl|shadow-2xl|bg-slate-900|bg-slate-950|rounded-3xl|rounded-\[/,
+    );
+  });
+
+  it('keeps dashboard module tabs lightweight and route-aware', () => {
+    const moduleTabs = read('components/dashboard/module-tabs.tsx');
+
+    assert.match(moduleTabs, /usePathname/);
+    assert.match(moduleTabs, /pathname === item\.href/);
+    assert.match(moduleTabs, /pathname\?\.startsWith\(item\.href\)/);
+    assert.match(moduleTabs, /item\.count !== undefined && item\.count > 0/);
+    assert.match(moduleTabs, /bg-slate-700 text-white shadow-md border-slate-700/);
+    assert.doesNotMatch(
+      moduleTabs,
+      /bg-slate-800|bg-slate-900|bg-slate-950|shadow-xl|shadow-2xl|rounded-3xl|rounded-\[/,
+    );
   });
 
   it('keeps Phase 1 and Phase 2 admin dashboard routes present', () => {
@@ -328,6 +400,10 @@ describe('SchoolOS web production contracts', () => {
     for (const label of ['Send Reminder', 'Assign', 'Close', 'All Statuses']) {
       assert.match(homeworkTab, new RegExp(label));
     }
+    assert.match(homeworkTab, /onSave=\{\(data\) => createHomeworkMutation\.mutate\(data\)\}/);
+    assert.match(homeworkTab, /onSave\(\{/);
+    assert.match(homeworkTab, /bg-black\/40/);
+    assert.doesNotMatch(homeworkTab, /bg-slate-900|bg-slate-950|shadow-xl|shadow-2xl|rounded-3xl|rounded-\[/);
     assert.doesNotMatch(homeworkPage, /\/edit/);
     assert.doesNotMatch(homeworkDetailPage, /Edit Assignment/);
     assert.match(
@@ -745,6 +821,11 @@ describe('SchoolOS web production contracts', () => {
     const layoutBasics = readMany([
       'components/layout/breadcrumbs.tsx',
       'components/layout/dashboard-shell.tsx',
+      'components/layout/global-student-search.tsx',
+      'components/layout/header.tsx',
+      'components/layout/notification-bell.tsx',
+      'components/layout/platform-shell.tsx',
+      'components/layout/sidebar.tsx',
       'components/layout/upgrade-prompt.tsx',
     ]);
     const dashboardPrimitives = readMany([
@@ -758,10 +839,14 @@ describe('SchoolOS web production contracts', () => {
 
     assert.match(shell, /Skip to workspace/);
     assert.match(layoutBasics, /bg-\[var\(--primary\)\]/);
+    assert.match(layoutBasics, /bg-\[var\(--primary-soft\)\]/);
+    assert.match(layoutBasics, /text-\[var\(--primary-dark\)\]/);
+    assert.match(layoutBasics, /focus:ring-\[var\(--primary-soft\)\]/);
+    assert.match(layoutBasics, /bg-\[var\(--color-mod-platform-text\)\]/);
     assert.match(layoutBasics, /hover:text-\[var\(--primary\)\]/);
     assert.doesNotMatch(
       layoutBasics,
-      /bg-slate-950|primary-(50|100|200|300|400|500|600|700|800|900)|shadow-xl|shadow-2xl|rounded-3xl/,
+      /bg-slate-950|bg-slate-900|primary-(50|100|200|300|400|500|600|700|800|900)|shadow-xl|shadow-2xl|rounded-3xl/,
     );
     assert.match(dashboard, /DashboardHeroMetric/);
     assert.match(dashboard, /alertToneStyles/);
@@ -2265,9 +2350,12 @@ describe('SchoolOS web production contracts', () => {
     );
 
     assert.match(contractList, /api\.listStaffContracts/);
+    assert.match(contractList, /api\.listStaff/);
     assert.match(contractList, /api\.createStaffContract/);
     assert.match(contractList, /Base Salary/);
     assert.match(contractList, /Allowances/);
+    assert.match(contractList, /bg-black\/40/);
+    assert.doesNotMatch(contractList, /bg-slate-950|bg-slate-900|shadow-xl|shadow-2xl|rounded-3xl|rounded-\[/);
 
     assert.match(leaveList, /api\.listLeaveRequests/);
     assert.match(leaveList, /api\.approveLeaveRequest/);

@@ -22,7 +22,7 @@ export function Button({ className, variant = 'default', size = 'default', isLoa
   const sizes = {
     default: "h-11 px-6 py-2.5",
     sm: "h-9 rounded-xl px-4",
-    lg: "h-13 rounded-3xl px-10 text-base",
+    lg: "h-13 rounded-2xl px-10 text-base",
     icon: "h-10 w-10 p-0",
   };
 

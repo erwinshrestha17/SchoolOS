@@ -549,7 +549,7 @@ function CreateHomeworkModal({
   const subjectsForClass = subjects.filter((s) => s.classId === formData.classId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
       <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-lg animate-in fade-in zoom-in duration-300">
         <div className="relative border-b border-slate-100 bg-white p-8">
           <div className="flex items-center gap-3">

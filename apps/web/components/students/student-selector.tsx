@@ -56,7 +56,7 @@ export function StudentSelector({
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            'flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm transition focus:border-primary-300 focus:ring-2 focus:ring-primary-100',
+            'flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm transition focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary-soft)]',
             !selectedStudent && 'text-slate-400'
           )}
         >
@@ -92,13 +92,13 @@ export function StudentSelector({
               className="fixed inset-0 z-20"
               onClick={() => setIsOpen(false)}
             />
-            <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-72 overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl animate-in fade-in zoom-in-95">
+            <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-72 overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-lg animate-in fade-in zoom-in-95">
               <div className="sticky top-0 mb-2 bg-white pb-2">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                   <input
                     autoFocus
-                    className="h-10 w-full rounded-xl border border-slate-100 bg-slate-50 pl-9 pr-3 text-sm outline-none transition focus:border-primary-200 focus:bg-white"
+                    className="h-10 w-full rounded-xl border border-slate-100 bg-slate-50 pl-9 pr-3 text-sm outline-none transition focus:border-[var(--primary)] focus:bg-white"
                     placeholder="Type to search..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -116,7 +116,7 @@ export function StudentSelector({
                     }}
                     className={cn(
                       'flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition hover:bg-slate-50',
-                      !selectedId && 'bg-primary-50 text-primary-700'
+                      !selectedId && 'bg-[var(--primary-soft)] text-[var(--primary-dark)]'
                     )}
                   >
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
@@ -137,7 +137,8 @@ export function StudentSelector({
                     }}
                     className={cn(
                       'flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition hover:bg-slate-50',
-                      selectedId === student.id && 'bg-primary-50 text-primary-700'
+                      selectedId === student.id &&
+                        'bg-[var(--primary-soft)] text-[var(--primary-dark)]'
                     )}
                   >
                     <Avatar

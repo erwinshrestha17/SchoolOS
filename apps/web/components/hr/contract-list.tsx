@@ -85,7 +85,7 @@ export function ContractList() {
       </div>
 
       {isCreating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-300">
           <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-sm animate-in zoom-in-95 duration-300 sm:p-8">
             <h3 className="mb-6 text-xl font-black uppercase tracking-tight text-slate-900">Create Staff Contract</h3>
             

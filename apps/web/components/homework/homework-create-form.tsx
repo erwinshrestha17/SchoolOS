@@ -233,7 +233,7 @@ export function HomeworkCreateForm() {
               type="checkbox"
               checked={formData.isSubmissionRequired}
               onChange={(e) => setFormData({ ...formData, isSubmissionRequired: e.target.checked })}
-              className="h-5 w-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+              className="h-5 w-5 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary-soft)]"
             />
           </div>
         </SectionCard>

@@ -89,7 +89,7 @@ const tabAccentStyles = {
   },
   slate: {
     activeDark: "bg-slate-700 text-white shadow-lg shadow-slate-700/20",
-    activeLight: "bg-slate-800 text-white shadow-md border-slate-800",
+    activeLight: "bg-slate-700 text-white shadow-md border-slate-700",
     badgeActiveDark: "bg-white/20 text-white",
     badgeInactiveDark: "bg-white/10 text-white/50",
     badgeActiveLight: "bg-white/20 text-white",

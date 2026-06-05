@@ -137,7 +137,7 @@ export function GlobalStudentSearch() {
       />
 
       {open && canSearchStudents && query.trim().length > 0 ? (
-        <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+        <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg">
           {query.trim().length < 2 ? (
             <div className="px-4 py-3 text-sm text-gray-500">
               Type at least 2 characters to search.
@@ -161,8 +161,10 @@ export function GlobalStudentSearch() {
                   key={student.id}
                   type="button"
                   data-testid="global-student-search-result"
-                  className={`grid w-full gap-1 px-4 py-3 text-left transition hover:bg-primary-50 ${
-                    index === activeIndex ? 'bg-primary-50' : 'bg-white'
+                  className={`grid w-full gap-1 px-4 py-3 text-left transition hover:bg-[var(--primary-soft)] ${
+                    index === activeIndex
+                      ? 'bg-[var(--primary-soft)]'
+                      : 'bg-white'
                   }`}
                   onMouseEnter={() => setActiveIndex(index)}
                   onClick={() => goToStudent(student.id)}

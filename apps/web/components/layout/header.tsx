@@ -100,7 +100,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
       <button
         type="button"
         onClick={onMobileMenuToggle}
-        className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2 lg:hidden"
+        className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 lg:hidden"
         aria-controls="dashboard-main"
         aria-label="Open navigation menu"
       >
@@ -108,7 +108,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
       </button>
 
       <div className="hidden min-w-0 items-center gap-3 lg:flex">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-xs font-bold text-white shadow-sm shadow-primary-600/20">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)] text-xs font-bold text-white shadow-sm shadow-[var(--primary-soft)]">
           {tenantName[0]?.toUpperCase() ?? <School size={16} />}
         </div>
         <div className="min-w-0">
@@ -133,7 +133,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
           <button
             type="button"
             onClick={() => setYearMenuOpen(!yearMenuOpen)}
-            className="hidden h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-primary-200 hover:bg-primary-50/60 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2 disabled:opacity-50 sm:flex"
+            className="hidden h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-[var(--primary-soft)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 disabled:opacity-50 sm:flex"
             disabled={!canReadAcademicYears || academicYears.length === 0}
             aria-expanded={yearMenuOpen}
             aria-haspopup="menu"
@@ -175,7 +175,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                     className={cn(
                       'dropdown-item w-full transition-all duration-150',
                       year.id === selectedAcademicYear?.id
-                        ? 'bg-primary-50 text-primary-700 font-bold'
+                        ? 'bg-[var(--primary-soft)] text-[var(--primary-dark)] font-bold'
                         : 'text-slate-600',
                     )}
                     role="menuitem"
@@ -204,7 +204,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
           <button
             type="button"
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className="group flex items-center gap-3 rounded-xl p-1 pr-2 transition-all hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2"
+            className="group flex items-center gap-3 rounded-xl p-1 pr-2 transition-all hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2"
             aria-expanded={userMenuOpen}
             aria-haspopup="menu"
             aria-label="User profile menu"
@@ -212,7 +212,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
             <Avatar
               initials={initials}
               size="sm"
-              className="shadow-sm shadow-primary-600/10 ring-2 ring-white transition-all group-hover:ring-primary-100"
+              className="shadow-sm shadow-[var(--primary-soft)] ring-2 ring-white transition-all group-hover:ring-[var(--primary-soft)]"
             />
             <div className="hidden min-w-0 text-left sm:block">
               <p className="mb-1 max-w-[120px] truncate text-sm font-bold capitalize leading-none text-slate-900">

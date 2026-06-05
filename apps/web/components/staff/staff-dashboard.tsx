@@ -64,13 +64,13 @@ export function StaffDashboard() {
           <Card className="w-full md:w-80 shrink-0 shell-card">
             <CardContent className="pt-6">
               <div className="flex flex-col items-center text-center space-y-4">
-                <div className="w-24 h-24 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center font-bold text-2xl shadow-inner border border-primary-100">
+                <div className="w-24 h-24 rounded-full bg-[var(--primary-soft)] text-[var(--primary-dark)] flex items-center justify-center font-bold text-2xl shadow-inner border border-[var(--primary-soft)]">
                   {initials}
                 </div>
                 <div>
                   <h2 className="text-xl font-bold capitalize text-slate-900">{displayName}</h2>
                   <p className="text-sm text-slate-500 mt-1">{session?.user.email}</p>
-                  <Badge className="mt-3 bg-primary-50 text-primary-700 hover:bg-primary-100 border border-primary-200">
+                  <Badge className="mt-3 bg-[var(--primary-soft)] text-[var(--primary-dark)] hover:bg-[var(--primary-soft)] border border-[var(--primary-soft)]">
                     {primaryRole}
                   </Badge>
                 </div>
@@ -132,14 +132,14 @@ export function StaffDashboard() {
         <Card className="w-full md:w-80 shrink-0">
           <CardContent className="pt-6">
             <div className="flex flex-col items-center text-center space-y-4">
-              <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
+              <div className="w-24 h-24 rounded-full bg-[var(--primary-soft)] flex items-center justify-center">
                 {profile.photoUrl ? (
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={profile.photoUrl} alt="" className="w-full h-full rounded-full object-cover" />
                   </>
                 ) : (
-                  <User className="w-12 h-12 text-primary" />
+                  <User className="w-12 h-12 text-[var(--primary)]" />
                 )}
               </div>
               <div>

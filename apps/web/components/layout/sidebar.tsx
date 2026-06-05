@@ -362,12 +362,12 @@ function SidebarContent({
   return (
     <div
       className={cn(
-        'sidebar-transition flex h-full flex-col border-r border-white/[0.06] bg-sidebar-900 text-white shadow-xl shadow-slate-950/15',
+        'sidebar-transition flex h-full flex-col border-r border-white/[0.06] bg-sidebar-900 text-white shadow-lg shadow-black/10',
         collapsed ? 'w-[72px]' : 'w-[280px]',
       )}
     >
       <div className="flex h-16 items-center gap-3 border-b border-white/[0.06] px-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-sm font-bold shadow-lg shadow-primary-600/20">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)] text-sm font-bold shadow-sm shadow-black/20">
           S
         </div>
 
@@ -478,7 +478,7 @@ function NavEntry({
   const content = (
     <>
       {active && !item.disabled && (
-        <span className="absolute left-0 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-primary-300" />
+        <span className="absolute left-0 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--primary-soft)]" />
       )}
 
       <Icon
@@ -501,13 +501,13 @@ function NavEntry({
       </span>
 
       {!collapsed && item.badge && (
-        <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary-600 px-1.5 text-[0.65rem] font-bold text-white">
+        <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--primary)] px-1.5 text-[0.65rem] font-bold text-white">
           {item.badge}
         </span>
       )}
 
       {collapsed && (
-        <div className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+        <div className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-lg bg-sidebar-800 px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
           {item.label}
         </div>
       )}
@@ -515,9 +515,9 @@ function NavEntry({
   );
 
   const className = cn(
-    'group relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-300/70 focus:ring-offset-2 focus:ring-offset-sidebar-900',
+    'group relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 focus:ring-offset-sidebar-900',
     active && !item.disabled
-      ? 'bg-primary-500 text-white shadow-sm shadow-primary-950/20'
+      ? 'bg-[var(--primary)] text-white shadow-sm shadow-black/20'
       : 'text-slate-400 hover:bg-white/[0.04] hover:text-white',
     item.disabled &&
       'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-400',
