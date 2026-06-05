@@ -23,14 +23,14 @@ export function NoticesWorkspace({
         actions={
           <Link
             href="/dashboard/notices/new"
-            className="inline-flex min-h-10 items-center justify-center rounded-xl bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-700"
+            className="inline-flex min-h-10 items-center justify-center rounded-xl bg-[var(--color-mod-notices-accent)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--color-mod-notices-text)]"
           >
             Publish Notice
           </Link>
         }
       />
 
-      <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+      <div className="mb-6 rounded-2xl border border-[var(--color-mod-notices-border)] bg-white p-2 shadow-sm">
         <ModuleTabs
           items={[
             { href: '/dashboard/notices', label: 'Notices' },

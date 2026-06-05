@@ -50,7 +50,7 @@ export function ExamList({
         <div className="flex items-center gap-2">
           <div className="h-2 w-16 overflow-hidden rounded-full bg-slate-100">
             <div
-              className="h-full bg-primary-500"
+              className="h-full bg-[var(--color-mod-academics-accent)]"
               style={{ width: `${exam.weightPercent}%` }}
             />
           </div>

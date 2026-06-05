@@ -43,4 +43,21 @@ describe('Platform operator state component contracts', () => {
       assert.match(component, new RegExp(expected));
     }
   });
+
+  it('keeps platform access and redirect states on platform tokens', () => {
+    const surfaces = [
+      read('components/platform/PermissionDenied.tsx'),
+      read('app/platform/layout.tsx'),
+      read('app/platform/settings/audit/page.tsx'),
+      read('app/platform/settings/system-health/page.tsx'),
+    ].join('\n');
+
+    assert.match(surfaces, /color-mod-platform-accent/);
+    assert.match(surfaces, /color-mod-platform-text/);
+    assert.match(surfaces, /color-mod-platform-border/);
+    assert.doesNotMatch(
+      surfaces,
+      /bg-slate-900|bg-slate-950|shadow-xl|rounded-\[20px\]|primary-(50|100|200|500|600|700|800|900)/,
+    );
+  });
 });

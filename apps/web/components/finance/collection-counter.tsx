@@ -96,24 +96,24 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
                 key={inv.id}
                 onClick={() => handleSelectInvoice(inv)}
                 className={cn(
-                  "w-full flex items-start justify-between p-5 rounded-[2rem] border transition-all duration-300 group",
+                  "w-full flex items-start justify-between p-5 rounded-2xl border transition-all duration-300 group",
                   selectedInvoiceId === inv.id
-                    ? "bg-slate-900 border-slate-900 text-white shadow-2xl shadow-slate-900/20 translate-x-1"
-                    : "bg-white border-slate-100 hover:border-slate-200 text-slate-900 hover:bg-slate-50/50"
+                    ? "bg-[var(--color-mod-fees-bg)] border-[var(--color-mod-fees-border)] text-[var(--color-mod-fees-text)] shadow-sm translate-x-1"
+                    : "bg-white border-slate-100 hover:border-[var(--color-mod-fees-border)] text-slate-900 hover:bg-[var(--color-mod-fees-bg)]"
                 )}
               >
                 <div className="flex gap-4">
                   <div className={cn(
                     "h-12 w-12 rounded-2xl flex items-center justify-center transition-colors",
-                    selectedInvoiceId === inv.id ? "bg-white/10 text-white" : "bg-slate-50 text-slate-400 group-hover:bg-white"
+                    selectedInvoiceId === inv.id ? "bg-white text-[var(--color-mod-fees-accent)]" : "bg-slate-50 text-slate-400 group-hover:bg-white"
                   )}>
                     <User size={20} />
                   </div>
                   <div className="text-left">
-                    <p className="text-sm font-black truncate max-w-[160px] tracking-tight">{inv.student?.name || 'Unknown Student'}</p>
+                    <p className="text-sm font-black truncate max-w-[160px] tracking-tight">{inv.student?.name || 'Student name not set'}</p>
                     <p className={cn(
                       "text-[0.65rem] font-bold uppercase tracking-widest mt-1",
-                      selectedInvoiceId === inv.id ? "text-slate-400" : "text-slate-500"
+                      selectedInvoiceId === inv.id ? "text-[var(--color-mod-fees-text)]/70" : "text-slate-500"
                     )}>
                       {inv.invoiceNumber}
                     </p>
@@ -127,7 +127,7 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
             ))}
             {isLoading && (
               <div className="py-12 flex justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+                <Loader2 className="h-8 w-8 animate-spin text-[var(--color-mod-fees-accent)]" />
               </div>
             )}
             {invoices.length === 0 && !isLoading && (
@@ -149,20 +149,20 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
                <SummaryCard 
                 icon={<GraduationCap size={18} />} 
                 label="Student Detail" 
-                value={selectedInvoice.student?.name} 
-                sub={selectedInvoice.student?.studentSystemId} 
+                value={selectedInvoice.student?.name || 'Student name not set'}
+                sub={selectedInvoice.student?.studentSystemId || 'Student ID not set'}
                />
                <SummaryCard 
                 icon={<MapPin size={18} />} 
                 label="Class / Section" 
-                value={`${selectedInvoice.student?.class?.name || 'N/A'}`} 
-                sub={selectedInvoice.student?.section?.name || 'General'} 
+                value={selectedInvoice.student?.class?.name || 'Class not set'}
+                sub={selectedInvoice.student?.section?.name || 'Section not set'}
                />
                <SummaryCard 
                 icon={<Phone size={18} />} 
                 label="Primary Guardian" 
-                value={selectedInvoice.student?.primaryGuardianName || 'N/A'} 
-                sub={selectedInvoice.student?.primaryGuardianPhone || 'No contact'} 
+                value={selectedInvoice.student?.primaryGuardianName || 'Guardian not recorded'}
+                sub={selectedInvoice.student?.primaryGuardianPhone || 'Guardian phone not recorded'}
                />
             </div>
 
@@ -170,16 +170,14 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
               title="Collection Detail" 
               description="Review breakdown and finalize payment collection."
               headerAction={
-                <div className="flex items-center gap-2">
-                   <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 border border-slate-100 text-[0.65rem] font-black text-slate-500 uppercase tracking-widest hover:bg-slate-100 transition-colors">
+                <div className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-fees-bg)] border border-[var(--color-mod-fees-border)] px-4 py-2 text-[0.65rem] font-black text-[var(--color-mod-fees-text)] uppercase tracking-widest">
                      <Receipt size={14} />
-                     View Full Invoice
-                   </button>
+                     Invoice breakdown
                 </div>
               }
             >
               <div className="space-y-8">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-slate-50 rounded-2xl border border-slate-100">
                   <StatItem label="Total Billed" value={formatCurrency(selectedInvoice.totalAmount)} />
                   <StatItem label="Paid Amount" value={formatCurrency(selectedInvoice.totalAmount - selectedInvoice.outstandingAmount)} color="text-emerald-600" />
                   <StatItem label="Current Balance" value={formatCurrency(selectedInvoice.outstandingAmount)} color="text-danger-600 font-black" />
@@ -193,7 +191,7 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {invoiceDetailQuery.data.lines?.map((item: any) => (
                         <div key={item.id} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl">
-                          <span className="text-xs font-bold text-slate-700">{item.feeHeadName || 'General Fee'}</span>
+                          <span className="text-xs font-bold text-slate-700">{item.feeHeadName || 'Fee head not set'}</span>
                           <span className="text-xs font-black text-slate-900">{formatCurrency(item.netAmount)}</span>
                         </div>
                       ))}
@@ -206,12 +204,12 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
                     <div className="space-y-3">
                       <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">Collection Amount</label>
                       <div className="relative group">
-                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400 pointer-events-none transition-colors group-focus-within:text-emerald-600">NPR</span>
+                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400 pointer-events-none transition-colors group-focus-within:text-[var(--color-mod-fees-accent)]">NPR</span>
                         <Input
                           type="number"
                           value={amount}
                           onChange={(e) => setAmount(Number(e.target.value))}
-                          className="pl-20 text-3xl font-black h-20 rounded-[1.5rem] border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                          className="pl-20 text-3xl font-black h-20 rounded-2xl border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-[var(--color-mod-fees-accent)]/10 transition-all"
                         />
                       </div>
                     </div>
@@ -253,13 +251,13 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
                           className={cn(
                             "flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-300",
                             method === m.id
-                              ? "bg-slate-900 border-slate-900 text-white shadow-xl shadow-slate-900/20"
-                              : "bg-white border-slate-100 text-slate-600 hover:border-slate-200"
+                              ? "bg-[var(--color-mod-fees-bg)] border-[var(--color-mod-fees-border)] text-[var(--color-mod-fees-text)] shadow-sm"
+                              : "bg-white border-slate-100 text-slate-600 hover:border-[var(--color-mod-fees-border)]"
                           )}
                         >
                           <div className={cn(
                             "h-8 w-8 rounded-lg flex items-center justify-center",
-                            method === m.id ? "bg-white/10" : "bg-slate-50"
+                            method === m.id ? "bg-white" : "bg-slate-50"
                           )}>
                             {m.icon}
                           </div>
@@ -285,7 +283,7 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
                     <button
                       onClick={() => onCollect(selectedInvoice.id, amount, method, reference, remarks)}
                       disabled={amount <= 0 || amount > selectedInvoice.outstandingAmount}
-                      className="flex items-center gap-3 px-12 py-4 bg-emerald-600 text-white rounded-[2rem] font-black text-sm shadow-2xl shadow-emerald-600/30 transition-all hover:bg-emerald-700 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                      className="flex items-center gap-3 px-12 py-4 bg-[var(--color-mod-fees-accent)] text-white rounded-2xl font-black text-sm shadow-sm transition-all hover:bg-[var(--color-mod-fees-text)] active:scale-95 disabled:opacity-50"
                     >
                       <CheckSquare size={20} />
                       Finalize & Print Receipt
@@ -296,8 +294,8 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
             </SectionCard>
           </div>
         ) : (
-          <div className="h-[700px] rounded-[3rem] border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-center p-12 bg-slate-50/20">
-            <div className="h-24 w-24 rounded-[2.5rem] bg-white shadow-xl flex items-center justify-center text-slate-300 mb-8 border border-slate-50">
+          <div className="h-[700px] rounded-2xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-center p-12 bg-slate-50/20">
+            <div className="h-24 w-24 rounded-2xl bg-white shadow-sm flex items-center justify-center text-slate-300 mb-8 border border-slate-50">
               <Wallet size={48} />
             </div>
             <h4 className="text-2xl font-black text-slate-900 tracking-tight">Fee Collection Counter</h4>
@@ -326,7 +324,7 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
 
 function SummaryCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
-    <div className="p-5 bg-white border border-slate-100 rounded-[2rem] shadow-sm flex items-center gap-4">
+    <div className="p-5 bg-white border border-slate-100 rounded-2xl shadow-sm flex items-center gap-4">
       <div className="h-12 w-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center">
         {icon}
       </div>

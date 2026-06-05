@@ -34,7 +34,7 @@ export function HealthTab({ profile }: { profile: StudentProfileDetail }) {
             icon={<Heart size={18} />} 
             label="Special Needs" 
             value={(student as any).specialNeeds || 'No special needs recorded'} 
-            tone={(student as any).specialNeeds ? 'primary' : 'neutral'}
+            tone={(student as any).specialNeeds ? 'admissions' : 'neutral'}
           />
         </div>
       </SectionCard>
@@ -44,7 +44,7 @@ export function HealthTab({ profile }: { profile: StudentProfileDetail }) {
           <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-5">
             <p className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 mb-4">Primary Emergency Contact</p>
             <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--color-mod-admissions-border)] bg-white text-[var(--color-mod-admissions-accent)] shadow-sm">
                 <User size={18} />
               </div>
               <div>
@@ -57,7 +57,7 @@ export function HealthTab({ profile }: { profile: StudentProfileDetail }) {
           <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-5">
             <p className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 mb-4">Family Doctor</p>
             <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--color-mod-admissions-border)] bg-white text-[var(--color-mod-admissions-accent)] shadow-sm">
                 <ShieldAlert size={18} />
               </div>
               <div>
@@ -72,11 +72,11 @@ export function HealthTab({ profile }: { profile: StudentProfileDetail }) {
   );
 }
 
-function HealthItem({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone: 'danger' | 'warning' | 'primary' | 'neutral' }) {
+function HealthItem({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone: 'danger' | 'warning' | 'admissions' | 'neutral' }) {
   const colors = {
     danger: 'text-danger-500 bg-danger-50',
     warning: 'text-warning-500 bg-warning-50',
-    primary: 'text-primary-500 bg-primary-50',
+    admissions: 'text-[var(--color-mod-admissions-accent)] bg-[var(--color-mod-admissions-bg)]',
     neutral: 'text-slate-400 bg-slate-50',
   };
 

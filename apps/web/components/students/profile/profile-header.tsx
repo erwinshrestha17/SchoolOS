@@ -50,7 +50,9 @@ export function ProfileHeader({ profile, onEdit, onOpenIdCard, pdfError }: Profi
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Badge className="border-success-200 bg-success-50 text-success-700">{student.lifecycleStatus ?? 'ACTIVE'}</Badge>
-              <Badge className="border-primary-200 bg-primary-50 text-primary-700">{student.gender ?? 'N/A'}</Badge>
+              <Badge className="border-[var(--color-mod-admissions-border)] bg-white text-[var(--color-mod-admissions-text)]">
+                {student.gender ?? 'Gender not recorded'}
+              </Badge>
               {student.disabilityFlag ? (
                 <Badge className="border-warning-200 bg-warning-50 text-warning-700">{student.disabilityFlag}</Badge>
               ) : (

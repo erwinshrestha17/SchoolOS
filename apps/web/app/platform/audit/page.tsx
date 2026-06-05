@@ -118,14 +118,14 @@ export default function PlatformAudit() {
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={6}>
+                  <TableCell colSpan={7}>
                     <div className="h-12 animate-pulse bg-slate-50 rounded-lg w-full" />
                   </TableCell>
                 </TableRow>
               ))
             ) : data.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-64 text-center">
+                <TableCell colSpan={7} className="h-64 text-center">
                   <div className="flex flex-col items-center justify-center text-slate-400 gap-2">
                     <Database size={40} className="text-slate-200" />
                     <p>No audit logs found.</p>
@@ -151,11 +151,11 @@ export default function PlatformAudit() {
                   <TableCell>
                     <div className="flex flex-col">
                       <span className="text-sm font-semibold text-slate-700 capitalize">{log.resource}</span>
-                      <span className="text-[10px] font-mono text-slate-400">{log.resourceId || 'N/A'}</span>
+                      <span className="text-[10px] font-mono text-slate-400">{log.resourceId || 'Resource ID not recorded'}</span>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className={log.tenantId === 'platform' ? "text-primary-600 font-bold text-xs" : "text-slate-600 text-xs font-mono"}>
+                    <span className={log.tenantId === 'platform' ? "text-[var(--color-mod-platform-accent)] font-bold text-xs" : "text-slate-600 text-xs font-mono"}>
                       {log.tenantId}
                     </span>
                   </TableCell>
@@ -172,11 +172,11 @@ export default function PlatformAudit() {
                   </TableCell>
                   <TableCell>
                     <span className="text-[10px] font-mono text-slate-400">
-                      {log.requestId?.slice(0, 8) || 'N/A'}
+                      {log.requestId?.slice(0, 8) || 'Request ID not recorded'}
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" className="h-8 rounded-lg gap-1.5 text-xs text-slate-500 hover:text-primary-600">
+                    <Button variant="ghost" size="sm" className="h-8 rounded-lg gap-1.5 text-xs text-slate-500 hover:text-[var(--color-mod-platform-accent)]">
                       View JSON
                       <ChevronRight size={14} />
                     </Button>

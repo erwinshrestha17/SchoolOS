@@ -240,7 +240,7 @@ export function AdmissionsPipeline() {
         <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
           {admissionsQuery.isLoading ? (
             <div className="p-8 text-center">
-              <Loader2 className="h-8 w-8 text-primary-500 animate-spin mx-auto mb-2" />
+              <Loader2 className="h-8 w-8 text-[var(--color-mod-admissions-accent)] animate-spin mx-auto mb-2" />
               <p className="text-sm text-slate-500 font-medium">Loading admissions...</p>
             </div>
           ) : filteredAdmissions.length === 0 ? (
@@ -264,7 +264,7 @@ export function AdmissionsPipeline() {
                   }}
                   className={cn(
                     "p-5 cursor-pointer flex items-center justify-between transition-all hover:bg-slate-50",
-                    isSelected ? "bg-primary-50/50 hover:bg-primary-50/50 border-l-4 border-primary-500 pl-4" : ""
+                    isSelected ? "bg-[var(--color-mod-admissions-soft)] hover:bg-[var(--color-mod-admissions-soft)] border-l-4 border-[var(--color-mod-admissions-accent)] pl-4" : ""
                   )}
                 >
                   <div className="space-y-1.5">
@@ -338,7 +338,7 @@ export function AdmissionsPipeline() {
                         className={cn(
                           "w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold border transition-all duration-300",
                           isCompleted ? "bg-success-500 border-success-500 text-white shadow-md shadow-success-500/20" :
-                          isActive ? "bg-[var(--color-mod-admissions-accent)] border-[var(--color-mod-admissions-accent)] text-white shadow-xl shadow-primary-500/30 scale-110 ring-4 ring-primary-50" :
+                          isActive ? "bg-[var(--color-mod-admissions-accent)] border-[var(--color-mod-admissions-accent)] text-white shadow-sm ring-4 ring-[var(--color-mod-admissions-soft)]" :
                           "bg-white border-slate-200 text-slate-400"
                         )}
                       >
@@ -391,7 +391,7 @@ export function AdmissionsPipeline() {
                             {guar.primaryPhone && (
                               <a
                                 href={`tel:${guar.primaryPhone}`}
-                                className="h-8 w-8 rounded-xl bg-primary-50 hover:bg-primary-100 text-primary-600 flex items-center justify-center transition-all"
+                                className="h-8 w-8 rounded-xl bg-[var(--color-mod-admissions-soft)] hover:bg-[var(--color-mod-admissions-border)] text-[var(--color-mod-admissions-text)] flex items-center justify-center transition-all"
                                 title="Call Guardian"
                               >
                                 <Phone className="h-3.5 w-3.5" />
@@ -414,7 +414,7 @@ export function AdmissionsPipeline() {
                       </div>
                       <div>
                         <span className="text-[0.65rem] text-slate-400 uppercase">Academic Year</span>
-                        <p className="text-slate-800 mt-0.5">{selectedAdmission.latestEnrollment?.academicYear ?? 'N/A'}</p>
+                        <p className="text-slate-800 mt-0.5">{selectedAdmission.latestEnrollment?.academicYear ?? 'Academic year not assigned'}</p>
                       </div>
                       <div>
                         <span className="text-[0.65rem] text-slate-400 uppercase">Enrollment Status</span>
@@ -445,7 +445,7 @@ export function AdmissionsPipeline() {
                   
                   {documentsQuery.isLoading ? (
                     <div className="text-center py-4">
-                      <Loader2 className="h-5 w-5 text-primary-500 animate-spin mx-auto" />
+                      <Loader2 className="h-5 w-5 text-[var(--color-mod-admissions-accent)] animate-spin mx-auto" />
                     </div>
                   ) : (
                     <div className="space-y-3.5">
@@ -495,7 +495,7 @@ export function AdmissionsPipeline() {
                                         });
                                       }
                                     }}
-                                    className="p-1 text-slate-400 transition-colors hover:text-primary-600"
+                                    className="p-1 text-slate-400 transition-colors hover:text-[var(--color-mod-admissions-text)]"
                                     title="Preview"
                                   >
                                     <ExternalLink className="h-3.5 w-3.5" />
@@ -509,7 +509,7 @@ export function AdmissionsPipeline() {
                                   </button>
                                 </div>
                               ) : (
-                                <label className="cursor-pointer text-[0.68rem] font-bold text-primary-600 hover:text-primary-700 flex items-center gap-1">
+                                <label className="cursor-pointer text-[0.68rem] font-bold text-[var(--color-mod-admissions-text)] hover:text-[var(--color-mod-admissions-accent)] flex items-center gap-1">
                                   <Upload className="h-3 w-3" />
                                   {uploadingKind === docSpec.kind ? 'Uploading...' : 'Upload'}
                                   <input
@@ -601,7 +601,7 @@ export function AdmissionsPipeline() {
                           });
                         }
                       }}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white transition-all hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-mod-admissions-accent)] px-5 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
                     >
                       <UserCheck className="h-3.5 w-3.5" />
                       Print ID Card
@@ -610,7 +610,7 @@ export function AdmissionsPipeline() {
                 ) : (
                   <Link
                     href={`/dashboard/students/${selectedAdmission.id}`}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white transition-all hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-mod-admissions-accent)] px-5 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
                   >
                     Open Student Review
                   </Link>

@@ -58,7 +58,7 @@ export function Breadcrumbs() {
     >
       <Link
         href="/dashboard"
-        className="flex items-center gap-1 text-slate-400 transition-colors hover:text-primary-600"
+        className="flex items-center gap-1 text-slate-400 transition-colors hover:text-[var(--primary)]"
       >
         <Home size={14} />
         <span className="hidden sm:inline">Dashboard</span>
@@ -72,7 +72,7 @@ export function Breadcrumbs() {
           ) : (
             <Link
               href={crumb.href}
-              className="transition-colors hover:text-primary-600"
+              className="transition-colors hover:text-[var(--primary)]"
             >
               {crumb.label}
             </Link>

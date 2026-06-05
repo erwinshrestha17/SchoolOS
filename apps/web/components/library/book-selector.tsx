@@ -76,7 +76,7 @@ export function BookSelector({
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            'flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm transition focus:border-primary-300 focus:ring-2 focus:ring-primary-100',
+            'flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm transition focus:border-[var(--color-mod-library-border)] focus:ring-2 focus:ring-[var(--color-mod-library-bg)]',
             !selectedItem && 'text-slate-400'
           )}
         >
@@ -105,13 +105,13 @@ export function BookSelector({
         {isOpen && (
           <>
             <div className="fixed inset-0 z-20" onClick={() => setIsOpen(false)} />
-            <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-72 overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl animate-in fade-in zoom-in-95">
+            <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-72 overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-md animate-in fade-in zoom-in-95">
               <div className="sticky top-0 mb-2 bg-white pb-2">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                   <input
                     autoFocus
-                    className="h-10 w-full rounded-xl border border-slate-100 bg-slate-50 pl-9 pr-3 text-sm outline-none transition focus:border-primary-200 focus:bg-white"
+                    className="h-10 w-full rounded-xl border border-slate-100 bg-slate-50 pl-9 pr-3 text-sm outline-none transition focus:border-[var(--color-mod-library-border)] focus:bg-white"
                     placeholder="Search catalogue..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -140,12 +140,14 @@ export function BookSelector({
                     }}
                     className={cn(
                       'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition hover:bg-slate-50',
-                      selectedId === item.id && 'bg-primary-50 text-primary-700'
+                      selectedId === item.id && 'bg-[var(--color-mod-library-bg)] text-[var(--color-mod-library-text)]'
                     )}
                   >
                     <div className={cn(
                       "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
-                      mode === 'book' ? "bg-indigo-50 text-indigo-600" : "bg-emerald-50 text-emerald-600"
+                      mode === 'book'
+                        ? "bg-[var(--color-mod-library-bg)] text-[var(--color-mod-library-text)]"
+                        : "bg-emerald-50 text-emerald-600"
                     )}>
                       {mode === 'book' ? <Book size={16} /> : <Hash size={16} />}
                     </div>
@@ -155,7 +157,7 @@ export function BookSelector({
                       </p>
                       <p className="text-[0.65rem] text-slate-500 font-medium">
                         {mode === 'book' 
-                          ? `${(item as LibraryBook).author} • ISBN: ${(item as LibraryBook).isbn || 'N/A'}`
+                          ? `${(item as LibraryBook).author} • ISBN: ${(item as LibraryBook).isbn || 'ISBN not recorded'}`
                           : `Barcode: ${(item as LibraryCopy).barcode} • Status: ${(item as LibraryCopy).status}`}
                       </p>
                     </div>

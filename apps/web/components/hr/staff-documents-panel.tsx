@@ -63,23 +63,23 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
   const handleVerifySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setVerifyError(null);
-    verifyMutation.mutate(verifyNotes);
+    verifyMutation.mutate(verifyNotes.trim());
   };
 
   const docs = documentsQuery.data?.items ?? documentsQuery.data ?? [];
 
   return (
-    <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-6">
+    <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-xl font-bold flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center">
+          <div className="h-8 w-8 rounded-lg bg-[var(--color-mod-hr-soft)] text-[var(--color-mod-hr-text)] flex items-center justify-center">
             <FileText size={18} />
           </div>
           Staff Documents
         </h3>
         <button
           onClick={() => setIsUploadOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 border border-slate-200 hover:border-blue-200 hover:bg-blue-50/20 text-slate-700 hover:text-blue-600 rounded-xl font-bold text-xs transition-all active:scale-[0.98]"
+          className="flex items-center gap-2 px-4 py-2 border border-slate-200 hover:border-[var(--color-mod-hr-border)] hover:bg-[var(--color-mod-hr-soft)]/60 text-slate-700 hover:text-[var(--color-mod-hr-text)] rounded-xl font-bold text-xs transition-all active:scale-[0.98]"
         >
           <Plus size={14} />
           Upload Document
@@ -106,7 +106,7 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
       <div className="rounded-2xl border border-slate-100 overflow-hidden">
         {documentsQuery.isLoading ? (
           <div className="py-12 flex justify-center items-center gap-3">
-            <div className="h-5 w-5 border-2 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-[var(--color-mod-hr-accent)]" />
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Hydrating records...</span>
           </div>
         ) : docs.length > 0 ? (
@@ -190,7 +190,7 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
       {/* Verification Dialog */}
       {selectedDocToVerify && (
         <Dialog open={!!selectedDocToVerify} onOpenChange={() => setSelectedDocToVerify(null)}>
-          <DialogContent className="max-w-md rounded-[2.5rem]">
+          <DialogContent className="max-w-md rounded-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <ShieldCheck className="text-emerald-500" />
@@ -218,6 +218,7 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
                 onClick={handleVerifySubmit}
                 isLoading={verifyMutation.isPending}
                 disabled={verifyMutation.isPending}
+                className="bg-[var(--color-mod-hr-accent)] hover:bg-[var(--color-mod-hr-text)]"
               >
                 Approve & Mark Verified
               </Button>

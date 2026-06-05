@@ -122,10 +122,10 @@ export function AccountingAuditWorkspace() {
                         ? 'text-emerald-600'
                         : log.action === 'delete'
                           ? 'text-rose-600'
-                          : 'text-primary-600',
+                          : 'text-[var(--color-mod-accounting-accent)]',
                   },
-                  { value: `${log.resource} (${log.resourceId || 'N/A'})` },
-                  { value: log.userId || 'SYSTEM' },
+                  { value: `${log.resource} (${log.resourceId || 'Resource ID not recorded'})` },
+                  { value: log.userId || 'System actor' },
                   {
                     value: (
                       <button
@@ -185,11 +185,11 @@ export function AccountingAuditWorkspace() {
                 />
                 <AuditDetailField
                   label="Resource ID"
-                  value={selectedLog.resourceId || 'N/A'}
+                  value={selectedLog.resourceId || 'Resource ID not recorded'}
                 />
                 <AuditDetailField
                   label="Actor ID"
-                  value={selectedLog.userId || 'SYSTEM'}
+                  value={selectedLog.userId || 'System actor'}
                 />
                 <AuditDetailField
                   label="Timestamp"
@@ -197,7 +197,7 @@ export function AccountingAuditWorkspace() {
                 />
                 <AuditDetailField
                   label="Tenant scope"
-                  value={selectedLog.tenantId || 'N/A'}
+                  value={selectedLog.tenantId || 'Tenant scope not recorded'}
                 />
               </div>
 
@@ -210,7 +210,7 @@ export function AccountingAuditWorkspace() {
                     <pre>
                       {selectedLog.before
                         ? JSON.stringify(selectedLog.before, null, 2)
-                        : 'N/A'}
+                        : 'No previous value recorded'}
                     </pre>
                   </div>
                 </div>
@@ -222,7 +222,7 @@ export function AccountingAuditWorkspace() {
                     <pre>
                       {selectedLog.after
                         ? JSON.stringify(selectedLog.after, null, 2)
-                        : 'N/A'}
+                        : 'No updated value recorded'}
                     </pre>
                   </div>
                 </div>

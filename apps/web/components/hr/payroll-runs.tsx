@@ -96,7 +96,7 @@ function statusClasses(status: string) {
       return 'border-amber-200 bg-amber-100 text-amber-700';
     case 'REVIEWED':
     case 'UNDER_REVIEW':
-      return 'border-blue-200 bg-blue-100 text-blue-700';
+      return 'border-[var(--color-mod-hr-border)] bg-[var(--color-mod-hr-soft)] text-[var(--color-mod-hr-text)]';
     case 'APPROVED':
       return 'border-success-200 bg-success-100 text-success-700';
     case 'POSTED':
@@ -256,7 +256,7 @@ export function PayrollRuns() {
           <button
             type="button"
             onClick={() => setShowDraftWorkflow((value) => !value)}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-primary-500/20 transition-colors hover:bg-primary-700"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-hr-accent)] px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--color-mod-hr-text)]"
           >
             <Plus size={18} />
             {showDraftWorkflow ? 'Hide Draft Workflow' : 'New Draft Run'}
@@ -279,7 +279,7 @@ export function PayrollRuns() {
                 <select
                   value={year}
                   onChange={(event) => setYear(Number(event.target.value))}
-                  className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                  className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-hr-border)]/60"
                 >
                   {years.map((yearOption) => (
                     <option key={yearOption} value={yearOption}>
@@ -293,7 +293,7 @@ export function PayrollRuns() {
                 <select
                   value={month}
                   onChange={(event) => setMonth(Number(event.target.value))}
-                  className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                  className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-hr-border)]/60"
                 >
                   {monthLabels.map((label, index) => (
                     <option key={label} value={index + 1}>
@@ -310,7 +310,7 @@ export function PayrollRuns() {
                   max={31}
                   value={workingDays}
                   onChange={(event) => setWorkingDays(Number(event.target.value))}
-                  className="w-28 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                  className="w-28 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-hr-border)]/60"
                 />
               </label>
               <button
@@ -326,7 +326,7 @@ export function PayrollRuns() {
                 type="button"
                 disabled={!canManagePayroll || previewRows.length === 0 || createDraftMutation.isPending}
                 onClick={() => createDraftMutation.mutate()}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-hr-accent)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--color-mod-hr-text)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {createDraftMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
                 Save as Draft
@@ -357,7 +357,7 @@ export function PayrollRuns() {
             </div>
             <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Preview Net</p>
-              <p className="mt-1 text-xl font-bold text-primary-700">{formatMoney(totals.netPay)}</p>
+              <p className="mt-1 text-xl font-bold text-[var(--color-mod-hr-text)]">{formatMoney(totals.netPay)}</p>
             </div>
           </div>
 
@@ -368,7 +368,7 @@ export function PayrollRuns() {
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Staff</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Gross</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Deductions</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-primary-600">Net Preview</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--color-mod-hr-text)]">Net Preview</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Days</th>
                 </tr>
               </thead>
@@ -403,7 +403,7 @@ export function PayrollRuns() {
                       </td>
                       <td className="px-4 py-3 text-right text-gray-700">{formatMoney(row.grossPay)}</td>
                       <td className="px-4 py-3 text-right text-danger-600">-{formatMoney(row.deductions)}</td>
-                      <td className="px-4 py-3 text-right font-bold text-primary-700">{formatMoney(row.netPay)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-[var(--color-mod-hr-text)]">{formatMoney(row.netPay)}</td>
                       <td className="px-4 py-3 text-center text-xs font-bold text-gray-600">
                         {row.presentDays + row.approvedPaidLeaveDays}/{row.workingDays}
                       </td>
@@ -436,7 +436,7 @@ export function PayrollRuns() {
                   <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
                   <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Gross</th>
                   <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Deductions</th>
-                  <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wider text-primary-600">Net</th>
+                  <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wider text-[var(--color-mod-hr-text)]">Net</th>
                   <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Action</th>
                 </tr>
               </thead>
@@ -472,12 +472,12 @@ export function PayrollRuns() {
                       </td>
                       <td className="px-5 py-4 text-right text-gray-700">{formatMoney(run.grossAmount)}</td>
                       <td className="px-5 py-4 text-right text-danger-600">-{formatMoney(run.deductionAmount)}</td>
-                      <td className="px-5 py-4 text-right font-bold text-primary-700">{formatMoney(run.netAmount)}</td>
+                      <td className="px-5 py-4 text-right font-bold text-[var(--color-mod-hr-text)]">{formatMoney(run.netAmount)}</td>
                       <td className="px-5 py-4 text-right">
                         <button
                           type="button"
                           onClick={() => setSelectedRunId(run.id)}
-                          className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-600 hover:text-primary-700"
+                          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--color-mod-hr-text)] hover:text-[var(--color-mod-hr-accent)]"
                         >
                           <Eye size={15} /> View
                         </button>
@@ -524,7 +524,7 @@ export function PayrollRuns() {
                   </div>
                   <div>
                     <p className="font-semibold uppercase tracking-wider text-gray-400">Net</p>
-                    <p className="font-bold text-primary-700">{formatMoney(selectedRun.netAmount)}</p>
+                    <p className="font-bold text-[var(--color-mod-hr-text)]">{formatMoney(selectedRun.netAmount)}</p>
                   </div>
                 </div>
               </div>
@@ -541,7 +541,7 @@ export function PayrollRuns() {
                     <div className="flex flex-col items-center gap-1">
                       <div className={cn(
                         "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-black",
-                        step.active ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-400"
+                        step.active ? "bg-[var(--color-mod-hr-accent)] text-white" : "bg-slate-100 text-slate-400"
                       )}>
                         {step.active ? <CheckCircle2 size={12} /> : idx + 1}
                       </div>
@@ -553,7 +553,7 @@ export function PayrollRuns() {
                     {idx < arr.length - 1 && (
                       <div className={cn(
                         "h-[2px] flex-1 mx-2 mb-4",
-                        arr[idx+1].active ? "bg-primary-600" : "bg-slate-100"
+                        arr[idx+1].active ? "bg-[var(--color-mod-hr-accent)]" : "bg-slate-100"
                       )} />
                     )}
                   </div>
@@ -578,7 +578,7 @@ export function PayrollRuns() {
                         setActionType('SUBMIT_REVIEW');
                         setIsActionDialogOpen(true);
                       }}
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-hr-accent)] px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-[var(--color-mod-hr-text)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <ShieldAlert size={14} />
                       Submit Review
@@ -714,7 +714,7 @@ export function PayrollRuns() {
                         </div>
                         <div>
                           <p className="font-semibold uppercase tracking-wider text-gray-400">Net</p>
-                          <p className="font-bold text-primary-700">{formatMoney(line.netSalary)}</p>
+                          <p className="font-bold text-[var(--color-mod-hr-text)]">{formatMoney(line.netSalary)}</p>
                         </div>
                         <div>
                           <p className="font-semibold uppercase tracking-wider text-gray-400">Days</p>
@@ -726,7 +726,7 @@ export function PayrollRuns() {
                           type="button"
                           disabled={salarySlipMutation.isPending}
                           onClick={() => salarySlipMutation.mutate(line)}
-                          className="mt-3 inline-flex items-center gap-2 rounded-lg border border-primary-200 px-3 py-1.5 text-xs font-bold text-primary-700 transition-colors hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[var(--color-mod-hr-border)] px-3 py-1.5 text-xs font-bold text-[var(--color-mod-hr-text)] transition-colors hover:bg-[var(--color-mod-hr-soft)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {salarySlipMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                           Open Salary Slip PDF

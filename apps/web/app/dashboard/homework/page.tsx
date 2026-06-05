@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Plus, BookOpen, Clock, AlertCircle, CheckCircle2, History, ClipboardCheck } from 'lucide-react';
+import { Plus, BookOpen, Clock, AlertCircle, CheckCircle2, ClipboardCheck } from 'lucide-react';
 import Link from 'next/link';
 
 import { api } from '../../../lib/api';
@@ -155,7 +155,7 @@ export default function HomeworkPage() {
           >
             {row.title}
           </Link>
-          <span className="text-xs text-slate-500 line-clamp-1">{row.instructions}</span>
+          <span className="text-xs text-slate-500 line-clamp-1">{row.instructions?.trim() || 'Instructions not set'}</span>
         </div>
       ),
     },
@@ -164,9 +164,10 @@ export default function HomeworkPage() {
       accessorKey: 'subject.name',
       cell: (row: any) => (
         <div className="flex flex-col">
-          <span className="font-medium text-slate-700">{row.subject?.name}</span>
+          <span className="font-medium text-slate-700">{row.subject?.name?.trim() || 'Subject not set'}</span>
           <span className="text-xs text-slate-500">
-            {row.class?.name} {row.section?.name ? `- ${row.section.name}` : ''}
+            {row.class?.name?.trim() || 'Class not set'}
+            {row.section?.name?.trim() ? ` - ${row.section.name.trim()}` : ' - All sections'}
           </span>
         </div>
       ),
@@ -186,7 +187,7 @@ export default function HomeworkPage() {
       cell: (row: any) => (
         <div className="flex flex-col">
           <span className="text-sm font-medium text-slate-700">
-            {row.dueAt ? new Date(row.dueAt).toLocaleDateString() : 'No date'}
+            {row.dueAt ? new Date(row.dueAt).toLocaleDateString() : 'Due date not set'}
           </span>
           <span className="text-xs text-slate-500">
             {row.dueAt ? new Date(row.dueAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
@@ -205,8 +206,8 @@ export default function HomeworkPage() {
       cell: (row: any) => (
         <div className="flex items-center gap-2">
           <div className="h-2 w-16 bg-slate-100 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-indigo-500" 
+            <div
+              className="h-full bg-[var(--color-mod-homework-accent)]"
               style={{ width: `${Math.min(100, (row.submissions?.length || 0) * 10)}%` }} 
             />
           </div>
@@ -225,12 +226,6 @@ export default function HomeworkPage() {
               label: 'View Details',
               onClick: () => router.push(`/dashboard/homework/${row.id}`),
               icon: <BookOpen className="h-4 w-4" />,
-            },
-            {
-              label: 'Edit',
-              onClick: () => router.push(`/dashboard/homework/${row.id}/edit`),
-              icon: <History className="h-4 w-4" />,
-              disabled: row.status === 'CLOSED',
             },
             {
               label: 'Review Submissions',

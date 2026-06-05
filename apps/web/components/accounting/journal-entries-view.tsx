@@ -83,8 +83,8 @@ export function JournalEntriesView() {
         <button
           onClick={handleCreateVoucher}
           className={cn(
-            "inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold text-white shadow-xl transition-all hover:-translate-y-0.5 active:translate-y-0",
-            activePeriod ? "bg-slate-900 shadow-slate-900/20 hover:bg-slate-800" : "bg-slate-400 cursor-not-allowed opacity-70"
+            "inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 active:translate-y-0",
+            activePeriod ? "bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]" : "bg-slate-400 cursor-not-allowed opacity-70"
           )}
         >
           <Plus size={18} />
@@ -124,7 +124,7 @@ export function JournalEntriesView() {
                   value: (
                     <button
                       onClick={() => setSelectedEntry(entry)}
-                      className="p-2 text-slate-400 hover:text-primary-600 transition-colors"
+                      className="p-2 text-slate-400 hover:text-[var(--color-mod-accounting-accent)] transition-colors"
                       title="View Details"
                     >
                       <Eye size={18} />

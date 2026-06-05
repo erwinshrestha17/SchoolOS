@@ -12,6 +12,11 @@ import { X, ShieldAlert, CheckCircle, XCircle } from 'lucide-react';
 type LeaveReviewDialogProps = {
   isOpen: boolean;
   onClose: () => void;
+  onSubmitReview?: (
+    id: string,
+    status: 'APPROVED' | 'REJECTED',
+    reviewNote?: string,
+  ) => Promise<unknown>;
   leaveRequest: {
     id: string;
     leaveType: string;
@@ -30,6 +35,7 @@ type LeaveReviewDialogProps = {
 export function LeaveReviewDialog({
   isOpen,
   onClose,
+  onSubmitReview,
   leaveRequest,
 }: LeaveReviewDialogProps) {
   const queryClient = useQueryClient();
@@ -38,11 +44,15 @@ export function LeaveReviewDialog({
   const [anomalies, setAnomalies] = useState<any[]>([]);
 
   const reviewMutation = useMutation({
-    mutationFn: (status: 'APPROVED' | 'REJECTED') =>
-      api.reviewLeaveRequest(leaveRequest.id, {
-        status,
-        reviewNote: reviewNote || undefined,
-      }),
+    mutationFn: (status: 'APPROVED' | 'REJECTED') => {
+      const trimmedReviewNote = reviewNote.trim() || undefined;
+      return onSubmitReview
+        ? onSubmitReview(leaveRequest.id, status, trimmedReviewNote)
+        : api.reviewLeaveRequest(leaveRequest.id, {
+            status,
+            reviewNote: trimmedReviewNote,
+          });
+    },
     onSuccess: (data: any) => {
       // Check if backend returned overlap anomalies
       if (data && data.overlapAnomalies && data.overlapAnomalies.length > 0) {
@@ -55,8 +65,7 @@ export function LeaveReviewDialog({
         void queryClient.invalidateQueries({ queryKey: ['staff-attendance-summary'] });
         void queryClient.invalidateQueries({ queryKey: ['staff-detail'] });
         void queryClient.invalidateQueries({ queryKey: ['payroll-preview'] });
-        onClose();
-        setReviewNote('');
+        handleClose();
       }
     },
     onError: (error: any) => {
@@ -64,9 +73,16 @@ export function LeaveReviewDialog({
     },
   });
 
+  const handleClose = () => {
+    setToastError(null);
+    setReviewNote('');
+    setAnomalies([]);
+    onClose();
+  };
+
   const handleAction = (status: 'APPROVED' | 'REJECTED') => {
     setToastError(null);
-    if (status === 'REJECTED' && !reviewNote) {
+    if (status === 'REJECTED' && !reviewNote.trim()) {
       setToastError('Please specify a rejection reason in the review notes.');
       return;
     }
@@ -78,8 +94,8 @@ export function LeaveReviewDialog({
     : 'Staff Member';
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md rounded-[2.5rem]">
+    <Dialog open={isOpen} onOpenChange={(open: boolean) => { if (!open) handleClose(); }}>
+      <DialogContent className="max-w-md rounded-2xl">
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle>Review Leave Request</DialogTitle>
@@ -87,7 +103,7 @@ export function LeaveReviewDialog({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="absolute top-6 right-6 p-2 rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
           >
             <X size={16} />
@@ -96,7 +112,7 @@ export function LeaveReviewDialog({
 
         {toastError && (
           <Toast
-            title={anomalies.length > 0 ? 'Overlay Detected' : 'Review Error'}
+            title={anomalies.length > 0 ? 'Overlap Detected' : 'Review Error'}
             description={toastError}
             tone={anomalies.length > 0 ? 'warning' : 'danger'}
             onDismiss={() => setToastError(null)}
@@ -149,7 +165,7 @@ export function LeaveReviewDialog({
                   void queryClient.invalidateQueries({ queryKey: ['staff-leave-balances'] });
                   void queryClient.invalidateQueries({ queryKey: ['staff-attendance-summary'] });
                   void queryClient.invalidateQueries({ queryKey: ['staff-detail'] });
-                  onClose();
+                  handleClose();
                 }}
                 className="mt-2"
               >

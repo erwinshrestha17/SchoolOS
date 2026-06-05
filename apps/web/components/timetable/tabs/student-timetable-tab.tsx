@@ -47,7 +47,7 @@ export function StudentTimetableTab() {
         title="My Weekly Schedule" 
         description="View your classes, subjects, and teachers for the current academic session."
         headerAction={
-          <Badge variant="outline" className="font-black uppercase tracking-widest text-[10px] py-1 border-indigo-200 text-indigo-600">
+          <Badge variant="outline" className="border-[var(--color-mod-homework-border)] py-1 text-[10px] font-black uppercase tracking-widest text-[var(--color-mod-homework-text)]">
              {timetable.length} Weekly Slots
           </Badge>
         }
@@ -77,41 +77,54 @@ export function StudentTimetableTab() {
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {daySlots.map((s: any) => (
-                      <div key={s.id} className="group relative rounded-[2rem] border border-slate-100 bg-white p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                        <div className="flex justify-between items-start mb-4">
-                          <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-widest py-0.5">
-                            {s.subject?.code ?? 'SUB'}
-                          </Badge>
-                          {s.room && (
-                            <div className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                              <MapPin size={10} />
-                              {s.room}
+                    {daySlots.map((s: any) => {
+                      const subjectName = s.subject?.name?.trim() || 'Subject not set';
+                      const subjectCode = s.subject?.code?.trim();
+                      const staffName = [s.staff?.firstName, s.staff?.lastName]
+                        .map((part) => part?.trim())
+                        .filter(Boolean)
+                        .join(' ') || 'Teacher not assigned';
+                      const subjectInitial = subjectName === 'Subject not set' ? '-' : subjectName.charAt(0);
+
+                      return (
+                        <div
+                          key={s.id}
+                          className="group relative rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-colors hover:border-[var(--color-mod-homework-border)] hover:bg-[var(--color-mod-homework-bg)]"
+                        >
+                          <div className="flex justify-between items-start mb-4">
+                            <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-widest py-0.5">
+                              {subjectCode || 'Code not set'}
+                            </Badge>
+                            {s.room && (
+                              <div className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                <MapPin size={10} />
+                                {s.room}
+                              </div>
+                            )}
+                          </div>
+
+                          <h4 className="font-black text-slate-900 uppercase tracking-tight italic text-base leading-tight mb-4 truncate transition-colors group-hover:text-[var(--color-mod-homework-text)]">
+                            {subjectName}
+                          </h4>
+
+                          <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
+                            <div className="space-y-1">
+                               <div className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--color-mod-homework-text)] uppercase tracking-widest">
+                                 <Clock size={12} className="shrink-0" />
+                                 {s.startsAt} - {s.endsAt}
+                               </div>
+                               <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                                 <User size={12} className="shrink-0" />
+                                 {staffName}
+                               </div>
                             </div>
-                          )}
-                        </div>
-                        
-                        <h4 className="font-black text-slate-900 uppercase tracking-tight italic text-base leading-tight mb-4 truncate group-hover:text-indigo-600 transition-colors">
-                          {s.subject?.name}
-                        </h4>
-                        
-                        <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
-                          <div className="space-y-1">
-                             <div className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 uppercase tracking-widest">
-                               <Clock size={12} className="shrink-0" />
-                               {s.startsAt} - {s.endsAt}
-                             </div>
-                             <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                               <User size={12} className="shrink-0" />
-                               {s.staff?.firstName} {s.staff?.lastName}
-                             </div>
-                          </div>
-                          <div className="h-10 w-10 rounded-2xl bg-slate-50 flex items-center justify-center font-black text-slate-300 text-xs shadow-inner transition-colors group-hover:bg-indigo-50 group-hover:text-indigo-300">
-                             {(s.subject?.name ?? '?')[0]}
+                            <div className="h-10 w-10 rounded-2xl bg-slate-50 flex items-center justify-center font-black text-slate-300 text-xs shadow-inner transition-colors group-hover:bg-white group-hover:text-[var(--color-mod-homework-text)]">
+                               {subjectInitial}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -132,8 +145,8 @@ export function StudentTimetableTab() {
             </div>
          </div>
          <div className="flex items-center gap-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-50">
-               <BookOpen className="h-7 w-7 text-indigo-600" />
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)]">
+               <BookOpen className="h-7 w-7" />
             </div>
             <div>
                <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Weekly Load</p>

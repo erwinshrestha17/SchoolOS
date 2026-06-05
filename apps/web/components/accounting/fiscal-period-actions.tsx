@@ -59,7 +59,7 @@ export function FiscalPeriodActions({ periodId, status, label }: FiscalPeriodAct
             </button>
             <button
               onClick={() => handleAction('reopen')}
-              className="p-1 text-slate-400 hover:text-primary-600 transition-colors"
+              className="p-1 text-slate-400 hover:text-[var(--color-mod-accounting-accent)] transition-colors"
               title="Reopen Period"
             >
               <Unlock size={14} />
@@ -69,7 +69,7 @@ export function FiscalPeriodActions({ periodId, status, label }: FiscalPeriodAct
         {status === 'CLOSED' && (
           <button
             onClick={() => handleAction('reopen')}
-            className="p-1 text-slate-400 hover:text-primary-600 transition-colors"
+            className="p-1 text-slate-400 hover:text-[var(--color-mod-accounting-accent)] transition-colors"
             title="Reopen Period"
           >
             <Unlock size={14} />
@@ -92,7 +92,7 @@ export function FiscalPeriodActions({ periodId, status, label }: FiscalPeriodAct
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Required for reopening, recommended for others..."
-            className="w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-primary-500 min-h-[80px]"
+            className="w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-[var(--color-mod-accounting-accent)] min-h-[80px]"
           />
           {actionType === 'reopen' && !reason && (
             <p className="flex items-center gap-1 text-[10px] text-rose-500 font-bold uppercase">

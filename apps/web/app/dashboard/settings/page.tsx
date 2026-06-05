@@ -929,7 +929,7 @@ function SettingsSidebar({
                       className={cn(
                         'group flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors',
                         isActive
-                          ? 'bg-slate-900 text-white'
+                          ? 'bg-[var(--color-mod-settings-accent)] text-white'
                           : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
                       )}
                     >
@@ -1009,7 +1009,7 @@ function MobileSectionSelector({
                     className={cn(
                       'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition',
                       isActive
-                        ? 'bg-slate-900 text-white'
+                        ? 'bg-[var(--color-mod-settings-accent)] text-white'
                         : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900',
                     )}
                   >
@@ -1125,7 +1125,7 @@ function UnsavedBar({
             size="sm"
             onClick={onSave}
             disabled={saving}
-            className="gap-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
+            className="gap-1.5 rounded-lg bg-[var(--color-mod-settings-accent)] text-white hover:bg-[var(--color-mod-settings-text)]"
           >
             {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
             {saving ? 'Saving…' : 'Save changes'}
@@ -1310,8 +1310,8 @@ function ToggleRow({
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={cn(
-          'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2',
-          checked ? 'bg-slate-900' : 'bg-slate-200',
+          'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-settings-accent)] focus-visible:ring-offset-2',
+          checked ? 'bg-[var(--color-mod-settings-accent)]' : 'bg-slate-200',
         )}
       >
         <span
@@ -1362,7 +1362,7 @@ function MultiCheckRow({
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition',
                 isSelected
-                  ? 'border-slate-900 bg-slate-900 text-white'
+                  ? 'border-[var(--color-mod-settings-accent)] bg-[var(--color-mod-settings-accent)] text-white'
                   : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900',
               )}
             >
@@ -1581,7 +1581,7 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
             <div className="mt-3 flex flex-wrap gap-2">
               <label
                 className={cn(
-                  'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800',
+                  'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--color-mod-settings-accent)] bg-[var(--color-mod-settings-accent)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--color-mod-settings-text)]',
                   busy && 'cursor-not-allowed opacity-50',
                 )}
               >
@@ -2045,7 +2045,7 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
 
             <button
               type="submit"
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-mod-settings-accent)] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-[var(--color-mod-settings-text)] disabled:opacity-50 transition-colors"
               disabled={feeHeadMutation.isPending}
             >
               {feeHeadMutation.isPending ? (
@@ -2192,7 +2192,7 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
 
             <button
               type="submit"
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-mod-settings-accent)] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-[var(--color-mod-settings-text)] disabled:opacity-50 transition-colors"
               disabled={feePlanMutation.isPending}
             >
               {feePlanMutation.isPending ? (
@@ -2519,7 +2519,7 @@ function UsersAccessPanel() {
           <button
             type="submit"
             disabled={createUserMutation.isPending || rolesQuery.isLoading}
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-mod-settings-accent)] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[var(--color-mod-settings-text)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {createUserMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
             Create User
@@ -2693,7 +2693,7 @@ function UsersAccessPanel() {
                       type="button"
                       onClick={() => submitPasswordReset(user.id)}
                       disabled={resetPasswordMutation.isPending}
-                      className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-lg bg-[var(--color-mod-settings-accent)] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[var(--color-mod-settings-text)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {resetPasswordMutation.isPending ? 'Resetting...' : 'Confirm Reset'}
                     </button>
@@ -3284,7 +3284,7 @@ function SubscriptionPanel() {
         </div>
         <a
           href="mailto:support@schoolos.io?subject=SchoolOS Plan Upgrade Request"
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-[var(--color-mod-settings-accent)] bg-[var(--color-mod-settings-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--color-mod-settings-text)]"
         >
           Upgrade Plan
           <ArrowUpRight size={14} />

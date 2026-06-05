@@ -65,15 +65,15 @@ export function FileUploader({
     <div className={cn("space-y-4", className)}>
       <div 
         className={cn(
-          "p-8 border-2 border-dashed rounded-3xl flex flex-col items-center justify-center text-center transition-all cursor-pointer",
-          isUploading ? "bg-slate-50 border-slate-200" : "bg-white border-slate-200 hover:border-primary-300 hover:bg-primary-50/30",
+          "group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 text-center transition-all",
+          isUploading ? "bg-slate-50 border-slate-200" : "bg-white border-slate-200 hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]/40",
           error ? "border-rose-200 bg-rose-50/30" : ""
         )}
         onClick={() => !isUploading && fileInputRef.current?.click()}
       >
         <input 
           type="file" 
-          className="hidden" 
+          className="sr-only"
           ref={fileInputRef} 
           onChange={handleFileChange} 
           accept={accept}
@@ -82,13 +82,13 @@ export function FileUploader({
         
         {isUploading ? (
           <>
-            <Loader2 className="h-10 w-10 mb-4 text-primary-500 animate-spin" />
+            <Loader2 className="h-10 w-10 mb-4 text-[var(--primary)] animate-spin" />
             <p className="text-sm font-bold text-slate-900">Uploading...</p>
             <p className="text-xs text-slate-500 mt-1">Please wait while we process your files.</p>
           </>
         ) : (
           <>
-            <div className="h-12 w-12 mb-4 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:text-primary-500 transition-colors">
+            <div className="h-12 w-12 mb-4 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:text-[var(--primary)] transition-colors">
               <Upload className="h-6 w-6" />
             </div>
             <p className="text-sm font-bold text-slate-900">Click to upload or drag and drop</p>
@@ -114,7 +114,7 @@ export function FileUploader({
               className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100 animate-in fade-in slide-in-from-left-2"
             >
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center text-primary-500 shadow-sm">
+                <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center text-[var(--primary)] shadow-sm">
                   <FileText className="h-4 w-4" />
                 </div>
                 <span className="text-sm font-bold text-slate-900 truncate max-w-[200px]">

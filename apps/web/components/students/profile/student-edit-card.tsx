@@ -109,7 +109,7 @@ export function StudentEditCard({
     <>
     <SectionCard title="Edit Profile" description={`Updating record for ${student.studentSystemId}`} className="animate-in fade-in slide-in-from-top-4">
       <div className="grid gap-8">
-        <div className="rounded-[2rem] border border-slate-100 bg-slate-50 p-6">
+        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-6">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
               {student.photoUrl ? (
@@ -133,7 +133,7 @@ export function StudentEditCard({
                   through short-lived preview URLs.
                 </p>
                 {isPhotoBusy ? (
-                  <p className="mt-2 text-xs font-bold text-primary-600">
+                  <p className="mt-2 text-xs font-bold text-[var(--color-mod-admissions-text)]">
                     {isUploadingPhoto ? 'Uploading photo...' : 'Removing photo...'}
                   </p>
                 ) : null}
@@ -205,7 +205,7 @@ export function StudentEditCard({
            </FormField>
         </div>
 
-        <div className="rounded-[2rem] bg-slate-50 p-6 space-y-6">
+        <div className="rounded-2xl bg-slate-50 p-6 space-y-6">
            <p className="text-sm font-bold text-slate-900 flex items-center gap-2">
              <Heart size={18} className="text-danger-500" />
              Health & Special Needs
@@ -224,14 +224,14 @@ export function StudentEditCard({
               <div className="grid gap-4 sm:grid-cols-2">
                  <label className={cn(
                    "flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition-all bg-white",
-                   disabilityStatus === 'no' ? "border-primary-500 ring-1 ring-primary-500" : "border-slate-200"
+                   disabilityStatus === 'no' ? "border-[var(--color-mod-admissions-accent)] ring-1 ring-[var(--color-mod-admissions-accent)]" : "border-slate-200"
                  )}>
                    <input type="radio" checked={disabilityStatus === 'no'} onChange={() => setDisabilityStatus('no')} />
                    <span className="text-sm font-bold text-slate-900">No known disability</span>
                  </label>
                  <label className={cn(
                    "flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition-all bg-white",
-                   disabilityStatus === 'yes' ? "border-primary-500 ring-1 ring-primary-500" : "border-slate-200"
+                   disabilityStatus === 'yes' ? "border-[var(--color-mod-admissions-accent)] ring-1 ring-[var(--color-mod-admissions-accent)]" : "border-slate-200"
                  )}>
                    <input type="radio" checked={disabilityStatus === 'yes'} onChange={() => setDisabilityStatus('yes')} />
                    <span className="text-sm font-bold text-slate-900">Disability Present</span>

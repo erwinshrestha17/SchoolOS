@@ -23,6 +23,7 @@ describe('Platform tenant SaaS billing page contracts', () => {
     assert.match(page, /api\.getPlatformTenantDetail\(tenantId\)/);
     assert.match(page, /api\.listPlatformSaaSInvoices\(tenantId\)/);
     assert.doesNotMatch(page, /SO-2024-00124/);
+    assert.doesNotMatch(page, /fake billing records/i);
   });
 
   it('uses shared platform operator state components', () => {
@@ -63,8 +64,13 @@ describe('Platform tenant SaaS billing page contracts', () => {
       'Tenant billing unavailable',
       'Back to tenant detail',
       'Change plan',
+      'Synthetic billing records are never shown here',
+      'Date not recorded',
+      'color-mod-platform-accent',
     ]) {
       assert.match(page, new RegExp(expected));
     }
+
+    assert.doesNotMatch(page, /bg-slate-900|bg-slate-950|shadow-xl|shadow-2xl|N\/A|Unknown failure/);
   });
 });

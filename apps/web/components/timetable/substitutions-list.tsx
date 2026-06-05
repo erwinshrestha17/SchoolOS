@@ -14,6 +14,21 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Toast, type ToastTone } from '@/components/ui/toast';
 
+function formatSubstitutionDate(value: string | null | undefined) {
+  if (!value) return 'Date not set';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Date unavailable';
+  return date.toLocaleDateString();
+}
+
+function formatTeacherName(teacher: any) {
+  if (!teacher) return 'Teacher not assigned';
+  return [teacher.firstName, teacher.lastName]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(' ') || 'Teacher name not set';
+}
+
 export function SubstitutionsList({ filters }: { filters: any }) {
   const queryClient = useQueryClient();
   const [selectedSub, setSelectedSub] = useState<any>(null);
@@ -81,16 +96,18 @@ export function SubstitutionsList({ filters }: { filters: any }) {
     {
       header: 'Date',
       accessorKey: 'date',
-      cell: (row: any) => new Date(row.date).toLocaleDateString(),
+      cell: (row: any) => formatSubstitutionDate(row.date),
     },
     {
       header: 'Class / Slot',
       accessorKey: 'timetableSlot.subject.name',
       cell: (row: any) => (
         <div className="flex flex-col">
-          <span className="font-bold text-slate-900">{row.timetableSlot?.subject?.name || 'Manual Entry'}</span>
+          <span className="font-bold text-slate-900">{row.timetableSlot?.subject?.name?.trim() || 'Subject not set'}</span>
           <span className="text-xs text-slate-500">
-            {row.timetableSlot?.startsAt} - {row.timetableSlot?.endsAt}
+            {row.timetableSlot?.startsAt && row.timetableSlot?.endsAt
+              ? `${row.timetableSlot.startsAt} - ${row.timetableSlot.endsAt}`
+              : 'Slot time not set'}
           </span>
         </div>
       ),
@@ -100,7 +117,7 @@ export function SubstitutionsList({ filters }: { filters: any }) {
       accessorKey: 'absentTeacher.firstName',
       cell: (row: any) => (
         <span className="text-sm font-medium text-slate-700">
-          {row.absentTeacher ? `${row.absentTeacher.firstName} ${row.absentTeacher.lastName}` : '—'}
+          {formatTeacherName(row.absentTeacher)}
         </span>
       ),
     },
@@ -108,8 +125,8 @@ export function SubstitutionsList({ filters }: { filters: any }) {
       header: 'Substitute Teacher',
       accessorKey: 'substituteTeacher.firstName',
       cell: (row: any) => (
-        <span className="text-sm font-bold text-primary-600">
-          {row.substituteTeacher ? `${row.substituteTeacher.firstName} ${row.substituteTeacher.lastName}` : 'Unassigned'}
+        <span className="text-sm font-bold text-slate-700">
+          {formatTeacherName(row.substituteTeacher)}
         </span>
       ),
     },
@@ -187,7 +204,7 @@ export function SubstitutionsList({ filters }: { filters: any }) {
         </Button>
       </div>
       {!filters.classId ? (
-        <p className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs font-semibold text-indigo-700">
+        <p className="rounded-2xl border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] px-4 py-3 text-xs font-semibold text-[var(--color-mod-homework-text)]">
           Select a class in the timetable filters to record an absence from a real published slot.
         </p>
       ) : null}

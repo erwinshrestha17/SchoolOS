@@ -57,7 +57,7 @@ export function DefaulterAgingSummary() {
   ] as const;
 
   return (
-    <section className="space-y-6 rounded-[2.5rem] border border-slate-100 bg-white p-6 shadow-sm">
+    <section className="space-y-6 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-xl font-black tracking-tight text-slate-900">Defaulter Aging</h2>
@@ -88,7 +88,7 @@ export function DefaulterAgingSummary() {
           <div 
             key={b.label} 
             className={cn(
-              "group relative p-6 bg-white rounded-[2.5rem] border transition-all duration-500 hover:shadow-2xl hover:shadow-slate-200/50 hover:-translate-y-1",
+              "group relative p-6 bg-white rounded-2xl border transition-all duration-300 hover:shadow-md",
               b.border
             )}
           >

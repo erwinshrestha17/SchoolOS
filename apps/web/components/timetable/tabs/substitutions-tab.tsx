@@ -15,7 +15,7 @@ export function SubstitutionsTab() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
+      <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex flex-col">
           <h3 className="text-xl font-black uppercase italic tracking-tight text-slate-900">
             Substitution Oversight
@@ -31,7 +31,7 @@ export function SubstitutionsTab() {
           </Button>
           
           <label className="flex h-10 w-[240px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-left text-xs font-black uppercase tracking-tight text-slate-700">
-            <CalendarIcon className="h-4 w-4 text-indigo-500" />
+            <CalendarIcon className="h-4 w-4 text-[var(--color-mod-homework-text)]" />
             <input
               aria-label="Substitution date"
               className="w-full bg-transparent text-xs font-black uppercase outline-none"
@@ -49,7 +49,7 @@ export function SubstitutionsTab() {
 
       <SubstitutionSummaryPanel date={dateStr} />
 
-      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+      <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
         <SubstitutionsList filters={{ date: dateStr }} />
       </div>
     </div>

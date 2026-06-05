@@ -23,7 +23,7 @@ export function SectionCard({
   noPadding = false,
 }: SectionCardProps) {
   return (
-    <div className={cn('bg-white rounded-[2rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden', className)}>
+    <div className={cn('bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden', className)}>
       {(title || description || headerAction) && (
         <div className="flex flex-col gap-3 border-b border-slate-100 p-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">

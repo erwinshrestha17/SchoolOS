@@ -59,7 +59,7 @@ export function LifecyclePanel({
                  ) : (
                    <button 
                      onClick={onCheckClearance}
-                     className="text-xs font-bold text-primary-600 hover:underline"
+                     className="text-xs font-bold text-[var(--color-mod-admissions-text)] hover:underline"
                      disabled={isCheckingClearance}
                    >
                      {isCheckingClearance ? 'Checking Clearance...' : 'Check Fee Clearance'}
@@ -116,7 +116,7 @@ export function LifecyclePanel({
            )}
 
            {!message && !hasOutstanding && !action && (
-             <div className="text-center p-8 border border-dashed border-slate-200 rounded-[2rem]">
+             <div className="text-center p-8 border border-dashed border-slate-200 rounded-2xl">
                 <ShieldAlert size={32} className="mx-auto text-slate-300 mb-4" />
                 <p className="text-sm font-bold text-slate-400">Select an action to continue</p>
              </div>
@@ -138,7 +138,7 @@ function ActionButton({ label, icon, active, onClick, danger }: { label: string;
         active 
           ? danger 
             ? "border-danger-100 bg-white text-danger-600 hover:bg-danger-50 shadow-sm" 
-            : "border-slate-100 bg-white text-slate-700 hover:border-primary-200 hover:bg-primary-50 shadow-sm"
+            : "border-slate-100 bg-white text-slate-700 hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] shadow-sm"
           : "opacity-40 grayscale cursor-not-allowed border-slate-100 bg-slate-50"
       )}
     >

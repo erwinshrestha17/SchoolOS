@@ -66,6 +66,17 @@ describe('SchoolOS Settings Page Contracts', () => {
     assert.match(page, /EditableSettingsSection/);
   });
 
+  it('keeps school settings controls aligned to settings UI tokens', () => {
+    const page = read('app/dashboard/settings/page.tsx');
+
+    assert.match(page, /color-mod-settings-accent/);
+    assert.match(page, /color-mod-settings-text/);
+    assert.doesNotMatch(
+      page,
+      /bg-slate-900|bg-slate-950|hover:bg-slate-800|focus-visible:ring-slate-900|border-slate-900|primary-(50|100|200|500|600|700|800|900)|shadow-2xl|shadow-xl/,
+    );
+  });
+
   it('strictly separates school settings from platform settings', () => {
     const page = read('app/dashboard/settings/page.tsx');
 

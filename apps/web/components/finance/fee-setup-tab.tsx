@@ -143,7 +143,7 @@ export function FeeSetupTab() {
                 <input
                   type="text"
                   placeholder="e.g. TUITION"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={feeHead.code}
                   onChange={(e) => setFeeHead((prev) => ({ ...prev, code: e.target.value }))}
                   required
@@ -155,7 +155,7 @@ export function FeeSetupTab() {
                 <input
                   type="text"
                   placeholder="e.g. Tuition Fee"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={feeHead.name}
                   onChange={(e) => setFeeHead((prev) => ({ ...prev, name: e.target.value }))}
                   required
@@ -168,7 +168,7 @@ export function FeeSetupTab() {
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Frequency</label>
                 <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={feeHead.frequency}
                   onChange={(e) => setFeeHead((prev) => ({ ...prev, frequency: e.target.value }))}
                   disabled={feeHeadMutation.isPending}
@@ -186,7 +186,7 @@ export function FeeSetupTab() {
                 <input
                   type="number"
                   placeholder="0"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={feeHead.defaultAmount || ''}
                   onChange={(e) => setFeeHead((prev) => ({ ...prev, defaultAmount: Number(e.target.value) }))}
                   disabled={feeHeadMutation.isPending}
@@ -198,7 +198,7 @@ export function FeeSetupTab() {
               <input
                 type="checkbox"
                 id="vatApplicable"
-                className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                className="h-4 w-4 rounded border-slate-300 text-[var(--color-mod-fees-accent)] focus:ring-[var(--color-mod-fees-accent)]"
                 checked={feeHead.vatApplicable}
                 onChange={(e) => setFeeHead((prev) => ({ ...prev, vatApplicable: e.target.checked }))}
                 disabled={feeHeadMutation.isPending}
@@ -210,7 +210,7 @@ export function FeeSetupTab() {
 
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-slate-800 disabled:opacity-50 transition-all"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 transition-all"
               disabled={feeHeadMutation.isPending}
             >
               {feeHeadMutation.isPending ? (
@@ -251,7 +251,7 @@ export function FeeSetupTab() {
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Academic Year</label>
                 <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={feePlan.academicYearId}
                   onChange={(e) => setFeePlan((prev) => ({ ...prev, academicYearId: e.target.value }))}
                   required
@@ -269,7 +269,7 @@ export function FeeSetupTab() {
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Class (Optional)</label>
                 <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={feePlan.classId}
                   onChange={(e) => setFeePlan((prev) => ({ ...prev, classId: e.target.value }))}
                   disabled={feePlanMutation.isPending}
@@ -288,7 +288,7 @@ export function FeeSetupTab() {
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Fee Head</label>
                 <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={feePlan.feeHeadId}
                   onChange={(e) => setFeePlan((prev) => ({ ...prev, feeHeadId: e.target.value }))}
                   required
@@ -308,7 +308,7 @@ export function FeeSetupTab() {
                 <input
                   type="text"
                   placeholder="e.g. PLAN-TUITION-GR1"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={feePlan.code}
                   onChange={(e) => setFeePlan((prev) => ({ ...prev, code: e.target.value }))}
                   required
@@ -323,7 +323,7 @@ export function FeeSetupTab() {
                 <input
                   type="text"
                   placeholder="e.g. Grade 1 Monthly Tuition Plan"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={feePlan.name}
                   onChange={(e) => setFeePlan((prev) => ({ ...prev, name: e.target.value }))}
                   required
@@ -336,7 +336,7 @@ export function FeeSetupTab() {
                 <input
                   type="number"
                   placeholder="0"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={feePlan.amount || ''}
                   onChange={(e) => setFeePlan((prev) => ({ ...prev, amount: Number(e.target.value) }))}
                   required
@@ -347,7 +347,7 @@ export function FeeSetupTab() {
 
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-slate-800 disabled:opacity-50 transition-all"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 transition-all"
               disabled={feePlanMutation.isPending}
             >
               {feePlanMutation.isPending ? (

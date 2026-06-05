@@ -43,15 +43,15 @@ export function SubstitutionSummaryPanel({ date }: { date: string }) {
       label: 'Pending',
       value: summary.pendingSubstitutions,
       icon: Clock,
-      color: 'text-indigo-600',
-      bgColor: 'bg-indigo-50',
+      color: 'text-[var(--color-mod-homework-text)]',
+      bgColor: 'bg-[var(--color-mod-homework-bg)]',
     },
   ];
 
   return (
     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat) => (
-        <Card key={stat.label} className="p-6 border-slate-200/60 shadow-sm rounded-[2rem]">
+        <Card key={stat.label} className="p-6 border-slate-200/60 shadow-sm rounded-2xl">
           <div className="flex items-center gap-4">
             <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${stat.bgColor}`}>
               <stat.icon className={`h-6 w-6 ${stat.color}`} />

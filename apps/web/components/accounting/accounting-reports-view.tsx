@@ -159,7 +159,7 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
       });
       rows.push({ id: 'exp-total', isFooter: true, cells: [{ value: 'Total Expenses' }, { value: '' }, { value: '' }, { value: pnl?.expenses ?? 0, type: 'currency', align: 'right' }] });
 
-      rows.push({ id: 'net-total', isFooter: true, className: 'bg-slate-900 text-white hover:bg-slate-900', cells: [{ value: 'NET INCOME', bold: true }, { value: '' }, { value: '' }, { value: pnl?.netIncome ?? 0, type: 'currency', align: 'right' }] });
+      rows.push({ id: 'net-total', isFooter: true, className: 'bg-[var(--color-mod-accounting-bg)] text-[var(--color-mod-accounting-text)] hover:bg-[var(--color-mod-accounting-bg)]', cells: [{ value: 'NET INCOME', bold: true }, { value: '' }, { value: '' }, { value: pnl?.netIncome ?? 0, type: 'currency', align: 'right' }] });
 
       return <ReportTable headers={['Classification', '', '', 'Amount']} rows={rows} />;
     }
@@ -259,7 +259,7 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
             <button
               onClick={() => pdfMutation.mutate(activeReport)}
               disabled={pdfMutation.isPending || !isExportSupported(activeReport)}
-              className="group inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 transition-all disabled:opacity-30 disabled:grayscale"
+              className="group inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-accounting-text)] disabled:opacity-30 disabled:grayscale"
               data-testid="accounting-report-pdf-export"
             >
               <FileDown size={18} className="transition-transform group-hover:scale-110" />
@@ -299,15 +299,15 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
                   className={cn(
                     "flex flex-col gap-0.5 rounded-xl px-4 py-3 text-left transition-all",
                     activeReport === report.id
-                      ? "bg-slate-900 text-white shadow-xl shadow-slate-900/10"
-                      : "bg-white border border-slate-100 text-slate-600 hover:bg-slate-50 hover:border-slate-200"
+                      ? "border border-[var(--color-mod-accounting-border)] bg-[var(--color-mod-accounting-bg)] text-[var(--color-mod-accounting-text)] shadow-sm"
+                      : "bg-white border border-slate-100 text-slate-600 hover:bg-[var(--color-mod-accounting-bg)] hover:border-[var(--color-mod-accounting-border)]"
                   )}
                 >
                   <div className="flex items-center gap-2 font-bold text-sm">
                     <report.icon size={16} />
                     {report.label}
                   </div>
-                  <span className={cn("text-[10px]", activeReport === report.id ? "text-slate-400" : "text-slate-400")}>
+                  <span className={cn("text-[10px]", activeReport === report.id ? "text-[var(--color-mod-accounting-text)]/70" : "text-slate-400")}>
                     {report.desc}
                   </span>
                 </button>
@@ -321,17 +321,17 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
              <ReportFilters onFilterChange={(f) => setFilters(prev => ({ ...prev, ...f }))} />
           </SectionCard>
 
-          <SectionCard className="border-none shadow-2xl shadow-slate-200/50 min-h-[400px]">
+          <SectionCard className="min-h-[400px] shadow-sm">
             <div className="mb-6 flex items-center justify-between">
                <div>
                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">
                    {activeReport.replace('-', ' ')}
                  </h3>
-                 <p className="text-xs font-medium text-slate-400 mt-0.5">Report Preview</p>
+                 <p className="text-xs font-medium text-slate-400 mt-0.5">Ledger-backed preview</p>
                </div>
-               <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-3 py-1.5 rounded-lg">
+               <div className="flex items-center gap-2 text-[10px] font-bold text-[var(--color-mod-accounting-text)] uppercase tracking-wider bg-[var(--color-mod-accounting-bg)] px-3 py-1.5 rounded-lg">
                   <History size={12} />
-                  Generated {new Date().toLocaleTimeString()}
+                  Current ledger data
                </div>
             </div>
             <div className="animate-in fade-in duration-700">

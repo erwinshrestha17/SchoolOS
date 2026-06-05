@@ -160,7 +160,7 @@ export function BankReconciliationWorkspace() {
             <button
               type="button"
               onClick={() => suggestionsQuery.refetch()}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--color-mod-accounting-border)] bg-[var(--color-mod-accounting-accent)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-mod-accounting-text)]"
               data-testid="bank-reconciliation-auto-match"
             >
               <Search size={16} />
@@ -212,21 +212,21 @@ export function BankReconciliationWorkspace() {
 
       {selectedAccountId && summaryQuery.data && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="rounded-[2rem] bg-white border border-slate-100 p-6 shadow-sm">
+          <div className="rounded-2xl bg-white border border-slate-100 p-6 shadow-sm">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Statements</p>
             <p className="mt-1 text-2xl font-bold text-slate-900">{summaryQuery.data.totalStatements}</p>
           </div>
-          <div className="rounded-[2rem] bg-emerald-50 border border-emerald-100 p-6 shadow-sm">
+          <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-6 shadow-sm">
             <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest">Reconciled</p>
             <p className="mt-1 text-2xl font-bold text-emerald-700">{summaryQuery.data.reconciledStatements}</p>
           </div>
-          <div className="rounded-[2rem] bg-amber-50 border border-amber-100 p-6 shadow-sm">
+          <div className="rounded-2xl bg-amber-50 border border-amber-100 p-6 shadow-sm">
             <p className="text-xs font-bold text-amber-600 uppercase tracking-widest">Unreconciled</p>
             <p className="mt-1 text-2xl font-bold text-amber-700">{summaryQuery.data.unreconciledStatements}</p>
           </div>
-          <div className="rounded-[2rem] bg-slate-900 border border-slate-800 p-6 shadow-lg shadow-slate-900/10">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Ledger Balance</p>
-            <p className="mt-1 text-2xl font-bold text-white">
+          <div className="rounded-2xl bg-[var(--color-mod-accounting-bg)] border border-[var(--color-mod-accounting-border)] p-6 shadow-sm">
+            <p className="text-xs font-bold text-[var(--color-mod-accounting-text)] uppercase tracking-widest">Ledger Balance</p>
+            <p className="mt-1 text-2xl font-bold text-[var(--color-mod-accounting-text)]">
               {(Number(summaryQuery.data.statementBalance.debit || 0) - Number(summaryQuery.data.statementBalance.credit || 0)).toLocaleString(undefined, { style: 'currency', currency: 'NPR' })}
             </p>
           </div>
@@ -241,7 +241,7 @@ export function BankReconciliationWorkspace() {
                 headers={['Date', 'Description', 'Amount', 'Action']}
                 rows={(unreconciledQuery.data ?? []).map((stmt: any) => ({
                   id: stmt.id,
-                  className: matching === stmt.id ? "bg-primary-50 ring-2 ring-primary-500 ring-inset" : "",
+                  className: matching === stmt.id ? "bg-[var(--color-mod-accounting-bg)] ring-2 ring-[var(--color-mod-accounting-accent)] ring-inset" : "",
                   cells: [
                     { value: stmt.statementDate, type: 'date' },
                     { value: stmt.description },
@@ -257,7 +257,7 @@ export function BankReconciliationWorkspace() {
                         className={cn(
                           "rounded-lg px-3 py-1 text-xs font-bold transition-all",
                           matching === stmt.id 
-                            ? "bg-primary-600 text-white shadow-md shadow-primary-600/20" 
+                            ? "bg-[var(--color-mod-accounting-accent)] text-white shadow-md shadow-[var(--color-mod-accounting-accent)]/20"
                             : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         )}
                       >
@@ -326,12 +326,12 @@ export function BankReconciliationWorkspace() {
       )}
 
       {!selectedAccountId && (
-        <div className="flex flex-col items-center justify-center py-20 rounded-[3rem] bg-slate-50 border border-dashed border-slate-200 text-center">
-          <div className="h-16 w-16 rounded-3xl bg-slate-100 flex items-center justify-center text-slate-400 mb-4">
+        <div className="flex flex-col items-center justify-center py-20 rounded-2xl bg-[var(--color-mod-accounting-bg)] border border-dashed border-[var(--color-mod-accounting-border)] text-center">
+          <div className="h-16 w-16 rounded-2xl bg-white flex items-center justify-center text-[var(--color-mod-accounting-accent)] mb-4 border border-[var(--color-mod-accounting-border)]">
             <Landmark size={32} />
           </div>
-          <h3 className="text-lg font-bold text-slate-900">Start Bank Reconciliation</h3>
-          <p className="mt-2 text-sm text-slate-500 max-w-sm">
+          <h3 className="text-lg font-bold text-[var(--color-mod-accounting-text)]">Start Bank Reconciliation</h3>
+          <p className="mt-2 text-sm text-[var(--color-mod-accounting-text)]/80 max-w-sm">
             Select a bank or cash account from the dropdown above to begin matching statement lines with your ledger entries.
           </p>
         </div>

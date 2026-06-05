@@ -46,7 +46,7 @@ export function ReprintDialog({ receiptId, receiptNumber, isOpen, onClose }: Rep
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="rounded-[2rem] border-slate-200 shadow-2xl">
+      <DialogContent className="rounded-2xl border-slate-200 shadow-lg">
         <DialogHeader>
           <DialogTitle className="text-xl font-black text-slate-900">Reprint Receipt</DialogTitle>
           <DialogDescription className="text-slate-500 font-medium">
@@ -78,7 +78,7 @@ export function ReprintDialog({ receiptId, receiptNumber, isOpen, onClose }: Rep
           <Button 
             onClick={handleReprint} 
             disabled={isLoading || !reason.trim()} 
-            className="rounded-xl font-bold bg-slate-900 text-white hover:bg-slate-800"
+            className="rounded-xl font-bold bg-[var(--color-mod-fees-accent)] text-white hover:bg-[var(--color-mod-fees-text)]"
           >
             {isLoading ? 'Reprinting...' : 'Reprint & Download'}
           </Button>

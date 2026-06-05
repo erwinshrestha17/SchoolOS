@@ -98,7 +98,7 @@ export default function NoticeDetailPage() {
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <article className="rounded-2xl border border-[var(--line)] bg-white p-6 shadow-sm sm:p-8">
           <div className="flex items-center gap-3 border-b border-gray-100 pb-5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-mod-notices-bg)] text-[var(--color-mod-notices-text)]">
               <Megaphone size={20} />
             </div>
             <div>
@@ -267,8 +267,8 @@ function UnreadRecipientsPanel({
   return (
     <section className="rounded-2xl border border-[var(--line)] bg-white p-6 shadow-sm sm:p-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-mod-notices-bg)] text-[var(--color-mod-notices-text)]">
             <UsersRound size={20} />
           </div>
           <div>
@@ -446,7 +446,7 @@ function InfoCard({
   return (
     <div className="rounded-2xl border border-[var(--line)] bg-white p-5 shadow-sm">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gray-100 text-gray-700">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--color-mod-notices-bg)] text-[var(--color-mod-notices-text)]">
           {icon}
         </div>
         <h2 className="text-sm font-semibold text-gray-950">{title}</h2>

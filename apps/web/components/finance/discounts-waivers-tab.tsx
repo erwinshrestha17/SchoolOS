@@ -172,7 +172,7 @@ export function DiscountsWaiversTab() {
                 <input
                   type="text"
                   placeholder="e.g. Sibling Discount 10%"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={discount.name}
                   onChange={(e) => setDiscount((prev) => ({ ...prev, name: e.target.value }))}
                   required
@@ -185,7 +185,7 @@ export function DiscountsWaiversTab() {
                 <input
                   type="text"
                   placeholder="e.g. Approved board waiver policy"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={discount.reason}
                   onChange={(e) => setDiscount((prev) => ({ ...prev, reason: e.target.value }))}
                   required
@@ -198,7 +198,7 @@ export function DiscountsWaiversTab() {
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Type</label>
                 <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={discount.type}
                   onChange={(e) => setDiscount((prev) => ({ ...prev, type: e.target.value }))}
                   disabled={discountMutation.isPending}
@@ -213,7 +213,7 @@ export function DiscountsWaiversTab() {
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Applicable Plan</label>
                 <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={discount.feePlanId}
                   onChange={(e) => setDiscount((prev) => ({ ...prev, feePlanId: e.target.value }))}
                   disabled={discountMutation.isPending}
@@ -232,7 +232,7 @@ export function DiscountsWaiversTab() {
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Class (Optional)</label>
                 <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={discount.classId}
                   onChange={(e) => setDiscount((prev) => ({ ...prev, classId: e.target.value }))}
                   disabled={discountMutation.isPending}
@@ -249,7 +249,7 @@ export function DiscountsWaiversTab() {
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Fee Head (Optional)</label>
                 <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={discount.feeHeadId}
                   onChange={(e) => setDiscount((prev) => ({ ...prev, feeHeadId: e.target.value }))}
                   disabled={discountMutation.isPending}
@@ -271,7 +271,7 @@ export function DiscountsWaiversTab() {
                   type="number"
                   min={0}
                   max={100}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={discount.percentOff || ''}
                   onChange={(e) => setDiscount((prev) => ({ ...prev, percentOff: Number(e.target.value) }))}
                   disabled={discountMutation.isPending || discount.amountOff > 0}
@@ -283,7 +283,7 @@ export function DiscountsWaiversTab() {
                 <input
                   type="number"
                   min={0}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={discount.amountOff || ''}
                   onChange={(e) => setDiscount((prev) => ({ ...prev, amountOff: Number(e.target.value) }))}
                   disabled={discountMutation.isPending || discount.percentOff > 0}
@@ -293,7 +293,7 @@ export function DiscountsWaiversTab() {
 
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-slate-800 disabled:opacity-50 transition-all"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 transition-all"
               disabled={discountMutation.isPending || (!discount.feeHeadId && !discount.classId && !discount.feePlanId)}
             >
               {discountMutation.isPending ? (
@@ -338,7 +338,7 @@ export function DiscountsWaiversTab() {
             <div className="space-y-2">
               <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Select Invoice</label>
               <select
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                 value={waiver.invoiceId}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -368,7 +368,7 @@ export function DiscountsWaiversTab() {
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Fee Head Scope</label>
                 <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={waiver.feeHeadId}
                   onChange={(e) => setWaiver((prev) => ({ ...prev, feeHeadId: e.target.value }))}
                   disabled={waiverMutation.isPending}
@@ -389,7 +389,7 @@ export function DiscountsWaiversTab() {
                   min={1}
                   max={selectedWaiverOutstanding || undefined}
                   placeholder="Waiver Amount"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={waiver.amount || ''}
                   onChange={(e) => setWaiver((prev) => ({ ...prev, amount: Number(e.target.value) }))}
                   required
@@ -403,7 +403,7 @@ export function DiscountsWaiversTab() {
               <textarea
                 rows={3}
                 placeholder="Detail approval reasons for audits..."
-                className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-primary-500 focus:outline-none"
+                className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                 value={waiver.reason}
                 onChange={(e) => setWaiver((prev) => ({ ...prev, reason: e.target.value }))}
                 required
@@ -419,7 +419,7 @@ export function DiscountsWaiversTab() {
 
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-slate-800 disabled:opacity-50 transition-all"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 transition-all"
               disabled={waiverMutation.isPending || waiver.amount <= 0 || !waiver.reason || !waiver.invoiceId}
             >
               {waiverMutation.isPending ? (

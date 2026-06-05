@@ -25,7 +25,7 @@ export function ErrorState({
 
   return (
     <div className={cn(
-      "flex flex-col items-center justify-center rounded-[2rem] border border-rose-100 bg-rose-50/10 p-8 text-center animate-in fade-in duration-300",
+      "flex flex-col items-center justify-center rounded-2xl border border-rose-100 bg-rose-50/10 p-8 text-center animate-in fade-in duration-300",
       className
     )}>
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 shadow-sm">
@@ -44,7 +44,7 @@ export function ErrorState({
             {showStack ? "Hide technical details" : "Show technical details"}
           </button>
           {showStack && (
-            <pre className="mt-2 max-h-40 overflow-y-auto rounded-lg bg-slate-950 p-3 text-[10px] text-rose-400 border border-slate-800">
+            <pre className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-rose-200 bg-rose-950 p-3 text-[10px] text-rose-100">
               {error.stack || error.message || JSON.stringify(error, null, 2)}
             </pre>
           )}

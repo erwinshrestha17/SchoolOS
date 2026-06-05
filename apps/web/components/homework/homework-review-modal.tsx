@@ -40,6 +40,7 @@ export function HomeworkReviewModal({
   const [feedback, setFeedback] = useState(submission?.feedback ?? '');
   const [isCorrectionRequested, setIsCorrectionRequested] = useState(false);
   const [fileNotice, setFileNotice] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const reviewMutation = useMutation({
     mutationFn: (data: any) => api.reviewHomeworkSubmissionById(submission.id, data),
@@ -58,6 +59,7 @@ export function HomeworkReviewModal({
   });
 
   const handleReview = () => {
+    setActionNotice(null);
     reviewMutation.mutate({
       score: score === '' ? null : Number(score),
       feedback: feedback.trim() || null,
@@ -66,8 +68,14 @@ export function HomeworkReviewModal({
   };
 
   const handleRequestCorrection = () => {
+    const trimmedFeedback = feedback.trim();
+    if (!trimmedFeedback) {
+      setActionNotice('Teacher feedback is required before requesting a correction.');
+      return;
+    }
+    setActionNotice(null);
     requestCorrectionMutation.mutate({
-      feedback: feedback.trim() || 'Please correct and resubmit.',
+      feedback: trimmedFeedback,
     });
   };
 
@@ -75,15 +83,15 @@ export function HomeworkReviewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl">
-        <DialogHeader className="p-8 bg-slate-900 text-white">
+      <DialogContent className="max-w-3xl rounded-2xl p-0 overflow-hidden border border-slate-200 shadow-sm">
+        <DialogHeader className="border-b border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] p-8 text-[var(--color-mod-homework-text)]">
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
               <DialogTitle className="text-2xl font-black tracking-tight italic uppercase">
                 Review Submission
               </DialogTitle>
-              <p className="text-slate-400 text-sm font-medium mt-1">
-                Student: {submission.student?.fullNameEn} ({submission.student?.studentSystemId})
+              <p className="text-sm font-medium mt-1 text-[var(--color-mod-homework-text)]">
+                Student: {submission.student?.fullNameEn?.trim() || 'Student name not set'} ({submission.student?.studentSystemId || 'ID not set'})
               </p>
             </div>
             <StatusBadge status={submission.status} />
@@ -94,11 +102,11 @@ export function HomeworkReviewModal({
           {/* Submission Content */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm font-black text-slate-900 uppercase tracking-widest">
-              <MessageSquare className="h-4 w-4 text-primary-500" />
+              <MessageSquare className="h-4 w-4 text-[var(--color-mod-homework-text)]" />
               Student Content
             </div>
-            <div className="p-6 rounded-[2rem] bg-slate-50 text-slate-700 border border-slate-100 min-h-[100px] whitespace-pre-wrap leading-relaxed">
-              {submission.content || <span className="italic opacity-50">No text content provided.</span>}
+            <div className="p-6 rounded-2xl bg-slate-50 text-slate-700 border border-slate-100 min-h-[100px] whitespace-pre-wrap leading-relaxed">
+              {submission.content?.trim() || <span className="italic opacity-50">No text content provided.</span>}
             </div>
           </div>
 
@@ -106,22 +114,22 @@ export function HomeworkReviewModal({
           {submission.attachments && submission.attachments.length > 0 && (
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-black text-slate-900 uppercase tracking-widest">
-                <FileText className="h-4 w-4 text-primary-500" />
+                <FileText className="h-4 w-4 text-[var(--color-mod-homework-text)]" />
                 Submitted Files
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {submission.attachments.map((attachment: any) => (
                   <div 
                     key={attachment.id}
-                    className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 bg-white shadow-sm hover:border-primary-200 transition-colors group"
+                    className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 bg-white shadow-sm hover:border-[var(--color-mod-homework-border)] transition-colors group"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center text-primary-500">
+                      <div className="h-10 w-10 rounded-xl bg-[var(--color-mod-homework-bg)] flex items-center justify-center text-[var(--color-mod-homework-text)]">
                         <FileText className="h-5 w-5" />
                       </div>
                       <div className="flex flex-col">
                         <span className="text-sm font-bold text-slate-900 truncate max-w-[150px]">
-                          {attachment.fileAsset?.originalFilename}
+                          {attachment.fileAsset?.originalFilename?.trim() || 'File name not set'}
                         </span>
                         <span className="text-[10px] text-slate-500 font-medium">
                           {Math.round((attachment.fileAsset?.sizeBytes || 0) / 1024)} KB
@@ -131,7 +139,7 @@ export function HomeworkReviewModal({
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="h-9 w-9 rounded-xl text-slate-400 hover:text-primary-600 hover:bg-primary-50"
+                      className="h-9 w-9 rounded-xl text-slate-400 hover:text-[var(--color-mod-homework-text)] hover:bg-[var(--color-mod-homework-bg)]"
                       onClick={async () => {
                         try {
                           const view = await api.getFileView(attachment.fileAssetId);
@@ -155,6 +163,14 @@ export function HomeworkReviewModal({
               description={fileNotice}
               tone="danger"
               onDismiss={() => setFileNotice(null)}
+            />
+          ) : null}
+          {actionNotice ? (
+            <Toast
+              title="Review action needs feedback"
+              description={actionNotice}
+              tone="warning"
+              onDismiss={() => setActionNotice(null)}
             />
           ) : null}
 
@@ -185,7 +201,7 @@ export function HomeworkReviewModal({
                     variant="outline"
                     className={cn(
                       "rounded-xl font-bold h-12",
-                      !isCorrectionRequested ? "border-primary-500 bg-primary-50 text-primary-700" : "bg-white"
+                      !isCorrectionRequested ? "border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)]" : "bg-white"
                     )}
                     onClick={() => setIsCorrectionRequested(false)}
                   >
@@ -213,7 +229,7 @@ export function HomeworkReviewModal({
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
                 rows={4}
-                className="rounded-[1.5rem] p-4"
+                className="rounded-2xl p-4"
               />
             </FormField>
           </div>
@@ -239,7 +255,7 @@ export function HomeworkReviewModal({
             ) : (
               <Button 
                 onClick={handleReview} 
-                className="bg-slate-900 hover:bg-slate-800 rounded-xl font-bold px-8 shadow-lg"
+                className="bg-[var(--color-mod-homework-accent)] hover:bg-[var(--color-mod-homework-text)] rounded-xl font-bold px-8 shadow-sm"
                 disabled={reviewMutation.isPending}
               >
                 Submit Review

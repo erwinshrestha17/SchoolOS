@@ -325,7 +325,7 @@ function ActivityPostDetail({
                       )
                     }
                     disabled={Boolean(attachment.accessBlockedReason)}
-                    className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 text-xs font-bold text-white hover:bg-slate-800"
+                    className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-activity-accent)] text-xs font-bold text-white hover:bg-[var(--color-mod-activity-text)]"
                   >
                     <Download size={14} />
                     Save
@@ -429,7 +429,7 @@ function LifecyclePanel({
             type="button"
             onClick={onSave}
             disabled={!canEdit || isSaving || editTitle.trim().length < 2}
-            className="inline-flex h-10 items-center rounded-xl bg-slate-900 px-4 text-xs font-black uppercase tracking-widest text-white disabled:opacity-50"
+            className="inline-flex h-10 items-center rounded-xl bg-[var(--color-mod-activity-accent)] px-4 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-activity-text)] disabled:opacity-50"
           >
             {isSaving ? 'Saving...' : 'Save draft edit'}
           </button>
@@ -497,7 +497,7 @@ function LifecyclePanel({
           type="button"
           onClick={onDelete}
           disabled={!canDelete || isDeleting}
-          className="mt-3 h-10 rounded-xl bg-slate-950 px-4 text-xs font-black uppercase tracking-widest text-white disabled:opacity-50"
+          className="mt-3 h-10 rounded-xl bg-[var(--color-mod-activity-accent)] px-4 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-activity-text)] disabled:opacity-50"
         >
           {isDeleting ? 'Removing...' : 'Remove post'}
         </button>

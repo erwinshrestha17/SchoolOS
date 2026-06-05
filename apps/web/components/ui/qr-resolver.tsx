@@ -88,7 +88,7 @@ export function QRResolver({
           aria-label="Student QR token"
           placeholder={placeholder}
           className={cn(
-            'h-12 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-28 text-sm font-bold shadow-sm transition outline-none focus:border-primary-300 focus:ring-4 focus:ring-primary-100',
+            'h-12 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-28 text-sm font-bold shadow-sm transition outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--primary-soft)]',
             error && 'border-red-300 focus:border-red-400 focus:ring-red-100',
             success && 'border-emerald-300 focus:border-emerald-400 focus:ring-emerald-100'
           )}
@@ -98,14 +98,14 @@ export function QRResolver({
         />
         <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
           {isResolving ? (
-            <Loader2 className="animate-spin text-primary-500" size={20} />
+            <Loader2 className="animate-spin text-[var(--primary)]" size={20} />
           ) : success ? (
             <CheckCircle2 className="text-emerald-500" size={20} />
           ) : null}
           <button
             type="submit"
             disabled={isResolving || !token.trim()}
-            className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+            className="rounded-xl bg-[var(--primary)] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[var(--primary-dark)] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
           >
             {submitLabel}
           </button>

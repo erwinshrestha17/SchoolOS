@@ -141,21 +141,21 @@ export function CashierCloseSection() {
               ))}
             </div>
 
-            <div className="rounded-xl bg-slate-900 p-6 text-white">
+            <div className="rounded-xl bg-[var(--color-mod-fees-bg)] border border-[var(--color-mod-fees-border)] p-6 text-[var(--color-mod-fees-text)]">
                <div className="flex items-center justify-between mb-4">
-                  <p className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em]">Collector Breakdown</p>
+                  <p className="text-[0.65rem] font-black text-[var(--color-mod-fees-text)] uppercase tracking-[0.2em]">Collector Breakdown</p>
                   <Badge variant="phase2" className="border-none bg-[var(--color-mod-fees-soft)] text-[var(--color-mod-fees-text)]">Active Counter</Badge>
                </div>
                <div className="space-y-4">
                   {preview?.byUser?.map((u: any) => (
-                    <div key={u.userId} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                    <div key={u.userId} className="flex items-center justify-between py-2 border-b border-[var(--color-mod-fees-border)] last:border-0">
                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-[0.65rem] font-bold">
-                             {u.userName?.slice(0, 2).toUpperCase() || 'US'}
+                          <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center text-[0.65rem] font-bold">
+                             {u.userName?.slice(0, 2).toUpperCase() || 'CO'}
                           </div>
-                          <span className="text-sm font-bold">{u.userName}</span>
+                          <span className="text-sm font-bold">{u.userName || 'Collector not recorded'}</span>
                        </div>
-                       <span className="text-sm font-black text-primary-400">{formatCurrency(u.amount)}</span>
+                       <span className="text-sm font-black text-[var(--color-mod-fees-accent)]">{formatCurrency(u.amount)}</span>
                     </div>
                   ))}
                </div>
@@ -197,7 +197,7 @@ export function CashierCloseSection() {
                 summary: preview,
               })}
               disabled={closeDisabled}
-              className="flex w-full items-center justify-center gap-3 rounded-xl bg-[var(--color-mod-fees-accent)] py-4 text-sm font-black text-white shadow-xl shadow-primary-500/20 transition-all hover:scale-[1.02] hover:bg-[var(--color-mod-fees-text)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+              className="flex w-full items-center justify-center gap-3 rounded-xl bg-[var(--color-mod-fees-accent)] py-4 text-sm font-black text-white shadow-sm transition-all hover:bg-[var(--color-mod-fees-text)] active:scale-95 disabled:opacity-50"
              >
                {closeMutation.isPending ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle2 size={20} />}
                Close Counter & Handover
@@ -232,7 +232,7 @@ export function CashierCloseSection() {
 function CollectionStat({ label, value, sub, icon, color }: { label: string; value: string; sub: string; icon: React.ReactNode; color: 'emerald' | 'primary' | 'amber' }) {
   const colorMap = {
     emerald: "text-emerald-600 bg-emerald-50 border-emerald-100",
-    primary: "text-primary-600 bg-primary-50 border-primary-100",
+    primary: "text-[var(--color-mod-fees-accent)] bg-[var(--color-mod-fees-bg)] border-[var(--color-mod-fees-border)]",
     amber: "text-amber-600 bg-amber-50 border-amber-100",
   };
 

@@ -472,7 +472,7 @@ export default function PlatformSettings() {
   };
 
   const formatDate = (dateString: string | number | null | undefined) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return 'Date not recorded';
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -496,7 +496,7 @@ export default function PlatformSettings() {
 
   if (loading)
     return (
-      <div className="space-y-8 animate-pulse p-8 bg-slate-950/5 rounded-3xl border border-slate-100">
+      <div className="space-y-8 animate-pulse p-8 bg-[var(--color-mod-platform-bg)] rounded-2xl border border-[var(--color-mod-platform-border)]">
         <div className="pb-8 border-b border-slate-100 space-y-3">
           <div className="h-4 w-24 bg-slate-200 rounded-lg" />
           <div className="h-10 w-64 bg-slate-200 rounded-lg" />
@@ -508,11 +508,11 @@ export default function PlatformSettings() {
           <div className="h-9 w-28 bg-slate-200 rounded-lg" />
         </div>
         <div className="grid gap-6 md:grid-cols-3">
-          <div className="h-32 bg-slate-200 rounded-3xl" />
-          <div className="h-32 bg-slate-200 rounded-3xl" />
-          <div className="h-32 bg-slate-200 rounded-3xl" />
+          <div className="h-32 bg-slate-200 rounded-2xl" />
+          <div className="h-32 bg-slate-200 rounded-2xl" />
+          <div className="h-32 bg-slate-200 rounded-2xl" />
         </div>
-        <div className="h-64 bg-slate-100 rounded-3xl" />
+        <div className="h-64 bg-slate-100 rounded-2xl" />
       </div>
     );
 
@@ -551,7 +551,7 @@ export default function PlatformSettings() {
             Refresh State
           </Button>
           <Button
-            className="rounded-2xl h-12 px-6 font-bold bg-slate-900 shadow-xl shadow-slate-200 hover:bg-slate-800 gap-2 text-white"
+            className="rounded-2xl h-12 px-6 font-bold bg-[var(--color-mod-platform-accent)] shadow-sm hover:bg-[var(--color-mod-platform-text)] gap-2 text-white"
             onClick={() => {
               setEditingProvider(null);
               setProviderError(null);
@@ -656,7 +656,7 @@ export default function PlatformSettings() {
                 >
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-all">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-platform-bg)] text-[var(--color-mod-platform-accent)] group-hover:bg-[var(--color-mod-platform-accent)] group-hover:text-white transition-all">
                         {key === 'database' ? (
                           <Database size={24} />
                         ) : key === 'redis' ? (
@@ -687,7 +687,7 @@ export default function PlatformSettings() {
             )}
           </div>
 
-          <Card className="rounded-[2.5rem] border-slate-100 shadow-sm overflow-hidden">
+          <Card className="rounded-2xl border-slate-100 shadow-sm overflow-hidden">
             <CardHeader className="bg-slate-50/50 p-8">
               <CardTitle className="text-2xl font-black">
                 Environmental Metrics
@@ -704,7 +704,7 @@ export default function PlatformSettings() {
                   configured in the current backend response.
                 </p>
                 <p className="mt-2 text-xs font-semibold text-slate-500">
-                  No fake production metrics are displayed. Connect
+                  No synthetic production metrics are displayed. Connect
                   observability data to the platform health API to populate this
                   section.
                 </p>
@@ -718,7 +718,7 @@ export default function PlatformSettings() {
           className="space-y-8 animate-in fade-in slide-in-from-bottom-2"
         >
           {providersReadiness.length > 0 && (
-            <Card className="rounded-[2.5rem] border-slate-100 shadow-sm overflow-hidden">
+            <Card className="rounded-2xl border-slate-100 shadow-sm overflow-hidden">
               <CardHeader className="bg-slate-50/50 p-8">
                 <CardTitle className="text-2xl font-black flex items-center gap-2">
                   <ShieldCheck className="text-emerald-500" size={24} />
@@ -769,11 +769,11 @@ export default function PlatformSettings() {
             {safeProviders.map((provider) => (
               <Card
                 key={provider.id}
-                className="rounded-3xl border-slate-100 shadow-sm transition-all hover:border-slate-200 hover:shadow-xl hover:shadow-slate-100/50 group"
+                className="rounded-2xl border-slate-100 shadow-sm transition-all hover:border-[var(--color-mod-platform-border)] group"
               >
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between mb-4">
-                    <div className="h-12 w-12 flex items-center justify-center rounded-2xl bg-slate-900 text-white">
+                    <div className="h-12 w-12 flex items-center justify-center rounded-2xl bg-[var(--color-mod-platform-accent)] text-white">
                       {provider.type === 'SMS' ? (
                         <MessageSquare size={24} />
                       ) : provider.type === 'EMAIL' ? (
@@ -906,7 +906,7 @@ export default function PlatformSettings() {
                   </CardDescription>
                 </div>
                 <Button
-                  className="rounded-2xl bg-slate-900 font-bold text-white"
+                  className="rounded-2xl bg-[var(--color-mod-platform-accent)] font-bold text-white hover:bg-[var(--color-mod-platform-text)]"
                   onClick={() => setWebhookDialogOpen(true)}
                   data-testid="platform-webhook-create-button"
                 >
@@ -1047,7 +1047,7 @@ export default function PlatformSettings() {
                 <CardHeader className="bg-slate-50/50">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-900 text-white shadow-lg shadow-slate-200">
+                      <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-[var(--color-mod-platform-accent)] text-white shadow-sm">
                         <Server size={20} />
                       </div>
                       <div>
@@ -1173,9 +1173,9 @@ export default function PlatformSettings() {
                             </span>
                           </div>
                           <p className="text-sm font-bold text-rose-700">
-                            {job.failedReason || 'Unknown failure'}
+                            {job.failedReason || 'Failure reason not recorded'}
                           </p>
-                          <div className="rounded-xl bg-slate-900 p-4 text-[10px] font-mono text-indigo-200 overflow-x-auto">
+                          <div className="rounded-xl bg-[var(--color-mod-platform-text)] p-4 text-[10px] font-mono text-[var(--color-mod-platform-bg)] overflow-x-auto">
                             <pre>{JSON.stringify(job.data, null, 2)}</pre>
                           </div>
                           <div className="flex justify-end gap-2">
@@ -1233,7 +1233,7 @@ export default function PlatformSettings() {
                 className="rounded-3xl border-slate-100 shadow-sm relative overflow-hidden group"
               >
                 {plan.key === 'premium' && (
-                  <div className="absolute top-0 right-0 h-24 w-24 translate-x-12 -translate-y-12 rotate-45 bg-indigo-500 shadow-xl" />
+                  <div className="absolute top-0 right-0 h-24 w-24 translate-x-12 -translate-y-12 rotate-45 bg-[var(--color-mod-platform-accent)] shadow-sm" />
                 )}
                 <CardHeader className="p-8">
                   <div className="flex items-center justify-between mb-4">
@@ -1298,7 +1298,7 @@ export default function PlatformSettings() {
                   </div>
                   <Button
                     variant="outline"
-                    className="w-full mt-8 rounded-2xl font-black h-12 border-slate-200 group-hover:bg-slate-900 group-hover:text-white group-hover:border-slate-900 transition-all"
+                    className="w-full mt-8 rounded-2xl font-black h-12 border-slate-200 group-hover:bg-[var(--color-mod-platform-accent)] group-hover:text-white group-hover:border-[var(--color-mod-platform-accent)] transition-all"
                   >
                     Edit Plan Details
                   </Button>
@@ -1410,7 +1410,7 @@ export default function PlatformSettings() {
                 Export current page CSV
               </Button>
               <Button
-                className="rounded-xl font-bold bg-slate-900 text-white gap-2"
+                className="rounded-xl font-bold bg-[var(--color-mod-platform-accent)] text-white hover:bg-[var(--color-mod-platform-text)] gap-2"
                 onClick={() => load(true)}
               >
                 <Search size={16} />
@@ -1474,7 +1474,7 @@ export default function PlatformSettings() {
                                 {log.resource}
                               </span>
                               <span className="text-xs font-mono font-bold text-slate-700">
-                                {log.resourceId || 'N/A'}
+                                {log.resourceId || 'Resource ID not recorded'}
                               </span>
                             </div>
                           </td>
@@ -1521,7 +1521,7 @@ export default function PlatformSettings() {
                   Module / Scope
                 </Label>
                 <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-platform-accent)] focus:outline-none bg-white"
                   value={exportModuleFilter}
                   onChange={(e) => setExportModuleFilter(e.target.value)}
                 >
@@ -1538,7 +1538,7 @@ export default function PlatformSettings() {
                   Status
                 </Label>
                 <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-platform-accent)] focus:outline-none bg-white"
                   value={exportStatusFilter}
                   onChange={(e) => setExportStatusFilter(e.target.value)}
                 >
@@ -1562,7 +1562,7 @@ export default function PlatformSettings() {
                 Clear
               </Button>
               <Button
-                className="rounded-xl font-bold bg-slate-900 text-white"
+                className="rounded-xl font-bold bg-[var(--color-mod-platform-accent)] text-white hover:bg-[var(--color-mod-platform-text)]"
                 onClick={loadReportExports}
                 disabled={loadingExports}
               >
@@ -1669,7 +1669,7 @@ export default function PlatformSettings() {
                             {exp.fileAssetId && exp.status === 'COMPLETED' ? (
                               <button
                                 type="button"
-                                className="text-xs font-black text-primary-500 hover:text-primary-700 uppercase tracking-widest transition-colors"
+                                className="text-xs font-black text-[var(--color-mod-platform-accent)] hover:text-[var(--color-mod-platform-text)] uppercase tracking-widest transition-colors"
                                 onClick={() => downloadExport(exp.fileAssetId)}
                               >
                                 Download
@@ -1680,7 +1680,7 @@ export default function PlatformSettings() {
                               </span>
                             ) : (
                               <span className="text-xs text-slate-400 font-semibold">
-                                N/A
+                                Export file unavailable
                               </span>
                             )}
                           </td>
@@ -1725,7 +1725,7 @@ export default function PlatformSettings() {
               Cancel
             </Button>
             <Button
-              className="rounded-xl font-bold bg-slate-900 text-white"
+              className="rounded-xl font-bold bg-[var(--color-mod-platform-accent)] text-white hover:bg-[var(--color-mod-platform-text)]"
               disabled={retryReason.trim().length < 5 || !!retrying}
               onClick={submitRetry}
             >
@@ -1761,7 +1761,7 @@ export default function PlatformSettings() {
                   value={
                     jobDetail.processedOn
                       ? formatDate(jobDetail.processedOn)
-                      : 'N/A'
+                      : 'Processed date not recorded'
                   }
                 />
                 <StatusTile
@@ -1769,18 +1769,18 @@ export default function PlatformSettings() {
                   value={
                     jobDetail.finishedOn
                       ? formatDate(jobDetail.finishedOn)
-                      : 'N/A'
+                      : 'Finished date not recorded'
                   }
                 />
               </div>
               <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">
-                {jobDetail.failedReason || 'Unknown failure'}
+                {jobDetail.failedReason || 'Failure reason not recorded'}
               </div>
               <div>
                 <Label className="text-xs font-black uppercase tracking-widest text-slate-500">
                   Sanitized payload
                 </Label>
-                <pre className="mt-2 max-h-56 overflow-auto rounded-2xl bg-slate-900 p-4 text-xs text-indigo-100">
+                <pre className="mt-2 max-h-56 overflow-auto rounded-2xl bg-[var(--color-mod-platform-text)] p-4 text-xs text-[var(--color-mod-platform-bg)]">
                   {JSON.stringify(jobDetail.data, null, 2)}
                 </pre>
               </div>
@@ -1802,7 +1802,7 @@ export default function PlatformSettings() {
                         <p className="text-xs font-semibold text-slate-500">
                           {formatDate(entry.createdAt)} ·{' '}
                           {entry.userId ?? 'System'} · attempts before retry{' '}
-                          {entry.attemptsMade ?? 'N/A'}
+                          {entry.attemptsMade ?? 'Attempts not recorded'}
                         </p>
                       </div>
                     ))
@@ -1883,7 +1883,7 @@ export default function PlatformSettings() {
                   }
                 />
               </div>
-              <pre className="max-h-56 overflow-auto rounded-2xl bg-slate-900 p-4 text-xs text-indigo-100">
+              <pre className="max-h-56 overflow-auto rounded-2xl bg-[var(--color-mod-platform-text)] p-4 text-xs text-[var(--color-mod-platform-bg)]">
                 {JSON.stringify(providerReadiness.provider.config, null, 2)}
               </pre>
             </div>
@@ -2041,7 +2041,7 @@ export default function PlatformSettings() {
               Cancel
             </Button>
             <Button
-              className="rounded-xl bg-slate-900 font-bold text-white"
+              className="rounded-xl bg-[var(--color-mod-platform-accent)] font-bold text-white hover:bg-[var(--color-mod-platform-text)]"
               disabled={webhookSaving}
               onClick={createWebhookEndpoint}
             >
@@ -2138,7 +2138,7 @@ export default function PlatformSettings() {
               Cancel
             </Button>
             <Button
-              className="rounded-xl font-bold bg-slate-900 text-white"
+              className="rounded-xl font-bold bg-[var(--color-mod-platform-accent)] text-white hover:bg-[var(--color-mod-platform-text)]"
               onClick={saveProvider}
               disabled={savingProvider}
             >

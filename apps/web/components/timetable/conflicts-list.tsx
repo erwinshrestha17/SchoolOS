@@ -31,8 +31,8 @@ export function ConflictsList({ activeVersionId }: { activeVersionId?: string })
           <h2 className="text-lg font-black uppercase italic tracking-tight text-slate-900">Conflict Report</h2>
           <p className="text-sm text-slate-500 font-medium">Real-time validation against teacher availability, room capacity, and workload limits.</p>
         </div>
-        <Button 
-          className="rounded-2xl font-bold bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200"
+        <Button
+          className="rounded-xl bg-[var(--color-mod-homework-accent)] font-bold text-white shadow-sm hover:bg-[var(--color-mod-homework-text)]"
           onClick={() => validateQuery.refetch()}
           disabled={validateQuery.isFetching}
         >

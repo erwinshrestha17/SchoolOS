@@ -27,7 +27,7 @@ export function FiscalManagementView() {
       >
         <div className="grid gap-4">
           {(fiscalYearsQuery.data ?? []).map((year) => (
-            <div key={year.id} className="rounded-[2rem] border border-slate-100 bg-slate-50/50 p-6">
+            <div key={year.id} className="rounded-2xl border border-slate-100 bg-slate-50/50 p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-bold text-slate-900">{year.name}</p>
@@ -49,7 +49,7 @@ export function FiscalManagementView() {
                         setFyMode('CLOSE');
                         setFyCloseOpen(true);
                       }}
-                      className="inline-flex h-8 items-center gap-2 rounded-lg bg-slate-900 px-3 text-xs font-bold text-white hover:bg-slate-800"
+                      className="inline-flex h-8 items-center gap-2 rounded-lg bg-rose-600 px-3 text-xs font-bold text-white hover:bg-rose-700"
                     >
                       <Lock size={14} />
                       Close Year
@@ -61,7 +61,7 @@ export function FiscalManagementView() {
                         setFyMode('REOPEN');
                         setFyCloseOpen(true);
                       }}
-                      className="inline-flex h-8 items-center gap-2 rounded-lg bg-primary-600 px-3 text-xs font-bold text-white hover:bg-primary-700"
+                      className="inline-flex h-8 items-center gap-2 rounded-lg bg-[var(--color-mod-accounting-accent)] px-3 text-xs font-bold text-white hover:bg-[var(--color-mod-accounting-text)]"
                     >
                       <Unlock size={14} />
                       Reopen

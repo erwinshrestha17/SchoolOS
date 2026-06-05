@@ -726,7 +726,7 @@ function CreatePostSection({
                       className={cn(
                         'h-9 rounded-full px-4 text-xs font-bold transition-all',
                         selected
-                          ? 'bg-slate-900 text-white shadow-md shadow-slate-200'
+                          ? 'bg-[var(--color-mod-activity-accent)] text-white shadow-sm'
                           : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300',
                       )}
                       onClick={() => toggleStudent(student.id)}
@@ -1253,7 +1253,7 @@ function MediaGallerySection({
                     </button>
                     <button
                       type="button"
-                      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
+                      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[var(--color-mod-activity-accent)] px-3 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-[var(--color-mod-activity-text)] disabled:opacity-50"
                       disabled={!item.previewUrl || isBusy}
                       onClick={() =>
                         void handleDownload(item.id, item.fileName)
@@ -1329,7 +1329,7 @@ function PostCard({
   const actor = findReactionActor(students, taggedStudentIds);
 
   return (
-    <article className="group bg-white rounded-[2rem] border border-slate-200 overflow-hidden hover:shadow-xl transition-all duration-300">
+    <article className="group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-md transition-all duration-300">
       <div className="p-6 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
@@ -1368,7 +1368,7 @@ function PostCard({
                     alt={attachment.fileName}
                     className="h-full w-full object-cover transition duration-500 group-hover/media:scale-110"
                   />
-                  <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover/media:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2">
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/media:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2">
                     <button
                       onClick={() => handlePreview(attachment.id)}
                       disabled={loadingAttachmentId === attachment.id}
@@ -1505,7 +1505,7 @@ function MoodLogsSection({
 }) {
   return (
     <div className="grid gap-8 xl:grid-cols-2">
-      <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-8">
+      <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8">
         <div>
           <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">
             Daily Mood Log
@@ -1631,7 +1631,7 @@ function MoodLogsSection({
             )}
             <button
               type="button"
-              className="w-full h-14 rounded-2xl bg-emerald-600 text-white font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-emerald-100 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0"
+              className="w-full h-14 rounded-2xl bg-[var(--color-mod-activity-accent)] text-white font-black uppercase tracking-[0.2em] text-xs shadow-sm hover:-translate-y-0.5 hover:bg-[var(--color-mod-activity-text)] transition-all disabled:opacity-50 disabled:translate-y-0"
               disabled={!moodLog.classId || isPending}
               onClick={saveMoodLog}
             >
@@ -1709,7 +1709,7 @@ function MilestonesSection({
 }) {
   return (
     <div className="grid gap-8 xl:grid-cols-2">
-      <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-8">
+      <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8">
         <div>
           <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">
             ECE Milestones
@@ -1860,7 +1860,7 @@ function MilestonesSection({
             )}
             <button
               type="button"
-              className="w-full h-14 rounded-2xl bg-indigo-600 text-white font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-indigo-100 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0"
+              className="w-full h-14 rounded-2xl bg-[var(--color-mod-activity-accent)] text-white font-black uppercase tracking-[0.2em] text-xs shadow-sm hover:-translate-y-0.5 hover:bg-[var(--color-mod-activity-text)] transition-all disabled:opacity-50 disabled:translate-y-0"
               disabled={!milestone.classId || !milestone.studentId || isPending}
               onClick={saveMilestone}
             >
@@ -2002,7 +2002,7 @@ function HistoryCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-200 shadow-inner">
+    <div className="bg-slate-50 p-8 rounded-2xl border border-slate-200 shadow-inner">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">
           {title}

@@ -19,7 +19,7 @@ export function PermissionDenied({
 }: PermissionDeniedProps) {
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center p-8 text-center">
-      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-[20px] bg-danger-50 text-danger-600 shadow-sm">
+      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-danger-50 text-danger-600 shadow-sm">
         <ShieldAlert size={40} />
       </div>
 
@@ -48,7 +48,7 @@ export function PermissionDenied({
           <Link href="/">
             <Button
               size="lg"
-              className="rounded-2xl bg-slate-900 px-8 font-bold text-white shadow-xl shadow-slate-200 hover:bg-slate-800"
+              className="rounded-2xl bg-[var(--color-mod-platform-accent)] px-8 font-bold text-white shadow-sm hover:bg-[var(--color-mod-platform-text)]"
             >
               <Home size={18} className="mr-2" />
               Return Home

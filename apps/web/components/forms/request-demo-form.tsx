@@ -14,7 +14,8 @@ import {
   Phone,
   Mail,
   MapPin,
-  ClipboardList
+  ClipboardList,
+  ChevronDown
 } from 'lucide-react';
 
 import { Button } from '../ui/button';
@@ -301,7 +302,7 @@ export function RequestDemoForm() {
                     <option value="Other">Other</option>
                   </Select>
                   <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-slate-400">
-                    <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                    <ChevronDown className="h-3 w-3" />
                   </div>
                 </div>
                 {errors.schoolType && <p className="text-[10px] text-red-650 font-medium">{errors.schoolType}</p>}
@@ -328,7 +329,7 @@ export function RequestDemoForm() {
                     <option value="2,000+">2,000+</option>
                   </Select>
                   <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-slate-400">
-                    <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                    <ChevronDown className="h-3 w-3" />
                   </div>
                 </div>
                 {errors.studentsCount && <p className="text-[10px] text-red-650 font-medium">{errors.studentsCount}</p>}
@@ -352,7 +353,7 @@ export function RequestDemoForm() {
                     <option value="4+ branches">4+ branches</option>
                   </Select>
                   <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-slate-400">
-                    <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                    <ChevronDown className="h-3 w-3" />
                   </div>
                 </div>
               </div>
@@ -454,7 +455,7 @@ export function RequestDemoForm() {
                     <option value="In-person meeting">In-person meeting</option>
                   </Select>
                   <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-slate-400">
-                    <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                    <ChevronDown className="h-3 w-3" />
                   </div>
                 </div>
               </div>
@@ -541,7 +542,7 @@ export function RequestDemoForm() {
                     <option value="Exploring only">Exploring only</option>
                   </Select>
                   <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-slate-400">
-                    <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                    <ChevronDown className="h-3 w-3" />
                   </div>
                 </div>
                 {errors.expectedTimeline && <p className="text-[10px] text-red-650 font-medium">{errors.expectedTimeline}</p>}

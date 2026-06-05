@@ -82,7 +82,7 @@ export function ReportTable({ headers, rows }: ReportTableProps) {
       </table>
       {rows.length === 0 && (
         <div className="py-20 text-center bg-white">
-          <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-slate-50 text-slate-300 mb-6 border-4 border-white shadow-xl shadow-slate-200/50">
+          <div className="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-[var(--color-mod-accounting-bg)] text-[var(--color-mod-accounting-accent)] mb-6 border border-[var(--color-mod-accounting-border)] shadow-sm">
              <Calculator size={36} />
           </div>
           <p className="text-base font-black italic uppercase tracking-tight text-slate-900">No records found</p>

@@ -32,7 +32,7 @@ export function FilterBar({
   return (
     <div
       className={cn(
-        'rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm',
+        'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm',
         sticky && 'sticky top-6 z-10 backdrop-blur-md bg-white/95',
         className,
       )}

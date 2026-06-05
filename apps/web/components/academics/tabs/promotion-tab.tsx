@@ -171,7 +171,7 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
         </div>
 
         <div className="grid gap-8 lg:grid-cols-2">
-           <div className="space-y-6 p-8 rounded-[2rem] bg-white border border-slate-100 shadow-sm">
+           <div className="space-y-6 p-8 rounded-2xl bg-white border border-slate-100 shadow-sm">
               <div className="flex items-center gap-2 mb-2">
                  <div className="h-6 w-6 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center">
                     <Users size={14} />
@@ -288,7 +288,7 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
                  {readinessQuery.isLoading ? (
                    <tr>
                       <td colSpan={6} className="py-20 text-center">
-                         <Loader2 className="h-10 w-10 animate-spin text-primary-500 mx-auto opacity-20" />
+                         <Loader2 className="h-10 w-10 animate-spin text-[var(--color-mod-academics-accent)] mx-auto opacity-20" />
                          <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Validating Readiness Map</p>
                       </td>
                    </tr>

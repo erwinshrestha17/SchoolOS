@@ -249,7 +249,7 @@ export function ParentTeacherMessagingWorkspace({
                   <button
                     type="submit"
                     disabled={!studentId.trim() || createThreadMutation.isPending}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white disabled:opacity-50"
+                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--color-mod-notices-accent)] px-4 text-sm font-semibold text-white hover:bg-[var(--color-mod-notices-text)] disabled:opacity-50"
                   >
                     <MessageSquare size={16} />
                     Open
@@ -340,7 +340,7 @@ export function ParentTeacherMessagingWorkspace({
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}
                     placeholder="Write a professional school message..."
-                    className="min-h-28 w-full resize-y rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-primary-400"
+                    className="min-h-28 w-full resize-y rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-[var(--color-mod-notices-accent)] focus:ring-4 focus:ring-[var(--color-mod-notices-border)]/40"
                     maxLength={2000}
                   />
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -358,7 +358,7 @@ export function ParentTeacherMessagingWorkspace({
                     <button
                       type="submit"
                       disabled={!canSend || sendMutation.isPending}
-                      className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50"
+                      className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--color-mod-notices-accent)] px-4 text-sm font-semibold text-white hover:bg-[var(--color-mod-notices-text)] disabled:opacity-50"
                     >
                       <Send size={16} />
                       Send
@@ -465,7 +465,7 @@ function ThreadListItem({
       href={`/dashboard/messages/${thread.id}`}
       className={cn(
         'block rounded-2xl border bg-white p-4 transition',
-        active ? 'border-primary-300 shadow-sm' : 'border-slate-200 hover:border-slate-300',
+        active ? 'border-[var(--color-mod-notices-border)] shadow-sm' : 'border-slate-200 hover:border-slate-300',
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -582,7 +582,7 @@ function MessageTimeline({
             <div
               className={cn(
                 'max-w-[78%] rounded-2xl px-4 py-3 text-sm',
-                mine ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-800',
+                mine ? 'bg-[var(--color-mod-notices-accent)] text-white' : 'bg-slate-100 text-slate-800',
               )}
             >
               <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide opacity-75">
@@ -651,7 +651,7 @@ function ActionPanel({
           type="button"
           onClick={onSubmit}
           disabled={disabled}
-          className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="rounded-xl bg-[var(--color-mod-notices-accent)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-mod-notices-text)] disabled:opacity-50"
         >
           {buttonLabel}
         </button>

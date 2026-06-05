@@ -401,7 +401,7 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
           <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
             <div className="space-y-6">
               {(stats.vehicleAlerts > 0 || stats.driverAlerts > 0) && (
-                <section className="rounded-[2rem] border border-red-200 bg-red-50 p-5">
+                <section className="rounded-2xl border border-red-200 bg-red-50 p-5">
                   <h3 className="flex items-center gap-2 font-bold text-red-900">
                     <AlertTriangle size={18} />
                     Operational Alerts
@@ -435,19 +435,19 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
               <InfoCard title="Privacy and safety rules" lines={['Parents will only see their own child’s assigned vehicle/trip in the future parent view.', 'Driver app will only expose trips assigned to that driver later.', 'Never expose a full bus passenger list to parents.', 'Live map/WebSocket tracking is intentionally deferred; this admin slice shows latest coordinates only.']} />
             </div>
 
-            <section className="space-y-4 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+            <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <h3 className="font-bold text-slate-900">Quick Actions</h3>
               <div className="grid gap-2">
                 <button type="button" onClick={() => setActiveTab('routes')} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:bg-slate-100">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600"><MapPin size={20} /></div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-mod-transport-bg)] text-[var(--color-mod-transport-text)]"><MapPin size={20} /></div>
                   <div><p className="text-sm font-bold text-slate-900">Add Route</p><p className="text-xs text-slate-500">Create new bus path</p></div>
                 </button>
                 <button type="button" onClick={() => setActiveTab('vehicles')} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:bg-slate-100">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600"><Bus size={20} /></div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-mod-transport-bg)] text-[var(--color-mod-transport-text)]"><Bus size={20} /></div>
                   <div><p className="text-sm font-bold text-slate-900">Add Vehicle</p><p className="text-xs text-slate-500">Register new bus</p></div>
                 </button>
                 <button type="button" onClick={() => setActiveTab('assignments')} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:bg-slate-100">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-600"><Users size={20} /></div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-mod-transport-bg)] text-[var(--color-mod-transport-text)]"><Users size={20} /></div>
                   <div><p className="text-sm font-bold text-slate-900">Assign Student</p><p className="text-xs text-slate-500">Enrol student to route</p></div>
                 </button>
                 <button type="button" onClick={() => setActiveTab('trips')} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:bg-slate-100">
@@ -478,7 +478,7 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">{route.stops?.length ?? stops.filter((stop) => stop.routeId === route.id).length} stops</span>
-                      <button type="button" onClick={() => updateRouteMutation.mutate({ id: route.id, body: { isActive: !route.isActive } })} className="text-xs font-bold text-blue-600 hover:underline">{route.isActive ? 'Deactivate' : 'Activate'}</button>
+                      <button type="button" onClick={() => updateRouteMutation.mutate({ id: route.id, body: { isActive: !route.isActive } })} className="text-xs font-bold text-[var(--color-mod-transport-text)] hover:underline">{route.isActive ? 'Deactivate' : 'Activate'}</button>
                     </div>
                   </div>
                   {route.stops && route.stops.length > 0 && (
@@ -552,7 +552,7 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => updateVehicleMutation.mutate({ id: vehicle.id, body: { status: vehicle.status === 'ACTIVE' ? 'MAINTENANCE' : 'ACTIVE' } })} className="text-xs font-bold text-blue-600 hover:underline">
+                      <button type="button" onClick={() => updateVehicleMutation.mutate({ id: vehicle.id, body: { status: vehicle.status === 'ACTIVE' ? 'MAINTENANCE' : 'ACTIVE' } })} className="text-xs font-bold text-[var(--color-mod-transport-text)] hover:underline">
                         {vehicle.status === 'ACTIVE' ? 'Maintenance' : 'Set Active'}
                       </button>
                     </div>
@@ -972,8 +972,8 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
       </ConfirmDialog>
 
       {viewingTripId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-auto rounded-[2rem] bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-auto rounded-2xl bg-white p-6 shadow-lg">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold text-slate-900">Trip Details</h2>
               <button type="button" onClick={() => setViewingTripId(null)} className="text-sm font-bold text-slate-400 hover:text-slate-900">Close</button>
@@ -1045,7 +1045,7 @@ function TwoColumn({ children }: { children: React.ReactNode }) {
 
 function Panel({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <h2 className="text-lg font-bold text-slate-900">{title}</h2>
       <p className="mt-1 text-sm text-slate-500">{description}</p>
       <div className="mt-5">{children}</div>
@@ -1064,7 +1064,7 @@ function Notice({ tone, message, onDismiss }: { tone: 'success' | 'error'; messa
 
 function InfoCard({ title, lines }: { title: string; lines: string[] }) {
   return (
-    <section className="rounded-[2rem] border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+    <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
       <h2 className="font-bold">{title}</h2>
       <ul className="mt-2 list-disc space-y-1 pl-5">
         {lines.map((line) => <li key={line}>{line}</li>)}

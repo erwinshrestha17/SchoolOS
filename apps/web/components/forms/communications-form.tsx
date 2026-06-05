@@ -483,9 +483,9 @@ export function CommunicationsForm({
         </div>
 
         {deliveryStats.pending > 0 && (
-          <div className="bg-primary-50 border border-primary-100 p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-500">
-            <div className="h-2 w-2 rounded-full bg-primary-500 animate-pulse" />
-            <p className="text-sm font-bold text-primary-900">
+          <div className="bg-[var(--color-mod-notices-bg)] border border-[var(--color-mod-notices-border)] p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="h-2 w-2 rounded-full bg-[var(--color-mod-notices-accent)] animate-pulse" />
+            <p className="text-sm font-bold text-[var(--color-mod-notices-text)]">
               {deliveryStats.pending} delivery records are currently queued or
               retrying.
             </p>
@@ -600,7 +600,7 @@ function NoticesSection({
 
   return (
     <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
-      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+      <div className="shell-card rounded-2xl border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
         <SectionHeader
           eyebrow="Notice Composer"
           title="Publish school notice"
@@ -639,7 +639,7 @@ function NoticesSection({
                 }))
               }
               placeholder="Write the notice body for guardians, students, or staff..."
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium transition-all focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-500/10 min-h-[160px] resize-none"
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium transition-all focus:border-[var(--color-mod-notices-accent)] focus:outline-none focus:ring-4 focus:ring-[var(--color-mod-notices-border)]/40 min-h-[160px] resize-none"
             />
           </FormField>
 
@@ -849,7 +849,7 @@ function NoticeList({
   error: string | null;
 }) {
   return (
-    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm xl:sticky xl:top-28 xl:self-start">
+    <section className="shell-card rounded-2xl border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm xl:sticky xl:top-28 xl:self-start">
       <SectionHeader
         eyebrow="Recent Notices"
         title="Published & scheduled notices"
@@ -917,7 +917,7 @@ function EventsSection({
 }) {
   return (
     <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
-      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+      <div className="shell-card rounded-2xl border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
         <SectionHeader
           eyebrow="Event Publisher"
           title="Create school event"
@@ -955,7 +955,7 @@ function EventsSection({
                 }))
               }
               placeholder="Event details, instructions, or preparation notes..."
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium transition-all focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-500/10 min-h-[140px] resize-none"
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium transition-all focus:border-[var(--color-mod-notices-accent)] focus:outline-none focus:ring-4 focus:ring-[var(--color-mod-notices-border)]/40 min-h-[140px] resize-none"
             />
           </FormField>
           <div className="grid gap-3 md:grid-cols-2">
@@ -1106,7 +1106,7 @@ function EventsSection({
 
           <button
             type="button"
-            className="min-h-12 rounded-2xl bg-slate-900 px-8 font-black text-xs uppercase tracking-widest text-white transition-all hover:bg-slate-800 shadow-lg shadow-slate-900/10 active:scale-95 disabled:opacity-50"
+            className="min-h-12 rounded-2xl bg-[var(--color-mod-notices-accent)] px-8 font-black text-xs uppercase tracking-widest text-white transition-all hover:bg-[var(--color-mod-notices-text)] shadow-sm active:scale-95 disabled:opacity-50"
             disabled={isPending}
             onClick={submitEvent}
           >
@@ -1134,7 +1134,7 @@ function EventList({
   error: string | null;
 }) {
   return (
-    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm xl:sticky xl:top-28 xl:self-start">
+    <section className="shell-card rounded-2xl border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm xl:sticky xl:top-28 xl:self-start">
       <SectionHeader
         eyebrow="Events"
         title="Upcoming communication events"
@@ -1199,7 +1199,7 @@ function DeliveryRecordsSection({
   totalDeliveries: number;
 }) {
   return (
-    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+    <section className="shell-card rounded-2xl border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <SectionHeader
           eyebrow="Delivery Records"
@@ -1336,7 +1336,7 @@ function ConsentManagementSection({
 }) {
   return (
     <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)]">
-      <div className="shell-card rounded-[30px] border border-slate-200 bg-white/90 p-8 shadow-sm backdrop-blur-sm">
+      <div className="shell-card rounded-2xl border border-slate-200 bg-white/90 p-8 shadow-sm backdrop-blur-sm">
         <SectionHeader
           eyebrow="Consent Management"
           title="Guardian controls"
@@ -1386,7 +1386,7 @@ function ConsentManagementSection({
             </button>
             <button
               type="button"
-              className="min-h-12 rounded-2xl bg-slate-900 px-8 font-black text-xs uppercase tracking-widest text-white transition-all hover:bg-slate-800 shadow-lg shadow-slate-900/10 active:scale-95 disabled:opacity-50"
+              className="min-h-12 rounded-2xl bg-[var(--color-mod-notices-accent)] px-8 font-black text-xs uppercase tracking-widest text-white transition-all hover:bg-[var(--color-mod-notices-text)] shadow-sm active:scale-95 disabled:opacity-50"
               disabled={capturePending || !selectedGuardianId}
               onClick={captureConsent}
             >
@@ -1403,7 +1403,7 @@ function ConsentManagementSection({
         </div>
       </div>
 
-      <div className="shell-card rounded-[30px] border border-slate-200 bg-slate-50/50 p-8 shadow-sm xl:sticky xl:top-28 xl:self-start">
+      <div className="shell-card rounded-2xl border border-slate-200 bg-slate-50/50 p-8 shadow-sm xl:sticky xl:top-28 xl:self-start">
         <SectionHeader
           eyebrow="Active Consents"
           title="Guardian status"
@@ -1417,7 +1417,7 @@ function ConsentManagementSection({
             statuses.map((status: any) => (
               <div
                 key={status.consentType}
-                className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-3 transition-all hover:border-slate-300"
+                className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3 transition-all hover:border-[var(--color-mod-notices-border)]"
               >
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-black text-slate-900">
@@ -1432,7 +1432,7 @@ function ConsentManagementSection({
                 </div>
                 <div className="pt-3 border-t border-slate-50 flex items-center justify-between">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Version {status.version ?? 'N/A'}
+                    Version {status.version ?? 'Version not recorded'}
                   </p>
                   <p className="text-[10px] font-black text-slate-400">
                     {status.capturedAt
@@ -1525,7 +1525,7 @@ function ScheduleOption({
     <label
       className={`flex min-h-20 cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${
         checked
-          ? 'border-slate-950 bg-white shadow-sm ring-2 ring-slate-100'
+          ? 'border-[var(--color-mod-notices-accent)] bg-white shadow-sm ring-2 ring-[var(--color-mod-notices-border)]/40'
           : 'border-[var(--line)] bg-white/70 hover:bg-white'
       }`}
     >

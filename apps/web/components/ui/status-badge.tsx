@@ -72,7 +72,7 @@ const toneClasses: Record<StatusTone, string> = {
   approved: 'border-success-100 bg-success-50 text-success-700',
   rejected: 'border-danger-100 bg-danger-50 text-danger-700',
   draft: 'border-slate-200 bg-slate-50 text-slate-600',
-  published: 'border-primary-100 bg-primary-50 text-primary-700',
+  published: 'border-[var(--primary-soft)] bg-[var(--primary-soft)] text-[var(--primary-dark)]',
   locked: 'border-slate-200 bg-slate-100 text-slate-700',
   paid: 'border-success-100 bg-success-50 text-success-700',
   partial: 'border-warning-100 bg-warning-50 text-warning-700',

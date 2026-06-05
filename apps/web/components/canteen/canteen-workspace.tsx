@@ -1500,7 +1500,7 @@ function TwoColumn({ children }: { children: React.ReactNode }) {
 }
 function Panel({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <h2 className="text-lg font-bold text-slate-900">{title}</h2>
       <p className="mt-1 text-sm text-slate-500">{description}</p>
       <div className="mt-5">{children}</div>
@@ -1521,7 +1521,7 @@ function Notice({ tone, message, onDismiss }: { tone: 'success' | 'error'; messa
 }
 function InfoCard({ lines }: { lines: string[] }) {
   return (
-    <section className="rounded-[2rem] border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+    <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
       <ul className="list-disc space-y-1 pl-5">
         {lines.map((line) => (
           <li key={line}>{line}</li>
@@ -1651,7 +1651,7 @@ function ReceiptPreview({ receipt }: { receipt: CanteenPosReceipt }) {
         {receipt.walletBalanceAfter ? <ReceiptTotalRow label="Wallet balance" value={receipt.walletBalanceAfter} /> : null}
       </div>
       <p className="mt-3 text-xs text-slate-500">
-        {receipt.student?.name ?? receipt.staff?.name ?? 'Walk-in sale'} • {receipt.paymentMethod} • cashier {receipt.cashier ?? 'N/A'}
+        {receipt.student?.name ?? receipt.staff?.name ?? 'Walk-in sale'} • {receipt.paymentMethod} • cashier {receipt.cashier ?? 'Cashier not recorded'}
       </p>
     </section>
   );
@@ -1723,10 +1723,10 @@ function CanteenQrStudentCard({
   const allergies = student.allergyWarnings ?? [];
 
   return (
-    <div className="mb-6 rounded-2xl border border-primary-100 bg-primary-50/20 p-4 shadow-sm">
+    <div className="mb-6 rounded-2xl border border-[var(--color-mod-canteen-border)] bg-[var(--color-mod-canteen-bg)]/60 p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-wide text-primary-600">
+          <p className="text-xs font-black uppercase tracking-wide text-[var(--color-mod-canteen-text)]">
             {context === 'pos' ? 'POS QR student selected' : 'Serving QR student selected'}
           </p>
           <h3 className="mt-1 truncate font-black text-slate-900">{student.name ?? 'Student'}</h3>

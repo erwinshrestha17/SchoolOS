@@ -11,8 +11,8 @@ export default function AuditRedirect() {
   }, [router]);
 
   return (
-    <div className="flex h-screen items-center justify-center bg-slate-950">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-cyan-400 border-t-transparent" />
+    <div className="flex h-screen items-center justify-center bg-[var(--color-mod-platform-text)]">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-mod-platform-border)] border-t-transparent" />
     </div>
   );
 }

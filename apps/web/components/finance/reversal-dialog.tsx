@@ -33,7 +33,7 @@ export function ReversalDialog({ invoiceId, invoiceNumber, isOpen, onClose, onCo
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md rounded-[2.5rem] p-8">
+      <DialogContent className="max-w-md rounded-2xl p-8">
         <DialogHeader>
           <div className="h-14 w-14 rounded-2xl bg-danger-50 text-danger-600 flex items-center justify-center mb-6">
             <AlertTriangle size={28} />
@@ -84,7 +84,7 @@ export function ReversalDialog({ invoiceId, invoiceNumber, isOpen, onClose, onCo
             <button
               onClick={handleConfirm}
               disabled={isSubmitting}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-danger-900 text-white rounded-xl font-bold text-sm shadow-xl transition-all hover:scale-105 active:scale-95"
+              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-danger-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all hover:bg-danger-800 active:scale-95 disabled:opacity-50"
             >
               {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Undo2 size={18} />}
               Confirm IRREVERSIBLE Reversal

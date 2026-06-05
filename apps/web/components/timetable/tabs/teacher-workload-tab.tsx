@@ -98,42 +98,48 @@ export function TeacherWorkloadTab({ workload, isLoading }: Props) {
                     const hours = (item.teachingMinutes / 60);
                     const isOverloaded = hours > 30;
                     const isSelected = selectedTeacherId === item.staffId;
+                    const employeeId = item.employeeId?.trim();
+                    const staffInitial = item.staffName.trim().charAt(0) || '?';
 
                     return (
                       <tr 
                         key={item.staffId} 
                         onClick={() => setSelectedTeacherId(item.staffId)}
                         className={cn(
-                          "group cursor-pointer transition-all duration-200",
-                          isSelected ? "bg-slate-900 text-white" : "hover:bg-slate-50/50"
+                          "group cursor-pointer transition-colors duration-200",
+                          isSelected
+                            ? "bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)]"
+                            : "hover:bg-slate-50/50"
                         )}
                       >
                         <td className="py-5">
                           <div className="flex items-center gap-3">
                             <div className={cn(
                               "h-10 w-10 rounded-full flex items-center justify-center font-black text-[11px] shadow-sm transition-colors",
-                              isSelected ? "bg-white/10 text-white ring-1 ring-white/20" : "bg-slate-100 text-slate-500"
+                              isSelected
+                                ? "border border-[var(--color-mod-homework-border)] bg-white text-[var(--color-mod-homework-text)]"
+                                : "bg-slate-100 text-slate-500"
                             )}>
-                              {item.staffName[0]}
+                              {staffInitial}
                             </div>
                             <div>
-                              <p className={cn("font-black uppercase tracking-tight text-sm", isSelected ? "text-white" : "text-slate-900")}>
+                              <p className={cn("font-black uppercase tracking-tight text-sm", isSelected ? "text-[var(--color-mod-homework-text)]" : "text-slate-900")}>
                                 {item.staffName}
                               </p>
-                              <p className={cn("text-[9px] font-bold uppercase tracking-widest", isSelected ? "text-slate-400" : "text-slate-400")}>
-                                {item.employeeId || 'Staff Member'}
+                              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                                {employeeId || 'Employee ID not set'}
                               </p>
                             </div>
                           </div>
                         </td>
                         <td className="py-5">
-                          <span className={cn("text-sm font-bold", isSelected ? "text-slate-200" : "text-slate-700")}>
+                          <span className={cn("text-sm font-bold", isSelected ? "text-[var(--color-mod-homework-text)]" : "text-slate-700")}>
                             {item.slotCount}
                           </span>
                         </td>
                         <td className="py-5">
                           <div className="flex items-center gap-2">
-                            <span className={cn("text-sm font-bold", isSelected ? "text-slate-200" : "text-slate-700")}>
+                            <span className={cn("text-sm font-bold", isSelected ? "text-[var(--color-mod-homework-text)]" : "text-slate-700")}>
                               {hours.toFixed(1)}h
                             </span>
                             {isOverloaded && (
@@ -144,12 +150,12 @@ export function TeacherWorkloadTab({ workload, isLoading }: Props) {
                           </div>
                         </td>
                         <td className="py-5">
-                          <span className={cn("text-sm font-bold", isSelected ? "text-slate-200" : "text-slate-700")}>
+                          <span className={cn("text-sm font-bold", isSelected ? "text-[var(--color-mod-homework-text)]" : "text-slate-700")}>
                             {item.homeworkCount}
                           </span>
                         </td>
                         <td className="py-5 text-right">
-                          <div className={cn("inline-flex h-2 w-20 overflow-hidden rounded-full", isSelected ? "bg-white/10" : "bg-slate-100")}>
+                          <div className={cn("inline-flex h-2 w-20 overflow-hidden rounded-full", isSelected ? "bg-[var(--color-mod-homework-border)]" : "bg-slate-100")}>
                             <div
                               className={cn(
                                 "h-full rounded-full transition-all duration-1000",
@@ -227,9 +233,9 @@ export function TeacherWorkloadTab({ workload, isLoading }: Props) {
                   )}
                 </div>
 
-                <div className="rounded-2xl bg-indigo-50/50 p-4 border border-indigo-100 flex items-start gap-3">
-                   <AlertCircle className="h-4 w-4 text-indigo-500 shrink-0 mt-0.5" />
-                   <p className="text-[11px] font-medium text-indigo-700 leading-relaxed">
+                <div className="rounded-2xl border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] p-4 flex items-start gap-3">
+                   <AlertCircle className="h-4 w-4 text-[var(--color-mod-homework-text)] shrink-0 mt-0.5" />
+                   <p className="text-[11px] font-medium text-[var(--color-mod-homework-text)] leading-relaxed">
                      Limits are enforced by the Timetable Builder during slot assignment to prevent scheduling conflicts.
                    </p>
                 </div>
@@ -237,18 +243,21 @@ export function TeacherWorkloadTab({ workload, isLoading }: Props) {
             )}
           </SectionCard>
           
-          <SectionCard title="Workload Distribution" className="border-slate-800 bg-slate-900 text-white">
+          <SectionCard
+            title="Workload Distribution"
+            className="border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)]"
+          >
             {workloadDistribution.length === 0 ? (
               <div className="flex h-40 flex-col items-center justify-center space-y-3 text-center">
-                <BarChart3 className="h-10 w-10 text-slate-700" />
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">No slots assigned</p>
-                <p className="text-[11px] font-medium text-slate-400">Publish timetable slots to compare teacher load.</p>
+                <BarChart3 className="h-10 w-10 text-slate-400" />
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-mod-homework-text)]">No slots assigned</p>
+                <p className="text-[11px] font-medium text-slate-500">Publish timetable slots to compare teacher load.</p>
               </div>
             ) : (
               <div className="space-y-4" data-testid="teacher-workload-distribution">
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Top teaching load</p>
-                  <Badge variant="secondary" className="border-white/10 bg-white/10 text-[9px] font-black uppercase text-slate-200">
+                  <Badge variant="secondary" className="border-[var(--color-mod-homework-border)] bg-white text-[9px] font-black uppercase text-[var(--color-mod-homework-text)]">
                     {workloadDistribution.length} shown
                   </Badge>
                 </div>
@@ -263,10 +272,10 @@ export function TeacherWorkloadTab({ workload, isLoading }: Props) {
                     return (
                       <div key={item.staffId} className="space-y-1">
                         <div className="flex items-center justify-between gap-3 text-[11px]">
-                          <span className="truncate font-bold text-slate-200">{item.staffName}</span>
-                          <span className="shrink-0 font-black text-white">{hours.toFixed(1)}h</span>
+                          <span className="truncate font-bold text-[var(--color-mod-homework-text)]">{item.staffName}</span>
+                          <span className="shrink-0 font-black text-[var(--color-mod-homework-text)]">{hours.toFixed(1)}h</span>
                         </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                        <div className="h-2 overflow-hidden rounded-full bg-white">
                           <div
                             className={cn(
                               'h-full rounded-full',
@@ -279,7 +288,7 @@ export function TeacherWorkloadTab({ workload, isLoading }: Props) {
                     );
                   })}
                 </div>
-                <p className="text-[11px] font-medium leading-relaxed text-slate-400">
+                <p className="text-[11px] font-medium leading-relaxed text-slate-500">
                   Bars use live timetable workload totals and highlight teachers above 30 weekly hours.
                 </p>
               </div>

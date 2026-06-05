@@ -11,7 +11,6 @@ import {
   FileCheck2, 
   AlertCircle, 
   ChevronLeft,
-  MoreVertical,
   Trash2,
   CheckCircle2,
   MessageSquare,
@@ -200,12 +199,6 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
             <Trash2 className="mr-2 h-5 w-5 text-red-500" />
             Cancel Assignment
           </Button>
-          <Button 
-            className="rounded-2xl font-bold shadow-lg shadow-primary-500/20"
-            disabled={homework.status === 'CLOSED'}
-          >
-            Edit Assignment
-          </Button>
         </div>
       </div>
 
@@ -220,47 +213,48 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Due Date</span>
                   <span className="text-sm font-bold text-slate-900">
-                    {homework.dueAt ? new Date(homework.dueAt).toLocaleString() : 'No date'}
+                    {homework.dueAt ? new Date(homework.dueAt).toLocaleString() : 'Due date not set'}
                   </span>
                 </div>
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Subject</span>
-                  <span className="text-sm font-bold text-slate-900">{homework.subject?.name}</span>
+                  <span className="text-sm font-bold text-slate-900">{homework.subject?.name?.trim() || 'Subject not set'}</span>
                 </div>
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Class</span>
                   <span className="text-sm font-bold text-slate-900">
-                    {homework.class?.name} {homework.section?.name ? `- ${homework.section.name}` : ''}
+                    {homework.class?.name?.trim() || 'Class not set'}
+                    {homework.section?.name?.trim() ? ` - ${homework.section.name.trim()}` : ' - All sections'}
                   </span>
                 </div>
               </div>
 
               <div>
                 <h3 className="text-sm font-bold text-slate-900 mb-2">Instructions</h3>
-                <div className="p-6 rounded-[2rem] bg-slate-50 text-slate-700 whitespace-pre-wrap leading-relaxed">
-                  {homework.instructions}
+                <div className="p-6 rounded-2xl bg-slate-50 text-slate-700 whitespace-pre-wrap leading-relaxed">
+                  {homework.instructions?.trim() || 'Instructions not set'}
                 </div>
               </div>
 
               {homework.attachments && homework.attachments.length > 0 && (
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary-500" />
+                    <FileText className="h-4 w-4 text-[var(--color-mod-homework-text)]" />
                     Attachments
                   </h3>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {homework.attachments.map((attachment: any) => (
                       <div 
                         key={attachment.id}
-                        className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 bg-white shadow-sm hover:border-primary-200 transition-colors group"
+                        className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 bg-white shadow-sm hover:border-[var(--color-mod-homework-border)] transition-colors group"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center text-primary-500">
+                          <div className="h-10 w-10 rounded-xl bg-[var(--color-mod-homework-bg)] flex items-center justify-center text-[var(--color-mod-homework-text)]">
                             <FileText className="h-5 w-5" />
                           </div>
                           <div className="flex flex-col">
                             <span className="text-sm font-bold text-slate-900 truncate max-w-[150px]">
-                              {attachment.fileAsset?.originalFilename}
+                              {attachment.fileAsset?.originalFilename?.trim() || 'File name not set'}
                             </span>
                             <span className="text-[10px] text-slate-500 font-medium">
                               {Math.round((attachment.fileAsset?.sizeBytes || 0) / 1024)} KB
@@ -270,7 +264,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-9 w-9 rounded-xl text-slate-400 hover:text-primary-600 hover:bg-primary-50"
+                          className="h-9 w-9 rounded-xl text-slate-400 hover:text-[var(--color-mod-homework-text)] hover:bg-[var(--color-mod-homework-bg)]"
                           onClick={async () => {
                             try {
                               const view = await api.getFileView(attachment.fileAssetId);
@@ -295,16 +289,16 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
           </SectionCard>
 
           <Tabs defaultValue={activeTab} onValueChange={(val) => router.push(`?tab=${val}`)}>
-            <TabsList className="bg-slate-100 p-1.5 rounded-[1.5rem] inline-flex h-auto">
+            <TabsList className="bg-slate-100 p-1.5 rounded-2xl inline-flex h-auto">
               <TabsTrigger 
                 value="submissions" 
-                className="rounded-[1.2rem] px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 font-black uppercase tracking-widest text-[10px]"
+                className="rounded-xl px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 font-black uppercase tracking-widest text-[10px]"
               >
                 Submissions
               </TabsTrigger>
               <TabsTrigger 
                 value="reminders" 
-                className="rounded-[1.2rem] px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 font-black uppercase tracking-widest text-[10px]"
+                className="rounded-xl px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 font-black uppercase tracking-widest text-[10px]"
               >
                 Reminders
               </TabsTrigger>
@@ -340,21 +334,21 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-3">
-                    <div className="p-6 rounded-[2rem] border border-slate-100 bg-white shadow-sm flex flex-col items-center justify-center text-center">
-                      <Clock className="h-8 w-8 text-indigo-500 mb-2 opacity-20" />
+                    <div className="p-6 rounded-2xl border border-slate-100 bg-white shadow-sm flex flex-col items-center justify-center text-center">
+                      <Clock className="h-8 w-8 text-[var(--color-mod-homework-text)] mb-2 opacity-30" />
                       <span className="text-2xl font-black text-slate-900">
                         {submissionsQuery.data?.filter(s => s.status === 'PENDING').length ?? 0}
                       </span>
                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Awaiting</span>
                     </div>
-                    <div className="p-6 rounded-[2rem] border border-slate-100 bg-white shadow-sm flex flex-col items-center justify-center text-center">
+                    <div className="p-6 rounded-2xl border border-slate-100 bg-white shadow-sm flex flex-col items-center justify-center text-center">
                       <AlertCircle className="h-8 w-8 text-red-500 mb-2 opacity-20" />
                       <span className="text-2xl font-black text-slate-900">
                         {homework.dueAt && new Date(homework.dueAt) < new Date() ? submissionsQuery.data?.filter(s => s.status === 'PENDING').length ?? 0 : 0}
                       </span>
                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Overdue</span>
                     </div>
-                    <div className="p-6 rounded-[2rem] border border-slate-100 bg-white shadow-sm flex flex-col items-center justify-center text-center">
+                    <div className="p-6 rounded-2xl border border-slate-100 bg-white shadow-sm flex flex-col items-center justify-center text-center">
                       <CheckCircle2 className="h-8 w-8 text-emerald-500 mb-2 opacity-20" />
                       <span className="text-2xl font-black text-slate-900">
                         {submissionsQuery.data?.filter(s => s.status === 'SUBMITTED' || s.status === 'REVIEWED').length ?? 0}
@@ -366,7 +360,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                   <div className="flex justify-end">
                     <Button 
                       size="lg" 
-                      className="rounded-2xl font-bold px-8 shadow-lg shadow-primary-500/20"
+                      className="rounded-xl bg-[var(--color-mod-homework-accent)] font-bold px-8 text-white shadow-sm hover:bg-[var(--color-mod-homework-text)]"
                       onClick={() => sendReminderMutation.mutate()}
                       disabled={sendReminderMutation.isPending || homework.status === 'CLOSED'}
                     >

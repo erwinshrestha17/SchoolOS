@@ -30,7 +30,7 @@ export function AcademicsTab({ profile, onOpenPdf }: AcademicsTabProps) {
                   className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 p-4"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-primary-500 shadow-sm">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[var(--color-mod-admissions-accent)] shadow-sm">
                       <Calendar size={18} />
                     </div>
                     <div>
@@ -60,7 +60,7 @@ export function AcademicsTab({ profile, onOpenPdf }: AcademicsTabProps) {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[2rem] bg-slate-50 text-slate-300">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50 text-slate-300">
                 <Calendar size={32} />
               </div>
               <p className="text-sm font-bold text-slate-900">No enrollment records</p>
@@ -80,7 +80,7 @@ export function AcademicsTab({ profile, onOpenPdf }: AcademicsTabProps) {
               {reportCards.map((doc) => (
                 <div
                   key={doc.id}
-                  className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 p-4 hover:border-primary-200 transition-all"
+                  className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 p-4 hover:border-[var(--color-mod-admissions-border)] transition-all"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-emerald-500 shadow-sm">
@@ -102,7 +102,7 @@ export function AcademicsTab({ profile, onOpenPdf }: AcademicsTabProps) {
                       <button
                         type="button"
                         onClick={() => onOpenPdf(doc.kind)}
-                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition hover:bg-primary-500 hover:text-white"
+                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition hover:bg-[var(--color-mod-admissions-accent)] hover:text-white"
                         aria-label="Download Report Card"
                       >
                         <Download size={18} />
@@ -114,7 +114,7 @@ export function AcademicsTab({ profile, onOpenPdf }: AcademicsTabProps) {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[2rem] bg-slate-50 text-slate-300">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50 text-slate-300">
                 <FileText size={32} />
               </div>
               <p className="text-sm font-bold text-slate-900">No report cards generated yet</p>

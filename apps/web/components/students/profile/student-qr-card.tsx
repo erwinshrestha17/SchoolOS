@@ -120,8 +120,8 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
         </div>
 
         {qrSvg && (
-          <div className="rounded-[2rem] border-2 border-primary-100 bg-primary-50/30 p-6 text-center animate-in zoom-in-95 duration-300">
-            <div className="mx-auto mb-4 flex h-48 w-48 items-center justify-center rounded-3xl bg-white p-4 shadow-xl ring-8 ring-primary-50">
+          <div className="rounded-2xl border-2 border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-soft)] p-6 text-center animate-in zoom-in-95 duration-300">
+            <div className="mx-auto mb-4 flex h-48 w-48 items-center justify-center rounded-2xl bg-white p-4 shadow-sm ring-8 ring-white/70">
               <div
                 className="h-full w-full [&>svg]:h-full [&>svg]:w-full"
                 dangerouslySetInnerHTML={{ __html: qrSvg }}
@@ -180,12 +180,12 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
         )}
 
         {showConfirmRotate && (
-          <div className="rounded-2xl border border-primary-100 bg-primary-50 p-4 space-y-3 animate-in slide-in-from-top-2">
-            <div className="flex items-center gap-2 text-primary-700">
+          <div className="rounded-2xl border border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-soft)] p-4 space-y-3 animate-in slide-in-from-top-2">
+            <div className="flex items-center gap-2 text-[var(--color-mod-admissions-text)]">
               <RefreshCw size={16} />
               <p className="text-xs font-bold uppercase">Confirm QR Rotation</p>
             </div>
-            <p className="text-xs text-primary-600">
+            <p className="text-xs text-[var(--color-mod-admissions-text)]">
               The existing QR code will be immediately invalidated. Provide a reason for this rotation.
             </p>
             <input 
@@ -196,14 +196,14 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
             />
             <div className="flex gap-2">
               <button 
-                className="flex-1 rounded-xl bg-primary-500 py-2 text-xs font-bold text-white transition hover:bg-primary-600 disabled:opacity-50"
+                className="flex-1 rounded-xl bg-[var(--color-mod-admissions-accent)] py-2 text-xs font-bold text-white transition hover:bg-[var(--color-mod-admissions-text)] disabled:opacity-50"
                 disabled={!rotateReason || rotateMutation.isPending}
                 onClick={() => rotateMutation.mutate()}
               >
                 {rotateMutation.isPending ? 'Rotating...' : 'Rotate Now'}
               </button>
               <button 
-                className="flex-1 rounded-xl bg-white border border-primary-200 py-2 text-xs font-bold text-primary-600"
+                className="flex-1 rounded-xl bg-white border border-[var(--color-mod-admissions-border)] py-2 text-xs font-bold text-[var(--color-mod-admissions-text)]"
                 onClick={() => setShowConfirmRotate(false)}
               >
                 Cancel

@@ -494,7 +494,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
                                 onKeyDown={(e) => handleKeyDown(e, rowIndex, 0)}
                                 data-cas-row={rowIndex}
                                 data-cas-col={0}
-                                className="w-full h-12 rounded-xl border border-slate-100 bg-slate-50 text-center font-black tracking-tighter focus:bg-white focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 transition-all outline-none"
+                                className="w-full h-12 rounded-xl border border-slate-100 bg-slate-50 text-center font-black tracking-tighter focus:bg-white focus:border-[var(--color-mod-academics-accent)] focus:ring-4 focus:ring-[var(--color-mod-academics-border)] transition-all outline-none"
                               />
                            </td>
                            <td className="py-4 px-6">
@@ -506,7 +506,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
                                 onKeyDown={(e) => handleKeyDown(e, rowIndex, 1)}
                                 data-cas-row={rowIndex}
                                 data-cas-col={1}
-                                className="w-full h-12 rounded-xl border border-slate-100 bg-slate-50 px-4 text-xs font-medium focus:bg-white focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 transition-all outline-none"
+                                className="w-full h-12 rounded-xl border border-slate-100 bg-slate-50 px-4 text-xs font-medium focus:bg-white focus:border-[var(--color-mod-academics-accent)] focus:ring-4 focus:ring-[var(--color-mod-academics-border)] transition-all outline-none"
                               />
                            </td>
                          </tr>

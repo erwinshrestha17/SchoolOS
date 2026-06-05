@@ -72,7 +72,7 @@ export function StatCard({
     </>
   );
 
-  const containerStyles = "bg-white rounded-[2rem] border border-slate-200 p-6 shadow-sm";
+  const containerStyles = "bg-white rounded-2xl border border-slate-200 p-6 shadow-sm";
 
   if (loading) {
     return (

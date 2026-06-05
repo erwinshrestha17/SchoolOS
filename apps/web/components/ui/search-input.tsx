@@ -35,13 +35,13 @@ export function SearchInput({
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className="h-11 w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-10 text-sm font-medium text-slate-800 outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+          className="h-11 w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-10 text-sm font-medium text-slate-800 outline-none transition focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary-soft)] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
         />
         {value ? (
           <button
             type="button"
             onClick={() => onChange('')}
-            className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+            className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)]"
             aria-label="Clear search"
           >
             <X size={14} />

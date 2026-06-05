@@ -192,7 +192,7 @@ export default function PayrollReportsPage() {
       value: formatMoney(pfQuery.data?.totalContribution ?? 0),
       meta: `${pfQuery.data?.staffCount ?? 0} contributors`,
       action: () => exportMutation.mutate('pf'),
-      color: 'text-blue-600 bg-blue-50',
+      color: 'text-[var(--color-mod-hr-text)] bg-[var(--color-mod-hr-soft)]',
     },
     {
       title: 'Leave Deductions',
@@ -328,7 +328,7 @@ export default function PayrollReportsPage() {
                 type="button"
                 disabled={!canExportReports || exportMutation.isPending}
                 onClick={report.action}
-                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-hr-accent)] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[var(--color-mod-hr-text)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {exportMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
                 Export CSV
@@ -366,40 +366,40 @@ export default function PayrollReportsPage() {
         )}
       </section>
 
-      <section className="rounded-2xl bg-slate-950 p-6 text-white shadow-xl">
+      <section className="rounded-2xl border border-[var(--color-mod-hr-border)] bg-[var(--color-mod-hr-soft)]/70 p-6 text-slate-900 shadow-sm">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)] lg:items-start">
           <div>
             <h3 className="text-xl font-bold">Accounting Posting Status</h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-400">
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
               Payroll posting is still a separate approved action. After posting, payroll cannot be edited directly. Use reversal/correction.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold">
-                <ShieldCheck size={18} className="text-emerald-400" />
+              <div className="flex items-center gap-2 rounded-xl border border-[var(--color-mod-hr-border)] bg-white px-4 py-2 text-sm font-bold">
+                <ShieldCheck size={18} className="text-emerald-700" />
                 M9 posting boundary
               </div>
-              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold">
-                <BarChart3 size={18} className="text-blue-400" />
+              <div className="flex items-center gap-2 rounded-xl border border-[var(--color-mod-hr-border)] bg-white px-4 py-2 text-sm font-bold">
+                <BarChart3 size={18} className="text-[var(--color-mod-hr-text)]" />
                 Backend report totals
               </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">Posted Payroll Runs</h4>
+          <div className="rounded-2xl border border-[var(--color-mod-hr-border)] bg-white p-4">
+            <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-500">Posted Payroll Runs</h4>
             {runsQuery.isLoading ? (
               <div className="space-y-2">
                 {Array.from({ length: 3 }).map((_, index) => (
-                  <div key={index} className="h-12 animate-pulse rounded-xl bg-white/10" />
+                  <div key={index} className="h-12 animate-pulse rounded-xl bg-slate-100" />
                 ))}
               </div>
             ) : postedRuns.length === 0 ? (
-              <p className="rounded-xl bg-white/5 p-4 text-sm text-slate-400">
+              <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
                 No posted payroll runs match the current data set.
               </p>
             ) : (
               <div className="space-y-2">
                 {postedRuns.map((run) => (
-                  <div key={run.id} className="flex items-center justify-between gap-3 rounded-xl bg-white/5 p-3">
+                  <div key={run.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3">
                     <div>
                       <p className="text-sm font-bold">
                         {monthLabels[run.periodMonth - 1]} {run.periodYear}
@@ -408,7 +408,7 @@ export default function PayrollReportsPage() {
                         Journal: {run.journalEntryId ?? 'Not linked'}
                       </p>
                     </div>
-                    <span className="rounded-md bg-emerald-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-300">
+                    <span className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700">
                       {run.status}
                     </span>
                   </div>

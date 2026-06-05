@@ -178,15 +178,15 @@ function ReportsWorkspace() {
                       className={cn(
                         "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl text-left text-sm transition-all",
                         selectedReportKey === report.key
-                          ? "bg-primary-600 text-white shadow-lg shadow-primary-600/20 font-bold"
+                          ? "border border-slate-200 bg-slate-100 text-slate-950 font-bold"
                           : "hover:bg-slate-50 text-slate-600"
                       )}
                     >
                       <div className="flex items-center gap-3">
-                        <ClipboardList size={16} className={selectedReportKey === report.key ? "text-primary-200" : "text-slate-400"} />
+                        <ClipboardList size={16} className={selectedReportKey === report.key ? "text-slate-700" : "text-slate-400"} />
                         <span>{report.name}</span>
                       </div>
-                      <ChevronRight size={14} className={selectedReportKey === report.key ? "text-primary-300" : "text-slate-300"} />
+                      <ChevronRight size={14} className={selectedReportKey === report.key ? "text-slate-600" : "text-slate-300"} />
                     </button>
                   ))}
                 </div>
@@ -275,7 +275,7 @@ function ReportsWorkspace() {
                   type="checkbox"
                   checked={queueExport}
                   onChange={(event) => setQueueExport(event.target.checked)}
-                  className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
                 />
                 <span>
                   <span className="block text-sm font-black text-slate-900">
@@ -325,8 +325,8 @@ function ReportsWorkspace() {
             </div>
           </SectionCard>
         ) : (
-          <div className="flex flex-col items-center justify-center py-32 rounded-[3rem] bg-slate-50 border border-dashed border-slate-200 text-center">
-            <div className="h-20 w-20 rounded-full bg-white shadow-xl flex items-center justify-center text-slate-300 mb-6">
+          <div className="flex flex-col items-center justify-center py-32 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center">
+            <div className="h-20 w-20 rounded-2xl bg-white shadow-sm flex items-center justify-center text-slate-300 mb-6">
               <Filter size={32} />
             </div>
             <h3 className="text-xl font-black text-slate-400 italic uppercase">Select a Report</h3>

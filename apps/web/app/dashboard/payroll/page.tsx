@@ -144,21 +144,21 @@ export default function PayrollDashboardPage() {
       </section>
 
       <div className="grid gap-8 lg:grid-cols-2">
-        <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm">
+        <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold">Payroll Operations</h3>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             {[
               { label: 'Create Payroll Run', href: '/dashboard/payroll/runs', icon: History, color: 'text-emerald-500 bg-emerald-50' },
-              { label: 'Salary Structures', href: '/dashboard/payroll/salary-structures', icon: Calculator, color: 'text-blue-500 bg-blue-50' },
+              { label: 'Salary Structures', href: '/dashboard/payroll/salary-structures', icon: Calculator, color: 'text-[var(--color-mod-hr-text)] bg-[var(--color-mod-hr-soft)]' },
               { label: 'Manage Payslips', href: '/dashboard/payroll/payslips', icon: FileText, color: 'text-indigo-500 bg-indigo-50' },
               { label: 'Payroll Reports', href: '/dashboard/payroll/reports', icon: BarChart3, color: 'text-amber-500 bg-amber-50' },
             ].map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
-                className="group flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/30 transition-all"
+                className="group flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-[var(--color-mod-hr-border)] hover:bg-[var(--color-mod-hr-soft)]/40 transition-all"
               >
                 <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl", item.color)}>
                   <item.icon size={20} />
@@ -166,37 +166,36 @@ export default function PayrollDashboardPage() {
                 <div className="flex-1">
                   <p className="font-bold text-slate-900">{item.label}</p>
                 </div>
-                <ArrowRight size={16} className="text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                <ArrowRight size={16} className="text-slate-300 group-hover:text-[var(--color-mod-hr-text)] transition-colors" />
               </Link>
             ))}
           </div>
         </section>
 
-        <section className="bg-slate-900 rounded-[2rem] p-8 text-white shadow-xl relative overflow-hidden">
-          <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-emerald-500/10 blur-2xl" />
+        <section className="rounded-2xl border border-[var(--color-mod-hr-border)] bg-[var(--color-mod-hr-soft)]/70 p-8 text-slate-900 shadow-sm">
           <h3 className="text-xl font-bold mb-4">Posting Status</h3>
-          <p className="text-slate-400 text-sm mb-6">Integration status with Accounting Ledger.</p>
+          <p className="text-slate-600 text-sm mb-6">Integration status with Accounting Ledger.</p>
           
           <div className="space-y-4">
             {[
               {
                 label: 'Latest Run',
                 status: latestRun?.status?.replaceAll('_', ' ') ?? 'No runs',
-                statusColor: latestRun ? 'text-blue-400' : 'text-slate-400',
+                statusColor: latestRun ? 'text-[var(--color-mod-hr-text)]' : 'text-slate-500',
               },
               {
                 label: 'Latest Posted Journal',
                 status: latestPostedRun?.journalEntryId ? 'Linked' : 'Not posted',
-                statusColor: latestPostedRun?.journalEntryId ? 'text-emerald-400' : 'text-amber-400',
+                statusColor: latestPostedRun?.journalEntryId ? 'text-emerald-700' : 'text-amber-700',
               },
               {
                 label: 'Runs Awaiting Approval',
                 status: String(pendingApprovalCount),
-                statusColor: pendingApprovalCount > 0 ? 'text-amber-400' : 'text-emerald-400',
+                statusColor: pendingApprovalCount > 0 ? 'text-amber-700' : 'text-emerald-700',
               },
             ].map((item) => (
-              <div key={item.label} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
-                <span className="text-slate-300 font-medium">{item.label}</span>
+              <div key={item.label} className="flex items-center justify-between p-4 rounded-2xl bg-white border border-[var(--color-mod-hr-border)]/70">
+                <span className="text-slate-600 font-medium">{item.label}</span>
                 <span className={cn("font-bold uppercase tracking-widest text-xs", item.statusColor)}>{item.status}</span>
               </div>
             ))}

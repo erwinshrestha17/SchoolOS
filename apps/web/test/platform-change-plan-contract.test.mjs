@@ -60,6 +60,9 @@ describe('Platform tenant subscription change workflow contracts', () => {
     ]) {
       assert.match(page, new RegExp(label), `Missing workflow text: ${label}`);
     }
+
+    assert.match(page, /color-mod-platform-accent/);
+    assert.doesNotMatch(page, /bg-slate-900|bg-slate-950|shadow-xl|shadow-2xl/);
   });
 
   it('guards submit on selected plan, audit reason length, and saving state', () => {
@@ -124,12 +127,20 @@ describe('Platform tenant subscription change workflow contracts', () => {
       'Audit Reason',
       'time-bound support override',
       'This creates a platform SaaS invoice only',
+      'color-mod-platform-accent',
+      'color-mod-platform-text',
+      'Date not recorded',
     ]) {
       assert.match(
         page,
         new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
       );
     }
+
+    assert.doesNotMatch(
+      page,
+      /bg-slate-900|bg-slate-950|shadow-xl|shadow-2xl|N\/A|Unknown failure|fake|mock|Coming soon/,
+    );
   });
 
   it('wires platform settings provider, queue, audit, and tab deep-link workflows', () => {
@@ -156,6 +167,12 @@ describe('Platform tenant subscription change workflow contracts', () => {
       'const failedJobsForInspectingQueue = safeFailedJobs.filter',
       'failedJobsForInspectingQueue.map',
       'router.replace(`/platform/settings?tab=${value}`)',
+      'color-mod-platform-accent',
+      'color-mod-platform-text',
+      'Date not recorded',
+      'Resource ID not recorded',
+      'Failure reason not recorded',
+      'Export file unavailable',
     ]) {
       assert.match(
         settings,
@@ -164,6 +181,10 @@ describe('Platform tenant subscription change workflow contracts', () => {
     }
 
     assert.doesNotMatch(settings, /failedJobs\.filter/);
+    assert.doesNotMatch(
+      settings,
+      /bg-slate-900|bg-slate-950|rounded-\[2\.5rem\]|shadow-xl|shadow-2xl|primary-(50|100|200|500|600|700|800|900)|N\/A|Unknown failure|fake production metrics/,
+    );
     assert.match(shell, /\/platform\/settings\/plans/);
     assert.match(shell, /\/platform\/settings\/providers/);
     assert.match(shell, /\/platform\/settings\/modules/);
@@ -276,12 +297,19 @@ describe('Platform tenant subscription change workflow contracts', () => {
       'M3 student fee collection',
       'M9 school',
       'PlatformDashboardSkeleton',
+      'color-mod-platform-accent',
+      'color-mod-platform-text',
     ]) {
       assert.match(
         dashboard,
         new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
       );
     }
+
+    assert.doesNotMatch(
+      dashboard,
+      /bg-slate-900|bg-slate-950|rounded-\[20px\]|shadow-xl|shadow-2xl/,
+    );
   });
 
   it('keeps the redesigned schools page focused on tenant operations', () => {
@@ -297,6 +325,8 @@ describe('Platform tenant subscription change workflow contracts', () => {
       'Minimum 5 characters',
       'Open SaaS billing',
       'SchoolOS SaaS billing',
+      'color-mod-platform-accent',
+      'color-mod-platform-text',
     ]) {
       assert.match(
         schoolsPage,
@@ -305,5 +335,32 @@ describe('Platform tenant subscription change workflow contracts', () => {
     }
 
     assert.doesNotMatch(schoolsPage, /LayoutGrid/);
+    assert.doesNotMatch(
+      schoolsPage,
+      /bg-slate-900|bg-slate-950|rounded-\[20px\]|shadow-xl|shadow-2xl/,
+    );
+  });
+
+  it('keeps the platform audit log route tokenized and explicit', () => {
+    const auditPage = read('app/platform/audit/page.tsx');
+
+    for (const expected of [
+      'Audit Logs',
+      'api.listPlatformAuditLogs',
+      'Resource ID not recorded',
+      'Request ID not recorded',
+      'color-mod-platform-accent',
+      'No audit logs found.',
+    ]) {
+      assert.match(
+        auditPage,
+        new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      );
+    }
+
+    assert.doesNotMatch(
+      auditPage,
+      /N\/A|primary-(50|100|200|500|600|700|800|900)|bg-slate-900|bg-slate-950|shadow-xl|shadow-2xl|fake|mock|Coming soon/,
+    );
   });
 });

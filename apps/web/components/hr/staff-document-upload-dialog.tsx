@@ -48,7 +48,7 @@ export function StaffDocumentUploadDialog({
 
   const handleUploadComplete = (id: string, fileName: string) => {
     setFileId(id);
-    if (!name) {
+    if (!name.trim()) {
       // Auto-populate document name with filename without extension
       setName(fileName.replace(/\.[^/.]+$/, ''));
     }
@@ -66,7 +66,8 @@ export function StaffDocumentUploadDialog({
       setToastError('Please upload a document file.');
       return;
     }
-    if (!name) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
       setToastError('Please enter a document name.');
       return;
     }
@@ -74,14 +75,14 @@ export function StaffDocumentUploadDialog({
     addDocumentMutation.mutate({
       kind,
       fileId,
-      name,
-      notes: notes || undefined,
+      name: trimmedName,
+      notes: notes.trim() || undefined,
     });
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md rounded-[2.5rem]">
+      <DialogContent className="max-w-md rounded-2xl">
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle>Upload Document</DialogTitle>
@@ -158,6 +159,7 @@ export function StaffDocumentUploadDialog({
             onClick={handleSubmit}
             disabled={!fileId || addDocumentMutation.isPending}
             isLoading={addDocumentMutation.isPending}
+            className="bg-[var(--color-mod-hr-accent)] hover:bg-[var(--color-mod-hr-text)]"
           >
             Save Document
           </Button>

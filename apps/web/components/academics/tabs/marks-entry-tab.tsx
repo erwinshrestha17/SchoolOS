@@ -196,7 +196,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
       </section>
 
       {saveSuccess !== null && (
-        <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-[2rem] flex items-center justify-between shadow-lg shadow-emerald-500/5 animate-in slide-in-from-top-4 duration-500">
+        <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between shadow-lg shadow-emerald-500/5 animate-in slide-in-from-top-4 duration-500">
            <div className="flex items-center gap-4">
               <div className="h-10 w-10 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
                  <CheckCircle2 size={24} />
@@ -216,7 +216,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
       )}
 
       {isLocked && (
-        <div className="p-6 bg-amber-50 border border-amber-100 rounded-[2rem] flex items-center gap-4 text-amber-800 animate-in fade-in duration-500">
+        <div className="p-6 bg-amber-50 border border-amber-100 rounded-2xl flex items-center gap-4 text-amber-800 animate-in fade-in duration-500">
           <Lock size={24} className="text-amber-500" />
           <div>
             <p className="text-sm font-black tracking-tight uppercase">Operational Lock Active</p>
@@ -244,7 +244,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
                 {existingMarksQuery.isLoading ? (
                   <tr>
                     <td colSpan={7} className="py-20 text-center">
-                       <Loader2 className="h-10 w-10 animate-spin text-primary-500 mx-auto opacity-20" />
+                       <Loader2 className="h-10 w-10 animate-spin text-[var(--color-mod-academics-accent)] mx-auto opacity-20" />
                        <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Fetching Student Roster</p>
                     </td>
                   </tr>
@@ -328,7 +328,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
                                   "w-full rounded-2xl border px-4 py-3 text-sm font-black transition-all focus:ring-4 text-center tracking-tighter",
                                   isInvalid 
                                     ? "border-rose-300 bg-rose-50 text-rose-600 focus:ring-rose-100" 
-                                    : "border-slate-100 bg-slate-50 focus:bg-white focus:border-primary-400 focus:ring-primary-100",
+                                    : "border-slate-100 bg-slate-50 focus:bg-white focus:border-[var(--color-mod-academics-accent)] focus:ring-[var(--color-mod-academics-border)]",
                                   currentStatus === 'ABSENT' && "bg-slate-100 border-transparent text-slate-300 cursor-not-allowed"
                                 )}
                                 onChange={(e) => {
@@ -357,7 +357,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
                             value={remarks[student.id] ?? existing?.remarks ?? ''}
                             disabled={isLocked}
                             placeholder="Add observation..."
-                            className="w-full rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs font-medium focus:bg-white focus:border-primary-400 transition-all"
+                            className="w-full rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs font-medium focus:bg-white focus:border-[var(--color-mod-academics-accent)] transition-all"
                             onChange={(e) => setRemarks(c => ({ ...c, [student.id]: e.target.value }))}
                            />
                         </td>

@@ -82,7 +82,7 @@ export function ChartOfAccountsView() {
               });
             }
           }}
-          className="inline-flex items-center gap-2 rounded-2xl bg-primary-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-primary-600/20 hover:bg-primary-700 transition-all"
+          className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[var(--color-mod-accounting-text)] transition-all"
         >
           <Plus size={18} />
           Opening Balance
@@ -97,7 +97,7 @@ export function ChartOfAccountsView() {
             type="button"
             disabled={seedMutation.isPending}
             onClick={() => setSeedConfirmOpen(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-mod-accounting-text)] disabled:opacity-50"
           >
             <Landmark size={16} />
             {seedMutation.isPending ? 'Seeding...' : 'Seed defaults'}

@@ -24,6 +24,8 @@ export function OverviewTab({ profile, onOpenPdf }: { profile: StudentProfileDet
   const primaryGuardian = profile.guardians.find((g) => g.isPrimary) ?? profile.guardians[0];
   const outstanding = profile.invoices.reduce((sum, invoice) => sum + invoice.outstandingAmount, 0);
   const presentCount = profile.attendanceRecords.filter((r) => r.status === 'PRESENT').length;
+  const className = profile.student.className ?? profile.student.class?.name ?? 'Class not assigned';
+  const sectionName = profile.student.sectionName ?? profile.student.section ?? 'Section not assigned';
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -41,7 +43,7 @@ export function OverviewTab({ profile, onOpenPdf }: { profile: StudentProfileDet
             <DetailItem icon={<Hash size={18} />} label="Student ID" value={profile.student.studentSystemId} />
             <DetailItem icon={<CalendarCheck size={18} />} label="Date of Birth" value={profile.student.dateOfBirth ? formatDate(profile.student.dateOfBirth) : 'Not recorded'} />
             <DetailItem icon={<TrendingUp size={18} />} label="Lifecycle Status" value={profile.student.lifecycleStatus ?? 'ACTIVE'} />
-            <DetailItem icon={<MapPin size={18} />} label="Class / Section" value={`${profile.student.className ?? profile.student.class?.name ?? 'N/A'} • ${profile.student.sectionName ?? profile.student.section ?? 'N/A'}`} />
+            <DetailItem icon={<MapPin size={18} />} label="Class / Section" value={`${className} • ${sectionName}`} />
             <DetailItem icon={<Hash size={18} />} label="Roll Number" value={profile.student.rollNumber ?? 'Not assigned'} />
           </div>
         </SectionCard>
@@ -59,7 +61,7 @@ export function OverviewTab({ profile, onOpenPdf }: { profile: StudentProfileDet
              {primaryGuardian ? (
                <div className="space-y-6">
                   <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 font-bold text-lg">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-admissions-soft)] text-[var(--color-mod-admissions-text)] font-bold text-lg">
                       {primaryGuardian.fullName[0]}
                     </div>
                     <div>

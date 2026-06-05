@@ -40,7 +40,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="rounded-[2rem]">
+      <DialogContent className="rounded-2xl">
         <DialogHeader className="flex flex-row items-start gap-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-warning-50 text-warning-600">
             <AlertTriangle size={22} />

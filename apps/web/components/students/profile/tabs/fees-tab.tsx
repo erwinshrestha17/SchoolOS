@@ -26,7 +26,7 @@ const formatDate = (date: string | Date) => {
       dateStyle: 'medium',
     }).format(new Date(date));
   } catch {
-    return 'N/A';
+    return 'Invoice date not recorded';
   }
 };
 
@@ -103,7 +103,7 @@ export function FeesTab({ studentId, invoices }: FeesTabProps) {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[2rem] bg-slate-50 text-slate-300">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-bg)] text-[var(--color-mod-admissions-accent)]">
                   <Receipt size={32} />
                 </div>
                 <p className="text-sm font-bold text-slate-900">No invoices found</p>

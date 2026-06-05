@@ -25,7 +25,7 @@ export function LoadingState({
         role="status"
       >
         <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="h-7 w-7 animate-spin rounded-full border-[3px] border-primary-100 border-t-primary-500" />
+          <div className="h-7 w-7 animate-spin rounded-full border-[3px] border-[var(--primary-soft)] border-t-[var(--primary)]" />
         </div>
         <div className="text-center">
           <p className="text-sm font-bold text-slate-700">{label}</p>
@@ -70,7 +70,7 @@ export function LoadingState({
       aria-live="polite"
       role="status"
     >
-      <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-100 border-t-primary-500" />
+      <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--primary-soft)] border-t-[var(--primary)]" />
       {label && <p className="text-sm text-slate-500">{label}</p>}
     </div>
   );

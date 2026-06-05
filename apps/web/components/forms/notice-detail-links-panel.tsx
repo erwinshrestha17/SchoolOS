@@ -14,9 +14,9 @@ export function NoticeDetailLinksPanel() {
   const notices = noticesQuery.data ?? [];
 
   return (
-    <section className="rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+    <section className="rounded-2xl border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-mod-notices-bg)] text-[var(--color-mod-notices-text)]">
           <Megaphone size={20} />
         </div>
         <div>
@@ -45,7 +45,7 @@ export function NoticeDetailLinksPanel() {
             <Link
               key={notice.id}
               href={`/dashboard/notices/${encodeURIComponent(notice.id)}`}
-              className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-4 text-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:bg-primary-50/40 hover:shadow-sm"
+              className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-4 text-sm transition hover:-translate-y-0.5 hover:border-[var(--color-mod-notices-border)] hover:bg-[var(--color-mod-notices-bg)] hover:shadow-sm"
             >
               <div className="min-w-0">
                 <p className="truncate font-semibold text-gray-950">{notice.title}</p>

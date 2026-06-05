@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { FileText, Search, User } from 'lucide-react';
+import { FileText, User } from 'lucide-react';
 import { StaffDocumentsPanel } from './staff-documents-panel';
 import { Select } from '../ui/select';
 
@@ -17,14 +17,16 @@ export function CentralDocumentsPanel() {
 
   const staffList = staffQuery.data ?? [];
   const selectedStaff = staffList.find((s) => s.id === selectedStaffId);
+  const formatAssignedText = (value: string | null | undefined, fallback: string) =>
+    value?.trim() || fallback;
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-[2rem] border border-slate-200 p-6 shadow-sm">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <FileText size={18} className="text-blue-500" />
+              <FileText size={18} className="text-[var(--color-mod-hr-text)]" />
               Staff Documents Hub
             </h3>
             <p className="text-xs text-slate-500">Select a staff member to upload, verify, and manage their records.</p>
@@ -51,24 +53,24 @@ export function CentralDocumentsPanel() {
 
       {selectedStaffId ? (
         <div className="space-y-6">
-          <div className="bg-slate-900 rounded-[2rem] p-6 text-white flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-white/10 flex items-center justify-center font-black">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-[var(--color-mod-hr-soft)] text-[var(--color-mod-hr-text)] flex items-center justify-center font-black">
               {selectedStaff?.firstName[0]}
               {selectedStaff?.lastName[0]}
             </div>
             <div>
-              <h4 className="font-bold text-lg">
+              <h4 className="font-bold text-lg text-slate-900">
                 {selectedStaff?.firstName} {selectedStaff?.lastName}
               </h4>
-              <p className="text-xs text-slate-400">
-                {selectedStaff?.employeeId} • {selectedStaff?.designation || 'Staff'} • {selectedStaff?.department || 'General'}
+              <p className="text-xs text-slate-500">
+                {selectedStaff?.employeeId} &bull; {formatAssignedText(selectedStaff?.designation, 'Designation not set')} &bull; {formatAssignedText(selectedStaff?.department, 'Department not set')}
               </p>
             </div>
           </div>
           <StaffDocumentsPanel staffId={selectedStaffId} />
         </div>
       ) : (
-        <div className="bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200 py-16 text-center">
+        <div className="bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 py-16 text-center">
           <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4 text-slate-400">
             <User size={20} />
           </div>

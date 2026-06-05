@@ -272,7 +272,7 @@ export function MarksLockTab({ exams }: Props) {
          <div className="p-8 grid gap-6">
             {requestsQuery.isLoading ? (
                <div className="py-20 text-center">
-                  <Loader2 className="h-10 w-10 animate-spin text-primary-500 mx-auto opacity-20" />
+                  <Loader2 className="h-10 w-10 animate-spin text-[var(--color-mod-academics-accent)] mx-auto opacity-20" />
                   <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Loading Audit Trail</p>
                </div>
             ) : (requestsQuery.data ?? []).length === 0 ? (
@@ -326,7 +326,7 @@ export function MarksLockTab({ exams }: Props) {
                             value={reviewNote[request.id] ?? ''} 
                             onChange={(e) => setReviewNote(c => ({ ...c, [request.id]: e.target.value }))} 
                             placeholder="Add review note..."
-                            className="w-full bg-white rounded-xl border border-slate-100 p-3 text-[10px] font-medium focus:ring-4 focus:ring-primary-100 transition-all"
+                            className="w-full bg-white rounded-xl border border-slate-100 p-3 text-[10px] font-medium focus:ring-4 focus:ring-[var(--color-mod-academics-border)] transition-all"
                            />
                            <div className="flex gap-2">
                               <button 

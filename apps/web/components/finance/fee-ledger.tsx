@@ -76,8 +76,8 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
       header: 'Student',
       cell: (inv: Invoice) => (
         <div className="flex flex-col">
-          <span className="text-sm font-bold text-slate-900">{inv.student?.name || 'N/A'}</span>
-          <span className="text-[0.6rem] text-slate-400 uppercase tracking-widest">{inv.student?.studentSystemId}</span>
+          <span className="text-sm font-bold text-slate-900">{inv.student?.name || 'Student name not set'}</span>
+          <span className="text-[0.6rem] text-slate-400 uppercase tracking-widest">{inv.student?.studentSystemId || 'Student ID not set'}</span>
         </div>
       )
     },
@@ -146,7 +146,7 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[2.5rem] border border-slate-100 overflow-hidden bg-white shadow-sm">
+      <div className="rounded-2xl border border-slate-100 overflow-hidden bg-white shadow-sm">
         <DataTable
           columns={columns}
           data={invoices}

@@ -31,7 +31,7 @@ export function ApprovalTimeline({ steps }: ApprovalTimelineProps) {
               className={cn(
                 'mt-0.5 shrink-0',
                 step.status === 'done' && 'text-success-600',
-                step.status === 'current' && 'text-primary-600',
+                step.status === 'current' && 'text-[var(--primary)]',
                 step.status === 'rejected' && 'text-danger-600',
                 step.status === 'pending' && 'text-slate-300',
               )}

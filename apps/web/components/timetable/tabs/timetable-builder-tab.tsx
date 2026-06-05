@@ -62,6 +62,20 @@ const daysOfWeek = [
   { value: 7, label: 'Sunday' },
 ];
 
+function formatTimetableDate(value: string | null | undefined, fallback = 'Date not set') {
+  if (!value) return fallback;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Date unavailable';
+  return date.toLocaleDateString();
+}
+
+function formatSlotTeacher(slot: TimetableSlotSummary) {
+  return [slot.staff?.firstName, slot.staff?.lastName]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(' ') || 'Teacher not assigned';
+}
+
 export function TimetableBuilderTab({
   academicYears,
   classes,
@@ -325,7 +339,7 @@ export function TimetableBuilderTab({
                   </button>
                   <button
                     type="button"
-                    className="flex h-9 items-center gap-2 rounded-full bg-indigo-50 px-4 text-[10px] font-black uppercase tracking-widest text-indigo-700 transition-colors hover:bg-indigo-100"
+                    className="flex h-9 items-center gap-2 rounded-full border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] px-4 text-[10px] font-black uppercase tracking-widest text-[var(--color-mod-homework-text)] transition-colors hover:bg-white"
                     onClick={() => activeVersionId && validateVersionMut.mutate(activeVersionId)}
                     disabled={!activeVersionId || validateVersionMut.isPending}
                   >
@@ -343,7 +357,7 @@ export function TimetableBuilderTab({
                   </button>
                   <button
                     type="button"
-                    className="flex h-9 items-center gap-2 rounded-full bg-slate-900 px-4 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-slate-800"
+                    className="flex h-9 items-center gap-2 rounded-full bg-slate-100 px-4 text-[10px] font-black uppercase tracking-widest text-slate-700 transition-colors hover:bg-slate-200"
                     onClick={() => setConfirmAction('lock')}
                     disabled={!activeVersionId || lockVersionMut.isPending}
                   >
@@ -416,7 +430,7 @@ export function TimetableBuilderTab({
                   <div key={item.id} className="space-y-1 rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
                     <p className="text-xs font-black uppercase tracking-tight text-slate-900">{item.status}</p>
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                      {new Date(item.date).toLocaleDateString()} · {item.reason}
+                      {formatTimetableDate(item.date)} · {item.reason?.trim() || 'Reason not set'}
                     </p>
                   </div>
                 ))}
@@ -497,9 +511,9 @@ export function TimetableBuilderTab({
 
                 <button
                   type="button"
-                  className="h-14 w-full rounded-2xl bg-slate-900 text-xs font-black uppercase tracking-[0.2em] text-white shadow-xl shadow-slate-200 transition-all hover:-translate-y-1 disabled:translate-y-0 disabled:opacity-50"
+                  className="h-14 w-full rounded-2xl bg-[var(--color-mod-homework-accent)] text-xs font-black uppercase tracking-[0.2em] text-white shadow-sm transition-colors hover:bg-[var(--color-mod-homework-text)] disabled:opacity-50"
                   disabled={!slot.academicYearId || !slot.subjectId || !slot.staffId || slot.startsAt >= slot.endsAt || slotMut.isPending}
-                  onClick={() => slotMut.mutate({ ...slot, classId, sectionId: slot.sectionId || null })}
+                  onClick={() => slotMut.mutate({ ...slot, room: slot.room.trim(), classId, sectionId: slot.sectionId || null })}
                 >
                   {slotMut.isPending ? 'Saving...' : 'Add Slot to Schedule'}
                 </button>
@@ -540,16 +554,16 @@ export function TimetableBuilderTab({
                                   "w-48 flex-shrink-0 space-y-2 rounded-2xl border p-4 transition-colors",
                                   hasConflict 
                                     ? "border-red-200 bg-red-50 hover:bg-red-100/50" 
-                                    : "border-indigo-100 bg-indigo-50/30 hover:bg-indigo-50"
+                                    : "border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] hover:bg-white"
                                 )}
                               >
                                 <div className="flex items-start justify-between gap-2">
                                   <div className="flex items-center gap-1.5">
                                     <p className={cn(
                                       "text-xs font-black uppercase leading-tight tracking-tight",
-                                      hasConflict ? "text-red-900" : "text-indigo-900"
+                                      hasConflict ? "text-red-900" : "text-[var(--color-mod-homework-text)]"
                                     )}>
-                                      {s.subject?.code ?? 'SUB'}
+                                      {s.subject?.code?.trim() || 'Code not set'}
                                     </p>
                                     {hasConflict && <AlertCircle className="h-3 w-3 text-red-500" />}
                                   </div>
@@ -557,7 +571,7 @@ export function TimetableBuilderTab({
                                     variant="outline" 
                                     className={cn(
                                       "px-1 py-0 text-[8px] font-black uppercase",
-                                      hasConflict ? "border-red-200 text-red-400" : "border-indigo-200 text-indigo-400"
+                                      hasConflict ? "border-red-200 text-red-400" : "border-[var(--color-mod-homework-border)] text-[var(--color-mod-homework-text)]"
                                     )}
                                   >
                                     {s.startsAt}
@@ -567,12 +581,12 @@ export function TimetableBuilderTab({
                                   "truncate text-[10px] font-bold uppercase tracking-widest",
                                   hasConflict ? "text-red-700" : "text-slate-500"
                                 )}>
-                                  {s.staff?.firstName} {s.staff?.lastName}
+                                  {formatSlotTeacher(s)}
                                 </p>
                                 {(s.section?.name || s.room) && (
                                   <div className={cn(
                                     "flex gap-2 text-[9px] font-black uppercase tracking-widest",
-                                    hasConflict ? "text-red-300" : "text-indigo-300"
+                                    hasConflict ? "text-red-300" : "text-slate-500"
                                   )}>
                                     {s.section?.name && <span>Sec {s.section.name}</span>}
                                     {s.room && <span>• {s.room}</span>}

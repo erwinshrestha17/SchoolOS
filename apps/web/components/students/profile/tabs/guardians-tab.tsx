@@ -42,7 +42,7 @@ export function GuardiansTab({
                     {guardian.isPrimary && <Badge variant="success">Primary</Badge>}
                     <button
                       type="button"
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-primary-500 hover:text-white transition-colors"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-mod-admissions-bg)] text-[var(--color-mod-admissions-accent)] transition-colors hover:bg-[var(--color-mod-admissions-accent)] hover:text-white"
                       onClick={() => onEditGuardian(guardian.id)}
                     >
                       <Edit3 size={14} />
@@ -78,7 +78,7 @@ export function GuardiansTab({
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-slate-400">
                         <MapPin size={14} />
                       </div>
-                      <span>Ward {guardian.wardNumber || 'N/A'}</span>
+                      <span>{guardian.wardNumber ? `Ward ${guardian.wardNumber}` : 'Ward not recorded'}</span>
                     </div>
                   </div>
                 </div>
@@ -87,7 +87,7 @@ export function GuardiansTab({
           );
         })
       ) : (
-        <div className="col-span-2 py-12 text-center bg-white rounded-[2rem] border border-slate-200">
+        <div className="col-span-2 rounded-2xl border border-[var(--color-mod-admissions-border)] bg-white py-12 text-center">
           <p className="text-slate-400 font-medium">No guardian records found.</p>
         </div>
       )}
@@ -146,7 +146,7 @@ function GuardianEditForm({
         <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Full Name</label>
         <input
           type="text"
-          className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-primary-500 focus:outline-none"
+          className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-[var(--color-mod-admissions-accent)] focus:outline-none"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           required
@@ -157,7 +157,7 @@ function GuardianEditForm({
         <div className="space-y-2">
           <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Relation</label>
           <select
-            className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-primary-500 focus:outline-none bg-white"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm focus:border-[var(--color-mod-admissions-accent)] focus:outline-none"
             value={relation}
             onChange={(e) => setRelation(e.target.value)}
             disabled={isSaving}
@@ -172,7 +172,7 @@ function GuardianEditForm({
           <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Phone</label>
           <input
             type="text"
-            className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-primary-500 focus:outline-none"
+            className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-[var(--color-mod-admissions-accent)] focus:outline-none"
             maxLength={10}
             value={primaryPhone}
             onChange={(e) => {
@@ -192,7 +192,7 @@ function GuardianEditForm({
           <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Email</label>
           <input
             type="email"
-            className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-primary-500 focus:outline-none"
+            className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-[var(--color-mod-admissions-accent)] focus:outline-none"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={isSaving}
@@ -202,7 +202,7 @@ function GuardianEditForm({
           <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Ward Number</label>
           <input
             type="text"
-            className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-primary-500 focus:outline-none"
+            className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-[var(--color-mod-admissions-accent)] focus:outline-none"
             value={wardNumber}
             onChange={(e) => setWardNumber(e.target.value)}
             disabled={isSaving}
@@ -213,7 +213,7 @@ function GuardianEditForm({
         <input
           type="checkbox"
           id={`primary-${guardian.id}`}
-          className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+          className="h-4 w-4 rounded border-slate-300 text-[var(--color-mod-admissions-accent)] focus:ring-[var(--color-mod-admissions-accent)]"
           checked={isPrimary}
           onChange={(e) => setIsPrimary(e.target.checked)}
           disabled={isSaving}
@@ -233,7 +233,7 @@ function GuardianEditForm({
         </button>
         <button
           type="submit"
-          className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+          className="rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 py-2 text-xs font-bold text-white hover:bg-[var(--color-mod-admissions-text)] disabled:opacity-50"
           disabled={isSaving}
         >
           {isSaving ? 'Saving...' : 'Save Changes'}
@@ -242,4 +242,3 @@ function GuardianEditForm({
     </form>
   );
 }
-

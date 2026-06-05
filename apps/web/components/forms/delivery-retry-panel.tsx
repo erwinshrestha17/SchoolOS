@@ -110,7 +110,7 @@ export function DeliveryRetryPanel() {
   );
 
   return (
-    <section className="shell-card rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-sm">
+    <section className="shell-card rounded-2xl border border-[var(--color-mod-notices-border)] bg-white p-8 shadow-sm">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <span className="inline-flex rounded-full bg-rose-50 px-4 py-1.5 text-[0.65rem] font-black uppercase tracking-widest text-rose-700 border border-rose-100">
@@ -127,7 +127,7 @@ export function DeliveryRetryPanel() {
 
         <button
           type="button"
-          className="inline-flex min-h-12 items-center justify-center gap-3 rounded-2xl bg-slate-900 px-8 font-black text-xs uppercase tracking-widest text-white transition-all hover:bg-slate-800 shadow-lg shadow-slate-900/10 active:scale-95 disabled:opacity-50"
+          className="inline-flex min-h-12 items-center justify-center gap-3 rounded-2xl bg-[var(--color-mod-notices-accent)] px-8 font-black text-xs uppercase tracking-widest text-white transition-all hover:bg-[var(--color-mod-notices-text)] shadow-sm active:scale-95 disabled:opacity-50"
           disabled={failedDeliveries.length === 0 || retryAllMutation.isPending}
           onClick={() => retryAllMutation.mutate()}
         >
@@ -195,7 +195,7 @@ export function DeliveryRetryPanel() {
         />
       ) : null}
 
-      <div className="mt-8 overflow-hidden rounded-[2rem] border border-slate-100 bg-slate-50/50">
+      <div className="mt-8 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/50">
         {deliveriesQuery.isLoading ? (
           <LoadingState
             variant="spinner"
@@ -257,7 +257,7 @@ export function DeliveryRetryPanel() {
                         {delivery.noticeId ? (
                           <Link
                             href={`/dashboard/notices/${delivery.noticeId}`}
-                            className="font-semibold text-primary-700 hover:text-primary-800"
+                            className="font-semibold text-[var(--color-mod-notices-text)] hover:text-[var(--color-mod-notices-accent)]"
                           >
                             Open source notice
                           </Link>
@@ -305,7 +305,7 @@ function RetryMetric({
     neutral: 'bg-slate-50 text-slate-700 border-slate-100',
     danger: 'bg-rose-50 text-rose-700 border-rose-100',
     warning: 'bg-amber-50 text-amber-700 border-amber-100',
-    info: 'bg-primary-50 text-primary-700 border-primary-100',
+    info: 'bg-[var(--color-mod-notices-bg)] text-[var(--color-mod-notices-text)] border-[var(--color-mod-notices-border)]',
   }[tone];
 
   return (

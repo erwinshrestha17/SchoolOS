@@ -164,7 +164,7 @@ export function StudentDirectory({
         title="No classes configured"
         description="You need to set up academic years and classes before you can manage students."
         action={
-          <Link href="/dashboard/settings" className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800">
+          <Link href="/dashboard/settings" className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2">
             Configure School Settings
           </Link>
         }
@@ -386,20 +386,20 @@ export function StudentDirectory({
                       src={student.photoUrl ?? undefined} 
                       initials={initials(studentName)} 
                       size="lg" 
-                      className="ring-2 ring-white shadow-sm transition group-hover:ring-primary-100" 
+                      className="ring-2 ring-white shadow-sm transition group-hover:ring-[var(--color-mod-admissions-border)]"
                     />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <Link 
                           href={`/dashboard/students/${encodeURIComponent(student.id)}`}
-                          className="font-bold text-slate-900 truncate hover:text-primary-600 transition"
+                          className="font-bold text-slate-900 truncate hover:text-[var(--color-mod-admissions-text)] transition"
                         >
                           {studentName}
                         </Link>
                         <StatusChip status={student.lifecycleStatus || 'ACTIVE'} />
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-500">
-                        <span className="text-primary-600 font-bold tracking-tight">{student.studentSystemId}</span>
+                        <span className="text-[var(--color-mod-admissions-text)] font-bold tracking-tight">{student.studentSystemId}</span>
                         <span className="h-1 w-1 rounded-full bg-slate-300" />
                         <span className="text-slate-700">{className} {sectionName !== 'No section' ? `• ${sectionName}` : ''}</span>
                         {rollNumber && (
@@ -418,7 +418,7 @@ export function StudentDirectory({
                   <div className="flex flex-wrap items-center gap-2">
                     <Link
                       href={`/dashboard/students/${encodeURIComponent(student.id)}`}
-                      className="inline-flex h-9 items-center gap-2 rounded-xl bg-slate-900 px-4 text-[0.7rem] font-bold text-white transition hover:bg-slate-800"
+                      className="inline-flex h-9 items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-[0.7rem] font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
                     >
                       View Profile
                       <ChevronRight size={14} />
@@ -438,7 +438,7 @@ export function StudentDirectory({
                       >
                         <MoreHorizontal size={16} />
                       </button>
-                      <div className="absolute right-0 top-full z-10 mt-2 hidden w-48 origin-top-right rounded-2xl border border-slate-200 bg-white p-2 shadow-xl group-hover/actions:block animate-in fade-in zoom-in-95">
+                      <div className="absolute right-0 top-full z-10 mt-2 hidden w-48 origin-top-right rounded-xl border border-slate-200 bg-white p-2 shadow-md group-hover/actions:block animate-in fade-in zoom-in-95">
                         <Link
                           href={`/dashboard/students/${encodeURIComponent(student.id)}?edit=true`}
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
@@ -519,7 +519,7 @@ export function StudentDirectory({
             action={!(search || status || classId) && (
                <Link
                 href="/dashboard/admissions"
-                className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800"
+                className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
               >
                 <UserPlus size={18} />
                 Enroll First Student

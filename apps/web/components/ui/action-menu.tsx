@@ -61,7 +61,7 @@ export function ActionMenu({
         <div
           role="menu"
           className={cn(
-            'absolute top-11 z-30 min-w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100',
+            'absolute top-11 z-30 min-w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-md animate-in fade-in zoom-in-95 duration-100',
             align === 'right' ? 'right-0' : 'left-0',
           )}
         >

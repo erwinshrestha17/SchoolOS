@@ -84,81 +84,97 @@
   /* Module colors from SchoolOS UI/UX Guide Section 8 */
   --color-mod-dashboard-accent: #155EEF;
   --color-mod-dashboard-soft: #EAF1FF;
+  --color-mod-dashboard-bg: var(--color-mod-dashboard-soft);
   --color-mod-dashboard-border: #A9C9FF;
   --color-mod-dashboard-text: #0B3A88;
 
   --color-mod-platform-accent: #4F46E5;
   --color-mod-platform-soft: #EEF2FF;
+  --color-mod-platform-bg: var(--color-mod-platform-soft);
   --color-mod-platform-border: #C7D2FE;
   --color-mod-platform-text: #3730A3;
 
   --color-mod-admissions-accent: #2563EB;
   --color-mod-admissions-soft: #EFF6FF;
+  --color-mod-admissions-bg: var(--color-mod-admissions-soft);
   --color-mod-admissions-border: #BFDBFE;
   --color-mod-admissions-text: #1D4ED8;
 
   --color-mod-attendance-accent: #059669;
   --color-mod-attendance-soft: #ECFDF5;
+  --color-mod-attendance-bg: var(--color-mod-attendance-soft);
   --color-mod-attendance-border: #A7F3D0;
   --color-mod-attendance-text: #047857;
 
   --color-mod-fees-accent: #D97706;
   --color-mod-fees-soft: #FFFBEB;
+  --color-mod-fees-bg: var(--color-mod-fees-soft);
   --color-mod-fees-border: #FCD34D;
   --color-mod-fees-text: #92400E;
 
   --color-mod-academics-accent: #7C3AED;
   --color-mod-academics-soft: #F5F3FF;
+  --color-mod-academics-bg: var(--color-mod-academics-soft);
   --color-mod-academics-border: #DDD6FE;
   --color-mod-academics-text: #6D28D9;
 
   --color-mod-activity-accent: #DB2777;
   --color-mod-activity-soft: #FDF2F8;
+  --color-mod-activity-bg: var(--color-mod-activity-soft);
   --color-mod-activity-border: #FBCFE8;
   --color-mod-activity-text: #BE185D;
 
   --color-mod-homework-accent: #0284C7;
   --color-mod-homework-soft: #E0F2FE;
+  --color-mod-homework-bg: var(--color-mod-homework-soft);
   --color-mod-homework-border: #7DD3FC;
   --color-mod-homework-text: #0369A1;
 
   --color-mod-hr-accent: #9333EA;
   --color-mod-hr-soft: #FAF5FF;
+  --color-mod-hr-bg: var(--color-mod-hr-soft);
   --color-mod-hr-border: #E9D5FF;
   --color-mod-hr-text: #7E22CE;
 
   --color-mod-library-accent: #0D9488;
   --color-mod-library-soft: #F0FDFA;
+  --color-mod-library-bg: var(--color-mod-library-soft);
   --color-mod-library-border: #99F6E4;
   --color-mod-library-text: #0F766E;
 
   --color-mod-transport-accent: #EA580C;
   --color-mod-transport-soft: #FFF7ED;
+  --color-mod-transport-bg: var(--color-mod-transport-soft);
   --color-mod-transport-border: #FDBA74;
   --color-mod-transport-text: #C2410C;
 
   --color-mod-canteen-accent: #65A30D;
   --color-mod-canteen-soft: #F7FEE7;
+  --color-mod-canteen-bg: var(--color-mod-canteen-soft);
   --color-mod-canteen-border: #BEF264;
   --color-mod-canteen-text: #4D7C0F;
 
   --color-mod-accounting-accent: #0F766E;
   --color-mod-accounting-soft: #F0FDFA;
+  --color-mod-accounting-bg: var(--color-mod-accounting-soft);
   --color-mod-accounting-border: #99F6E4;
   --color-mod-accounting-text: #115E59;
 
   --color-mod-notices-accent: #E11D48;
   --color-mod-notices-soft: #FFF1F2;
+  --color-mod-notices-bg: var(--color-mod-notices-soft);
   --color-mod-notices-border: #FDA4AF;
   --color-mod-notices-text: #BE123C;
 
   --color-mod-reports-accent: #0891B2;
   --color-mod-reports-soft: #ECFEFF;
+  --color-mod-reports-bg: var(--color-mod-reports-soft);
   --color-mod-reports-border: #67E8F9;
   --color-mod-reports-text: #0E7490;
 
   --color-mod-settings-accent: #475569;
   --color-mod-settings-soft: #F8FAFC;
+  --color-mod-settings-bg: var(--color-mod-settings-soft);
   --color-mod-settings-border: #CBD5E1;
   --color-mod-settings-text: #334155;
 

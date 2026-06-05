@@ -444,7 +444,7 @@ export default function PlatformSchoolDetail() {
   };
 
   const formatDate = (dateString: string | null | undefined) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return 'Date not recorded';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
@@ -453,7 +453,7 @@ export default function PlatformSchoolDetail() {
   };
 
   const formatDateTime = (dateString: string | null | undefined) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return 'Date not recorded';
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -465,7 +465,7 @@ export default function PlatformSchoolDetail() {
   };
 
   if (loading) return (
-    <div className="space-y-8 animate-pulse p-8 bg-slate-950/5 rounded-3xl border border-slate-100">
+    <div className="space-y-8 animate-pulse p-8 bg-[var(--color-mod-platform-bg)] rounded-2xl border border-[var(--color-mod-platform-border)]">
       <div className="h-4 w-24 bg-slate-200 rounded-lg" />
       <div className="flex justify-between items-center pb-8 border-b border-slate-100">
         <div className="space-y-2">
@@ -830,7 +830,7 @@ export default function PlatformSchoolDetail() {
                  </CardContent>
                </Card>
 
-               <Card className="rounded-3xl border-slate-100 shadow-sm bg-slate-900 text-white overflow-hidden relative">
+               <Card className="rounded-2xl border-[var(--color-mod-platform-border)] shadow-sm bg-[var(--color-mod-platform-text)] text-white overflow-hidden relative">
                   <div className="absolute -right-4 -bottom-4 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
                   <CardHeader>
                     <CardTitle className="text-lg font-bold">Metadata</CardTitle>
@@ -1043,7 +1043,7 @@ export default function PlatformSchoolDetail() {
                   Cancel
                 </Button>
                 <Button 
-                  className="rounded-xl font-bold bg-slate-900 text-white"
+                  className="rounded-xl font-bold bg-[var(--color-mod-platform-accent)] text-white hover:bg-[var(--color-mod-platform-text)]"
                   disabled={!overrideReason.trim() || updating}
                   onClick={handleFeatureToggle}
                 >
@@ -1247,7 +1247,7 @@ export default function PlatformSchoolDetail() {
                       tenantAuditLogs.map((log) => (
                        <div key={log.id} className="group flex items-center justify-between p-6 hover:bg-slate-50/50 transition-colors">
                           <div className="flex items-start gap-4">
-                             <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 group-hover:bg-slate-900 group-hover:text-white transition-colors">
+                             <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-mod-platform-bg)] text-[var(--color-mod-platform-accent)] group-hover:bg-[var(--color-mod-platform-accent)] group-hover:text-white transition-colors">
                                 <History size={18} />
                              </div>
                              <div>
@@ -1296,7 +1296,7 @@ export default function PlatformSchoolDetail() {
           </div>
           <DialogFooter>
             <Button variant="outline" className="rounded-xl font-bold" onClick={() => setSupportDialogOpen(false)}>Cancel</Button>
-            <Button className="rounded-xl font-bold bg-slate-900 text-white" disabled={supportReason.trim().length < 5 || supportSaving} onClick={handleEnterSupportMode}>
+            <Button className="rounded-xl font-bold bg-[var(--color-mod-platform-accent)] text-white hover:bg-[var(--color-mod-platform-text)]" disabled={supportReason.trim().length < 5 || supportSaving} onClick={handleEnterSupportMode}>
               {supportSaving ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
               Enter Support Mode
             </Button>
@@ -1350,7 +1350,7 @@ export default function PlatformSchoolDetail() {
           </div>
           <DialogFooter>
             <Button variant="outline" className="rounded-xl font-bold" onClick={() => setInvoiceDialogOpen(false)}>Cancel</Button>
-            <Button className="rounded-xl font-bold bg-slate-900 text-white" disabled={invoiceSaving || !invoiceForm.description.trim() || Number(invoiceForm.quantity) < 1 || !invoiceForm.unitAmount} onClick={createInvoice}>
+            <Button className="rounded-xl font-bold bg-[var(--color-mod-platform-accent)] text-white hover:bg-[var(--color-mod-platform-text)]" disabled={invoiceSaving || !invoiceForm.description.trim() || Number(invoiceForm.quantity) < 1 || !invoiceForm.unitAmount} onClick={createInvoice}>
               {invoiceSaving ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
               Create Invoice
             </Button>
@@ -1398,7 +1398,7 @@ export default function PlatformSchoolDetail() {
           <DialogFooter>
             <Button variant="outline" className="rounded-xl font-bold" onClick={() => setInvoiceAction(null)}>Close</Button>
             {invoiceAction?.mode === 'payment' && (
-              <Button className="rounded-xl font-bold bg-slate-900 text-white" disabled={invoiceSaving || !paymentForm.amount} onClick={recordPayment}>Record Payment</Button>
+              <Button className="rounded-xl font-bold bg-[var(--color-mod-platform-accent)] text-white hover:bg-[var(--color-mod-platform-text)]" disabled={invoiceSaving || !paymentForm.amount} onClick={recordPayment}>Record Payment</Button>
             )}
             {invoiceAction?.mode === 'cancel' && (
               <Button variant="destructive" className="rounded-xl font-bold" disabled={invoiceSaving || cancelReason.trim().length < 5} onClick={cancelInvoice}>Cancel Invoice</Button>
@@ -1437,7 +1437,7 @@ export default function PlatformSchoolDetail() {
           </div>
           <DialogFooter>
             <Button variant="outline" className="rounded-xl font-bold" onClick={() => setBillingDialogOpen(false)}>Cancel</Button>
-            <Button className="rounded-xl font-bold bg-slate-900 text-white" disabled={updating} onClick={saveBillingProfile}>Save Billing Profile</Button>
+            <Button className="rounded-xl font-bold bg-[var(--color-mod-platform-accent)] text-white hover:bg-[var(--color-mod-platform-text)]" disabled={updating} onClick={saveBillingProfile}>Save Billing Profile</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1477,7 +1477,7 @@ export default function PlatformSchoolDetail() {
           <Textarea className="my-4 rounded-2xl border-slate-200" placeholder="Audit reason" value={onboardingReason} onChange={(e) => setOnboardingReason(e.target.value)} />
           <DialogFooter>
             <Button variant="outline" className="rounded-xl font-bold" onClick={() => setOnboardingOverride(null)}>Cancel</Button>
-            <Button className="rounded-xl font-bold bg-slate-900 text-white" disabled={onboardingReason.trim().length < 5 || updating} onClick={saveOnboardingOverride}>Save Override</Button>
+            <Button className="rounded-xl font-bold bg-[var(--color-mod-platform-accent)] text-white hover:bg-[var(--color-mod-platform-text)]" disabled={onboardingReason.trim().length < 5 || updating} onClick={saveOnboardingOverride}>Save Override</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1515,7 +1515,7 @@ export default function PlatformSchoolDetail() {
             <Button variant="outline" className="rounded-xl font-bold" onClick={() => setApiKeyDialogOpen(false)}>
               Cancel
             </Button>
-            <Button className="rounded-xl bg-slate-900 font-bold text-white" disabled={apiKeySaving || apiKeyForm.name.trim().length < 3} onClick={createApiKey}>
+            <Button className="rounded-xl bg-[var(--color-mod-platform-accent)] font-bold text-white hover:bg-[var(--color-mod-platform-text)]" disabled={apiKeySaving || apiKeyForm.name.trim().length < 3} onClick={createApiKey}>
               {apiKeySaving ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
               Create API Key
             </Button>
@@ -1563,7 +1563,7 @@ export default function PlatformSchoolDetail() {
           </div>
           <DialogFooter>
             <Button variant="outline" className="rounded-xl font-bold" onClick={() => setAuditFilters({ action: '', resource: '', resourceId: '', userId: '', startDate: '', endDate: '' })}>Clear</Button>
-            <Button className="rounded-xl font-bold bg-slate-900 text-white" disabled={loadingInvoices} onClick={applyTenantAuditFilters}>Apply Filters</Button>
+            <Button className="rounded-xl font-bold bg-[var(--color-mod-platform-accent)] text-white hover:bg-[var(--color-mod-platform-text)]" disabled={loadingInvoices} onClick={applyTenantAuditFilters}>Apply Filters</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1617,7 +1617,7 @@ export default function PlatformSchoolDetail() {
 
 function MetricCard({ label, value, icon: Icon, color, bg }: { label: string, value: string | number, icon: any, color: string, bg: string }) {
   return (
-    <div className="group relative overflow-hidden rounded-3xl border border-slate-100 bg-white p-8 shadow-sm transition-all hover:border-slate-200 hover:shadow-xl hover:shadow-slate-100">
+    <div className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-8 shadow-sm transition-all hover:border-[var(--color-mod-platform-border)]">
       <div className={`mb-4 flex h-14 w-14 items-center justify-center rounded-2xl ${bg} ${color} transition-transform group-hover:scale-110`}>
         <Icon size={28} />
       </div>

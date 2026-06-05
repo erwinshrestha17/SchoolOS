@@ -57,7 +57,7 @@ export function StaffAttendanceSummary() {
                 <th className="px-6 py-4 font-semibold text-gray-500 text-center">Present</th>
                 <th className="px-6 py-4 font-semibold text-gray-500 text-center text-amber-600">Late</th>
                 <th className="px-6 py-4 font-semibold text-gray-500 text-center text-danger-600">Absent</th>
-                <th className="px-6 py-4 font-semibold text-gray-500 text-center text-primary-600">Leave</th>
+                <th className="px-6 py-4 font-semibold text-gray-500 text-center text-[var(--color-mod-hr-text)]">Leave</th>
                 <th className="px-6 py-4 font-semibold text-gray-500 text-center">Approved Leave</th>
                 <th className="px-6 py-4 font-semibold text-gray-500 text-center">Anomalies</th>
               </tr>
@@ -85,7 +85,7 @@ export function StaffAttendanceSummary() {
                     <td className="px-6 py-4 text-center font-medium text-success-600">{item.presentDays}</td>
                     <td className="px-6 py-4 text-center font-medium text-amber-600">{item.lateDays}</td>
                     <td className="px-6 py-4 text-center font-medium text-danger-600">{item.absentDays}</td>
-                    <td className="px-6 py-4 text-center font-medium text-primary-600">{item.leaveDays}</td>
+                    <td className="px-6 py-4 text-center font-medium text-[var(--color-mod-hr-text)]">{item.leaveDays}</td>
                     <td className="px-6 py-4 text-center font-medium text-gray-700">{item.approvedLeaveDays}</td>
                     <td className="px-6 py-4 text-center font-medium">
                       {item.unresolvedOverlapAnomalies > 0 ? (

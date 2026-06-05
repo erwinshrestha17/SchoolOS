@@ -472,7 +472,7 @@ function ReportCardCorrectionDialog({
 }) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="rounded-[2rem]">
+      <DialogContent className="rounded-2xl">
         <DialogHeader>
           <DialogTitle>Review Locked Report-Card Correction</DialogTitle>
           <DialogDescription>

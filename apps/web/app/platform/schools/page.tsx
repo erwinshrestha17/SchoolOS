@@ -222,7 +222,7 @@ export default function PlatformSchools() {
           </p>
         </div>
         <Button
-          className="h-12 gap-2 rounded-2xl bg-slate-900 px-8 font-bold shadow-sm hover:bg-slate-800"
+          className="h-12 gap-2 rounded-2xl bg-[var(--color-mod-platform-accent)] px-8 font-bold shadow-sm hover:bg-[var(--color-mod-platform-text)]"
           onClick={() => {
             setOnboardDialogOpen(true);
             setOnboardError(null);
@@ -410,7 +410,7 @@ export default function PlatformSchools() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-10 w-10 rounded-xl hover:bg-slate-900 hover:text-white"
+                          className="h-10 w-10 rounded-xl hover:bg-[var(--color-mod-platform-accent)] hover:text-white"
                           aria-label={`View ${tenant.name}`}
                         >
                           <Eye size={18} />
@@ -550,7 +550,7 @@ export default function PlatformSchools() {
           }
         }}
       >
-        <DialogContent className="rounded-3xl sm:max-w-lg bg-white/95 backdrop-blur-md shadow-2xl border border-slate-100">
+        <DialogContent className="rounded-2xl sm:max-w-lg bg-white/95 backdrop-blur-md shadow-lg border border-slate-100">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3 text-2xl font-black text-slate-900">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
@@ -669,7 +669,7 @@ export default function PlatformSchools() {
               <Button
                 type="submit"
                 disabled={onboardSubmitting || !newSchoolPlan}
-                className="rounded-xl px-8 font-bold bg-slate-900 hover:bg-slate-800 text-white"
+                className="rounded-xl px-8 font-bold bg-[var(--color-mod-platform-accent)] hover:bg-[var(--color-mod-platform-text)] text-white"
               >
                 {onboardSubmitting ? 'Onboarding...' : 'Onboard school'}
               </Button>

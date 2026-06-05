@@ -116,7 +116,7 @@ export function DefaulterQueueTab() {
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Class</label>
               <select
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-primary-500 focus:outline-none bg-white"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                 value={classId}
                 onChange={(e) => {
                   setClassId(e.target.value);
@@ -134,7 +134,7 @@ export function DefaulterQueueTab() {
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fee Head</label>
               <select
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-primary-500 focus:outline-none bg-white"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                 value={feeHeadId}
                 onChange={(e) => {
                   setFeeHeadId(e.target.value);
@@ -162,7 +162,7 @@ export function DefaulterQueueTab() {
             </button>
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-slate-800 disabled:opacity-50 transition-all"
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 transition-all"
               disabled={selectedInvoiceIds.length === 0 || reminderMutation.isPending}
               onClick={() =>
                 reminderMutation.mutate({
@@ -203,7 +203,7 @@ export function DefaulterQueueTab() {
                   onClick={() => handleToggleSelect(item.invoiceId)}
                   className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 select-none ${
                     isChecked
-                      ? 'border-primary-500 bg-primary-50/10 shadow-sm shadow-primary-50/20'
+                      ? 'border-[var(--color-mod-fees-accent)] bg-[var(--color-mod-fees-bg)] shadow-sm shadow-[var(--color-mod-fees-border)]/20'
                       : 'border-slate-100 bg-white hover:border-slate-200'
                   }`}
                 >
@@ -211,7 +211,7 @@ export function DefaulterQueueTab() {
                     type="checkbox"
                     checked={isChecked}
                     onChange={() => {}} // Controlled by outer click
-                    className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 mt-0.5"
+                    className="h-4 w-4 rounded border-slate-300 text-[var(--color-mod-fees-accent)] focus:ring-[var(--color-mod-fees-accent)] mt-0.5"
                   />
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center justify-between">

@@ -256,7 +256,7 @@ export default function PlatformChangePlanPage() {
               <Button variant="outline" className="rounded-xl font-bold" onClick={() => router.push(`/platform/schools/${tenant.id}`)}>
                 Cancel
               </Button>
-              <Button className="rounded-xl bg-slate-900 font-bold text-white" disabled={!canSubmit} onClick={() => void submit()}>
+              <Button className="rounded-xl bg-[var(--color-mod-platform-accent)] font-bold text-white hover:bg-[var(--color-mod-platform-text)]" disabled={!canSubmit} onClick={() => void submit()}>
                 {saving ? <RefreshCw size={16} className="mr-2 animate-spin" /> : null}
                 Change Plan
               </Button>

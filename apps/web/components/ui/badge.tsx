@@ -21,7 +21,7 @@ export function Badge({ className, variant = 'default', ...props }: BadgeProps) 
 
   const variants = {
     default:
-      'border-transparent bg-primary-500 text-white hover:bg-primary-600',
+      'border-transparent bg-[var(--primary)] text-white hover:bg-[var(--primary-dark)]',
     secondary:
       'border-transparent bg-secondary-500 text-white hover:bg-secondary-600',
     outline: 'border-slate-200 text-slate-700',
@@ -34,7 +34,7 @@ export function Badge({ className, variant = 'default', ...props }: BadgeProps) 
     info: 'border-transparent bg-info-50 text-info-700 border-info-100',
     neutral: 'border-transparent bg-slate-100 text-slate-700',
     phase2:
-      'border-primary-100 bg-primary-50 text-primary-700 uppercase tracking-wide text-[0.6rem]',
+      'border-[var(--primary-soft)] bg-[var(--primary-soft)] text-[var(--primary-dark)] uppercase tracking-wide text-[0.6rem]',
     later:
       'border-slate-200 bg-slate-50 text-slate-500 uppercase tracking-wide text-[0.6rem]',
   };

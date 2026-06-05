@@ -48,11 +48,11 @@ export function LoadingState({
           <div className="hidden h-10 w-32 rounded-xl bg-slate-100 sm:block" />
         </div>
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="h-28 rounded-[2rem] bg-slate-100/75 border border-slate-100" />
-          <div className="h-28 rounded-[2rem] bg-slate-100/75 border border-slate-100" />
-          <div className="h-28 rounded-[2rem] bg-slate-100/75 border border-slate-100" />
+          <div className="h-28 rounded-2xl bg-slate-100/75 border border-slate-100" />
+          <div className="h-28 rounded-2xl bg-slate-100/75 border border-slate-100" />
+          <div className="h-28 rounded-2xl bg-slate-100/75 border border-slate-100" />
         </div>
-        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="space-y-4">
             <div className="h-5 w-full rounded bg-slate-100" />
             <div className="h-5 w-11/12 rounded bg-slate-100" />

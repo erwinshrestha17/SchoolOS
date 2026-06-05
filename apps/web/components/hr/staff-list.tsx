@@ -24,6 +24,8 @@ export function StaffList() {
   // Pagination states
   const [page, setPage] = useState(1);
   const limit = 10;
+  const formatAssignedText = (value: string | null | undefined, fallback: string) =>
+    value?.trim() || fallback;
 
   const staffQuery = useQuery({
     queryKey: ['staff'],
@@ -214,7 +216,7 @@ export function StaffList() {
                             )}
                             {(staff.department || staff.designation) && (
                               <span className="text-slate-400">
-                                {staff.designation || 'Staff'} • {staff.department || 'General'}
+                                {formatAssignedText(staff.designation, 'Designation not set')} &bull; {formatAssignedText(staff.department, 'Department not set')}
                               </span>
                             )}
                           </div>

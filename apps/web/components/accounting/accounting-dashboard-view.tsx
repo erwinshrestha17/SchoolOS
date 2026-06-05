@@ -57,7 +57,7 @@ export function AccountingDashboardView() {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-10">
       {noFiscalYear && (
-        <div className="rounded-[2rem] border border-rose-200 bg-rose-50 p-6 shadow-xl shadow-rose-900/5 animate-in slide-in-from-top-4">
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 shadow-sm animate-in slide-in-from-top-4">
           <div className="flex gap-5">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-600/30">
               <AlertCircle size={30} />
@@ -100,7 +100,7 @@ export function AccountingDashboardView() {
           value={formatMoney(summaryQuery.data?.incomeStatement?.netIncome ?? 0)}
           icon={<Wallet size={20} />}
           loading={summaryQuery.isLoading}
-          className="border-primary-100 bg-primary-50/30"
+          className="border-[var(--color-mod-accounting-border)] bg-[var(--color-mod-accounting-bg)]/70"
         />
         <StatCard
           title="Cash/Bank"
@@ -119,21 +119,21 @@ export function AccountingDashboardView() {
           >
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
               {[
-                { label: 'Journal Voucher', desc: 'Manual ledger posting', icon: FileText, color: 'bg-slate-900', action: () => setIsVoucherDialogOpen(true) },
+                { label: 'Journal Voucher', desc: 'Manual ledger posting', icon: FileText, color: 'bg-[var(--color-mod-accounting-accent)]', action: () => setIsVoucherDialogOpen(true) },
                 { label: 'Expense Voucher', desc: 'Direct school expenses', icon: Calculator, color: 'bg-rose-600', action: () => setIsVoucherDialogOpen(true) },
-                { label: 'Payment Voucher', desc: 'Vendor/Staff payments', icon: Wallet, color: 'bg-primary-600', action: () => setIsVoucherDialogOpen(true) },
+                { label: 'Payment Voucher', desc: 'Vendor/Staff payments', icon: Wallet, color: 'bg-[var(--color-mod-accounting-accent)]', action: () => setIsVoucherDialogOpen(true) },
                 { label: 'Receipt Voucher', desc: 'Inward cash/bank receipts', icon: CheckCircle2, color: 'bg-emerald-600', action: () => setIsVoucherDialogOpen(true) },
               ].map((action, idx) => (
                 <button
                   key={idx}
                   onClick={action.action}
-                  className="group flex flex-col items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 text-center transition hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5"
+                  className="group flex flex-col items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 text-center transition hover:border-[var(--color-mod-accounting-border)] hover:bg-[var(--color-mod-accounting-bg)]"
                 >
                   <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-lg transition group-hover:scale-110", action.color)}>
                     <action.icon size={22} />
                   </div>
                   <div>
-                    <p className="text-xs font-black text-slate-900 uppercase tracking-tight">{action.label}</p>
+                    <p className="text-xs font-black text-slate-900 uppercase tracking-tight group-hover:text-[var(--color-mod-accounting-text)]">{action.label}</p>
                     <p className="mt-1 text-[10px] font-bold text-slate-400">{action.desc}</p>
                   </div>
                 </button>
@@ -151,26 +151,26 @@ export function AccountingDashboardView() {
               </AuditInfo>
               <div className="grid gap-4 sm:grid-cols-2">
                 {[
-                  { href: '/dashboard/accounting/reports?report=trial-balance', label: 'Trial Balance', desc: 'Summary of all ledger balances.', icon: BarChart3, color: 'bg-primary-500' },
+                  { href: '/dashboard/accounting/reports?report=trial-balance', label: 'Trial Balance', desc: 'Summary of all ledger balances.', icon: BarChart3, color: 'bg-[var(--color-mod-accounting-accent)]' },
                   { href: '/dashboard/accounting/reports?report=income-statement', label: 'Income Statement', desc: 'Profit and loss for the period.', icon: FileText, color: 'bg-emerald-500' },
                   { href: '/dashboard/accounting/reports?report=balance-sheet', label: 'Balance Sheet', desc: 'Financial position of the school.', icon: PieChart, color: 'bg-secondary-500' },
                   { href: '/dashboard/accounting/reports?report=general-ledger', label: 'General Ledger', desc: 'Detailed transaction history.', icon: History, color: 'bg-amber-500' },
                   { href: '/dashboard/accounting/reports?report=cash-book', label: 'Cash Book', desc: 'Real-time cash and bank flow.', icon: Wallet, color: 'bg-cyan-500' },
-                  { href: '/dashboard/accounting/reconciliation', label: 'Bank Reconciliation', desc: 'Verify bank statements.', icon: Landmark, color: 'bg-indigo-500' },
+                  { href: '/dashboard/accounting/reconciliation', label: 'Bank Reconciliation', desc: 'Verify bank statements.', icon: Landmark, color: 'bg-[var(--color-mod-accounting-accent)]' },
                 ].map((report) => (
                   <Link
                     key={report.href}
                     href={report.href}
-                    className="group flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 text-left transition hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5"
+                    className="group flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 text-left transition hover:border-[var(--color-mod-accounting-border)] hover:bg-[var(--color-mod-accounting-bg)]"
                   >
                     <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white shadow-lg transition group-hover:scale-110", report.color)}>
                       <report.icon size={22} />
                     </div>
                     <div className="flex-1">
-                      <p className="font-bold text-slate-900">{report.label}</p>
+                      <p className="font-bold text-slate-900 group-hover:text-[var(--color-mod-accounting-text)]">{report.label}</p>
                       <p className="text-xs text-slate-500">{report.desc}</p>
                     </div>
-                    <ArrowRight size={18} className="text-slate-300 transition group-hover:translate-x-1 group-hover:text-emerald-500" />
+                    <ArrowRight size={18} className="text-slate-300 transition group-hover:translate-x-1 group-hover:text-[var(--color-mod-accounting-text)]" />
                   </Link>
                 ))}
               </div>
@@ -218,13 +218,13 @@ export function AccountingDashboardView() {
         <div className="space-y-8">
           <SectionCard title="Fiscal Status">
             <div className="space-y-6">
-              <div className="rounded-2xl bg-slate-900 p-5 text-white shadow-xl">
-                <p className="text-[0.65rem] font-bold uppercase tracking-widest text-white/50">Current Fiscal Year</p>
-                <h4 className="mt-1 text-xl font-black">{activeFiscalYear?.name ?? 'Not Set'}</h4>
+              <div className="rounded-2xl border border-[var(--color-mod-accounting-border)] bg-[var(--color-mod-accounting-bg)] p-5 text-[var(--color-mod-accounting-text)] shadow-sm">
+                <p className="text-[0.65rem] font-bold uppercase tracking-widest text-[var(--color-mod-accounting-text)]/70">Current Fiscal Year</p>
+                <h4 className="mt-1 text-xl font-black">{activeFiscalYear?.name ?? 'Fiscal year not set'}</h4>
                 
-                <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4">
-                  <span className="text-xs font-bold text-white/70">Status</span>
-                  <div className="flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-1 text-[10px] font-black text-emerald-400 border border-emerald-500/20">
+                <div className="mt-4 flex items-center justify-between border-t border-[var(--color-mod-accounting-border)] pt-4">
+                  <span className="text-xs font-bold text-[var(--color-mod-accounting-text)]/80">Status</span>
+                  <div className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700">
                     <CheckCircle2 size={10} />
                     {activeFiscalYear?.status}
                   </div>
@@ -234,7 +234,7 @@ export function AccountingDashboardView() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-mod-accounting-bg)] text-[var(--color-mod-accounting-text)]">
                       <Clock size={20} />
                     </div>
                     <div>
@@ -280,19 +280,19 @@ export function AccountingDashboardView() {
                   <XCircle size={18} className="text-rose-500" />
                 )}
               </div>
-              <div className="p-4 rounded-xl bg-slate-900 text-white">
-                <div className="flex items-center justify-between text-[0.65rem] font-black uppercase tracking-widest text-white/40">
+              <div className="p-4 rounded-xl border border-[var(--color-mod-accounting-border)] bg-[var(--color-mod-accounting-bg)] text-[var(--color-mod-accounting-text)]">
+                <div className="flex items-center justify-between text-[0.65rem] font-black uppercase tracking-widest text-[var(--color-mod-accounting-text)]/70">
                   <span>Trial Balance</span>
                   <span>Check</span>
                 </div>
                 <div className="mt-3 flex justify-between items-end">
                   <div>
-                    <p className="text-[10px] text-white/50 uppercase font-bold">Debit</p>
+                    <p className="text-[10px] text-[var(--color-mod-accounting-text)]/70 uppercase font-bold">Debit</p>
                     <p className="text-sm font-bold">{formatMoney(summaryQuery.data?.totals?.debit ?? 0)}</p>
                   </div>
-                  <div className="h-8 w-px bg-white/10" />
+                  <div className="h-8 w-px bg-[var(--color-mod-accounting-border)]" />
                   <div className="text-right">
-                    <p className="text-[10px] text-white/50 uppercase font-bold">Credit</p>
+                    <p className="text-[10px] text-[var(--color-mod-accounting-text)]/70 uppercase font-bold">Credit</p>
                     <p className="text-sm font-bold">{formatMoney(summaryQuery.data?.totals?.credit ?? 0)}</p>
                   </div>
                 </div>

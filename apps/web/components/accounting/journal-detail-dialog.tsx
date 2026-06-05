@@ -203,12 +203,12 @@ export function JournalDetailDialog({ isOpen, onClose, entry }: JournalDetailDia
             </div>
           )}
 
-          <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100 shadow-inner">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Narration</p>
-            <p className="text-sm font-semibold text-slate-700">{entry.narration}</p>
+          <div className="rounded-2xl bg-[var(--color-mod-accounting-bg)] p-4 border border-[var(--color-mod-accounting-border)]">
+            <p className="text-xs font-bold text-[var(--color-mod-accounting-text)] uppercase tracking-widest mb-1">Narration</p>
+            <p className="text-sm font-semibold text-[var(--color-mod-accounting-text)]">{entry.narration}</p>
             {entry.reference && (
-              <div className="mt-2 flex items-center gap-2 text-xs font-medium text-slate-500">
-                <span className="font-bold text-slate-400">REF:</span>
+              <div className="mt-2 flex items-center gap-2 text-xs font-medium text-[var(--color-mod-accounting-text)]/80">
+                <span className="font-bold text-[var(--color-mod-accounting-text)]">REF:</span>
                 {entry.reference}
               </div>
             )}
@@ -244,7 +244,7 @@ export function JournalDetailDialog({ isOpen, onClose, entry }: JournalDetailDia
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-slate-900 text-white font-bold">
+                  <tr className="bg-[var(--color-mod-accounting-bg)] text-[var(--color-mod-accounting-text)] font-bold">
                     <td className="px-4 py-3">Totals</td>
                     <td className="px-4 py-3 text-right">{formatCurrency(entry.totalDebit)}</td>
                     <td className="px-4 py-3 text-right">{formatCurrency(entry.totalCredit)}</td>
@@ -258,7 +258,7 @@ export function JournalDetailDialog({ isOpen, onClose, entry }: JournalDetailDia
              <div className="rounded-xl border border-slate-100 p-3 flex flex-col">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Posted By</span>
                 <span className="text-sm font-bold text-slate-700">
-                  {entry.postedBy ? `${entry.postedBy.firstName} ${entry.postedBy.lastName}` : 'System'}
+                  {entry.postedBy ? `${entry.postedBy.firstName} ${entry.postedBy.lastName}` : 'Posting user not recorded'}
                 </span>
              </div>
              <div className="rounded-xl border border-slate-100 p-3 flex flex-col">

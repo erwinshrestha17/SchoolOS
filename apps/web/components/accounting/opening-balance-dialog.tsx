@@ -147,7 +147,7 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
             <button
               type="button"
               onClick={addLine}
-              className="flex items-center gap-2 text-sm font-bold text-primary-600 hover:text-primary-700 transition-colors py-2"
+              className="flex items-center gap-2 text-sm font-bold text-[var(--color-mod-accounting-accent)] hover:text-[var(--color-mod-accounting-text)] transition-colors py-2"
             >
               <Plus size={16} />
               Add line
@@ -197,7 +197,7 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
             <button
               type="submit"
               disabled={loading || Math.abs(diff) > 0.001}
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2 text-sm font-semibold text-white shadow-lg transition-all hover:bg-slate-800 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-6 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[var(--color-mod-accounting-text)] disabled:opacity-50"
             >
               {loading && <Loader2 size={16} className="animate-spin" />}
               Save Opening Balance

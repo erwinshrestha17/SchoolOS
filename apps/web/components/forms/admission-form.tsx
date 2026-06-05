@@ -254,7 +254,7 @@ export function AdmissionForm() {
               <div key={step} className="flex items-center gap-2 group cursor-default">
                 <div className={cn(
                   "flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold transition-all duration-500",
-                  activeStep === idx ? "bg-primary-500 text-white shadow-xl shadow-primary-500/40 scale-110 ring-4 ring-primary-50" : 
+                  activeStep === idx ? "bg-[var(--color-mod-admissions-accent)] text-white shadow-sm ring-4 ring-[var(--color-mod-admissions-soft)]" :
                   activeStep > idx || latestAdmission ? "bg-success-500 text-white shadow-lg shadow-success-500/20" : "bg-slate-100 text-slate-400"
                 )}>
                   {activeStep > idx || (idx === 4 && latestAdmission) ? <CheckCircle2 size={18} /> : idx + 1}
@@ -262,7 +262,7 @@ export function AdmissionForm() {
                 <div className="hidden lg:flex flex-col">
                    <span className={cn(
                     "text-[0.6rem] font-bold uppercase tracking-tighter",
-                    activeStep === idx ? "text-primary-600" : "text-slate-400"
+                    activeStep === idx ? "text-[var(--color-mod-admissions-text)]" : "text-slate-400"
                   )}>
                     Step {idx + 1}
                   </span>
@@ -307,7 +307,7 @@ export function AdmissionForm() {
                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
                       <label className={cn(
                         "flex cursor-pointer items-start gap-4 rounded-xl border p-4 transition-all",
-                        disabilityMode === 'NO_KNOWN_DISABILITY' ? "border-primary-500 bg-primary-50" : "border-slate-200 bg-white hover:border-slate-300"
+                        disabilityMode === 'NO_KNOWN_DISABILITY' ? "border-[var(--color-mod-admissions-accent)] bg-[var(--color-mod-admissions-soft)]" : "border-slate-200 bg-white hover:border-slate-300"
                       )}>
                         <input type="radio" className="mt-1" checked={disabilityMode === 'NO_KNOWN_DISABILITY'} onChange={() => {
                           setDisabilityMode('NO_KNOWN_DISABILITY');
@@ -321,7 +321,7 @@ export function AdmissionForm() {
                       </label>
                       <label className={cn(
                         "flex cursor-pointer items-start gap-4 rounded-xl border p-4 transition-all",
-                        disabilityMode === 'DISABILITY_PRESENT' ? "border-primary-500 bg-primary-50" : "border-slate-200 bg-white hover:border-slate-300"
+                        disabilityMode === 'DISABILITY_PRESENT' ? "border-[var(--color-mod-admissions-accent)] bg-[var(--color-mod-admissions-soft)]" : "border-slate-200 bg-white hover:border-slate-300"
                       )}>
                         <input type="radio" className="mt-1" checked={disabilityMode === 'DISABILITY_PRESENT'} onChange={() => {
                           setDisabilityMode('DISABILITY_PRESENT');
@@ -373,7 +373,7 @@ export function AdmissionForm() {
                 title="Guardian Contacts" 
                 description="Manage family members and emergency contacts."
                 headerAction={
-                  <button type="button" className="text-sm font-bold text-primary-600" onClick={() => guardians.append({ fullName: '', relation: 'guardian', primaryPhone: '', isPrimary: false })}>
+                  <button type="button" className="text-sm font-bold text-[var(--color-mod-admissions-text)] hover:text-[var(--color-mod-admissions-accent)]" onClick={() => guardians.append({ fullName: '', relation: 'guardian', primaryPhone: '', isPrimary: false })}>
                     + Add Guardian
                   </button>
                 }
@@ -464,14 +464,14 @@ export function AdmissionForm() {
                     <div className="space-y-5">
                        <SummaryItem label="Full Name" value={`${watchedFirstNameEn} ${watchedLastNameEn}`} />
                        <SummaryItem label="Gender" value={form.getValues('gender')} />
-                       <SummaryItem label="Date of Birth" value={watchedDateOfBirth ? new Date(watchedDateOfBirth).toLocaleDateString() : 'N/A'} />
+                       <SummaryItem label="Date of Birth" value={watchedDateOfBirth ? new Date(watchedDateOfBirth).toLocaleDateString() : 'Date of birth not entered'} />
                        <div className="my-2 h-px bg-slate-100" />
-                       <SummaryItem label="Class" value={classesQuery.data?.find(c => c.id === selectedClassId)?.name ?? 'N/A'} />
+                       <SummaryItem label="Class" value={classesQuery.data?.find(c => c.id === selectedClassId)?.name ?? 'Class not selected'} />
                        <SummaryItem label="Section" value={availableSections.find(s => s.id === selectedSectionId)?.name ?? 'None'} />
                        <SummaryItem label="Admission Date" value={new Date(form.getValues('admissionDate')).toLocaleDateString()} />
                        <div className="my-2 h-px bg-slate-100" />
                        <SummaryItem label="Primary Guardian" value={watchedGuardians.find(g => g.isPrimary)?.fullName ?? 'Not set'} />
-                       <SummaryItem label="Contact" value={watchedGuardians.find(g => g.isPrimary)?.primaryPhone ?? 'N/A'} />
+                       <SummaryItem label="Contact" value={watchedGuardians.find(g => g.isPrimary)?.primaryPhone ?? 'Guardian phone not entered'} />
                        <div className="my-2 h-px bg-slate-100" />
                        <SummaryItem label="Documents" value={documentFile ? `1 File (${documentKind.replace('_', ' ')})` : 'None attached'} />
                     </div>
@@ -498,31 +498,31 @@ export function AdmissionForm() {
                 
                 <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <button type="button" className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]" onClick={startAnotherEnrollment}>
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-colors">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-[var(--color-mod-admissions-accent)] group-hover:text-white transition-colors">
                       <UserPlus size={20} />
                     </div>
-                    <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">Add Another Student</span>
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-[var(--color-mod-admissions-text)]">Add Another Student</span>
                   </button>
                   
                   <Link href={`/dashboard/students/${latestAdmission?.student.id}`} className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-colors">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-[var(--color-mod-admissions-accent)] group-hover:text-white transition-colors">
                       <FileText size={20} />
                     </div>
-                    <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">View Profile</span>
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-[var(--color-mod-admissions-text)]">View Profile</span>
                   </Link>
 
                   <Link href={`/dashboard/finance?studentId=${latestAdmission?.student.id}`} className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-colors">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-[var(--color-mod-admissions-accent)] group-hover:text-white transition-colors">
                       <Wallet size={20} />
                     </div>
-                    <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">Collect First Fee</span>
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-[var(--color-mod-admissions-text)]">Collect First Fee</span>
                   </Link>
 
                   <button type="button" className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-colors">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-[var(--color-mod-admissions-accent)] group-hover:text-white transition-colors">
                       <Download size={20} />
                     </div>
-                    <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">Download ID Card</span>
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-[var(--color-mod-admissions-text)]">Download ID Card</span>
                   </button>
                 </div>
               </div>
@@ -545,7 +545,7 @@ export function AdmissionForm() {
                 <button
                   type="submit"
                   disabled={mutation.isPending}
-                  className="flex items-center gap-2 rounded-2xl bg-primary-500 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-primary-500/30 transition hover:bg-primary-600 active:scale-95 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-8 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] disabled:opacity-50"
                 >
                   {mutation.isPending ? 'Enrolling...' : 'Complete Enrollment'}
                   <CheckCircle2 size={20} />
@@ -553,7 +553,7 @@ export function AdmissionForm() {
               ) : (
                 <button
                   type="button"
-                  className="flex items-center gap-2 rounded-2xl bg-slate-900 px-8 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800 active:scale-95"
+                  className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-8 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)]"
                   onClick={goToNextStep}
                 >
                   Next Step
@@ -586,7 +586,7 @@ export function AdmissionForm() {
                 type="button"
                 disabled={!bulkFile || bulkImportMutation.isPending}
                 onClick={() => bulkFile && bulkImportMutation.mutate(bulkFile)}
-                className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+                className="rounded-xl bg-[var(--color-mod-admissions-accent)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] disabled:opacity-50"
               >
                 {bulkImportMutation.isPending ? 'Importing...' : 'Validate & Import'}
               </button>

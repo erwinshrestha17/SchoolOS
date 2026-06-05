@@ -121,7 +121,7 @@ export function DuesAnalysisSection() {
           </div>
         ) : null}
 
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 p-6 bg-slate-50 rounded-2xl border border-slate-100">
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
               <div className="space-y-2">
                 <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">Class Filter</label>
@@ -160,7 +160,7 @@ export function DuesAnalysisSection() {
            </button>
         </div>
 
-        <div className="relative rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm bg-white">
+        <div className="relative rounded-2xl border border-slate-100 overflow-hidden shadow-sm bg-white">
           <DataTable
             columns={columns}
             data={duesQuery.data?.rows || []}
@@ -184,15 +184,15 @@ export function DuesAnalysisSection() {
 function SummaryStat({ label, value, color = "text-slate-900", isMain = false }: { label: string; value: number; color?: string; isMain?: boolean }) {
   return (
     <div className={cn(
-      "p-6 rounded-[2rem] border transition-all",
-      isMain ? "bg-slate-900 border-slate-900 shadow-xl shadow-slate-900/10" : "bg-white border-slate-100"
+      "p-6 rounded-2xl border transition-all",
+      isMain ? "bg-[var(--color-mod-fees-bg)] border-[var(--color-mod-fees-border)] shadow-sm" : "bg-white border-slate-100"
     )}>
-      <p className={cn("text-[0.6rem] font-black uppercase tracking-[0.2em] mb-2", isMain ? "text-slate-400" : "text-slate-500")}>
+      <p className={cn("text-[0.6rem] font-black uppercase tracking-[0.2em] mb-2", isMain ? "text-[var(--color-mod-fees-text)]" : "text-slate-500")}>
         {label}
       </p>
       <div className="flex items-baseline gap-1">
-        <span className={cn("text-[0.65rem] font-bold uppercase", isMain ? "text-slate-500" : "text-slate-400")}>NPR</span>
-        <p className={cn("text-2xl font-black tracking-tighter", isMain ? "text-white" : color)}>
+        <span className={cn("text-[0.65rem] font-bold uppercase", isMain ? "text-[var(--color-mod-fees-text)]/70" : "text-slate-400")}>NPR</span>
+        <p className={cn("text-2xl font-black tracking-tighter", isMain ? "text-[var(--color-mod-fees-text)]" : color)}>
           {value.toLocaleString()}
         </p>
       </div>

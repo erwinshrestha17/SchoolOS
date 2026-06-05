@@ -93,13 +93,13 @@ export default function HRDashboardPage() {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
-        <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm">
+        <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold">HR Quick Actions</h3>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             {[
-              { label: 'Add New Staff', href: '/dashboard/hr/staff', icon: Users, color: 'text-blue-500 bg-blue-50' },
+              { label: 'Add New Staff', href: '/dashboard/hr/staff', icon: Users, color: 'text-[var(--color-mod-hr-text)] bg-[var(--color-mod-hr-soft)]' },
               { label: 'Approve Leave', href: '/dashboard/hr/leave', icon: CalendarDays, color: 'text-emerald-500 bg-emerald-50' },
               { label: 'Staff Attendance', href: '/dashboard/hr/attendance', icon: ClipboardCheck, color: 'text-amber-500 bg-amber-50' },
               { label: 'Manage Contracts', href: '/dashboard/hr/contracts', icon: Briefcase, color: 'text-indigo-500 bg-indigo-50' },
@@ -107,7 +107,7 @@ export default function HRDashboardPage() {
               <Link
                 key={item.label}
                 href={item.href}
-                className="group flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all"
+                className="group flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-[var(--color-mod-hr-border)] hover:bg-[var(--color-mod-hr-soft)]/40 transition-all"
               >
                 <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl", item.color)}>
                   <item.icon size={20} />
@@ -115,7 +115,7 @@ export default function HRDashboardPage() {
                 <div className="flex-1">
                   <p className="font-bold text-slate-900">{item.label}</p>
                 </div>
-                <ArrowRight size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
+                <ArrowRight size={16} className="text-slate-300 group-hover:text-[var(--color-mod-hr-text)] transition-colors" />
               </Link>
             ))}
           </div>

@@ -93,6 +93,12 @@ export function TimetableGrid({ filters, activeVersionId }: { filters: any, acti
                   s.dayOfWeek === day.value && 
                   (s.periodId === period.id || (s.startsAt === period.startsAt && s.endsAt === period.endsAt))
                 );
+                const subjectName = slot?.subject?.name?.trim() || 'Subject not set';
+                const staffName = [slot?.staff?.firstName, slot?.staff?.lastName]
+                  .map((part) => part?.trim())
+                  .filter(Boolean)
+                  .join(' ') || 'Teacher not assigned';
+                const roomName = slot?.room?.trim() || 'Room not set';
 
                 return (
                   <td key={`${day.value}-${period.id}`} className="border-b border-slate-200 p-3">
@@ -106,18 +112,18 @@ export function TimetableGrid({ filters, activeVersionId }: { filters: any, acti
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <span className="text-xs font-black uppercase tracking-tight text-[var(--color-mod-homework-text)]">
-                            {slot.subject?.name}
+                            {subjectName}
                           </span>
                         </div>
                         
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
                             <User className="h-3 w-3 opacity-50" />
-                            {slot.staff ? `${slot.staff.firstName} ${slot.staff.lastName}` : 'No Teacher'}
+                            {staffName}
                           </div>
                           <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
                             <MapPin className="h-3 w-3 opacity-50" />
-                            {slot.room || 'No Room'}
+                            {roomName}
                           </div>
                         </div>
 

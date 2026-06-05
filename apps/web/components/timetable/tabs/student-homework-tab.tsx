@@ -40,6 +40,25 @@ type HomeworkAttachment = {
     sizeBytes?: string | number;
   } | null;
 };
+type HomeworkStaff = NonNullable<NonNullable<HomeworkSubmissionSummary['homework']>['assignedByStaff']>;
+
+function formatHomeworkDate(
+  value: string | null | undefined,
+  mode: 'date' | 'dateTime',
+  fallback = 'Date not set',
+) {
+  if (!value) return fallback;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Date unavailable';
+  return mode === 'date' ? date.toLocaleDateString() : date.toLocaleString();
+}
+
+function formatStaffName(staff: HomeworkStaff | null | undefined) {
+  return [staff?.firstName, staff?.lastName]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(' ') || 'Teacher not assigned';
+}
 
 export function StudentHomeworkTab() {
   const queryClient = useQueryClient();
@@ -95,41 +114,47 @@ export function StudentHomeworkTab() {
             />
           ) : (
             <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-              {submissions.map((submission: HomeworkSubmissionSummary) => (
-                <button
-                  key={submission.id}
-                  onClick={() => setSelectedSubmissionId(submission.id)}
-                  className={cn(
-                    "w-full text-left p-5 rounded-[1.5rem] border transition-all duration-300 group",
-                    selectedSubmissionId === submission.id
-                      ? "bg-slate-900 border-slate-900 text-white shadow-xl shadow-slate-200"
-                      : "bg-white border-slate-100 hover:border-slate-200 hover:shadow-md"
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <p className={cn("text-[9px] font-black uppercase tracking-widest", selectedSubmissionId === submission.id ? "text-indigo-400" : "text-indigo-600")}>
-                        {submission.homework?.subject?.name}
-                      </p>
-                      <h4 className="font-black uppercase tracking-tight text-base italic leading-tight">{submission.homework?.title}</h4>
-                    </div>
-                    <StatusBadge status={submission.status} isSelected={selectedSubmissionId === submission.id} />
-                  </div>
-                  
-                  <div className="mt-4 flex items-center justify-between pt-3 border-t border-white/10">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      <Clock size={12} className="shrink-0" />
-                      {new Date(submission.homework?.dueAt || '').toLocaleDateString()}
-                    </div>
-                    {submission.score !== null && (
-                      <div className={cn("flex items-center gap-1 text-[10px] font-black uppercase tracking-widest", selectedSubmissionId === submission.id ? "text-emerald-400" : "text-emerald-600")}>
-                        <Trophy size={12} />
-                        {submission.score}/{submission.homework?.maxScore}
-                      </div>
+              {submissions.map((submission: HomeworkSubmissionSummary) => {
+                const isSelected = selectedSubmissionId === submission.id;
+                const subjectName = submission.homework?.subject?.name?.trim() || 'Subject not set';
+                const title = submission.homework?.title?.trim() || 'Assignment title not set';
+
+                return (
+                  <button
+                    key={submission.id}
+                    onClick={() => setSelectedSubmissionId(submission.id)}
+                    className={cn(
+                      "w-full rounded-2xl border p-5 text-left transition-colors group",
+                      isSelected
+                        ? "border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)] shadow-sm"
+                        : "border-slate-100 bg-white hover:border-[var(--color-mod-homework-border)] hover:bg-[var(--color-mod-homework-bg)]"
                     )}
-                  </div>
-                </button>
-              ))}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-[var(--color-mod-homework-text)]">
+                          {subjectName}
+                        </p>
+                        <h4 className="font-black uppercase tracking-tight text-base italic leading-tight text-slate-900">{title}</h4>
+                      </div>
+                      <StatusBadge status={submission.status} isSelected={isSelected} />
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                        <Clock size={12} className="shrink-0" />
+                          {formatHomeworkDate(submission.homework?.dueAt, 'date', 'Due date not set')}
+                      </div>
+                      {submission.score !== null && (
+                        <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-emerald-600">
+                          <Trophy size={12} />
+                          {submission.score}/{submission.homework?.maxScore}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </SectionCard>
@@ -143,16 +168,18 @@ export function StudentHomeworkTab() {
               <div className="space-y-6">
                 <div>
                   <div className="flex items-center gap-3 mb-4">
-                    <Badge variant="outline" className="font-black uppercase tracking-widest text-[9px] py-0.5 border-indigo-200 text-indigo-600">
-                      {selectedSubmission.homework?.subject?.name}
+                    <Badge variant="outline" className="font-black uppercase tracking-widest text-[9px] py-0.5 border-[var(--color-mod-homework-border)] text-[var(--color-mod-homework-text)]">
+                      {selectedSubmission.homework?.subject?.name?.trim() || 'Subject not set'}
                     </Badge>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      By {selectedSubmission.homework?.assignedByStaff?.firstName} {selectedSubmission.homework?.assignedByStaff?.lastName}
+                      By {formatStaffName(selectedSubmission.homework?.assignedByStaff)}
                     </span>
                   </div>
-                  <h2 className="text-3xl font-black text-slate-900 uppercase italic tracking-tight leading-none mb-4">{selectedSubmission.homework?.title}</h2>
-                  <div className="rounded-[2rem] bg-slate-50 p-6 text-sm leading-relaxed text-slate-600 italic border border-slate-100 whitespace-pre-wrap">
-                    {selectedSubmission.homework?.instructions}
+                  <h2 className="text-3xl font-black text-slate-900 uppercase italic tracking-tight leading-none mb-4">
+                    {selectedSubmission.homework?.title?.trim() || 'Assignment title not set'}
+                  </h2>
+                  <div className="rounded-2xl bg-slate-50 p-6 text-sm leading-relaxed text-slate-600 italic border border-slate-100 whitespace-pre-wrap">
+                    {selectedSubmission.homework?.instructions?.trim() || 'Instructions not set'}
                   </div>
                 </div>
 
@@ -160,7 +187,7 @@ export function StudentHomeworkTab() {
                    <div className="space-y-1">
                       <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Due Date</p>
                       <p className="text-sm font-bold text-slate-900 uppercase">
-                        {new Date(selectedSubmission.homework?.dueAt || '').toLocaleString()}
+                        {formatHomeworkDate(selectedSubmission.homework?.dueAt, 'dateTime', 'Due date not set')}
                       </p>
                    </div>
                    <div className="h-8 w-px bg-slate-100" />
@@ -197,7 +224,7 @@ export function StudentHomeworkTab() {
                   }
                 >
                   <div className="space-y-6">
-                    <div className="rounded-[2rem] border border-slate-100 bg-white p-6 text-sm text-slate-700 leading-relaxed shadow-sm whitespace-pre-wrap">
+                    <div className="rounded-2xl border border-slate-100 bg-white p-6 text-sm text-slate-700 leading-relaxed shadow-sm whitespace-pre-wrap">
                       {selectedSubmission.submissionContent || 'No text content provided.'}
                     </div>
 
@@ -220,11 +247,11 @@ export function StudentHomeworkTab() {
                               onClick={() => void openAttachment(a.id)}
                               className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left text-[11px] font-black uppercase tracking-widest transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
                             >
-                              <FileText size={16} className="text-indigo-500" />
+                              <FileText size={16} className="text-[var(--color-mod-homework-text)]" />
                               <span className="truncate flex-1">
                                 {openingAttachmentId === a.id
                                   ? 'Opening signed file...'
-                                  : a.fileAsset?.originalFilename ?? 'Attachment'}
+                                  : a.fileAsset?.originalFilename?.trim() || 'File name not set'}
                               </span>
                             </button>
                           ))}
@@ -234,7 +261,7 @@ export function StudentHomeworkTab() {
                     
                     <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-t border-slate-50 pt-4">
                       <CheckCircle2 size={14} className="text-emerald-500" />
-                      Finalized on {new Date(selectedSubmission.submittedAt || '').toLocaleString()}
+                      Finalized on {formatHomeworkDate(selectedSubmission.submittedAt, 'dateTime', 'Submission date not set')}
                     </div>
                   </div>
                 </SectionCard>
@@ -242,18 +269,18 @@ export function StudentHomeworkTab() {
                 {selectedSubmission.feedback && (
                   <SectionCard 
                     title="Teacher Feedback" 
-                    className="bg-indigo-900 text-white border-indigo-800 shadow-indigo-100"
+                    className="border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)]"
                   >
                     <div className="flex items-start gap-4">
-                      <div className="h-10 w-10 rounded-2xl bg-white/10 flex items-center justify-center shrink-0 ring-1 ring-white/20">
-                         <MessageSquare className="h-5 w-5 text-indigo-300" />
+                      <div className="h-10 w-10 rounded-2xl bg-white flex items-center justify-center shrink-0 ring-1 ring-[var(--color-mod-homework-border)]">
+                         <MessageSquare className="h-5 w-5 text-[var(--color-mod-homework-text)]" />
                       </div>
                       <div>
-                        <p className="text-sm italic leading-relaxed text-indigo-100">&ldquo;{selectedSubmission.feedback}&rdquo;</p>
+                        <p className="text-sm italic leading-relaxed text-slate-700">&ldquo;{selectedSubmission.feedback}&rdquo;</p>
                         {selectedSubmission.score !== null && (
                           <div className="mt-4 flex items-center gap-2">
                              <Trophy size={14} className="text-amber-400" />
-                             <span className="text-xs font-black uppercase tracking-[0.2em]">Score: {selectedSubmission.score} / {selectedSubmission.homework?.maxScore}</span>
+                             <span className="text-xs font-black uppercase tracking-[0.2em] text-[var(--color-mod-homework-text)]">Score: {selectedSubmission.score} / {selectedSubmission.homework?.maxScore}</span>
                           </div>
                         )}
                       </div>
@@ -289,9 +316,9 @@ function StatusBadge({ status, isSelected }: { status: string; isSelected: boole
     <span className={cn(
       "inline-flex items-center px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest",
       isSelected 
-        ? "bg-white/10 text-white ring-1 ring-white/20" 
+        ? "bg-white text-[var(--color-mod-homework-text)] ring-1 ring-[var(--color-mod-homework-border)]"
         : isReviewed ? "bg-emerald-100 text-emerald-700" :
-          isSubmitted ? "bg-indigo-100 text-indigo-700" :
+          isSubmitted ? "bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)]" :
           isLate ? "bg-amber-100 text-amber-700" :
           "bg-slate-100 text-slate-500"
     )}>
@@ -345,7 +372,7 @@ function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onS
     }
     mutation.mutate({ 
       submissionId, 
-      content, 
+      content: content.trim(),
       attachmentIds: attachments.map(a => a.id) 
     });
   };
@@ -365,7 +392,7 @@ function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onS
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900">Supportive Files</h4>
-          <label className="cursor-pointer h-9 px-4 rounded-full bg-indigo-50 text-indigo-700 text-[9px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-colors flex items-center gap-2">
+          <label className="cursor-pointer h-9 px-4 rounded-full border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)] text-[9px] font-black uppercase tracking-widest hover:bg-white transition-colors flex items-center gap-2">
             <Paperclip size={12} />
             Upload File
             <input 
@@ -392,16 +419,16 @@ function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onS
             </div>
           ))}
           {isUploading && (
-            <div className="flex items-center gap-3 rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/30 p-4 animate-pulse">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-              <span className="text-[11px] font-bold text-indigo-500 uppercase tracking-widest italic">Uploading...</span>
+            <div className="flex items-center gap-3 rounded-2xl border border-dashed border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] p-4 animate-pulse">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-mod-homework-text)] border-t-transparent" />
+              <span className="text-[11px] font-bold text-[var(--color-mod-homework-text)] uppercase tracking-widest italic">Uploading...</span>
             </div>
           )}
         </div>
       </div>
 
       {error && (
-        <div className="flex items-center gap-3 p-4 rounded-[1.5rem] bg-red-50 border border-red-100 text-red-700">
+        <div className="flex items-center gap-3 p-4 rounded-2xl bg-red-50 border border-red-100 text-red-700">
           <AlertCircle size={18} className="shrink-0" />
           <p className="text-xs font-bold uppercase tracking-widest">{error}</p>
         </div>
@@ -410,7 +437,7 @@ function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onS
       <div className="flex justify-end pt-4">
         <button
           type="submit"
-          className="h-14 px-12 rounded-[1.5rem] bg-slate-900 text-white font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-slate-200 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0 flex items-center gap-3"
+          className="h-14 px-12 rounded-2xl bg-[var(--color-mod-homework-accent)] text-white font-black uppercase tracking-[0.2em] text-xs shadow-sm transition-colors hover:bg-[var(--color-mod-homework-text)] disabled:opacity-50 flex items-center gap-3"
           disabled={mutation.isPending || isUploading}
         >
           {mutation.isPending ? (

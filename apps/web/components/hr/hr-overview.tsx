@@ -8,10 +8,7 @@ import {
   CalendarDays,
   Calculator,
   AlertCircle,
-  Clock,
   UserCheck,
-  UserMinus,
-  CheckCircle2,
 } from 'lucide-react';
 import { StatCard } from '../ui/stat-card';
 import { Badge } from '../ui/badge';
@@ -76,6 +73,8 @@ export function HROverview() {
   ).length;
 
   const latestPayrollRun = payrollRuns[0] ?? null;
+  const formatAssignedText = (value: string | null | undefined, fallback: string) =>
+    value?.trim() || fallback;
 
   const isLoading =
     staffQuery.isLoading ||
@@ -99,7 +98,7 @@ export function HROverview() {
           title="Active Contracts"
           value={activeContracts}
           description="Awaiting renewals"
-          icon={<Briefcase className="h-5 w-5 text-blue-500" />}
+          icon={<Briefcase className="h-5 w-5 text-[var(--color-mod-hr-text)]" />}
           loading={isLoading}
         />
         <StatCard
@@ -120,35 +119,35 @@ export function HROverview() {
 
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Payroll Status Card */}
-        <section className="bg-slate-900 rounded-[2rem] p-8 text-white shadow-xl lg:col-span-1 flex flex-col justify-between">
+        <section className="rounded-2xl border border-[var(--color-mod-hr-border)] bg-[var(--color-mod-hr-soft)]/70 p-8 text-slate-900 shadow-sm lg:col-span-1 flex flex-col justify-between">
           <div>
             <h3 className="text-xl font-bold flex items-center gap-3">
-              <Calculator className="text-emerald-400" />
+              <Calculator className="text-[var(--color-mod-hr-text)]" />
               Payroll Status
             </h3>
-            <p className="text-slate-400 text-xs mt-2">Current month processing overview.</p>
+            <p className="text-slate-600 text-xs mt-2">Current month processing overview.</p>
             
             <div className="mt-8 space-y-4">
-              <div className="flex justify-between items-center py-2.5 border-b border-white/5">
-                <span className="text-sm text-slate-400">Latest Processed Run</span>
-                <span className="font-bold text-white">
+              <div className="flex justify-between items-center py-2.5 border-b border-[var(--color-mod-hr-border)]/70">
+                <span className="text-sm text-slate-600">Latest Processed Run</span>
+                <span className="font-bold text-slate-950">
                   {latestPayrollRun
                     ? `${latestPayrollRun.periodMonth}/${latestPayrollRun.periodYear}`
                     : 'None'}
                 </span>
               </div>
-              <div className="flex justify-between items-center py-2.5 border-b border-white/5">
-                <span className="text-sm text-slate-400">Run Status</span>
+              <div className="flex justify-between items-center py-2.5 border-b border-[var(--color-mod-hr-border)]/70">
+                <span className="text-sm text-slate-600">Run Status</span>
                 {latestPayrollRun ? (
-                  <Badge variant="phase2" className="bg-emerald-500/20 text-emerald-300 border-emerald-500/20">
+                  <Badge variant="phase2" className="bg-emerald-50 text-emerald-700 border-emerald-200/70">
                     {latestPayrollRun.status}
                   </Badge>
                 ) : (
-                  <span className="text-slate-500 font-bold">N/A</span>
+                  <span className="text-slate-500 font-bold">No run processed</span>
                 )}
               </div>
               <div className="flex justify-between items-center py-2.5">
-                <span className="text-sm text-slate-400">Runs Pending Review</span>
+                <span className="text-sm text-slate-600">Runs Pending Review</span>
                 <span className="font-bold text-amber-400">
                   {payrollRuns.filter((r) => ['GENERATED', 'UNDER_REVIEW', 'REVIEWED'].includes(r.status)).length}
                 </span>
@@ -157,20 +156,20 @@ export function HROverview() {
           </div>
           <Link
             href="/dashboard/payroll/runs"
-            className="mt-8 inline-flex items-center justify-center w-full px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-bold text-sm transition-all border border-white/10"
+            className="mt-8 inline-flex items-center justify-center w-full px-5 py-3 rounded-2xl bg-[var(--color-mod-hr-accent)] hover:bg-[var(--color-mod-hr-text)] text-white font-bold text-sm transition-all border border-[var(--color-mod-hr-accent)]"
           >
             Manage Payroll Runs
           </Link>
         </section>
 
         {/* Recently Joined Staff */}
-        <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm lg:col-span-2">
+        <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm lg:col-span-2">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold flex items-center gap-3">
               <Users className="text-indigo-500" />
               Recently Joined Staff
             </h3>
-            <Link href="/dashboard/hr/staff" className="text-xs font-bold text-blue-600 hover:underline">
+            <Link href="/dashboard/hr/staff" className="text-xs font-bold text-[var(--color-mod-hr-text)] hover:underline">
               View Directory
             </Link>
           </div>
@@ -201,7 +200,9 @@ export function HROverview() {
                       <tr key={item.id} className="hover:bg-slate-50/30 transition-colors">
                         <td className="px-5 py-4">
                           <p className="font-bold text-slate-900">{item.firstName} {item.lastName}</p>
-                          <p className="text-[10px] text-slate-400 mt-1">{item.designation || 'Staff'} • {item.department || 'General'}</p>
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            {formatAssignedText(item.designation, 'Designation not set')} &bull; {formatAssignedText(item.department, 'Department not set')}
+                          </p>
                         </td>
                         <td className="px-5 py-4 text-slate-500 font-medium">
                           {new Date(item.joiningDate).toLocaleDateString()}

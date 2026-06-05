@@ -134,7 +134,27 @@ describe('Phase 3B Library frontend contracts', () => {
     assert.match(workspace, /LoadingState/);
     assert.match(workspace, /EmptyState/);
     assert.match(workspace, /ErrorNotice/);
+    assert.match(workspace, /color-mod-library-accent/);
+    assert.doesNotMatch(
+      workspace,
+      /rounded-\[2rem\]|rounded-\[3rem\]|Unknown book|Unknown author|Unknown borrower|\bN\/A\b/,
+    );
     assert.doesNotMatch(workspace, /demo-|fake-|placeholderId/i);
+  });
+
+  it('keeps Library selector and report rows explicit about missing source data', () => {
+    const workspace = read('components/library/library-workspace.tsx');
+    const selector = read('components/library/book-selector.tsx');
+
+    assert.match(selector, /ISBN not recorded/);
+    assert.match(workspace, /Borrower record unavailable/);
+    assert.match(workspace, /Author not recorded/);
+    assert.match(workspace, /Barcode not recorded/);
+
+    for (const source of [workspace, selector]) {
+      assert.doesNotMatch(source, /\bN\/A\b|\bUnknown\b/);
+      assert.doesNotMatch(source, /shadow-xl|rounded-\[2rem\]|rounded-\[2\.5rem\]|rounded-\[30px\]/);
+    }
   });
 
   it('adds a scanner-first Library issue workflow without bypassing form validation', () => {

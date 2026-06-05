@@ -389,7 +389,7 @@ export function MarksEntryWorkspace() {
             description={`Recording marks for ${selectedComponent?.subject?.name} - ${selectedComponent?.name}`}
           >
             {isExamLocked && (
-              <div className="mb-6 flex items-center gap-3 rounded-[2rem] bg-amber-50 border border-amber-100 p-6 text-amber-800">
+              <div className="mb-6 flex items-center gap-3 rounded-2xl bg-amber-50 border border-amber-100 p-6 text-amber-800">
                 <Lock size={20} className="shrink-0" />
                 <div>
                   <p className="font-black uppercase italic tracking-tight">Exam Term Locked</p>

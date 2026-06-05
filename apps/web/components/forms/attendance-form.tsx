@@ -649,7 +649,7 @@ export function AttendanceForm() {
 
       {/* Summary Floating Bar */}
       {roster.length > 0 && (
-        <div className="animate-in slide-in-from-bottom-8 fixed bottom-8 left-1/2 z-50 flex -translate-x-1/2 items-center gap-8 rounded-xl border border-white/10 bg-slate-900/95 p-6 text-white shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl duration-700">
+        <div className="animate-in slide-in-from-bottom-8 fixed bottom-8 left-1/2 z-50 flex -translate-x-1/2 items-center gap-8 rounded-xl border border-white/10 bg-[var(--color-mod-attendance-text)]/95 p-6 text-white shadow-[0_20px_50px_rgba(15,23,42,0.28)] backdrop-blur-xl duration-700">
           <div className="flex items-center gap-8 px-4">
             <SummaryStat
               label="Present"
@@ -681,7 +681,7 @@ export function AttendanceForm() {
             disabled={
               mutation.isPending || roster.length === 0 || futureDateBlocked
             }
-            className="flex items-center gap-3 rounded-xl bg-[var(--color-mod-attendance-accent)] px-10 py-4 text-sm font-black text-white shadow-xl shadow-primary-500/30 transition-all hover:scale-105 hover:bg-[var(--color-mod-attendance-text)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+            className="flex items-center gap-3 rounded-xl bg-[var(--color-mod-attendance-accent)] px-10 py-4 text-sm font-black text-white shadow-lg shadow-[var(--color-mod-attendance-border)]/40 transition-all hover:scale-105 hover:bg-[var(--color-mod-attendance-text)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
           >
             {mutation.isPending ? (
               <Loader2 size={20} className="animate-spin" />

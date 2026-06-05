@@ -134,7 +134,7 @@ export function AssessmentComponentsDialog({
 
       <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
         {componentsQuery.data?.map((comp) => (
-          <div key={comp.id} className="group relative flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-4 transition-all hover:border-primary-100 hover:shadow-sm">
+          <div key={comp.id} className="group relative flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-4 transition-all hover:border-[var(--color-mod-academics-border)] hover:shadow-sm">
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black uppercase tracking-tight text-slate-900">{comp.subject?.name}</span>

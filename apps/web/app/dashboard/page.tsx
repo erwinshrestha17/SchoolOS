@@ -221,10 +221,10 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Setup needs attention */}
-      <header className="rounded-[20px] border border-primary-100 bg-white px-5 py-6 shadow-sm lg:px-7">
+      <header className="rounded-2xl border border-[var(--color-mod-dashboard-border)] bg-white px-5 py-6 shadow-sm lg:px-7">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_440px] xl:items-center">
           <div className="max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-wide text-primary-700">
+            <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-mod-dashboard-text)]">
               School day header
             </p>
             <h1 className="mt-2 text-[30px] font-extrabold leading-[38px] text-slate-950 sm:text-[36px] sm:leading-[44px]">
@@ -250,7 +250,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            <div className="grid grid-cols-3 gap-2 rounded-2xl border border-primary-100 bg-primary-50 p-3">
+            <div className="grid grid-cols-3 gap-2 rounded-2xl border border-[var(--color-mod-dashboard-border)] bg-[var(--color-mod-dashboard-bg)] p-3">
               <DashboardHeroMetric
                 label="Alerts"
                 value={operationalAlerts.length}
@@ -261,14 +261,14 @@ export default function DashboardPage() {
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/dashboard/admissions"
-                className="flex min-h-11 items-center gap-2 rounded-xl bg-primary-500 px-5 py-3 text-sm font-bold text-white shadow-sm shadow-primary-500/20 transition hover:-translate-y-0.5 hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2"
+                className="flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-dashboard-accent)] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[var(--color-mod-dashboard-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-dashboard-border)] focus:ring-offset-2"
               >
                 <UserPlus size={18} />
                 New Admission
               </Link>
               <Link
                 href="/dashboard/attendance"
-                className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2"
+                className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--color-mod-dashboard-border)] hover:text-[var(--color-mod-dashboard-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-dashboard-border)] focus:ring-offset-2"
               >
                 <CalendarCheck size={18} />
                 Mark Attendance
@@ -281,7 +281,7 @@ export default function DashboardPage() {
       {session?.user.roles.includes('teacher') && (
         <section className="space-y-6">
           <div className="flex items-center gap-3">
-            <div className="h-1 w-8 bg-indigo-500 rounded-full" />
+            <div className="h-1 w-8 bg-[var(--color-mod-dashboard-accent)] rounded-full" />
             <h2 className="text-xl font-black text-slate-900">
               Teacher Insights
             </h2>
@@ -405,7 +405,7 @@ export default function DashboardPage() {
             </div>
             <Link
               href="/dashboard/attendance"
-              className="mt-4 block text-center text-sm font-bold text-primary-600 hover:text-primary-700"
+              className="mt-4 block text-center text-sm font-bold text-[var(--color-mod-dashboard-accent)] hover:text-[var(--color-mod-dashboard-text)]"
             >
               View Detailed Reports
             </Link>
@@ -435,7 +435,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
-                    className="h-full rounded-full bg-primary-500 transition-all duration-1000"
+                    className="h-full rounded-full bg-[var(--color-mod-dashboard-accent)] transition-all duration-1000"
                     style={{
                       width: `${Math.min(100, collectionRate)}%`,
                     }}
@@ -464,7 +464,7 @@ export default function DashboardPage() {
             </div>
             <Link
               href="/dashboard/fees"
-              className="mt-4 block text-center text-sm font-bold text-primary-600 hover:text-primary-700"
+              className="mt-4 block text-center text-sm font-bold text-[var(--color-mod-dashboard-accent)] hover:text-[var(--color-mod-dashboard-text)]"
             >
               Manage Collections
             </Link>
@@ -486,7 +486,7 @@ export default function DashboardPage() {
               </p>
               <Link
                 href="/dashboard/admissions"
-                className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-mod-admissions-text hover:text-primary-700"
+                className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-mod-admissions-text hover:text-[var(--color-mod-dashboard-text)]"
               >
                 Open admissions
                 <ArrowRight size={14} />
@@ -538,7 +538,7 @@ export default function DashboardPage() {
           </div>
           <Link
             href="/dashboard/notices"
-            className="mt-5 inline-flex items-center gap-1 text-sm font-bold text-primary-600 hover:text-primary-700"
+            className="mt-5 inline-flex items-center gap-1 text-sm font-bold text-[var(--color-mod-dashboard-accent)] hover:text-[var(--color-mod-dashboard-text)]"
           >
             Review notices
             <ArrowRight size={14} />
@@ -560,12 +560,12 @@ export default function DashboardPage() {
               <Link
                 key={action.label}
                 href={action.href}
-                className="group flex min-h-[108px] flex-col items-center justify-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-4 text-center transition hover:border-primary-200 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2"
+                className="group flex min-h-[108px] flex-col items-center justify-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-4 text-center transition hover:border-[var(--color-mod-dashboard-border)] hover:bg-[var(--color-mod-dashboard-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-dashboard-border)] focus:ring-offset-2"
               >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-100 bg-white text-slate-500 shadow-sm transition group-hover:border-primary-100 group-hover:text-primary-600">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-100 bg-white text-slate-500 shadow-sm transition group-hover:border-[var(--color-mod-dashboard-border)] group-hover:text-[var(--color-mod-dashboard-accent)]">
                   <action.icon size={24} />
                 </div>
-                <span className="text-center text-xs font-bold text-slate-700 group-hover:text-primary-700">
+                <span className="text-center text-xs font-bold text-slate-700 group-hover:text-[var(--color-mod-dashboard-text)]">
                   {action.label}
                 </span>
               </Link>
@@ -579,7 +579,7 @@ export default function DashboardPage() {
           headerAction={
             <Link
               href="/dashboard/notices"
-              className="text-sm font-bold text-primary-600 hover:text-primary-700"
+              className="text-sm font-bold text-[var(--color-mod-dashboard-accent)] hover:text-[var(--color-mod-dashboard-text)]"
             >
               Go to Communications
             </Link>
@@ -597,7 +597,7 @@ export default function DashboardPage() {
                       'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
                       notice.priority.toUpperCase() === 'HIGH'
                         ? 'bg-danger-50 text-danger-500'
-                        : 'bg-primary-50 text-primary-500',
+                        : 'bg-[var(--color-mod-dashboard-bg)] text-[var(--color-mod-dashboard-accent)]',
                     )}
                   >
                     <Megaphone size={20} />
@@ -738,8 +738,8 @@ function RecentActivityList({
         : admission.className,
       date: normalizeActivityDate(admission),
       icon: UserPlus,
-      color: 'text-primary-500',
-      bg: 'bg-primary-50',
+      color: 'text-[var(--color-mod-dashboard-accent)]',
+      bg: 'bg-[var(--color-mod-dashboard-bg)]',
     })),
     ...receipts.slice(0, 3).map((receipt) => ({
       title: `Fee Collected: ${formatMoney(receipt.amount ?? receipt.payment?.amount ?? 0)}`,

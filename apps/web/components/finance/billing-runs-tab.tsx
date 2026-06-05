@@ -100,7 +100,7 @@ export function BillingRunsTab() {
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Academic Year</label>
                 <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={academicYearId}
                   onChange={(e) => setAcademicYearId(e.target.value)}
                   required
@@ -118,7 +118,7 @@ export function BillingRunsTab() {
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Fee Plan Scope</label>
                 <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={feePlanId}
                   onChange={(e) => setFeePlanId(e.target.value)}
                   disabled={billingRunMutation.isPending}
@@ -140,7 +140,7 @@ export function BillingRunsTab() {
                   type="number"
                   min={1}
                   max={12}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={runMonth}
                   onChange={(e) => setRunMonth(Number(e.target.value))}
                   required
@@ -152,7 +152,7 @@ export function BillingRunsTab() {
                 <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Billing Year</label>
                 <input
                   type="number"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={runYear}
                   onChange={(e) => setRunYear(Number(e.target.value))}
                   required
@@ -164,7 +164,7 @@ export function BillingRunsTab() {
                 <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Due Date</label>
                 <input
                   type="date"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
                   required
@@ -175,7 +175,7 @@ export function BillingRunsTab() {
 
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-slate-800 disabled:opacity-50 transition-all shadow-lg"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 transition-all shadow-sm"
               disabled={billingRunMutation.isPending || !academicYearId}
             >
               {billingRunMutation.isPending ? (
@@ -288,7 +288,7 @@ export function BillingRunsTab() {
             </button>
             <button
               type="button"
-              className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2"
+              className="rounded-xl bg-[var(--color-mod-fees-accent)] px-4 py-2 text-xs font-bold text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 flex items-center gap-2"
               onClick={confirmBillingRun}
               disabled={billingRunMutation.isPending}
             >

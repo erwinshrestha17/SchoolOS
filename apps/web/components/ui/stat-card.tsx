@@ -24,7 +24,7 @@ interface StatCardProps {
 }
 
 const toneStyles: Record<StatTone, string> = {
-  dashboard: 'border-primary-100 bg-primary-50 text-primary-600',
+  dashboard: 'border-[var(--primary-soft)] bg-[var(--primary-soft)] text-[var(--primary-dark)]',
   success: 'border-success-100 bg-success-50 text-success-700',
   warning: 'border-warning-100 bg-warning-50 text-warning-700',
   danger: 'border-danger-100 bg-danger-50 text-danger-700',
@@ -112,7 +112,7 @@ export function StatCard({
       <Link
         href={href}
         className={cn(
-          'shell-card block p-5 transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2 active:translate-y-0 lg:p-6',
+          'shell-card block p-5 transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 active:translate-y-0 lg:p-6',
           className,
         )}
       >

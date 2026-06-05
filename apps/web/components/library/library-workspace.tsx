@@ -629,13 +629,13 @@ function OverviewPanel({
         <StatCard title="Lost / damaged" value={stats.lostDamaged} icon={<Library size={18} />} loading={isLoading} />
       </div>
 
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-slate-900">Operational attention</h2>
             <p className="text-sm text-slate-500">Overdue copies that may need reminders or follow-up.</p>
           </div>
-          <Link href="/dashboard/library/overdue" className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
+          <Link href="/dashboard/library/overdue" className="rounded-xl bg-[var(--color-mod-library-accent)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-mod-library-text)]">
             Open overdue
           </Link>
         </div>
@@ -650,22 +650,22 @@ function OverviewPanel({
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <PanelHeader
           title="Library operations"
           description="Access detailed borrower history, fine records, and health reports."
         />
         <div className="mt-5 grid gap-4 lg:grid-cols-3">
-          <Link href="/dashboard/library/reports" className="group rounded-2xl border border-slate-100 bg-slate-50/50 p-5 transition hover:border-primary-100 hover:bg-primary-50/20">
-            <h3 className="font-bold text-slate-900 group-hover:text-primary-700">Detailed reports</h3>
+          <Link href="/dashboard/library/reports" className="group rounded-2xl border border-slate-100 bg-slate-50/50 p-5 transition hover:border-[var(--color-mod-library-border)] hover:bg-[var(--color-mod-library-bg)]">
+            <h3 className="font-bold text-slate-900 group-hover:text-[var(--color-mod-library-text)]">Detailed reports</h3>
             <p className="mt-1 text-sm text-slate-500">Popular books, damaged inventory, and CSV exports.</p>
           </Link>
-          <Link href="/dashboard/library/fines" className="group rounded-2xl border border-slate-100 bg-slate-50/50 p-5 transition hover:border-primary-100 hover:bg-primary-50/20">
-            <h3 className="font-bold text-slate-900 group-hover:text-primary-700">Fine management</h3>
+          <Link href="/dashboard/library/fines" className="group rounded-2xl border border-slate-100 bg-slate-50/50 p-5 transition hover:border-[var(--color-mod-library-border)] hover:bg-[var(--color-mod-library-bg)]">
+            <h3 className="font-bold text-slate-900 group-hover:text-[var(--color-mod-library-text)]">Fine management</h3>
             <p className="mt-1 text-sm text-slate-500">Track pending fines and apply audit-logged waivers.</p>
           </Link>
-          <Link href="/dashboard/library/issues" className="group rounded-2xl border border-slate-100 bg-slate-50/50 p-5 transition hover:border-primary-100 hover:bg-primary-50/20">
-            <h3 className="font-bold text-slate-900 group-hover:text-primary-700">Borrower lookup</h3>
+          <Link href="/dashboard/library/issues" className="group rounded-2xl border border-slate-100 bg-slate-50/50 p-5 transition hover:border-[var(--color-mod-library-border)] hover:bg-[var(--color-mod-library-bg)]">
+            <h3 className="font-bold text-slate-900 group-hover:text-[var(--color-mod-library-text)]">Borrower lookup</h3>
             <p className="mt-1 text-sm text-slate-500">Search student history and check active issue limits.</p>
           </Link>
         </div>
@@ -702,7 +702,7 @@ function BooksPanel(props: {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <PanelHeader
           title="Book Catalogue"
           description="Search books by title, author, ISBN, or category."
@@ -761,7 +761,7 @@ function BooksPanel(props: {
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <PanelHeader
           title={props.editingBookId ? 'Edit Book' : 'Add Book'}
           description="Catalogue data used by copy tracking and issue workflows."
@@ -816,7 +816,7 @@ function CopiesPanel(props: {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <PanelHeader title="Copy Management" description="Track physical copies, barcodes, shelf location, and circulation status." />
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           <SearchBox value={props.search} onChange={props.setSearch} placeholder="Search barcode" />
@@ -833,7 +833,7 @@ function CopiesPanel(props: {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-bold text-slate-900">{copy.book?.title ?? 'Unknown book'}</h3>
+                    <h3 className="font-bold text-slate-900">{copy.book?.title?.trim() || 'Book title not set'}</h3>
                     <LibraryStatusBadge status={copy.status} />
                   </div>
                   <p className="mt-1 text-sm text-slate-500">Barcode: {copy.barcode} • Shelf: {copy.shelfLocation || 'Not set'}</p>
@@ -880,7 +880,7 @@ function CopiesPanel(props: {
         />
       </section>
 
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <PanelHeader title={props.editingCopyId ? 'Edit Copy' : 'Add Copy'} description="Barcode must be unique per tenant." />
         {props.error && <ErrorNotice message={props.error.message} />}
         <form onSubmit={props.onSubmit} className="mt-5 space-y-4">
@@ -1004,7 +1004,7 @@ function IssuesPanel(props: {
   
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <PanelHeader title="Issue / Return" description="Issue available copies and close active borrower records." />
         <div className="mt-5 max-w-xs">
           <select value={props.status} onChange={(e) => props.setStatus(e.target.value)} className="input-control">
@@ -1026,7 +1026,7 @@ function IssuesPanel(props: {
                     <TextInput label="Condition" placeholder="e.g. Good" value={draft.returnCondition ?? ''} onChange={(returnCondition) => props.setReturnDrafts({ ...props.returnDrafts, [issue.id]: { ...draft, returnCondition } })} />
                     <TextInput label="Fine (NPR)" type="number" value={draft.fineAmount?.toString() ?? ''} onChange={(value) => props.setReturnDrafts({ ...props.returnDrafts, [issue.id]: { ...draft, fineAmount: value ? Number(value) : undefined } })} />
                     <label className="flex items-center gap-2 pb-3 text-sm font-bold text-slate-700">
-                      <input type="checkbox" className="rounded-lg border-slate-300 text-primary-600 focus:ring-primary-100" checked={Boolean(draft.markLost)} onChange={(e) => props.setReturnDrafts({ ...props.returnDrafts, [issue.id]: { ...draft, markLost: e.target.checked } })} />
+                      <input type="checkbox" className="rounded-lg border-slate-300 text-[var(--color-mod-library-text)] focus:ring-[var(--color-mod-library-bg)]" checked={Boolean(draft.markLost)} onChange={(e) => props.setReturnDrafts({ ...props.returnDrafts, [issue.id]: { ...draft, markLost: e.target.checked } })} />
                       Mark lost/damaged
                     </label>
                     <button type="button" className="btn-primary h-11" disabled={props.isSaving} onClick={() => setConfirmId(issue.id)}>
@@ -1053,7 +1053,7 @@ function IssuesPanel(props: {
       </section>
 
       <section className="space-y-6">
-        <section className="rounded-[2rem] border border-primary-100 bg-primary-50/20 p-5 shadow-sm">
+        <section className="rounded-2xl border border-[var(--color-mod-library-border)] bg-[var(--color-mod-library-bg)] p-5 shadow-sm">
           <PanelHeader title="Quick QR Lookup" description="Scan student QR to select the borrower and review borrowing status." />
           <QRResolver
             purpose="LIBRARY"
@@ -1066,7 +1066,7 @@ function IssuesPanel(props: {
           {resolvedBorrower ? <QrBorrowerSummary borrower={resolvedBorrower} /> : null}
         </section>
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <PanelHeader title="Issue copy" description="Select a physical copy and a borrower." />
           {props.error && <ErrorNotice message={props.error.message} />}
           <form onSubmit={props.onIssueSubmit} className="mt-5 space-y-4">
@@ -1149,7 +1149,7 @@ function IssuesPanel(props: {
             
             <button
               type="submit"
-              className="btn-primary w-full h-12 text-base shadow-lg shadow-primary-100" 
+              className="btn-primary w-full h-12 text-base shadow-sm"
               disabled={
                 props.isSaving ||
                 !props.form.copyId ||
@@ -1267,11 +1267,11 @@ function QrBorrowerSummary({ borrower }: { borrower: LibraryQrBorrower }) {
   const canBorrow = borrower.canBorrow ?? true;
 
   return (
-    <div className="mt-4 rounded-2xl border border-primary-100 bg-white p-4 shadow-sm">
+    <div className="mt-4 rounded-2xl border border-[var(--color-mod-library-border)] bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wide text-primary-600">QR borrower selected</p>
-          <h3 className="mt-1 truncate font-bold text-slate-900">{borrower.name ?? 'Student'}</h3>
+          <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-mod-library-text)]">QR borrower selected</p>
+          <h3 className="mt-1 truncate font-bold text-slate-900">{borrower.name?.trim() || 'Student name not set'}</h3>
           <p className="mt-1 text-xs font-semibold text-slate-500">
             {[borrower.studentCode, borrower.classSection].filter(Boolean).join(' • ') || 'Student QR resolved'}
           </p>
@@ -1352,7 +1352,7 @@ function OverduePanel({
   error: Error | null;
 }) {
   return (
-    <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <PanelHeader title="Overdue Issues" description="Review overdue copies and queue consent-aware reminders." />
         <button type="button" onClick={onSendReminders} disabled={isSending || overdueIssues.length === 0} className="btn-primary">
@@ -1382,7 +1382,7 @@ function IssueRow({ issue, compact = false }: { issue: LibraryIssue; compact?: b
     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="font-bold text-slate-900">{issue.copy?.book?.title ?? 'Unknown book'}</h3>
+          <h3 className="font-bold text-slate-900">{issue.copy?.book?.title?.trim() || 'Book title not set'}</h3>
           <LibraryStatusBadge status={issue.status} />
         </div>
         <p className="mt-1 text-sm text-slate-500">
@@ -1548,7 +1548,7 @@ function overdueDays(dueAt: string) {
 function borrowerName(issue: LibraryIssue) {
   if (issue.borrowerStudent) return studentName(issue.borrowerStudent);
   if (issue.borrowerStaff) return staffName(issue.borrowerStaff);
-  return 'Unknown borrower';
+  return 'Borrower record unavailable';
 }
 
 function studentName(student: { firstNameEn?: string; lastNameEn?: string; studentSystemId?: string }) {
@@ -1583,7 +1583,7 @@ function FinesPanel({
   const [postReason, setPostReason] = useState('');
 
   return (
-    <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <PanelHeader title="Fine Management" description="Track, waive, and hand student library fines to the Fees counter with mandatory audit logging." />
       {postError && <ErrorNotice message={postError.message} />}
       <div className="mt-5 space-y-3">
@@ -1601,17 +1601,17 @@ function FinesPanel({
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-bold text-slate-900">{fine.issue?.copy?.book?.title ?? 'Unknown book'}</h3>
+                    <h3 className="font-bold text-slate-900">{fine.issue?.copy?.book?.title?.trim() || 'Book title not set'}</h3>
                     <StatusBadge status={fine.status} label={fine.status} tone={fine.status === 'PENDING' ? 'overdue' : 'approved'} />
                   </div>
                   <p className="mt-1 text-sm text-slate-500">
-                    Borrower: {fine.issue ? borrowerName(fine.issue) : 'Unknown'} • Amount: {money(fine.amount)}
+                    Borrower: {fine.issue ? borrowerName(fine.issue) : 'Borrower not set'} • Amount: {money(fine.amount)}
                   </p>
                   {fine.waivedAmount > 0 && (
                     <p className="mt-1 text-xs text-emerald-600 font-semibold">Waived: {money(fine.waivedAmount)} (Reason: {fine.waiverReason})</p>
                   )}
                   {linkedInvoiceId && (
-                    <p className="mt-1 text-xs font-semibold text-primary-700">
+                    <p className="mt-1 text-xs font-semibold text-[var(--color-mod-library-text)]">
                       Linked Fees invoice: {fine.issue?.invoice?.invoiceNumber ?? linkedInvoiceId}
                     </p>
                   )}
@@ -1760,7 +1760,7 @@ function ReportsPanel({
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <PanelHeader
             title="Reports & Exports"
@@ -1807,7 +1807,7 @@ function ReportsPanel({
       </section>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <PanelHeader title="Issued Books" description="Recent active circulation records included in the CSV export." />
           <div className="mt-5 space-y-3">
             {isLoading && <LoadingState label="Loading issued report..." />}
@@ -1820,7 +1820,7 @@ function ReportsPanel({
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <PanelHeader title="Overdue Books" description="Active issues past their due date." />
           <div className="mt-5 space-y-3">
             {isLoading && <LoadingState label="Loading overdue report..." />}
@@ -1835,15 +1835,15 @@ function ReportsPanel({
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <PanelHeader title="Popular Books" description="Most frequently issued books in the library." />
           <div className="mt-5 space-y-3">
             {isLoading && <LoadingState label="Loading popularity report..." />}
             {popularBooks.map((item, idx) => (
               <div key={`${item.book?.id ?? 'book'}-${idx}`} className="flex items-center justify-between border-b border-slate-50 p-3 last:border-0">
                 <div className="min-w-0">
-                  <p className="truncate font-bold text-slate-900">{item.book?.title ?? 'Unknown book'}</p>
-                  <p className="text-xs text-slate-500">{item.book?.author ?? 'Unknown author'}</p>
+                  <p className="truncate font-bold text-slate-900">{item.book?.title?.trim() || 'Book title not set'}</p>
+                  <p className="text-xs text-slate-500">{item.book?.author ?? 'Author not recorded'}</p>
                 </div>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
                   {item.issueCount} issues
@@ -1856,14 +1856,14 @@ function ReportsPanel({
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <PanelHeader title="Lost / Damaged Copies" description="Current inventory items marked as unusable." />
           <div className="mt-5 space-y-3">
             {isLoading && <LoadingState label="Loading loss report..." />}
             {lostDamaged.map((copy) => (
               <div key={copy.id} className="flex items-center justify-between border-b border-slate-50 p-3 last:border-0">
                 <div>
-                  <p className="font-bold text-slate-900">{copy.book?.title ?? 'Unknown book'}</p>
+                  <p className="font-bold text-slate-900">{copy.book?.title?.trim() || 'Book title not set'}</p>
                   <p className="text-xs text-slate-500">Barcode: {copy.barcode} - Status: {copy.status}</p>
                 </div>
                 <LibraryStatusBadge status={copy.status} />
@@ -1919,9 +1919,9 @@ function LibraryIssueReportRow({
   return (
     <div className="flex items-center justify-between gap-3 border-b border-slate-50 p-3 last:border-0">
       <div className="min-w-0">
-        <p className="truncate font-bold text-slate-900">{issue.copy?.book?.title ?? 'Unknown book'}</p>
+        <p className="truncate font-bold text-slate-900">{issue.copy?.book?.title?.trim() || 'Book title not set'}</p>
         <p className="text-xs text-slate-500">
-          {borrowerName(issue)} - Barcode {issue.copy?.barcode ?? 'N/A'}
+          {borrowerName(issue)} - Barcode {issue.copy?.barcode ?? 'Barcode not recorded'}
         </p>
       </div>
       <div className="shrink-0 text-right text-xs font-semibold text-slate-500">

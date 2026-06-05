@@ -70,7 +70,7 @@ export function PageState({
   return (
     <div
       className={cn(
-        'flex min-h-[280px] flex-col items-center justify-center rounded-[2rem] border p-8 text-center shadow-sm',
+        'flex min-h-[280px] flex-col items-center justify-center rounded-2xl border p-8 text-center shadow-sm',
         toneStyles[tone],
         className,
       )}

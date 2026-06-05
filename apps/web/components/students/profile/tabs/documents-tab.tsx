@@ -77,7 +77,7 @@ export function DocumentsTab({
             return (
               <div
                 key={kind}
-                className="group flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 p-4 transition hover:border-primary-200 hover:bg-primary-50"
+                className="group flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 p-4 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-bg)]"
               >
                 <div className="flex items-center gap-3">
                   <div
@@ -85,7 +85,7 @@ export function DocumentsTab({
                       'flex h-10 w-10 items-center justify-center rounded-xl transition',
                       isGenerated
                         ? 'bg-success-500 text-white'
-                        : 'bg-white text-slate-400 group-hover:text-primary-500',
+                        : 'bg-white text-slate-400 group-hover:text-[var(--color-mod-admissions-accent)]',
                     )}
                   >
                     <FileText size={20} />
@@ -102,7 +102,7 @@ export function DocumentsTab({
                 <button
                   type="button"
                   onClick={() => onOpenPdf(kind)}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition hover:bg-primary-500 hover:text-white"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition hover:bg-[var(--color-mod-admissions-accent)] hover:text-white"
                 >
                   <ExternalLink size={18} />
                 </button>
@@ -129,7 +129,7 @@ export function DocumentsTab({
                 className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 p-4"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-primary-500 shadow-sm">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[var(--color-mod-admissions-accent)] shadow-sm">
                     <FileType size={20} />
                   </div>
                   <div>
@@ -153,7 +153,7 @@ export function DocumentsTab({
                     disabled={openingDocumentId === doc.id}
                     onClick={() => void openUploadedDocument(doc.id)}
                     aria-label={`Open ${doc.title || doc.fileName}`}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition hover:text-primary-500 disabled:cursor-wait disabled:opacity-60"
+                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition hover:text-[var(--color-mod-admissions-accent)] disabled:cursor-wait disabled:opacity-60"
                   >
                     <Download size={18} />
                   </button>
@@ -163,7 +163,7 @@ export function DocumentsTab({
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[2rem] bg-slate-50 text-slate-300">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-bg)] text-[var(--color-mod-admissions-accent)]">
               <ShieldCheck size={32} />
             </div>
             <p className="text-sm font-bold text-slate-900">No uploads found</p>
@@ -196,7 +196,7 @@ export function DocumentsTab({
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-primary-500 shadow-sm">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--color-mod-admissions-accent)] shadow-sm">
                       <History size={18} />
                     </div>
                     <div>
@@ -224,7 +224,7 @@ export function DocumentsTab({
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[2rem] bg-slate-50 text-slate-300">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-bg)] text-[var(--color-mod-admissions-accent)]">
               <History size={32} />
             </div>
             <p className="text-sm font-bold text-slate-900">
@@ -262,8 +262,12 @@ function documentStatusVariant(
 }
 
 function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat('en-NP', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
+  try {
+    return new Intl.DateTimeFormat('en-NP', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(value));
+  } catch {
+    return 'Audit date not recorded';
+  }
 }

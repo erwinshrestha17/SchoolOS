@@ -15,7 +15,7 @@ const formatDate = (date: string | Date) => {
       dateStyle: 'medium',
     }).format(new Date(date));
   } catch {
-    return 'N/A';
+    return 'Publish date not recorded';
   }
 };
 
@@ -27,7 +27,7 @@ export function ActivityTab({ posts }: ActivityTabProps) {
             <div className="space-y-8 relative before:absolute before:left-5 before:top-2 before:bottom-2 before:w-px before:bg-slate-100">
                {posts.map((post) => (
                  <div key={post.id} className="relative pl-12">
-                    <div className="absolute left-0 top-0 flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-slate-200 text-primary-500 shadow-sm z-10">
+                    <div className="absolute left-0 top-0 z-10 flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--color-mod-admissions-border)] bg-white text-[var(--color-mod-admissions-accent)] shadow-sm">
                        <Images size={18} />
                     </div>
                     <div className="rounded-2xl border border-slate-100 bg-slate-50/30 p-5 transition hover:bg-white hover:shadow-md">
@@ -49,7 +49,7 @@ export function ActivityTab({ posts }: ActivityTabProps) {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[2rem] bg-slate-50 text-slate-300">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-bg)] text-[var(--color-mod-admissions-accent)]">
                 <Images size={32} />
               </div>
               <p className="text-sm font-bold text-slate-900">No activity yet</p>

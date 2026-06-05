@@ -292,7 +292,7 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2 text-sm font-semibold text-white shadow-lg transition-all hover:bg-slate-800 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-6 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[var(--color-mod-accounting-text)] disabled:opacity-50"
             >
               {loading && <Loader2 size={16} className="animate-spin" />}
               Post Transaction

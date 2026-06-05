@@ -38,7 +38,7 @@ export default function PlatformDashboard() {
 
   if (error) {
     return (
-      <div className="rounded-[20px] border border-danger-200 bg-danger-50 p-8 text-danger-900">
+      <div className="rounded-2xl border border-danger-200 bg-danger-50 p-8 text-danger-900">
         <div className="flex items-center gap-3 font-bold">
           <AlertTriangle size={20} />
           Dashboard unavailable
@@ -170,7 +170,7 @@ export default function PlatformDashboard() {
           </p>
         </div>
         <Link href="/platform/schools">
-          <Button className="gap-2 rounded-2xl bg-slate-900 px-6 font-bold hover:bg-slate-800">
+          <Button className="gap-2 rounded-2xl bg-[var(--color-mod-platform-accent)] px-6 font-bold hover:bg-[var(--color-mod-platform-text)]">
             View Schools
             <ArrowRight size={18} />
           </Button>
@@ -179,7 +179,7 @@ export default function PlatformDashboard() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {kpis.map((kpi) => (
-          <div key={kpi.label} className="rounded-[20px] border border-slate-100 bg-white p-6 shadow-sm">
+          <div key={kpi.label} className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
@@ -199,7 +199,7 @@ export default function PlatformDashboard() {
       </div>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-        <div className="rounded-[20px] border border-slate-100 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-mod-platform-text">
@@ -253,7 +253,7 @@ export default function PlatformDashboard() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-[20px] border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold leading-7 text-slate-900">System readiness</h2>
@@ -270,7 +270,7 @@ export default function PlatformDashboard() {
             </div>
           </div>
 
-          <div className="rounded-[20px] border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
               <CreditCard size={16} />
               SaaS billing boundary
@@ -287,7 +287,7 @@ export default function PlatformDashboard() {
         </div>
       </section>
 
-      <section className="rounded-[20px] border border-slate-100 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -333,13 +333,13 @@ export default function PlatformDashboard() {
 function PlatformDashboardSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="h-28 animate-pulse rounded-[20px] bg-slate-100" />
+      <div className="h-28 animate-pulse rounded-2xl bg-slate-100" />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="h-36 animate-pulse rounded-[20px] bg-slate-100" />
+          <div key={index} className="h-36 animate-pulse rounded-2xl bg-slate-100" />
         ))}
       </div>
-      <div className="h-80 animate-pulse rounded-[20px] bg-slate-100" />
+      <div className="h-80 animate-pulse rounded-2xl bg-slate-100" />
     </div>
   );
 }

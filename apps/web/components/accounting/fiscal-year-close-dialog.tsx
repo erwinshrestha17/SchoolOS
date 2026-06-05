@@ -88,7 +88,7 @@ export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: Fis
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-700">Reason for reopening</label>
               <textarea
-                className="w-full min-h-[100px] rounded-2xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full min-h-[100px] rounded-2xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-accounting-accent)]"
                 placeholder="Describe why this fiscal year needs to be reopened..."
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
@@ -109,8 +109,8 @@ export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: Fis
               type="submit"
               disabled={loading}
               className={cn(
-                "inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2 text-sm font-semibold text-white shadow-lg transition-all disabled:opacity-50",
-                mode === 'CLOSE' ? "bg-slate-900 hover:bg-slate-800" : "bg-primary-600 hover:bg-primary-700"
+                "inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2 text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-50",
+                mode === 'CLOSE' ? "bg-rose-600 hover:bg-rose-700" : "bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]"
               )}
             >
               {loading && <Loader2 size={16} className="animate-spin" />}
@@ -122,4 +122,3 @@ export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: Fis
     </Dialog>
   );
 }
-

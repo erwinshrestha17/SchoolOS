@@ -64,6 +64,20 @@ type HomeworkPayload = {
   maxScore: number;
 };
 
+function formatHomeworkDate(value: string | null | undefined, fallback = 'Date not set') {
+  if (!value) return fallback;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Date unavailable';
+  return date.toLocaleDateString();
+}
+
+function formatHomeworkDateTime(value: string | null | undefined, fallback = 'Date not set') {
+  if (!value) return fallback;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Date unavailable';
+  return date.toLocaleString();
+}
+
 export function HomeworkTab({
   academicYears,
   classes,
@@ -131,7 +145,7 @@ export function HomeworkTab({
         actions={
           <button
             onClick={() => setIsCreating(true)}
-            className="flex h-12 items-center gap-2 rounded-2xl bg-slate-900 px-6 text-[11px] font-black uppercase tracking-widest text-white shadow-xl shadow-slate-200 transition-all hover:-translate-y-1"
+            className="flex h-12 items-center gap-2 rounded-2xl bg-[var(--color-mod-homework-accent)] px-6 text-[11px] font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-[var(--color-mod-homework-text)]"
           >
             <Plus className="h-4 w-4" />
             Assign Homework
@@ -183,44 +197,51 @@ export function HomeworkTab({
             />
           ) : (
             <div className="space-y-4">
-              {homeworkQuery.data?.map((h) => (
-                <button
-                  key={h.id}
-                  onClick={() => setSelectedAssignmentId(h.id)}
-                  className={cn(
-                    'group w-full rounded-[2rem] border p-6 text-left transition-all duration-300',
-                    selectedAssignmentId === h.id
-                      ? 'border-slate-900 bg-slate-900 text-white shadow-xl shadow-slate-200'
-                      : 'border-slate-100 bg-white hover:border-slate-200 hover:shadow-md'
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <p className={cn('text-[10px] font-black uppercase tracking-widest', selectedAssignmentId === h.id ? 'text-indigo-400' : 'text-indigo-600')}>
-                        {h.subject?.name} · {h.class?.name}
-                      </p>
-                      <h3 className="text-lg font-black uppercase italic tracking-tight">{h.title}</h3>
+              {homeworkQuery.data?.map((h) => {
+                const isSelected = selectedAssignmentId === h.id;
+                const subjectName = h.subject?.name?.trim() || 'Subject not set';
+                const className = h.class?.name?.trim() || 'Class not set';
+                const title = h.title?.trim() || 'Assignment title not set';
+
+                return (
+                  <button
+                    key={h.id}
+                    onClick={() => setSelectedAssignmentId(h.id)}
+                    className={cn(
+                      'group w-full rounded-2xl border p-6 text-left transition-colors',
+                      isSelected
+                        ? 'border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] shadow-sm'
+                        : 'border-slate-100 bg-white hover:border-[var(--color-mod-homework-border)] hover:bg-[var(--color-mod-homework-bg)]'
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-[var(--color-mod-homework-text)]">
+                          {subjectName} · {className}
+                        </p>
+                        <h3 className="text-lg font-black uppercase italic tracking-tight text-slate-900">{title}</h3>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Due Date</p>
+                        <p className="text-xs font-bold text-slate-700">
+                          {formatHomeworkDate(h.dueDate ?? h.dueAt, 'Due date not set')}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Due Date</p>
-                      <p className={cn('text-xs font-bold', selectedAssignmentId === h.id ? 'text-slate-200' : 'text-slate-700')}>
-                        {new Date(h.dueDate ?? h.dueAt).toLocaleDateString()}
-                      </p>
+                    <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-3.5 w-3.5 text-slate-300" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                          {h.submissions?.length ?? 0} Students
+                        </span>
+                      </div>
+                      <Badge variant={isSelected ? 'secondary' : 'outline'} className="text-[9px] font-black uppercase tracking-widest">
+                        {h.submissions?.filter((s) => s.status === 'SUBMITTED' || s.status === 'REVIEWED').length ?? 0} Submitted
+                      </Badge>
                     </div>
-                  </div>
-                  <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4">
-                    <div className="flex items-center gap-2">
-                      <Users className={cn('h-3.5 w-3.5', selectedAssignmentId === h.id ? 'text-slate-400' : 'text-slate-300')} />
-                      <span className={cn('text-[10px] font-bold uppercase tracking-widest', selectedAssignmentId === h.id ? 'text-slate-400' : 'text-slate-500')}>
-                        {h.submissions?.length ?? 0} Students
-                      </span>
-                    </div>
-                    <Badge variant={selectedAssignmentId === h.id ? 'secondary' : 'outline'} className="text-[9px] font-black uppercase tracking-widest">
-                      {h.submissions?.filter((s) => s.status === 'SUBMITTED' || s.status === 'REVIEWED').length ?? 0} Submitted
-                    </Badge>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )}
         </SectionCard>
@@ -231,9 +252,11 @@ export function HomeworkTab({
               <SectionCard title="Assignment Details">
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-2xl font-black uppercase italic tracking-tight text-slate-900">{selectedAssignment.title}</h2>
+                    <h2 className="text-2xl font-black uppercase italic tracking-tight text-slate-900">
+                      {selectedAssignment.title?.trim() || 'Assignment title not set'}
+                    </h2>
                     <p className="mt-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">
-                      {selectedAssignment.instructions}
+                      {selectedAssignment.instructions?.trim() || 'Instructions not set'}
                     </p>
                   </div>
 
@@ -254,7 +277,7 @@ export function HomeworkTab({
                   <div className="flex flex-wrap gap-2 pt-2">
                     <button
                       type="button"
-                      className="flex h-9 items-center gap-2 rounded-full bg-indigo-50 px-4 text-[10px] font-black uppercase tracking-widest text-indigo-700 transition-colors hover:bg-indigo-100"
+                      className="flex h-9 items-center gap-2 rounded-full border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] px-4 text-[10px] font-black uppercase tracking-widest text-[var(--color-mod-homework-text)] transition-colors hover:bg-white"
                       onClick={() => assignMutation.mutate(selectedAssignment.id)}
                       disabled={selectedAssignment.status !== 'DRAFT' || assignMutation.isPending}
                     >
@@ -301,7 +324,7 @@ export function HomeworkTab({
                 ) : (
                   <div className="space-y-4">
                     {assignmentSubmissions.map((s) => (
-                      <div key={s.id} className="group space-y-6 rounded-[2rem] border border-slate-100 bg-white p-6 shadow-sm">
+                      <div key={s.id} className="group space-y-6 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-xs font-black uppercase text-slate-500">
@@ -310,7 +333,7 @@ export function HomeworkTab({
                             <div>
                               <p className="font-black uppercase tracking-tight text-slate-900">{studentName(s)}</p>
                               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                {s.submittedAt ? `Submitted · ${new Date(s.submittedAt).toLocaleString()}` : 'Not submitted'}
+                                {s.submittedAt ? `Submitted · ${formatHomeworkDateTime(s.submittedAt)}` : 'Not submitted'}
                               </p>
                             </div>
                           </div>
@@ -342,7 +365,7 @@ export function HomeworkTab({
                                   className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-600"
                                 >
                                   <FileText className="h-3 w-3 text-slate-400" />
-                                  <span className="max-w-[150px] truncate">{a.fileAsset?.originalFilename ?? 'Attachment'}</span>
+                                  <span className="max-w-[150px] truncate">{a.fileAsset?.originalFilename?.trim() || 'File name not set'}</span>
                                 </div>
                               ))}
                             </div>
@@ -405,8 +428,8 @@ function StatusBadge({ status }: { status: string }) {
     <span className={cn(
       'rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest',
       isReviewed ? 'bg-emerald-100 text-emerald-700' :
-      isSubmitted ? 'bg-indigo-100 text-indigo-700' :
-      isAssigned ? 'bg-blue-100 text-blue-700' :
+      isSubmitted ? 'bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)]' :
+      isAssigned ? 'bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)]' :
       isLate ? 'bg-amber-100 text-amber-700' :
       isClosed ? 'bg-slate-100 text-slate-700' :
       'bg-slate-100 text-slate-500'
@@ -418,10 +441,10 @@ function StatusBadge({ status }: { status: string }) {
 
 function studentName(submission: HomeworkSubmissionSummary) {
   const student = submission.student;
-  if (!student) return 'Student';
+  if (!student) return 'Student name not set';
   const firstName = student.firstNameEn ?? '';
   const lastName = student.lastNameEn ?? '';
-  return `${firstName} ${lastName}`.trim() || student.studentSystemId || 'Student';
+  return `${firstName} ${lastName}`.trim() || student.studentSystemId || 'Student name not set';
 }
 
 function studentInitials(submission: HomeworkSubmissionSummary) {
@@ -430,7 +453,7 @@ function studentInitials(submission: HomeworkSubmissionSummary) {
     .map((part) => part[0])
     .join('')
     .slice(0, 2)
-    .toUpperCase();
+    .toUpperCase() || '-';
 }
 
 function GradingForm({
@@ -479,9 +502,9 @@ function GradingForm({
       </div>
       <div className="flex justify-end pt-2">
         <button
-          onClick={() => onReview({ submissionId, status: 'REVIEWED', score: Number(score), feedback })}
+          onClick={() => onReview({ submissionId, status: 'REVIEWED', score: Number(score), feedback: feedback.trim() })}
           disabled={isPending || !score}
-          className="h-10 rounded-2xl bg-emerald-600 px-6 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-100 transition-all hover:-translate-y-0.5 disabled:opacity-50"
+          className="h-10 rounded-2xl bg-emerald-600 px-6 text-[10px] font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
         >
           {isPending ? 'Saving...' : 'Finalize Grade'}
         </button>
@@ -527,7 +550,7 @@ function CreateHomeworkModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl animate-in fade-in zoom-in duration-300">
+      <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-lg animate-in fade-in zoom-in duration-300">
         <div className="relative border-b border-slate-100 bg-white p-8">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)]">
@@ -656,8 +679,12 @@ function CreateHomeworkModal({
             Cancel
           </button>
           <button
-            onClick={() => onSave(formData)}
-            disabled={isPending || !formData.classId || !formData.subjectId || !formData.title || !formData.dueDate}
+            onClick={() => onSave({
+              ...formData,
+              title: formData.title.trim(),
+              instructions: formData.instructions.trim(),
+            })}
+            disabled={isPending || !formData.classId || !formData.subjectId || !formData.title.trim() || !formData.dueDate}
             className="h-12 rounded-2xl bg-[var(--color-mod-homework-accent)] px-8 text-[10px] font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-[var(--color-mod-homework-text)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isPending ? 'Publishing...' : 'Assign Homework'}

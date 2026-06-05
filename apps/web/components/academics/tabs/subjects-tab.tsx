@@ -192,7 +192,7 @@ export function SubjectsTab({ academicYears, classes, allSections, staff, subjec
                   <p className="text-[10px] font-black uppercase tracking-widest">Master catalog is empty</p>
                </div>
             ) : subjects.map((s: SubjectSummary) => (
-               <div key={s.id} className="group relative rounded-[2rem] border border-slate-100 bg-white p-6 transition-all hover:border-primary-200 hover:shadow-xl hover:shadow-primary-500/5">
+               <div key={s.id} className="group relative rounded-2xl border border-slate-100 bg-white p-6 transition-all hover:border-[var(--color-mod-academics-border)] hover:shadow-lg hover:shadow-[var(--color-mod-academics-border)]/40">
                   <div className="flex items-start justify-between mb-4">
                      <div className="flex flex-col">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.class?.name ?? 'General'}</span>
@@ -206,7 +206,7 @@ export function SubjectsTab({ academicYears, classes, allSections, staff, subjec
                   <div className="flex flex-wrap gap-2">
                      <span className={cn(
                         "px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border",
-                        s.type === 'CORE' ? "bg-primary-50 text-primary-600 border-primary-100" : "bg-slate-50 text-slate-500 border-slate-100"
+                        s.type === 'CORE' ? "bg-[var(--color-mod-academics-bg)] text-[var(--color-mod-academics-text)] border-[var(--color-mod-academics-border)]" : "bg-slate-50 text-slate-500 border-slate-100"
                      )}>
                         {s.type}
                      </span>

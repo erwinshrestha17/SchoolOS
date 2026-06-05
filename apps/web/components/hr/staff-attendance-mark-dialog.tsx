@@ -112,7 +112,7 @@ export function StaffAttendanceMarkDialog({ isOpen, onClose }: StaffAttendanceMa
           staffId: r.staffId,
           status: r.status,
           checkInAt,
-          note: r.note || undefined,
+          note: r.note.trim() || undefined,
         };
       }),
     };
@@ -122,11 +122,11 @@ export function StaffAttendanceMarkDialog({ isOpen, onClose }: StaffAttendanceMa
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[85vh] rounded-[2.5rem]">
+      <DialogContent className="max-w-4xl max-h-[85vh] rounded-2xl">
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle className="flex items-center gap-2">
-              <ClipboardCheck size={20} className="text-blue-500" />
+              <ClipboardCheck size={20} className="text-[var(--color-mod-hr-text)]" />
               Mark Daily Attendance
             </DialogTitle>
             <p className="text-xs text-slate-500 mt-1">Submit bulk attendance logs for active staff.</p>
@@ -187,7 +187,7 @@ export function StaffAttendanceMarkDialog({ isOpen, onClose }: StaffAttendanceMa
                   <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Staff Member</th>
                   <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Status Select</th>
                   <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Check In Time</th>
-                  <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Remarks / Remarks</th>
+                  <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Remarks</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -269,6 +269,7 @@ export function StaffAttendanceMarkDialog({ isOpen, onClose }: StaffAttendanceMa
             onClick={handleSubmit}
             disabled={records.length === 0 || markMutation.isPending}
             isLoading={markMutation.isPending}
+            className="bg-[var(--color-mod-hr-accent)] hover:bg-[var(--color-mod-hr-text)]"
           >
             Submit Logs
           </Button>

@@ -91,7 +91,7 @@ export default function PlatformTenantBillingPage() {
           </p>
         </div>
         <Link href={`/platform/schools/${tenant.id}/change-plan`}>
-          <Button className="rounded-2xl bg-slate-900 px-6 font-bold hover:bg-slate-800">
+          <Button className="rounded-2xl bg-[var(--color-mod-platform-accent)] px-6 font-bold hover:bg-[var(--color-mod-platform-text)]">
             Change plan
           </Button>
         </Link>
@@ -123,7 +123,7 @@ export default function PlatformTenantBillingPage() {
             <PlatformEmptyState
               icon={FileClock}
               title="No SaaS invoices yet"
-              description="Create invoices from the tenant detail billing workflow when needed. No fake billing records are shown here."
+              description="Create invoices from the tenant detail billing workflow when needed. Synthetic billing records are never shown here."
             />
           ) : (
             <div className="overflow-hidden rounded-2xl border border-slate-100">
@@ -183,7 +183,7 @@ function BillingMetric({
 
 function formatDate(value: string) {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'N/A';
+  if (Number.isNaN(date.getTime())) return 'Date not recorded';
   return date.toLocaleDateString();
 }
 
