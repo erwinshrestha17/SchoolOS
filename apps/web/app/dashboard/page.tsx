@@ -4,8 +4,10 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
   CalendarCheck,
+  ClipboardList,
   Images,
   Megaphone,
+  Settings,
   UserPlus,
   Users,
   Wallet,
@@ -130,6 +132,12 @@ export default function DashboardPage() {
     defaultersQuery.data ?? [],
     invoicesQuery.data ?? [],
   );
+  const collectionBase = collectedThisMonth + outstandingFees;
+  const collectionRate =
+    collectionBase > 0
+      ? Math.round((collectedThisMonth / collectionBase) * 100)
+      : 0;
+  const recentAdmissions = admissionsQuery.data?.items ?? [];
 
   const failedDeliveries =
     deliveriesQuery.data?.filter(
@@ -211,43 +219,38 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       {/* Setup needs attention */}
-      <header className="relative overflow-hidden rounded-2xl border border-slate-900 bg-slate-950 px-6 py-8 text-white shadow-xl shadow-slate-900/10 lg:px-10">
-        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-center">
+      <header className="rounded-[20px] border border-primary-100 bg-white px-5 py-6 shadow-sm lg:px-7">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_440px] xl:items-center">
           <div className="max-w-2xl">
-            <h1 className="text-3xl font-extrabold sm:text-4xl">
+            <p className="text-xs font-bold uppercase tracking-wide text-primary-700">
+              School day header
+            </p>
+            <h1 className="mt-2 text-[30px] font-extrabold leading-[38px] text-slate-950 sm:text-[36px] sm:leading-[44px]">
               School Dashboard
             </h1>
-            <p className="mt-3 text-base leading-7 text-slate-300">
+            <p className="mt-3 text-sm leading-[22px] text-slate-600 sm:text-base sm:leading-[26px]">
               Namaste,{' '}
-              <span className="font-bold text-white">
+              <span className="font-bold text-slate-950">
                 {session?.user.email?.split('@')[0] ?? 'User'}
               </span>
               . Here is what needs attention across{' '}
-              <span className="font-bold text-white">
+              <span className="font-bold text-slate-950">
                 {session?.tenant.name}
               </span>{' '}
               today.
             </p>
-            <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
-              <Badge
-                variant="neutral"
-                className="border-white/10 bg-white/10 text-white"
-              >
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Badge variant="info">
                 {currentAcademicYear?.name ?? 'Academic year not set'}
               </Badge>
-              <Badge
-                variant="neutral"
-                className="border-white/10 bg-white/10 text-white"
-              >
-                {todayLabel}
-              </Badge>
+              <Badge variant="neutral">{todayLabel}</Badge>
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            <div className="grid grid-cols-3 gap-2 rounded-xl border border-white/10 bg-white/[0.06] p-3">
+            <div className="grid grid-cols-3 gap-2 rounded-2xl border border-primary-100 bg-primary-50 p-3">
               <DashboardHeroMetric
                 label="Alerts"
                 value={operationalAlerts.length}
@@ -258,14 +261,14 @@ export default function DashboardPage() {
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/dashboard/admissions"
-                className="flex items-center gap-2 rounded-xl bg-primary-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary-500/20 transition hover:-translate-y-0.5 hover:bg-primary-600"
+                className="flex min-h-11 items-center gap-2 rounded-xl bg-primary-500 px-5 py-3 text-sm font-bold text-white shadow-sm shadow-primary-500/20 transition hover:-translate-y-0.5 hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2"
               >
                 <UserPlus size={18} />
                 New Admission
               </Link>
               <Link
                 href="/dashboard/attendance"
-                className="flex items-center gap-2 rounded-xl bg-white/10 px-5 py-3 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/20"
+                className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2"
               >
                 <CalendarCheck size={18} />
                 Mark Attendance
@@ -293,6 +296,7 @@ export default function DashboardPage() {
           value={totalStudents}
           icon={<Users size={20} />}
           loading={studentsQuery.isLoading}
+          tone="dashboard"
           href="/dashboard/students"
         />
         <StatCard
@@ -300,6 +304,7 @@ export default function DashboardPage() {
           value={`${attendancePercent}%`}
           icon={<CalendarCheck size={20} />}
           loading={attendanceQuery.isLoading}
+          tone={attendancePercent >= 80 ? 'success' : 'warning'}
           trend={{
             value: attendancePercent,
             label: 'Presence rate',
@@ -312,6 +317,7 @@ export default function DashboardPage() {
           value={formatMoney(collectedToday)}
           icon={<Wallet size={20} />}
           loading={receiptsQuery.isLoading}
+          tone="success"
           href="/dashboard/fees"
         />
         <StatCard
@@ -319,13 +325,18 @@ export default function DashboardPage() {
           value={formatMoney(outstandingFees)}
           icon={<Calculator size={20} />}
           loading={defaultersQuery.isLoading}
+          tone={outstandingFees > 0 ? 'danger' : 'neutral'}
           href="/dashboard/fees"
         />
       </section>
 
-      <div className="grid gap-8 lg:grid-cols-3">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
+        <div className="space-y-6">
         {operationalAlerts.length > 0 ? (
-          <SectionCard title="What Needs Attention Today" className="lg:col-span-3">
+          <SectionCard
+            title="Attention Required"
+            description="Operational items that need a school staff decision today."
+          >
             <div className="grid gap-3 md:grid-cols-3">
               {operationalAlerts.slice(0, 3).map((alert) => (
                 <Link
@@ -338,7 +349,7 @@ export default function DashboardPage() {
                 >
                   <p className="font-bold">{alert.title}</p>
                   <p className="mt-1 opacity-85">{alert.body}</p>
-                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-black uppercase tracking-wider">
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wide">
                     {alert.cta}
                     <ArrowRight
                       size={13}
@@ -350,17 +361,21 @@ export default function DashboardPage() {
             </div>
           </SectionCard>
         ) : (
-          <SectionCard title="No alerts available yet" className="lg:col-span-3">
+          <SectionCard
+            title="No alerts available yet"
+            description="Setup, attendance, fees, and communication alerts will appear here."
+          >
             <p className="text-sm text-slate-500">
               Setup, attendance, fee, and communication alerts will appear here.
             </p>
           </SectionCard>
         )}
 
+        <div className="grid gap-6 lg:grid-cols-2">
         <SectionCard title="Attendance Snapshot" description="Today's presence summary">
           <div className="space-y-6">
             <div className="flex items-end gap-2">
-              <span className="text-4xl font-extrabold text-slate-900">
+              <span className="text-[36px] font-extrabold leading-[44px] text-slate-900 tabular-nums">
                 {attendancePercent}%
               </span>
               <span className="mb-1 text-sm font-bold text-slate-400">
@@ -400,7 +415,7 @@ export default function DashboardPage() {
         <SectionCard title="Fee Snapshot" description="Monthly target tracking">
           <div className="space-y-6">
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-extrabold text-slate-900">
+              <span className="text-2xl font-extrabold leading-8 text-slate-900 tabular-nums">
                 {formatMoney(collectedThisMonth)}
               </span>
               <span className="mb-0.5 text-sm font-bold text-slate-400">
@@ -415,24 +430,14 @@ export default function DashboardPage() {
                     Collection Target
                   </span>
                   <span className="font-bold text-slate-900">
-                    {Math.round(
-                      (collectedThisMonth /
-                        (collectedThisMonth + outstandingFees)) *
-                        100,
-                    ) || 0}
-                    %
+                    {collectionRate}%
                   </span>
                 </div>
                 <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
                     className="h-full rounded-full bg-primary-500 transition-all duration-1000"
                     style={{
-                      width: `${Math.min(
-                        100,
-                        (collectedThisMonth /
-                          (collectedThisMonth + outstandingFees)) *
-                          100,
-                      ) || 0}%`,
+                      width: `${Math.min(100, collectionRate)}%`,
                     }}
                   />
                 </div>
@@ -465,23 +470,99 @@ export default function DashboardPage() {
             </Link>
           </div>
         </SectionCard>
+        </div>
 
-        <SectionCard title="Quick Actions">
+        <SectionCard
+          title="Admissions / Student Movement"
+          description="Recent admissions and student-record movement from backend data."
+        >
+          <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
+            <div className="rounded-2xl border border-mod-admissions-border bg-mod-admissions-soft p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-mod-admissions-text">
+                Admissions in queue
+              </p>
+              <p className="mt-2 text-[30px] font-extrabold leading-[38px] text-slate-950 tabular-nums">
+                {admissionsQuery.data?.total ?? recentAdmissions.length}
+              </p>
+              <Link
+                href="/dashboard/admissions"
+                className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-mod-admissions-text hover:text-primary-700"
+              >
+                Open admissions
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+            {recentAdmissions.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                {recentAdmissions.slice(0, 4).map((admission) => (
+                  <div
+                    key={admission.id}
+                    className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-slate-900">
+                        {admission.fullNameEn}
+                      </p>
+                      <p className="text-xs leading-[18px] text-slate-500">
+                        {admission.sectionName
+                          ? `${admission.className} ${admission.sectionName}`
+                          : admission.className}
+                      </p>
+                    </div>
+                    <Badge variant="info" className="shrink-0">
+                      {admission.latestEnrollment?.status ?? 'Review'}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No admissions in queue"
+                description="Recent admission records will appear here after staff create them."
+                icon={<UserPlus size={32} />}
+              />
+            )}
+          </div>
+        </SectionCard>
+        </div>
+
+        <aside className="space-y-6">
+        <SectionCard
+          title="Communication Health"
+          description="Notification delivery status from recent backend records."
+        >
+          <div className="grid grid-cols-3 gap-2">
+            <DashboardHeroMetric label="Sent" value={sentDeliveries} />
+            <DashboardHeroMetric label="Queued" value={queuedDeliveries} />
+            <DashboardHeroMetric label="Failed" value={failedDeliveries} />
+          </div>
+          <Link
+            href="/dashboard/notices"
+            className="mt-5 inline-flex items-center gap-1 text-sm font-bold text-primary-600 hover:text-primary-700"
+          >
+            Review notices
+            <ArrowRight size={14} />
+          </Link>
+        </SectionCard>
+
+        <SectionCard title="Dedicated Module Links">
           <div className="grid grid-cols-2 gap-3">
             {[
-              { label: 'Admission', href: '/dashboard/admissions', icon: UserPlus },
-              { label: 'Fee Collection', href: '/dashboard/fees', icon: Wallet },
+              { label: 'Admissions', href: '/dashboard/admissions', icon: UserPlus },
               { label: 'Attendance', href: '/dashboard/attendance', icon: CalendarCheck },
+              { label: 'Fees', href: '/dashboard/fees', icon: Wallet },
               { label: 'Activity Feed', href: '/dashboard/activity', icon: Images },
-              { label: 'Send Notice', href: '/dashboard/notices', icon: Megaphone },
+              { label: 'Notices', href: '/dashboard/notices', icon: Megaphone },
+              { label: 'Settings', href: '/dashboard/settings', icon: Settings },
+              { label: 'Reports', href: '/dashboard/reports', icon: ClipboardList },
               { label: 'Accounting', href: '/dashboard/accounting', icon: Calculator },
             ].map((action) => (
               <Link
                 key={action.label}
                 href={action.href}
-                className="group flex flex-col items-center justify-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/30 p-4 transition hover:border-primary-200 hover:bg-primary-50"
+                className="group flex min-h-[108px] flex-col items-center justify-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-4 text-center transition hover:border-primary-200 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2"
               >
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm transition group-hover:bg-primary-500 group-hover:text-white group-hover:rotate-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-100 bg-white text-slate-500 shadow-sm transition group-hover:border-primary-100 group-hover:text-primary-600">
                   <action.icon size={24} />
                 </div>
                 <span className="text-center text-xs font-bold text-slate-700 group-hover:text-primary-700">
@@ -566,6 +647,7 @@ export default function DashboardPage() {
             notices={noticesQuery.data ?? []}
           />
         </SectionCard>
+        </aside>
       </div>
     </div>
   );
@@ -584,11 +666,11 @@ function DashboardHeroMetric({
   value: string | number;
 }) {
   return (
-    <div className="rounded-lg bg-white/[0.06] px-3 py-2">
-      <p className="text-[0.65rem] font-black uppercase tracking-wider text-slate-400">
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+      <p className="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">
         {label}
       </p>
-      <p className="mt-1 text-lg font-black leading-none text-white">
+      <p className="mt-1 text-lg font-extrabold leading-none text-slate-950 tabular-nums">
         {value}
       </p>
     </div>

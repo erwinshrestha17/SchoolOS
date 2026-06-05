@@ -2942,7 +2942,7 @@ function DataOperations() {
   return (
     <div className="space-y-6">
       <p className="text-xs text-slate-500">
-        Use the shortcuts below to navigate to the relevant module for bulk imports, exports, and integrations.
+        Use the links below to navigate to the relevant module for bulk imports, exports, and integrations.
       </p>
       <div className="grid gap-4 sm:grid-cols-3">
         <DataOpColumn

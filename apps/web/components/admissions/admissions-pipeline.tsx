@@ -175,10 +175,10 @@ export function AdmissionsPipeline() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-12rem)] min-h-[500px]">
+    <div className="grid min-h-[500px] grid-cols-1 gap-6 lg:h-[calc(100vh-12rem)] lg:grid-cols-12">
       
       {/* LEFT COLUMN: Pipeline List & Search */}
-      <div className="lg:col-span-5 flex flex-col bg-white border border-slate-200 rounded-[2rem] overflow-hidden shadow-sm h-full">
+      <div className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-5">
         {/* Filters Header */}
         <div className="p-5 border-b border-slate-100 bg-slate-50/50 space-y-4">
           <div className="flex gap-2">
@@ -186,17 +186,17 @@ export function AdmissionsPipeline() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
               <input
                 type="text"
-                placeholder="Search candidates..."
+                placeholder="Search by student name or code"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white"
+                className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm focus:border-[var(--color-mod-admissions-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
               />
             </div>
             
             <select
               value={selectedClassId}
               onChange={(e) => setSelectedClassId(e.target.value)}
-              className="text-sm border border-slate-200 rounded-2xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
             >
               <option value="">All Classes</option>
               {classesQuery.data?.map((cls) => (
@@ -210,7 +210,7 @@ export function AdmissionsPipeline() {
             <button
               onClick={() => setSelectedStage('all')}
               className={cn(
-                "flex-1 py-1.5 rounded-lg transition-all",
+                "flex-1 rounded-lg py-1.5 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]",
                 selectedStage === 'all' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
               )}
             >
@@ -225,7 +225,7 @@ export function AdmissionsPipeline() {
                   key={stg.key}
                   onClick={() => setSelectedStage(stg.key)}
                   className={cn(
-                    "flex-1 py-1.5 rounded-lg transition-all",
+                    "flex-1 rounded-lg py-1.5 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]",
                     selectedStage === stg.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
                   )}
                 >
@@ -296,14 +296,14 @@ export function AdmissionsPipeline() {
       </div>
 
       {/* RIGHT COLUMN: Stepper & Checklist Workspace */}
-      <div className="lg:col-span-7 flex flex-col bg-white border border-slate-200 rounded-[2rem] overflow-hidden shadow-sm h-full">
+      <div className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-7">
         {selectedAdmission ? (
           <div className="flex flex-col h-full">
             
             {/* Candidate Header */}
             <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-4">
               <div>
-                <span className="text-[0.65rem] font-extrabold uppercase tracking-widest text-primary-500">Pipeline Workspace</span>
+                <span className="text-[0.65rem] font-extrabold uppercase tracking-widest text-[var(--color-mod-admissions-text)]">Pipeline Workspace</span>
                 <h3 className="text-xl font-extrabold text-slate-900 mt-1">{selectedAdmission.fullNameEn}</h3>
                 <p className="text-xs text-slate-500 font-medium mt-0.5">
                   Class {selectedAdmission.className} {selectedAdmission.sectionName ? `• Section ${selectedAdmission.sectionName}` : ''}
@@ -312,7 +312,7 @@ export function AdmissionsPipeline() {
               <div className="flex items-center gap-2">
                 <Link
                   href={`/dashboard/students/${selectedAdmission.id}`}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-all hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
                 >
                   Full Profile
                   <ExternalLink className="h-3.5 w-3.5" />
@@ -338,7 +338,7 @@ export function AdmissionsPipeline() {
                         className={cn(
                           "w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold border transition-all duration-300",
                           isCompleted ? "bg-success-500 border-success-500 text-white shadow-md shadow-success-500/20" :
-                          isActive ? "bg-primary-500 border-primary-500 text-white shadow-xl shadow-primary-500/30 scale-110 ring-4 ring-primary-50" :
+                          isActive ? "bg-[var(--color-mod-admissions-accent)] border-[var(--color-mod-admissions-accent)] text-white shadow-xl shadow-primary-500/30 scale-110 ring-4 ring-primary-50" :
                           "bg-white border-slate-200 text-slate-400"
                         )}
                       >
@@ -417,9 +417,9 @@ export function AdmissionsPipeline() {
                         <p className="text-slate-800 mt-0.5">{selectedAdmission.latestEnrollment?.academicYear ?? 'N/A'}</p>
                       </div>
                       <div>
-                        <span className="text-[0.65rem] text-slate-400 uppercase">Admission Date</span>
+                        <span className="text-[0.65rem] text-slate-400 uppercase">Enrollment Status</span>
                         <p className="text-slate-800 mt-0.5">
-                          {selectedAdmission.latestEnrollment ? new Date(selectedAdmission.latestEnrollment.id).toLocaleDateString() : 'N/A'}
+                          {selectedAdmission.latestEnrollment?.status ?? 'Not enrolled'}
                         </p>
                       </div>
                       <div>
@@ -583,7 +583,7 @@ export function AdmissionsPipeline() {
                     {selectedAdmission.latestInvoice && (
                       <Link
                         href={`/dashboard/finance?studentId=${selectedAdmission.id}`}
-                        className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold shadow-md shadow-primary-500/25 transition-all"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-mod-admissions-accent)] px-5 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
                       >
                         <CreditCard className="h-3.5 w-3.5" />
                         Collect Fee
@@ -601,27 +601,19 @@ export function AdmissionsPipeline() {
                           });
                         }
                       }}
-                      className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white transition-all hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2"
                     >
                       <UserCheck className="h-3.5 w-3.5" />
                       Print ID Card
                     </button>
                   </>
                 ) : (
-                  <button
-                    onClick={() => {
-                      // Mark complete review
-                      setActionNotice({
-                        title: 'Checklist cleared',
-                        description: 'Proceed to verify enrollment details in the student directory.',
-                        tone: 'success',
-                      });
-                    }}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-40"
-                    disabled={selectedAdmission.documentCount === 0}
+                  <Link
+                    href={`/dashboard/students/${selectedAdmission.id}`}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white transition-all hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2"
                   >
-                    Verify & Enroll
-                  </button>
+                    Open Student Review
+                  </Link>
                 )}
               </div>
             </div>

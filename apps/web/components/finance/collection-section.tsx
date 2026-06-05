@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { CollectionCounter } from './collection-counter';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { CheckCircle2, AlertCircle, Printer, X, Download } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Printer, X } from 'lucide-react';
 
 interface CollectionSectionProps {
   invoices: any[];
@@ -46,27 +46,28 @@ export function CollectionSection({ invoices, isLoading, initialInvoiceId }: Col
   return (
     <div className="space-y-8">
       {lastReceipt && (
-        <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-[2.5rem] flex items-center justify-between shadow-lg shadow-emerald-500/5 animate-in slide-in-from-top-4 duration-500">
+        <div className="animate-in slide-in-from-top-4 flex items-center justify-between rounded-xl border border-success-100 bg-success-50 p-6 shadow-sm duration-500">
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success-500 text-white shadow-lg shadow-success-500/20">
               <CheckCircle2 size={24} />
             </div>
             <div>
-               <p className="text-sm font-black text-emerald-900 tracking-tight">Payment Collected Successfully</p>
-               <p className="text-xs text-emerald-700 font-bold uppercase tracking-widest mt-0.5">Receipt #{lastReceipt.receiptNumber} Generated</p>
+               <p className="text-sm font-black tracking-tight text-success-900">Payment collected successfully</p>
+               <p className="mt-0.5 text-xs font-bold uppercase tracking-widest text-success-700">Receipt #{lastReceipt.receiptNumber} generated</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
              <button 
               onClick={handleOpenReceipt}
-              className="flex items-center gap-2 px-6 py-3 bg-white text-emerald-700 border border-emerald-200 rounded-xl font-bold text-xs shadow-sm hover:bg-emerald-100 transition-all active:scale-95"
+              className="flex items-center gap-2 rounded-xl border border-success-100 bg-white px-6 py-3 text-xs font-bold text-success-700 shadow-sm transition-all hover:bg-success-100 active:scale-95"
              >
                <Printer size={16} />
-               Print Receipt
+               Open Receipt
              </button>
              <button 
               onClick={() => setLastReceipt(null)}
-              className="p-3 text-emerald-400 hover:text-emerald-600 transition-colors"
+              className="p-3 text-success-400 transition-colors hover:text-success-600"
+              aria-label="Dismiss receipt success message"
              >
                <X size={20} />
              </button>
@@ -75,7 +76,7 @@ export function CollectionSection({ invoices, isLoading, initialInvoiceId }: Col
       )}
 
       {paymentMutation.isError && (
-        <div className="p-6 bg-danger-50 border border-danger-100 rounded-[2.5rem] flex items-center gap-4 text-danger-800 text-sm font-bold animate-fade-in">
+        <div className="animate-fade-in flex items-center gap-4 rounded-xl border border-danger-100 bg-danger-50 p-6 text-sm font-bold text-danger-800">
           <AlertCircle size={24} className="text-danger-500" />
           <div className="flex flex-col">
              <span className="text-[0.65rem] uppercase tracking-widest text-danger-600 mb-1">Payment Failed</span>

@@ -96,11 +96,11 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
   const tenantName = session?.tenant.name ?? 'SchoolOS';
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-slate-200 bg-white/80 px-4 backdrop-blur-md lg:px-8">
+    <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-slate-200 bg-white/95 px-4 shadow-sm shadow-slate-200/40 backdrop-blur-md lg:px-8">
       <button
         type="button"
         onClick={onMobileMenuToggle}
-        className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 lg:hidden"
+        className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2 lg:hidden"
         aria-controls="dashboard-main"
         aria-label="Open navigation menu"
       >
@@ -108,23 +108,23 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
       </button>
 
       <div className="hidden min-w-0 items-center gap-3 lg:flex">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-xs font-bold text-white shadow-sm shadow-primary-600/20">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-xs font-bold text-white shadow-sm shadow-primary-600/20">
           {tenantName[0]?.toUpperCase() ?? <School size={16} />}
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-slate-900 tracking-tight">
+          <p className="truncate text-sm font-bold text-slate-900">
             {tenantName}
           </p>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <div className="h-1.5 w-1.5 rounded-full bg-success-500 animate-pulse" />
-            <p className="truncate text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">
-              {session?.tenant.slug ?? 'schoolos'}
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <div className="h-1.5 w-1.5 rounded-full bg-success-500" />
+            <p className="truncate text-xs font-semibold leading-[18px] text-slate-500">
+              {session?.tenant.slug ?? 'schoolos'} school
             </p>
           </div>
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-xl hidden md:block">
+      <div className="mx-auto hidden w-full max-w-xl md:block">
         <GlobalStudentSearch />
       </div>
 
@@ -133,13 +133,13 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
           <button
             type="button"
             onClick={() => setYearMenuOpen(!yearMenuOpen)}
-            className="hidden h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 sm:flex"
+            className="hidden h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-primary-200 hover:bg-primary-50/60 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2 disabled:opacity-50 sm:flex"
             disabled={!canReadAcademicYears || academicYears.length === 0}
             aria-expanded={yearMenuOpen}
             aria-haspopup="menu"
             aria-label="Select academic year"
           >
-            <span className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-wider">
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
               AY
             </span>
             <span>{selectedAcademicYear?.name ?? 'Not set'}</span>
@@ -147,15 +147,19 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
               size={14}
               className={cn(
                 'text-slate-400 transition-transform duration-200',
-                yearMenuOpen && 'rotate-180'
+                yearMenuOpen && 'rotate-180',
               )}
             />
           </button>
 
           {yearMenuOpen && (
-            <div className="dropdown-menu animate-scale-in" role="menu" style={{ minWidth: '180px' }}>
-              <div className="px-3 py-2 border-b border-slate-50">
-                <p className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">
+            <div
+              className="dropdown-menu animate-scale-in"
+              role="menu"
+              style={{ minWidth: '180px' }}
+            >
+              <div className="border-b border-slate-50 px-3 py-2">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
                   Select Academic Year
                 </p>
               </div>
@@ -172,13 +176,16 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                       'dropdown-item w-full transition-all duration-150',
                       year.id === selectedAcademicYear?.id
                         ? 'bg-primary-50 text-primary-700 font-bold'
-                        : 'text-slate-600'
+                        : 'text-slate-600',
                     )}
                     role="menuitem"
                   >
                     <span className="flex-1 text-left">{year.name}</span>
                     {year.isCurrent && (
-                      <Badge variant="success" className="h-4.5 px-1.5 text-[0.6rem]">
+                      <Badge
+                        variant="success"
+                        className="h-4.5 px-1.5 text-[0.6rem]"
+                      >
                         Current
                       </Badge>
                     )}
@@ -191,45 +198,57 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
 
         <NotificationBell enabled={canReadNotifications} />
 
-        <div className="hidden sm:block h-8 w-px bg-slate-200 mx-1" />
+        <div className="mx-1 hidden h-8 w-px bg-slate-200 sm:block" />
 
         <div className="relative" ref={userMenuRef}>
           <button
             type="button"
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className="group flex items-center gap-3 rounded-xl p-1 pr-2 transition-all hover:bg-slate-50"
+            className="group flex items-center gap-3 rounded-xl p-1 pr-2 transition-all hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2"
             aria-expanded={userMenuOpen}
             aria-haspopup="menu"
             aria-label="User profile menu"
           >
-            <Avatar initials={initials} size="sm" className="shadow-sm shadow-primary-600/10 ring-2 ring-white group-hover:ring-primary-100 transition-all" />
-            <div className="hidden sm:block text-left min-w-0">
-              <p className="text-sm font-bold text-slate-900 truncate max-w-[120px] capitalize tracking-tight leading-none mb-1">
+            <Avatar
+              initials={initials}
+              size="sm"
+              className="shadow-sm shadow-primary-600/10 ring-2 ring-white transition-all group-hover:ring-primary-100"
+            />
+            <div className="hidden min-w-0 text-left sm:block">
+              <p className="mb-1 max-w-[120px] truncate text-sm font-bold capitalize leading-none text-slate-900">
                 {displayName}
               </p>
-              <p className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-wider leading-none">
+              <p className="text-xs font-semibold capitalize leading-none text-slate-500">
                 {primaryRole}
               </p>
             </div>
             <ChevronDown
               size={14}
               className={cn(
-                'hidden sm:block text-slate-400 transition-transform duration-200',
-                userMenuOpen && 'rotate-180'
+                'hidden text-slate-400 transition-transform duration-200 sm:block',
+                userMenuOpen && 'rotate-180',
               )}
             />
           </button>
 
           {userMenuOpen && (
-            <div className="dropdown-menu animate-scale-in" role="menu" style={{ width: '240px' }}>
-              <div className="p-3 border-b border-slate-50 bg-slate-50/50 rounded-t-xl">
+            <div
+              className="dropdown-menu animate-scale-in"
+              role="menu"
+              style={{ width: '240px' }}
+            >
+              <div className="rounded-t-xl border-b border-slate-50 bg-slate-50/50 p-3">
                 <div className="flex items-center gap-3">
-                  <Avatar initials={initials} size="md" className="ring-2 ring-white" />
+                  <Avatar
+                    initials={initials}
+                    size="md"
+                    className="ring-2 ring-white"
+                  />
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-900 capitalize truncate">
+                    <p className="truncate text-sm font-bold capitalize text-slate-900">
                       {displayName}
                     </p>
-                    <p className="text-[0.7rem] text-slate-500 truncate">
+                    <p className="truncate text-[0.7rem] text-slate-500">
                       {session?.user.email ?? session?.tenant.slug}
                     </p>
                   </div>
@@ -239,7 +258,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                     {primaryRole}
                   </Badge>
                   {session?.tenant.name && (
-                    <span className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-wider truncate">
+                    <span className="truncate text-xs font-semibold text-slate-500">
                       {session.tenant.name}
                     </span>
                   )}
@@ -259,7 +278,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                   <User size={16} className="text-slate-400" />
                   <span className="font-medium">My Profile</span>
                 </button>
-                
+
                 <button
                   type="button"
                   className="dropdown-item w-full"

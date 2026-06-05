@@ -11,8 +11,8 @@ import type {
 } from '@schoolos/core';
 import Link from 'next/link';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { SectionCard } from '../dashboard/section-card';
-import { StatCard } from '../dashboard/stat-card';
+import { SectionCard } from '../ui/section-card';
+import { StatCard } from '../ui/stat-card';
 import { Badge } from '../ui/badge';
 import { Avatar } from '../ui/avatar';
 import { LoadingState } from '../ui/loading-state';
@@ -176,14 +176,14 @@ export function StudentDirectory({
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="grid gap-4 flex-1 grid-cols-1 sm:grid-cols-3">
-          <StatCard title="Total Records" value={totalStudents} icon={<Users size={20} />} />
-          <StatCard title="Active Enrollment" value={students.filter(s => s.lifecycleStatus === 'ACTIVE').length} icon={<UserCheck size={20} />} className="border-success-100 bg-success-50/20" />
-          <StatCard title="Current Page" value={currentPage} icon={<Filter size={20} />} className="border-primary-100 bg-primary-50/20" />
+          <StatCard title="Total Records" value={totalStudents} icon={<Users size={20} />} tone="info" />
+          <StatCard title="Active Enrollment" value={students.filter(s => s.lifecycleStatus === 'ACTIVE').length} icon={<UserCheck size={20} />} tone="success" />
+          <StatCard title="Current Page" value={currentPage} icon={<Filter size={20} />} tone="neutral" />
         </div>
         <div className="flex flex-wrap items-center gap-2 lg:justify-end shrink-0">
           <button
             type="button"
-            className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 shrink-0"
+            className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
             onClick={() => onExportRoster('csv', { academicYearId, classId, sectionId })}
           >
             <Download size={18} />
@@ -191,20 +191,13 @@ export function StudentDirectory({
           </button>
           <button
             type="button"
-            className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 shrink-0"
+            className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={onExportIemis}
             disabled={!canExportIemis || isExportingIemis}
           >
             <Download size={18} />
             {isExportingIemis ? 'Exporting...' : 'iEMIS'}
           </button>
-          <Link
-            href="/dashboard/admissions"
-            className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800 shrink-0"
-          >
-            <UserPlus size={18} />
-            Enroll Student
-          </Link>
         </div>
       </div>
 
@@ -220,7 +213,7 @@ export function StudentDirectory({
                 setStatus('');
                 setSearch('');
               }}
-              className="flex items-center gap-1.5 text-xs font-bold text-primary-600 transition hover:text-primary-700"
+              className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-bold text-[var(--color-mod-admissions-text)] transition hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
             >
               <RotateCcw size={12} />
               Reset All
@@ -232,7 +225,7 @@ export function StudentDirectory({
           <div className="space-y-1.5">
             <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Academic Year</label>
             <select
-              className="premium-input text-sm"
+              className="premium-input text-sm focus:border-[var(--color-mod-admissions-accent)] focus:ring-[var(--color-mod-admissions-border)]"
               value={academicYearId}
               onChange={(e) => setAcademicYearId(e.target.value)}
             >
@@ -245,7 +238,7 @@ export function StudentDirectory({
           <div className="space-y-1.5">
             <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Class</label>
             <select
-              className="premium-input text-sm"
+              className="premium-input text-sm focus:border-[var(--color-mod-admissions-accent)] focus:ring-[var(--color-mod-admissions-border)]"
               value={classId}
               onChange={(e) => {
                 setClassId(e.target.value);
@@ -261,7 +254,7 @@ export function StudentDirectory({
           <div className="space-y-1.5">
             <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Section</label>
             <select
-              className="premium-input text-sm"
+              className="premium-input text-sm focus:border-[var(--color-mod-admissions-accent)] focus:ring-[var(--color-mod-admissions-border)]"
               value={sectionId}
               onChange={(e) => setSectionId(e.target.value)}
               disabled={!classId}
@@ -275,7 +268,7 @@ export function StudentDirectory({
           <div className="space-y-1.5">
             <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Status</label>
             <select
-              className="premium-input text-sm"
+              className="premium-input text-sm focus:border-[var(--color-mod-admissions-accent)] focus:ring-[var(--color-mod-admissions-border)]"
               value={status}
               onChange={(e) => setStatus(e.target.value)}
             >
@@ -294,7 +287,7 @@ export function StudentDirectory({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
-                className="premium-input pl-9 text-sm"
+                className="premium-input pl-9 text-sm focus:border-[var(--color-mod-admissions-accent)] focus:ring-[var(--color-mod-admissions-border)]"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Name or SCH-ID, guardian, or phone"
@@ -324,7 +317,7 @@ export function StudentDirectory({
               {duplicateCandidates.map((candidate) => (
                 <div
                   key={`${candidate.sourceStudent.id}-${candidate.candidateStudent.id}`}
-                  className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4"
+                  className="rounded-xl border border-warning-100 bg-warning-50/40 p-4"
                 >
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex items-start gap-3">
@@ -348,13 +341,13 @@ export function StudentDirectory({
                     <div className="flex items-center gap-2">
                       <Badge
                         variant="phase2"
-                        className="border-amber-200 bg-white text-amber-700"
+                        className="border-warning-200 bg-white text-warning-700"
                       >
                         {candidate.confidence} / {candidate.score}
                       </Badge>
                       <Link
                         href={`/dashboard/students/${encodeURIComponent(candidate.sourceStudent.id)}`}
-                        className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                        className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
                       >
                         Review
                       </Link>
@@ -537,7 +530,7 @@ export function StudentDirectory({
       </SectionCard>
 
       {pdfError && (
-        <div className="rounded-xl border border-danger-100 bg-danger-50 p-4 text-sm font-medium text-danger-600 animate-in fade-in slide-in-from-top-2">
+        <div className="animate-in fade-in slide-in-from-top-2 rounded-xl border border-danger-100 bg-danger-50 p-4 text-sm font-medium text-danger-600">
           {pdfError}
         </div>
       )}

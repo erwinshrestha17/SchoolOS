@@ -17,10 +17,12 @@ export function AttendanceHeader({ total, presentPercent, exceptions }: Attendan
         title="Total Students"
         value={String(total)}
         icon={<Users size={18} />}
+        tone="neutral"
       />
       <StatCard
         title="Attendance Rate"
         value={`${presentPercent}%`}
+        tone="success"
         trend={{
           value: presentPercent,
           label: 'Current rate',
@@ -30,6 +32,7 @@ export function AttendanceHeader({ total, presentPercent, exceptions }: Attendan
       <StatCard
         title="Exceptions"
         value={String(exceptions)}
+        tone={exceptions > 0 ? 'warning' : 'neutral'}
       />
     </div>
   );

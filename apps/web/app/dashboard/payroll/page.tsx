@@ -42,6 +42,32 @@ export default function PayrollDashboardPage() {
   const latestPostedRun = runsQuery.data?.find((run) =>
     ['POSTED', 'PAID'].includes(run.status),
   );
+  const payrollRuns = runsQuery.data ?? [];
+  const workflowSteps = [
+    {
+      label: 'Draft',
+      statuses: ['DRAFT', 'GENERATED', 'UNDER_REVIEW', 'REVIEWED'],
+      description: 'Generated or under review',
+    },
+    {
+      label: 'Approved',
+      statuses: ['APPROVED'],
+      description: 'Ready for posting',
+    },
+    {
+      label: 'Posted',
+      statuses: ['POSTED'],
+      description: 'Accrued in accounting',
+    },
+    {
+      label: 'Paid',
+      statuses: ['PAID'],
+      description: 'Disbursement recorded',
+    },
+  ].map((step) => ({
+    ...step,
+    count: payrollRuns.filter((run) => step.statuses.includes(run.status)).length,
+  }));
 
   const stats = [
     {
@@ -49,19 +75,25 @@ export default function PayrollDashboardPage() {
       value: moneyFormatter.format(summaryQuery.data?.gross ?? 0),
       icon: <TrendingUp className="h-5 w-5" />,
       loading: summaryQuery.isLoading,
+      tone: 'neutral' as const,
+      description: 'Selected payroll report scope',
     },
     {
       title: "Net Pay (Current)",
       value: moneyFormatter.format(summaryQuery.data?.netPayable ?? 0),
       icon: <Wallet className="h-5 w-5" />,
       loading: summaryQuery.isLoading,
+      tone: 'info' as const,
+      description: 'After deductions in report summary',
     },
     {
       title: "Pending Approval",
       value: pendingApprovalCount,
       icon: <AlertCircle className="h-5 w-5" />,
       loading: runsQuery.isLoading,
-      href: "/dashboard/payroll/runs"
+      href: "/dashboard/payroll/runs",
+      tone: pendingApprovalCount > 0 ? 'warning' as const : 'success' as const,
+      description: 'Generated, review, or reviewed runs',
     }
   ];
 
@@ -75,9 +107,41 @@ export default function PayrollDashboardPage() {
             value={stat.value}
             icon={stat.icon}
             loading={stat.loading}
+            href={stat.href}
+            tone={stat.tone}
+            description={stat.description}
           />
         ))}
       </div>
+
+      <section className="shell-card p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-slate-950">Payroll workflow</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Draft to Approved to Posted to Paid counts are derived from current payroll run statuses.
+            </p>
+          </div>
+          <Link href="/dashboard/payroll/runs" className="text-sm font-bold text-purple-700 hover:text-purple-800">
+            Open Payroll Runs
+          </Link>
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-4">
+          {workflowSteps.map((step, index) => (
+            <div key={step.label} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  {index + 1}. {step.label}
+                </span>
+                <span className="rounded-lg bg-purple-50 px-2 py-1 text-xs font-bold tabular-nums text-purple-700">
+                  {runsQuery.isLoading ? '...' : step.count}
+                </span>
+              </div>
+              <p className="mt-3 text-sm font-medium text-slate-700">{step.description}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="grid gap-8 lg:grid-cols-2">
         <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm">

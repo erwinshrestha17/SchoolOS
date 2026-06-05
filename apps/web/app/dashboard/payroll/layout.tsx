@@ -1,11 +1,11 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { Wallet, LayoutDashboard, Calculator, History, FileText, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Calculator, History, FileText, BarChart3 } from 'lucide-react';
 import { useSession } from '../../../components/session-provider';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
-import { ModuleHero } from '../../../components/dashboard/module-hero';
 import { ModuleTabs } from '../../../components/dashboard/module-tabs';
+import { PageHeader } from '../../../components/ui/page-header';
 
 export default function PayrollLayout({ children }: { children: ReactNode }) {
   const { session } = useSession();
@@ -18,20 +18,15 @@ export default function PayrollLayout({ children }: { children: ReactNode }) {
     { href: '/dashboard/payroll/reports', label: 'Reports', icon: BarChart3 },
   ];
 
-  const tabs = <ModuleTabs items={navItems} accentColor="emerald" variant="dark" />;
+  const tabs = <ModuleTabs items={navItems} accentColor="purple" variant="light" />;
 
   return (
     <DashboardPageShell>
-      <ModuleHero
-        title="Payroll Workspace"
-        subtitle={`Generate payroll runs, manage salary structures, and track statutory deductions for ${session?.tenant.name || 'your school'}.`}
-        badge="Payroll"
-        category="Compensation & Benefits"
-        icon={<Wallet size={32} className="text-emerald-400" />}
-        accentColor="emerald"
-        variant="dark"
-        tabs={tabs}
+      <PageHeader
+        title="Payroll"
+        description={`Generate payroll runs, manage salary structures, and track statutory deductions for ${session?.tenant.name || 'your school'}.`}
       />
+      <div className="mb-6">{tabs}</div>
       <main>
         {children}
       </main>

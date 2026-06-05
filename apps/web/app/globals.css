@@ -16,9 +16,9 @@
   --surface: #FFFFFF;
   --success: #16A34A;
   --success-soft: #DCFCE7;
-  --warning: #F59E0B;
+  --warning: #D97706;
   --warning-soft: #FEF3C7;
-  --danger: #EF4444;
+  --danger: #DC2626;
   --danger-soft: #FEE2E2;
   --info: #0284C7;
   --info-soft: #E0F2FE;
@@ -53,16 +53,33 @@
   --color-sidebar-700: #334155;
 
   --color-success-50: #DCFCE7;
+  --color-success-100: #BBF7D0;
   --color-success-500: #16A34A;
   --color-success-600: #15803D;
+  --color-success-700: #15803D;
+  --color-success-900: #14532D;
 
   --color-warning-50: #FEF3C7;
-  --color-warning-500: #F59E0B;
+  --color-warning-100: #FDE68A;
+  --color-warning-200: #FCD34D;
+  --color-warning-500: #D97706;
   --color-warning-600: #D97706;
+  --color-warning-700: #B45309;
+  --color-warning-900: #78350F;
 
   --color-danger-50: #FEE2E2;
-  --color-danger-500: #EF4444;
+  --color-danger-100: #FECACA;
+  --color-danger-200: #FCA5A5;
+  --color-danger-500: #DC2626;
   --color-danger-600: #DC2626;
+  --color-danger-700: #B91C1C;
+  --color-danger-900: #7F1D1D;
+
+  --color-info-50: #E0F2FE;
+  --color-info-100: #BAE6FD;
+  --color-info-500: #0284C7;
+  --color-info-600: #0369A1;
+  --color-info-700: #0369A1;
 
   /* Module colors from SchoolOS UI/UX Guide Section 8 */
   --color-mod-dashboard-accent: #155EEF;

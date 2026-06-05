@@ -14,6 +14,13 @@ import { StatCard } from '../../../components/ui/stat-card';
 import Link from 'next/link';
 import { cn } from '../../../lib/utils';
 
+const isDateWithinDays = (value?: string | null, days = 30) => {
+  if (!value) return false;
+  const target = new Date(value).getTime();
+  const now = new Date().getTime();
+  return target >= now && target <= now + days * 24 * 60 * 60 * 1000;
+};
+
 export default function HRDashboardPage() {
   const staffQuery = useQuery({ queryKey: ['staff'], queryFn: api.listStaff });
   const contractsQuery = useQuery({
@@ -22,27 +29,49 @@ export default function HRDashboardPage() {
   });
   const leaveRequestsQuery = useQuery({ queryKey: ['leave-requests'], queryFn: api.listLeaveRequests });
 
+  const staff = staffQuery.data ?? [];
+  const contracts = contractsQuery.data ?? [];
+  const leaveRequests = leaveRequestsQuery.data ?? [];
+  const activeStaff = staff.filter((member) => member.status === 'ACTIVE' || !member.status).length;
+  const pendingLeave = leaveRequests.filter((leave) => leave.status === 'PENDING').length;
+  const today = new Date().toISOString().slice(0, 10);
+  const onLeaveToday = leaveRequests.filter((leave) => {
+    if (leave.status !== 'APPROVED') return false;
+    const start = new Date(leave.startsOn).toISOString().slice(0, 10);
+    const end = new Date(leave.endsOn).toISOString().slice(0, 10);
+    return start <= today && end >= today;
+  }).length;
+  const contractRenewalsDue = contracts.filter(
+    (contract) => contract.status === 'ACTIVE' && isDateWithinDays(contract.endDate),
+  ).length;
+
   const stats = [
     {
       title: "Total Staff",
-      value: staffQuery.data?.length ?? 0,
+      value: staff.length,
       icon: <Users className="h-5 w-5" />,
       loading: staffQuery.isLoading,
-      href: "/dashboard/hr/staff"
+      href: "/dashboard/hr/staff",
+      tone: 'neutral' as const,
+      description: `${activeStaff} active staff`,
     },
     {
       title: "Active Contracts",
-      value: contractsQuery.data?.filter((c) => c.status === 'ACTIVE').length ?? 0,
+      value: contracts.filter((c) => c.status === 'ACTIVE').length,
       icon: <Briefcase className="h-5 w-5" />,
       loading: contractsQuery.isLoading,
-      href: "/dashboard/hr/contracts"
+      href: "/dashboard/hr/contracts",
+      tone: 'info' as const,
+      description: `${contractRenewalsDue} renewal(s) due in 30 days`,
     },
     {
       title: "Pending Leave",
-      value: leaveRequestsQuery.data?.filter((l) => l.status === 'PENDING').length ?? 0,
+      value: pendingLeave,
       icon: <AlertCircle className="h-5 w-5" />,
       loading: leaveRequestsQuery.isLoading,
-      href: "/dashboard/hr/leave"
+      href: "/dashboard/hr/leave",
+      tone: pendingLeave > 0 ? 'warning' as const : 'success' as const,
+      description: `${onLeaveToday} approved leave today`,
     }
   ];
 
@@ -56,6 +85,9 @@ export default function HRDashboardPage() {
             value={stat.value}
             icon={stat.icon}
             loading={stat.loading}
+            href={stat.href}
+            tone={stat.tone}
+            description={stat.description}
           />
         ))}
       </div>
@@ -89,20 +121,31 @@ export default function HRDashboardPage() {
           </div>
         </section>
 
-        <section className="bg-slate-900 rounded-[2rem] p-8 text-white shadow-xl relative overflow-hidden">
-          <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-blue-500/10 blur-2xl" />
-          <h3 className="text-xl font-bold mb-4">Operational Status</h3>
-          <p className="text-slate-400 text-sm mb-6">Overview of current month HR activities.</p>
+        <section className="shell-card p-8">
+          <h3 className="text-xl font-bold text-slate-950 mb-4">Operational Status</h3>
+          <p className="text-slate-500 text-sm mb-6">Overview from live staff, contract, and leave records.</p>
           
           <div className="space-y-4">
             {[
-              { label: 'Staff Attendance Logged', status: '85%', color: 'bg-emerald-500' },
-              { label: 'Leave Requests Cleared', status: '12 Pending', statusColor: 'text-amber-400' },
-              { label: 'Contract Renewals Due', status: '2 This Month', statusColor: 'text-rose-400' },
+              {
+                label: 'Active Staff',
+                status: `${activeStaff}/${staff.length}`,
+                statusColor: 'text-success-700',
+              },
+              {
+                label: 'Pending Leave Requests',
+                status: String(pendingLeave),
+                statusColor: pendingLeave > 0 ? 'text-warning-700' : 'text-success-700',
+              },
+              {
+                label: 'Contract Renewals Due',
+                status: String(contractRenewalsDue),
+                statusColor: contractRenewalsDue > 0 ? 'text-danger-700' : 'text-success-700',
+              },
             ].map((item) => (
-              <div key={item.label} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
-                <span className="text-slate-300 font-medium">{item.label}</span>
-                <span className={cn("font-bold", item.statusColor || "text-white")}>{item.status}</span>
+              <div key={item.label} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                <span className="text-slate-600 font-medium">{item.label}</span>
+                <span className={cn("font-bold tabular-nums", item.statusColor)}>{item.status}</span>
               </div>
             ))}
           </div>

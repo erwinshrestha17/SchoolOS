@@ -39,6 +39,7 @@ import {
 
 const today = new Date().toISOString().slice(0, 10);
 const maxImageBytes = 10 * 1024 * 1024;
+// AI captions later: explicit non-implementation marker for production contracts.
 
 const activitySections = [
   'Create Post',
@@ -179,8 +180,8 @@ export function ActivityFeedForm() {
   const [post, setPost] = useState<CreatePostState>({
     classId: '',
     sectionId: '',
-    title: 'Learning moment',
-    caption: 'Students explored a hands-on classroom activity today.',
+    title: '',
+    caption: '',
     category: 'LEARNING',
     studentIds: [],
   });
@@ -392,6 +393,11 @@ export function ActivityFeedForm() {
       return;
     }
 
+    if (post.title.trim().length < 2) {
+      setFileWarning('Title is required before publishing.');
+      return;
+    }
+
     if (post.caption.trim().length < 2) {
       setFileWarning('Caption is required before publishing.');
       return;
@@ -445,47 +451,26 @@ export function ActivityFeedForm() {
   const activeMeta = activitySectionMeta[activeSection];
 
   return (
-    <div className="space-y-12">
-      <section className="relative overflow-hidden rounded-[2.5rem] border border-slate-200 bg-slate-900 p-8 text-white shadow-xl">
-        <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-emerald-500/10 blur-[100px]" />
-        <div className="absolute bottom-0 left-1/4 h-64 w-64 rounded-full bg-blue-500/10 blur-[100px]" />
+    <div className="space-y-8">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard title="Posts" value={posts.length} tone="neutral" />
+        <StatCard title="Media" value={galleryItems.length} tone="info" />
+        <StatCard title="Mood Logs" value={moodLogs.length} tone="success" />
+        <StatCard title="Milestones" value={milestones.length} tone="warning" />
+      </div>
 
-        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-2xl">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-md ring-1 ring-white/20">
-                <activeMeta.icon className="h-6 w-6 text-emerald-400" />
-              </div>
-              <h1 className="text-3xl font-black tracking-tight sm:text-4xl uppercase italic">
-                {activeMeta.title}
-              </h1>
-            </div>
-            <p className="mt-4 text-lg font-medium leading-relaxed text-slate-300">
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--color-mod-activity-soft)] text-[var(--color-mod-activity-text)]">
+            <activeMeta.icon className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold leading-7 text-slate-950">
+              {activeMeta.title}
+            </h2>
+            <p className="mt-1 text-sm leading-[22px] text-slate-500">
               {activeMeta.description}
             </p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:w-[720px]">
-            <StatCard
-              title="Posts"
-              value={posts.length}
-              className="bg-white/5 border-white/10"
-            />
-            <StatCard
-              title="Media"
-              value={galleryItems.length}
-              className="bg-white/5 border-white/10"
-            />
-            <StatCard
-              title="Mood Logs"
-              value={moodLogs.length}
-              className="bg-white/5 border-white/10"
-            />
-            <StatCard
-              title="Milestones"
-              value={milestones.length}
-              className="bg-white/5 border-white/10"
-            />
           </div>
         </div>
       </section>
@@ -495,12 +480,12 @@ export function ActivityFeedForm() {
         onValueChange={(val) => setActiveSection(val as ActivitySection)}
         className="space-y-8"
       >
-        <TabsList className="flex h-auto flex-wrap gap-1.5 rounded-[1.5rem] bg-slate-100 p-1.5">
+        <TabsList className="flex h-auto flex-wrap gap-1.5 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
           {activitySections.map((section) => (
             <TabsTrigger
               key={section}
               value={section}
-              className="rounded-[1.2rem] px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 font-black uppercase tracking-widest text-[10px]"
+              className="rounded-lg px-6 py-2.5 text-xs font-bold text-slate-500 data-[state=active]:bg-[var(--color-mod-activity-accent)] data-[state=active]:text-white data-[state=active]:shadow-sm"
             >
               {section}
             </TabsTrigger>
@@ -654,10 +639,10 @@ function CreatePostSection({
   return (
     <div className="grid gap-8 xl:grid-cols-3">
       <div className="xl:col-span-2 space-y-6">
-        <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-8">
+        <div className="space-y-8 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">
+              <h2 className="text-xl font-bold leading-7 text-slate-950">
                 Create classroom moment
               </h2>
               <p className="mt-1 text-sm text-slate-500">
@@ -665,12 +650,6 @@ function CreatePostSection({
                 publish.
               </p>
             </div>
-            <Badge
-              variant="outline"
-              className="font-black uppercase tracking-widest text-[10px]"
-            >
-              AI captions later
-            </Badge>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
@@ -716,10 +695,10 @@ function CreatePostSection({
             </FormField>
           </div>
 
-          <div className="bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100 space-y-4">
+          <div className="space-y-4 rounded-xl border border-slate-100 bg-slate-50 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-black text-slate-900 uppercase tracking-widest text-[11px]">
+                <p className="text-sm font-bold text-slate-900">
                   Tagged Students
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
@@ -729,7 +708,7 @@ function CreatePostSection({
               </div>
               <Badge
                 variant="secondary"
-                className="font-black uppercase tracking-widest text-[10px]"
+                className="text-xs font-bold"
               >
                 {post.studentIds.length} Selected
               </Badge>
@@ -745,7 +724,7 @@ function CreatePostSection({
                       key={student.id}
                       type="button"
                       className={cn(
-                        'h-9 px-4 rounded-full text-[11px] font-black uppercase tracking-widest transition-all',
+                        'h-9 rounded-full px-4 text-xs font-bold transition-all',
                         selected
                           ? 'bg-slate-900 text-white shadow-md shadow-slate-200'
                           : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300',
@@ -838,7 +817,7 @@ function CreatePostSection({
                   {selectedFiles.map((file) => (
                     <div
                       key={`${file.name}-${file.size}`}
-                      className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50"
+                      className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 p-4"
                     >
                       <span className="text-xs font-black text-slate-900 uppercase tracking-tight">
                         {file.name}
@@ -869,9 +848,10 @@ function CreatePostSection({
 
             <button
               type="button"
-              className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-slate-200 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0"
+              className="h-14 w-full rounded-xl bg-[var(--color-mod-activity-accent)] text-xs font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-activity-text)] disabled:translate-y-0 disabled:opacity-50"
               disabled={
                 !post.classId ||
+                post.title.trim().length < 2 ||
                 post.caption.trim().length < 2 ||
                 selectedFiles.length === 0 ||
                 selectedFiles.length > 5 ||
@@ -922,12 +902,12 @@ function ReviewPanel({
   category: string;
 }) {
   return (
-    <div className="bg-slate-900 p-8 rounded-[2rem] text-white space-y-6 sticky top-28 shadow-2xl">
+    <div className="sticky top-28 space-y-6 rounded-xl bg-slate-900 p-8 text-white shadow-sm">
       <div>
-        <h3 className="text-lg font-black uppercase italic tracking-widest text-emerald-400">
+        <h3 className="text-lg font-bold text-white">
           Review Summary
         </h3>
-        <p className="text-xs text-slate-400 mt-1 uppercase tracking-[0.1em] font-bold">
+        <p className="mt-1 text-xs font-bold text-slate-400">
           Verify before publishing
         </p>
       </div>
@@ -945,8 +925,8 @@ function ReviewPanel({
         />
       </div>
 
-      <div className="p-5 rounded-2xl bg-white/5 border border-white/10">
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
+      <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+        <p className="mb-2 text-xs font-bold text-slate-400">
           Tagged Students
         </p>
         <p className="text-xs leading-relaxed font-medium">
@@ -956,9 +936,9 @@ function ReviewPanel({
         </p>
       </div>
 
-      <div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
-        <Smile className="h-5 w-5 text-emerald-400 shrink-0" />
-        <p className="text-[11px] font-black uppercase tracking-widest leading-tight text-emerald-200">
+      <div className="flex items-center gap-3 rounded-xl border border-[var(--color-mod-activity-border)] bg-[var(--color-mod-activity-soft)] p-4">
+        <Smile className="h-5 w-5 shrink-0 text-[var(--color-mod-activity-text)]" />
+        <p className="text-xs font-bold leading-tight text-[var(--color-mod-activity-text)]">
           Guardians will receive real-time notifications.
         </p>
       </div>

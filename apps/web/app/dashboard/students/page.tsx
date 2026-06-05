@@ -3,11 +3,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
 import { StudentDirectory } from '../../../components/forms/student-directory';
-import { Users } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useSession } from '../../../components/session-provider';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
-import { ModuleHero } from '../../../components/dashboard/module-hero';
+import { PageHeader } from '../../../components/ui/page-header';
+import Link from 'next/link';
 
 export default function StudentsPage() {
   const [pdfError, setPdfError] = useState('');
@@ -102,14 +103,18 @@ export default function StudentsPage() {
 
   return (
     <DashboardPageShell>
-      <ModuleHero
+      <PageHeader
         title="Student Directory"
-        subtitle="Search student records, manage placement, and open profile details."
-        badge="Students"
-        category="Student Management"
-        icon={<Users size={32} className="text-blue-400" />}
-        accentColor="blue"
-        variant="dark"
+        description="Search student records, manage placement, and open profile details."
+        actions={
+          <Link
+            href="/dashboard/admissions"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
+          >
+            <UserPlus size={18} />
+            Enroll Student
+          </Link>
+        }
       />
 
       <StudentDirectory

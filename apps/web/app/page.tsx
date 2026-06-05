@@ -100,7 +100,7 @@ const operatingLayers = [
     title: 'Academics & Attendance',
     desc: 'Tools designed for teachers to map schedules, mark attendance, and manage continuous assessment grading.',
     bullets: [
-      'Fast 3-tap attendance entry',
+      'Clear attendance register workflow',
       'Timetables & substitution tracking',
       'CAS and terminal report cards'
     ],

@@ -2,11 +2,11 @@
 
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionCard } from '@/components/ui/section-card';
+import { StatCard } from '@/components/ui/stat-card';
+import { Badge } from '@/components/ui/badge';
 import { 
   ClipboardList, 
   FileText, 
-  TrendingUp,
-  Trophy,
   CheckCircle2,
   Megaphone,
   Lock,
@@ -14,9 +14,7 @@ import {
   ArrowRight,
   Settings,
   GraduationCap,
-  Loader2,
   AlertCircle,
-  Users,
   Search
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -109,39 +107,44 @@ export default function AcademicsOverviewPage() {
   ];
 
   return (
-    <div className="space-y-12 pb-20 animate-fade-in">
-      {/* Academic workflow header */}
-      <section className="relative overflow-hidden rounded-[3rem] bg-slate-900 p-12 text-white shadow-2xl">
-        <div className="relative z-10 lg:flex lg:items-center lg:justify-between">
-          <div className="max-w-2xl">
-            <div className="mb-4 flex items-center gap-2">
-              <span className="rounded-full bg-primary-500/20 px-4 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-primary-300 backdrop-blur-md border border-primary-500/30">
-                Exams, CAS & Report Cards
-              </span>
-            </div>
-            <h1 className="text-4xl font-black tracking-tight md:text-7xl italic uppercase">
-              Academic <span className="text-primary-400">Workflow</span>
-            </h1>
-            <p className="mt-4 text-lg font-medium text-slate-300 leading-relaxed">
-              Standardized administrative flow for exams, assessment, and student progress reporting.
-            </p>
-          </div>
+    <div className="space-y-8 pb-20 animate-fade-in">
+      <PageHeader
+        title="Academics"
+        description="Manage exam setup, marks entry, locks, report cards, publishing, and promotion readiness."
+        actions={
+          <Link
+            href="/dashboard/academics/exam-terms"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-academics-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-academics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-academics-border)] focus:ring-offset-2"
+          >
+            <Settings size={18} />
+            Exam Setup
+          </Link>
+        }
+      />
 
-          <div className="mt-10 lg:mt-0 flex gap-4">
-             <div className="h-24 w-24 rounded-3xl bg-white/5 border border-white/10 flex flex-col items-center justify-center backdrop-blur-xl">
-                <span className="text-2xl font-black text-white tracking-tighter">{activeExamsCount}</span>
-                <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Active</span>
-             </div>
-             <div className="h-24 w-24 rounded-3xl bg-white/5 border border-white/10 flex flex-col items-center justify-center backdrop-blur-xl">
-                <span className="text-2xl font-black text-white tracking-tighter">{reportCardsGenerated}</span>
-                <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Cards</span>
-             </div>
-          </div>
-        </div>
-
-        <div className="absolute -right-20 -top-20 h-96 w-96 rounded-full bg-primary-500/10 blur-[120px]" />
-        <div className="absolute -bottom-40 left-1/4 h-80 w-80 rounded-full bg-blue-500/10 blur-[100px]" />
-      </section>
+      <div className="grid gap-6 md:grid-cols-3">
+        <StatCard
+          title="Active Exam Terms"
+          value={activeExamsCount}
+          icon={<ClipboardList size={18} />}
+          loading={examsQuery.isLoading}
+          tone="info"
+        />
+        <StatCard
+          title="Report Cards"
+          value={reportCardsGenerated}
+          icon={<FileText size={18} />}
+          loading={reportsQuery.isLoading}
+          tone="neutral"
+        />
+        <StatCard
+          title="Subjects"
+          value={totalSubjects}
+          icon={<Layers size={18} />}
+          loading={subjectsQuery.isLoading}
+          tone={totalSubjects > 0 ? 'success' : 'warning'}
+        />
+      </div>
 
       {/* Workflow stepper */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -150,7 +153,7 @@ export default function AcademicsOverviewPage() {
 
           return (
           <Link key={step.id} href={step.href}>
-            <div className="group relative h-full rounded-[2.5rem] border border-slate-200 bg-white p-8 transition-all hover:scale-[1.02] hover:shadow-2xl hover:shadow-slate-200 overflow-hidden">
+            <div className="group relative h-full overflow-hidden rounded-xl border border-slate-200 bg-white p-6 transition-all hover:border-[var(--color-mod-academics-border)] hover:shadow-sm">
               {/* Progress Indicator */}
               <div className="absolute top-0 right-0 h-1 bg-slate-100 w-full">
                 <div 
@@ -163,13 +166,13 @@ export default function AcademicsOverviewPage() {
                 <div className={`flex h-16 w-16 items-center justify-center rounded-2xl ${step.color} transition-transform group-hover:rotate-12`}>
                   <step.icon size={32} />
                 </div>
-                <div className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Step 0{idx + 1}</div>
+                <div className="text-xs font-bold text-slate-400">Step {idx + 1}</div>
               </div>
 
-              <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900 mb-2 italic">
+              <h3 className="mb-2 text-xl font-bold leading-7 text-slate-950">
                 {step.label}
               </h3>
-              <p className="text-sm font-bold text-slate-400 leading-relaxed mb-6">
+              <p className="mb-6 text-sm leading-[22px] text-slate-500">
                 {step.description}
               </p>
 
@@ -183,7 +186,7 @@ export default function AcademicsOverviewPage() {
                         {task.done && <CheckCircle2 size={10} />}
                       </div>
                       <span className={cn(
-                        "text-[10px] font-black uppercase tracking-widest",
+                        "text-xs font-bold",
                         task.done ? "text-emerald-600" : "text-slate-400"
                       )}>
                         {task.label}
@@ -193,12 +196,12 @@ export default function AcademicsOverviewPage() {
               </div>
 
               <div className="mt-10 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary-600 opacity-0 transition-all -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0">
-                  Open Control
+                <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-mod-academics-text)] opacity-0 transition-all -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0">
+                  Open Workspace
                   <ArrowRight size={14} />
                 </div>
                 {progress === 100 && (
-                  <Badge variant="success" className="h-6 px-3 font-black text-[8px] uppercase tracking-widest">Complete</Badge>
+                  <Badge variant="success" className="h-6 px-3 text-xs font-bold">Complete</Badge>
                 )}
               </div>
             </div>
@@ -209,19 +212,13 @@ export default function AcademicsOverviewPage() {
 
       <div className="grid gap-8 lg:grid-cols-2">
         <SectionCard
-          title="Audit Timeline"
-          description="Latest academic modifications and entries."
-          headerAction={
-            <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-colors">
-              <ClipboardList size={14} />
-              Full Audit
-            </button>
-          }
+          title="Audit Scope"
+          description="Academic actions stay inside their dedicated exam, marks, lock, report-card, and publishing workspaces."
         >
-          <div className="p-12 border-2 border-dashed border-slate-100 rounded-[3rem] flex flex-col items-center justify-center text-slate-400 text-center">
+          <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-100 p-12 text-center text-slate-400">
             <Search className="h-12 w-12 mb-4 opacity-10" />
-            <p className="text-xs font-black uppercase tracking-[0.2em]">Awaiting Data Flow</p>
-            <p className="mt-2 text-[10px] font-bold max-w-xs leading-relaxed">System activity will appear here once you begin the academic workflow for this terminal period.</p>
+            <p className="text-sm font-bold text-slate-700">Open a workspace for audit-controlled actions</p>
+            <p className="mt-2 max-w-xs text-xs font-medium leading-relaxed">This overview only summarizes readiness from backend data and links to the operational screens.</p>
           </div>
         </SectionCard>
 
@@ -230,7 +227,7 @@ export default function AcademicsOverviewPage() {
           description="Pre-requisite check for the next step."
         >
           <div className="space-y-4">
-             <div className="p-6 rounded-[2rem] bg-indigo-50/50 border border-indigo-100 flex items-center justify-between">
+             <div className="flex items-center justify-between rounded-xl border border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-soft)] p-6">
                 <div className="flex items-center gap-4">
                    <div className="h-12 w-12 rounded-2xl bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
                       <Layers size={24} />
@@ -246,7 +243,7 @@ export default function AcademicsOverviewPage() {
                 </div>
              </div>
              
-             <div className="p-6 rounded-[2rem] bg-amber-50/50 border border-amber-100 flex items-center justify-between opacity-60 grayscale transition-all hover:opacity-100 hover:grayscale-0">
+             <div className="flex items-center justify-between rounded-xl border border-warning-100 bg-warning-50/50 p-6 opacity-80 transition-all hover:opacity-100">
                 <div className="flex items-center gap-4">
                    <div className="h-12 w-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center">
                       <Lock size={24} />
@@ -271,15 +268,4 @@ export default function AcademicsOverviewPage() {
 function getStepProgress(tasks: Array<{ done: boolean }>) {
   if (tasks.length === 0) return 0;
   return Math.round((tasks.filter((task) => task.done).length / tasks.length) * 100);
-}
-
-function Badge({ children, variant, className }: { children: React.ReactNode; variant: 'success'; className?: string }) {
-  return (
-    <span className={cn(
-      "rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200",
-      className
-    )}>
-      {children}
-    </span>
-  );
 }

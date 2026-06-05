@@ -362,12 +362,12 @@ function SidebarContent({
   return (
     <div
       className={cn(
-        'flex h-full flex-col bg-sidebar-900 text-white sidebar-transition',
+        'sidebar-transition flex h-full flex-col border-r border-white/[0.06] bg-sidebar-900 text-white shadow-xl shadow-slate-950/15',
         collapsed ? 'w-[72px]' : 'w-[280px]',
       )}
     >
       <div className="flex h-16 items-center gap-3 border-b border-white/[0.06] px-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-sm font-bold shadow-lg shadow-primary-600/20">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-sm font-bold shadow-lg shadow-primary-600/20">
           S
         </div>
 
@@ -377,11 +377,11 @@ function SidebarContent({
             collapsed ? 'w-0 opacity-0' : 'opacity-100',
           )}
         >
-          <span className="block truncate text-sm font-bold text-white tracking-tight">
+          <span className="block truncate text-sm font-bold text-white">
             SchoolOS
           </span>
-          <span className="block truncate text-[0.6rem] font-bold uppercase tracking-[0.2em] text-slate-500">
-            Workspace
+          <span className="block truncate text-[0.68rem] font-semibold text-slate-400">
+            School operations
           </span>
         </div>
       </div>
@@ -448,7 +448,7 @@ function SidebarContent({
             ) : (
               <>
                 <ChevronLeft size={20} className="shrink-0" />
-                <span className="sidebar-label font-medium">Collapse</span>
+                <span className="sidebar-label font-semibold">Collapse</span>
               </>
             )}
           </button>
@@ -478,7 +478,7 @@ function NavEntry({
   const content = (
     <>
       {active && !item.disabled && (
-        <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-primary-500" />
+        <span className="absolute left-0 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-primary-300" />
       )}
 
       <Icon
@@ -486,14 +486,14 @@ function NavEntry({
         className={cn(
           'shrink-0 transition-colors',
           active && !item.disabled
-            ? 'text-primary-400'
+            ? 'text-white'
             : 'text-slate-500 group-hover:text-slate-300',
         )}
       />
 
       <span
         className={cn(
-          'sidebar-label font-medium',
+          'sidebar-label font-semibold',
           collapsed ? 'w-0 opacity-0' : 'opacity-100',
         )}
       >
@@ -515,9 +515,9 @@ function NavEntry({
   );
 
   const className = cn(
-    'group relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200',
+    'group relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-300/70 focus:ring-offset-2 focus:ring-offset-sidebar-900',
     active && !item.disabled
-      ? 'bg-primary-600/10 text-primary-50 shadow-sm'
+      ? 'bg-primary-500 text-white shadow-sm shadow-primary-950/20'
       : 'text-slate-400 hover:bg-white/[0.04] hover:text-white',
     item.disabled &&
       'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-400',
@@ -537,7 +537,12 @@ function NavEntry({
   }
 
   return (
-    <Link href={item.href} onClick={onMobileClose} className={className}>
+    <Link
+      href={item.href}
+      onClick={onMobileClose}
+      className={className}
+      aria-current={active ? 'page' : undefined}
+    >
       {content}
     </Link>
   );

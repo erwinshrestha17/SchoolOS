@@ -315,6 +315,28 @@ export default function DashboardLayout({
     );
   }
 
+  const PLATFORM_ROLES = [
+    'platform_super_admin',
+    'platform_support',
+    'platform_billing_admin',
+  ];
+  const isPlatformUser = session.user.roles.some((role) =>
+    PLATFORM_ROLES.includes(role),
+  );
+
+  if (isPlatformUser && !session.user.isSupportOverride) {
+    return (
+      <DashboardShell>
+        <PermissionDenied
+          title="Access Restricted"
+          description="Platform administrator accounts cannot access school operations directly. Please use the Support Override console to access a school workspace."
+          resource="School Operations"
+          action="support_override"
+        />
+      </DashboardShell>
+    );
+  }
+
   const routeGate = getRouteGateForHref(pathname || '');
   if (
     routeGate &&

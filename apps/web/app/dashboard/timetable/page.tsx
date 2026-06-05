@@ -7,12 +7,12 @@ import Link from 'next/link';
 
 import { api } from '@/lib/api';
 import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
-import { ModuleHero } from '@/components/dashboard/module-hero';
-import { StatCard } from '@/components/dashboard/stat-card';
 import { FilterBar } from '@/components/dashboard/filter-bar';
 import { ModuleTabs } from '@/components/dashboard/module-tabs';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatCard } from '@/components/ui/stat-card';
 import { TimetableGrid } from '@/components/timetable/timetable-grid';
 import { TimetableVersionsList } from '@/components/timetable/versions-list';
 import { WeeklyRequirementsList } from '@/components/timetable/weekly-requirements-list';
@@ -91,24 +91,32 @@ export default function TimetablePage() {
       value: activeVersion?.versionName || 'None',
       icon: <Calendar className="h-5 w-5" />,
       loading: versionsQuery.isLoading,
+      tone: 'info' as const,
+      description: 'Published timetable for current filters',
     },
     {
       title: 'Draft Versions',
       value: draftVersions?.length ?? 0,
       icon: <Settings className="h-5 w-5" />,
       loading: versionsQuery.isLoading,
+      tone: 'neutral' as const,
+      description: 'Editable schedules before publish',
     },
     {
       title: 'Conflicts',
       value: conflictCount,
       icon: <FileWarning className="h-5 w-5" />,
       loading: validationQuery.isLoading,
+      tone: validationQuery.data?.errors.length ? 'danger' as const : 'warning' as const,
+      description: 'Backend validation errors and warnings',
     },
     {
       title: 'Substitutions',
       value: substitutionStatsQuery.data?.length ?? 0,
       icon: <Users className="h-5 w-5" />,
       loading: substitutionStatsQuery.isLoading,
+      tone: 'info' as const,
+      description: 'Teacher coverage records in scope',
     },
   ];
 
@@ -121,28 +129,51 @@ export default function TimetablePage() {
   ];
 
   const headerActions = (
-    <Link href="/dashboard/timetable/builder">
-      <Button className="rounded-2xl font-bold shadow-lg bg-slate-900 text-white hover:bg-slate-800">
-        <Plus className="mr-2 h-5 w-5" />
-        New Timetable Version
-      </Button>
-    </Link>
+    <div className="flex flex-wrap gap-2">
+      <Link href="/dashboard/timetable/conflicts">
+        <Button variant="outline" className="rounded-xl border-info-100 text-info-700 hover:border-info-100 hover:bg-info-50">
+          <FileWarning className="mr-2 h-4 w-4" />
+          Conflict Review
+        </Button>
+      </Link>
+      <Link href="/dashboard/timetable/builder">
+        <Button className="rounded-xl bg-info-600 text-white shadow-sm hover:bg-info-700 focus-visible:ring-info-100">
+          <Plus className="mr-2 h-5 w-5" />
+          New Timetable Version
+        </Button>
+      </Link>
+    </div>
+  );
+
+  const workflowLinks = (
+    <div className="flex flex-wrap gap-2">
+      <Link href="/dashboard/timetable/builder">
+        <Button variant="outline" className="rounded-xl">
+          Builder
+        </Button>
+      </Link>
+      <Link href="/dashboard/timetable/substitutions">
+        <Button variant="outline" className="rounded-xl">
+          Substitutions
+        </Button>
+      </Link>
+      <Link href="/dashboard/timetable/conflicts">
+        <Button variant="outline" className="rounded-xl">
+          Conflicts
+        </Button>
+      </Link>
+    </div>
   );
 
   return (
     <DashboardPageShell>
-      <ModuleHero
-        title="Timetable Manager"
-        subtitle="Build, validate, publish, and manage class schedules and teacher assignments."
-        badge="Timetable"
-        category="School Operations"
-        icon={<Calendar size={32} className="text-indigo-400" />}
-        accentColor="indigo"
-        variant="dark"
+      <PageHeader
+        title="Timetable"
+        description="View the published weekly schedule while keeping builder, conflict review, and substitutions in dedicated workflows."
         actions={headerActions}
       />
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <StatCard
             key={stat.title}
@@ -150,8 +181,22 @@ export default function TimetablePage() {
             value={stat.value}
             icon={stat.icon}
             loading={stat.loading}
+            tone={stat.tone}
+            description={stat.description}
           />
         ))}
+      </div>
+
+      <div className="shell-card border-info-100 bg-info-50/40 p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-slate-950">Timetable operations</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              Published timetable view stays separate from builder, conflict validation, and substitution coverage workflows.
+            </p>
+          </div>
+          {workflowLinks}
+        </div>
       </div>
 
       <FilterBar>
@@ -203,7 +248,7 @@ export default function TimetablePage() {
           items={tabItems}
           activeValue={activeTab}
           onValueChange={setActiveTab}
-          accentColor="indigo"
+          accentColor="blue"
           variant="light"
         />
 

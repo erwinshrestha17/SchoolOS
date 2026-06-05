@@ -87,6 +87,10 @@ export function CashierCloseSection() {
     TRANSFER: <History size={16} />,
     MOBILE: <CreditCard size={16} />,
   };
+  const closeDisabled =
+    closeMutation.isPending ||
+    (preview?.totalCollected || 0) === 0 ||
+    remarks.trim().length < 5;
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -122,7 +126,7 @@ export function CashierCloseSection() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {preview?.byMethod?.map((m: any) => (
-                <div key={m.method} className="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-3xl shadow-sm transition-all hover:border-slate-200">
+                <div key={m.method} className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:border-slate-200">
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center">
                       {methodIcons[m.method] || <CreditCard size={16} />}
@@ -137,10 +141,10 @@ export function CashierCloseSection() {
               ))}
             </div>
 
-            <div className="p-6 bg-slate-900 rounded-[2.5rem] text-white">
+            <div className="rounded-xl bg-slate-900 p-6 text-white">
                <div className="flex items-center justify-between mb-4">
                   <p className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em]">Collector Breakdown</p>
-                  <Badge variant="phase2" className="bg-primary-500/20 text-primary-400 border-none">Active Counter</Badge>
+                  <Badge variant="phase2" className="border-none bg-[var(--color-mod-fees-soft)] text-[var(--color-mod-fees-text)]">Active Counter</Badge>
                </div>
                <div className="space-y-4">
                   {preview?.byUser?.map((u: any) => (
@@ -169,9 +173,12 @@ export function CashierCloseSection() {
                 <textarea
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="e.g. Total cash tallied, one check pending clearance..."
-                  className="w-full min-h-[120px] p-4 text-sm font-medium rounded-2xl border-slate-100 bg-slate-50/50 focus:bg-white transition-all resize-none"
+                  placeholder="Required handover reason or cash variance note"
+                  className="min-h-[120px] w-full resize-none rounded-xl border-slate-100 bg-slate-50/50 p-4 text-sm font-medium transition-all focus:bg-white focus:ring-2 focus:ring-[var(--color-mod-fees-border)]"
                 />
+                <p className="text-[0.7rem] font-semibold text-slate-500">
+                  Required for the day-end audit trail.
+                </p>
              </div>
 
              <div className="p-5 bg-warning-50 border border-warning-100 rounded-2xl flex gap-3 text-warning-800">
@@ -189,8 +196,8 @@ export function CashierCloseSection() {
                 remarks,
                 summary: preview,
               })}
-              disabled={closeMutation.isPending || (preview?.totalCollected || 0) === 0}
-              className="w-full flex items-center justify-center gap-3 py-4 bg-primary-500 text-white rounded-[1.5rem] font-black text-sm shadow-xl shadow-primary-500/20 transition-all hover:bg-primary-600 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+              disabled={closeDisabled}
+              className="flex w-full items-center justify-center gap-3 rounded-xl bg-[var(--color-mod-fees-accent)] py-4 text-sm font-black text-white shadow-xl shadow-primary-500/20 transition-all hover:scale-[1.02] hover:bg-[var(--color-mod-fees-text)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
              >
                {closeMutation.isPending ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle2 size={20} />}
                Close Counter & Handover
@@ -230,7 +237,7 @@ function CollectionStat({ label, value, sub, icon, color }: { label: string; val
   };
 
   return (
-    <div className={cn("p-6 rounded-[2.5rem] border bg-white shadow-sm flex items-center gap-5", colorMap[color])}>
+    <div className={cn("flex items-center gap-5 rounded-xl border bg-white p-6 shadow-sm", colorMap[color])}>
        <div className={cn("h-14 w-14 rounded-2xl flex items-center justify-center shadow-inner", colorMap[color].split(' ')[1])}>
           {icon}
        </div>

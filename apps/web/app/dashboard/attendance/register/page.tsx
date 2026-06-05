@@ -120,7 +120,7 @@ export default function AttendanceRegisterPage() {
 
   const getStatusColorClass = (status: string | null) => {
     if (!status) return 'text-slate-200';
-    if (status === 'PRESENT') return 'text-emerald-600 bg-emerald-50';
+    if (status === 'PRESENT') return 'text-success-600 bg-success-50';
     if (status === 'LATE') return 'text-warning-600 bg-warning-50';
     if (status === 'ABSENT') return 'text-danger-600 bg-danger-50';
     return 'text-info-600 bg-info-50';
@@ -133,14 +133,14 @@ export default function AttendanceRegisterPage() {
         description="Comprehensive monthly attendance matrix for classroom management."
       />
 
-      <section className="rounded-[3rem] border border-slate-100 bg-white/50 p-6 backdrop-blur-xl shadow-xl shadow-slate-200/50">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5 items-end">
           <div className="space-y-2">
             <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">Academic Year</label>
             <select
               value={academicYearId}
               onChange={(e) => setAcademicYearId(e.target.value)}
-              className="premium-input bg-white"
+              className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
             >
               <option value="">Select Year</option>
               {(academicYearsQuery.data ?? []).map((year) => (
@@ -159,7 +159,7 @@ export default function AttendanceRegisterPage() {
                 setClassId(e.target.value);
                 setSectionId('');
               }}
-              className="premium-input bg-white"
+              className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
             >
               <option value="">Select Class</option>
               {(classesQuery.data ?? []).map((classroom) => (
@@ -174,7 +174,7 @@ export default function AttendanceRegisterPage() {
             <select
               value={sectionId}
               onChange={(e) => setSectionId(e.target.value)}
-              className="premium-input bg-white"
+              className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
             >
               <option value="">All Sections</option>
               {availableSections.map((section) => (
@@ -189,7 +189,7 @@ export default function AttendanceRegisterPage() {
             <select
               value={month}
               onChange={(e) => setMonth(Number(e.target.value))}
-              className="premium-input bg-white"
+              className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
             >
               {months.map((m) => (
                 <option key={m.value} value={m.value}>
@@ -201,7 +201,7 @@ export default function AttendanceRegisterPage() {
           <div className="flex gap-2">
             <button
               type="button"
-              className="flex-1 h-12 flex items-center justify-center gap-2 rounded-2xl bg-slate-900 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800 disabled:opacity-50"
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-attendance-accent)] text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-attendance-text)] disabled:opacity-50"
               disabled={!academicYearId || !classId || registerQuery.isFetching}
               onClick={() => registerQuery.refetch()}
             >
@@ -210,7 +210,7 @@ export default function AttendanceRegisterPage() {
             </button>
             <button
               type="button"
-              className="flex-1 h-12 flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
               disabled={!academicYearId || !classId || !registerQuery.data?.students?.length}
               onClick={handleExportCsv}
             >
@@ -224,7 +224,7 @@ export default function AttendanceRegisterPage() {
       {registerQuery.isFetching ? (
         <LoadingState label="Preparing attendance matrix..." />
       ) : registerQuery.data ? (
-        <div className="rounded-[2.5rem] border border-slate-100 bg-white p-6 shadow-xl overflow-x-auto relative">
+        <div className="relative overflow-x-auto rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           {registerQuery.data.students.length > 0 ? (
             <table className="min-w-full border-separate border-spacing-0 text-left">
               <thead>
@@ -244,7 +244,7 @@ export default function AttendanceRegisterPage() {
                       {day.date}
                     </th>
                   ))}
-                  <th className="border-b-2 border-slate-100 py-4 px-3 text-center text-[0.65rem] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50/50">P</th>
+                  <th className="border-b-2 border-slate-100 py-4 px-3 text-center text-[0.65rem] font-black uppercase tracking-widest text-success-600 bg-success-50/50">P</th>
                   <th className="border-b-2 border-slate-100 py-4 px-3 text-center text-[0.65rem] font-black uppercase tracking-widest text-danger-600 bg-danger-50/50">A</th>
                   <th className="border-b-2 border-slate-100 py-4 px-3 text-center text-[0.65rem] font-black uppercase tracking-widest text-warning-600 bg-warning-50/50">L</th>
                 </tr>
@@ -272,7 +272,7 @@ export default function AttendanceRegisterPage() {
                         </td>
                       );
                     })}
-                    <td className="py-3 px-3 text-center font-black text-emerald-700 bg-emerald-50/30">
+                    <td className="py-3 px-3 text-center font-black text-success-700 bg-success-50/30">
                       {student.totalPresent}
                     </td>
                     <td className="py-3 px-3 text-center font-black text-danger-700 bg-danger-50/30">
@@ -296,8 +296,8 @@ export default function AttendanceRegisterPage() {
           )}
         </div>
       ) : (
-        <div className="rounded-[3rem] border-2 border-dashed border-slate-100 p-20 flex flex-col items-center text-center">
-           <div className="h-20 w-20 rounded-[2rem] bg-slate-50 flex items-center justify-center text-slate-400 mb-6">
+        <div className="flex flex-col items-center rounded-xl border-2 border-dashed border-slate-100 p-20 text-center">
+           <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-xl bg-slate-50 text-slate-400">
              <Calendar size={40} />
            </div>
            <h3 className="text-xl font-bold text-slate-900 tracking-tight">Generate Monthly Register</h3>
@@ -309,7 +309,7 @@ export default function AttendanceRegisterPage() {
               </div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 text-[0.65rem] font-bold text-slate-500 uppercase tracking-widest">
                 <FileText size={14} />
-                PDF Export
+                CSV Export
               </div>
            </div>
         </div>

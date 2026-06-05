@@ -20,7 +20,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
   if (status === 'loading') {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+      <div className="flex h-screen w-full items-center justify-center bg-[var(--background)]">
         <LoadingState variant="page" label="Syncing workspace..." />
       </div>
     );
@@ -31,7 +31,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
+    <div className="flex h-screen overflow-hidden bg-[var(--background)]">
       <a
         href="#dashboard-main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-xl focus:bg-slate-950 focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-white"
@@ -50,11 +50,11 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
         <main
           id="dashboard-main"
-          className="flex-1 overflow-y-auto scroll-smooth focus:outline-none"
+          className="flex-1 overflow-y-auto scroll-smooth bg-[var(--background)] focus:outline-none"
           tabIndex={-1}
         >
-          <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-10">
-            <div className="mb-6">
+          <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 xl:px-10">
+            <div className="mb-5">
               <Breadcrumbs />
             </div>
             <div className="animate-fade-in transition-all duration-300">

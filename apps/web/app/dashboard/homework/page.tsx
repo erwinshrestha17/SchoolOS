@@ -2,13 +2,11 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Plus, BookOpen, Clock, AlertCircle, CheckCircle2, History } from 'lucide-react';
+import { Plus, BookOpen, Clock, AlertCircle, CheckCircle2, History, ClipboardCheck } from 'lucide-react';
 import Link from 'next/link';
 
 import { api } from '../../../lib/api';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
-import { ModuleHero } from '../../../components/dashboard/module-hero';
-import { StatCard } from '../../../components/dashboard/stat-card';
 import { FilterBar } from '../../../components/dashboard/filter-bar';
 import { DataTable } from '../../../components/ui/data-table';
 import { StatusChip } from '../../../components/dashboard/status-chip';
@@ -20,6 +18,25 @@ import { Select } from '../../../components/ui/select';
 import { PermissionState } from '../../../components/ui/permission-state';
 import { useSession } from '../../../components/session-provider';
 import { useRouter } from 'next/navigation';
+import { PageHeader } from '../../../components/ui/page-header';
+import { StatCard } from '../../../components/ui/stat-card';
+
+const isDueToday = (dueAt?: string | null) => {
+  if (!dueAt) return false;
+  return new Date(dueAt).toDateString() === new Date().toDateString();
+};
+
+const isUpcoming = (dueAt?: string | null) => {
+  if (!dueAt) return false;
+  const dueDate = new Date(dueAt);
+  const today = new Date();
+  return dueDate > today && !isDueToday(dueAt);
+};
+
+const isOverdue = (dueAt?: string | null, status?: string) => {
+  if (!dueAt || status === 'CLOSED' || status === 'CANCELLED') return false;
+  return new Date(dueAt) < new Date() && !isDueToday(dueAt);
+};
 
 export default function HomeworkPage() {
   const router = useRouter();
@@ -60,26 +77,69 @@ export default function HomeworkPage() {
     }
   }
 
+  const homeworkItems = homeworkQuery.data ?? [];
   const stats = [
     {
       title: 'Total Homework',
-      value: homeworkQuery.data?.length ?? 0,
+      value: homeworkItems.length,
       icon: <BookOpen className="h-5 w-5" />,
+      tone: 'info' as const,
+      description: 'Backend assignments in the current filter',
     },
     {
       title: 'Due Today',
-      value: homeworkQuery.data?.filter(h => h.dueAt && new Date(h.dueAt).toDateString() === new Date().toDateString()).length ?? 0,
+      value: homeworkItems.filter(h => isDueToday(h.dueAt)).length,
       icon: <Clock className="h-5 w-5" />,
+      tone: 'warning' as const,
+      description: 'Assignments requiring same-day attention',
     },
     {
       title: 'Overdue',
-      value: homeworkQuery.data?.filter(h => h.dueAt && new Date(h.dueAt) < new Date() && h.status !== 'CLOSED').length ?? 0,
+      value: homeworkItems.filter(h => isOverdue(h.dueAt, h.status)).length,
       icon: <AlertCircle className="h-5 w-5" />,
+      tone: 'danger' as const,
+      description: 'Open assignments past due time',
     },
     {
-      title: 'Submitted',
-      value: homeworkQuery.data?.reduce((acc, h) => acc + (h.submissions?.length ?? 0), 0) ?? 0,
+      title: 'Checked',
+      value: homeworkItems.reduce(
+        (acc, h) => acc + (h.submissions?.filter(s => s.status === 'REVIEWED').length ?? 0),
+        0,
+      ),
       icon: <CheckCircle2 className="h-5 w-5" />,
+      tone: 'success' as const,
+      description: 'Reviewed student submissions',
+    },
+  ];
+
+  const homeworkGroups = [
+    {
+      title: 'Due Today',
+      value: homeworkItems.filter(h => isDueToday(h.dueAt)).length,
+      tone: 'warning' as const,
+    },
+    {
+      title: 'Upcoming',
+      value: homeworkItems.filter(h => isUpcoming(h.dueAt)).length,
+      tone: 'info' as const,
+    },
+    {
+      title: 'Overdue',
+      value: homeworkItems.filter(h => isOverdue(h.dueAt, h.status)).length,
+      tone: 'danger' as const,
+    },
+    {
+      title: 'Checked',
+      value: homeworkItems.reduce(
+        (acc, h) => acc + (h.submissions?.filter(s => s.status === 'REVIEWED').length ?? 0),
+        0,
+      ),
+      tone: 'success' as const,
+    },
+    {
+      title: 'Closed',
+      value: homeworkItems.filter(h => h.status === 'CLOSED').length,
+      tone: 'neutral' as const,
     },
   ];
 
@@ -185,7 +245,7 @@ export default function HomeworkPage() {
 
   const headerActions = (
     <Link href="/dashboard/homework/new">
-      <Button className="rounded-2xl font-bold shadow-lg bg-slate-900 text-white hover:bg-slate-800">
+      <Button className="rounded-xl bg-info-600 text-white shadow-sm hover:bg-info-700 focus-visible:ring-info-100">
         <Plus className="mr-2 h-5 w-5" />
         Create Homework
       </Button>
@@ -194,27 +254,48 @@ export default function HomeworkPage() {
 
   return (
     <DashboardPageShell>
-      <ModuleHero
-        title="Homework Portal"
-        subtitle="Assign, track, review, and remind students about homework assignments."
-        badge="Homework"
-        category="Student Academics"
-        icon={<BookOpen size={32} className="text-indigo-400" />}
-        accentColor="indigo"
-        variant="dark"
+      <PageHeader
+        title="Homework"
+        description="Assign, track, review, and close homework using the live academic workflow."
         actions={headerActions}
       />
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <StatCard
             key={stat.title}
             title={stat.title}
             value={stat.value}
             icon={stat.icon}
+            tone={stat.tone}
+            description={stat.description}
             loading={homeworkQuery.isLoading}
           />
         ))}
+      </div>
+
+      <div className="shell-card p-5">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <ClipboardCheck className="h-4 w-4 text-info-600" />
+            <h2 className="text-sm font-bold text-slate-950">Homework workload groups</h2>
+          </div>
+          <p className="text-sm text-slate-500">
+            Assignments are grouped by due date and review state from the current backend result set.
+          </p>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {homeworkGroups.map((group) => (
+            <StatCard
+              key={group.title}
+              title={group.title}
+              value={group.value}
+              tone={group.tone}
+              loading={homeworkQuery.isLoading}
+              className="p-4 lg:p-4"
+            />
+          ))}
+        </div>
       </div>
 
       <FilterBar>

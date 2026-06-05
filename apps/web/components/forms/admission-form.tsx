@@ -183,13 +183,35 @@ export function AdmissionForm() {
 
   const latestAdmission = mutation.data;
 
+  function startAnotherEnrollment() {
+    form.reset({
+      dateOfBirth: '',
+      disabilityFlag: '',
+      confirmNoDisability: false,
+      admissionDate: today,
+      gender: 'FEMALE',
+      mediumOfInstruction: 'English',
+      academicYearId: academicYearsQuery.data?.find((year) => year.isCurrent)?.id ?? academicYearsQuery.data?.[0]?.id ?? '',
+      classId: classesQuery.data?.[0]?.id ?? '',
+      sectionId: '',
+      guardians: [{ fullName: '', relation: 'mother', primaryPhone: '', isPrimary: true }],
+    });
+    mutation.reset();
+    setDocumentFile(null);
+    setDocumentKind('BIRTH_CERTIFICATE');
+    setDuplicateWarning(null);
+    setDisabilityMode('');
+    setPdfError('');
+    setActiveStep(0);
+    setActiveWorkspaceTab('enrollment');
+  }
+
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard title="Total Admissions" value={admissionsQuery.data?.total ?? 0} icon={<UserPlus size={20} />} />
-        <StatCard title="Active Students" value={studentsQuery.data?.total ?? 0} icon={<Users size={20} />} />
-        <Link href="/dashboard/students" className="group relative overflow-hidden rounded-[2rem] bg-slate-900 p-6 text-white shadow-xl transition hover:-translate-y-1">
-          <div className="absolute right-0 top-0 h-24 w-24 rounded-full bg-primary-500/20 blur-2xl" />
+        <StatCard title="Total Admissions" value={admissionsQuery.data?.total ?? 0} icon={<UserPlus size={20} />} tone="info" />
+        <StatCard title="Active Students" value={studentsQuery.data?.total ?? 0} icon={<Users size={20} />} tone="success" />
+        <Link href="/dashboard/students" className="group relative overflow-hidden rounded-xl bg-slate-900 p-6 text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2">
           <div className="relative flex items-center justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Manage Records</p>
@@ -202,14 +224,14 @@ export function AdmissionForm() {
         </Link>
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-[2rem] border border-slate-200 bg-white/50 p-2 backdrop-blur-sm">
+      <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
         {workspaceTabs.map(([value, label]) => (
           <button
             key={value}
             type="button"
             className={cn(
-              "flex-1 min-h-[3rem] rounded-[1.5rem] px-6 text-sm font-bold transition-all",
-              activeWorkspaceTab === value ? "bg-slate-900 text-white shadow-lg" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+              "min-h-11 flex-1 rounded-lg px-4 text-sm font-bold transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2",
+              activeWorkspaceTab === value ? "bg-[var(--color-mod-admissions-accent)] text-white shadow-sm" : "text-slate-500 hover:bg-[var(--color-mod-admissions-soft)] hover:text-[var(--color-mod-admissions-text)]"
             )}
             onClick={() => setActiveWorkspaceTab(value as any)}
           >
@@ -400,11 +422,25 @@ export function AdmissionForm() {
               <SectionCard title="Review & Documents" description="Finalize enrollment and attach supporting files.">
                 <div className="grid gap-8 lg:grid-cols-2">
                   <div className="space-y-6">
-                     <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center transition hover:border-primary-400 hover:bg-slate-50">
+                     <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center transition hover:border-[var(--color-mod-admissions-accent)] hover:bg-[var(--color-mod-admissions-soft)]/50">
                         <Upload className="mx-auto mb-4 text-slate-400" size={32} />
-                        <p className="text-sm font-bold text-slate-900">Upload Birth Certificate or ID</p>
+                        <p className="text-sm font-bold text-slate-900">Attach supporting document</p>
                         <p className="mt-1 text-xs text-slate-500">PDF, JPG, PNG up to 5MB</p>
-                        <input type="file" className="mt-4 text-xs" onChange={(e) => setDocumentFile(e.target.files?.[0] ?? null)} />
+                        <div className="mx-auto mt-4 grid max-w-md gap-3 sm:grid-cols-[1fr_auto]">
+                          <select
+                            className="premium-input text-sm"
+                            value={documentKind}
+                            onChange={(event) => setDocumentKind(event.target.value)}
+                            aria-label="Document type"
+                          >
+                            {documentKinds.map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                          <input type="file" className="text-xs" onChange={(e) => setDocumentFile(e.target.files?.[0] ?? null)} />
+                        </div>
                      </div>
                      
                      {duplicateWarning?.hasWarnings && (
@@ -423,8 +459,7 @@ export function AdmissionForm() {
                      )}
                   </div>
 
-                  <div className="rounded-[2.5rem] bg-slate-900 p-8 text-white shadow-2xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/10 rounded-full blur-3xl -mr-16 -mt-16" />
+                  <div className="relative overflow-hidden rounded-xl bg-slate-900 p-8 text-white shadow-sm">
                     <h4 className="text-xs font-bold uppercase tracking-widest text-primary-400 mb-8">Enrollment Summary</h4>
                     <div className="space-y-5">
                        <SummaryItem label="Full Name" value={`${watchedFirstNameEn} ${watchedLastNameEn}`} />
@@ -452,8 +487,8 @@ export function AdmissionForm() {
             )}
 
             {activeStep === 4 && (
-              <div className="rounded-[3rem] border border-slate-100 bg-white p-12 text-center shadow-xl animate-in zoom-in-95 duration-500">
-                <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-[2.5rem] bg-success-50 text-success-500 shadow-inner">
+              <div className="animate-in zoom-in-95 rounded-xl border border-slate-100 bg-white p-12 text-center shadow-sm duration-500">
+                <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-xl bg-success-50 text-success-500 shadow-inner">
                   <CheckCircle2 size={48} />
                 </div>
                 <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Enrollment Successful!</h2>
@@ -462,28 +497,28 @@ export function AdmissionForm() {
                 </p>
                 
                 <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <button type="button" className="flex flex-col items-center gap-3 rounded-3xl border border-slate-100 bg-slate-50/50 p-6 transition hover:bg-primary-50 hover:border-primary-100 group" onClick={() => window.location.reload()}>
+                  <button type="button" className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]" onClick={startAnotherEnrollment}>
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-colors">
                       <UserPlus size={20} />
                     </div>
                     <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">Add Another Student</span>
                   </button>
                   
-                  <Link href={`/dashboard/students/${latestAdmission?.student.id}`} className="flex flex-col items-center gap-3 rounded-3xl border border-slate-100 bg-slate-50/50 p-6 transition hover:bg-primary-50 hover:border-primary-100 group">
+                  <Link href={`/dashboard/students/${latestAdmission?.student.id}`} className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-colors">
                       <FileText size={20} />
                     </div>
                     <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">View Profile</span>
                   </Link>
 
-                  <Link href={`/dashboard/finance?studentId=${latestAdmission?.student.id}`} className="flex flex-col items-center gap-3 rounded-3xl border border-slate-100 bg-slate-50/50 p-6 transition hover:bg-primary-50 hover:border-primary-100 group">
+                  <Link href={`/dashboard/finance?studentId=${latestAdmission?.student.id}`} className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-colors">
                       <Wallet size={20} />
                     </div>
                     <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">Collect First Fee</span>
                   </Link>
 
-                  <button type="button" className="flex flex-col items-center gap-3 rounded-3xl border border-slate-100 bg-slate-50/50 p-6 transition hover:bg-primary-50 hover:border-primary-100 group">
+                  <button type="button" className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-colors">
                       <Download size={20} />
                     </div>

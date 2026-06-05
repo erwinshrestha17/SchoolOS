@@ -38,7 +38,7 @@ export default function PlatformDashboard() {
 
   if (error) {
     return (
-      <div className="rounded-3xl border border-rose-200 bg-rose-50 p-8 text-rose-800">
+      <div className="rounded-[20px] border border-danger-200 bg-danger-50 p-8 text-danger-900">
         <div className="flex items-center gap-3 font-bold">
           <AlertTriangle size={20} />
           Dashboard unavailable
@@ -76,7 +76,7 @@ export default function PlatformDashboard() {
       value: s.activeTenants ?? 0,
       helper: `${s.totalTenants ?? 0} total schools`,
       icon: ShieldCheck,
-      tone: 'text-emerald-700',
+      tone: 'text-success-700',
     },
     {
       label: 'Suspended schools',
@@ -90,14 +90,14 @@ export default function PlatformDashboard() {
       value: overdueInvoices,
       helper: formatMoney(unpaidAmount),
       icon: CreditCard,
-      tone: overdueInvoices > 0 ? 'text-rose-700' : 'text-slate-600',
+      tone: overdueInvoices > 0 ? 'text-danger-700' : 'text-slate-600',
     },
     {
       label: 'Failed jobs',
       value: failedJobs,
       helper: 'Retry actions are audited',
       icon: Zap,
-      tone: failedJobs > 0 ? 'text-rose-700' : 'text-slate-600',
+      tone: failedJobs > 0 ? 'text-danger-700' : 'text-slate-600',
     },
   ];
 
@@ -160,7 +160,7 @@ export default function PlatformDashboard() {
       <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <Badge variant="neutral">Platform Control Plane</Badge>
-          <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-slate-900">
+          <h1 className="mt-3 text-[30px] font-extrabold leading-[38px] text-slate-900">
             Operator Attention Dashboard
           </h1>
           <p className="mt-2 max-w-2xl text-slate-500">
@@ -179,13 +179,13 @@ export default function PlatformDashboard() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {kpis.map((kpi) => (
-          <div key={kpi.label} className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+          <div key={kpi.label} className="rounded-[20px] border border-slate-100 bg-white p-6 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
                   {kpi.label}
                 </p>
-                <p className="mt-2 text-3xl font-black text-slate-900">
+                <p className="mt-2 text-[30px] font-extrabold leading-[38px] text-slate-900 tabular-nums">
                   {formatValue(kpi.value)}
                 </p>
                 <p className="mt-1 text-sm font-medium text-slate-500">{kpi.helper}</p>
@@ -199,14 +199,14 @@ export default function PlatformDashboard() {
       </div>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-        <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+        <div className="rounded-[20px] border border-slate-100 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-cyan-700">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-mod-platform-text">
                 <BellRing size={16} />
                 Attention queue
               </div>
-              <h2 className="mt-2 text-2xl font-black text-slate-900">
+              <h2 className="mt-2 text-xl font-bold leading-7 text-slate-900">
                 What needs operator action
               </h2>
               <p className="mt-1 text-sm text-slate-500">
@@ -225,25 +225,25 @@ export default function PlatformDashboard() {
                 <Link
                   key={`${item.badge}:${item.title}`}
                   href={item.href}
-                  className="group flex items-start justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-cyan-200 hover:bg-cyan-50"
+                  className="group flex items-start justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-mod-platform-border hover:bg-mod-platform-soft focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-2"
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant={item.urgent ? 'destructive' : 'neutral'}>{item.badge}</Badge>
-                      <h3 className="font-black text-slate-900">{item.title}</h3>
+                      <h3 className="font-bold text-slate-900">{item.title}</h3>
                     </div>
                     <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>
                   </div>
-                  <ArrowRight className="mt-1 shrink-0 text-slate-400 transition-transform group-hover:translate-x-1 group-hover:text-cyan-700" size={18} />
+                  <ArrowRight className="mt-1 shrink-0 text-slate-400 transition-transform group-hover:translate-x-1 group-hover:text-mod-platform-text" size={18} />
                 </Link>
               ))
             ) : (
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 text-emerald-900">
-                <div className="flex items-center gap-3 font-black">
+              <div className="rounded-2xl border border-success-100 bg-success-50 p-5 text-success-900">
+                <div className="flex items-center gap-3 font-bold">
                   <CheckCircle2 size={20} />
                   No urgent platform actions right now
                 </div>
-                <p className="mt-2 text-sm text-emerald-800">
+                <p className="mt-2 text-sm text-success-700">
                   Queue failures, provider readiness, usage warnings, overdue
                   SaaS invoices, and onboarding issues are currently clear.
                 </p>
@@ -253,10 +253,10 @@ export default function PlatformDashboard() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="rounded-[20px] border border-slate-100 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h2 className="text-xl font-black text-slate-900">System readiness</h2>
+                <h2 className="text-xl font-bold leading-7 text-slate-900">System readiness</h2>
                 <p className="mt-1 text-sm text-slate-500">Operational dependencies for platform workflows.</p>
               </div>
               <Link href="/platform/settings?tab=health" className="text-sm font-bold text-indigo-600 hover:text-indigo-700">
@@ -270,8 +270,8 @@ export default function PlatformDashboard() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-slate-500">
+          <div className="rounded-[20px] border border-slate-100 bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
               <CreditCard size={16} />
               SaaS billing boundary
             </div>
@@ -287,14 +287,14 @@ export default function PlatformDashboard() {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+      <section className="rounded-[20px] border border-slate-100 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-slate-500">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
               <FileClock size={16} />
               Recent platform audit
             </div>
-            <h2 className="mt-2 text-xl font-black text-slate-900">Who did what recently</h2>
+            <h2 className="mt-2 text-xl font-bold leading-7 text-slate-900">Who did what recently</h2>
           </div>
           <Link href="/platform/audit" className="text-sm font-bold text-indigo-600 hover:text-indigo-700">
             View full audit
@@ -305,7 +305,7 @@ export default function PlatformDashboard() {
             recentAudit.slice(0, 5).map((log: any) => (
               <div key={log.id} className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="font-black text-slate-900">{formatAction(log.action)}</p>
+                  <p className="font-bold text-slate-900">{formatAction(log.action)}</p>
                   <span className="flex items-center gap-1 text-xs font-semibold text-slate-400">
                     <Clock3 size={13} />
                     {formatDate(log.createdAt)}
@@ -313,7 +313,7 @@ export default function PlatformDashboard() {
                 </div>
                 <p className="mt-1">
                   {log.user?.email ?? log.actorEmail ?? 'System'} acted on {log.resource ?? log.resourceType ?? 'platform resource'}{' '}
-                  <span className="font-medium tracking-tight text-slate-500">
+                  <span className="font-medium text-slate-500">
                     {String(log.resourceId ?? '').slice(0, 8)}
                   </span>
                 </p>
@@ -333,13 +333,13 @@ export default function PlatformDashboard() {
 function PlatformDashboardSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="h-28 animate-pulse rounded-3xl bg-slate-100" />
+      <div className="h-28 animate-pulse rounded-[20px] bg-slate-100" />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="h-36 animate-pulse rounded-3xl bg-slate-100" />
+          <div key={index} className="h-36 animate-pulse rounded-[20px] bg-slate-100" />
         ))}
       </div>
-      <div className="h-80 animate-pulse rounded-3xl bg-slate-100" />
+      <div className="h-80 animate-pulse rounded-[20px] bg-slate-100" />
     </div>
   );
 }

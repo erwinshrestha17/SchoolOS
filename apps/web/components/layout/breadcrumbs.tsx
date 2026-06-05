@@ -54,11 +54,11 @@ export function Breadcrumbs() {
   return (
     <nav
       aria-label="Breadcrumb"
-      className="flex items-center gap-1 text-sm text-gray-500 mb-4 animate-fade-in"
+      className="flex items-center gap-1 text-sm text-slate-500 animate-fade-in"
     >
       <Link
         href="/dashboard"
-        className="flex items-center gap-1 text-gray-400 hover:text-primary-600 transition-colors"
+        className="flex items-center gap-1 text-slate-400 transition-colors hover:text-primary-600"
       >
         <Home size={14} />
         <span className="hidden sm:inline">Dashboard</span>
@@ -68,11 +68,11 @@ export function Breadcrumbs() {
         <span key={crumb.href} className="flex items-center gap-1">
           <ChevronRight size={14} className="breadcrumb-separator" />
           {crumb.isLast ? (
-            <span className="font-medium text-gray-900">{crumb.label}</span>
+            <span className="font-semibold text-slate-900">{crumb.label}</span>
           ) : (
             <Link
               href={crumb.href}
-              className="hover:text-primary-600 transition-colors"
+              className="transition-colors hover:text-primary-600"
             >
               {crumb.label}
             </Link>

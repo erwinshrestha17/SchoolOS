@@ -10,10 +10,10 @@ import { StatCard } from '@/components/ui/stat-card';
 import { DuesAnalysisSection } from '@/components/finance/dues-analysis-section';
 import { DefaulterAgingSummary } from '@/components/finance/defaulter-aging-summary';
 import { CashierCloseSection } from '@/components/finance/cashier-close-section';
-import { Badge } from '@/components/ui/badge';
 import { useSession } from '@/components/session-provider';
 import type { InvoiceSummary } from '@schoolos/core';
 import { useSearchParams } from 'next/navigation';
+import { PageHeader } from '@/components/ui/page-header';
 
 // Parity Sub-Tabs Imports
 import { FeeSetupTab } from '@/components/finance/fee-setup-tab';
@@ -57,34 +57,10 @@ export default function FinancePage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <header className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 px-6 py-10 text-white shadow-2xl lg:px-12">
-        <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-primary-500/10 blur-3xl" />
-        <div className="absolute bottom-0 left-1/4 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl" />
-        
-        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-2xl">
-            <div className="flex items-center gap-2 mb-4">
-              <Badge variant="phase2" className="bg-primary-500/20 text-primary-400 border-primary-500/20">
-                Finance & Fees
-              </Badge>
-              <div className="h-1 w-1 rounded-full bg-white/30" />
-              <span className="text-xs font-bold uppercase tracking-wider text-white/50">
-                Billing & Collections
-              </span>
-            </div>
-            <h1 className="text-3xl font-extrabold tracking-tight sm:text-5xl">
-              Financial <span className="text-primary-400">Terminal</span>
-            </h1>
-            <p className="mt-4 text-lg text-slate-300 leading-relaxed">
-              Track student fee collections, manage billing runs, and analyze outstanding dues for <span className="font-bold text-white">{session?.tenant.name}</span>.
-            </p>
-          </div>
-
-          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 shadow-inner">
-            <Wallet size={40} className="text-primary-400" />
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        title="Fees & Receipts"
+        description={`Collect student fees, close cashier days, and review outstanding dues${session?.tenant.name ? ` for ${session.tenant.name}` : ''}.`}
+      />
 
       <div className="grid gap-6 md:grid-cols-3">
         <StatCard
@@ -92,11 +68,13 @@ export default function FinancePage() {
           value={formatCurrency(totalOutstanding)}
           icon={<Wallet size={18} />}
           loading={invoicesQuery.isLoading}
+          tone="warning"
         />
         <StatCard
           title="Collection Rate"
           value={`${collectionRate}%`}
           loading={invoicesQuery.isLoading}
+          tone={collectionRate >= 80 ? 'success' : 'warning'}
           trend={{
             value: collectionRate,
             label: 'Total paid',
@@ -108,12 +86,13 @@ export default function FinancePage() {
           value={String(totalInvoices)}
           loading={invoicesQuery.isLoading}
           icon={<Receipt size={18} />}
+          tone="neutral"
         />
       </div>
 
       <Tabs defaultValue="collection" className="space-y-8">
         <div className="flex items-center justify-between">
-          <TabsList className="h-auto gap-2 rounded-[2rem] border border-slate-100 bg-white/50 p-2 backdrop-blur-sm">
+          <TabsList className="h-auto gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
             {[
               { value: 'collection', label: 'Counter', icon: <Calculator size={14} /> },
               { value: 'close', label: 'Day End', icon: <History size={14} /> },
@@ -124,7 +103,7 @@ export default function FinancePage() {
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
-                className="flex items-center gap-2 rounded-[1.5rem] px-6 py-2.5 font-bold transition-all data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 bg-transparent shadow-none"
+                className="flex items-center gap-2 rounded-lg bg-transparent px-6 py-2.5 font-bold text-slate-500 shadow-none transition-all hover:bg-slate-100 hover:text-slate-900 data-[state=active]:bg-[var(--color-mod-fees-accent)] data-[state=active]:text-white data-[state=active]:shadow-sm"
               >
                 {tab.icon}
                 {tab.label}
@@ -154,16 +133,16 @@ export default function FinancePage() {
         <TabsContent value="setup" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <Tabs defaultValue="heads-plans" className="space-y-6">
             <div className="flex justify-center sm:justify-start border-b border-slate-100 pb-2">
-              <TabsList className="bg-slate-50 p-1 rounded-xl border border-slate-100">
-                <TabsTrigger value="heads-plans" className="flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm text-slate-500 hover:text-slate-900 bg-transparent shadow-none">
+              <TabsList className="rounded-xl border border-slate-100 bg-slate-50 p-1">
+                <TabsTrigger value="heads-plans" className="flex items-center gap-2 rounded-lg bg-transparent px-4 py-2 text-xs font-bold text-slate-500 shadow-none hover:text-slate-900 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                   <Database size={12} />
                   Heads & Plans
                 </TabsTrigger>
-                <TabsTrigger value="discounts" className="flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm text-slate-500 hover:text-slate-900 bg-transparent shadow-none">
+                <TabsTrigger value="discounts" className="flex items-center gap-2 rounded-lg bg-transparent px-4 py-2 text-xs font-bold text-slate-500 shadow-none hover:text-slate-900 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                   <Percent size={12} />
                   Discounts & Waivers
                 </TabsTrigger>
-                <TabsTrigger value="billing-runs" className="flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm text-slate-500 hover:text-slate-900 bg-transparent shadow-none">
+                <TabsTrigger value="billing-runs" className="flex items-center gap-2 rounded-lg bg-transparent px-4 py-2 text-xs font-bold text-slate-500 shadow-none hover:text-slate-900 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                   <Play size={12} />
                   Billing Runs
                 </TabsTrigger>

@@ -19,15 +19,15 @@ export function PermissionDenied({
 }: PermissionDeniedProps) {
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center p-8 text-center">
-      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-rose-50 text-rose-600 shadow-sm">
+      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-[20px] bg-danger-50 text-danger-600 shadow-sm">
         <ShieldAlert size={40} />
       </div>
 
-      <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+      <h1 className="text-[30px] font-extrabold leading-[38px] text-slate-900">
         {title}
       </h1>
 
-      <p className="mt-4 max-w-lg text-lg leading-relaxed text-slate-500">
+      <p className="mt-4 max-w-lg text-base leading-[26px] text-slate-500">
         {description}
       </p>
 
@@ -58,7 +58,7 @@ export function PermissionDenied({
       </div>
 
       <div className="mt-12 text-sm font-medium text-slate-400">
-        Error Code: <span className="font-semibold tracking-tight text-slate-500">403_FORBIDDEN_PLATFORM</span>
+        Reference: <span className="font-semibold text-slate-500">Platform access denied</span>
       </div>
     </div>
   );

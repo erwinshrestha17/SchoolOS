@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, useMemo } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import {
   clearAttendanceDraft,
@@ -373,8 +374,8 @@ export function AttendanceForm() {
   return (
     <div className="space-y-8 animate-fade-in pb-24">
       {submitMessage && (
-        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-[2rem] flex items-center gap-4 text-emerald-800 text-sm font-bold animate-in slide-in-from-top-4 duration-500">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
+        <div className="animate-in slide-in-from-top-4 flex items-center gap-4 rounded-xl border border-success-100 bg-success-50 p-4 text-sm font-bold text-success-800 duration-500">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success-500 text-white shadow-lg shadow-success-500/20">
             <CheckCircle2 size={20} />
           </div>
           {submitMessage}
@@ -384,12 +385,12 @@ export function AttendanceForm() {
       {draftSyncState !== 'idle' && (
         <div
           className={cn(
-            'flex items-center justify-between gap-4 rounded-[2rem] border px-5 py-4 text-sm font-bold',
+            'flex items-center justify-between gap-4 rounded-xl border px-5 py-4 text-sm font-bold',
             draftSyncState === 'conflict'
-              ? 'border-amber-200 bg-amber-50 text-amber-900'
+              ? 'border-warning-200 bg-warning-50 text-warning-900'
               : draftSyncState === 'failed'
                 ? 'border-danger-100 bg-danger-50 text-danger-800'
-                : 'border-blue-100 bg-blue-50 text-blue-800',
+                : 'border-info-100 bg-info-50 text-info-800',
           )}
         >
           <div className="flex items-center gap-3">
@@ -403,7 +404,7 @@ export function AttendanceForm() {
               <button
                 type="button"
                 onClick={keepServerVersion}
-                className="rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs"
+                className="rounded-xl border border-warning-200 bg-white px-3 py-2 text-xs"
               >
                 Keep server version
               </button>
@@ -414,7 +415,7 @@ export function AttendanceForm() {
                     'Review the local draft below, then request correction if attendance is submitted or locked.',
                   )
                 }
-                className="rounded-xl bg-amber-600 px-3 py-2 text-xs text-white"
+                className="rounded-xl bg-warning-600 px-3 py-2 text-xs text-white"
               >
                 Review local draft
               </button>
@@ -423,7 +424,7 @@ export function AttendanceForm() {
             <button
               type="button"
               onClick={() => void syncDraftSubmission()}
-              className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs"
+              className="rounded-xl border border-info-100 bg-white px-3 py-2 text-xs"
             >
               Sync now
             </button>
@@ -437,7 +438,7 @@ export function AttendanceForm() {
         exceptions={totals.absent + totals.late + totals.leave}
       />
 
-      <section className="rounded-[3rem] border border-slate-100 bg-white/50 p-6 backdrop-blur-xl shadow-xl shadow-slate-200/50">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="space-y-2">
             <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
@@ -446,7 +447,7 @@ export function AttendanceForm() {
             <select
               value={academicYearId}
               onChange={(e) => setAcademicYearId(e.target.value)}
-              className="premium-input bg-white"
+              className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
               aria-label="Academic Year"
             >
               <option value="">Select Year</option>
@@ -469,7 +470,7 @@ export function AttendanceForm() {
                 setClassId(e.target.value);
                 setSectionId('');
               }}
-              className="premium-input bg-white"
+              className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
               aria-label="Class"
             >
               <option value="">Select Class</option>
@@ -488,7 +489,7 @@ export function AttendanceForm() {
             <select
               value={sectionId}
               onChange={(e) => setSectionId(e.target.value)}
-              className="premium-input bg-white"
+              className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
               aria-label="Section"
             >
               <option value="">All Sections</option>
@@ -509,7 +510,7 @@ export function AttendanceForm() {
               value={attendanceDate}
               max={today}
               onChange={(e) => setAttendanceDate(e.target.value)}
-              className="premium-input bg-white"
+              className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
               aria-label="Date"
             />
           </div>
@@ -518,10 +519,10 @@ export function AttendanceForm() {
 
       <SectionCard
         title="Attendance Roster"
-        description="Mark student attendance status. Multi-tap for quick changes."
+        description="Mark student attendance states. Present is the default; record exceptions with remarks."
         headerAction={
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 mr-4 px-4 py-2 rounded-2xl bg-slate-100 border border-slate-200">
+            <div className="mr-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-2">
               <span className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest">
                 Status:
               </span>
@@ -532,7 +533,7 @@ export function AttendanceForm() {
                 <button
                   type="button"
                   onClick={markAllPresent}
-                  className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-xl hover:bg-emerald-100 transition-colors"
+                  className="flex items-center gap-2 rounded-xl border border-success-100 bg-success-50 px-4 py-2 text-xs font-bold text-success-700 transition-colors hover:bg-success-100"
                 >
                   <CheckSquare size={14} />
                   Mark All Present
@@ -568,9 +569,9 @@ export function AttendanceForm() {
             }
             action={
               !classId ? undefined : (
-                <button className="text-primary-600 font-bold text-sm hover:underline">
-                  Setup Class Roster
-                </button>
+                <Link href="/dashboard/students" className="text-sm font-bold text-[var(--color-mod-attendance-text)] hover:underline">
+                  Manage Student Roster
+                </Link>
               )
             }
           />
@@ -583,7 +584,7 @@ export function AttendanceForm() {
               <SummaryPill
                 label="Present"
                 value={totals.present}
-                className="text-emerald-700"
+                className="text-success-700"
               />
               <SummaryPill
                 label="Absent"
@@ -602,7 +603,7 @@ export function AttendanceForm() {
               />
             </div>
 
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            <div className="rounded-xl border border-info-100 bg-info-50 px-4 py-3 text-sm text-info-800">
               Everyone is present by default. Mark exceptions only when a
               student is absent, late, sick leave, excused leave, or unexcused
               leave.
@@ -648,12 +649,12 @@ export function AttendanceForm() {
 
       {/* Summary Floating Bar */}
       {roster.length > 0 && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-8 p-6 bg-slate-900/95 backdrop-blur-xl text-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] animate-in slide-in-from-bottom-8 duration-700 border border-white/10 z-50">
+        <div className="animate-in slide-in-from-bottom-8 fixed bottom-8 left-1/2 z-50 flex -translate-x-1/2 items-center gap-8 rounded-xl border border-white/10 bg-slate-900/95 p-6 text-white shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl duration-700">
           <div className="flex items-center gap-8 px-4">
             <SummaryStat
               label="Present"
               value={totals.present}
-              color="text-emerald-400"
+              color="text-success-400"
             />
             <SummaryStat
               label="Absent"
@@ -680,7 +681,7 @@ export function AttendanceForm() {
             disabled={
               mutation.isPending || roster.length === 0 || futureDateBlocked
             }
-            className="flex items-center gap-3 px-10 py-4 bg-primary-500 text-white rounded-[2rem] font-black text-sm transition-all hover:scale-105 hover:bg-primary-600 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-xl shadow-primary-500/30"
+            className="flex items-center gap-3 rounded-xl bg-[var(--color-mod-attendance-accent)] px-10 py-4 text-sm font-black text-white shadow-xl shadow-primary-500/30 transition-all hover:scale-105 hover:bg-[var(--color-mod-attendance-text)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
           >
             {mutation.isPending ? (
               <Loader2 size={20} className="animate-spin" />
@@ -693,7 +694,7 @@ export function AttendanceForm() {
       )}
 
       {mutation.isError && (
-        <div className="p-6 bg-danger-50 border border-danger-100 rounded-[2rem] flex items-center gap-4 text-danger-800 text-sm font-bold animate-fade-in shadow-lg">
+        <div className="animate-fade-in flex items-center gap-4 rounded-xl border border-danger-100 bg-danger-50 p-6 text-sm font-bold text-danger-800 shadow-lg">
           <AlertCircle size={24} className="text-danger-500" />
           <div className="flex flex-col">
             <span className="text-[0.65rem] uppercase tracking-widest text-danger-600 mb-1">
@@ -704,7 +705,7 @@ export function AttendanceForm() {
         </div>
       )}
 
-      <div className="rounded-[2.5rem] border border-slate-200 bg-slate-50 p-6 shadow-sm flex items-center justify-between mb-4">
+      <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
         <div className="flex items-center gap-4 text-slate-600">
           <div className="h-10 w-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
             <Download size={20} className="text-slate-400" />
@@ -721,7 +722,7 @@ export function AttendanceForm() {
             type="button"
             onClick={() => void saveDraftToServer()}
             disabled={saveDraftMutation.isPending || roster.length === 0}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-primary-600 bg-white border border-primary-200 rounded-xl hover:bg-primary-50 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 rounded-xl border border-[var(--color-mod-attendance-border)] bg-white px-4 py-2 text-xs font-bold text-[var(--color-mod-attendance-text)] transition-colors hover:bg-[var(--color-mod-attendance-soft)] disabled:opacity-50"
           >
             <Save size={14} />
             Save Draft
@@ -738,7 +739,7 @@ export function AttendanceForm() {
         </div>
       </div>
 
-      <div className="rounded-[2.5rem] border border-slate-200 bg-white p-6 shadow-sm flex items-center justify-between">
+      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center gap-4 text-slate-500">
           <div className="h-10 w-10 rounded-2xl bg-slate-50 flex items-center justify-center">
             <Info size={20} />
@@ -768,7 +769,7 @@ export function AttendanceForm() {
             )
           }
           disabled={!academicYearId || !classId}
-          className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
         >
           <Download size={14} />
           Export CSV

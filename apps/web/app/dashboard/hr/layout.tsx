@@ -4,8 +4,8 @@ import { ReactNode } from 'react';
 import { Users, LayoutDashboard, CalendarDays, ClipboardCheck, FileText } from 'lucide-react';
 import { useSession } from '../../../components/session-provider';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
-import { ModuleHero } from '../../../components/dashboard/module-hero';
 import { ModuleTabs } from '../../../components/dashboard/module-tabs';
+import { PageHeader } from '../../../components/ui/page-header';
 
 export default function HRLayout({ children }: { children: ReactNode }) {
   const { session } = useSession();
@@ -18,20 +18,15 @@ export default function HRLayout({ children }: { children: ReactNode }) {
     { href: '/dashboard/hr/contracts', label: 'Contracts', icon: FileText },
   ];
 
-  const tabs = <ModuleTabs items={navItems} accentColor="blue" variant="dark" />;
+  const tabs = <ModuleTabs items={navItems} accentColor="purple" variant="light" />;
 
   return (
     <DashboardPageShell>
-      <ModuleHero
-        title="HR Workspace"
-        subtitle={`Manage staff profiles, contracts, leave workflows, and track attendance for ${session?.tenant.name || 'your school'}.`}
-        badge="Human Resources"
-        category="Staff Management"
-        icon={<Users size={32} className="text-blue-400" />}
-        accentColor="blue"
-        variant="dark"
-        tabs={tabs}
+      <PageHeader
+        title="HR"
+        description={`Manage staff profiles, contracts, leave workflows, and attendance for ${session?.tenant.name || 'your school'}.`}
       />
+      <div className="mb-6">{tabs}</div>
       <main>
         {children}
       </main>

@@ -17,7 +17,7 @@ interface ModuleTabsProps {
   items: TabItem[];
   activeValue?: string;
   onValueChange?: (value: string) => void;
-  accentColor?: 'blue' | 'emerald' | 'indigo' | 'purple' | 'amber' | 'rose' | 'slate';
+  accentColor?: 'blue' | 'emerald' | 'indigo' | 'purple' | 'amber' | 'orange' | 'lime' | 'rose' | 'slate';
   variant?: 'dark' | 'light';
   className?: string;
 }
@@ -58,6 +58,22 @@ const tabAccentStyles = {
   amber: {
     activeDark: "bg-amber-500 text-white shadow-lg shadow-amber-500/20",
     activeLight: "bg-amber-600 text-white shadow-md border-amber-600",
+    badgeActiveDark: "bg-white/20 text-white",
+    badgeInactiveDark: "bg-white/10 text-white/50",
+    badgeActiveLight: "bg-white/20 text-white",
+    badgeInactiveLight: "bg-slate-100 text-slate-500",
+  },
+  orange: {
+    activeDark: "bg-orange-500 text-white shadow-lg shadow-orange-500/20",
+    activeLight: "bg-orange-600 text-white shadow-md border-orange-600",
+    badgeActiveDark: "bg-white/20 text-white",
+    badgeInactiveDark: "bg-white/10 text-white/50",
+    badgeActiveLight: "bg-white/20 text-white",
+    badgeInactiveLight: "bg-slate-100 text-slate-500",
+  },
+  lime: {
+    activeDark: "bg-lime-600 text-white shadow-lg shadow-lime-600/20",
+    activeLight: "bg-lime-700 text-white shadow-md border-lime-700",
     badgeActiveDark: "bg-white/20 text-white",
     badgeInactiveDark: "bg-white/10 text-white/50",
     badgeActiveLight: "bg-white/20 text-white",

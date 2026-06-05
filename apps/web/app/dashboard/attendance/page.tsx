@@ -7,10 +7,11 @@ import { AttendanceForm } from '@/components/forms/attendance-form';
 import { AttendanceAnalytics } from '@/components/attendance/attendance-analytics';
 import { AttendanceConflictReview } from '@/components/attendance/attendance-conflict-review';
 import { AttendanceCorrectionReview } from '@/components/attendance/attendance-correction-review';
-import { CalendarCheck, BarChart3, AlertTriangle } from 'lucide-react';
+import { CalendarCheck, BarChart3, AlertTriangle, FileText } from 'lucide-react';
 import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
-import { ModuleHero } from '@/components/dashboard/module-hero';
 import { ModuleTabs } from '@/components/dashboard/module-tabs';
+import { PageHeader } from '@/components/ui/page-header';
+import Link from 'next/link';
 
 export default function AttendancePage() {
   const [activeTab, setActiveTab] = useState('marking');
@@ -38,14 +39,18 @@ export default function AttendancePage() {
 
   return (
     <DashboardPageShell>
-      <ModuleHero
-        title="Smart Attendance"
-        subtitle="Daily student attendance tracking and automated absence analytics."
-        badge="Attendance"
-        category="Student Operations"
-        icon={<CalendarCheck size={32} className="text-blue-400" />}
-        accentColor="blue"
-        variant="dark"
+      <PageHeader
+        title="Attendance"
+        description="Daily student attendance tracking, exception review, and absence analytics."
+        actions={
+          <Link
+            href="/dashboard/attendance/register"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-attendance-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-attendance-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-attendance-border)] focus:ring-offset-2"
+          >
+            <FileText size={18} />
+            Monthly Register
+          </Link>
+        }
       />
 
       <div className="space-y-6">
@@ -53,7 +58,7 @@ export default function AttendancePage() {
           items={tabItems}
           activeValue={activeTab}
           onValueChange={setActiveTab}
-          accentColor="blue"
+          accentColor="emerald"
           variant="light"
         />
 
