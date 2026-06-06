@@ -266,7 +266,7 @@ function makeSyncPrisma() {
 
 function makeRejectedSyncPrisma() {
   const state: {
-    syncSubmissions: Array<{
+    syncSubmissions: {
       id: string;
       tenantId: string;
       clientSubmissionId: string;
@@ -287,7 +287,7 @@ function makeRejectedSyncPrisma() {
       rejectionReason: AttendanceSyncRejectionReason | null;
       submittedById: string;
       payload: unknown;
-    }>;
+    }[];
   } = {
     syncSubmissions: [],
   };

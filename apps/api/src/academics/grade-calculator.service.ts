@@ -634,9 +634,7 @@ export class GradeCalculatorService {
     }
 
     const entries = value
-      .map((entry) =>
-        this.parseGradingScaleEntry(entry as Prisma.JsonValue | null),
-      )
+      .map((entry) => this.parseGradingScaleEntry(entry))
       .filter((entry): entry is GradeScaleEntry => entry !== null)
       .sort((a, b) => b.minPercentage - a.minPercentage);
 

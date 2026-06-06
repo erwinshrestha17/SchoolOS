@@ -28,14 +28,14 @@ import { PayrollActionDto } from './dto/payroll-action.dto';
 import { PayrollPreviewQueryDto } from './dto/payroll-preview-query.dto';
 import { UpdateSalaryStructureDto } from './dto/update-salary-structure.dto';
 
-type PayrollReportFilters = {
+interface PayrollReportFilters {
   payrollRunId?: string;
   month?: number;
   year?: number;
   department?: string;
   staffId?: string;
   status?: PayrollRunStatus;
-};
+}
 
 type PayrollReportFilterInput = string | PayrollReportFilters;
 

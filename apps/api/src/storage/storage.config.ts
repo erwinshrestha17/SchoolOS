@@ -2,19 +2,19 @@ import {
   DEFAULT_SIGNED_READ_URL_TTL_SECONDS,
   DEFAULT_SIGNED_UPLOAD_URL_TTL_SECONDS,
   MAX_SIGNED_URL_TTL_SECONDS,
-  SchoolOSStorageProvider,
+  type SchoolOSStorageProvider,
 } from './storage.types';
 
-export type LocalStorageConfig = {
+export interface LocalStorageConfig {
   provider: 'local';
   localRoot: string;
   publicBaseUrl: string;
   signingSecret: string;
   signedReadUrlTtlSeconds: number;
   signedUploadUrlTtlSeconds: number;
-};
+}
 
-export type S3CompatibleStorageConfig = {
+export interface S3CompatibleStorageConfig {
   provider: 's3' | 'r2' | 'minio';
   bucket: string;
   region: string;
@@ -25,9 +25,9 @@ export type S3CompatibleStorageConfig = {
   forcePathStyle: boolean;
   signedReadUrlTtlSeconds: number;
   signedUploadUrlTtlSeconds: number;
-};
+}
 
-export type GcpStorageConfig = {
+export interface GcpStorageConfig {
   provider: 'gcp';
   bucket: string;
   projectId: string;
@@ -35,7 +35,7 @@ export type GcpStorageConfig = {
   publicBaseUrl: string | null;
   signedReadUrlTtlSeconds: number;
   signedUploadUrlTtlSeconds: number;
-};
+}
 
 export type SchoolOSStorageConfig =
   | LocalStorageConfig

@@ -1,5 +1,5 @@
-import { Logger } from '@nestjs/common';
-import { PlansService } from './plans.service';
+import { type Logger } from '@nestjs/common';
+import { type PlansService } from './plans.service';
 
 export async function skipSuspendedTenantJob(
   plansService: PlansService,

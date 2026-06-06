@@ -2456,5 +2456,5 @@ function coerceReportFilters(value: Prisma.JsonValue): Record<string, unknown> {
     return {};
   }
 
-  return value as Record<string, unknown>;
+  return value;
 }

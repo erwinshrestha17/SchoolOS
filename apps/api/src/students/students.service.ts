@@ -888,6 +888,24 @@ export class StudentsService {
           },
         });
       }
+
+      if (dto.classId !== undefined && dto.classId !== student.classId) {
+        await tx.studentLifecycleTransition.create({
+          data: {
+            tenantId: actor.tenantId,
+            studentId: student.id,
+            fromStatus: student.lifecycleStatus,
+            toStatus: student.lifecycleStatus,
+            reason: 'Class placement updated',
+            changedById: actor.userId,
+            metadata: {
+              classChange: true,
+              fromClassId: student.classId,
+              toClassId: dto.classId,
+            },
+          },
+        });
+      }
     });
 
     await this.auditService.record({
@@ -1406,6 +1424,8 @@ export class StudentsService {
         studentSystemId: true,
         firstNameEn: true,
         lastNameEn: true,
+        firstNameNp: true,
+        lastNameNp: true,
         dateOfBirth: true,
         admissionNumber: true,
         previousSchool: true,
@@ -1419,8 +1439,14 @@ export class StudentsService {
                 fullName: true,
                 primaryPhone: true,
                 secondaryPhone: true,
+                email: true,
               },
             },
+          },
+        },
+        siblingMemberships: {
+          select: {
+            siblingGroupId: true,
           },
         },
       },
@@ -1449,6 +1475,8 @@ export class StudentsService {
             studentSystemId: true,
             firstNameEn: true,
             lastNameEn: true,
+            firstNameNp: true,
+            lastNameNp: true,
             dateOfBirth: true,
             admissionNumber: true,
             previousSchool: true,
@@ -1462,8 +1490,14 @@ export class StudentsService {
                     fullName: true,
                     primaryPhone: true,
                     secondaryPhone: true,
+                    email: true,
                   },
                 },
+              },
+            },
+            siblingMemberships: {
+              select: {
+                siblingGroupId: true,
               },
             },
           },
@@ -2601,7 +2635,14 @@ export class StudentsService {
     const students = await this.prisma.student.findMany({
       where: {
         tenantId: actor.tenantId,
-        lifecycleStatus: 'ACTIVE',
+        lifecycleStatus: {
+          in: [
+            StudentLifecycleStatus.ACTIVE,
+            StudentLifecycleStatus.TRANSFERRED,
+            StudentLifecycleStatus.EXITED,
+            StudentLifecycleStatus.ALUMNI,
+          ],
+        },
         ...(filters.classId ? { classId: filters.classId } : {}),
         ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
       },
@@ -2685,6 +2726,92 @@ export class StudentsService {
         ],
         rows,
       }),
+    };
+  }
+
+  async getStudentLifecycleTimeline(studentId: string, actor: AuthContext) {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId: actor.tenantId },
+    });
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const transitions = await this.prisma.studentLifecycleTransition.findMany({
+      where: {
+        studentId: student.id,
+        tenantId: actor.tenantId,
+      },
+      orderBy: { changedAt: 'desc' },
+    });
+
+    const userIds = transitions
+      .map((t) => t.changedById)
+      .filter((id): id is string => Boolean(id));
+
+    const users =
+      userIds.length > 0
+        ? await this.prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: { id: true, email: true },
+          })
+        : [];
+
+    const userMap = new Map(users.map((u) => [u.id, u.email]));
+
+    return transitions.map((t) => ({
+      id: t.id,
+      fromStatus: t.fromStatus,
+      toStatus: t.toStatus,
+      reason: t.reason,
+      changedById: t.changedById,
+      changedByEmail: t.changedById
+        ? (userMap.get(t.changedById) ?? null)
+        : null,
+      changedAt: t.changedAt.toISOString(),
+      feeClearanceWaived: t.feeClearanceWaived,
+      metadata: t.metadata,
+    }));
+  }
+
+  async getIemisReadiness(studentId: string, actor: AuthContext) {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId: actor.tenantId },
+      include: {
+        tenant: true,
+        class: true,
+        sectionRef: true,
+        guardianLinks: {
+          include: { guardian: true },
+        },
+        enrollments: {
+          include: {
+            academicYear: true,
+            section: true,
+          },
+          orderBy: [{ createdAt: 'desc' }],
+          take: 1,
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const issues = validateIemisStudent(student);
+    const score = Math.max(0, Math.round(((12 - issues.length) / 12) * 100));
+
+    return {
+      studentId: student.id,
+      studentSystemId: student.studentSystemId,
+      fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+      eligible: issues.length === 0,
+      score,
+      issues: issues.map((issue) => ({
+        field: issue.field,
+        message: issue.message,
+      })),
     };
   }
 
@@ -3605,11 +3732,13 @@ function isProbableDuplicateStudent(
   return nameDobMatch || admissionMatch;
 }
 
-type DuplicateCandidateStudent = {
+export interface DuplicateCandidateStudent {
   id: string;
   studentSystemId: string;
   firstNameEn: string;
   lastNameEn: string;
+  firstNameNp?: string | null;
+  lastNameNp?: string | null;
   dateOfBirth: Date;
   admissionNumber?: string | null;
   previousSchool?: string | null;
@@ -3621,9 +3750,11 @@ type DuplicateCandidateStudent = {
       fullName: string;
       primaryPhone?: string | null;
       secondaryPhone?: string | null;
+      email?: string | null;
     };
   }>;
-};
+  siblingMemberships?: Array<{ siblingGroupId: string }>;
+}
 
 function buildDuplicateCandidatePairs(
   sourceStudents: DuplicateCandidateStudent[],
@@ -3679,15 +3810,43 @@ function scoreDuplicateCandidate(
   source: DuplicateCandidateStudent,
   candidate: DuplicateCandidateStudent,
 ) {
+  // 1. Sibling group overlap check (Known Siblings are NOT duplicates of the same student)
+  const shareSiblingGroup = source.siblingMemberships?.some((sm) =>
+    candidate.siblingMemberships?.some(
+      (cm) => cm.siblingGroupId === sm.siblingGroupId,
+    ),
+  );
+  if (shareSiblingGroup) {
+    return { score: 0, reasons: [] };
+  }
+
   let score = 0;
   const reasons: string[] = [];
-  const sourceName = `${source.firstNameEn} ${source.lastNameEn}`;
-  const candidateName = `${candidate.firstNameEn} ${candidate.lastNameEn}`;
-  const nameSimilarity = calculateNameSimilarity(sourceName, candidateName);
 
-  if (nameSimilarity >= 0.85) {
+  // English Name Similarity
+  const sourceNameEn = `${source.firstNameEn} ${source.lastNameEn}`;
+  const candidateNameEn = `${candidate.firstNameEn} ${candidate.lastNameEn}`;
+  const enSimilarity = calculateNameSimilarity(sourceNameEn, candidateNameEn);
+
+  if (enSimilarity >= 0.85) {
     score += 25;
     reasons.push('Similar student name');
+  }
+
+  // Nepali Name Similarity
+  if (
+    source.firstNameNp &&
+    source.lastNameNp &&
+    candidate.firstNameNp &&
+    candidate.lastNameNp
+  ) {
+    const sourceNameNp = `${source.firstNameNp} ${source.lastNameNp}`;
+    const candidateNameNp = `${candidate.firstNameNp} ${candidate.lastNameNp}`;
+    const npSimilarity = calculateNameSimilarity(sourceNameNp, candidateNameNp);
+    if (npSimilarity >= 0.85) {
+      score += 25;
+      reasons.push('Similar student Nepali name');
+    }
   }
 
   if (
@@ -3712,6 +3871,11 @@ function scoreDuplicateCandidate(
     reasons.push('Shared guardian phone');
   }
 
+  if (sharedGuardianEmail(source, candidate)) {
+    score += 30;
+    reasons.push('Shared guardian email');
+  }
+
   if (
     source.previousSchool &&
     source.previousSchool.trim().toLowerCase() ===
@@ -3731,6 +3895,10 @@ function summarizeDuplicateCandidateStudent(
     id: student.id,
     studentSystemId: student.studentSystemId,
     fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+    fullNameNp:
+      student.firstNameNp || student.lastNameNp
+        ? `${student.firstNameNp ?? ''} ${student.lastNameNp ?? ''}`.trim()
+        : null,
     dateOfBirth: student.dateOfBirth.toISOString().slice(0, 10),
     admissionNumber: student.admissionNumber ?? null,
     previousSchool: student.previousSchool ?? null,
@@ -3738,6 +3906,7 @@ function summarizeDuplicateCandidateStudent(
     className: student.class?.name ?? null,
     sectionName: student.sectionRef?.name ?? null,
     guardianPhones: guardianPhones(student),
+    guardianEmails: guardianEmails(student),
   };
 }
 
@@ -3755,7 +3924,27 @@ function guardianPhones(student: DuplicateCandidateStudent) {
       link.guardian.primaryPhone?.trim(),
       link.guardian.secondaryPhone?.trim(),
     ])
-    .filter((phone): phone is string => Boolean(phone));
+    .filter((phone): phone is string => Boolean(phone))
+    .map(normalizePhoneNumber);
+}
+
+function sharedGuardianEmail(
+  source: DuplicateCandidateStudent,
+  candidate: DuplicateCandidateStudent,
+) {
+  const sourceEmails = new Set(guardianEmails(source));
+  return guardianEmails(candidate).some((email) => sourceEmails.has(email));
+}
+
+function guardianEmails(student: DuplicateCandidateStudent) {
+  return student.guardianLinks
+    .map((link) => link.guardian.email?.trim().toLowerCase())
+    .filter((email): email is string => Boolean(email));
+}
+
+function normalizePhoneNumber(phone: string) {
+  const clean = phone.replace(/\D/g, '');
+  return clean.length >= 10 ? clean.slice(-10) : clean;
 }
 
 function calculateNameSimilarity(a: string, b: string) {

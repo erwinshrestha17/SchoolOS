@@ -281,9 +281,9 @@ describe('StorageService', () => {
     process.env.STORAGE_PROVIDER = 'r2';
     process.env.R2_BUCKET = 'schoolos-assets';
 
-    expect(() => new ConfigService().validateForRuntime()).toThrow(
-      /OBJECT_STORAGE_ENDPOINT or R2_ENDPOINT is required/,
-    );
+    expect(() => {
+      new ConfigService().validateForRuntime();
+    }).toThrow(/OBJECT_STORAGE_ENDPOINT or R2_ENDPOINT is required/);
   });
 
   it('treats deleteObject as idempotent when provider reports missing objects', async () => {
@@ -345,10 +345,10 @@ describe('StorageService', () => {
   });
 });
 
-type CommandWithInput = {
+interface CommandWithInput {
   input: object;
   constructor: { name: string };
-};
+}
 
 function configureR2Env() {
   process.env.STORAGE_PROVIDER = 'r2';

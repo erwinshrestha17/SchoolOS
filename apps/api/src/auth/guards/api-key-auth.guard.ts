@@ -54,7 +54,7 @@ export class ApiKeyAuthGuard implements CanActivate {
       return headerKey;
     }
 
-    const authHeader = request.headers['authorization'];
+    const authHeader = request.headers.authorization;
     if (authHeader?.startsWith('Bearer sk_schoolos_')) {
       return authHeader.slice(7);
     }

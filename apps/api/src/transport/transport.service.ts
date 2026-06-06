@@ -1199,7 +1199,9 @@ export class TransportService {
             subscribed = !err;
           });
         })
-        .catch((err) => subscriber.error(err));
+        .catch((err) => {
+          subscriber.error(err);
+        });
 
       subClient.on('message', (ch, message) => {
         if (ch === channel) {

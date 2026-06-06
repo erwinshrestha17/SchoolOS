@@ -265,7 +265,7 @@ describe('School OS Auth + RBAC integration', () => {
     const teacherRequest = await authenticateRequest(
       jwtAuthGuard,
       rolesGuard,
-      teacherVerifiedLogin.accessToken as string,
+      teacherVerifiedLogin.accessToken!,
       ClassesController.prototype.listClasses as unknown as (
         ...args: unknown[]
       ) => unknown,

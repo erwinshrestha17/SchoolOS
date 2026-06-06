@@ -292,13 +292,13 @@ export class PlatformService {
     );
     const usageWarnings = (await Promise.all(warningsPromises)).filter(
       Boolean,
-    ) as {
+    ) as Array<{
       tenantId: string;
       tenantName: string;
       usageKey: string;
       value: number;
       limit: number;
-    }[];
+    }>;
 
     // Fetch provider statuses
     const [redisHealth, storageProvider, emailProvider, smsProvider] =
@@ -1767,7 +1767,7 @@ export class PlatformService {
 
   async getProvidersReadiness() {
     const checkedAt = new Date();
-    const result: Record<string, unknown>[] = [];
+    const result: Array<Record<string, unknown>> = [];
 
     // 1. SMS
     const smsProvider = await this.prisma.providerConfig.findFirst({

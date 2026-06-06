@@ -279,7 +279,7 @@ export class NotificationsProcessor extends WorkerHost {
       return null;
     }
 
-    const tenantId = (metadata as Record<string, unknown>).tenantId;
+    const tenantId = metadata.tenantId;
     return typeof tenantId === 'string' ? tenantId : null;
   }
 

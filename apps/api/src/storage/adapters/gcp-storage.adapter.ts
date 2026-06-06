@@ -1,11 +1,11 @@
-import { GcpStorageConfig } from '../storage.config';
+import { type GcpStorageConfig } from '../storage.config';
 import {
-  PutObjectInput,
-  SignedUrlInput,
-  SignedUploadResult,
-  StorageAdapter,
-  StorageReadinessResult,
-  StoredObjectResult,
+  type PutObjectInput,
+  type SignedUrlInput,
+  type SignedUploadResult,
+  type StorageAdapter,
+  type StorageReadinessResult,
+  type StoredObjectResult,
 } from '../storage.types';
 
 export class GcpStorageAdapter implements StorageAdapter {

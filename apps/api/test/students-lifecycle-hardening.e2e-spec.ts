@@ -23,6 +23,7 @@ import {
   createQueueMock,
 } from './test-helpers';
 import { getQueueToken } from '@nestjs/bullmq';
+import { StudentQrService } from '../src/students/student-qr.service';
 
 describe('Student Lifecycle Hardening (E2E)', () => {
   let app: INestApplication;
@@ -30,7 +31,16 @@ describe('Student Lifecycle Hardening (E2E)', () => {
   let studentsService: StudentsService;
 
   const tenantId = 'test-tenant-lifecycle';
-  const actor = createAuthContextMock({ tenantId, userId: 'test-admin' });
+  const actor = createAuthContextMock({
+    tenantId,
+    userId: 'test-admin',
+    permissions: [
+      'students:read',
+      'students:qr:resolve_all',
+      'students:qr:read',
+      'students:qr:generate',
+    ],
+  });
 
   beforeAll(async () => {
     const prismaMock = createPrismaMock();
@@ -345,5 +355,195 @@ describe('Student Lifecycle Hardening (E2E)', () => {
     });
     expect(history).toBeDefined();
     expect(history?.reason).toContain(student1.studentSystemId);
+  });
+
+  it('should exclude sibling group members from duplicate detection and match on Nepali names, normalized phones, and emails', async () => {
+    const s1 = await studentsService.createStudent(
+      {
+        firstNameEn: 'Duplicate',
+        lastNameEn: 'Test',
+        firstNameNp: 'प्रतिलिपि',
+        lastNameNp: 'परीक्षण',
+        dateOfBirth: '2015-05-05',
+        gender: 'MALE',
+        admissionDate: '2024-04-15',
+        classId,
+      },
+      actor,
+    );
+
+    const s2 = await studentsService.createStudent(
+      {
+        firstNameEn: 'Duplicate',
+        lastNameEn: 'Test',
+        firstNameNp: 'प्रतिलिपि',
+        lastNameNp: 'परीक्षण',
+        dateOfBirth: '2015-05-05',
+        gender: 'MALE',
+        admissionDate: '2024-04-15',
+        classId,
+      },
+      actor,
+    );
+
+    const guardian = await prisma.guardian.create({
+      data: {
+        tenantId,
+        fullName: 'Parent Test',
+        relation: 'FATHER',
+        primaryPhone: '+977-9841-111222',
+        email: 'parent@example.com',
+      },
+    });
+
+    await prisma.studentGuardian.createMany({
+      data: [
+        {
+          tenantId,
+          studentId: s1.id,
+          guardianId: guardian.id,
+          relation: 'FATHER',
+        },
+        {
+          tenantId,
+          studentId: s2.id,
+          guardianId: guardian.id,
+          relation: 'FATHER',
+        },
+      ],
+    });
+
+    const res1 = await studentsService.listDuplicateStudentCandidates(
+      { studentId: s1.id },
+      actor,
+    );
+    expect(res1.candidates.length).toBeGreaterThan(0);
+    expect(res1.candidates[0].candidateStudent.id).toBe(s2.id);
+    expect(res1.candidates[0].score).toBe(100);
+    expect(res1.candidates[0].reasons).toContain('Similar student Nepali name');
+    expect(res1.candidates[0].reasons).toContain('Shared guardian email');
+
+    await prisma.siblingGroup.create({
+      data: {
+        tenantId,
+        name: 'Test Sibling Group',
+        members: {
+          create: [
+            { tenantId, studentId: s1.id, relationship: 'BROTHER' },
+            { tenantId, studentId: s2.id, relationship: 'BROTHER' },
+          ],
+        },
+      },
+    });
+
+    const res2 = await studentsService.listDuplicateStudentCandidates(
+      { studentId: s1.id },
+      actor,
+    );
+    expect(res2.candidates).toHaveLength(0);
+  });
+
+  it('should record transition entry when classId changes and retrieve lifecycle timeline', async () => {
+    const student = await studentsService.createStudent(
+      {
+        firstNameEn: 'Transition',
+        lastNameEn: 'User',
+        dateOfBirth: '2010-01-01',
+        gender: 'MALE',
+        admissionDate: '2024-04-15',
+        classId,
+      },
+      actor,
+    );
+
+    const otherClass = await prisma.class.create({
+      data: {
+        tenantId,
+        name: 'Grade 11',
+        level: 11,
+      },
+    });
+
+    await studentsService.updateStudent(
+      student.id,
+      { classId: otherClass.id, confirmNoDisability: true },
+      actor,
+    );
+
+    const timeline = await studentsService.getStudentLifecycleTimeline(
+      student.id,
+      actor,
+    );
+
+    expect(timeline.length).toBeGreaterThanOrEqual(2);
+    const classChange = timeline.find(
+      (t) => t.reason === 'Class placement updated',
+    );
+    expect(classChange).toBeDefined();
+    expect((classChange?.metadata as any).classChange).toBe(true);
+    expect((classChange?.metadata as any).fromClassId).toBe(classId);
+    expect((classChange?.metadata as any).toClassId).toBe(otherClass.id);
+  });
+
+  it('should retrieve student iEMIS readiness diagnostics score and details', async () => {
+    const student = await studentsService.createStudent(
+      {
+        firstNameEn: 'Readiness',
+        lastNameEn: 'Tester',
+        dateOfBirth: '2010-01-01',
+        gender: 'FEMALE',
+        admissionDate: '2024-04-15',
+        classId,
+      },
+      actor,
+    );
+
+    const diagnostics = await studentsService.getIemisReadiness(
+      student.id,
+      actor,
+    );
+
+    expect(diagnostics.studentId).toBe(student.id);
+    expect(diagnostics.eligible).toBe(false);
+    expect(diagnostics.score).toBeLessThan(100);
+    expect(diagnostics.issues.some((i) => i.field === 'fullNameNp')).toBe(true);
+    expect(diagnostics.issues.some((i) => i.field === 'guardianContact')).toBe(
+      true,
+    );
+  });
+
+  it('should retrieve student QR scan history from audit logs', async () => {
+    const qrService = app.get<StudentQrService>(StudentQrService);
+
+    const student = await studentsService.createStudent(
+      {
+        firstNameEn: 'QRScan',
+        lastNameEn: 'Tester',
+        dateOfBirth: '2010-01-01',
+        gender: 'MALE',
+        admissionDate: '2024-04-15',
+        classId,
+      },
+      actor,
+    );
+
+    const { rawToken, credential } = await qrService.generateQr(
+      tenantId,
+      student.id,
+      actor,
+    );
+
+    await qrService.resolveQr(
+      tenantId,
+      rawToken!,
+      'GENERAL_STUDENT_LOOKUP' as any,
+      actor,
+    );
+
+    const scans = await qrService.getQrScanHistory(tenantId, student.id, actor);
+    expect(scans).toHaveLength(1);
+    expect(scans[0].action).toBe('QR_RESOLVED');
+    expect(scans[0].purpose).toBe('GENERAL_STUDENT_LOOKUP');
+    expect(scans[0].success).toBe(true);
   });
 });

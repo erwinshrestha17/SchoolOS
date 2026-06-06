@@ -4009,7 +4009,7 @@ export class FinanceService {
     const signature =
       headers[sigHeaderName] ||
       headers[sigHeaderName.toUpperCase()] ||
-      headers['signature'];
+      headers.signature;
 
     if (!signature || signature.trim() === '') {
       throw new BadRequestException('Missing signature header.');

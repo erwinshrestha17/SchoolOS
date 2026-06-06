@@ -322,7 +322,7 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
       const draft = await platformService.createSaaSInvoice(
         tenantId,
         {
-          issueDate: new Date().toISOString(),
+          issueDate: new Date(Date.now() - 3600000).toISOString(),
           dueDate: new Date(Date.now() + 86400000).toISOString(),
           status: 'DRAFT',
           lines: [

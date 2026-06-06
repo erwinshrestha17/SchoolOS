@@ -295,6 +295,24 @@ export class StudentsController {
     return this.studentsService.getAttendanceHistory(studentId, query, auth);
   }
 
+  @Get(':id/iemis-readiness')
+  @Permissions('students:read')
+  getIemisReadiness(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.getIemisReadiness(studentId, auth);
+  }
+
+  @Get(':id/lifecycle-timeline')
+  @Permissions('students:read')
+  getStudentLifecycleTimeline(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.getStudentLifecycleTimeline(studentId, auth);
+  }
+
   @Get(':id/identity')
   @Permissions('students:read')
   getStudentIdentity(

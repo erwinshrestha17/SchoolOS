@@ -109,6 +109,12 @@ Manage tenants, platform administration, feature controls, provider readiness, q
 4. API keys are stored hashed and only shown once during creation.
 5. File and queue failure screens show safe, non-secret diagnostics.
 
+### 4.7 Future Enhancement Direction
+
+Unique angle: SchoolOS Pilot Readiness Console — a platform operator can see exactly why a school is or is not ready to go live.
+
+Planned enhancements: guided onboarding wizard, tenant readiness score, provider health center, queue mission control, tenant sandbox mode, data import center, tenant change log, feature usage analytics, and tenant exit/export package. See MODULE_FEATURE_ENHANCEMENT_PLAN.md for full backlog.
+
 ---
 
 ## 5. M1 Admissions and Student Profiles
@@ -166,6 +172,12 @@ Manage student lifecycle from inquiry/admission to active, transferred, withdraw
 4. QR lifecycle works with generate, rotate, revoke, and fail-closed resolve.
 5. Historical records remain available after transfer, withdrawal, graduation, or archive.
 
+### 5.7 Future Enhancement Direction
+
+Unique angle: Family 360, not just Student 360. Nepal schools deal with siblings, guardians, fee negotiations, transport, and documents together.
+
+Planned enhancements: admission funnel board, Nepali-name duplicate engine, sibling intelligence, guardian trust profile, parent pickup pass, medical safety card, student risk-free flagging, and alumni registry. See MODULE_FEATURE_ENHANCEMENT_PLAN.md for full backlog.
+
 ---
 
 ## 6. M2 Smart Attendance
@@ -220,6 +232,12 @@ Digitize student attendance with teacher-scoped marking, correction requests, of
 2. Offline conflicts show choices instead of silently replacing data.
 3. Correction workflow preserves audit history.
 4. Attendance exports are tenant-scoped and registered through File Registry where retained.
+
+### 6.7 Future Enhancement Direction
+
+Unique angle: Poor-connectivity-first attendance. Make offline sync and conflict clarity a major selling point.
+
+Planned enhancements: attendance command board, parent absence confirmation, leave pre-approval, exam-day attendance mode, late arrival register, class attendance heatmap, attendance correction SLA, and substitute teacher attendance authority. See MODULE_FEATURE_ENHANCEMENT_PLAN.md for full backlog.
 
 ---
 
@@ -287,6 +305,12 @@ Manage fee setup, invoices, student ledgers, payments, receipts, refunds, revers
 4. Receipt reprint is history-tracked and non-duplicating.
 5. Gateway readiness state is visible and honest.
 
+### 7.7 Future Enhancement Direction
+
+Unique angle: Nepal-first fee operations — cash, QR wallet, bank transfer, manual references, partial payments, scholarship, and audit-safe receipts.
+
+Planned enhancements: fee negotiation plans, discount rule engine, fee hold policy, overpayment wallet, installment plans, defaulter segmentation, smart reminders, payment provider fallback, fee dispute workflow, and bank statement matching. See MODULE_FEATURE_ENHANCEMENT_PLAN.md for full backlog.
+
 ---
 
 ## 8. M4 Academics, Exams, CAS, and Report Cards
@@ -348,6 +372,12 @@ Manage subjects, exams, assessments, marks, CAS, grading, report cards, result p
 3. Promotion readiness clearly shows incomplete, failed, withheld, and ready states.
 4. Parent/student see only authorized published results.
 
+### 8.7 Future Enhancement Direction
+
+Unique angle: Promotion readiness + result publishing governance. Manage the approval and hold workflow, not just report card generation.
+
+Planned enhancements: marks grid spreadsheet UX, assessment blueprint, CAS rubric builder, report card designer, result publish checklist, result hold manager, promotion board, result analytics, academic timeline, and intervention plans. See MODULE_FEATURE_ENHANCEMENT_PLAN.md for full backlog.
+
 ---
 
 ## 9. M5 Activity Feed and Milestones
@@ -398,6 +428,12 @@ Provide safe school/class/student activity feed, media, milestones, mood logs, r
 1. Wrong-class media does not leak to unauthorized parents.
 2. Removed content does not appear from cache.
 3. Media access is private and tenant-scoped.
+
+### 9.7 Future Enhancement Direction
+
+Unique angle: Consent-safe private parent engagement. Critical for school trust.
+
+Planned enhancements: student tagging confidence, consent-aware media hiding, mood/wellbeing logs, parent engagement analytics, activity albums, private student notes, birthday/achievement templates, parent comment controls, and activity-to-profile linking. See MODULE_FEATURE_ENHANCEMENT_PLAN.md for full backlog.
 
 ---
 
@@ -457,6 +493,12 @@ Manage homework lifecycle, submissions, reminders, reviews, correction requests,
 2. Homework deleted after queued reminder does not send stale reminder.
 3. Parent/student can see only authorized homework/timetable data.
 
+### 10.7 Future Enhancement Direction
+
+Unique angle: Academic operations scheduler — homework, timetable, exams, leave, and substitutions working together.
+
+Planned enhancements: homework template library, student submission states, homework load calendar, timetable version compare, teacher availability matrix, room/resource booking, substitution auto-suggest, and event/exam timetable integration. See MODULE_FEATURE_ENHANCEMENT_PLAN.md for full backlog.
+
 ---
 
 ## 11. M7 HR and Payroll
@@ -514,6 +556,12 @@ Manage staff records, contracts, documents, leave, attendance, salary structures
 3. Sensitive fields are masked unless permission allows.
 4. Payslip files use protected access.
 
+### 11.7 Future Enhancement Direction
+
+Unique angle: HR + timetable + payroll integration. Connect staff workload, leave, and payroll rather than keeping them separate.
+
+Planned enhancements: contract renewal workflow, staff document checklist, leave calendar, leave policy engine, payroll approval chain, payroll variance report, staff workload link, exit clearance, and substitute availability from HR leave. See MODULE_FEATURE_ENHANCEMENT_PLAN.md for full backlog.
+
 ---
 
 ## 12. M8A Library Management
@@ -562,6 +610,12 @@ Manage books, physical copies, issue/return, overdue, fines, borrower history, Q
 1. Same copy cannot be issued twice.
 2. Borrower history remains visible after return, loss, or lifecycle change.
 3. Library reports are tenant-scoped.
+
+### 12.7 Future Enhancement Direction
+
+Unique angle: Library as reading engagement, not just inventory.
+
+Planned enhancements: reservation/hold queue, book availability portal, shelf/location map, acquisition workflow, reading challenge, class reading list, library period attendance, fine waiver approval, and barcode label printing. See MODULE_FEATURE_ENHANCEMENT_PLAN.md for full backlog.
 
 ---
 
@@ -616,6 +670,12 @@ Manage routes, stops, vehicles, drivers, assignments, trips, boarding/drop statu
 1. Parent cannot track non-linked child.
 2. Stale GPS is never presented as live.
 3. Trip status supports boarded, dropped, absent, not-boarded, delayed, and completed.
+
+### 13.7 Future Enhancement Direction
+
+Unique angle: Trustworthy transport visibility, not just live map. Stale/uncertain GPS should be honestly shown.
+
+Planned enhancements: driver daily manifest, substitute vehicle/driver, GPS quality score, transport fee integration, boarding anomaly detection, trip incident log, and vehicle maintenance log. See MODULE_FEATURE_ENHANCEMENT_PLAN.md for full backlog.
 
 ---
 
@@ -676,6 +736,12 @@ Manage menu items, meal plans, serving, student wallets, POS sales, spending con
 1. POS double submit cannot duplicate transaction.
 2. Parent can see only linked child canteen spending where enabled.
 3. Stock ledger and sales reports are tenant-scoped.
+
+### 14.7 Future Enhancement Direction
+
+Unique angle: Safety-first canteen — allergy enforcement + wallet controls + inventory accountability.
+
+Planned enhancements: hard allergy block, parent spending control, meal subscription, menu planner, inventory recipe linking, student dietary profile, parent canteen history, and popular item reports. See MODULE_FEATURE_ENHANCEMENT_PLAN.md for full backlog.
 
 ---
 
@@ -739,6 +805,12 @@ Provide double-entry accounting, chart of accounts, fiscal years, journals, ledg
 3. Payroll cannot post twice.
 4. Large ledger export does not block normal operations.
 
+### 15.7 Future Enhancement Direction
+
+Unique angle: ERP-grade accounting backbone, not a side ledger.
+
+Planned enhancements: accounting setup wizard, source-ledger drilldown, fiscal close checklist, bank reconciliation workspace, voucher workflows, audit-ready snapshots, budgeting, tax/PAN/VAT readiness, and management reports. See MODULE_FEATURE_ENHANCEMENT_PLAN.md for full backlog.
+
 ---
 
 ## 16. M10 Notices, Communication, and Messaging
@@ -796,6 +868,12 @@ Centralize notices, events, consent, preferences, notification delivery, read tr
 2. Parent removed from student cannot access old message link.
 3. Delivery retry does not duplicate messages.
 
+### 16.7 Future Enhancement Direction
+
+Unique angle: Reliable school communication, not just chat. Delivery/read/failure transparency is the differentiator.
+
+Planned enhancements: notice template library, delivery confidence tracking, emergency override, parent-teacher office hours, chat moderation, multi-channel fallback, parent language preference, and communication health score. See MODULE_FEATURE_ENHANCEMENT_PLAN.md for full backlog.
+
 ---
 
 ## 17. M11 School Intelligence and Analytics
@@ -841,9 +919,47 @@ Provide future analytics and intelligence only after reliable production data ex
 2. Sensitive insights are visible only to authorized roles.
 3. Incomplete pilot data is clearly marked.
 
+### 17.7 Future Enhancement Direction
+
+Unique angle: Human-reviewed school intelligence, not automated decisions.
+
+Planned enhancements: attendance risk insight, fee collection risk, academic intervention, parent engagement insight, transport reliability score, canteen demand forecast, timetable optimization, staff workload balancing, accounting anomaly detection, and student wellbeing signals. All must be human-reviewed, explainable, and permission-gated. See MODULE_FEATURE_ENHANCEMENT_PLAN.md for full backlog.
+
 ---
 
-## 18. Pilot Functional Acceptance Checklist
+## 18. Cross-Module Integration Features
+
+### 18.1 Universal Student 360
+
+- FR-CM-01: The system must provide a unified student profile view aggregating data from admissions, attendance, fees, receipts, homework, marks, report cards, activity feed, library, transport, canteen, and notices.
+- FR-CM-02: The system must support a Family 360 variant showing sibling relationships, shared guardians, and family-level fee/transport/document views.
+- FR-CM-03: Student 360 data must be tenant-scoped and permission-gated by viewer role.
+
+### 18.2 School Command Center
+
+- FR-CM-04: The system must provide a principal dashboard showing live operational status including today's attendance, absent students, unpaid fees, cashier collection, homework due, transport status, canteen stock, pending leave, pending approvals, and unread emergency notices.
+- FR-CM-05: Command Center data must be role-gated to principal and authorized admin roles.
+
+### 18.3 Nepal Compliance Center
+
+- FR-CM-06: The system must provide a compliance area with iEMIS readiness, PAN/VAT readiness, accounting close readiness, fee receipt audit, payroll/PF/TDS summaries, student document completeness, and report-card publish readiness.
+- FR-CM-07: Compliance checks must identify specific missing fields and blocking issues.
+
+### 18.4 Approval Inbox
+
+- FR-CM-08: The system must provide a global approval queue aggregating fee reversal/refund, marks unlock, attendance correction, leave, payroll, report-card correction, notice, canteen reversal, and library fine waiver approvals.
+- FR-CM-09: Each approver must see only their authorized approval types based on role and permissions.
+- FR-CM-10: Pending approvals must track SLA duration and highlight overdue items.
+
+### 18.5 School Health Score
+
+- FR-CM-11: The system must provide a deterministic (non-AI) school health score covering attendance health, fee health, academic data completeness, communication reach, transport reliability, canteen stock safety, HR/payroll readiness, and accounting close readiness.
+- FR-CM-12: Health score must be calculated from real module data, not estimates or projections.
+- FR-CM-13: Health score history must be tracked for trend analysis.
+
+---
+
+## 19. Pilot Functional Acceptance Checklist
 
 Before pilot, manually verify:
 
@@ -865,7 +981,7 @@ Before pilot, manually verify:
 
 ---
 
-## 19. Relationship to Other Documents
+## 20. Relationship to Other Documents
 
 | Document | Purpose |
 |---|---|

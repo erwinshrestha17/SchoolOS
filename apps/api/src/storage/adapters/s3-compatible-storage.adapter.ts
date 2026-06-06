@@ -1,21 +1,21 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
-  HeadBucketCommand,
+  type HeadBucketCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import { Readable } from 'stream';
-import { S3CompatibleStorageConfig } from '../storage.config';
+import { type S3CompatibleStorageConfig } from '../storage.config';
 import {
-  PutObjectInput,
-  SignedUrlInput,
-  SignedUploadResult,
-  StorageAdapter,
-  StorageReadinessResult,
-  StoredObjectResult,
+  type PutObjectInput,
+  type SignedUrlInput,
+  type SignedUploadResult,
+  type StorageAdapter,
+  type StorageReadinessResult,
+  type StoredObjectResult,
 } from '../storage.types';
 import {
   buildExpiresAt,
@@ -31,9 +31,9 @@ type S3Command =
   | DeleteObjectCommand
   | HeadBucketCommand;
 
-type S3ClientLike = {
+interface S3ClientLike {
   send(command: S3Command): Promise<unknown>;
-};
+}
 
 type PresignCommand = GetObjectCommand | PutObjectCommand;
 
@@ -344,6 +344,6 @@ function isProviderNotFoundError(error: unknown) {
   return (
     isRawProviderNotFoundError(error) ||
     (error instanceof StorageOperationError &&
-      /Object storage delete failed with status 404/.test(error.message))
+      error.message.includes('Object storage delete failed with status 404'))
   );
 }

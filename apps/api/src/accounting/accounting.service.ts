@@ -2136,14 +2136,14 @@ export class AccountingService {
       throw new NotFoundException('Account not found');
     }
 
-    const [totalStatements, reconciledStatements] = (await Promise.all([
+    const [totalStatements, reconciledStatements] = await Promise.all([
       this.bankStatements.count({
         where: { tenantId: actor.tenantId, accountId },
       }),
       this.bankStatements.count({
         where: { tenantId: actor.tenantId, accountId, isReconciled: true },
       }),
-    ])) as number[];
+    ]);
 
     const unreconciledStatements = totalStatements - reconciledStatements;
 

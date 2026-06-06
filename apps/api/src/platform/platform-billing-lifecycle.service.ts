@@ -170,7 +170,7 @@ export class PlatformBillingLifecycleService {
     let count = 0;
     for (const subscription of dueSubscriptions) {
       const plan = subscription.plan;
-      if (!plan || plan.status !== 'ACTIVE') {
+      if (plan?.status !== 'ACTIVE') {
         continue;
       }
 

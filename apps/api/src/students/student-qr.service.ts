@@ -288,6 +288,62 @@ export class StudentQrService {
     };
   }
 
+  async getQrScanHistory(
+    tenantId: string,
+    studentId: string,
+    _actor: AuthContext,
+  ) {
+    await this.assertTenantStudent(tenantId, studentId);
+
+    const credentials = await this.prisma.studentQrCredential.findMany({
+      where: { tenantId, studentId },
+    });
+    const credentialIds = credentials.map((c) => c.id);
+
+    const audits = await this.prisma.auditLog.findMany({
+      where: {
+        tenantId,
+        resource: 'student_qr',
+        resourceId: { in: credentialIds },
+        action: { in: ['QR_RESOLVED', 'QR_RESOLVE_FAILED'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    const userIds = audits
+      .map((a) => a.userId)
+      .filter((id): id is string => Boolean(id));
+
+    const users =
+      userIds.length > 0
+        ? await this.prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: { id: true, email: true },
+          })
+        : [];
+    const userMap = new Map(users.map((u) => [u.id, u.email]));
+
+    return audits.map((a) => {
+      const details =
+        a.after && typeof a.after === 'object' && !Array.isArray(a.after)
+          ? (a.after as Record<string, unknown>)
+          : {};
+      return {
+        id: a.id,
+        action: a.action,
+        scannedBy: a.userId,
+        scannedByEmail: a.userId ? (userMap.get(a.userId) ?? null) : null,
+        purpose: (details.purpose as string | undefined) ?? null,
+        success:
+          (details.success as boolean | undefined) ??
+          a.action === 'QR_RESOLVED',
+        failureCode: (details.failureCode as string | undefined) ?? null,
+        timestamp: a.createdAt.toISOString(),
+      };
+    });
+  }
+
   async resolveQr(
     tenantId: string,
     token: string,

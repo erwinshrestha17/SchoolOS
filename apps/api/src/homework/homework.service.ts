@@ -541,7 +541,7 @@ export class HomeworkService {
     const take = query.limit ?? 20;
     const studentScope = await this.resolveVisibleStudentIdsForRead(actor);
 
-    if (studentScope && studentScope.length === 0) {
+    if (studentScope?.length === 0) {
       return { items: [], total: 0 };
     }
 
@@ -1598,11 +1598,11 @@ function parseDate(value: string | undefined, fieldName: string) {
   return parsed;
 }
 
-type HomeworkOccurrence = {
+interface HomeworkOccurrence {
   assignedDate: Date;
   dueDate: Date;
   dueAt: Date;
-};
+}
 
 function buildHomeworkOccurrences(args: {
   assignedDate: Date;

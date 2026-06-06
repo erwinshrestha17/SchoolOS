@@ -1,14 +1,14 @@
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { dirname, isAbsolute, join, normalize } from 'path';
-import { LocalStorageConfig } from '../storage.config';
+import { type LocalStorageConfig } from '../storage.config';
 import {
-  PutObjectInput,
-  SignedUrlInput,
-  SignedUploadResult,
-  StorageAdapter,
-  StorageReadinessResult,
-  StoredObjectResult,
+  type PutObjectInput,
+  type SignedUrlInput,
+  type SignedUploadResult,
+  type StorageAdapter,
+  type StorageReadinessResult,
+  type StoredObjectResult,
 } from '../storage.types';
 import {
   buildExpiresAt,

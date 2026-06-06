@@ -513,6 +513,23 @@ Provide the SaaS foundation for tenant management, platform administration, feat
 - Provider and diagnostic views must mask secrets.
 - Tenant subscription and SaaS billing status inconsistencies must surface in platform diagnostics.
 
+### Unique Angle
+
+SchoolOS Pilot Readiness Console — a platform operator can see exactly why a school is or is not ready to go live.
+
+### Future Enhancements
+
+- Guided school onboarding wizard: school profile → academic year → classes → sections → fee heads → users → modules → provider checks.
+- Tenant readiness score: tells platform operator if a school is ready for pilot.
+- Provider health center: SMS, email, FCM, storage, payment gateway, object storage, Redis, queue health.
+- Queue mission control: failed jobs grouped by module, tenant, reason, retry/discard decision.
+- Tenant sandbox mode: let new schools test without polluting production reports.
+- Data import center: legacy students, staff, fee dues, books, routes, inventory.
+- Tenant change log: every module enabled/disabled, plan changed, override used, provider changed.
+- Support override banner: visible warning and audit timer when platform support enters a school tenant.
+- Feature usage analytics: which modules are used daily vs unused.
+- Tenant exit/export package: export all school data if contract ends.
+
 ---
 
 ## M1: Admissions and Student Profiles
@@ -558,6 +575,24 @@ Manage the full student lifecycle from inquiry/application/admission to active, 
 - Student lifecycle changes must preserve historical attendance, fees, report cards, documents, and accounting links.
 - Student official-readiness state must fail validation when required fields are missing.
 
+### Unique Angle
+
+Family 360, not just Student 360. Nepal schools often deal with siblings, guardians, fee negotiations, transport, and documents together.
+
+### Future Enhancements
+
+- Admission funnel board: inquiry → application → document pending → interview → approved → admitted → rejected.
+- Admission draft autosave: parents/admin can stop and resume forms.
+- Nepali-name duplicate engine: match mixed scripts, spacing, spelling, guardian phone, DOB.
+- Sibling intelligence: suggest sibling relationship, shared guardians, family-level fee view.
+- Guardian trust profile: verified phone/email, identity docs, pickup authorization, communication preference.
+- Student lifecycle timeline: admission, transfer, promotion, withdrawal, rejoin, graduation, alumni.
+- Document checklist by school policy: birth certificate, transfer certificate, photo, guardian citizenship, medical notes.
+- Parent pickup pass: QR-based authorized guardian pickup with audit trail.
+- Medical safety card: allergies, medication, emergency doctor, visible only to permitted roles.
+- Student risk-free flagging: operational flags for missing docs, fee hold, attendance concern, transport missing assignment.
+- Alumni registry: graduated students, certificates, transfer docs, old report cards.
+
 ---
 
 ## M2: Smart Attendance
@@ -598,6 +633,26 @@ Digitize student attendance with correction requests, sync conflict handling, pa
 - Parent/student attendance APIs must fail closed to linked students only.
 - Attendance exports must be tenant scoped and registered through File Registry where retained or applicable.
 - Export failure must not create false success state.
+
+### Unique Angle
+
+Poor-connectivity-first attendance. Most ERPs fail here; make offline sync and conflict clarity a major selling point.
+
+### Future Enhancements
+
+- Attendance command board: today's classes not started, draft, submitted, locked, correction pending.
+- Teacher offline mode: local draft queue with conflict explanation.
+- Attendance anomaly dashboard: consecutive absence, repeated late, sudden drop, class-level absence spike.
+- Parent absence confirmation: parent can submit reason after absent notification.
+- Leave pre-approval: approved leave automatically appears during marking.
+- Exam-day attendance mode: separate attendance policy for exam days.
+- Late arrival register: gate staff can mark late arrivals with timestamp.
+- Pickup/early leave log: student leaves early with guardian/authorized pickup audit.
+- Class attendance heatmap: month view by class/section.
+- Attendance-to-fee/academic view: attendance percentage on report cards or promotion readiness.
+- Auto-reminder to unmarked teachers: class not submitted by configurable time.
+- Attendance correction SLA: corrections pending over 24h highlighted.
+- Substitute teacher attendance authority: approved substitute can mark that period/day.
 
 ---
 
@@ -649,6 +704,28 @@ Manage fee setup, invoices, student ledgers, payments, receipts, refunds, revers
 - Receipt issuance must follow provider verification rules where a gateway is used.
 - Cashier close must detect collection variance.
 
+### Unique Angle
+
+Nepal-first fee operations — cash, QR wallet, bank transfer, manual references, partial payments, scholarship, and audit-safe receipts.
+
+### Future Enhancements
+
+- Cashier-first fee collection mode: search student → show dues → collect → print/share receipt.
+- Fee negotiation/commitment plan: parent promises partial payment by date, reminders tracked.
+- Scholarship workflow: request → approve → apply → audit.
+- Discount rule engine: sibling discount, staff child discount, early payment discount, need-based discount.
+- Fee hold policy: block report card/promotion/transfer if dues exist, configurable.
+- Receipt QR verification: parent/admin scans receipt QR to verify authenticity.
+- Cashier drawer close: cash, bank, QR, manual transfer, variance, supervisor approval.
+- Overpayment wallet: overpaid amount becomes credit for next invoice.
+- Installment plans: monthly/term-wise auto schedule.
+- Defaulter segmentation: 0–30, 31–60, 60+, high-value, repeated.
+- Smart reminders: different message for soft reminder, final reminder, exam result hold warning.
+- Payment provider fallback: eSewa/Khalti unavailable → manual reference capture with reconciliation.
+- Fee dispute workflow: parent disputes invoice line, admin resolves with audit.
+- Batch invoice preview: preview before generating hundreds of invoices.
+- Bank statement matching: match manual deposits to student invoices.
+
 ---
 
 ## M4: Academics, Exams, CAS, and Report Cards
@@ -693,6 +770,27 @@ Manage subjects, exams, assessments, marks, CAS records, grading, report cards, 
 - Generated report files must be tenant scoped and retrievable only by authorized users.
 - Storage registration failure must not produce a false report-card success state.
 
+### Unique Angle
+
+Promotion readiness + result publishing governance. Most school systems generate report cards; fewer manage the approval and hold workflow properly.
+
+### Future Enhancements
+
+- Marks grid like spreadsheet: autosave, keyboard navigation, absent/retest/withheld flags.
+- Assessment blueprint: theory, practical, project, viva, CAS weight templates.
+- CAS rubric builder: behavior, participation, project, reading, handwriting, discipline.
+- Report card designer: school logo, grading scale, remarks, signatures, templates.
+- Result publish checklist: marks locked, fees clear, report generated, principal approved.
+- Result hold manager: hold by student/class/reason, with audit and parent-safe display.
+- Retest/makeup workflow: request → approve → marks entry → versioned result.
+- Promotion board: ready, blocked by fees, blocked by marks, manually reviewed.
+- Teacher mark-entry progress: which subjects/classes have not submitted marks.
+- Result analytics: subject average, pass/fail, grade distribution, weak areas.
+- Student academic timeline: term-wise performance trend.
+- Remarks assistant: template-based remarks by performance category (not AI first).
+- Report-card version history: every regeneration visible with reason.
+- Academic intervention plan: remedial class recommendation, parent meeting, follow-up date.
+
 ---
 
 ## M5: Activity Feed and Milestones
@@ -733,6 +831,27 @@ Provide a safe school/class/student activity feed, developmental milestones, moo
 - Removed or archived posts must disappear from feed and detail views.
 - Moderation actions must be audited.
 - Cached feeds must invalidate safely after moderation or archive actions.
+
+### Unique Angle
+
+Consent-safe private parent engagement. This is very important for school trust.
+
+### Future Enhancements
+
+- Teacher post composer with audience preview before publishing.
+- Student tagging confidence: show exactly which parents will see the post.
+- Consent-aware media hiding: "Media hidden due to consent" instead of broken image.
+- Milestone templates: Montessori/ECD templates for motor, language, social, cognitive, self-care.
+- Mood/wellbeing logs: teacher logs mood trend without exposing sensitive notes widely.
+- Moderation queue: pending, approved, rejected, archived, restored.
+- Parent engagement analytics: seen by guardian, unread, reactions.
+- Low-bandwidth mode: compressed previews, retry upload, upload queue.
+- Activity album: auto-group events by day/class.
+- Private student note: only teachers/admin, not parent-visible unless shared.
+- Birthday/achievement posts: template-based safe posts.
+- Parent comment control: school can enable/disable comments by audience.
+- Media expiry/archive: old media archived but accessible by permission.
+- Activity-to-profile link: major milestones show on Student 360 timeline.
 
 ---
 

@@ -125,6 +125,18 @@ SchoolOS should win through:
 8. Library, transport, canteen, HR, payroll, academics, communication, and accounting in one connected platform.
 9. Low-bandwidth and school-office friendly UX.
 10. Transparent provider readiness for eSewa, Khalti, storage, notifications, queues, and reports.
+- **Family 360 Profile**: Unified family view beyond individual students — siblings, shared guardians, cross-module data in one timeline.
+- **School Command Center**: Principal real-time operational dashboard aggregating attendance, fees, homework, transport, canteen, leave, and approvals.
+- **Nepal Compliance Center**: Dedicated compliance workspace for iEMIS, PAN/VAT, accounting close, and document completeness readiness.
+- **Unified Approval Inbox**: Global approval queue across all modules — fee reversals, marks unlock, attendance corrections, leave, payroll, and more.
+- **School Health Score**: Deterministic, non-AI operational health scoring covering all module areas.
+- **Poor-Connectivity-First Attendance**: Offline sync with conflict clarity designed for Nepal's infrastructure reality.
+- **Nepal-First Fee Operations**: Cash, QR wallet, bank transfer, manual references, partial payments, scholarship, and audit-safe receipts.
+- **Safety-First Canteen**: Hard allergy blocks, wallet spending controls, and inventory accountability.
+- **HR-Timetable-Payroll Integration**: Connected staff workload, leave, substitution, and payroll flows.
+- **Consent-Safe Media Engagement**: Parent activity feed with consent-aware media, moderation, and trust-building engagement.
+- **ERP-Grade Accounting**: Full accounting backbone with source-ledger drilldown, bank reconciliation, and fiscal close governance.
+- **Human-Reviewed Intelligence**: When AI is introduced (M11), all insights are explainable, permission-gated, and human-reviewed.
 
 ---
 

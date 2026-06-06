@@ -868,7 +868,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         {
           planId: 'plan-premium',
           subscriptionId: sub!.id,
-          issueDate: new Date().toISOString(),
+          issueDate: new Date(Date.now() - 3600000).toISOString(),
           dueDate: new Date(Date.now() + 86400000).toISOString(),
           lines: [
             {
@@ -993,7 +993,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         {
           planId: 'plan-premium',
           subscriptionId: sub!.id,
-          issueDate: new Date().toISOString(),
+          issueDate: new Date(Date.now() - 7200000).toISOString(),
           dueDate: new Date(Date.now() + 86400000).toISOString(),
           lines: [
             {

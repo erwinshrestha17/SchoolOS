@@ -19,10 +19,11 @@ import {
   createPrismaMock,
   createQueueMock,
   ensureTenantDefaultsWithState,
+  MockState,
 } from './test-helpers';
 
 interface MockStateOwner {
-  __state: Record<string, Record<string, unknown>[]>;
+  __state: MockState;
 }
 
 interface ExportPayload {

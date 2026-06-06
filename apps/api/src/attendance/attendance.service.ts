@@ -3461,7 +3461,7 @@ export class AttendanceService {
         },
         select: { id: true },
       });
-      if (!ownStudent || ownStudent.id !== studentId) {
+      if (ownStudent?.id !== studentId) {
         throw new ForbiddenException(
           'Access denied to this student attendance.',
         );
