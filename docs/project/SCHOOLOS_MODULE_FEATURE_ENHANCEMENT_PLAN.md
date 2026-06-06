@@ -1,8 +1,10 @@
 # SchoolOS Module Feature Enhancement Plan
 
 **Status:** Active module-wise feature and enhancement backlog  
-**Last updated:** 2026-06-04  
+**Last updated:** 2026-06-06  
 **Purpose:** Capture module-wise feature scope, enhancement direction, backend/frontend ownership, and implementation order for future SchoolOS work.
+
+**Pilot-ready vs remaining:** M1–M10 core backend APIs and dashboard workspaces are implemented and pilot-ready for current scope. Sections 4–15 below describe **enhancement and production-depth backlog** — not missing greenfield modules. For a consolidated per-module remaining list, read `SCHOOLOS_IMPLEMENTATION_STATUS_AND_PLAN.md` Section 11.
 
 This document complements:
 
@@ -51,6 +53,29 @@ Phase 3 -> M6 Homework/Timetable and M7 HR/Payroll hardening
 Phase 4 -> M8A Library, M8B Transport, M8C Canteen operational QA
 Phase 5 -> Flutter parent/student/teacher/staff/driver/admin companion app depth
 Phase 6 -> M11 intelligence only after reliable production data exists
+```
+
+### 2026-06-06 implementation snapshot (what is done vs what sections below still describe)
+
+```text
+Done for current pilot scope (M1–M10)
+- Backend: NestJS modules, Prisma persistence, tenant isolation, RBAC, plan entitlements on primary and satellite controllers (M1 documents/QR/photo/siblings/academic-years; M5 media-access; M10 all communications/messaging sub-controllers).
+- Web: Dashboard workspaces wired to real APIs for students, admissions, attendance, fees, academics, activity, homework, timetable, HR, payroll, accounting, library, transport, canteen, notices, messaging, settings, reports.
+- Platform: /platform/demo-requests operator workspace for marketing lead review.
+- Mobile: Flutter companion surfaces where purpose-limited APIs exist.
+
+Still described in sections below (remaining enhancement depth)
+- M1: lifecycle timeline, duplicate depth, QR audit UI, iEMIS readiness panel.
+- M2: offline sync conflict rules, anomaly dashboard, lock-window audit.
+- M3: gateway sandbox, refund approval workflow, cashier-first UI polish.
+- M4: grading policy, promotion readiness, marks grid autosave.
+- M5: moderation queue polish, milestone templates, consent media test depth.
+- M6: homework templates, drag-and-drop builder polish, workload reports.
+- M7: staff lifecycle timeline, leave calendar, salary template UI.
+- M8A/B/C: lost/damaged library flows, live transport map (deferred), canteen allergy enforcement, device QA.
+- M9: COA templates, source-ledger drilldown, fiscal close regression.
+- M10: provider callback verification, notice templates, push notification depth.
+- Cross-cutting: staging smoke, cross-tenant tests, permission-denied UX, mobile session hardening.
 ```
 
 ---

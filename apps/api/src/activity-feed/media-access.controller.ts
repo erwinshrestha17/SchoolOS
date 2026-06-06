@@ -2,12 +2,15 @@ import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
+import { RequiredModule } from '../auth/decorators/required-module.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { ActivityMediaService } from './activity-media.service';
 
 @Controller('media')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@RequiredModule('activity')
 export class MediaAccessController {
   constructor(private readonly activityMediaService: ActivityMediaService) {}
 

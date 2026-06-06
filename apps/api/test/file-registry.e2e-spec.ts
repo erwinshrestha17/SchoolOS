@@ -7,7 +7,12 @@ import { RedisService } from '../src/redis/redis.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { UsageService } from '../src/usage/usage.service';
-import { PrismaMock, createPrismaMock, createQueueMock } from './test-helpers';
+import {
+  PrismaMock,
+  createPrismaMock,
+  createQueueMock,
+  ensureTenantDefaultsWithState,
+} from './test-helpers';
 
 describe('SchoolOS File Registry (E2E)', () => {
   let moduleRef: TestingModule;
@@ -53,6 +58,8 @@ describe('SchoolOS File Registry (E2E)', () => {
     const tenantAId = 'tenant-a';
     const tenantBId = 'tenant-b';
     const userAId = 'user-a';
+    ensureTenantDefaultsWithState(prisma.__state, tenantAId);
+    ensureTenantDefaultsWithState(prisma.__state, tenantBId);
 
     // 1. Register a file for Tenant A
     const assetA = await fileRegistryService.registerFile({

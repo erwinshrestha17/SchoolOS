@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 
 import { EntitlementsService } from './entitlements.service';
+import { SUSPENDED_TENANT_MESSAGE } from './tenant-access.constants';
 
 export enum PlanKey {
   FREE = 'free',
@@ -38,6 +39,36 @@ export class PlansService {
     });
   }
 
+  async assertTenantActive(tenantId: string): Promise<void> {
+    if (tenantId === 'platform') {
+      return;
+    }
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true, isActive: true },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
+    }
+
+    if (!tenant.isActive) {
+      throw new ForbiddenException(SUSPENDED_TENANT_MESSAGE);
+    }
+  }
+
+  async shouldProcessTenantJob(
+    tenantId: string | null | undefined,
+  ): Promise<boolean> {
+    if (!tenantId || tenantId === 'platform') {
+      return true;
+    }
+
+    const tenant = await this.getTenantStatus(tenantId);
+    return Boolean(tenant?.isActive);
+  }
+
   async checkFeatureEnabled(
     tenantId: string,
     featureKey: string,
@@ -55,8 +86,7 @@ export class PlansService {
       return {
         allowed: false,
         reason: 'tenant_inactive',
-        message:
-          'Your school account is currently suspended. Please contact platform support.',
+        message: SUSPENDED_TENANT_MESSAGE,
       };
     }
 
@@ -117,9 +147,7 @@ export class PlansService {
     }
 
     if (!tenant.isActive) {
-      throw new ForbiddenException(
-        'Your school account is currently suspended. Please contact platform support.',
-      );
+      throw new ForbiddenException(SUSPENDED_TENANT_MESSAGE);
     }
 
     const subscription = await this.prisma.tenantSubscription.findFirst({

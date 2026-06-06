@@ -24,6 +24,7 @@ import {
 
 import { FinanceService } from '../finance/finance.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
+import { PlansService } from '../plans/plans.service';
 import {
   buildTableReportPdf,
   getJpegDimensions,
@@ -53,6 +54,7 @@ export class ReportsService {
     private readonly auditService: AuditService,
     private readonly financeService: FinanceService,
     private readonly fileRegistryService: FileRegistryService,
+    private readonly plansService: PlansService,
     @InjectQueue('reports') private readonly reportsQueue: Queue,
   ) {
     this.registerInternalReports();
@@ -1910,6 +1912,7 @@ export class ReportsService {
     request: ReportExportRequest,
     actor: AuthContext,
   ): Promise<ReportExportResult> {
+    await this.plansService.assertTenantActive(actor.tenantId);
     const executor = this.registry.get(reportKey);
     if (!executor) {
       throw new NotFoundException('Report not found');
@@ -2032,6 +2035,7 @@ export class ReportsService {
     format: ReportFormat;
     actor: AuthContext;
   }) {
+    await this.plansService.assertTenantActive(input.actor.tenantId);
     const executor = this.registry.get(input.reportKey);
     if (!executor) {
       throw new NotFoundException('Report not found');
@@ -2108,6 +2112,7 @@ export class ReportsService {
     status: 'QUEUED';
     jobId: string | number | undefined;
   }> {
+    await this.plansService.assertTenantActive(actor.tenantId);
     const exportRecord = await this.prisma.reportExport.findFirst({
       where: { id: exportId, tenantId: actor.tenantId },
     });
@@ -2363,6 +2368,7 @@ export class ReportsService {
     tenantId: string,
     query: { page?: number | string; limit?: number | string },
   ) {
+    await this.plansService.assertTenantActive(tenantId);
     const page = normalizePositiveInteger(query.page, 1);
     const limit = Math.min(normalizePositiveInteger(query.limit, 25), 100);
     const skip = (page - 1) * limit;
@@ -2392,6 +2398,7 @@ export class ReportsService {
     exportId: string,
     actor: AuthContext,
   ): Promise<{ fileName: string; mimeType: string; content: Buffer }> {
+    await this.plansService.assertTenantActive(actor.tenantId);
     const exportRecord = await this.prisma.reportExport.findFirst({
       where: { id: exportId, tenantId: actor.tenantId },
     });

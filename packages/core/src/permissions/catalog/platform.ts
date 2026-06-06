@@ -135,6 +135,16 @@ export const platformPermissions = [
     description: "Update pilot onboarding checklist overrides",
   },
   {
+    resource: "platform:demo-requests",
+    action: "read",
+    description: "Read public marketing demo request leads",
+  },
+  {
+    resource: "platform:demo-requests",
+    action: "manage",
+    description: "Update demo request follow-up status and notes",
+  },
+  {
     resource: "settings",
     action: "read_public",
     description: "Read public-safe tenant branding and localization settings",

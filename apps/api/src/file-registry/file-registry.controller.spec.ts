@@ -2,6 +2,13 @@ import { BadRequestException } from '@nestjs/common';
 import { FileRegistryController } from './file-registry.controller';
 
 describe('FileRegistryController upload safety', () => {
+  it('requires TenantActiveGuard on the controller shell', () => {
+    const source = require('fs').readFileSync(
+      require('path').join(__dirname, 'file-registry.controller.ts'),
+      'utf8',
+    );
+    expect(source).toContain('TenantActiveGuard');
+  });
   let controller: FileRegistryController;
   let fileRegistryService: any;
   let storageService: any;

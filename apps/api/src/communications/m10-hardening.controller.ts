@@ -11,8 +11,10 @@ import {
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import {
   CommunicationAuditQueryDto,
   CommunicationPreferenceDto,
@@ -25,7 +27,8 @@ import {
 import { M10HardeningService } from './m10-hardening.service';
 
 @Controller()
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.communications')
 export class M10HardeningController {
   constructor(private readonly m10HardeningService: M10HardeningService) {}
 

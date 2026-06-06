@@ -263,6 +263,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "platform:health:read",
     "platform:reports:read",
     "platform:onboarding:read",
+    "platform:demo-requests:read",
     "students:read",
     "staff:read",
     "tenants:read",

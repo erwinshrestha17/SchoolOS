@@ -1,13 +1,18 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import { PlansService } from '../plans/plans.service';
+import { skipSuspendedTenantJob } from '../plans/processor-tenant.guard';
 import { FinanceService } from './finance.service';
 
 @Processor('finance')
 export class FinanceProcessor extends WorkerHost {
   private readonly logger = new Logger(FinanceProcessor.name);
 
-  constructor(private readonly financeService: FinanceService) {
+  constructor(
+    private readonly financeService: FinanceService,
+    private readonly plansService: PlansService,
+  ) {
     super();
   }
 
@@ -21,6 +26,17 @@ export class FinanceProcessor extends WorkerHost {
   }
 
   private async handleCalculateLateFees(input: { tenantId: string }) {
+    if (
+      await skipSuspendedTenantJob(
+        this.plansService,
+        input.tenantId,
+        this.logger,
+        'calculateLateFees',
+      )
+    ) {
+      return;
+    }
+
     this.logger.log(`Calculating late fees for tenant ${input.tenantId}...`);
     const result = await this.financeService.calculateLateFeesForTenant(
       input.tenantId,

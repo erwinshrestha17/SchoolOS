@@ -12,8 +12,10 @@ import {
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import {
   CloseParentTeacherThreadDto,
   CreateChatAbuseReportDto,
@@ -29,7 +31,8 @@ import {
 import { ParentTeacherChatService } from './parent-teacher-chat.service';
 
 @Controller('messaging/parent-teacher')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.communications')
 export class ParentTeacherChatController {
   constructor(private readonly service: ParentTeacherChatService) {}
 

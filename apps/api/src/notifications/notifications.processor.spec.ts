@@ -40,7 +40,12 @@ describe('NotificationsProcessor', () => {
         update: jest.fn(),
       },
     };
-    const processor = new NotificationsProcessor(prisma as never);
+    const processor = new NotificationsProcessor(
+      prisma as never,
+      {
+        shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
+      } as never,
+    );
 
     await processor.process({
       name: 'sendPushNotification',
@@ -89,7 +94,12 @@ describe('NotificationsProcessor', () => {
         update: jest.fn(),
       },
     };
-    const processor = new NotificationsProcessor(prisma as never);
+    const processor = new NotificationsProcessor(
+      prisma as never,
+      {
+        shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
+      } as never,
+    );
 
     await expect(
       processor.process({
@@ -135,7 +145,12 @@ describe('NotificationsProcessor', () => {
         update: jest.fn(),
       },
     };
-    const processor = new NotificationsProcessor(prisma as never);
+    const processor = new NotificationsProcessor(
+      prisma as never,
+      {
+        shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
+      } as never,
+    );
 
     await processor.process({
       name: 'sendSms',
@@ -192,7 +207,12 @@ describe('NotificationsProcessor', () => {
         update: jest.fn(),
       },
     };
-    const processor = new NotificationsProcessor(prisma as never);
+    const processor = new NotificationsProcessor(
+      prisma as never,
+      {
+        shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
+      } as never,
+    );
 
     await processor.process({
       name: 'sendEmail',
@@ -229,5 +249,42 @@ describe('NotificationsProcessor', () => {
         errorMessage: null,
       },
     });
+  });
+
+  it('skips notification jobs for suspended tenants without provider calls', async () => {
+    const prisma = {
+      providerConfig: {
+        findFirst: jest.fn(),
+      },
+      notificationDelivery: {
+        update: jest.fn(),
+      },
+    };
+    const plansService = {
+      shouldProcessTenantJob: jest.fn().mockResolvedValue(false),
+    };
+    const processor = new NotificationsProcessor(
+      prisma as never,
+      plansService as never,
+    );
+
+    await processor.process({
+      name: 'sendPushNotification',
+      data: {
+        title: 'Attendance alert',
+        body: 'Your child was marked absent today.',
+        audience: 'guardian-user-1',
+        metadata: {
+          tenantId: 'tenant-suspended',
+          notificationDeliveryId: 'delivery-suspended',
+        },
+      },
+    } as never);
+
+    expect(plansService.shouldProcessTenantJob).toHaveBeenCalledWith(
+      'tenant-suspended',
+    );
+    expect(prisma.providerConfig.findFirst).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.update).not.toHaveBeenCalled();
   });
 });

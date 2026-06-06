@@ -1,6 +1,9 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import { PlansService } from '../plans/plans.service';
+import { skipSuspendedTenantJob } from '../plans/processor-tenant.guard';
+import { SUSPENDED_TENANT_MESSAGE } from '../plans/tenant-access.constants';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportsService } from './reports.service';
 import { AuthContext } from '../auth/auth.types';
@@ -13,6 +16,7 @@ export class ReportsProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     private readonly reportsService: ReportsService,
+    private readonly plansService: PlansService,
   ) {
     super();
   }
@@ -30,6 +34,26 @@ export class ReportsProcessor extends WorkerHost {
     >,
   ): Promise<void> {
     const { exportId, reportKey, filters, format, actor } = job.data;
+
+    if (
+      await skipSuspendedTenantJob(
+        this.plansService,
+        actor.tenantId,
+        this.logger,
+        `report export ${reportKey}`,
+      )
+    ) {
+      await this.prisma.reportExport.update({
+        where: { id: exportId },
+        data: {
+          status: 'FAILED',
+          errorSummary: SUSPENDED_TENANT_MESSAGE,
+          completedAt: new Date(),
+        },
+      });
+      return;
+    }
+
     this.logger.log(`Processing report ${reportKey} for export ${exportId}`);
 
     try {

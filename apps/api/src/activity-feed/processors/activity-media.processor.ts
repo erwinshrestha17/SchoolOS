@@ -2,6 +2,8 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import sharp from 'sharp';
+import { PlansService } from '../../plans/plans.service';
+import { skipSuspendedTenantJob } from '../../plans/processor-tenant.guard';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 
@@ -23,12 +25,24 @@ export class ActivityMediaProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
+    private readonly plansService: PlansService,
   ) {
     super();
   }
 
   async process(job: Job<ActivityMediaCompressionJob>) {
     const { tenantId, attachmentId, fileAssetId } = job.data;
+
+    if (
+      await skipSuspendedTenantJob(
+        this.plansService,
+        tenantId,
+        this.logger,
+        'activity media compression',
+      )
+    ) {
+      return;
+    }
 
     const attachment = await this.prisma.activityAttachment.findFirst({
       where: { id: attachmentId, tenantId },

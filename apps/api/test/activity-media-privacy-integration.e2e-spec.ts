@@ -176,6 +176,9 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
     mediaProcessor = new ActivityMediaProcessor(
       prisma as unknown as PrismaService,
       storageService as unknown as StorageService,
+      {
+        shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
+      } as never,
     );
   });
 

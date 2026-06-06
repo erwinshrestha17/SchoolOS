@@ -68,6 +68,7 @@ export interface MockState {
   canteenMealServings: Record<string, unknown>[];
   canteenWalletTransactions: Record<string, unknown>[];
   guardianConsents: Record<string, unknown>[];
+  demoRequests: Record<string, unknown>[];
   [key: string]: Record<string, unknown>[];
 }
 
@@ -315,6 +316,7 @@ export function createPrismaMock() {
     canteenWalletTransactions: [] as Record<string, unknown>[],
     guardianConsents: [] as Record<string, unknown>[],
     supportOverrides: [] as Record<string, unknown>[],
+    demoRequests: [] as Record<string, unknown>[],
   };
 
   const nextId = (prefix: string) =>
@@ -359,6 +361,19 @@ export function createPrismaMock() {
       }
       if (value && typeof value === 'object' && 'in' in value) {
         return value.in.includes(item?.[key]);
+      }
+      if (
+        value &&
+        typeof value === 'object' &&
+        'contains' in value &&
+        typeof value.contains === 'string'
+      ) {
+        const fieldValue = String(item?.[key] ?? '');
+        const needle = value.contains;
+        if (value.mode === 'insensitive') {
+          return fieldValue.toLowerCase().includes(needle.toLowerCase());
+        }
+        return fieldValue.includes(needle);
       }
       if (value && typeof value === 'object' && !Array.isArray(value)) {
         return matchesWhere(item?.[key], value);
@@ -2231,6 +2246,7 @@ export function createPrismaMock() {
     'staffLifecycleEvent',
     'supportOverride',
     'tenantOnboardingChecklistOverride',
+    'demoRequest',
   ];
 
   for (const model of dummyModels) {
@@ -2416,9 +2432,24 @@ export function createPrismaMock() {
           const data = q.data || {};
           const item = {
             id: data.id || nextId(model),
+            status: data.status ?? 'NEW',
             ...data,
             createdAt: new Date(),
             updatedAt: new Date(),
+          };
+
+          const applySelect = (
+            record: any,
+            select?: Record<string, boolean>,
+          ) => {
+            if (!select) {
+              return record;
+            }
+            return Object.fromEntries(
+              Object.entries(select)
+                .filter(([, enabled]) => enabled)
+                .map(([field]) => [field, record[field]]),
+            );
           };
 
           // Handle nested lines for SaaSInvoice
@@ -2439,7 +2470,7 @@ export function createPrismaMock() {
           if ((state as any)[actualStateKey]) {
             (state as any)[actualStateKey].push(item);
           }
-          return Promise.resolve(item);
+          return Promise.resolve(applySelect(item, q.select));
         }),
         upsert: jest.fn((q: any) => {
           const items = (state as any)[actualStateKey] || [];
@@ -2511,29 +2542,7 @@ export function createPrismaMock() {
         count: jest.fn((q: any) => {
           let items = (state as any)[actualStateKey] || [];
           if (q?.where) {
-            items = items.filter((item: any) => {
-              return Object.entries(q.where).every(([key, value]) => {
-                if (value === undefined) return true;
-                if (
-                  value &&
-                  typeof value === 'object' &&
-                  'in' in (value as any)
-                ) {
-                  return (value as any).in.includes(item[key]);
-                }
-                if (
-                  value &&
-                  typeof value === 'object' &&
-                  !Array.isArray(value)
-                ) {
-                  const itemVal = item[key];
-                  return Object.entries(value as any).every(([nk, nv]) => {
-                    return itemVal && itemVal[nk] === nv;
-                  });
-                }
-                return item[key] === value;
-              });
-            });
+            items = items.filter((item: any) => matchesWhere(item, q.where));
           }
           return Promise.resolve(items.length);
         }),
@@ -2548,6 +2557,20 @@ export function ensureTenantDefaultsWithState(
   state: MockState,
   tenantId: string,
 ) {
+  if (
+    tenantId !== 'platform' &&
+    !state.tenants.some((tenant) => tenant.id === tenantId)
+  ) {
+    state.tenants.push({
+      id: tenantId,
+      slug: String(tenantId),
+      name: String(tenantId),
+      isActive: true,
+      plan: 'standard',
+      createdAt: new Date(),
+    });
+  }
+
   for (const roleDefinition of SYSTEM_ROLE_DEFINITIONS) {
     if (
       !state.roles.some(

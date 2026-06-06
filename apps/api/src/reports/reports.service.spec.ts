@@ -8,12 +8,15 @@ import { AuthMethod } from '@prisma/client';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { FileRegistryService } from '../file-registry/file-registry.service';
+import { PlansService } from '../plans/plans.service';
+import { SUSPENDED_TENANT_MESSAGE } from '../plans/tenant-access.constants';
 
 describe('ReportsService', () => {
   let service: ReportsService;
   let prisma: PrismaService;
   let audit: AuditService;
   let fileRegistry: FileRegistryService;
+  let plansService: jest.Mocked<PlansService>;
   let reportsQueue: { add: jest.Mock };
 
   const actor: AuthContext = {
@@ -210,6 +213,12 @@ describe('ReportsService', () => {
           provide: getQueueToken('reports'),
           useValue: { add: jest.fn().mockResolvedValue({ id: 'job-1' }) },
         },
+        {
+          provide: PlansService,
+          useValue: {
+            assertTenantActive: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -217,6 +226,7 @@ describe('ReportsService', () => {
     prisma = module.get<PrismaService>(PrismaService);
     audit = module.get<AuditService>(AuditService);
     fileRegistry = module.get<FileRegistryService>(FileRegistryService);
+    plansService = module.get(PlansService);
     reportsQueue = module.get(getQueueToken('reports'));
   });
 
@@ -236,6 +246,22 @@ describe('ReportsService', () => {
     expect(
       reports.find((r) => r.key === 'monthly-attendance-register'),
     ).toBeUndefined();
+  });
+
+  it('blocks report exports for suspended tenants before queueing or generating files', async () => {
+    plansService.assertTenantActive.mockRejectedValue(
+      new ForbiddenException(SUSPENDED_TENANT_MESSAGE),
+    );
+
+    await expect(
+      service.exportReport(
+        'student-roster',
+        { format: 'json', filters: {} },
+        actor,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(reportsQueue.add).not.toHaveBeenCalled();
   });
 
   it('exports monthly-attendance-register in CSV format', async () => {

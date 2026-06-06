@@ -4,6 +4,8 @@ import { NotificationStatus } from '@prisma/client';
 import { Job } from 'bullmq';
 import { decryptSensitiveField } from '../common/security/field-encryption';
 import { ConfigService } from '../config/config.service';
+import { PlansService } from '../plans/plans.service';
+import { skipSuspendedTenantJob } from '../plans/processor-tenant.guard';
 import { PrismaService } from '../prisma/prisma.service';
 
 interface EmailJobData {
@@ -51,12 +53,25 @@ export class NotificationsProcessor extends WorkerHost {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly plansService: PlansService,
     private readonly configService?: ConfigService,
   ) {
     super();
   }
 
   async process(job: Job<NotificationJobData, void>): Promise<void> {
+    const tenantId = this.extractTenantId(job.data);
+    if (
+      await skipSuspendedTenantJob(
+        this.plansService,
+        tenantId,
+        this.logger,
+        `notification job ${job.name}`,
+      )
+    ) {
+      return;
+    }
+
     try {
       let result: ProviderResult | undefined;
       switch (job.name) {
@@ -256,6 +271,16 @@ export class NotificationsProcessor extends WorkerHost {
       webhookUrl,
       headers: apiToken ? { Authorization: `Bearer ${apiToken}` } : {},
     };
+  }
+
+  private extractTenantId(data: NotificationJobData) {
+    const metadata = data.metadata;
+    if (!metadata || typeof metadata !== 'object') {
+      return null;
+    }
+
+    const tenantId = (metadata as Record<string, unknown>).tenantId;
+    return typeof tenantId === 'string' ? tenantId : null;
   }
 
   private decryptProviderConfig(

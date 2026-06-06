@@ -544,7 +544,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('keeps platform administration routes present and secure', () => {
-    const platformRoutes = ['dashboard', 'schools'];
+    const platformRoutes = ['dashboard', 'schools', 'demo-requests'];
 
     for (const route of platformRoutes) {
       assert.equal(
@@ -643,6 +643,23 @@ describe('SchoolOS web production contracts', () => {
     assert.match(marketingApi, /method:\s*'POST'/);
     assert.match(marketingApi, /auth:\s*false/);
     assert.match(apiIndex, /marketingApi/);
+  });
+
+  it('exposes platform demo request review APIs and operator workspace', () => {
+    const platformApi = read('lib/api/platform.ts');
+    const demoRequestsPage = read('app/platform/demo-requests/page.tsx');
+    const platformShell = read('components/layout/platform-shell.tsx');
+
+    assert.match(platformApi, /listPlatformDemoRequests/);
+    assert.match(platformApi, /getPlatformDemoRequest/);
+    assert.match(platformApi, /updatePlatformDemoRequestStatus/);
+    assert.match(platformApi, /\/platform\/demo-requests/);
+    assert.match(demoRequestsPage, /api\.listPlatformDemoRequests/);
+    assert.match(demoRequestsPage, /api\.getPlatformDemoRequest/);
+    assert.match(demoRequestsPage, /api\.updatePlatformDemoRequestStatus/);
+    assert.match(demoRequestsPage, /internalNotes/);
+    assert.match(platformShell, /\/platform\/demo-requests/);
+    assert.match(platformShell, /platform:demo-requests:read/);
   });
 
   it('keeps the login entry page tokenized and security focused', () => {

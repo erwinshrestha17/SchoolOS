@@ -52,6 +52,9 @@ describe('Student Documents Registry Integration (E2E)', () => {
         checkLimit: jest.fn().mockResolvedValue(undefined),
         incrementUsage: jest.fn().mockResolvedValue(undefined),
       } as any,
+      {
+        assertTenantActive: jest.fn().mockResolvedValue(undefined),
+      } as any,
     );
     studentRecordsService = new StudentRecordsService(
       prisma as unknown as PrismaService,

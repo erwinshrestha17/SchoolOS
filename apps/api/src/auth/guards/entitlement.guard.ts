@@ -11,6 +11,7 @@ import { REQUIRED_MODULE_KEY } from '../decorators/required-module.decorator';
 import { REQUIRED_FEATURE_KEY } from '../decorators/required-feature.decorator';
 import { PlansService } from '../../plans/plans.service';
 import { EntitlementsService } from '../../plans/entitlements.service';
+import { SUSPENDED_TENANT_MESSAGE } from '../../plans/tenant-access.constants';
 import { AuthenticatedRequest } from '../auth-request.interface';
 
 @Injectable()
@@ -60,9 +61,7 @@ export class EntitlementGuard implements CanActivate {
     }
 
     if (!tenantStatus.isActive) {
-      throw new ForbiddenException(
-        'Your school account is currently suspended. Please contact platform support.',
-      );
+      throw new ForbiddenException(SUSPENDED_TENANT_MESSAGE);
     }
 
     // 1. Check required module if present

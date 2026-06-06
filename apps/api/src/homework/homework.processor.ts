@@ -1,6 +1,8 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import { PlansService } from '../plans/plans.service';
+import { skipSuspendedTenantJob } from '../plans/processor-tenant.guard';
 import { HomeworkService } from './homework.service';
 import { HomeworkReminderJobData } from './homework.cron';
 
@@ -8,7 +10,10 @@ import { HomeworkReminderJobData } from './homework.cron';
 export class HomeworkProcessor extends WorkerHost {
   private readonly logger = new Logger(HomeworkProcessor.name);
 
-  constructor(private readonly homeworkService: HomeworkService) {
+  constructor(
+    private readonly homeworkService: HomeworkService,
+    private readonly plansService: PlansService,
+  ) {
     super();
   }
 
@@ -20,6 +25,17 @@ export class HomeworkProcessor extends WorkerHost {
       actor: actorPayload,
       force,
     } = job.data;
+
+    if (
+      await skipSuspendedTenantJob(
+        this.plansService,
+        tenantId,
+        this.logger,
+        `homework reminder ${reminderType}`,
+      )
+    ) {
+      return;
+    }
 
     this.logger.log(
       `Processing homework reminder: ${reminderType} for homework ${homeworkId} (tenant: ${tenantId})`,

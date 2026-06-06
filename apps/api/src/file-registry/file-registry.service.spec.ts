@@ -16,6 +16,9 @@ describe('FileRegistryService tenant scoping', () => {
     checkLimit: jest.Mock;
     incrementUsage: jest.Mock;
   };
+  let plansService: {
+    assertTenantActive: jest.Mock;
+  };
 
   const asset = {
     id: 'file-1',
@@ -78,6 +81,9 @@ describe('FileRegistryService tenant scoping', () => {
       checkLimit: jest.fn().mockResolvedValue(undefined),
       incrementUsage: jest.fn().mockResolvedValue(undefined),
     };
+    plansService = {
+      assertTenantActive: jest.fn().mockResolvedValue(undefined),
+    };
 
     service = new FileRegistryService(
       prisma,
@@ -93,6 +99,7 @@ describe('FileRegistryService tenant scoping', () => {
       } as any,
       storageService as any,
       usageService as any,
+      plansService as any,
     );
   });
 
@@ -252,6 +259,19 @@ describe('FileRegistryService tenant scoping', () => {
     await expect(service.getSignedUrl('tenant-1', 'file-1')).resolves.toBe(
       'http://localhost:4000/api/v1/files/file-1/preview',
     );
+  });
+
+  it('blocks file access for suspended tenants before resolving signed URLs', async () => {
+    plansService.assertTenantActive.mockRejectedValue(
+      new ForbiddenException(
+        'Your school account is currently suspended. Please contact platform support.',
+      ),
+    );
+
+    await expect(
+      service.getSignedUrl('tenant-suspended', 'file-1'),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.fileAsset.findUnique).not.toHaveBeenCalled();
   });
 
   it('creates bounded signed preview URLs without exposing provider metadata', async () => {

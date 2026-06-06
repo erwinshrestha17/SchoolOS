@@ -12,8 +12,10 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthContext } from '../auth/auth.types';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import {
   ResolveStudentQrDto,
   RotateStudentQrDto,
@@ -23,7 +25,8 @@ import { StudentQrService } from './student-qr.service';
 
 @ApiTags('Student QR')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.students')
 @Controller('students')
 export class StudentQrController {
   constructor(private readonly studentQrService: StudentQrService) {}

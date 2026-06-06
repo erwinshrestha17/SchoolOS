@@ -1,7 +1,10 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
+import { Logger } from '@nestjs/common';
 import { AudienceType, ConsentType, NotificationChannel } from '@prisma/client';
 import { CommunicationsService } from '../communications/communications.service';
+import { PlansService } from '../plans/plans.service';
+import { skipSuspendedTenantJob } from '../plans/processor-tenant.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthContext } from '../auth/auth.types';
 
@@ -16,9 +19,12 @@ interface LowBalanceNotificationJob {
 
 @Processor('canteen-alerts')
 export class CanteenAlertsProcessor extends WorkerHost {
+  private readonly logger = new Logger(CanteenAlertsProcessor.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly communicationsService: CommunicationsService,
+    private readonly plansService: PlansService,
   ) {
     super();
   }
@@ -32,6 +38,17 @@ export class CanteenAlertsProcessor extends WorkerHost {
     if (job.name === 'low-balance-notification') {
       const { tenantId, studentId, balance, threshold, windowKey, actor } =
         job.data;
+
+      if (
+        await skipSuspendedTenantJob(
+          this.plansService,
+          tenantId,
+          this.logger,
+          'canteen low-balance notification',
+        )
+      ) {
+        return { skipped: true, reason: 'Tenant inactive' };
+      }
 
       const sourceId = `canteen-low-balance:${studentId}:${threshold}:${windowKey}`;
 

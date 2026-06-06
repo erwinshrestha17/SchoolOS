@@ -9,6 +9,10 @@ import { EntitlementGuard } from '../src/auth/guards/entitlement.guard';
 import { AccountingReportsController } from '../src/accounting/accounting-reports.controller';
 import { AdmissionsController } from '../src/admissions/admissions.controller';
 import { CanteenController } from '../src/canteen/canteen.controller';
+import { FinanceCompatController } from '../src/finance/finance-compat.controller';
+import { ActivityFeedController } from '../src/activity-feed/activity-feed.controller';
+import { DeliveriesController } from '../src/communications/deliveries.controller';
+import { StudentDocumentsController } from '../src/student-records/student-documents.controller';
 import { HomeworkController } from '../src/homework/homework.controller';
 import { LibraryController } from '../src/library/library.controller';
 import { MobileTeacherAttendanceController } from '../src/mobile/mobile-teacher-attendance.controller';
@@ -311,6 +315,120 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
     );
   });
 
+  it('denies mobile parent module sub-routes when the paid module is not entitled', async () => {
+    const tenantId = 'tenant-mobile-no-canteen';
+    prisma.__state.tenants.push({
+      id: tenantId,
+      slug: 'mobile-no-canteen',
+      isActive: true,
+      plan: 'mobile-basic-only',
+    });
+
+    const planId = 'plan-mobile-basic-only';
+    prisma.__state.platformPlans.push({
+      id: planId,
+      key: 'mobile-basic-only',
+      name: 'Mobile Basic Only',
+    });
+    prisma.__state.platformPlanFeatures.push(
+      {
+        id: 'feature-students-mobile-basic',
+        planId,
+        featureKey: 'module.students',
+        enabled: true,
+      },
+      {
+        id: 'feature-mobile-parent-basic',
+        planId,
+        featureKey: FEATURE_KEYS.MOBILE_PARENT_BASIC,
+        enabled: true,
+      },
+    );
+    prisma.__state.tenantSubscriptions.push({
+      id: 'sub-mobile-basic-only',
+      tenantId,
+      planId,
+      status: 'ACTIVE',
+      createdAt: new Date(),
+    });
+
+    const actor: AuthContext = {
+      userId: 'parent-user',
+      tenantId,
+      tenantSlug: 'mobile-no-canteen',
+      email: 'parent@school.com',
+      roles: ['parent'],
+      permissions: [],
+      authMethod: 'PASSWORD' as any,
+    };
+
+    const request = { auth: actor } as unknown as AuthenticatedRequest;
+    const context = {
+      switchToHttp: () => ({
+        getRequest: () => request,
+      }),
+      getHandler: () => MobileController.prototype.getStudentCanteen,
+      getClass: () => MobileController,
+    } as unknown as ExecutionContext;
+
+    await expect(entitlementGuard.canActivate(context)).rejects.toThrow(
+      /module 'canteen'/,
+    );
+  });
+
+  it('denies mobile parent APIs for suspended tenants before module checks', async () => {
+    const tenantId = 'tenant-mobile-suspended';
+    prisma.__state.tenants.push({
+      id: tenantId,
+      slug: 'mobile-suspended',
+      isActive: false,
+      plan: 'standard',
+    });
+
+    const planId = 'plan-mobile-suspended';
+    prisma.__state.platformPlans.push({
+      id: planId,
+      key: 'standard',
+      name: 'Standard',
+    });
+    prisma.__state.platformPlanFeatures.push({
+      id: 'feature-mobile-parent-suspended',
+      planId,
+      featureKey: FEATURE_KEYS.MOBILE_PARENT_BASIC,
+      enabled: true,
+    });
+    prisma.__state.tenantSubscriptions.push({
+      id: 'sub-mobile-suspended',
+      tenantId,
+      planId,
+      status: 'ACTIVE',
+      createdAt: new Date(),
+    });
+
+    const actor: AuthContext = {
+      userId: 'parent-user',
+      tenantId,
+      tenantSlug: 'mobile-suspended',
+      email: 'parent@school.com',
+      roles: ['parent'],
+      permissions: [],
+      authMethod: 'PASSWORD' as any,
+    };
+
+    const request = { auth: actor } as unknown as AuthenticatedRequest;
+    const context = {
+      switchToHttp: () => ({
+        getRequest: () => request,
+      }),
+      getHandler: () => MobileController.prototype.getDashboard,
+      getClass: () => MobileController,
+    } as unknown as ExecutionContext;
+
+    await expect(entitlementGuard.canActivate(context)).rejects.toThrow(
+      /Your school account is currently suspended/,
+    );
+  });
+
   it.each([
     {
       label: 'attendance',
@@ -346,6 +464,27 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
       controller: HomeworkController,
       handler: HomeworkController.prototype.listHomework,
       permissions: ['homework:read'],
+    },
+    {
+      label: 'finance-compat',
+      featureKey: 'module.fees',
+      controller: FinanceCompatController,
+      handler: FinanceCompatController.prototype.listDues,
+      permissions: ['fees:manage'],
+    },
+    {
+      label: 'activity-feed',
+      featureKey: 'activity',
+      controller: ActivityFeedController,
+      handler: ActivityFeedController.prototype.streamFeed,
+      permissions: ['activity_feed:read'],
+    },
+    {
+      label: 'communications-deliveries',
+      featureKey: 'module.communications',
+      controller: DeliveriesController,
+      handler: DeliveriesController.prototype.listDeliveries,
+      permissions: ['communications:read_deliveries'],
     },
   ])(
     'denies $label school APIs when the module is not entitled even with RBAC permissions',
@@ -523,6 +662,60 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
     const platformGuard = moduleRef.get(PlatformGuard);
     await expect(() => platformGuard.canActivate(context)).toThrow(
       /Access restricted to platform administrators only/,
+    );
+  });
+
+  it('denies student document APIs when module.students is not entitled', async () => {
+    const tenantId = 'tenant-no-student-docs';
+    prisma.__state.tenants.push({
+      id: tenantId,
+      slug: 'no-student-docs',
+      name: 'No Student Docs School',
+      isActive: true,
+      plan: 'without-students',
+    });
+
+    const planId = 'plan-without-students';
+    prisma.__state.platformPlans.push({
+      id: planId,
+      key: 'without-students',
+      name: 'Without Students Plan',
+    });
+    prisma.__state.platformPlanFeatures.push({
+      id: 'feature-attendance-without-students',
+      planId,
+      featureKey: 'module.attendance',
+      enabled: true,
+    });
+    prisma.__state.tenantSubscriptions.push({
+      id: 'sub-without-students',
+      tenantId,
+      planId,
+      status: 'ACTIVE',
+      createdAt: new Date(),
+    });
+
+    const actor: AuthContext = {
+      userId: 'docs-admin',
+      tenantId,
+      tenantSlug: 'no-student-docs',
+      email: 'docs@school.com',
+      roles: ['admin'],
+      permissions: ['students:read'],
+      authMethod: 'PASSWORD' as any,
+    };
+
+    const request = { auth: actor } as unknown as AuthenticatedRequest;
+    const context = {
+      switchToHttp: () => ({
+        getRequest: () => request,
+      }),
+      getHandler: () => StudentDocumentsController.prototype.listDocuments,
+      getClass: () => StudentDocumentsController,
+    } as unknown as ExecutionContext;
+
+    await expect(entitlementGuard.canActivate(context)).rejects.toThrow(
+      'module.students',
     );
   });
 

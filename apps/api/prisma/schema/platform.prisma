@@ -257,6 +257,7 @@ model DemoRequest {
   expectedTimeline  String
   interestedModules String[] @default([])
   message           String?
+  internalNotes     String?
   status            String   @default("NEW")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

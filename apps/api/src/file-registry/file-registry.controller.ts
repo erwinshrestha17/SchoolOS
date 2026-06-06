@@ -12,6 +12,7 @@ import {
 import type { Response } from 'express';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { TenantActiveGuard } from '../auth/guards/tenant-active.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -95,7 +96,7 @@ const MODULE_UPLOAD_PERMISSIONS: Record<string, string[]> = {
 };
 
 @Controller('files')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, TenantActiveGuard, RolesPermissionsGuard)
 export class FileRegistryController {
   constructor(
     private readonly fileRegistryService: FileRegistryService,

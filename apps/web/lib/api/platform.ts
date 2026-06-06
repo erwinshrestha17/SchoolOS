@@ -1,9 +1,13 @@
 import type {
+  PaginatedResponse,
   PaginatedResult,
   PlatformApiKeyCreated,
   PlatformApiKeySummary,
   PlatformAuditLog,
   PlatformDashboardSummary,
+  PlatformDemoRequestDetail,
+  PlatformDemoRequestStatus,
+  PlatformDemoRequestSummary,
   PlatformFailedJobSummary,
   PlatformHealthSummary,
   PlatformOnboardingChecklist,
@@ -331,4 +335,34 @@ export const platformApi = {
     request<{ success: true; removed: boolean }>('/settings/branding/logo', {
       method: 'DELETE',
     }),
+  listPlatformDemoRequests: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: PlatformDemoRequestStatus | 'all';
+    dateFrom?: string;
+    dateTo?: string;
+  }) =>
+    request<PaginatedResponse<PlatformDemoRequestSummary>>(
+      withQuery('/platform/demo-requests', {
+        ...params,
+        page: params?.page?.toString(),
+        limit: params?.limit?.toString(),
+      }),
+    ),
+  getPlatformDemoRequest: (id: string) =>
+    request<PlatformDemoRequestDetail>(
+      `/platform/demo-requests/${encodeURIComponent(id)}`,
+    ),
+  updatePlatformDemoRequestStatus: (
+    id: string,
+    body: { status: PlatformDemoRequestStatus; internalNotes?: string },
+  ) =>
+    request<PlatformDemoRequestDetail>(
+      `/platform/demo-requests/${encodeURIComponent(id)}/status`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
 };

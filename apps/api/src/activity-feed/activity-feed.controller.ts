@@ -19,6 +19,8 @@ import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { RequiredModule } from '../auth/decorators/required-module.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { ActivityFeedService } from './activity-feed.service';
 import { ActivityMediaService } from './activity-media.service';
@@ -38,7 +40,8 @@ interface FeedPostEvent {
 }
 
 @Controller('activity-feed')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@RequiredModule('activity')
 export class ActivityFeedController {
   constructor(
     private readonly activityFeedService: ActivityFeedService,

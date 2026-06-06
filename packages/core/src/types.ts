@@ -2125,6 +2125,39 @@ export type PlatformOnboardingChecklist = {
   }>;
 };
 
+export type PlatformDemoRequestStatus =
+  | "NEW"
+  | "CONTACTED"
+  | "SCHEDULED"
+  | "CONVERTED"
+  | "CLOSED"
+  | "SPAM";
+
+export type PlatformDemoRequestSummary = {
+  id: string;
+  schoolName: string;
+  schoolType: string;
+  location: string;
+  studentsCount: string;
+  contactName: string;
+  role: string;
+  phone: string;
+  email: string;
+  expectedTimeline: string;
+  status: PlatformDemoRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PlatformDemoRequestDetail = PlatformDemoRequestSummary & {
+  branchesCount?: string | null;
+  preferredContact?: string | null;
+  currentSystem?: string | null;
+  interestedModules: string[];
+  message?: string | null;
+  internalNotes?: string | null;
+};
+
 export type PlatformAuditLog = {
   id: string;
   action: string;

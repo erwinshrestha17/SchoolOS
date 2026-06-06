@@ -10,13 +10,16 @@ import {
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { UploadStudentPhotoDto } from './dto/upload-student-photo.dto';
 import { StudentPhotoService } from './student-photo.service';
 
 @Controller('students')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.students')
 export class StudentPhotoController {
   constructor(private readonly studentPhotoService: StudentPhotoService) {}
 

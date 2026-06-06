@@ -77,6 +77,9 @@ describe('ActivityMediaProcessor', () => {
     processor = new ActivityMediaProcessor(
       prisma as unknown as PrismaService,
       storageService as unknown as StorageService,
+      {
+        shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
+      } as never,
     );
   });
 

@@ -18,6 +18,7 @@ import {
   createAuthContextMock,
   createPrismaMock,
   createQueueMock,
+  ensureTenantDefaultsWithState,
 } from './test-helpers';
 
 interface MockStateOwner {
@@ -91,6 +92,15 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
   });
 
   beforeEach(async () => {
+    ensureTenantDefaultsWithState(
+      (prisma as unknown as MockStateOwner).__state,
+      tenantId,
+    );
+    ensureTenantDefaultsWithState(
+      (prisma as unknown as MockStateOwner).__state,
+      otherTenantId,
+    );
+
     const academicYear = await prisma.academicYear.create({
       data: {
         tenantId,

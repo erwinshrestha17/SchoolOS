@@ -137,4 +137,56 @@ describe('PlansService entitlement and usage enforcement', () => {
       service.validateLimit('tenant-1', 'students.count', 5),
     ).rejects.toThrow(ForbiddenException);
   });
+
+  it('assertTenantActive skips the platform control-plane tenant id', async () => {
+    await expect(
+      service.assertTenantActive('platform'),
+    ).resolves.toBeUndefined();
+    expect(prisma.tenant.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('assertTenantActive rejects suspended school tenants with the standard message', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 'tenant-1',
+      isActive: false,
+    });
+
+    await expect(service.assertTenantActive('tenant-1')).rejects.toThrow(
+      ForbiddenException,
+    );
+    await expect(service.assertTenantActive('tenant-1')).rejects.toThrow(
+      /currently suspended/,
+    );
+  });
+
+  it('shouldProcessTenantJob returns true for platform and active tenants', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 'tenant-1',
+      isActive: true,
+    });
+
+    await expect(service.shouldProcessTenantJob('platform')).resolves.toBe(
+      true,
+    );
+    await expect(service.shouldProcessTenantJob('tenant-1')).resolves.toBe(
+      true,
+    );
+    await expect(service.shouldProcessTenantJob(null)).resolves.toBe(true);
+  });
+
+  it('shouldProcessTenantJob returns false for suspended or missing tenants', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 'tenant-suspended',
+      isActive: false,
+    });
+
+    await expect(
+      service.shouldProcessTenantJob('tenant-suspended'),
+    ).resolves.toBe(false);
+
+    prisma.tenant.findUnique.mockResolvedValue(null);
+    await expect(service.shouldProcessTenantJob('missing')).resolves.toBe(
+      false,
+    );
+  });
 });

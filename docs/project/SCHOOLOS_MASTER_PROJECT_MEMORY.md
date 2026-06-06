@@ -1,6 +1,6 @@
 # SchoolOS Master Project Memory
 
-**Status:** 2026-06-04 implementation updates recorded: AGENTS operating rules, demo request backend/web integration, M9 bank import validation, M3 payment webhook signature hardening, M7 statutory deduction refinement, M0 platform DTO hardening, M2 mobile attendance query validation, settings audit-log depth, M6 substitution UI polish, M8C canteen UI polish, and module enhancement planning  
+**Status:** 2026-06-06 implementation updates recorded: suspended-tenant file/export denial, M0 mobile/queue entitlement hardening, M1/M5/M10 satellite-controller entitlement gating, platform `/platform/demo-requests` operator workspace, and Section 11 remaining-work inventory for M1–M10. Prior 2026-06-04 slice: AGENTS rules, demo request public intake, M9 bank import validation, M3 webhook HMAC, M7 statutory deductions, settings audit-log depth, and module enhancement planning.  
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard, Flutter companion app
 
@@ -49,19 +49,19 @@ Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
 M0 Platform Core: Foundation complete; provider/queue/API-key/File Registry hardening implemented; platform DTO validation and status/support-override request shaping refined on 2026-06-04; staging/object-storage/browser coverage remains
-M1 Admissions & Student Profiles: Pilot-ready plus Student QR, storage/photo/logo, iEMIS artifact registration, duplicate candidate review, document audit, and mobile child profile foundation
+M1 Admissions & Student Profiles: Pilot-ready plus Student QR, storage/photo/logo, iEMIS artifact registration, duplicate candidate review, document audit, mobile child profile foundation, and satellite-controller entitlement gating
 M2 Smart Attendance: Pilot-ready plus correction/offline-draft, rejected replay regressions, correction-review UI, mobile teacher scope, real-data teacher dashboard, and mobile parent attendance summary query validation
 M3 Fees & Receipts: Pilot-ready plus receipt reprint, reversal, cashier close, reconciliation, Analysis CSV exports, protected day-end PDF snapshots, transaction-race coverage, and secure online payment webhook signature verification
 M4 Academics / Exams / CAS / Report Cards: Completed / Pilot-Ready with PDF/report/correction/snapshot polish
-M5 Activity Feed & Milestones: Strong foundation with media privacy, consent-aware blocking, optimized previews, moderation controls, and teacher media gallery
+M5 Activity Feed & Milestones: Strong foundation with media privacy, consent-aware blocking, optimized previews, moderation controls, teacher media gallery, and media-access entitlement gating
 M6 Homework / Timetable: Completed / Pilot-Ready with File Registry attachments, reminder hardening, absence/substitution conflict coverage, mobile homework/timetable views, and improved substitution slot selection / absence recording UI
 M7 HR / Payroll: Completed / Pilot-Ready with posting locks, accounting integration, reversals, PII masking, payroll reports, mobile staff self-service, and active-salary-structure statutory deduction retrieval
 M8A Library: Admin/backend foundation plus QR lookup, fines, staff borrowers, fine-to-fees/accounting tests, scanner-first UI, and reports/export polish
 M8B Transport: Admin/trip/location/report foundation plus Redis GPS/cache/pressure/retention hardening, driver mobile surfaces, parent latest-GPS view, and trip-history exports
 M8C Canteen: Admin/wallet/POS/inventory/vendor/report foundation plus receipt JSON/PDF, stock hardening, wallet guards, linked invoice handoff, parent mobile views, and canteen workspace UI polish
 M9 Accounting: Production-candidate / Pilot-Ready with PDFs, snapshots, audit trail, reconciliation suggestions, File Registry export support, and validated bank statement import DTO/service hardening
-M10 Notices / Communication / Chat: Strong foundation with provider modes, attachments, failure dashboard, moderation/escalation, unread-recipient follow-up, and mobile notification/chat surfaces
-Public marketing/demo intake: Backend-persisted demo request API, Prisma model/migration, CSRF public allow-list, web form integration, API helper, and tests added on 2026-06-04
+M10 Notices / Communication / Chat: Strong foundation with provider modes, attachments, failure dashboard, moderation/escalation, unread-recipient follow-up, mobile notification/chat surfaces, and full communications/messaging sub-controller entitlement gating
+Public marketing/demo intake: Public POST API plus platform `/platform/demo-requests` operator workspace, internal notes, RBAC, audit logging, rate limiting, and tests (public form on 2026-06-04; platform UI on 2026-06-06)
 Settings / audit visibility: Settings audit-log access and UI depth added on 2026-06-04
 M11 School Intelligence / AI: Roadmap only
 SchoolOS Flutter Mobile: Active companion app with scoped parent/student/teacher/staff/driver/admin surfaces where APIs exist
@@ -77,9 +77,36 @@ Multi-school production-ready: Not yet
 Full SchoolOS product complete: No
 ```
 
+**Remaining M1–M10 work:** Core modules are pilot-ready; enhancement depth, staging smoke, and mobile polish remain. See `SCHOOLOS_IMPLEMENTATION_STATUS_AND_PLAN.md` Section 11 and `SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md` Sections 4–15.
+
 ---
 
-## 2.1 2026-06-04 Implementation Update
+## 2.1 2026-06-06 Implementation Update
+
+```text
+Auth / Security
+- Suspended-tenant denial on file registry, report exports, and entitled controllers.
+- TenantActiveGuard on /files routes; queue processors skip suspended tenants.
+
+M0 Platform
+- Mobile parent per-module entitlement gates; finance-compat and ledger entitlement guards.
+- Activity-feed RequiredModule gate; processor-tenant skip helper.
+
+M1 / M5 / M10
+- EntitlementGuard on student-documents, document-access, photo, QR, siblings, academic-years (M1).
+- RequiredModule('activity') on media-access (M5).
+- EntitlementGuard on all communications/messaging satellite controllers (M10).
+
+Public Demo Requests
+- Platform API helpers and /platform/demo-requests operator workspace (list, filter, review, status, internal notes).
+
+Documentation
+- Section 11 remaining implementation inventory for M1–M10 added to implementation status plan.
+```
+
+---
+
+## 2.2 2026-06-04 Implementation Update
 
 Today's commits added or updated the following:
 

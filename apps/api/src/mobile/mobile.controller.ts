@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
+import { RequiredModule } from '../auth/decorators/required-module.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import type { AuthContext } from '../auth/auth.types';
@@ -49,6 +50,7 @@ export class MobileController {
   }
 
   @Get('students/:id/profile')
+  @RequiredModule('students')
   getStudentProfile(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,
@@ -57,6 +59,7 @@ export class MobileController {
   }
 
   @Get('students/:id/attendance-summary')
+  @RequiredModule('attendance')
   getStudentAttendanceSummary(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,
@@ -69,6 +72,7 @@ export class MobileController {
   }
 
   @Get('students/:id/fees-summary')
+  @RequiredModule('fees')
   getStudentFeesSummary(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,
@@ -77,6 +81,7 @@ export class MobileController {
   }
 
   @Get('students/:id/receipts/:receiptNumber.pdf')
+  @RequiredModule('fees')
   async getStudentReceiptPdf(
     @Param('id') studentId: string,
     @Param('receiptNumber') receiptNumber: string,
@@ -95,6 +100,7 @@ export class MobileController {
   }
 
   @Get('students/:id/activity-feed')
+  @RequiredModule('activity')
   getStudentActivityFeed(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,
@@ -104,6 +110,7 @@ export class MobileController {
   }
 
   @Get('students/:id/homework')
+  @RequiredModule('homework')
   getStudentHomework(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,
@@ -113,6 +120,7 @@ export class MobileController {
   }
 
   @Get('students/:id/timetable')
+  @RequiredModule('homework')
   getStudentTimetable(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,
@@ -121,6 +129,7 @@ export class MobileController {
   }
 
   @Get('students/:id/report-cards')
+  @RequiredModule('exams')
   getStudentReportCards(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,
@@ -129,6 +138,7 @@ export class MobileController {
   }
 
   @Get('students/:id/canteen')
+  @RequiredModule('canteen')
   getStudentCanteen(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,
@@ -137,6 +147,7 @@ export class MobileController {
   }
 
   @Get('students/:id/library')
+  @RequiredModule('library')
   getStudentLibrary(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,
@@ -145,6 +156,7 @@ export class MobileController {
   }
 
   @Get('students/:id/transport')
+  @RequiredModule('transport')
   getStudentTransport(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,

@@ -14,6 +14,7 @@ import {
   StorageProvider,
 } from '@prisma/client';
 import { UsageService } from '../usage/usage.service';
+import { PlansService } from '../plans/plans.service';
 import type { AuthContext } from '../auth/auth.types';
 import {
   getParentStudentIds,
@@ -31,6 +32,7 @@ export class FileRegistryService {
     private readonly configService: ConfigService,
     private readonly storageService: StorageService,
     private readonly usageService: UsageService,
+    private readonly plansService: PlansService,
   ) {}
 
   async registerFile(input: {
@@ -50,6 +52,7 @@ export class FileRegistryService {
     visibility?: FileVisibility;
     metadata?: Prisma.InputJsonValue;
   }) {
+    await this.plansService.assertTenantActive(input.tenantId);
     await this.usageService.checkLimit(
       input.tenantId,
       'storage.bytes',
@@ -283,6 +286,7 @@ export class FileRegistryService {
     asset: Awaited<ReturnType<FileRegistryService['getFileMetadata']>>,
     auth: AuthContext,
   ) {
+    await this.plansService.assertTenantActive(auth.tenantId);
     if (asset.tenantId !== auth.tenantId) {
       throw new ForbiddenException('Access denied');
     }
@@ -348,6 +352,7 @@ export class FileRegistryService {
   }
 
   async softDeleteFile(tenantId: string, assetId: string, userId: string) {
+    await this.plansService.assertTenantActive(tenantId);
     const asset = await this.getFileMetadata(tenantId, assetId);
 
     await this.prisma.fileAsset.update({
@@ -397,6 +402,7 @@ export class FileRegistryService {
   }
 
   async getSignedUrl(tenantId: string, assetId: string) {
+    await this.plansService.assertTenantActive(tenantId);
     const asset = await this.getFileMetadata(tenantId, assetId);
 
     if (asset.module === 'students' && asset.entityId) {
@@ -438,6 +444,7 @@ export class FileRegistryService {
     assetId: string,
     userId: string,
   ) {
+    await this.plansService.assertTenantActive(tenantId);
     const asset = await this.getFileMetadata(tenantId, assetId);
     await this.auditAccess(tenantId, assetId, userId, 'download');
 
