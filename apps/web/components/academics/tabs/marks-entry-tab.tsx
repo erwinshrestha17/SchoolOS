@@ -276,7 +276,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
                                  <User size={18} />
                               </div>
                               <div className="flex flex-col">
-                                 <span className="text-sm font-black text-slate-900 italic uppercase tracking-tight">{student.fullNameEn || student.fullName}</span>
+                                 <span className="text-sm font-bold text-slate-900">{student.fullNameEn || student.fullName}</span>
                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{student.studentSystemId}</span>
                               </div>
                            </div>

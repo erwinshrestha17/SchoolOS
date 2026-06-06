@@ -392,7 +392,7 @@ export function MarksEntryWorkspace() {
               <div className="mb-6 flex items-center gap-3 rounded-2xl bg-amber-50 border border-amber-100 p-6 text-amber-800">
                 <Lock size={20} className="shrink-0" />
                 <div>
-                  <p className="font-black uppercase italic tracking-tight">Exam Term Locked</p>
+                  <p className="font-bold text-slate-900">Exam Term Locked</p>
                   <p className="text-sm font-medium opacity-80">This exam term has been finalized. To make changes, please contact the administrator for an unlock request.</p>
                 </div>
               </div>
@@ -411,7 +411,7 @@ export function MarksEntryWorkspace() {
           <div className="h-16 w-16 rounded-2xl border border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-surface)] flex items-center justify-center text-[var(--color-mod-academics-accent)] mb-6">
             <Search size={32} />
           </div>
-          <p className="text-xl font-black italic uppercase tracking-tight text-slate-400">Select context to begin</p>
+          <p className="text-lg font-bold text-slate-600">Select context to begin</p>
           <p className="mt-2 text-sm font-medium text-slate-400">Choose an exam, class, subject and component from the filters above.</p>
         </div>
       )}

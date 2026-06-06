@@ -225,7 +225,7 @@ export function ResultPublishingTab({
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between mb-8">
            <div>
-              <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Results Delivery</h2>
+              <h2 className="text-2xl font-bold tracking-tight text-slate-950">Results Delivery</h2>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Dashboard Visibility & Notifications</p>
            </div>
            <div className="flex flex-wrap gap-3">
@@ -296,7 +296,7 @@ export function ResultPublishingTab({
                    <ShieldCheck size={20} />
                 </div>
                 <div>
-                   <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic text-[18px]">Delivery Hub</h3>
+                   <h3 className="text-lg font-bold tracking-tight text-slate-950">Delivery Hub</h3>
                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Control visibility to {records.length} students</p>
                 </div>
              </div>
@@ -366,7 +366,7 @@ export function ResultPublishingTab({
                        </td>
                        <td className="py-4 px-6">
                           <div className="flex flex-col">
-                             <span className="text-sm font-black text-slate-900 uppercase tracking-tight italic">{r.studentName}</span>
+                             <span className="text-sm font-bold text-slate-900">{r.studentName}</span>
                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{r.studentSystemId}</span>
                           </div>
                        </td>
@@ -378,7 +378,7 @@ export function ResultPublishingTab({
                        </td>
                        <td className="py-4 px-6 text-center">
                           <div className="inline-flex flex-col items-center">
-                             <span className="text-sm font-black text-slate-900 tracking-tighter italic">{r.grade}</span>
+                             <span className="text-sm font-bold text-slate-900">{r.grade}</span>
                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{r.percentage.toFixed(1)}%</span>
                           </div>
                        </td>
@@ -433,7 +433,7 @@ export function ResultPublishingTab({
           <div className="h-16 w-16 rounded-2xl bg-[var(--color-mod-academics-surface)] flex items-center justify-center text-[var(--color-mod-academics-accent)] mx-auto mb-8 border border-[var(--color-mod-academics-border)]">
              <Megaphone size={40} />
           </div>
-          <h3 className="text-2xl font-black text-slate-900 italic uppercase tracking-tight">Delivery Hub</h3>
+          <h3 className="text-2xl font-bold text-slate-950 tracking-tight">Delivery Hub</h3>
           <p className="mt-2 text-sm font-bold text-slate-400 max-w-sm mx-auto leading-relaxed">
             Select an exam term to control result visibility and notify guardians of student performance.
           </p>

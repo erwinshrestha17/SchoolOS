@@ -157,7 +157,7 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between mb-8">
            <div>
-              <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Year-End Promotion</h2>
+              <h2 className="text-2xl font-bold tracking-tight text-slate-950">Year-End Promotion</h2>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Batch Student Lifecycle Transition</p>
            </div>
            <button 
@@ -237,7 +237,7 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
                    <ShieldCheck size={20} />
                 </div>
                 <div>
-                   <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic text-[18px]">Readiness Registry</h3>
+                   <h3 className="text-lg font-bold tracking-tight text-slate-950">Readiness Registry</h3>
                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Pre-promotion validation checks</p>
                 </div>
              </div>
@@ -316,13 +316,13 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
                        </td>
                        <td className="py-4 px-6">
                           <div className="flex flex-col">
-                             <span className="text-sm font-black text-slate-900 uppercase tracking-tight italic">{s.studentName}</span>
+                             <span className="text-sm font-bold text-slate-900">{s.studentName}</span>
                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.studentSystemId}</span>
                           </div>
                        </td>
                        <td className="py-4 px-6 text-center">
                           <div className="inline-flex flex-col items-center">
-                             <span className="text-sm font-black text-slate-900 tracking-tighter italic">{s.grade}</span>
+                             <span className="text-sm font-bold text-slate-900">{s.grade}</span>
                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">GPA {s.gpa.toFixed(2)}</span>
                           </div>
                        </td>
@@ -400,7 +400,7 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
           <div className="h-16 w-16 rounded-2xl bg-[var(--color-mod-academics-surface)] flex items-center justify-center text-[var(--color-mod-academics-accent)] mx-auto mb-8 border border-[var(--color-mod-academics-border)]">
              <GraduationCap size={40} />
           </div>
-          <h3 className="text-2xl font-black text-slate-900 italic uppercase tracking-tight">Readiness Map</h3>
+          <h3 className="text-2xl font-bold text-slate-950 tracking-tight">Readiness Map</h3>
           <p className="mt-2 text-sm font-bold text-slate-400 max-w-sm mx-auto leading-relaxed">
             Select a class above to analyze student eligibility for promotion to the next academic year.
           </p>

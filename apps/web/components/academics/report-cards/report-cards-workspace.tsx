@@ -338,7 +338,7 @@ export function ReportCardsWorkspace() {
                     <div className="h-16 w-16 rounded-2xl border border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-surface)] flex items-center justify-center text-[var(--color-mod-academics-accent)] mb-6">
                       <Search size={32} />
                     </div>
-                    <p className="text-xl font-black italic uppercase tracking-tight text-slate-400">Select class and exam</p>
+                    <p className="text-lg font-bold text-slate-600">Select class and exam</p>
                     <p className="mt-2 text-sm font-medium text-slate-400">Generation controls will appear once context is selected.</p>
                   </div>
                 )}
@@ -482,7 +482,7 @@ function ReportCardCorrectionDialog({
 
         <div className="space-y-5 overflow-y-auto p-6" data-testid="report-card-correction-panel">
           <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-            <p className="text-xs font-black uppercase tracking-wide text-slate-400">Selected report card</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Selected report card</p>
             <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
               <CorrectionMeta label="Student" value={reportCardStudentName(reportCard)} />
               <CorrectionMeta label="Version" value={reportCard?.version ? `v${reportCard.version}` : 'Latest'} />
@@ -497,7 +497,7 @@ function ReportCardCorrectionDialog({
           </div>
 
           <div>
-            <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">Correction reason</p>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Correction reason</p>
             <TextArea
               value={reason}
               onChange={(event: any) => onReasonChange(event.target.value)}
@@ -530,7 +530,7 @@ function ReportCardCorrectionDialog({
 function CorrectionMeta({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
       <p className="mt-1 font-bold text-slate-800">{value}</p>
     </div>
   );

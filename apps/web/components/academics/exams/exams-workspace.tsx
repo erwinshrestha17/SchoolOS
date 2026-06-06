@@ -159,7 +159,7 @@ export function ExamsWorkspace() {
       </div>
 
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-black uppercase italic tracking-tight text-slate-900">
+        <h2 className="text-xl font-bold tracking-tight text-slate-950">
           Exam <span className="text-[var(--color-mod-academics-text)]">Terms</span>
         </h2>
         <Button onClick={() => { setEditingExam(null); setIsFormOpen(true); }} className="rounded-2xl shadow-lg shadow-[var(--color-mod-academics-border)]/50">
@@ -183,7 +183,7 @@ export function ExamsWorkspace() {
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-2xl rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black italic uppercase tracking-tight">
+            <DialogTitle className="text-2xl font-bold tracking-tight text-slate-950">
               {editingExam ? 'Edit' : 'Create'} <span className="text-[var(--color-mod-academics-text)]">Exam Term</span>
             </DialogTitle>
           </DialogHeader>
@@ -201,10 +201,10 @@ export function ExamsWorkspace() {
       <Dialog open={isComponentsOpen} onOpenChange={setIsComponentsOpen}>
         <DialogContent className="max-w-3xl rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black italic uppercase tracking-tight">
+            <DialogTitle className="text-2xl font-bold tracking-tight text-slate-950">
               Manage <span className="text-[var(--color-mod-academics-text)]">Components</span>
             </DialogTitle>
-            <DialogDescription className="text-sm font-bold uppercase tracking-widest text-slate-400">
+            <DialogDescription className="text-sm font-medium text-slate-500">
               {selectedExam?.name}
             </DialogDescription>
           </DialogHeader>

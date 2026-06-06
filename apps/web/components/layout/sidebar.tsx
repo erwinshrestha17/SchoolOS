@@ -27,6 +27,8 @@ import {
   ClipboardList,
   FileCheck2,
   CalendarDays,
+  GraduationCap,
+  FileText,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -114,9 +116,27 @@ export const dashboardNavGroups: NavGroup[] = [
     label: 'Academics',
     items: [
       {
-        href: '/dashboard/academics/report-cards',
-        label: 'Exams, CAS & Reports',
+        href: '/dashboard/academics',
+        label: 'Academics',
+        icon: GraduationCap,
+        permissions: academicPermissions,
+      },
+      {
+        href: '/dashboard/academics/exams',
+        label: 'Exams',
         icon: FileCheck2,
+        permissions: academicPermissions,
+      },
+      {
+        href: '/dashboard/academics/cas',
+        label: 'CAS Records',
+        icon: ClipboardList,
+        permissions: academicPermissions,
+      },
+      {
+        href: '/dashboard/academics/report-cards',
+        label: 'Report Cards',
+        icon: FileText,
         permissions: academicPermissions,
       },
       {
@@ -473,7 +493,10 @@ function NavEntry({
 
   const active =
     (item.href === '/dashboard' && pathname === '/dashboard') ||
-    (item.href !== '/dashboard' && pathname?.startsWith(item.href));
+    (item.href === '/dashboard/academics' && pathname === '/dashboard/academics') ||
+    (item.href !== '/dashboard' &&
+      item.href !== '/dashboard/academics' &&
+      pathname?.startsWith(item.href));
 
   const content = (
     <>

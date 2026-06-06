@@ -37,7 +37,12 @@ export function StaffDashboard() {
         setLoading(false);
       })
       .catch(err => {
-        console.error('Failed to fetch profile', err);
+        if (err && (err.statusCode === 404 || err.status === 404)) {
+          console.warn('No staff profile linked to this user account.');
+        } else {
+          console.error('Failed to fetch profile', err);
+        }
+        setProfile(null);
         setLoading(false);
       });
   }, []);
