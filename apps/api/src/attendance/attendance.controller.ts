@@ -71,6 +71,12 @@ export class AttendanceController {
     return this.attendanceService.getAnalytics(auth);
   }
 
+  @Get('anomalies')
+  @Permissions('attendance:read')
+  getAnomalies(@CurrentAuth() auth: AuthContext) {
+    return this.attendanceService.getAttendanceAnomalies(auth);
+  }
+
   @Get('summary')
   @Permissions('attendance:read')
   getSummary(
