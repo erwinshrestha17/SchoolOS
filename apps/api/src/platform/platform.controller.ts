@@ -43,6 +43,7 @@ import {
   PlatformTenantBillingStatusReasonDto,
   RecordPlatformWebhookDeliveryDto,
   RecordSaaSPaymentDto,
+  RemovePlatformJobDto,
   RevokePlatformApiKeyDto,
   RetryFailedJobDto,
   TenantFeatureOverrideDto,
@@ -470,11 +471,13 @@ export class PlatformController {
   async removeJob(
     @Param('queueName') queueName: string,
     @Param('jobId') jobId: string,
+    @Body() body: RemovePlatformJobDto,
     @Req() req: AuthenticatedRequest,
   ) {
     return this.platformQueuesService.removeJob(
       queueName,
       jobId,
+      body,
       this.requireUser(req),
     );
   }

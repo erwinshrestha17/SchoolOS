@@ -46,7 +46,7 @@ describe('M0 Queue & Provider safety contracts', () => {
   // ─── 2. Queue Topology & Health ───────────────────────────────────────
 
   describe('Queue health & topology', () => {
-    it('PlatformQueuesService monitors all 5 core queue topologies', () => {
+    it('PlatformQueuesService monitors all platform-visible queue topologies', () => {
       const service = read('src/platform/platform-queues.service.ts');
 
       expect(service).toContain("'notifications'");
@@ -54,6 +54,8 @@ describe('M0 Queue & Provider safety contracts', () => {
       expect(service).toContain("'payroll'");
       expect(service).toContain("'activity-media'");
       expect(service).toContain("'homework'");
+      expect(service).toContain("'reports'");
+      expect(service).toContain("'canteen-alerts'");
     });
 
     it('getQueueHealth reports worker health status', () => {
@@ -71,6 +73,16 @@ describe('M0 Queue & Provider safety contracts', () => {
       expect(service).toContain("waiting: this.count(counts, 'waiting')");
       expect(service).toContain("active: this.count(counts, 'active')");
       expect(service).toContain("failed: this.count(counts, 'failed')");
+    });
+
+    it('destructive failed-job discard records an operator reason', () => {
+      const service = read('src/platform/platform-queues.service.ts');
+      const controller = read('src/platform/platform.controller.ts');
+
+      expect(controller).toContain('RemovePlatformJobDto');
+      expect(service).toContain('RemovePlatformJobDto');
+      expect(service).toContain('reason: dto.reason');
+      expect(service).toContain("action: 'queue_job_removed'");
     });
   });
 

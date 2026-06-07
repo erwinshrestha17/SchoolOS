@@ -159,6 +159,8 @@ describe('Platform tenant subscription change workflow contracts', () => {
       'Retry Failed Job',
       'Retry audit history',
       'Discard Failed Job',
+      'Audit reason',
+      'discardReason.trim().length < 5',
       'Export current page CSV',
       'resourceId',
       'startDate',
@@ -181,6 +183,8 @@ describe('Platform tenant subscription change workflow contracts', () => {
     }
 
     assert.doesNotMatch(settings, /failedJobs\.filter/);
+    assert.match(apiClient, /removePlatformJob: \(queueName: string, jobId: string, reason: string\)/);
+    assert.match(apiClient, /json: \{ reason \}/);
     assert.doesNotMatch(
       settings,
       /bg-slate-900|bg-slate-950|rounded-\[2\.5rem\]|shadow-xl|shadow-2xl|primary-(50|100|200|500|600|700|800|900)|N\/A|Unknown failure|fake production metrics/,

@@ -30,6 +30,8 @@ import { PlatformBillingLifecycleService } from './platform-billing-lifecycle.se
       { name: 'payroll' },
       { name: 'activity-media' },
       { name: 'homework' },
+      { name: 'reports' },
+      { name: 'canteen-alerts' },
     ),
   ],
   controllers: [PlatformController],

@@ -203,6 +203,8 @@ export class PlatformService {
     @InjectQueue('payroll') private readonly payrollQueue: Queue,
     @InjectQueue('activity-media') private readonly activityQueue: Queue,
     @InjectQueue('homework') private readonly homeworkQueue: Queue,
+    @InjectQueue('reports') private readonly reportsQueue: Queue,
+    @InjectQueue('canteen-alerts') private readonly canteenAlertsQueue: Queue,
   ) {
     this.queues = new Map([
       ['notifications', notificationsQueue],
@@ -210,6 +212,8 @@ export class PlatformService {
       ['payroll', payrollQueue],
       ['activity-media', activityQueue],
       ['homework', homeworkQueue],
+      ['reports', reportsQueue],
+      ['canteen-alerts', canteenAlertsQueue],
     ]);
   }
 

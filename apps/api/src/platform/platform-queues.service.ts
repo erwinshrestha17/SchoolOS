@@ -8,7 +8,10 @@ import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
-import type { RetryFailedJobDto } from './dto/platform-core.dto';
+import type {
+  RemovePlatformJobDto,
+  RetryFailedJobDto,
+} from './dto/platform-core.dto';
 
 type QueueCounts = Partial<
   Record<'waiting' | 'active' | 'completed' | 'failed' | 'delayed', number>
@@ -65,6 +68,8 @@ export class PlatformQueuesService {
     @InjectQueue('payroll') private readonly payrollQueue: Queue,
     @InjectQueue('activity-media') private readonly activityMediaQueue: Queue,
     @InjectQueue('homework') private readonly homeworkQueue: Queue,
+    @InjectQueue('reports') private readonly reportsQueue: Queue,
+    @InjectQueue('canteen-alerts') private readonly canteenAlertsQueue: Queue,
   ) {
     this.queues = new Map([
       ['notifications', notificationsQueue],
@@ -72,6 +77,8 @@ export class PlatformQueuesService {
       ['payroll', payrollQueue],
       ['activity-media', activityMediaQueue],
       ['homework', homeworkQueue],
+      ['reports', reportsQueue],
+      ['canteen-alerts', canteenAlertsQueue],
     ]);
   }
 
@@ -182,7 +189,12 @@ export class PlatformQueuesService {
     };
   }
 
-  async removeJob(queueName: string, jobId: string, actorUserId: string) {
+  async removeJob(
+    queueName: string,
+    jobId: string,
+    dto: RemovePlatformJobDto,
+    actorUserId: string,
+  ) {
     const queue = this.queues.get(queueName);
     if (!queue) throw new NotFoundException(`Queue ${queueName} not found`);
 
@@ -198,7 +210,7 @@ export class PlatformQueuesService {
       tenantId: 'platform',
       userId: actorUserId,
       before: { queueName, jobId, name: job.name },
-      after: { removed: true },
+      after: { removed: true, reason: dto.reason },
     });
 
     return { success: true };

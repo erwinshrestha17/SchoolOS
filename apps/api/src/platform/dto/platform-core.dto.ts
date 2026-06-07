@@ -470,6 +470,12 @@ export class RetryFailedJobDto {
   reason!: string;
 }
 
+export class RemovePlatformJobDto {
+  @IsString()
+  @MinLength(5)
+  reason!: string;
+}
+
 export class OnboardingOverrideDto {
   @IsString()
   @IsNotEmpty()

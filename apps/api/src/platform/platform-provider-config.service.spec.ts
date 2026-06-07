@@ -69,6 +69,8 @@ describe('PlatformService provider config hardening', () => {
       makeQueue() as any,
       makeQueue() as any,
       makeQueue() as any,
+      makeQueue() as any,
+      makeQueue() as any,
     );
   });
 
@@ -81,6 +83,8 @@ describe('PlatformService provider config hardening', () => {
       {} as any,
       {} as any,
       {} as any,
+      makeQueue() as any,
+      makeQueue() as any,
       makeQueue() as any,
       makeQueue() as any,
       makeQueue() as any,

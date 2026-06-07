@@ -160,6 +160,7 @@ export default function PlatformSettings() {
   const [discardDialog, setDiscardDialog] =
     useState<PlatformFailedJobSummary | null>(null);
   const [discardConfirm, setDiscardConfirm] = useState('');
+  const [discardReason, setDiscardReason] = useState('');
   const [jobDetail, setJobDetail] = useState<PlatformFailedJobSummary | null>(
     null,
   );
@@ -385,12 +386,23 @@ export default function PlatformSettings() {
   };
 
   const discardJob = async () => {
-    if (!discardDialog || discardConfirm !== discardDialog.id) return;
+    const reason = discardReason.trim();
+    if (
+      !discardDialog ||
+      discardConfirm !== discardDialog.id ||
+      reason.length < 5
+    )
+      return;
     try {
-      await api.removePlatformJob(discardDialog.queueName, discardDialog.id);
+      await api.removePlatformJob(
+        discardDialog.queueName,
+        discardDialog.id,
+        reason,
+      );
       setActionMessage('Failed job discarded.');
       setDiscardDialog(null);
       setDiscardConfirm('');
+      setDiscardReason('');
       await load(true);
     } catch (err: any) {
       setError(err.message ?? 'Failed to discard job');
@@ -1893,7 +1905,13 @@ export default function PlatformSettings() {
 
       <Dialog
         open={!!discardDialog}
-        onOpenChange={(open: boolean) => !open && setDiscardDialog(null)}
+        onOpenChange={(open: boolean) => {
+          if (!open) {
+            setDiscardDialog(null);
+            setDiscardConfirm('');
+            setDiscardReason('');
+          }
+        }}
       >
         <DialogContent className="rounded-3xl sm:max-w-md">
           <DialogHeader>
@@ -1911,19 +1929,33 @@ export default function PlatformSettings() {
               value={discardConfirm}
               onChange={(e) => setDiscardConfirm(e.target.value)}
             />
+            <Label>Audit reason</Label>
+            <Textarea
+              value={discardReason}
+              onChange={(e) => setDiscardReason(e.target.value)}
+              placeholder="Why this failed job is being discarded"
+            />
           </div>
           <DialogFooter>
             <Button
               variant="outline"
               className="rounded-xl font-bold"
-              onClick={() => setDiscardDialog(null)}
+              onClick={() => {
+                setDiscardDialog(null);
+                setDiscardConfirm('');
+                setDiscardReason('');
+              }}
             >
               Cancel
             </Button>
             <Button
               variant="destructive"
               className="rounded-xl font-bold"
-              disabled={!discardDialog || discardConfirm !== discardDialog.id}
+              disabled={
+                !discardDialog ||
+                discardConfirm !== discardDialog.id ||
+                discardReason.trim().length < 5
+              }
               onClick={discardJob}
             >
               Discard Job

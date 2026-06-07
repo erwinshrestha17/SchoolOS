@@ -91,6 +91,8 @@ Auth / Security
 M0 Platform
 - Mobile parent per-module entitlement gates; finance-compat and ledger entitlement guards.
 - Activity-feed RequiredModule gate; processor-tenant skip helper.
+- 2026-06-07: platform queue monitoring now includes reports and canteen-alerts; failed-job discard requires and audits an operator reason from the platform settings UI/API.
+- Repo-truth correction: onboarding checklist UI and provider/storage readiness surfaces are already implemented; remaining M0 provider work is staging/provider-specific verification depth.
 
 M1 / M5 / M10
 - EntitlementGuard on student-documents, document-access, photo, QR, siblings, academic-years (M1).
@@ -102,6 +104,7 @@ Public Demo Requests
 
 Documentation
 - Section 11 remaining implementation inventory for M1–M10 added to implementation status plan.
+- 2026-06-07 M2 repo-truth correction: offline attendance sync/drafts/conflict-review backend APIs and replay-safe integration tests already exist; remaining M2 work is browser/mobile smoke and UX depth, not a missing sync API.
 ```
 
 ---

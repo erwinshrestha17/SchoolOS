@@ -267,11 +267,12 @@ export const platformApi = {
     request<PlatformFailedJobSummary>(
       `/platform/queues/${encodeURIComponent(queueName)}/jobs/${encodeURIComponent(jobId)}`,
     ),
-  removePlatformJob: (queueName: string, jobId: string) =>
+  removePlatformJob: (queueName: string, jobId: string, reason: string) =>
     request<{ success: true }>(
       `/platform/queues/${encodeURIComponent(queueName)}/jobs/${encodeURIComponent(jobId)}`,
       {
         method: 'DELETE',
+        json: { reason },
       },
     ),
   retryPlatformFailedJob: (body: JsonBody) =>

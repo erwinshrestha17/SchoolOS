@@ -236,11 +236,31 @@ pnpm build                              → passed
 Remaining M0 / provider / queue backlog:
 
 ```text
-- Platform queue monitoring for reports and canteen-alerts queues.
-- Discard reason DTO for platform removeJob.
 - Provider-specific readiness depth (SMS/email/FCM/storage/gateway) with staging verification.
-- Guided tenant onboarding checklist UI (school profile, academic year, classes, fee heads, users, modules).
-- Provider health dashboard and storage readiness panel polish.
+```
+
+2026-06-07 M0 queue-operations update:
+
+```text
+- Platform queue monitoring now includes reports and canteen-alerts alongside notifications, finance, payroll, activity-media, and homework.
+- Platform failed-job discard now requires a validated operator reason and stores that reason in the platform audit log.
+- Platform settings UI sends the discard reason through the shared API helper and blocks discard until the job id and reason are provided.
+- Focused queue service, M0 contract, M0 hardening e2e, web contract, and repo typecheck gates were rerun for this slice.
+```
+
+2026-06-07 M0 repo-truth correction:
+
+```text
+- Guided tenant onboarding checklist UI is already implemented on platform tenant detail with audited override reasons and on the school settings onboarding page.
+- Provider health and storage readiness surfaces are already implemented through platform settings operational dependency readiness, provider readiness detail, object-storage readiness checks, and platform dashboard readiness summaries.
+- Remaining M0 provider work is staging/provider-specific verification depth, not missing local dashboard UI.
+```
+
+2026-06-07 M2 repo-truth correction:
+
+```text
+- Deterministic offline attendance sync is already implemented through /attendance/sync, tenant-scoped clientSubmissionId idempotency, persisted rejected submissions with rejection reasons, sync conflict records, audited conflict review, and replay-safe integration tests.
+- Attendance draft endpoints and correction/conflict review APIs exist. Remaining M2 work should focus on browser/mobile smoke and UX depth, not a missing backend sync API.
 ```
 
 ---
@@ -621,9 +641,9 @@ apps/web/components dashboard/module workspaces
 | Module | Backend implemented | Backend missing / hardening | Web API implemented | Web UI implemented | Web UI missing / route issue | Browser/runtime / test gap |
 |---|---|---|---|---|---|---|
 | Auth / tenant / RBAC | Yes: auth, tenants, roles, users, RBAC, support override, TenantActiveGuard, suspended-tenant file/export denial, mobile per-module gates, queue suspended-tenant skip, M1/M5/M10 satellite-controller entitlement gating | Continue cross-tenant denial tests; permission-denied/session-expiry UX; support override banner | Yes: auth plus shared client/session helpers | Yes: login/register/session shell | No broad route issue found in first pass | Full browser session smoke still required |
-| M0 Platform | Yes: tenants, plans, billing, providers, queues, API keys, webhooks, report exports, structured platform DTOs, background job suspended-tenant skip | Platform queue monitoring for reports/canteen-alerts; discard reason on removeJob; provider-specific readiness staging; onboarding checklist UI | Yes: `platform.ts` exported incl. demo-request helpers | Yes: platform dashboard, schools, billing, settings, demo-requests | No broken platform links found in first pass | `test:web:e2e` still environment-sensitive |
+| M0 Platform | Yes: tenants, plans, billing, providers, queues including reports/canteen-alerts, API keys, webhooks, report exports, structured platform DTOs, background job suspended-tenant skip, audited failed-job discard reason, onboarding checklist, provider/storage readiness surfaces | Provider-specific readiness staging | Yes: `platform.ts` exported incl. demo-request helpers, onboarding helpers, provider readiness helpers, and queue discard reason payload | Yes: platform dashboard, schools, billing, settings, demo-requests | No broken platform links found in first pass | Authenticated browser smoke requires seeded/live API context |
 | M1 Students / Admissions | Yes: students, admissions, records, QR, documents, classes, sections, academic-years; EntitlementGuard now covers student-documents, document-access, photo, QR, siblings, academic-years | Continue ownership and document-access tests | Yes: `students.ts` plus academics helpers | Yes: students, admissions, student detail | Settings had dead student/staff import links; fixed in prior slice | Needs dashboard route smoke |
-| M2 Attendance | Yes: attendance, HR attendance controllers/services, mobile parent attendance summary query DTO | Continue correction/offline/suspended-tenant tests | Yes: `attendance.ts` | Yes: attendance and register routes | No broken route found in first pass | Needs route smoke and mutation confirmation audit |
+| M2 Attendance | Yes: attendance, HR attendance controllers/services, mobile parent attendance summary query DTO, offline sync/drafts/conflict review | Continue browser/mobile smoke and UX depth for correction/offline states | Yes: `attendance.ts` | Yes: attendance and register routes | No broken route found in first pass | Authenticated browser route smoke skipped unless seeded/live API context is available |
 | M3 Fees / Receipts | Yes: fees, finance compat, payments, receipts, ledger, HMAC webhook verification | Continue reversal/refund/cashier-close isolation tests and gateway sandbox verification | Yes: `finance.ts` | Yes: fees/finance components; finance form no longer relies on hardcoded values for touched flow | No broken route found in first pass | Needs browser mutation smoke and webhook/provider-mode staging smoke |
 | M4 Academics / Report Cards | Yes: academics, subjects, marks, CAS, locks, report-card PDFs | Continue report generation failure and correction tests | Yes: `academics.ts` | Yes: academics overview and subroutes | Settings linked to missing `/dashboard/academics/years`; fixed to implemented exam terms route | Specifically smoke `/dashboard/academics/report-cards` |
 | M5 Activity Feed | Yes: activity feed, media access, privacy routes; media-access controller now has RequiredModule('activity') | Continue consent/media cross-tenant tests | Yes: `activity.ts` | Yes: activity, parent activity, detail route | No broken route found in first pass | Needs protected media browser smoke |
@@ -711,7 +731,6 @@ Mobile remaining
 
 ```text
 Backend remaining
-- Deterministic offline attendance sync conflict rules.
 - Lock-window enforcement and correction workflow audit depth.
 - Duplicate session prevention for concurrent teachers.
 - Absence streak, repeated late, and attendance anomaly calculations.

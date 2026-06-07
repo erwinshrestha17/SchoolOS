@@ -66,6 +66,8 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
       makeQueue() as any,
       makeQueue() as any,
       makeQueue() as any,
+      makeQueue() as any,
+      makeQueue() as any,
     );
   });
 

@@ -31,6 +31,10 @@ describe('PlatformQueuesService', () => {
       queueOverrides['activity-media'] as any,
     );
     const homeworkQueue = makeQueue(queueOverrides.homework as any);
+    const reportsQueue = makeQueue(queueOverrides.reports as any);
+    const canteenAlertsQueue = makeQueue(
+      queueOverrides['canteen-alerts'] as any,
+    );
 
     const service = new PlatformQueuesService(
       auditService as any,
@@ -40,6 +44,8 @@ describe('PlatformQueuesService', () => {
       payrollQueue as any,
       activityMediaQueue as any,
       homeworkQueue as any,
+      reportsQueue as any,
+      canteenAlertsQueue as any,
     );
 
     return {
@@ -50,6 +56,8 @@ describe('PlatformQueuesService', () => {
         payrollQueue,
         activityMediaQueue,
         homeworkQueue,
+        reportsQueue,
+        canteenAlertsQueue,
       },
     };
   };
@@ -134,6 +142,90 @@ describe('PlatformQueuesService', () => {
           workerHealth: 'healthy',
         }),
       ]),
+    );
+  });
+
+  it('monitors reports and canteen alert queues alongside core queues', async () => {
+    const { service } = buildService({
+      reports: {
+        getJobCounts: jest.fn().mockResolvedValue({
+          waiting: 2,
+          active: 0,
+          completed: 8,
+          failed: 1,
+          delayed: 3,
+        }),
+      },
+      'canteen-alerts': {
+        getJobCounts: jest.fn().mockResolvedValue({
+          waiting: 4,
+          active: 1,
+          completed: 6,
+          failed: 0,
+          delayed: 0,
+        }),
+      },
+    });
+
+    await expect(service.getQueueHealth()).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'reports',
+          waiting: 2,
+          failed: 1,
+          delayed: 3,
+        }),
+        expect.objectContaining({
+          name: 'canteen-alerts',
+          waiting: 4,
+          active: 1,
+          completed: 6,
+        }),
+      ]),
+    );
+  });
+
+  it('audits failed-job discard with the required reason', async () => {
+    const remove = jest.fn().mockResolvedValue(undefined);
+    const job = {
+      id: 'job-1',
+      name: 'generate-report',
+      remove,
+    };
+
+    const { service } = buildService({
+      reports: {
+        getJob: jest.fn().mockResolvedValue(job),
+      },
+    });
+
+    await expect(
+      service.removeJob(
+        'reports',
+        'job-1',
+        { reason: 'Report payload obsolete after tenant fix' },
+        'platform-user-1',
+      ),
+    ).resolves.toEqual({ success: true });
+
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'queue_job_removed',
+        resource: 'queues',
+        resourceId: 'reports:job-1',
+        tenantId: 'platform',
+        userId: 'platform-user-1',
+        before: expect.objectContaining({
+          queueName: 'reports',
+          jobId: 'job-1',
+          name: 'generate-report',
+        }),
+        after: expect.objectContaining({
+          removed: true,
+          reason: 'Report payload obsolete after tenant fix',
+        }),
+      }),
     );
   });
 

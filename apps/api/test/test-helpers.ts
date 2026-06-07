@@ -169,6 +169,12 @@ export function mockBullQueues(moduleBuilder: any) {
     .overrideProvider(getQueueToken('notifications'))
     .useValue(createQueueMock())
     .overrideProvider(getQueueToken('activity-media'))
+    .useValue(createQueueMock())
+    .overrideProvider(getQueueToken('homework'))
+    .useValue(createQueueMock())
+    .overrideProvider(getQueueToken('reports'))
+    .useValue(createQueueMock())
+    .overrideProvider(getQueueToken('canteen-alerts'))
     .useValue(createQueueMock());
 }
 

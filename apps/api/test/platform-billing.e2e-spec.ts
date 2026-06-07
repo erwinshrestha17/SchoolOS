@@ -36,6 +36,10 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
       .useValue(createQueueMock())
       .overrideProvider(getQueueToken('homework'))
       .useValue(createQueueMock())
+      .overrideProvider(getQueueToken('reports'))
+      .useValue(createQueueMock())
+      .overrideProvider(getQueueToken('canteen-alerts'))
+      .useValue(createQueueMock())
       .compile();
 
     app = moduleFixture.createNestApplication();
