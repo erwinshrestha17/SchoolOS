@@ -140,6 +140,27 @@ describe('GradeCalculatorService', () => {
       expect(result.status).toBe('INCOMPLETE');
       expect(result.missingComponentCount).toBe(1);
     });
+
+    it('returns RETEST component result when status is RETEST and utilizes marksObtained', () => {
+      const result = service.calculateWeightedSubjectGrade({
+        subjectId: 'eng',
+        components: [
+          {
+            componentId: 'exam',
+            subjectId: 'eng',
+            maxMarks: 100,
+            marksObtained: 45,
+            passMarks: 35,
+            status: MarkEntryStatus.RETEST,
+            weightPercent: 100,
+          },
+        ],
+      });
+
+      expect(result.status).toBe('PASS');
+      expect(result.components[0].isRetest).toBe(true);
+      expect(result.components[0].obtainedMarks).toBe(45);
+    });
   });
 
   describe('Overall Calculation', () => {

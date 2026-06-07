@@ -780,6 +780,18 @@ enum MarkEntryStatus {
   MISSING
   WITHHELD
   SUBMITTED
+  RETEST
+}
+
+enum FinanceRequestType {
+  REFUND
+  REVERSAL
+}
+
+enum FinanceRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 
@@ -1676,6 +1688,8 @@ model User {
   createdStaffLifecycleEvents    StaffLifecycleEvent[]            @relation("CreatedStaffLifecycleEvents")
   attendanceDrafts               AttendanceDraft[]
   supportOverrides               SupportOverride[]                @relation("UserSupportOverrides")
+  requestedFinanceApprovals      FinanceApprovalRequest[]         @relation("RequestedFinanceApprovals")
+  reviewedFinanceApprovals       FinanceApprovalRequest[]         @relation("ReviewedFinanceApprovals")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -2742,9 +2756,10 @@ model Payment {
   student     Student         @relation(fields: [studentId], references: [id])
   invoice     Invoice         @relation(fields: [invoiceId], references: [id])
   collectedBy User?           @relation("CollectedPayments", fields: [collectedById], references: [id])
-  reversedBy  User?           @relation("ReversedPayments", fields: [reversedById], references: [id])
+  reversedBy  User?                  @relation("ReversedPayments", fields: [reversedById], references: [id])
   receipt     Receipt?
   refunds     PaymentRefund[]
+  financeApprovalRequests FinanceApprovalRequest[]
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, method, referenceNumber])
@@ -2938,6 +2953,30 @@ model FeeWaiver {
   approvedBy User?    @relation("ApprovedFeeWaivers", fields: [approvedById], references: [id], onDelete: SetNull)
 
   @@index([tenantId, studentId, status])
+}
+
+model FinanceApprovalRequest {
+  id            String               @id @default(uuid())
+  tenantId      String
+  type          FinanceRequestType
+  paymentId     String
+  amount        Decimal?             @db.Decimal(12, 2)
+  reason        String
+  status        FinanceRequestStatus @default(PENDING)
+  requestedById String
+  reviewedById  String?
+  reviewNote    String?
+  reviewedAt    DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payment     Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  requestedBy User    @relation("RequestedFinanceApprovals", fields: [requestedById], references: [id])
+  reviewedBy  User?   @relation("ReviewedFinanceApprovals", fields: [reviewedById], references: [id])
+
+  @@index([tenantId, status])
+  @@index([paymentId])
 }
 
 
@@ -4532,6 +4571,7 @@ model Tenant {
   staffDocuments                StaffDocument[]
   staffLifecycleEvents          StaffLifecycleEvent[]
   supportOverrides              SupportOverride[]
+  financeApprovalRequests       FinanceApprovalRequest[]
 }
 
 model TenantSetting {

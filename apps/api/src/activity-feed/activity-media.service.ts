@@ -252,6 +252,7 @@ export class ActivityMediaService {
     attachment: ActivityAttachment & {
       activityPost: {
         id: string;
+        studentTags: Array<{ studentId: string }>;
       };
       fileAsset?: {
         id: string;
@@ -279,23 +280,85 @@ export class ActivityMediaService {
         })
       : null;
 
-    if (latestConsent?.granted && !latestConsent.revokedAt) {
-      return;
+    if (!latestConsent?.granted || latestConsent.revokedAt) {
+      await this.auditService.record({
+        action: 'activity_attachment_denied_consent',
+        resource: 'activity_attachment',
+        resourceId: attachment.id,
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        after: {
+          activityPostId: attachment.activityPost.id,
+          fileAssetId: attachment.fileAsset?.id ?? null,
+          reason: 'PHOTO_USAGE_CONSENT_REQUIRED',
+        },
+      });
+      throw new ForbiddenException(ACTIVITY_MEDIA_CONSENT_MESSAGE);
     }
 
-    await this.auditService.record({
-      action: 'activity_attachment_denied_consent',
-      resource: 'activity_attachment',
-      resourceId: attachment.id,
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      after: {
-        activityPostId: attachment.activityPost.id,
-        fileAssetId: attachment.fileAsset?.id ?? null,
-        reason: 'PHOTO_USAGE_CONSENT_REQUIRED',
-      },
-    });
+    const studentIds = attachment.activityPost.studentTags.map(
+      (tag) => tag.studentId,
+    );
+    if (studentIds.length > 0) {
+      const students = await this.prisma.student.findMany({
+        where: { id: { in: studentIds }, tenantId: actor.tenantId },
+        include: {
+          guardianLinks: {
+            include: {
+              guardian: {
+                include: {
+                  consents: {
+                    where: { consentType: ConsentType.PHOTO_USAGE },
+                    orderBy: { capturedAt: 'desc' },
+                    take: 1,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
 
-    throw new ForbiddenException(ACTIVITY_MEDIA_CONSENT_MESSAGE);
+      for (const student of students) {
+        let studentAllowed = student.lifecycleStatus === 'ACTIVE';
+        if (studentAllowed) {
+          const guardians = student.guardianLinks.map((link) => link.guardian);
+          if (guardians.length === 0) {
+            studentAllowed = false;
+          } else {
+            let studentHasConsent = false;
+            for (const g of guardians) {
+              const latest = g.consents[0];
+              if (latest) {
+                if (latest.granted && !latest.revokedAt) {
+                  studentHasConsent = true;
+                } else {
+                  studentHasConsent = false;
+                  break;
+                }
+              }
+            }
+            studentAllowed = studentHasConsent;
+          }
+        }
+
+        if (!studentAllowed) {
+          await this.auditService.record({
+            action: 'activity_attachment_denied_consent',
+            resource: 'activity_attachment',
+            resourceId: attachment.id,
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            after: {
+              activityPostId: attachment.activityPost.id,
+              fileAssetId: attachment.fileAsset?.id ?? null,
+              reason: 'PHOTO_USAGE_CONSENT_REQUIRED',
+              blockedStudentId: student.id,
+            },
+          });
+          throw new ForbiddenException(ACTIVITY_MEDIA_CONSENT_MESSAGE);
+        }
+      }
+    }
   }
 }

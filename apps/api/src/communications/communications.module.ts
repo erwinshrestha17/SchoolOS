@@ -20,6 +20,8 @@ import { NotificationCenterService } from './notification-center.service';
 import { NotificationDeliveriesAliasController } from './notification-deliveries-alias.controller';
 import { NoticesController } from './notices.controller';
 
+import { RedisModule } from '../redis/redis.module';
+
 @Module({
   imports: [
     AuthModule,
@@ -27,6 +29,7 @@ import { NoticesController } from './notices.controller';
     AuditModule,
     UsageModule,
     FileRegistryModule,
+    RedisModule,
   ],
   controllers: [
     NoticesController,

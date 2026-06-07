@@ -22,6 +22,9 @@ import {
   ChartAccountType,
   FeeFrequency,
   FileAsset,
+  AuthMethod,
+  FinanceRequestType,
+  FinanceRequestStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
@@ -48,6 +51,8 @@ import {
 import { CashierCloseWindowDto } from './dto/cashier-close-window.dto';
 import { CollectPaymentDto } from './dto/collect-payment.dto';
 import { InitiateOnlinePaymentDto } from './dto/initiate-online-payment.dto';
+import { CreateFinanceRequestDto } from './dto/create-finance-request.dto';
+import { ReviewFinanceRequestDto } from './dto/review-finance-request.dto';
 import { CreateCashierCloseDto } from './dto/create-cashier-close.dto';
 import { CreateDiscountRuleDto } from './dto/create-discount-rule.dto';
 import { CreateFeeDueScheduleDto } from './dto/create-fee-due-schedule.dto';
@@ -2279,6 +2284,20 @@ export class FinanceService {
         },
       });
 
+      await this.accountingPostingService.postInvoiceAdjustment(
+        {
+          tenantId: actor.tenantId,
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          feeHeadId: feeHead.id,
+          feeHeadCode: feeHead.code,
+          amount: signedSubtotal.add(signedVat),
+          reason: dto.reason,
+        },
+        actor,
+        tx,
+      );
+
       return { line, invoice: updated };
     });
 
@@ -3020,6 +3039,268 @@ export class FinanceService {
     };
   }
 
+  async requestRefund(
+    paymentId: string,
+    dto: CreateFinanceRequestDto,
+    actor: AuthContext,
+  ) {
+    assertFinancePermission(actor, 'payments:collect');
+
+    const payment = await this.prisma.payment.findFirst({
+      where: { id: paymentId, tenantId: actor.tenantId },
+      include: { refunds: true },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found in this tenant');
+    }
+
+    if (payment.status === PaymentStatus.REVERSED) {
+      throw new ConflictException('Reversed payments cannot be refunded');
+    }
+
+    const refundedSoFar = sumRefundedAmount(payment.refunds);
+    const refundableAmount = payment.amount.sub(refundedSoFar);
+
+    if (refundableAmount.lte(0)) {
+      throw new ConflictException('Payment has already been fully refunded');
+    }
+
+    const refundAmount =
+      dto.amount === undefined
+        ? refundableAmount
+        : new Prisma.Decimal(dto.amount);
+    if (refundAmount.gt(refundableAmount)) {
+      throw new ConflictException(
+        'Refund exceeds the remaining refundable amount',
+      );
+    }
+
+    // Check for pending requests
+    const pendingRequest = await this.prisma.financeApprovalRequest.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        paymentId,
+        status: FinanceRequestStatus.PENDING,
+      },
+    });
+
+    if (pendingRequest) {
+      throw new ConflictException(
+        'A pending approval request already exists for this payment',
+      );
+    }
+
+    const request = await this.prisma.financeApprovalRequest.create({
+      data: {
+        tenantId: actor.tenantId,
+        type: FinanceRequestType.REFUND,
+        paymentId,
+        amount: refundAmount,
+        reason: dto.reason.trim(),
+        status: FinanceRequestStatus.PENDING,
+        requestedById: actor.userId,
+      },
+      include: {
+        payment: true,
+        requestedBy: true,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'finance_approval_request',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: request.id,
+      after: {
+        paymentId,
+        type: FinanceRequestType.REFUND,
+        amount: Number(refundAmount),
+        reason: dto.reason,
+      },
+    });
+
+    return request;
+  }
+
+  async requestReversal(
+    paymentId: string,
+    dto: CreateFinanceRequestDto,
+    actor: AuthContext,
+  ) {
+    assertFinancePermission(actor, 'payments:collect');
+
+    const payment = await this.prisma.payment.findFirst({
+      where: { id: paymentId, tenantId: actor.tenantId },
+      include: { refunds: true },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found in this tenant');
+    }
+
+    if (payment.status === PaymentStatus.REVERSED) {
+      throw new ConflictException('Payment is already reversed');
+    }
+
+    if (payment.refunds.length > 0) {
+      throw new ConflictException(
+        'Cannot reverse a payment that has been partially or fully refunded',
+      );
+    }
+
+    // Check for pending requests
+    const pendingRequest = await this.prisma.financeApprovalRequest.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        paymentId,
+        status: FinanceRequestStatus.PENDING,
+      },
+    });
+
+    if (pendingRequest) {
+      throw new ConflictException(
+        'A pending approval request already exists for this payment',
+      );
+    }
+
+    const request = await this.prisma.financeApprovalRequest.create({
+      data: {
+        tenantId: actor.tenantId,
+        type: FinanceRequestType.REVERSAL,
+        paymentId,
+        amount: null,
+        reason: dto.reason.trim(),
+        status: FinanceRequestStatus.PENDING,
+        requestedById: actor.userId,
+      },
+      include: {
+        payment: true,
+        requestedBy: true,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'finance_approval_request',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: request.id,
+      after: {
+        paymentId,
+        type: FinanceRequestType.REVERSAL,
+        reason: dto.reason,
+      },
+    });
+
+    return request;
+  }
+
+  async listApprovalRequests(actor: AuthContext) {
+    // Permission: either refund or reverse allows listing requests
+    const hasRefundPerm = actor.permissions.includes('payments:refund');
+    const hasReversePerm = actor.permissions.includes('payments:reverse');
+    const hasAdmin = actor.roles.includes('admin');
+    if (!hasRefundPerm && !hasReversePerm && !hasAdmin) {
+      throw new ForbiddenException(
+        'You do not have permission to view approval requests',
+      );
+    }
+
+    return this.prisma.financeApprovalRequest.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        payment: {
+          include: {
+            student: true,
+            invoice: true,
+          },
+        },
+        requestedBy: true,
+        reviewedBy: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+  }
+
+  async reviewApprovalRequest(
+    requestId: string,
+    dto: ReviewFinanceRequestDto,
+    actor: AuthContext,
+  ) {
+    const request = await this.prisma.financeApprovalRequest.findFirst({
+      where: { id: requestId, tenantId: actor.tenantId },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Approval request not found');
+    }
+
+    if (request.status !== FinanceRequestStatus.PENDING) {
+      throw new ConflictException('This request has already been reviewed');
+    }
+
+    // Gate by specific action permission
+    if (request.type === FinanceRequestType.REFUND) {
+      assertFinancePermission(actor, 'payments:refund');
+    } else {
+      assertFinancePermission(actor, 'payments:reverse');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (dto.status === FinanceRequestStatus.APPROVED) {
+        if (request.type === FinanceRequestType.REFUND) {
+          await this.refundPayment(
+            request.paymentId,
+            {
+              amount: request.amount ? Number(request.amount) : undefined,
+              reason: request.reason,
+            },
+            actor,
+          );
+        } else {
+          await this.reversePayment(
+            request.paymentId,
+            { reason: request.reason },
+            actor,
+          );
+        }
+      }
+
+      return tx.financeApprovalRequest.update({
+        where: { id: requestId },
+        data: {
+          status: dto.status,
+          reviewedById: actor.userId,
+          reviewedAt: new Date(),
+          reviewNote: dto.reviewNote?.trim() || null,
+        },
+        include: {
+          payment: true,
+          requestedBy: true,
+          reviewedBy: true,
+        },
+      });
+    });
+
+    await this.auditService.record({
+      action: 'review',
+      resource: 'finance_approval_request',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: request.id,
+      after: {
+        status: updated.status,
+        reviewNote: updated.reviewNote,
+        reviewedAt: updated.reviewedAt,
+      },
+    });
+
+    return updated;
+  }
+
   async refundPayment(
     paymentId: string,
     dto: CreatePaymentRefundDto,
@@ -3095,7 +3376,6 @@ export class FinanceService {
     const refundDate = dto.refundDate ? new Date(dto.refundDate) : new Date();
     await this.ensurePostingPeriodIsOpen(actor.tenantId, refundDate);
 
-    const refundNumber = await this.generateRefundNumber(actor.tenantId);
     const reversedDebitLines = allocateJournalLinesForRefund(
       sourceJournal.lines.filter(
         (line) => line.side === JournalLineSide.CREDIT,
@@ -3107,6 +3387,7 @@ export class FinanceService {
     );
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const refundNumber = await this.generateRefundNumber(actor.tenantId, tx);
       const refund = await tx.paymentRefund.create({
         data: {
           tenantId: actor.tenantId,
@@ -3512,8 +3793,6 @@ export class FinanceService {
       );
     }
 
-    const closeNumber = await this.generateCashierCloseNumber(actor.tenantId);
-
     let close: CashierCloseWithUsers;
 
     try {
@@ -3531,6 +3810,11 @@ export class FinanceService {
             'This cashier window is already closed for today.',
           );
         }
+
+        const closeNumber = await this.generateCashierCloseNumber(
+          actor.tenantId,
+          tx,
+        );
 
         return tx.cashierClose.create({
           data: {
@@ -4038,25 +4322,219 @@ export class FinanceService {
       tenantId = 'system';
     }
 
-    await this.auditService.record({
-      action: 'webhook_received',
-      resource: 'online_payment',
+    // Duplicate event checking
+    const idempotencyKey = `webhook:${provider.toLowerCase()}:${data.reference}`;
+    const existingPayment = await this.prisma.payment.findFirst({
+      where: { tenantId, idempotencyKey },
+      include: { receipt: true },
+    });
+
+    if (existingPayment) {
+      return {
+        status: 'verified',
+        postedToLedger: true,
+        duplicate: true,
+        message: 'Payment already processed and posted.',
+        paymentId: existingPayment.id,
+      };
+    }
+
+    // Look up invoice
+    const invoice = await this.prisma.invoice.findFirst({
+      where: {
+        OR: [
+          { id: String(data.reference) },
+          { invoiceNumber: String(data.reference) },
+        ],
+        tenantId,
+      },
+      include: {
+        student: true,
+        lines: {
+          include: {
+            feeHead: true,
+          },
+        },
+        payments: {
+          include: { refunds: true },
+        },
+      },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found in this tenant');
+    }
+
+    const paidSoFar = sumNetPaidAmount(invoice.payments);
+    const remaining = invoice.totalAmount.sub(paidSoFar);
+
+    if (remaining.lte(0)) {
+      return {
+        status: 'verified',
+        postedToLedger: false,
+        message:
+          'Invoice is already fully paid. Webhook event ignored to prevent duplicate payment.',
+      };
+    }
+
+    let paymentAmount = new Prisma.Decimal(data.amount || 0);
+    if (paymentAmount.gt(remaining)) {
+      paymentAmount = remaining;
+    }
+
+    const fiscalYear = resolveFiscalYear(new Date());
+    const tenant = await this.prisma.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+    });
+
+    const webhookActor: AuthContext = {
       tenantId,
       userId: 'system',
+      roles: ['admin'],
+      permissions: ['payments:collect', 'receipts:manage'],
+      authMethod: AuthMethod.PASSWORD,
+      tenantSlug: tenant.slug,
+      email: null,
+    };
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const receiptNumber = await this.generateReceiptNumber(
+        tenantId,
+        fiscalYear,
+        tx,
+      );
+
+      const receiptVat = invoice.totalAmount.gt(0)
+        ? invoice.vatAmount.mul(paymentAmount).div(invoice.totalAmount)
+        : new Prisma.Decimal(0);
+
+      const payment = await tx.payment.create({
+        data: {
+          tenantId,
+          studentId: invoice.studentId,
+          invoiceId: invoice.id,
+          collectedById: null, // Online payment has no cashier collector
+          method: PaymentMethod.TRANSFER, // Online gateway maps to TRANSFER in our system
+          status: PaymentStatus.SUCCESS,
+          referenceNumber: data.reference ?? null,
+          amount: paymentAmount,
+          isAdvance: false,
+          recognizedAt: new Date(),
+          metadata: {
+            remainingBeforePayment: Number(remaining),
+            webhookProvider: provider,
+          },
+          paidAt: new Date(),
+          narration: `Online payment via webhook for ${provider}`,
+          idempotencyKey,
+          receipt: {
+            create: {
+              tenantId,
+              receiptNumber,
+              fiscalYear,
+              schoolPan: tenant.panNumber,
+              vatAmount: receiptVat,
+              metadata: {
+                nonReusable: true,
+                invoiceFiscalYear: invoice.fiscalYear,
+                billNumber: invoice.billNumber ?? invoice.invoiceNumber,
+              },
+              pdfUrl: `/api/v1/receipts/${receiptNumber}.pdf`,
+            },
+          },
+        },
+        include: {
+          receipt: true,
+        },
+      });
+
+      const usageNow = new Date();
+      const usagePeriodStart = new Date(
+        Date.UTC(usageNow.getUTCFullYear(), usageNow.getUTCMonth(), 1),
+      );
+
+      await tx.usageCounter.upsert({
+        where: {
+          tenantId_usageKey_period_periodStart: {
+            tenantId,
+            usageKey: 'receipts.generated',
+            period: 'MONTHLY',
+            periodStart: usagePeriodStart,
+          },
+        },
+        create: {
+          tenantId,
+          usageKey: 'receipts.generated',
+          period: 'MONTHLY',
+          periodStart: usagePeriodStart,
+          value: 1,
+        },
+        update: {
+          value: { increment: 1 },
+        },
+      });
+
+      const totalPaid = paidSoFar.add(paymentAmount);
+
+      await tx.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          status: totalPaid.gte(invoice.totalAmount)
+            ? InvoiceStatus.PAID
+            : InvoiceStatus.PARTIAL,
+          paidAt: totalPaid.gte(invoice.totalAmount) ? new Date() : null,
+        },
+      });
+
+      await this.accountingPostingService.postFeePayment(
+        {
+          tenantId,
+          paymentId: payment.id,
+          invoiceNumber: invoice.invoiceNumber,
+          receiptNumber,
+          paymentAmount,
+          paymentMethod: PaymentMethod.TRANSFER,
+          paymentAccountCode: resolveCashAccountCode(PaymentMethod.TRANSFER),
+          narration: `Fee payment via online webhook for ${provider}`,
+          lines: [],
+        },
+        webhookActor,
+        tx,
+      );
+
+      return payment;
+    });
+
+    await this.auditService.record({
+      action: 'collect',
+      resource: 'payment',
+      tenantId,
+      userId: 'system',
+      resourceId: result.id,
       after: {
-        provider,
-        event: data?.event || 'payment.success',
-        amount: data?.amount,
-        reference: data?.reference,
-        status: 'verified_unposted_ledger',
+        invoiceId: invoice.id,
+        amount: Number(result.amount),
+        method: result.method,
+        receiptNumber: result.receipt?.receiptNumber ?? null,
       },
+    });
+
+    this.eventEmitter.emit('fees.payment.confirmed', {
+      tenantId,
+      actor: webhookActor,
+      paymentId: result.id,
+      invoiceId: invoice.id,
+      studentId: invoice.studentId,
+      amount: Number(result.amount),
+      method: result.method,
+      receiptNumber: result.receipt?.receiptNumber ?? null,
     });
 
     return {
       status: 'verified',
-      postedToLedger: false,
-      message:
-        'Payment verification succeeded but ledger posting is deferred until settlement confirmation rules are met.',
+      postedToLedger: true,
+      paymentId: result.id,
+      message: 'Online payment processed and posted to ledger.',
     };
   }
 
@@ -4694,24 +5172,33 @@ export class FinanceService {
     ).padStart(5, '0')}`;
   }
 
-  private async generateCashierCloseNumber(tenantId: string) {
-    const count = await this.prisma.cashierClose.count({
+  private async generateCashierCloseNumber(
+    tenantId: string,
+    client: Pick<Prisma.TransactionClient, 'cashierClose'> = this.prisma,
+  ) {
+    const count = await client.cashierClose.count({
       where: { tenantId },
     });
 
     return `CLS-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
   }
 
-  private async generateRefundNumber(tenantId: string) {
-    const count = await this.prisma.paymentRefund.count({
+  private async generateRefundNumber(
+    tenantId: string,
+    client: Pick<Prisma.TransactionClient, 'paymentRefund'> = this.prisma,
+  ) {
+    const count = await client.paymentRefund.count({
       where: { tenantId },
     });
 
     return `RFD-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
   }
 
-  private async generateJournalEntryNumber(tenantId: string) {
-    const count = await this.prisma.journalEntry.count({
+  private async generateJournalEntryNumber(
+    tenantId: string,
+    client: Pick<Prisma.TransactionClient, 'journalEntry'> = this.prisma,
+  ) {
+    const count = await client.journalEntry.count({
       where: { tenantId },
     });
 
@@ -5375,6 +5862,14 @@ function buildCashierCloseWindowKey(input: {
 }
 
 function isPrismaUniqueConstraintError(error: unknown) {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    error.code === 'P2002'
+  ) {
+    return true;
+  }
   const KnownRequestError = Prisma.PrismaClientKnownRequestError;
 
   return (

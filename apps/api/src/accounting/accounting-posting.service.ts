@@ -1047,6 +1047,146 @@ export class AccountingPostingService {
     return entry;
   }
 
+  async postInvoiceAdjustment(
+    input: {
+      tenantId: string;
+      invoiceId: string;
+      invoiceNumber: string;
+      feeHeadId: string;
+      feeHeadCode: string;
+      amount: Prisma.Decimal;
+      reason: string;
+    },
+    actor: AuthContext,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const entryDate = new Date();
+    const period = await this.ensurePostingPeriodIsOpen(
+      tx,
+      input.tenantId,
+      entryDate,
+    );
+
+    const receivableAccount = await this.ensureAccount(tx, input.tenantId, {
+      code: '1200',
+      name: 'Student Receivables',
+      type: ChartAccountType.ASSET,
+    });
+
+    let incomeAccountCode = '4000';
+    switch (input.feeHeadCode) {
+      case 'ADMISSION':
+        incomeAccountCode = '4010';
+        break;
+      case 'EXAM':
+        incomeAccountCode = '4020';
+        break;
+      case 'TRANSPORT':
+        incomeAccountCode = '4030';
+        break;
+      case 'LIBFINE':
+        incomeAccountCode = '4040';
+        break;
+      case 'MEALPLAN':
+        incomeAccountCode = '4050';
+        break;
+    }
+
+    const revenueAccount = await tx.chartAccount.findUniqueOrThrow({
+      where: {
+        tenantId_code: {
+          tenantId: input.tenantId,
+          code: incomeAccountCode,
+        },
+      },
+    });
+
+    const waiverExpense = await this.ensureAccount(tx, input.tenantId, {
+      code: '5100',
+      name: 'Fee Waivers & Discounts',
+      type: ChartAccountType.EXPENSE,
+    });
+
+    let debitAccountId: string;
+    let creditAccountId: string;
+    const absAmount = input.amount.abs();
+
+    if (input.amount.gt(0)) {
+      // Increase: Debit Receivables (1200), Credit Revenue (e.g. 4010)
+      debitAccountId = receivableAccount.id;
+      creditAccountId = revenueAccount.id;
+    } else {
+      // Decrease: Debit Expense (5100), Credit Receivables (1200)
+      debitAccountId = waiverExpense.id;
+      creditAccountId = receivableAccount.id;
+    }
+
+    const lines = [
+      {
+        tenantId: input.tenantId,
+        chartAccountId: debitAccountId,
+        side: JournalLineSide.DEBIT,
+        amount: absAmount,
+        description: `Invoice ${input.invoiceNumber} adjustment: ${input.reason}`,
+      },
+      {
+        tenantId: input.tenantId,
+        chartAccountId: creditAccountId,
+        side: JournalLineSide.CREDIT,
+        amount: absAmount,
+        description: `Invoice ${input.invoiceNumber} adjustment: ${input.reason}`,
+      },
+    ];
+
+    this.ensureBalanced(lines);
+
+    const entry = await tx.journalEntry.create({
+      data: {
+        tenantId: input.tenantId,
+        fiscalYearId: period?.fiscalYearId ?? null,
+        fiscalPeriodId: period?.id ?? null,
+        entryNumber: await this.generateJournalEntryNumber(
+          tx,
+          input.tenantId,
+          period?.fiscalYearId ?? null,
+          entryDate,
+        ),
+        entryDate,
+        status: JournalEntryStatus.POSTED,
+        narration: `Invoice ${input.invoiceNumber} adjustment: ${input.reason}`,
+        sourceModule: 'FINANCE',
+        sourceType: JournalSourceType.ADJUSTMENT,
+        sourceId: input.invoiceId,
+        postingType: 'ADJUSTMENT',
+        createdById: actor.userId,
+        postedAt: new Date(),
+        lines: {
+          create: lines.map((line, index) => ({
+            ...line,
+            lineNumber: index + 1,
+            debit: line.side === JournalLineSide.DEBIT ? line.amount : 0,
+            credit: line.side === JournalLineSide.CREDIT ? line.amount : 0,
+          })),
+        },
+      },
+    });
+
+    await this.auditService.record({
+      action: 'post',
+      resource: 'journal_entry',
+      tenantId: input.tenantId,
+      userId: actor.userId,
+      resourceId: entry.id,
+      after: {
+        sourceType: entry.sourceType,
+        sourceId: entry.sourceId,
+        amount: absAmount.toString(),
+      },
+    });
+
+    return entry;
+  }
+
   async postFeeWaiver(
     input: FeeWaiverPostingInput,
     actor: AuthContext,

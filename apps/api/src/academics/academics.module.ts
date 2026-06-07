@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { CommunicationsModule } from '../communications/communications.module';
@@ -19,6 +20,7 @@ import { ReportCardPdfService } from './report-card-pdf.service';
 import { ReportCardsService } from './report-cards.service';
 import { ResultPublishingService } from './result-publishing.service';
 import { ResultsService } from './results.service';
+import { AcademicsProcessor } from './academics.processor';
 import {
   SubjectsController,
   TeacherAssignmentsController,
@@ -33,6 +35,9 @@ import {
     FileRegistryModule,
     SettingsModule,
     UsageModule,
+    BullModule.registerQueue({
+      name: 'academics',
+    }),
   ],
   controllers: [
     SubjectsController,
@@ -52,6 +57,7 @@ import {
     ReportCardsService,
     ResultPublishingService,
     ResultsService,
+    AcademicsProcessor,
   ],
   exports: [
     AcademicsService,

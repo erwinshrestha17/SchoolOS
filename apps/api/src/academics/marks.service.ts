@@ -83,8 +83,15 @@ export class MarksService {
 
     const maxMarks = Number(component.maxMarks);
     for (const entry of dto.entries) {
-      if (entry.isAbsent && entry.isWithheld) {
-        throw new ConflictException('Entry cannot be both absent and withheld');
+      const activeStatesCount =
+        (entry.isAbsent ? 1 : 0) +
+        (entry.isWithheld ? 1 : 0) +
+        (entry.isRetest ? 1 : 0);
+
+      if (activeStatesCount > 1) {
+        throw new ConflictException(
+          'Entry can only be one of absent, withheld, or retest',
+        );
       }
 
       if (!entry.isAbsent && !entry.isWithheld) {
@@ -118,6 +125,7 @@ export class MarksService {
         let status: MarkEntryStatus = MarkEntryStatus.SUBMITTED;
         if (entry.isAbsent) status = MarkEntryStatus.ABSENT;
         else if (entry.isWithheld) status = MarkEntryStatus.WITHHELD;
+        else if (entry.isRetest) status = MarkEntryStatus.RETEST;
 
         const val = entry.marksObtained ?? 0;
 
@@ -316,18 +324,40 @@ export class MarksService {
       throw new ConflictException('Cannot update a locked mark entry');
     }
 
-    if (dto.isAbsent && dto.isWithheld) {
-      throw new ConflictException('Entry cannot be both absent and withheld');
+    const isAbsent =
+      dto.isAbsent !== undefined
+        ? dto.isAbsent
+        : dto.isWithheld || dto.isRetest
+          ? false
+          : existingMark.status === MarkEntryStatus.ABSENT;
+    const isWithheld =
+      dto.isWithheld !== undefined
+        ? dto.isWithheld
+        : dto.isAbsent || dto.isRetest
+          ? false
+          : existingMark.status === MarkEntryStatus.WITHHELD;
+    const isRetest =
+      dto.isRetest !== undefined
+        ? dto.isRetest
+        : dto.isAbsent || dto.isWithheld
+          ? false
+          : existingMark.status === MarkEntryStatus.RETEST;
+
+    const activeStatesCount =
+      (isAbsent ? 1 : 0) + (isWithheld ? 1 : 0) + (isRetest ? 1 : 0);
+
+    if (activeStatesCount > 1) {
+      throw new ConflictException(
+        'Entry can only be one of absent, withheld, or retest',
+      );
     }
 
     let status: MarkEntryStatus = existingMark.status;
     let val = Number(existingMark.marksObtained);
 
-    const isAbsent = dto.isAbsent ?? status === MarkEntryStatus.ABSENT;
-    const isWithheld = dto.isWithheld ?? status === MarkEntryStatus.WITHHELD;
-
     if (isAbsent) status = MarkEntryStatus.ABSENT;
     else if (isWithheld) status = MarkEntryStatus.WITHHELD;
+    else if (isRetest) status = MarkEntryStatus.RETEST;
     else status = MarkEntryStatus.SUBMITTED;
 
     if (!isAbsent && !isWithheld) {

@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -1960,6 +1961,27 @@ export class PlatformService {
   }
 
   async upsertProvider(dto: UpsertProviderConfigDto, actorUserId: string) {
+    if (
+      dto.type === 'PAYMENT_GATEWAY' &&
+      dto.environment === 'PRODUCTION' &&
+      dto.enabled
+    ) {
+      const sandbox = await this.prisma.providerConfig.findFirst({
+        where: {
+          type: 'PAYMENT_GATEWAY',
+          name: dto.name,
+          environment: 'TEST',
+          validationStatus: 'VALID',
+        },
+      });
+
+      if (!sandbox) {
+        throw new ConflictException(
+          `Cannot enable production payment gateway ${dto.name} without a validated TEST sandbox configuration.`,
+        );
+      }
+    }
+
     const delegate = this.requireDelegate('providerConfig');
     this.validateProvider(dto);
     const before = await delegate.findUnique({
@@ -2024,6 +2046,32 @@ export class PlatformService {
     if (!before) throw new NotFoundException('Provider not found');
     if (!enabled && (!reason?.trim() || reason.trim().length < 5)) {
       throw new BadRequestException('Provider disable requires a reason');
+    }
+
+    const beforeConfig = before as {
+      type: string;
+      environment: string;
+      name: string;
+    } | null;
+    if (
+      beforeConfig?.type === 'PAYMENT_GATEWAY' &&
+      beforeConfig?.environment === 'PRODUCTION' &&
+      enabled
+    ) {
+      const sandbox = await this.prisma.providerConfig.findFirst({
+        where: {
+          type: 'PAYMENT_GATEWAY',
+          name: beforeConfig.name,
+          environment: 'TEST',
+          validationStatus: 'VALID',
+        },
+      });
+
+      if (!sandbox) {
+        throw new ConflictException(
+          `Cannot enable production payment gateway ${beforeConfig.name} without a validated TEST sandbox configuration.`,
+        );
+      }
     }
 
     const provider = await delegate.update({
@@ -2101,6 +2149,37 @@ export class PlatformService {
           status: 'failed',
           message: `Object storage test connection failed: ${err instanceof Error ? err.message : String(err)}`,
         };
+      }
+    } else if (provider.type === 'PAYMENT_GATEWAY') {
+      if (provider.environment === 'PRODUCTION') {
+        const sandbox = await this.prisma.providerConfig.findFirst({
+          where: {
+            type: 'PAYMENT_GATEWAY',
+            name: provider.name,
+            environment: 'TEST',
+            validationStatus: 'VALID',
+          },
+        });
+        const baseReadiness = this.buildProviderReadinessDetail(
+          provider,
+          checkedAt,
+          [],
+        );
+        if (!sandbox) {
+          readiness = {
+            ...baseReadiness,
+            status: 'failed',
+            message: `Staging/sandbox verification failed. A validated TEST sandbox configuration for ${provider.name} must exist before validating production.`,
+          };
+        } else {
+          readiness = {
+            ...baseReadiness,
+            status: baseReadiness.status,
+            message: `Staging/sandbox verification succeeded. Found validated sandbox configuration: ${sandbox.environment}. ${baseReadiness.message}`,
+          };
+        }
+      } else {
+        readiness = this.buildProviderReadinessDetail(provider, checkedAt, []);
       }
     } else {
       readiness = this.buildProviderReadinessDetail(provider, checkedAt, []);

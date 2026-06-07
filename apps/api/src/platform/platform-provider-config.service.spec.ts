@@ -611,4 +611,58 @@ describe('PlatformService provider config hardening', () => {
       data: expect.objectContaining({ validationStatus: 'DEGRADED' }),
     });
   });
+
+  it('upsertProvider blocks production payment gateway enablement without a validated sandbox', async () => {
+    const dto = {
+      type: 'PAYMENT_GATEWAY' as const,
+      name: 'esewa',
+      enabled: true,
+      environment: 'PRODUCTION' as const,
+      config: {
+        merchantId: 'test-merchant',
+      },
+    };
+
+    prisma.providerConfig.findFirst.mockResolvedValue(null); // No validated sandbox found
+
+    await expect(
+      service.upsertProvider(dto, 'platform-user-1'),
+    ).rejects.toThrow(
+      'Cannot enable production payment gateway esewa without a validated TEST sandbox configuration.',
+    );
+  });
+
+  it('testProviderConnection fails verification for production payment gateway if no validated sandbox exists', async () => {
+    const provider = {
+      id: 'pg-prod',
+      type: 'PAYMENT_GATEWAY',
+      name: 'khalti',
+      enabled: true,
+      environment: 'PRODUCTION',
+      configEncrypted: { secretKey: 'some-key' },
+      secretKeys: ['secretKey'],
+      updatedAt: new Date(),
+      lastValidatedAt: null,
+      validationStatus: null,
+    };
+
+    prisma.providerConfig.findUnique.mockResolvedValue(provider);
+    prisma.providerConfig.findFirst.mockResolvedValue(null); // No validated sandbox config found
+    prisma.providerConfig.update.mockResolvedValue({
+      ...provider,
+      validationStatus: 'FAILED',
+    });
+
+    const result = await service.testProviderConnection(
+      'pg-prod',
+      'platform-user-1',
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.message).toContain('Staging/sandbox verification failed');
+    expect(prisma.providerConfig.update).toHaveBeenCalledWith({
+      where: { id: 'pg-prod' },
+      data: expect.objectContaining({ validationStatus: 'FAILED' }),
+    });
+  });
 });

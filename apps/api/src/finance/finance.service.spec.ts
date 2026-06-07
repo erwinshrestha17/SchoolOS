@@ -1437,6 +1437,18 @@ describe('finance production controls', () => {
     const { service, auditService } = buildService({
       invoice: buildInvoice({ invoiceNumber: 'INV-001' }),
       feeHead: null,
+      createdPayment: {
+        id: 'payment-1',
+        amount: new Prisma.Decimal(500),
+        method: PaymentMethod.TRANSFER,
+        receipt: { receiptNumber: 'REC-2026-00001' },
+      },
+      tenant: {
+        id: actor.tenantId,
+        name: 'SchoolOS',
+        slug: 'school-os',
+        panNumber: '123456789',
+      },
       gatewayProvider: {
         id: 'provider-1',
         name: 'NEPAL_GATEWAY',
@@ -1456,12 +1468,12 @@ describe('finance production controls', () => {
     ).resolves.toEqual(
       expect.objectContaining({
         status: 'verified',
-        postedToLedger: false,
+        postedToLedger: true,
       }),
     );
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'webhook_received',
+        action: 'collect',
         tenantId: actor.tenantId,
       }),
     );
@@ -1791,6 +1803,9 @@ function buildService(options: {
       count: jest.fn().mockResolvedValue(options.receiptCount ?? 0),
       findFirst: jest.fn().mockResolvedValue(options.receipt ?? null),
     },
+    usageCounter: {
+      upsert: jest.fn().mockResolvedValue(null),
+    },
     fileAsset: {
       findFirst: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue(options.cashierClosePdfFiles ?? []),
@@ -1851,6 +1866,16 @@ function buildService(options: {
       .fn()
       .mockResolvedValue(
         options.createdJournalEntry ?? { entryNumber: 'JE-RFD-1' },
+      ),
+    postInvoiceAdjustment: jest
+      .fn()
+      .mockResolvedValue(
+        options.createdJournalEntry ?? { entryNumber: 'JE-ADJ-1' },
+      ),
+    postReversal: jest
+      .fn()
+      .mockResolvedValue(
+        options.createdJournalEntry ?? { entryNumber: 'JE-REV-1' },
       ),
   };
   const eventEmitter = {

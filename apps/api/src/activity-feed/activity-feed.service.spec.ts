@@ -354,4 +354,126 @@ describe('ActivityFeedService', () => {
       }),
     );
   });
+
+  it('cleans up storage objects and database records if post creation fails', async () => {
+    prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    storageService.saveBase64Object.mockResolvedValue({
+      provider: StorageProvider.LOCAL,
+      objectKey: 'tenant-1/activity-feed/class-1/photo.jpg',
+      sizeBytes: 42,
+    });
+    fileRegistry.registerFile.mockResolvedValue({ id: 'file-asset-1' });
+
+    prisma.activityPost.create.mockRejectedValue(
+      new Error('DB connection lost'),
+    );
+    prisma.fileAsset.delete = jest.fn().mockResolvedValue({});
+    storageService.deleteObject = jest.fn().mockResolvedValue({});
+
+    await expect(
+      service.createPost(
+        {
+          classId: 'class-1',
+          title: 'Science day',
+          caption: 'Students built plant life-cycle charts.',
+          category: ActivityCategory.LEARNING,
+          attachments: [
+            {
+              fileName: 'photo.jpg',
+              contentType: 'image/jpeg',
+              base64Content: Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString(
+                'base64',
+              ),
+            },
+          ],
+        },
+        actor,
+      ),
+    ).rejects.toThrow('DB connection lost');
+
+    expect(storageService.deleteObject).toHaveBeenCalledWith(
+      'tenant-1/activity-feed/class-1/photo.jpg',
+    );
+    expect(prisma.fileAsset.delete).toHaveBeenCalledWith({
+      where: { id: 'file-asset-1' },
+    });
+  });
+
+  it('blocks media preview for parent actor if tagged student is inactive or lacks photo consent', async () => {
+    const parentActor: AuthContext = {
+      ...actor,
+      userId: 'guardian-user-1',
+      roles: ['parent'],
+      permissions: ['activity_feed:read'],
+    };
+
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.guardianConsent.findFirst.mockResolvedValue({
+      granted: true,
+      revokedAt: null,
+    });
+
+    prisma.activityPost.findMany.mockResolvedValue([
+      {
+        id: 'post-1',
+        classId: 'class-1',
+        studentTags: [{ studentId: 'student-1' }],
+        attachments: [
+          {
+            id: 'attachment-1',
+            fileName: 'photo.jpg',
+            contentType: 'image/jpeg',
+            fileAssetId: 'file-asset-1',
+          },
+        ],
+      },
+    ]);
+
+    // Tagged student is ARCHIVED
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        lifecycleStatus: 'ARCHIVED',
+        guardianLinks: [],
+      },
+    ]);
+
+    let results = await service.listPosts(parentActor);
+    expect(results[0].attachments[0].previewUrl).toBeNull();
+    expect(results[0].attachments[0].accessBlockedReason).toBe(
+      'PHOTO_USAGE_CONSENT_REQUIRED',
+    );
+
+    // Tagged student is active but lacks photo consent
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        lifecycleStatus: 'ACTIVE',
+        guardianLinks: [
+          {
+            guardian: {
+              id: 'guardian-other',
+              consents: [
+                {
+                  consentType: 'PHOTO_USAGE',
+                  granted: false,
+                  revokedAt: null,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+
+    results = await service.listPosts(parentActor);
+    expect(results[0].attachments[0].previewUrl).toBeNull();
+    expect(results[0].attachments[0].accessBlockedReason).toBe(
+      'PHOTO_USAGE_CONSENT_REQUIRED',
+    );
+  });
 });

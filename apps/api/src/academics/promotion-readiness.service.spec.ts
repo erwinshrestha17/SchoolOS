@@ -4,6 +4,7 @@ import { GradeLockStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { FinanceService } from '../finance/finance.service';
 import { PromotionReadinessService } from './promotion-readiness.service';
 
 describe('PromotionReadinessService', () => {
@@ -18,6 +19,7 @@ describe('PromotionReadinessService', () => {
     $transaction: jest.Mock;
   };
   let auditService: { record: jest.Mock };
+  let financeService: { getStudentFeeLedger: jest.Mock };
 
   const actor: AuthContext = {
     userId: 'user-1',
@@ -52,12 +54,14 @@ describe('PromotionReadinessService', () => {
       }),
     };
     auditService = { record: jest.fn() };
+    financeService = { getStudentFeeLedger: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PromotionReadinessService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuditService, useValue: auditService },
+        { provide: FinanceService, useValue: financeService },
       ],
     }).compile();
 
@@ -69,6 +73,9 @@ describe('PromotionReadinessService', () => {
     prisma.examTerm.findFirst.mockResolvedValue({ id: 'term-1' });
     prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
     prisma.section.findFirst.mockResolvedValue({ id: 'section-1' });
+    financeService.getStudentFeeLedger.mockResolvedValue({
+      outstandingBalance: 0,
+    });
   }
 
   function student(overrides: Record<string, unknown> = {}) {
@@ -258,5 +265,39 @@ describe('PromotionReadinessService', () => {
         actor,
       ),
     ).rejects.toThrow(ConflictException);
+  });
+
+  it('flags student as NEEDS_REVIEW with UNPAID_DUES reason if outstanding balance exists', async () => {
+    mockReferenceData();
+    financeService.getStudentFeeLedger.mockResolvedValue({
+      outstandingBalance: 120,
+    });
+    prisma.student.findMany.mockResolvedValue([student()]);
+    prisma.reportCard.findMany.mockResolvedValue([
+      {
+        id: 'report-card-1',
+        studentId: 'student-1',
+        status: GradeLockStatus.LOCKED,
+        percentage: new Prisma.Decimal(85),
+        grade: 'A',
+        gpa: new Prisma.Decimal(3.6),
+      },
+    ]);
+
+    const result = await service.listPromotionReadiness(actor, {
+      academicYearId: 'year-1',
+      examTermId: 'term-1',
+      classId: 'class-1',
+      sectionId: 'section-1',
+    });
+
+    expect(result[0]).toEqual(
+      expect.objectContaining({
+        studentId: 'student-1',
+        status: 'NEEDS_REVIEW',
+        reasons: expect.arrayContaining(['UNPAID_DUES']),
+        outstandingBalance: 120,
+      }),
+    );
   });
 });

@@ -29,6 +29,10 @@ export class BulkUpsertMarksEntryDto {
   isWithheld?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  isRetest?: boolean;
+
+  @IsOptional()
   @IsString()
   remarks?: string;
 }

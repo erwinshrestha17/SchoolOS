@@ -54,6 +54,7 @@ export interface ComponentResult {
   isAbsent: boolean;
   isWithheld: boolean;
   isMissing: boolean;
+  isRetest: boolean;
   passMarks: number | null;
   passed: boolean;
   resultStatus: GradeStatus;
@@ -285,13 +286,15 @@ export class GradeCalculatorService {
       component.status === MarkEntryStatus.ABSENT ||
       component.status === MarkEntryStatus.EXCUSED;
     const isWithheld = component.status === MarkEntryStatus.WITHHELD;
+    const isRetest = component.status === MarkEntryStatus.RETEST;
     const isMissing =
       component.isMissing ||
       component.status === MarkEntryStatus.MISSING ||
       ((component.marksObtained === undefined ||
         component.marksObtained === null) &&
         !isAbsent &&
-        !isWithheld);
+        !isWithheld &&
+        !isRetest);
 
     let obtainedMarks = 0;
     if (isAbsent) {
@@ -341,6 +344,7 @@ export class GradeCalculatorService {
       isAbsent,
       isWithheld,
       isMissing,
+      isRetest,
       passMarks: component.passMarks ?? null,
       passed,
       resultStatus,

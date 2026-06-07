@@ -69,7 +69,7 @@ describe('Transport Hardening (E2E)', () => {
     redis = {
       getClient: jest.fn().mockReturnValue({
         get: jest.fn(),
-        set: jest.fn(),
+        set: jest.fn().mockResolvedValue('OK'),
         setex: jest.fn(),
         del: jest.fn(),
       }),

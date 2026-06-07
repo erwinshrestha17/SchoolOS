@@ -16,6 +16,7 @@ describe('CommunicationsService', () => {
   let notificationsService: any;
   let auditService: any;
   let fileRegistryService: any;
+  let redisService: any;
   let service: CommunicationsService;
   let actor: AuthContext;
 
@@ -77,6 +78,12 @@ describe('CommunicationsService', () => {
       getSignedUrl: jest.fn(),
       linkToEntity: jest.fn(),
     };
+    redisService = {
+      getClient: jest.fn().mockReturnValue({
+        set: jest.fn().mockResolvedValue('OK'),
+        del: jest.fn().mockResolvedValue(1),
+      }),
+    };
     actor = {
       userId: 'admin-1',
       tenantId: 'tenant-1',
@@ -96,6 +103,7 @@ describe('CommunicationsService', () => {
         checkLimit: jest.fn().mockResolvedValue(undefined),
         incrementUsage: jest.fn().mockResolvedValue(undefined),
       } as any,
+      redisService,
       fileRegistryService,
     );
   });
@@ -484,5 +492,66 @@ describe('CommunicationsService', () => {
         errorMessage: 'Queue unavailable',
       },
     });
+  });
+
+  it('throws ConflictException if lock acquisition fails and deliveries are not created', async () => {
+    redisService.getClient.mockReturnValue({
+      set: jest.fn().mockResolvedValue(null),
+    });
+
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+
+    await expect(
+      service.recordDeliveryRecords({
+        actor,
+        sourceType: 'attendance_absent',
+        sourceId: 'attendance:session-1:student-1:absent',
+        audienceType: AudienceType.ALL,
+        studentIds: ['student-1'],
+        title: 'Attendance alert',
+        body: 'Your child was marked absent today.',
+        channels: [NotificationChannel.PUSH],
+        requiredConsentTypes: [ConsentType.MESSAGING],
+      }),
+    ).rejects.toThrow(
+      'Another process is currently recording delivery records for this notification',
+    );
+  });
+
+  it('polls and returns replayed deliveries if lock acquisition fails but concurrent process finishes', async () => {
+    redisService.getClient.mockReturnValue({
+      set: jest.fn().mockResolvedValue(null),
+    });
+
+    let callCount = 0;
+    prisma.notificationDelivery.findMany.mockImplementation(() => {
+      callCount++;
+      if (callCount > 1) {
+        return Promise.resolve([
+          { id: 'delivery-1', status: NotificationStatus.QUEUED },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const result = await service.recordDeliveryRecords({
+      actor,
+      sourceType: 'attendance_absent',
+      sourceId: 'attendance:session-1:student-1:absent',
+      audienceType: AudienceType.ALL,
+      studentIds: ['student-1'],
+      title: 'Attendance alert',
+      body: 'Your child was marked absent today.',
+      channels: [NotificationChannel.PUSH],
+      requiredConsentTypes: [ConsentType.MESSAGING],
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        count: 1,
+        queuedCount: 1,
+        replayed: true,
+      }),
+    );
   });
 });

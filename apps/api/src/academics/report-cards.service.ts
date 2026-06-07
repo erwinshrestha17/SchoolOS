@@ -3,6 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Queue } from 'bullmq';
+import { InjectQueue } from '@nestjs/bullmq';
 import { GradeLockStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -47,6 +49,7 @@ export class ReportCardsService {
     private readonly financeService: FinanceService,
     private readonly settingsService: SettingsService,
     private readonly usageService: UsageService,
+    @InjectQueue('academics') private readonly academicsQueue: Queue,
   ) {}
 
   async generateReportCard(dto: GenerateReportCardDto, actor: AuthContext) {
@@ -285,6 +288,24 @@ export class ReportCardsService {
       throw new ConflictException('Duplicate student IDs are not allowed');
     }
 
+    if (dto.studentIds.length > 20) {
+      const job = await this.academicsQueue.add('batchGenerateReportCards', {
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+        examTermId: dto.examTermId,
+        studentIds: dto.studentIds,
+        remarks: dto.remarks,
+        lock: dto.lock,
+        actor,
+      });
+      return {
+        queued: true,
+        jobId: job.id,
+        generated: 0,
+        reports: [],
+      };
+    }
+
     const reports: GeneratedReportCard[] = [];
 
     for (const studentId of dto.studentIds) {
@@ -303,6 +324,7 @@ export class ReportCardsService {
     }
 
     return {
+      queued: false,
       generated: reports.length,
       reports,
     };

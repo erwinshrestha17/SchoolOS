@@ -764,4 +764,16 @@ enum MarkEntryStatus {
   MISSING
   WITHHELD
   SUBMITTED
+  RETEST
+}
+
+enum FinanceRequestType {
+  REFUND
+  REVERSAL
+}
+
+enum FinanceRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

@@ -172,6 +172,7 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
     lifecycleService = new ActivityPostLifecycleService(
       prisma as unknown as PrismaService,
       auditService as unknown as AuditService,
+      eventEmitter as unknown as EventEmitter2,
     );
     mediaProcessor = new ActivityMediaProcessor(
       prisma as unknown as PrismaService,
@@ -538,12 +539,29 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
         tenantId,
         classId: 'class-1',
         sectionId: 'section-1',
+        lifecycleStatus: 'ACTIVE',
+        guardianLinks: [
+          {
+            guardian: {
+              id: 'guardian-1',
+              consents: [
+                {
+                  consentType: ConsentType.PHOTO_USAGE,
+                  granted: true,
+                  revokedAt: null,
+                },
+              ],
+            },
+          },
+        ],
       },
       {
         id: 'student-2',
         tenantId,
         classId: 'class-1',
         sectionId: 'section-1',
+        lifecycleStatus: 'ACTIVE',
+        guardianLinks: [],
       },
     ],
     guardians: [

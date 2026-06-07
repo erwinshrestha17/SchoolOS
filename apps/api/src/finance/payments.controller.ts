@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Post,
@@ -21,6 +22,8 @@ import { CreateCashierCloseDto } from './dto/create-cashier-close.dto';
 import { CreatePaymentRefundDto } from './dto/create-payment-refund.dto';
 import { ListCashierClosesDto } from './dto/list-cashier-closes.dto';
 import { ReversePaymentDto } from './dto/reverse-payment.dto';
+import { CreateFinanceRequestDto } from './dto/create-finance-request.dto';
+import { ReviewFinanceRequestDto } from './dto/review-finance-request.dto';
 import { FinanceService } from './finance.service';
 
 @Controller('payments')
@@ -114,5 +117,51 @@ export class PaymentsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.financeService.reopenCashierClose(closeId, dto, auth);
+  }
+
+  @Post(':id/refund/request')
+  @Permissions('payments:collect')
+  requestRefund(
+    @Param('id') paymentId: string,
+    @Body() dto: CreateFinanceRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.requestRefund(paymentId, dto, auth);
+  }
+
+  @Post(':id/reverse/request')
+  @Permissions('payments:collect')
+  requestReversal(
+    @Param('id') paymentId: string,
+    @Body() dto: CreateFinanceRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.requestReversal(paymentId, dto, auth);
+  }
+
+  @Get('requests')
+  listApprovalRequests(@CurrentAuth() auth: AuthContext) {
+    const hasRefund = auth.permissions.includes('payments:refund');
+    const hasReverse = auth.permissions.includes('payments:reverse');
+    const isSuperAdmin = auth.roles.includes('platform_super_admin');
+    if (!hasRefund && !hasReverse && !isSuperAdmin) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+    return this.financeService.listApprovalRequests(auth);
+  }
+
+  @Post('requests/:id/review')
+  reviewApprovalRequest(
+    @Param('id') requestId: string,
+    @Body() dto: ReviewFinanceRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    const hasRefund = auth.permissions.includes('payments:refund');
+    const hasReverse = auth.permissions.includes('payments:reverse');
+    const isSuperAdmin = auth.roles.includes('platform_super_admin');
+    if (!hasRefund && !hasReverse && !isSuperAdmin) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+    return this.financeService.reviewApprovalRequest(requestId, dto, auth);
   }
 }

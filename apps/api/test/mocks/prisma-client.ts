@@ -249,6 +249,17 @@ export const PaymentMethod = {
   MOBILE: 'MOBILE',
 } as const;
 
+export const FinanceRequestStatus = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+} as const;
+
+export const FinanceRequestType = {
+  REFUND: 'REFUND',
+  REVERSAL: 'REVERSAL',
+} as const;
+
 export const SalaryStructureStatus = {
   DRAFT: 'DRAFT',
   ACTIVE: 'ACTIVE',
@@ -509,6 +520,7 @@ export const MarkEntryStatus = {
   MISSING: 'MISSING',
   WITHHELD: 'WITHHELD',
   SUBMITTED: 'SUBMITTED',
+  RETEST: 'RETEST',
 } as const;
 
 export const HomeworkAssignmentStatus = {

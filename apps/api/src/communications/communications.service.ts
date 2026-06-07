@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   AudienceType,
@@ -19,6 +24,7 @@ import { CreateEventDto } from './dto/create-event.dto';
 import { CreateNoticeDto } from './dto/create-notice.dto';
 import { CaptureConsentDto } from './dto/capture-consent.dto';
 import { UsageService } from '../usage/usage.service';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class CommunicationsService {
@@ -29,6 +35,7 @@ export class CommunicationsService {
     private readonly notificationsService: NotificationsService,
     private readonly auditService: AuditService,
     private readonly usageService: UsageService,
+    private readonly redisService: RedisService,
     private readonly fileRegistryService?: FileRegistryService,
   ) {}
 
@@ -369,109 +376,141 @@ export class CommunicationsService {
   }
 
   async recordDeliveryRecords(input: DeliveryRecordInput) {
-    const existingDeliveries = await this.prisma.notificationDelivery.findMany({
-      where: {
+    const redis = this.redisService.getClient();
+    const lockKey = `lock:delivery:${input.actor.tenantId}:${input.sourceType}:${input.sourceId}`;
+    const acquired = await redis.set(lockKey, 'locked', 'PX', 5000, 'NX');
+
+    if (!acquired) {
+      for (let i = 0; i < 20; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const deliveries = await this.prisma.notificationDelivery.findMany({
+          where: {
+            tenantId: input.actor.tenantId,
+            sourceType: input.sourceType,
+            sourceId: input.sourceId,
+          },
+          select: {
+            id: true,
+            status: true,
+          },
+        });
+        if (deliveries.length > 0) {
+          return summarizeExistingDeliveries(deliveries);
+        }
+      }
+      throw new ConflictException(
+        'Another process is currently recording delivery records for this notification',
+      );
+    }
+
+    try {
+      const existingDeliveries =
+        await this.prisma.notificationDelivery.findMany({
+          where: {
+            tenantId: input.actor.tenantId,
+            sourceType: input.sourceType,
+            sourceId: input.sourceId,
+          },
+          select: {
+            id: true,
+            status: true,
+          },
+        });
+
+      if (existingDeliveries.length > 0) {
+        return summarizeExistingDeliveries(existingDeliveries);
+      }
+
+      const recipients = await this.resolveAudienceRecipients(input);
+      const { allowedRecipients, skippedRecipients } =
+        await this.partitionRecipientsByCommunicationPolicy(input, recipients);
+
+      if (recipients.length === 0) {
+        return { count: 0 };
+      }
+
+      const totalToSent = allowedRecipients.length * input.channels.length;
+      const smsToSent = input.channels.includes(NotificationChannel.SMS)
+        ? allowedRecipients.length
+        : 0;
+
+      if (totalToSent > 0) {
+        await this.usageService.checkLimit(
+          input.actor.tenantId,
+          'notifications.sent',
+          totalToSent,
+        );
+      }
+      if (smsToSent > 0) {
+        await this.usageService.checkLimit(
+          input.actor.tenantId,
+          'sms.sent',
+          smsToSent,
+        );
+      }
+
+      const queuedDeliveries = await this.createDeliveryRows(
+        input,
+        allowedRecipients,
+        NotificationStatus.QUEUED,
+      );
+      const skippedDeliveries = await this.createDeliveryRows(
+        input,
+        skippedRecipients,
+        NotificationStatus.SKIPPED,
+        `Missing required consent: ${input.requiredConsentTypes?.join(', ')}`,
+      );
+
+      for (const delivery of queuedDeliveries) {
+        await this.dispatchDelivery(delivery);
+      }
+
+      if (totalToSent > 0) {
+        await this.usageService.incrementUsage(
+          input.actor.tenantId,
+          'notifications.sent',
+          totalToSent,
+        );
+      }
+      if (smsToSent > 0) {
+        await this.usageService.incrementUsage(
+          input.actor.tenantId,
+          'sms.sent',
+          smsToSent,
+        );
+      }
+
+      await this.auditService.record({
+        action: 'record',
+        resource: 'notification_delivery',
         tenantId: input.actor.tenantId,
-        sourceType: input.sourceType,
-        sourceId: input.sourceId,
-      },
-      select: {
-        id: true,
-        status: true,
-      },
-    });
+        userId: input.actor.userId,
+        resourceId: input.sourceId,
+        after: {
+          sourceType: input.sourceType,
+          sourceId: input.sourceId,
+          audienceType: input.audienceType,
+          recipientCount: allowedRecipients.length,
+          skippedRecipientCount: skippedRecipients.length,
+          channelCount: input.channels.length,
+        },
+      });
 
-    if (existingDeliveries.length > 0) {
-      return summarizeExistingDeliveries(existingDeliveries);
+      return {
+        count:
+          (allowedRecipients.length + skippedRecipients.length) *
+          input.channels.length,
+        sentCount: allowedRecipients.length * input.channels.length,
+        skippedCount: skippedRecipients.length * input.channels.length,
+        queuedCount: queuedDeliveries.length,
+        failedCount: 0,
+        deliveryIds: [...queuedDeliveries, ...skippedDeliveries].map(
+          (delivery) => delivery.id,
+        ),
+      };
+    } finally {
+      await redis.del(lockKey);
     }
-
-    const recipients = await this.resolveAudienceRecipients(input);
-    const { allowedRecipients, skippedRecipients } =
-      await this.partitionRecipientsByCommunicationPolicy(input, recipients);
-
-    if (recipients.length === 0) {
-      return { count: 0 };
-    }
-
-    const totalToSent = allowedRecipients.length * input.channels.length;
-    const smsToSent = input.channels.includes(NotificationChannel.SMS)
-      ? allowedRecipients.length
-      : 0;
-
-    if (totalToSent > 0) {
-      await this.usageService.checkLimit(
-        input.actor.tenantId,
-        'notifications.sent',
-        totalToSent,
-      );
-    }
-    if (smsToSent > 0) {
-      await this.usageService.checkLimit(
-        input.actor.tenantId,
-        'sms.sent',
-        smsToSent,
-      );
-    }
-
-    const queuedDeliveries = await this.createDeliveryRows(
-      input,
-      allowedRecipients,
-      NotificationStatus.QUEUED,
-    );
-    const skippedDeliveries = await this.createDeliveryRows(
-      input,
-      skippedRecipients,
-      NotificationStatus.SKIPPED,
-      `Missing required consent: ${input.requiredConsentTypes?.join(', ')}`,
-    );
-
-    for (const delivery of queuedDeliveries) {
-      await this.dispatchDelivery(delivery);
-    }
-
-    if (totalToSent > 0) {
-      await this.usageService.incrementUsage(
-        input.actor.tenantId,
-        'notifications.sent',
-        totalToSent,
-      );
-    }
-    if (smsToSent > 0) {
-      await this.usageService.incrementUsage(
-        input.actor.tenantId,
-        'sms.sent',
-        smsToSent,
-      );
-    }
-
-    await this.auditService.record({
-      action: 'record',
-      resource: 'notification_delivery',
-      tenantId: input.actor.tenantId,
-      userId: input.actor.userId,
-      resourceId: input.sourceId,
-      after: {
-        sourceType: input.sourceType,
-        sourceId: input.sourceId,
-        audienceType: input.audienceType,
-        recipientCount: allowedRecipients.length,
-        skippedRecipientCount: skippedRecipients.length,
-        channelCount: input.channels.length,
-      },
-    });
-
-    return {
-      count:
-        (allowedRecipients.length + skippedRecipients.length) *
-        input.channels.length,
-      sentCount: allowedRecipients.length * input.channels.length,
-      skippedCount: skippedRecipients.length * input.channels.length,
-      queuedCount: queuedDeliveries.length,
-      failedCount: 0,
-      deliveryIds: [...queuedDeliveries, ...skippedDeliveries].map(
-        (delivery) => delivery.id,
-      ),
-    };
   }
 
   @OnEvent('student.admitted')

@@ -92,6 +92,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
       marksObtained: marks[studentId] ? Number(marks[studentId]) : undefined,
       isAbsent: statuses[studentId] === 'ABSENT' || statuses[studentId] === 'EXCUSED',
       isWithheld: statuses[studentId] === 'WITHHELD',
+      isRetest: statuses[studentId] === 'RETEST',
       remarks: remarks[studentId] || undefined,
     }));
   }, [marks, statuses, remarks]);
@@ -119,6 +120,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
     { value: 'ABSENT', label: 'A', color: 'text-rose-600 bg-rose-50' },
     { value: 'WITHHELD', label: 'W', color: 'text-amber-600 bg-amber-50' },
     { value: 'EXCUSED', label: 'E', color: 'text-blue-600 bg-blue-50' },
+    { value: 'RETEST', label: 'R', color: 'text-indigo-600 bg-indigo-50' },
   ];
 
   return (

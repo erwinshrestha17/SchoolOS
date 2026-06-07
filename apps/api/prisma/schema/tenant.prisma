@@ -155,6 +155,7 @@ model Tenant {
   staffDocuments                StaffDocument[]
   staffLifecycleEvents          StaffLifecycleEvent[]
   supportOverrides              SupportOverride[]
+  financeApprovalRequests       FinanceApprovalRequest[]
 }
 
 model TenantSetting {

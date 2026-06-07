@@ -7,6 +7,7 @@ import { GradeLockStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { FinanceService } from '../finance/finance.service';
 import { BatchPromoteDto } from './dto/batch-promote.dto';
 import { PromoteStudentDto } from './dto/promote-student.dto';
 
@@ -69,6 +70,7 @@ export class PromotionReadinessService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly financeService: FinanceService,
   ) {}
 
   async listPromotionReadiness(
@@ -143,8 +145,16 @@ export class PromotionReadinessService {
       }
     }
 
-    const rows = students.map((student) =>
-      this.buildReadinessRow(student, reportCardByStudent.get(student.id)),
+    const rows = await Promise.all(
+      students.map(async (student) => {
+        const reportCard = reportCardByStudent.get(student.id);
+        const ledger = await this.financeService.getStudentFeeLedger(
+          student.id,
+          actor,
+        );
+        const outstandingBalance = ledger.outstandingBalance;
+        return this.buildReadinessRow(student, reportCard, outstandingBalance);
+      }),
     );
 
     if (!filters.status) {
@@ -216,7 +226,17 @@ export class PromotionReadinessService {
       orderBy: [{ updatedAt: 'desc' }],
     });
 
-    const readiness = this.buildReadinessRow(student, reportCard ?? undefined);
+    const ledger = await this.financeService.getStudentFeeLedger(
+      dto.studentId,
+      actor,
+    );
+    const outstandingBalance = ledger.outstandingBalance;
+
+    const readiness = this.buildReadinessRow(
+      student,
+      reportCard ?? undefined,
+      outstandingBalance,
+    );
     if (readiness.status !== 'READY') {
       await this.auditService.record({
         action: 'ACADEMICS_PROMOTION_BLOCKED',
@@ -339,6 +359,7 @@ export class PromotionReadinessService {
   private buildReadinessRow(
     student: StudentWithScope,
     reportCard?: ReportCardLike,
+    outstandingBalance = 0,
   ): PromotionReadinessRow {
     const reasons: string[] = [];
     let status: PromotionReadinessStatus = 'READY';
@@ -356,7 +377,15 @@ export class PromotionReadinessService {
       status = 'NEEDS_REVIEW';
       recommendedAction = 'REVIEW';
       reasons.push('FAILED_SUBJECTS');
-    } else {
+    }
+
+    if (outstandingBalance > 0) {
+      status = 'NEEDS_REVIEW';
+      recommendedAction = 'REVIEW';
+      reasons.push('UNPAID_DUES');
+    }
+
+    if (reasons.length === 0) {
       reasons.push('READY');
     }
 
@@ -383,7 +412,7 @@ export class PromotionReadinessService {
       reasons,
       recommendedAction,
       lifecycleStatus,
-      outstandingBalance: 0,
+      outstandingBalance,
     };
   }
 

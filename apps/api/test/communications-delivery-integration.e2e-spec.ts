@@ -83,6 +83,12 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
         checkLimit: jest.fn().mockResolvedValue(undefined),
         incrementUsage: jest.fn().mockResolvedValue(undefined),
       } as any,
+      {
+        getClient: jest.fn().mockReturnValue({
+          set: jest.fn().mockResolvedValue('OK'),
+          del: jest.fn().mockResolvedValue(1),
+        }),
+      } as any,
     );
     m10HardeningService = new M10HardeningService(
       prisma as unknown as PrismaService,

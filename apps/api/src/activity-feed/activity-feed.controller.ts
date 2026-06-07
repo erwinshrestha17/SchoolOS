@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Observable, fromEvent, map, filter } from 'rxjs';
+import { Observable, fromEvent, map, filter, merge } from 'rxjs';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -53,9 +53,12 @@ export class ActivityFeedController {
   @Sse('stream')
   @Permissions('activity_feed:read')
   streamFeed(@CurrentAuth() auth: AuthContext): Observable<MessageEvent> {
-    // Uses RxJS to observe the event emitter and map it to an SSE MessageEvent.
-    // Filters events to ensure the user only receives posts intended for their tenant.
-    return fromEvent(this.eventEmitter, 'feed.post.created').pipe(
+    const created$ = fromEvent(this.eventEmitter, 'feed.post.created');
+    const updated$ = fromEvent(this.eventEmitter, 'feed.post.updated');
+    const deleted$ = fromEvent(this.eventEmitter, 'feed.post.deleted');
+    const moderated$ = fromEvent(this.eventEmitter, 'feed.post.moderated');
+
+    return merge(created$, updated$, deleted$, moderated$).pipe(
       filter(
         (payload): payload is FeedPostEvent =>
           typeof payload === 'object' &&

@@ -115,7 +115,11 @@ describe('Activity Hardening Verification', () => {
       mediaQueue,
     );
 
-    lifecycleService = new ActivityPostLifecycleService(prisma, auditService);
+    lifecycleService = new ActivityPostLifecycleService(
+      prisma,
+      auditService,
+      eventEmitter,
+    );
 
     mediaProcessor = new ActivityMediaProcessor(prisma, storageService, {
       shouldProcessTenantJob: jest.fn().mockResolvedValue(true),

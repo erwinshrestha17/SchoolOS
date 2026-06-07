@@ -67,6 +67,8 @@ model User {
   createdStaffLifecycleEvents    StaffLifecycleEvent[]            @relation("CreatedStaffLifecycleEvents")
   attendanceDrafts               AttendanceDraft[]
   supportOverrides               SupportOverride[]                @relation("UserSupportOverrides")
+  requestedFinanceApprovals      FinanceApprovalRequest[]         @relation("RequestedFinanceApprovals")
+  reviewedFinanceApprovals       FinanceApprovalRequest[]         @relation("ReviewedFinanceApprovals")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])

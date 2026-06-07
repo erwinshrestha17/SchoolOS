@@ -19,12 +19,14 @@ import {
   ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
+import { InvoiceAdjustmentDirection } from './dto/create-invoice-adjustment.dto';
 
 describe('FinanceService - Hardening', () => {
   let service: FinanceService;
   let prisma: PrismaService;
   let fileRegistry: FileRegistryService;
   let auditService: AuditService;
+  let accountingPostingService: AccountingPostingService;
 
   const actor = {
     tenantId: 't1',
@@ -35,6 +37,7 @@ describe('FinanceService - Hardening', () => {
       'payments:refund',
       'payments:reverse',
       'payments:close',
+      'payments:collect',
       'receipts:manage',
       'receipts:read',
     ],
@@ -60,10 +63,28 @@ describe('FinanceService - Hardening', () => {
         count: jest.fn(),
       },
       journalEntry: { findFirst: jest.fn() },
+      accountingPeriod: { findFirst: jest.fn().mockResolvedValue(null) },
       receipt: { findFirst: jest.fn(), count: jest.fn() },
       fileAsset: { findFirst: jest.fn() },
-      tenant: { findUnique: jest.fn() },
+      tenant: {
+        findUnique: jest.fn(),
+        findUniqueOrThrow: jest
+          .fn()
+          .mockResolvedValue({ id: 't1', slug: 't1' }),
+      },
       providerConfig: { findFirst: jest.fn() },
+      financeApprovalRequest: {
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      feeHead: {
+        findFirst: jest.fn(),
+      },
+      invoiceLine: {
+        create: jest.fn(),
+      },
       $transaction: jest.fn((cb) => cb(mockPrisma)),
     };
 
@@ -81,6 +102,7 @@ describe('FinanceService - Hardening', () => {
           useValue: {
             postPaymentRefund: jest.fn(),
             postReversal: jest.fn().mockResolvedValue({ id: 'rev-1' }),
+            postInvoiceAdjustment: jest.fn().mockResolvedValue({ id: 'adj-1' }),
           },
         },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
@@ -106,6 +128,9 @@ describe('FinanceService - Hardening', () => {
     prisma = module.get<PrismaService>(PrismaService);
     fileRegistry = module.get<FileRegistryService>(FileRegistryService);
     auditService = module.get<AuditService>(AuditService);
+    accountingPostingService = module.get<AccountingPostingService>(
+      AccountingPostingService,
+    );
   });
 
   describe('refundPayment', () => {
@@ -292,6 +317,307 @@ describe('FinanceService - Hardening', () => {
             status: InvoiceStatus.ISSUED,
           }),
         }),
+      );
+    });
+  });
+
+  describe('handleOnlinePaymentWebhook', () => {
+    it('returns existing payment if webhook is a duplicate (idempotency)', async () => {
+      const mockPayment = {
+        id: 'p-webhook-1',
+        amount: new Prisma.Decimal(1500),
+        status: PaymentStatus.SUCCESS,
+        idempotencyKey: 'webhook:esewa:ref-123',
+      };
+
+      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
+        id: 'prov-1',
+        name: 'ESEWA',
+        configEncrypted: { webhookSecret: 'secret' },
+      });
+      jest
+        .spyOn(service as any, 'verifyWebhookSignature')
+        .mockReturnValue(true);
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
+
+      const result = await service.handleOnlinePaymentWebhook(
+        'esewa',
+        {
+          reference: 'REF-123',
+          amount: 1500,
+          status: 'SUCCESS',
+        },
+        {
+          signature: 'valid-signature',
+          'x-tenant-id': actor.tenantId,
+        },
+      );
+
+      expect(result).toEqual({
+        duplicate: true,
+        message: 'Payment already processed and posted.',
+        paymentId: 'p-webhook-1',
+        postedToLedger: true,
+        status: 'verified',
+      });
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+    });
+
+    it('ignores online payment webhook if invoice is already paid', async () => {
+      const mockInvoice = {
+        id: 'i-webhook-1',
+        status: InvoiceStatus.PAID,
+        totalAmount: new Prisma.Decimal(1000),
+        vatAmount: new Prisma.Decimal(130),
+        payments: [
+          {
+            amount: new Prisma.Decimal(1000),
+            refunds: [],
+          },
+        ],
+      };
+
+      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
+        id: 'prov-2',
+        name: 'KHALTI',
+        configEncrypted: { webhookSecret: 'secret' },
+      });
+      jest
+        .spyOn(service as any, 'verifyWebhookSignature')
+        .mockReturnValue(true);
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.invoice.findFirst as jest.Mock).mockResolvedValue(mockInvoice);
+
+      const result = await service.handleOnlinePaymentWebhook(
+        'khalti',
+        {
+          reference: 'REF-456',
+          amount: 1000,
+          status: 'SUCCESS',
+          invoiceId: 'i-webhook-1',
+        },
+        {
+          signature: 'valid-signature',
+          'x-tenant-id': actor.tenantId,
+        },
+      );
+
+      expect(result).toEqual({
+        status: 'verified',
+        postedToLedger: false,
+        message:
+          'Invoice is already fully paid. Webhook event ignored to prevent duplicate payment.',
+      });
+    });
+  });
+
+  describe('Finance Approval Requests', () => {
+    it('creates a PENDING refund approval request successfully', async () => {
+      const mockPayment = {
+        id: 'p-req-1',
+        amount: new Prisma.Decimal(2000),
+        status: PaymentStatus.SUCCESS,
+        refunds: [],
+      };
+
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
+      (prisma.financeApprovalRequest.findFirst as jest.Mock).mockResolvedValue(
+        null,
+      );
+      (prisma.financeApprovalRequest.create as jest.Mock).mockResolvedValue({
+        id: 'req-refund-1',
+        status: 'PENDING',
+        amount: new Prisma.Decimal(1000),
+      });
+
+      const result = await service.requestRefund(
+        'p-req-1',
+        { amount: 1000, reason: 'Accidental charge' },
+        actor as any,
+      );
+
+      expect(prisma.financeApprovalRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'REFUND',
+            amount: new Prisma.Decimal(1000),
+            status: 'PENDING',
+          }),
+        }),
+      );
+      expect(result.id).toBe('req-refund-1');
+    });
+
+    it('creates a PENDING reversal approval request successfully', async () => {
+      const mockPayment = {
+        id: 'p-req-2',
+        amount: new Prisma.Decimal(2000),
+        status: PaymentStatus.SUCCESS,
+        refunds: [],
+      };
+
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
+      (prisma.financeApprovalRequest.findFirst as jest.Mock).mockResolvedValue(
+        null,
+      );
+      (prisma.financeApprovalRequest.create as jest.Mock).mockResolvedValue({
+        id: 'req-reverse-1',
+        status: 'PENDING',
+      });
+
+      const result = await service.requestReversal(
+        'p-req-2',
+        { reason: 'Wrong student billed' },
+        actor as any,
+      );
+
+      expect(prisma.financeApprovalRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'REVERSAL',
+            amount: null,
+            status: 'PENDING',
+          }),
+        }),
+      );
+      expect(result.id).toBe('req-reverse-1');
+    });
+
+    it('approves a request and runs actual refund', async () => {
+      const mockRequest = {
+        id: 'req-1',
+        type: 'REFUND',
+        paymentId: 'p1',
+        amount: new Prisma.Decimal(500),
+        reason: 'Double billing',
+        status: 'PENDING',
+      };
+
+      (prisma.financeApprovalRequest.findFirst as jest.Mock).mockResolvedValue(
+        mockRequest,
+      );
+      (prisma.financeApprovalRequest.update as jest.Mock).mockResolvedValue({
+        ...mockRequest,
+        status: 'APPROVED',
+      });
+
+      // Mock refundPayment dependencies
+      const mockPayment = {
+        id: 'p1',
+        amount: new Prisma.Decimal(1000),
+        status: PaymentStatus.SUCCESS,
+        refunds: [],
+        invoice: {
+          id: 'i1',
+          status: InvoiceStatus.PAID,
+          totalAmount: new Prisma.Decimal(1000),
+          payments: [],
+        },
+      };
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
+      (prisma.journalEntry.findFirst as jest.Mock).mockResolvedValue({
+        id: 'j1',
+        entryNumber: 'JE-001',
+        lines: [
+          {
+            chartAccountId: 'acc-1',
+            amount: new Prisma.Decimal(1000),
+            description: 'Fee payment revenue line',
+            side: 'CREDIT',
+          },
+        ],
+      });
+      (prisma.paymentRefund.count as jest.Mock).mockResolvedValue(0);
+      (prisma.paymentRefund.create as jest.Mock).mockResolvedValue({
+        id: 'refund-1',
+        refundNumber: 'RFD-2026-00001',
+      });
+      (prisma.invoice.update as jest.Mock).mockResolvedValue({
+        id: 'i1',
+        status: 'PARTIAL',
+      });
+      (
+        accountingPostingService.postPaymentRefund as jest.Mock
+      ).mockResolvedValue({
+        entryNumber: 'JE-REF-001',
+      });
+
+      const result = await service.reviewApprovalRequest(
+        'req-1',
+        {
+          status: 'APPROVED' as any,
+          reviewNote: 'Approved by principal',
+        },
+        actor as any,
+      );
+
+      expect(result.status).toBe('APPROVED');
+      expect(prisma.financeApprovalRequest.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'req-1' },
+          data: expect.objectContaining({
+            status: 'APPROVED',
+            reviewNote: 'Approved by principal',
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('Invoice Adjustment Ledger Posting', () => {
+    it('successfully calls accountingPostingService on adjustment', async () => {
+      const mockInvoice = {
+        id: 'i-adj-1',
+        invoiceNumber: 'INV-2026-001',
+        subtotal: new Prisma.Decimal(5000),
+        vatAmount: new Prisma.Decimal(650),
+        totalAmount: new Prisma.Decimal(5650),
+        status: InvoiceStatus.ISSUED,
+        payments: [],
+      };
+
+      const mockFeeHead = {
+        id: 'fh-1',
+        code: 'ADMISSION',
+      };
+
+      (prisma.invoice.findFirst as jest.Mock).mockResolvedValue(mockInvoice);
+      (prisma.feeHead.findFirst as jest.Mock).mockResolvedValue(mockFeeHead);
+      (prisma.invoiceLine.create as jest.Mock).mockResolvedValue({
+        id: 'il-adj-1',
+      });
+      (prisma.invoice.update as jest.Mock).mockResolvedValue({
+        ...mockInvoice,
+        subtotal: new Prisma.Decimal(6000),
+        totalAmount: new Prisma.Decimal(6780),
+      });
+
+      const accountingPostingService = service['accountingPostingService'];
+
+      await service.createInvoiceAdjustment(
+        'i-adj-1',
+        {
+          feeHeadId: 'fh-1',
+          amount: 1000,
+          vatAmount: 130,
+          direction: InvoiceAdjustmentDirection.INCREASE,
+          reason: 'Correction',
+        },
+        actor as any,
+      );
+
+      expect(
+        accountingPostingService.postInvoiceAdjustment,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: actor.tenantId,
+          invoiceId: 'i-adj-1',
+          invoiceNumber: 'INV-2026-001',
+          amount: new Prisma.Decimal(1130),
+          reason: 'Correction',
+        }),
+        expect.any(Object),
+        expect.any(Object),
       );
     });
   });

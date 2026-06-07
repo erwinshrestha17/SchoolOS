@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ActivityPostStatus, Prisma } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -18,6 +19,7 @@ export class ActivityPostLifecycleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async updatePost(
@@ -71,6 +73,8 @@ export class ActivityPostLifecycleService {
       },
     });
 
+    this.eventEmitter.emit('feed.post.updated', updated);
+
     return updated;
   }
 
@@ -106,6 +110,12 @@ export class ActivityPostLifecycleService {
       userId: actor.userId,
       before: { status: post.status },
       after: { reason: dto.reason, status: ActivityPostStatus.REJECTED },
+    });
+
+    this.eventEmitter.emit('feed.post.deleted', {
+      id: postId,
+      tenantId: actor.tenantId,
+      status: ActivityPostStatus.REJECTED,
     });
 
     return { ...updated, deleted: true };
@@ -146,6 +156,8 @@ export class ActivityPostLifecycleService {
         softDeletedAt: null,
       },
     });
+
+    this.eventEmitter.emit('feed.post.updated', updated);
 
     return { ...updated, restored: true };
   }
@@ -189,6 +201,8 @@ export class ActivityPostLifecycleService {
       before: { status: post.status },
       after: { status: dto.status, reason: dto.reason ?? null },
     });
+
+    this.eventEmitter.emit('feed.post.moderated', updated);
 
     return updated;
   }

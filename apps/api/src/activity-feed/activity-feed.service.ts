@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -13,6 +14,7 @@ import {
   Prisma,
   ActivityAttachment,
   ActivityPostStatus,
+  StorageProvider,
 } from '@prisma/client';
 import { Queue } from 'bullmq';
 import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter';
@@ -43,6 +45,8 @@ interface ActorMediaAccess {
 
 @Injectable()
 export class ActivityFeedService {
+  private readonly logger = new Logger(ActivityFeedService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
@@ -119,7 +123,77 @@ export class ActivityFeedService {
 
     const mediaAccess = await this.resolveActorMediaAccess(actor);
 
-    return posts.map((post) => this.serializePostForActor(post, mediaAccess));
+    const allTaggedStudentIds = Array.from(
+      new Set(
+        posts.flatMap((post) => post.studentTags.map((tag) => tag.studentId)),
+      ),
+    );
+
+    const consentMap = new Map<string, boolean>();
+    if (allTaggedStudentIds.length > 0 && isParentOnly(actor)) {
+      const students = await this.prisma.student.findMany({
+        where: { id: { in: allTaggedStudentIds }, tenantId: actor.tenantId },
+        include: {
+          guardianLinks: {
+            include: {
+              guardian: {
+                include: {
+                  consents: {
+                    where: { consentType: ConsentType.PHOTO_USAGE },
+                    orderBy: { capturedAt: 'desc' },
+                    take: 1,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      for (const student of students) {
+        let allowed = student.lifecycleStatus === 'ACTIVE';
+        if (allowed) {
+          const guardians = student.guardianLinks.map((link) => link.guardian);
+          if (guardians.length === 0) {
+            allowed = false;
+          } else {
+            let studentHasConsent = false;
+            for (const guardian of guardians) {
+              const latestConsent = guardian.consents[0];
+              if (latestConsent) {
+                if (latestConsent.granted && !latestConsent.revokedAt) {
+                  studentHasConsent = true;
+                } else {
+                  studentHasConsent = false;
+                  break;
+                }
+              }
+            }
+            allowed = studentHasConsent;
+          }
+        }
+        consentMap.set(student.id, allowed);
+      }
+    }
+
+    return posts.map((post) => {
+      let isBlockedByTags = false;
+      if (isParentOnly(actor)) {
+        for (const tag of post.studentTags) {
+          if (consentMap.get(tag.studentId) === false) {
+            isBlockedByTags = true;
+            break;
+          }
+        }
+      }
+      const postMediaAccess = {
+        blocked: mediaAccess.blocked || isBlockedByTags,
+        reason: isBlockedByTags
+          ? 'PHOTO_USAGE_CONSENT_REQUIRED'
+          : mediaAccess.reason,
+      };
+      return this.serializePostForActor(post, postMediaAccess);
+    });
   }
 
   async getPostDetail(postId: string, actor: AuthContext) {
@@ -161,7 +235,65 @@ export class ActivityFeedService {
 
     const mediaAccess = await this.resolveActorMediaAccess(actor);
 
-    return this.serializePostForActor(post, mediaAccess);
+    let isBlockedByTags = false;
+    if (isParentOnly(actor) && post.studentTags.length > 0) {
+      const studentIds = post.studentTags.map((tag) => tag.studentId);
+      const students = await this.prisma.student.findMany({
+        where: { id: { in: studentIds }, tenantId: actor.tenantId },
+        include: {
+          guardianLinks: {
+            include: {
+              guardian: {
+                include: {
+                  consents: {
+                    where: { consentType: ConsentType.PHOTO_USAGE },
+                    orderBy: { capturedAt: 'desc' },
+                    take: 1,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      for (const student of students) {
+        if (student.lifecycleStatus !== 'ACTIVE') {
+          isBlockedByTags = true;
+          break;
+        }
+        const guardians = student.guardianLinks.map((link) => link.guardian);
+        if (guardians.length === 0) {
+          isBlockedByTags = true;
+          break;
+        }
+        let studentHasConsent = false;
+        for (const guardian of guardians) {
+          const latestConsent = guardian.consents[0];
+          if (latestConsent) {
+            if (latestConsent.granted && !latestConsent.revokedAt) {
+              studentHasConsent = true;
+            } else {
+              studentHasConsent = false;
+              break;
+            }
+          }
+        }
+        if (!studentHasConsent) {
+          isBlockedByTags = true;
+          break;
+        }
+      }
+    }
+
+    const postMediaAccess = {
+      blocked: mediaAccess.blocked || isBlockedByTags,
+      reason: isBlockedByTags
+        ? 'PHOTO_USAGE_CONSENT_REQUIRED'
+        : mediaAccess.reason,
+    };
+
+    return this.serializePostForActor(post, postMediaAccess);
   }
 
   async listGallery(
@@ -197,7 +329,11 @@ export class ActivityFeedService {
         },
       },
       include: {
-        activityPost: true,
+        activityPost: {
+          include: {
+            studentTags: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: filters.limit ?? 50,
@@ -206,12 +342,85 @@ export class ActivityFeedService {
 
     const mediaAccess = await this.resolveActorMediaAccess(actor);
 
-    return attachments.map((attachment) => ({
-      ...this.serializeAttachmentForActor(attachment, mediaAccess),
-      postId: attachment.activityPostId,
-      createdAt: attachment.createdAt,
-      postTitle: attachment.activityPost.title,
-    }));
+    const allTaggedStudentIds = Array.from(
+      new Set(
+        attachments.flatMap((att) =>
+          att.activityPost.studentTags.map((tag) => tag.studentId),
+        ),
+      ),
+    );
+
+    const consentMap = new Map<string, boolean>();
+    if (allTaggedStudentIds.length > 0 && isParentOnly(actor)) {
+      const students = await this.prisma.student.findMany({
+        where: { id: { in: allTaggedStudentIds }, tenantId: actor.tenantId },
+        include: {
+          guardianLinks: {
+            include: {
+              guardian: {
+                include: {
+                  consents: {
+                    where: { consentType: ConsentType.PHOTO_USAGE },
+                    orderBy: { capturedAt: 'desc' },
+                    take: 1,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      for (const student of students) {
+        let allowed = student.lifecycleStatus === 'ACTIVE';
+        if (allowed) {
+          const guardians = student.guardianLinks.map((link) => link.guardian);
+          if (guardians.length === 0) {
+            allowed = false;
+          } else {
+            let studentHasConsent = false;
+            for (const guardian of guardians) {
+              const latestConsent = guardian.consents[0];
+              if (latestConsent) {
+                if (latestConsent.granted && !latestConsent.revokedAt) {
+                  studentHasConsent = true;
+                } else {
+                  studentHasConsent = false;
+                  break;
+                }
+              }
+            }
+            allowed = studentHasConsent;
+          }
+        }
+        consentMap.set(student.id, allowed);
+      }
+    }
+
+    return attachments.map((attachment) => {
+      let isBlockedByTags = false;
+      if (isParentOnly(actor)) {
+        for (const tag of attachment.activityPost.studentTags) {
+          if (consentMap.get(tag.studentId) === false) {
+            isBlockedByTags = true;
+            break;
+          }
+        }
+      }
+      const attachmentMediaAccess = {
+        blocked: mediaAccess.blocked || isBlockedByTags,
+        reason: isBlockedByTags
+          ? 'PHOTO_USAGE_CONSENT_REQUIRED'
+          : mediaAccess.reason,
+      };
+
+      return {
+        ...this.serializeAttachmentForActor(attachment, attachmentMediaAccess),
+        postId: attachment.activityPostId,
+        createdAt: attachment.createdAt,
+        postTitle: attachment.activityPost.title,
+      };
+    });
   }
 
   async getReactionAnalytics(actor: AuthContext) {
@@ -276,8 +485,20 @@ export class ActivityFeedService {
       this.validateActivityAttachment(attachment);
     }
 
-    const storedAttachments = await Promise.all(
-      dto.attachments.map(async (attachment, index) => {
+    const storedAttachments: Array<{
+      fileName: string;
+      contentType: string;
+      sizeBytes: number;
+      provider: StorageProvider;
+      objectKey: string;
+      fileAssetId: string;
+      publicUrl: string | null;
+      sortOrder: number;
+    }> = [];
+
+    try {
+      for (let index = 0; index < dto.attachments.length; index++) {
+        const attachment = dto.attachments[index];
         const stored = await this.storageService.saveBase64Object({
           tenantId: actor.tenantId,
           prefix: `activity-feed/${dto.classId}`,
@@ -305,7 +526,7 @@ export class ActivityFeedService {
           actor.userId,
         );
 
-        return {
+        storedAttachments.push({
           fileName: attachment.fileName,
           contentType: attachment.contentType,
           sizeBytes: stored.sizeBytes,
@@ -314,122 +535,153 @@ export class ActivityFeedService {
           fileAssetId: asset.id,
           publicUrl: null,
           sortOrder: index,
-        };
-      }),
-    );
-
-    const audienceType =
-      dto.audienceType ??
-      (dto.studentIds?.length
-        ? AudienceType.ALL
-        : dto.sectionId
-          ? AudienceType.SECTION
-          : AudienceType.CLASS);
-
-    const post = await this.prisma.activityPost.create({
-      data: {
-        tenantId: actor.tenantId,
-        classId: dto.classId,
-        sectionId: dto.sectionId ?? null,
-        createdById: actor.userId,
-        title: dto.title,
-        caption: dto.caption,
-        category: dto.category ?? ActivityCategory.GENERAL,
-        audienceType,
-        publishedAt: new Date(),
-        attachments: {
-          create: storedAttachments.map((attachment) => ({
-            tenantId: actor.tenantId,
-            fileName: attachment.fileName,
-            contentType: attachment.contentType,
-            sizeBytes: attachment.sizeBytes,
-            provider: attachment.provider,
-            objectKey: attachment.objectKey,
-            publicUrl: attachment.publicUrl,
-            fileAssetId: attachment.fileAssetId,
-            sortOrder: attachment.sortOrder,
-          })),
-        },
-        studentTags: dto.studentIds?.length
-          ? {
-              create: dto.studentIds.map((studentId) => ({
-                tenantId: actor.tenantId,
-                studentId,
-              })),
-            }
-          : undefined,
-      },
-      include: {
-        attachments: true,
-        studentTags: true,
-      },
-    });
-
-    // Update attachments with actual IDs for the queue
-    for (const attachment of post.attachments) {
-      await this.mediaQueue.add(
-        'compress',
-        {
-          tenantId: actor.tenantId,
-          attachmentId: attachment.id,
-          fileAssetId: attachment.fileAssetId,
-          requestedById: actor.userId,
-        },
-        {
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 5000 },
-          removeOnComplete: true,
-        },
-      );
+        });
+      }
+    } catch (error) {
+      for (const att of storedAttachments) {
+        try {
+          await this.storageService.deleteObject(att.objectKey);
+          await this.prisma.fileAsset.delete({
+            where: { id: att.fileAssetId },
+          });
+        } catch (cleanupErr) {
+          this.logger.error(
+            `Failed to clean up uploaded file: ${att.objectKey}`,
+            cleanupErr instanceof Error ? cleanupErr.stack : undefined,
+          );
+        }
+      }
+      throw error;
     }
 
-    // Update FileAssets with entityId
-    await Promise.all(
-      post.attachments.map((attachment) =>
-        (attachment as ActivityAttachment & { fileAssetId?: string })
-          .fileAssetId
-          ? this.prisma.fileAsset.update({
-              where: {
-                id: (
-                  attachment as ActivityAttachment & { fileAssetId?: string }
-                ).fileAssetId,
-              },
-              data: { entityId: post.id },
-            })
-          : Promise.resolve(),
-      ),
-    );
+    let post;
+    try {
+      const audienceType =
+        dto.audienceType ??
+        (dto.studentIds?.length
+          ? AudienceType.ALL
+          : dto.sectionId
+            ? AudienceType.SECTION
+            : AudienceType.CLASS);
 
-    await this.communicationsService.recordDeliveryRecords({
-      actor,
-      sourceType: 'activity_post',
-      sourceId: post.id,
-      activityPostId: post.id,
-      audienceType,
-      classId: post.classId,
-      sectionId: post.sectionId,
-      studentIds: dto.studentIds,
-      title: post.title,
-      body: post.caption,
-      channels: [NotificationChannel.PUSH],
-      requiredConsentTypes: [ConsentType.PHOTO_USAGE],
-    });
+      post = await this.prisma.activityPost.create({
+        data: {
+          tenantId: actor.tenantId,
+          classId: dto.classId,
+          sectionId: dto.sectionId ?? null,
+          createdById: actor.userId,
+          title: dto.title,
+          caption: dto.caption,
+          category: dto.category ?? ActivityCategory.GENERAL,
+          audienceType,
+          publishedAt: new Date(),
+          attachments: {
+            create: storedAttachments.map((attachment) => ({
+              tenantId: actor.tenantId,
+              fileName: attachment.fileName,
+              contentType: attachment.contentType,
+              sizeBytes: attachment.sizeBytes,
+              provider: attachment.provider,
+              objectKey: attachment.objectKey,
+              publicUrl: attachment.publicUrl,
+              fileAssetId: attachment.fileAssetId,
+              sortOrder: attachment.sortOrder,
+            })),
+          },
+          studentTags: dto.studentIds?.length
+            ? {
+                create: dto.studentIds.map((studentId) => ({
+                  tenantId: actor.tenantId,
+                  studentId,
+                })),
+              }
+            : undefined,
+        },
+        include: {
+          attachments: true,
+          studentTags: true,
+        },
+      });
 
-    await this.auditService.record({
-      action: 'create',
-      resource: 'activity_post',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: post.id,
-      after: {
+      for (const attachment of post.attachments) {
+        await this.mediaQueue.add(
+          'compress',
+          {
+            tenantId: actor.tenantId,
+            attachmentId: attachment.id,
+            fileAssetId: attachment.fileAssetId,
+            requestedById: actor.userId,
+          },
+          {
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 5000 },
+            removeOnComplete: true,
+          },
+        );
+      }
+
+      await Promise.all(
+        post.attachments.map((attachment) =>
+          (attachment as ActivityAttachment & { fileAssetId?: string })
+            .fileAssetId
+            ? this.prisma.fileAsset.update({
+                where: {
+                  id: (
+                    attachment as ActivityAttachment & { fileAssetId?: string }
+                  ).fileAssetId,
+                },
+                data: { entityId: post.id },
+              })
+            : Promise.resolve(),
+        ),
+      );
+
+      await this.communicationsService.recordDeliveryRecords({
+        actor,
+        sourceType: 'activity_post',
+        sourceId: post.id,
+        activityPostId: post.id,
+        audienceType,
         classId: post.classId,
         sectionId: post.sectionId,
-        attachmentCount: post.attachments.length,
-        taggedStudentCount: post.studentTags.length,
-      },
-    });
+        studentIds: dto.studentIds,
+        title: post.title,
+        body: post.caption,
+        channels: [NotificationChannel.PUSH],
+        requiredConsentTypes: [ConsentType.PHOTO_USAGE],
+      });
 
-    this.eventEmitter.emit('feed.post.created', post);
+      await this.auditService.record({
+        action: 'create',
+        resource: 'activity_post',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: post.id,
+        after: {
+          classId: post.classId,
+          sectionId: post.sectionId,
+          attachmentCount: post.attachments.length,
+          taggedStudentCount: post.studentTags.length,
+        },
+      });
+
+      this.eventEmitter.emit('feed.post.created', post);
+    } catch (error) {
+      for (const att of storedAttachments) {
+        try {
+          await this.storageService.deleteObject(att.objectKey);
+          await this.prisma.fileAsset.delete({
+            where: { id: att.fileAssetId },
+          });
+        } catch (cleanupErr) {
+          this.logger.error(
+            `Failed to clean up uploaded file: ${att.objectKey}`,
+            cleanupErr instanceof Error ? cleanupErr.stack : undefined,
+          );
+        }
+      }
+      throw error;
+    }
 
     return post;
   }

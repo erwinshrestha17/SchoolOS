@@ -9,12 +9,14 @@ import { SettingsService } from '../settings/settings.service';
 import { GradeCalculatorService } from './grade-calculator.service';
 import { ReportCardsService } from './report-cards.service';
 import { UsageService } from '../usage/usage.service';
+import { getQueueToken } from '@nestjs/bullmq';
 
 describe('ReportCardsService', () => {
   let service: ReportCardsService;
   let prisma: any;
   let auditService: { record: jest.Mock };
   let financeService: { getStudentFeeLedger: jest.Mock };
+  let academicsQueue: { add: jest.Mock };
 
   const actor: AuthContext = {
     userId: 'user-1',
@@ -60,6 +62,7 @@ describe('ReportCardsService', () => {
     };
     auditService = { record: jest.fn() };
     financeService = { getStudentFeeLedger: jest.fn() };
+    academicsQueue = { add: jest.fn().mockResolvedValue({ id: 'job-1' }) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -79,6 +82,10 @@ describe('ReportCardsService', () => {
             checkLimit: jest.fn().mockResolvedValue(undefined),
             incrementUsage: jest.fn().mockResolvedValue(undefined),
           } as any,
+        },
+        {
+          provide: getQueueToken('academics'),
+          useValue: academicsQueue,
         },
       ],
     }).compile();
@@ -294,6 +301,35 @@ describe('ReportCardsService', () => {
         actor,
       ),
     ).rejects.toThrow(ConflictException);
+  });
+
+  it('queues batch generation job when studentIds count is greater than 20', async () => {
+    mockValidBase();
+    const studentIds = Array.from({ length: 21 }, (_, i) => `student-${i}`);
+    const result = await service.batchGenerateReportCards(
+      {
+        academicYearId: 'year-1',
+        examTermId: 'term-1',
+        studentIds,
+        remarks: 'Batch test',
+        lock: true,
+      },
+      actor,
+    );
+
+    expect(result.queued).toBe(true);
+    expect(result.jobId).toBe('job-1');
+    expect(academicsQueue.add).toHaveBeenCalledWith(
+      'batchGenerateReportCards',
+      expect.objectContaining({
+        tenantId: actor.tenantId,
+        academicYearId: 'year-1',
+        examTermId: 'term-1',
+        studentIds,
+        remarks: 'Batch test',
+        lock: true,
+      }),
+    );
   });
 
   it('requires a reason before requesting a locked report-card correction', async () => {
