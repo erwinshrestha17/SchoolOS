@@ -380,6 +380,10 @@ Real phone:        http://<mac-local-ip>:4000/api/v1
 ```
 
 Use `SCHOOL_OS_API_BASE_URL` through Dart defines for environment-specific base URLs.
+To run on a real phone on the same Wi-Fi network, obtain your Mac's local IP (e.g., `ipconfig getifaddr en0`) and run:
+```bash
+flutter run --dart-define=SCHOOL_OS_API_BASE_URL=http://<mac-local-ip>:4000/api/v1
+```
 
 Expected auth endpoints:
 
@@ -404,6 +408,11 @@ Timeout handling
 Offline/network error detection
 Safe logging with sensitive values removed
 ```
+
+### Core Auth & Session Mechanisms
+- **Dio Token Refresh Interceptor**: Captures `401 Unauthorized` errors, locks subsequent queries, fetches new token pairs using refresh tokens, and retries the failed requests once.
+- **Offline Resilient Session Recovery**: Startup checks verify current profiles via `/auth/me` and fallback automatically to locally cached profile metadata if offline or server is unreachable.
+- **Secure Token Storage**: Persists JWT access and refresh credentials securely inside Keychains (iOS) and Keystores (Android).
 
 Rules:
 

@@ -1,10 +1,13 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { StudentProfileDetail } from '@schoolos/core';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatCard } from '@/components/ui/stat-card';
-import { Users, Wallet, CalendarCheck, TrendingUp, User, MapPin, Hash, Phone, ShieldCheck } from 'lucide-react';
+import { Users, Wallet, CalendarCheck, TrendingUp, User, MapPin, Hash, Phone, ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { StudentQrCard } from '../student-qr-card';
+import { Badge } from '@/components/ui/badge';
 
 const formatMoney = (amount: number) => {
   return new Intl.NumberFormat('en-NP', {
@@ -26,6 +29,12 @@ export function OverviewTab({ profile, onOpenPdf }: { profile: StudentProfileDet
   const presentCount = profile.attendanceRecords.filter((r) => r.status === 'PRESENT').length;
   const className = profile.student.className ?? profile.student.class?.name ?? 'Class not assigned';
   const sectionName = profile.student.sectionName ?? profile.student.section ?? 'Section not assigned';
+
+  const { data: iemisReadiness, isLoading: isIemisLoading } = useQuery({
+    queryKey: ['student-iemis-readiness', profile.student.id],
+    queryFn: () => api.getIemisReadiness(profile.student.id),
+    enabled: Boolean(profile.student.id),
+  });
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -56,6 +65,63 @@ export function OverviewTab({ profile, onOpenPdf }: { profile: StudentProfileDet
             qrCredential={profile.student.qrCredential ?? null}
             onOpenIdCard={(token) => onOpenPdf('id-card', token)}
           />
+
+          <SectionCard title="Government iEMIS Readiness">
+            {isIemisLoading ? (
+              <p className="text-xs text-slate-400">Loading readiness score...</p>
+            ) : iemisReadiness ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {iemisReadiness.eligible ? (
+                      <CheckCircle2 size={18} className="text-success-600" />
+                    ) : (
+                      <AlertTriangle size={18} className="text-warning-600" />
+                    )}
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">iEMIS Status</span>
+                  </div>
+                  <Badge variant={iemisReadiness.eligible ? 'success' : 'warning'} className="text-[10px] font-extrabold uppercase">
+                    {iemisReadiness.eligible ? 'Ready' : 'Incomplete'}
+                  </Badge>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-end">
+                    <span className="text-2xl font-black text-slate-900">{iemisReadiness.score}%</span>
+                    <span className="text-xs font-bold text-slate-400">readiness score</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all duration-500 ${
+                        iemisReadiness.score === 100 
+                          ? 'bg-success-500' 
+                          : iemisReadiness.score > 50 
+                            ? 'bg-warning-500' 
+                            : 'bg-danger-500'
+                      }`}
+                      style={{ width: `${iemisReadiness.score}%` }}
+                    />
+                  </div>
+                </div>
+
+                {iemisReadiness.issues.length > 0 ? (
+                  <div className="pt-3 border-t border-slate-100 space-y-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Validation Issues</p>
+                    <ul className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                      {iemisReadiness.issues.map((issue, idx) => (
+                        <li key={idx} className="text-xs text-slate-600 flex gap-2 font-medium">
+                          <span className="text-warning-600 font-bold">•</span>
+                          <span>{issue.message}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 font-medium">This profile matches all government iEMIS census reporting fields.</p>
+                )}
+              </div>
+            ) : null}
+          </SectionCard>
 
           <SectionCard title="Primary Guardian">
              {primaryGuardian ? (

@@ -8,33 +8,24 @@ It is designed as a modular school operating system covering admissions, student
 
 ## Source of Truth
 
-The consolidated project memory is:
+The consolidated active documentation set is:
 
 ```text
-docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
-```
+README.md
+AGENTS.md
 
-Active companion files:
+docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
+docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
 
-```text
-DEVELOPMENT_RULES.md
+docs/project/SCHOOLOS_PROJECT_STATUS.md
+docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
 
-docs/product/SCHOOLOS_PRD_COMBINED_MASTER_2026.md
-docs/business/SCHOOLOS_BRD_2026.md
-docs/requirements/SCHOOLOS_SRS_2026.md
-docs/requirements/SCHOOLOS_FRS_2026.md
+docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
+docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
 
 docs/design/SCHOOLOS_UI_UX_GUIDE.md
 
-docs/project/SCHOOLOS_IMPLEMENTATION_STATUS_AND_PLAN.md
-docs/project/SCHOOLOS_PLATFORM_AND_SETTINGS.md
-docs/project/SCHOOLOS_STORAGE_AND_FILE_REGISTRY.md
-docs/project/SCHOOLOS_TRANSPORT_REALTIME_READINESS.md
-docs/project/SCHOOLOS_SCALABILITY_HARDENING_POLICY.md
-
-docs/production/deployment-runbook.md
-docs/production/backup-restore-runbook.md
-docs/production/phase1-pilot-readiness.md
+docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md
 
 apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md
 apps/web/e2e/README.md

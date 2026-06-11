@@ -7,12 +7,12 @@ import { LoginForm } from '../../components/forms/login-form';
 const trustItems = [
   {
     title: 'Staff access',
-    description: 'School teams sign in with their school code, email, and password.',
+    description: 'School teams sign in with secure cookies using school code, email, and password.',
     icon: LockKeyhole,
   },
   {
     title: 'School workspace',
-    description: 'Each school uses its own workspace for day-to-day operations.',
+    description: 'Each school uses its own workspace for day-to-day operations with school-level data isolation.',
     icon: ShieldCheck,
   },
   {

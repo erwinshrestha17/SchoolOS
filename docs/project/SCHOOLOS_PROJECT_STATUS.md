@@ -1,10 +1,10 @@
-# SchoolOS Master Project Memory
+# SchoolOS Project Status
 
 **Status:** 2026-06-06 implementation updates recorded: suspended-tenant file/export denial, M0 mobile/queue entitlement hardening, M1/M5/M10 satellite-controller entitlement gating, platform `/platform/demo-requests` operator workspace, and Section 11 remaining-work inventory for M1–M10. Prior 2026-06-04 slice: AGENTS rules, demo request public intake, M9 bank import validation, M3 webhook HMAC, M7 statutory deductions, settings audit-log depth, and module enhancement planning.  
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard, Flutter companion app
 
-This is the consolidated source of truth for SchoolOS project memory. It records the current product/technical state and points to the active focused documents.
+This is the consolidated source of truth for SchoolOS project status. It records the current product/technical state and points to the active focused documents.
 
 ---
 
@@ -12,33 +12,26 @@ This is the consolidated source of truth for SchoolOS project memory. It records
 
 ```text
 README.md
-DEVELOPMENT_RULES.md
 AGENTS.md
 
-docs/product/SCHOOLOS_PRD_COMBINED_MASTER_2026.md
-docs/business/SCHOOLOS_BRD_2026.md
-docs/requirements/SCHOOLOS_SRS_2026.md
-docs/requirements/SCHOOLOS_FRS_2026.md
+docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
+docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
+
+docs/project/SCHOOLOS_PROJECT_STATUS.md
+docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
+
+docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
+docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
 
 docs/design/SCHOOLOS_UI_UX_GUIDE.md
 
-docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
-docs/project/SCHOOLOS_IMPLEMENTATION_STATUS_AND_PLAN.md
-docs/project/SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md
-docs/project/SCHOOLOS_PLATFORM_AND_SETTINGS.md
-docs/project/SCHOOLOS_STORAGE_AND_FILE_REGISTRY.md
-docs/project/SCHOOLOS_TRANSPORT_REALTIME_READINESS.md
-docs/project/SCHOOLOS_SCALABILITY_HARDENING_POLICY.md
-
-docs/production/deployment-runbook.md
-docs/production/backup-restore-runbook.md
-docs/production/phase1-pilot-readiness.md
+docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md
 
 apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md
 apps/web/e2e/README.md
 ```
 
-Do not recreate the old split PRD, repo-analysis, remaining-plan, deployment-checklist, Docker-VPS runbook, mobile project-instructions, mobile UI direction, or mobile development-plan docs unless the project grows enough to justify splitting them again.
+Do not recreate old split PRD, repo-analysis, remaining-plan, deployment-checklist, Docker-VPS runbook, mobile project-instructions, mobile UI direction, or mobile development-plan docs.
 
 ---
 
@@ -77,7 +70,7 @@ Multi-school production-ready: Not yet
 Full SchoolOS product complete: No
 ```
 
-**Remaining M1–M10 work:** Core modules are pilot-ready; enhancement depth, staging smoke, and mobile polish remain. See `SCHOOLOS_IMPLEMENTATION_STATUS_AND_PLAN.md` Section 11 and `SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md` Sections 4–15.
+**Remaining M1–M10 work:** Core modules are pilot-ready; enhancement depth, staging smoke, and mobile polish remain. See `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md` Section 11 and Sections 4–15.
 
 ---
 
@@ -201,11 +194,10 @@ Rules:
 
 ## 6. Current Implementation Plan
 
-Use these active plans:
+Use this active plan:
 
 ```text
-docs/project/SCHOOLOS_IMPLEMENTATION_STATUS_AND_PLAN.md
-docs/project/SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md
+docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
 ```
 
 Mandatory near-term order:
@@ -220,13 +212,7 @@ Phase 5 — deepen Flutter mobile only through purpose-limited APIs and ownershi
 Phase 6 — M11 intelligence only after reliable production data exists
 ```
 
-The module-wise feature and enhancement backlog is maintained in:
-
-```text
-docs/project/SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md
-```
-
-Use it for feature planning after the active phase gate allows new or deeper module work. It does not override verification, tenant-isolation, permission, File Registry, mobile ownership, or provider-disabled/mock-mode rules.
+The module-wise feature and enhancement backlog is maintained in the active implementation plan. Use it for feature planning after the active phase gate allows new or deeper module work. It does not override verification, tenant-isolation, permission, File Registry, mobile ownership, or provider-disabled/mock-mode rules.
 
 Explicitly deferred unless requested:
 
@@ -277,13 +263,11 @@ Do not claim verification passed unless the commands were actually run.
 
 ```text
 Read these first:
-- DEVELOPMENT_RULES.md
-- AGENTS.md
-- docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
-- docs/project/SCHOOLOS_IMPLEMENTATION_STATUS_AND_PLAN.md
-- docs/project/SCHOOLOS_MODULE_FEATURE_ENHANCEMENT_PLAN.md when planning or enhancing module features
-- docs/project/SCHOOLOS_PLATFORM_AND_SETTINGS.md when touching platform/settings boundaries
-- docs/project/SCHOOLOS_STORAGE_AND_FILE_REGISTRY.md when touching files/media/exports
+- AGENTS.md (incorporates development guidelines)
+- docs/project/SCHOOLOS_PROJECT_STATUS.md
+- docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
+- docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md when touching storage/files/media/exports/scaling/tenant isolation
+- docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md when touching platform/settings/queues/transports boundaries
 - docs/design/SCHOOLOS_UI_UX_GUIDE.md when touching web UI
 - apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md when touching mobile
 

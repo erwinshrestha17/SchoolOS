@@ -1226,6 +1226,48 @@ describe('attendance history', () => {
   });
 });
 
+describe('Cross-Tenant Access Hardening', () => {
+  it('rejects getStudentProfile for a student outside the actor tenant', async () => {
+    const prisma = buildPrisma({ studentFindFirstQueue: [null] });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.getStudentProfile('student-cross-tenant', actor),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('rejects updateStudent for a student outside the actor tenant', async () => {
+    const prisma = buildPrisma({ studentFindFirstQueue: [null] });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.updateStudent(
+        'student-cross-tenant',
+        { firstNameEn: 'Aarav' },
+        actor,
+      ),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('rejects getIemisReadiness for a student outside the actor tenant', async () => {
+    const prisma = buildPrisma({ studentFindFirstQueue: [null] });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.getIemisReadiness('student-cross-tenant', actor),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('rejects getStudentLifecycleTimeline for a student outside the actor tenant', async () => {
+    const prisma = buildPrisma({ studentFindFirstQueue: [null] });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.getStudentLifecycleTimeline('student-cross-tenant', actor),
+    ).rejects.toThrow(NotFoundException);
+  });
+});
+
 function buildStudent(
   overrides: Partial<{
     id: string;

@@ -223,4 +223,92 @@ describe('StudentsService (iEMIS Export)', () => {
     expect(result.issues.some((i) => i.field === 'fullNameNp')).toBe(true);
     expect(result.issues.some((i) => i.field === 'guardianContact')).toBe(true);
   });
+
+  describe('getIemisValidationList', () => {
+    const mockStudents = [
+      {
+        id: 'student-valid',
+        studentSystemId: 'SCH-2026-0001',
+        firstNameEn: 'John',
+        lastNameEn: 'Doe',
+        firstNameNp: 'जोन',
+        lastNameNp: 'डो',
+        dateOfBirth: new Date('2015-01-01'),
+        gender: 'MALE',
+        nationality: 'Nepali',
+        admissionDate: new Date('2026-01-01'),
+        admissionNumber: 'ADM-001',
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        classId: 'class-1',
+        class: { name: 'Class 1' },
+        sectionRef: { name: 'A' },
+        guardianLinks: [
+          {
+            isPrimary: true,
+            relation: 'Father',
+            guardian: {
+              fullName: 'James Doe',
+              primaryPhone: '9800000000',
+              email: 'james@example.com',
+              wardNumber: '5',
+            },
+          },
+        ],
+        enrollments: [
+          {
+            academicYear: { name: '2081' },
+            section: { name: 'A' },
+          },
+        ],
+        tenant: { name: 'Test School' },
+      },
+      {
+        id: 'student-invalid',
+        studentSystemId: 'SCH-2026-0002',
+        firstNameEn: 'Jane',
+        lastNameEn: 'Doe',
+        firstNameNp: null,
+        lastNameNp: null,
+        dateOfBirth: new Date('2015-01-01'),
+        gender: 'FEMALE',
+        nationality: 'Nepali',
+        admissionDate: new Date('2026-01-01'),
+        admissionNumber: 'ADM-002',
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        classId: 'class-1',
+        class: { name: 'Class 1' },
+        guardianLinks: [],
+        enrollments: [],
+        tenant: { name: 'Test School' },
+      },
+    ];
+
+    it('returns all students with correct eligibility and score calculations', async () => {
+      (prisma.student.findMany as jest.Mock).mockResolvedValue(mockStudents);
+
+      const result = await service.getIemisValidationList({}, mockAuth);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].studentId).toBe('student-valid');
+      expect(result[0].eligible).toBe(true);
+      expect(result[0].score).toBe(100);
+
+      expect(result[1].studentId).toBe('student-invalid');
+      expect(result[1].eligible).toBe(false);
+      expect(result[1].score).toBeLessThan(100);
+      expect(result[1].issuesCount).toBeGreaterThan(0);
+    });
+
+    it('filters by status ready or has_issues', async () => {
+      (prisma.student.findMany as jest.Mock).mockResolvedValue(mockStudents);
+
+      const readyOnly = await service.getIemisValidationList({ status: 'ready' }, mockAuth);
+      expect(readyOnly).toHaveLength(1);
+      expect(readyOnly[0].studentId).toBe('student-valid');
+
+      const issuesOnly = await service.getIemisValidationList({ status: 'has_issues' }, mockAuth);
+      expect(issuesOnly).toHaveLength(1);
+      expect(issuesOnly[0].studentId).toBe('student-invalid');
+    });
+  });
 });

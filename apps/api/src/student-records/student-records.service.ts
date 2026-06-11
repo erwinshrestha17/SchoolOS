@@ -457,4 +457,56 @@ export class StudentRecordsService {
 
     return { success: true };
   }
+
+  async getExpiringDocuments(
+    actor: AuthContext,
+    options: { days?: number; excludeExpired?: boolean },
+  ) {
+    const days = options.days ?? 30;
+    const excludeExpired = options.excludeExpired ?? false;
+    const now = new Date();
+    const thresholdDate = new Date();
+    thresholdDate.setDate(now.getDate() + days);
+
+    const documents = await this.prisma.studentDocument.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        expiryDate: {
+          not: null,
+          lte: thresholdDate,
+          ...(excludeExpired ? { gte: now } : {}),
+        },
+        status: { not: 'ARCHIVED' },
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            studentSystemId: true,
+            firstNameEn: true,
+            lastNameEn: true,
+          },
+        },
+      },
+      orderBy: [{ expiryDate: 'asc' }],
+      take: 100,
+    });
+
+    return documents.map((doc) => ({
+      id: doc.id,
+      studentId: doc.studentId,
+      studentSystemId: doc.student.studentSystemId,
+      studentName: `${doc.student.firstNameEn} ${doc.student.lastNameEn}`.trim(),
+      fileId: doc.fileId,
+      kind: doc.kind,
+      status: doc.status,
+      title: doc.title,
+      fileName: doc.fileName,
+      expiryDate: doc.expiryDate!.toISOString(),
+      isExpired: doc.expiryDate!.getTime() < now.getTime(),
+      daysUntilExpiry: Math.ceil(
+        (doc.expiryDate!.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+      ),
+    }));
+  }
 }

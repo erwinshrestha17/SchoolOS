@@ -226,6 +226,17 @@ export const studentsApi = {
 
   exportIemisStudents: () =>
     request<IemisExportResult>('/students/iemis/export'),
+  getIemisReadiness: (studentId: string) =>
+    request<{
+      studentId: string;
+      studentSystemId: string;
+      fullNameEn: string;
+      eligible: boolean;
+      score: number;
+      issues: Array<{ field: string; message: string }>;
+    }>(`/students/${encodeURIComponent(studentId)}/iemis-readiness`),
+  getStudentLifecycleTimeline: (studentId: string) =>
+    request<any[]>(`/students/${encodeURIComponent(studentId)}/lifecycle-timeline`),
   listDuplicateStudentCandidates: (params?: {
     studentId?: string;
     limit?: number;

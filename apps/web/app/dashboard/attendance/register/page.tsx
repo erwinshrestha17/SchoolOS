@@ -93,6 +93,18 @@ export default function AttendanceRegisterPage() {
     window.open(url.toString(), '_blank');
   };
 
+  const handleExportPdf = () => {
+    if (!academicYearId || !classId || !month || !year) return;
+    const url = new URL(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1'}/attendance/register/export`);
+    url.searchParams.set('academicYearId', academicYearId);
+    url.searchParams.set('classId', classId);
+    if (sectionId) url.searchParams.set('sectionId', sectionId);
+    url.searchParams.set('month', month.toString());
+    url.searchParams.set('year', year.toString());
+    url.searchParams.set('format', 'pdf');
+    window.open(url.toString(), '_blank');
+  };
+
   const months = [
     { value: 1, label: 'January' },
     { value: 2, label: 'February' },
@@ -216,6 +228,15 @@ export default function AttendanceRegisterPage() {
             >
               <Download size={16} />
               CSV
+            </button>
+            <button
+              type="button"
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+              disabled={!academicYearId || !classId || !registerQuery.data?.students?.length}
+              onClick={handleExportPdf}
+            >
+              <FileText size={16} />
+              PDF
             </button>
           </div>
         </div>

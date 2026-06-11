@@ -106,6 +106,20 @@ export class StudentsController {
     );
   }
 
+  @Get('iemis/validation')
+  @Permissions('students:read')
+  getIemisValidationList(
+    @Query('classId') classId: string | undefined,
+    @Query('sectionId') sectionId: string | undefined,
+    @Query('status') status: 'all' | 'ready' | 'has_issues' | undefined,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.getIemisValidationList(
+      { classId, sectionId, status },
+      auth,
+    );
+  }
+
   @Get('iemis/export')
   @Permissions('students:read')
   exportIemis(@CurrentAuth() auth: AuthContext) {

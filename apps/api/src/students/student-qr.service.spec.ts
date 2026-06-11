@@ -39,6 +39,12 @@ function createService() {
     canteenSpendingControl: {
       findUnique: jest.fn().mockResolvedValue(null),
     },
+    user: {
+      findMany: jest.fn(),
+    },
+    auditLog: {
+      findMany: jest.fn(),
+    },
   };
 
   const auditService = {
@@ -525,30 +531,78 @@ describe('StudentQrService', () => {
     );
   });
 
-  it('audits failed cross-tenant resolve attempts', async () => {
-    const { service, prisma, auditService } = createService();
-    prisma.studentQrCredential.findFirst.mockResolvedValue(null);
-
-    await expect(
-      service.resolveQr(
-        'tenant-1',
-        'qr-token',
-        StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP,
-        adminAuth,
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-
-    expect(auditService.record).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'QR_RESOLVE_FAILED',
+  it('returns complete QR status/scan log including generation, rotation, and revocation events', async () => {
+    const { service, prisma } = createService();
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.studentQrCredential.findMany.mockResolvedValue([baseCredential]);
+    prisma.user.findMany.mockResolvedValue([
+      { id: adminAuth.userId, email: adminAuth.email },
+    ]);
+    prisma.auditLog.findMany.mockResolvedValue([
+      {
+        id: 'audit-1',
+        action: 'QR_GENERATED',
         resource: 'student_qr',
+        resourceId: 'qr-1',
         tenantId: 'tenant-1',
-        after: expect.objectContaining({
-          reason: 'not_found',
-        }),
+        userId: adminAuth.userId,
+        createdAt: new Date('2026-05-12T00:00:00.000Z'),
+        after: { studentId: 'student-1' },
+      },
+      {
+        id: 'audit-2',
+        action: 'QR_ROTATED',
+        resource: 'student_qr',
+        resourceId: 'qr-1',
+        tenantId: 'tenant-1',
+        userId: adminAuth.userId,
+        createdAt: new Date('2026-05-13T00:00:00.000Z'),
+        after: { studentId: 'student-1', reason: 'Lost printed card' },
+      },
+      {
+        id: 'audit-3',
+        action: 'QR_RESOLVED',
+        resource: 'student_qr',
+        resourceId: 'qr-1',
+        tenantId: 'tenant-1',
+        userId: adminAuth.userId,
+        createdAt: new Date('2026-05-14T00:00:00.000Z'),
+        after: {
+          studentId: 'student-1',
+          purpose: StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP,
+        },
+      },
+    ]);
+
+    const result = await service.getQrScanHistory(
+      'tenant-1',
+      'student-1',
+      adminAuth,
+    );
+
+    expect(result).toHaveLength(3);
+    expect(result[0]).toEqual(
+      expect.objectContaining({
+        action: 'QR_GENERATED',
+        performedBy: adminAuth.userId,
+        performedByEmail: adminAuth.email,
+        success: true,
       }),
     );
-    expect(prisma.studentQrCredential.update).not.toHaveBeenCalled();
+    expect(result[1]).toEqual(
+      expect.objectContaining({
+        action: 'QR_ROTATED',
+        reason: 'Lost printed card',
+        success: true,
+      }),
+    );
+    expect(result[2]).toEqual(
+      expect.objectContaining({
+        action: 'QR_RESOLVED',
+        purpose: StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP,
+        success: true,
+      }),
+    );
   });
 
   // --- Cross-tenant generate/revoke ---

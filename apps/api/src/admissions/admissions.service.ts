@@ -6,7 +6,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { EnrollmentStatus, Prisma } from '@prisma/client';
+import {
+  EnrollmentStatus,
+  Prisma,
+  StudentLifecycleStatus,
+} from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { encryptSensitiveField } from '../common/security/field-encryption';
@@ -267,6 +271,22 @@ export class AdmissionsService {
               dto.specialNeeds
                 ? new Date()
                 : null,
+          },
+        });
+
+        await tx.studentLifecycleTransition.create({
+          data: {
+            tenantId: actor.tenantId,
+            studentId: student.id,
+            fromStatus: null,
+            toStatus: StudentLifecycleStatus.ACTIVE,
+            reason: 'Initial enrollment via admission',
+            changedById: actor.userId,
+            feeClearanceWaived: false,
+            metadata: {
+              admissionDate: student.admissionDate.toISOString(),
+              classId: student.classId,
+            },
           },
         });
 
@@ -545,38 +565,210 @@ export class AdmissionsService {
     dto: CheckAdmissionDuplicateDto,
     actor: AuthContext,
   ) {
+    const inputPhones =
+      dto.guardianPhones && dto.guardianPhones.length > 0
+        ? dto.guardianPhones.map((p) => normalizeGuardianPhone(p))
+        : [];
+
     const candidates = await this.prisma.student.findMany({
       where: {
         tenantId: actor.tenantId,
-        dateOfBirth: new Date(dto.dateOfBirth),
         ...(dto.excludeStudentId ? { id: { not: dto.excludeStudentId } } : {}),
+        OR: [
+          // 1. Exact name (English or Nepali) + Date of Birth
+          {
+            dateOfBirth: new Date(dto.dateOfBirth),
+            OR: [
+              {
+                firstNameEn: {
+                  equals: dto.firstNameEn,
+                  mode: 'insensitive' as const,
+                },
+                lastNameEn: {
+                  equals: dto.lastNameEn,
+                  mode: 'insensitive' as const,
+                },
+              },
+              ...(dto.firstNameNp && dto.lastNameNp
+                ? [
+                    {
+                      firstNameNp: {
+                        equals: dto.firstNameNp,
+                        mode: 'insensitive' as const,
+                      },
+                      lastNameNp: {
+                        equals: dto.lastNameNp,
+                        mode: 'insensitive' as const,
+                      },
+                    },
+                  ]
+                : []),
+            ],
+          },
+          // 2. Name (English or Nepali) + Guardian primary/secondary phone
+          ...(inputPhones.length > 0
+            ? [
+                {
+                  OR: [
+                    {
+                      firstNameEn: {
+                        equals: dto.firstNameEn,
+                        mode: 'insensitive' as const,
+                      },
+                      lastNameEn: {
+                        equals: dto.lastNameEn,
+                        mode: 'insensitive' as const,
+                      },
+                    },
+                    ...(dto.firstNameNp && dto.lastNameNp
+                      ? [
+                          {
+                            firstNameNp: {
+                              equals: dto.firstNameNp,
+                              mode: 'insensitive' as const,
+                            },
+                            lastNameNp: {
+                              equals: dto.lastNameNp,
+                              mode: 'insensitive' as const,
+                            },
+                          },
+                        ]
+                      : []),
+                  ],
+                  guardianLinks: {
+                    some: {
+                      guardian: {
+                        OR: [
+                          { primaryPhone: { in: inputPhones } },
+                          { secondaryPhone: { in: inputPhones } },
+                        ],
+                      },
+                    },
+                  },
+                },
+                // 3. Sibling matching: Same last name + matching guardian phone
+                {
+                  OR: [
+                    {
+                      lastNameEn: {
+                        equals: dto.lastNameEn,
+                        mode: 'insensitive' as const,
+                      },
+                    },
+                    ...(dto.lastNameNp
+                      ? [
+                          {
+                            lastNameNp: {
+                              equals: dto.lastNameNp,
+                              mode: 'insensitive' as const,
+                            },
+                          },
+                        ]
+                      : []),
+                  ],
+                  guardianLinks: {
+                    some: {
+                      guardian: {
+                        OR: [
+                          { primaryPhone: { in: inputPhones } },
+                          { secondaryPhone: { in: inputPhones } },
+                        ],
+                      },
+                    },
+                  },
+                },
+              ]
+            : []),
+        ],
       },
       include: {
         class: true,
         sectionRef: true,
+        guardianLinks: {
+          include: {
+            guardian: true,
+          },
+        },
       },
       orderBy: [{ createdAt: 'desc' }],
       take: 100,
     });
 
-    const normalizedFirstName = normalizeAdmissionName(dto.firstNameEn);
-    const normalizedLastName = normalizeAdmissionName(dto.lastNameEn);
     const matches = candidates
-      .filter(
-        (candidate) =>
+      .map((candidate) => {
+        const matchTypes: string[] = [];
+
+        const dobMatches =
+          new Date(candidate.dateOfBirth).getTime() ===
+          new Date(dto.dateOfBirth).getTime();
+
+        const nameEnMatches =
           normalizeAdmissionName(candidate.firstNameEn) ===
-            normalizedFirstName &&
-          normalizeAdmissionName(candidate.lastNameEn) === normalizedLastName,
-      )
-      .map((candidate) => ({
-        studentId: candidate.id,
-        studentSystemId: candidate.studentSystemId,
-        fullNameEn: `${candidate.firstNameEn} ${candidate.lastNameEn}`.trim(),
-        dateOfBirth: candidate.dateOfBirth,
-        className: candidate.class.name,
-        sectionName: candidate.sectionRef?.name ?? candidate.section ?? null,
-        rollNumber: candidate.rollNumber,
-      }));
+            normalizeAdmissionName(dto.firstNameEn) &&
+          normalizeAdmissionName(candidate.lastNameEn) ===
+            normalizeAdmissionName(dto.lastNameEn);
+
+        const nameNpMatches =
+          dto.firstNameNp &&
+          dto.lastNameNp &&
+          candidate.firstNameNp &&
+          candidate.lastNameNp
+            ? normalizeAdmissionName(candidate.firstNameNp) ===
+                normalizeAdmissionName(dto.firstNameNp) &&
+              normalizeAdmissionName(candidate.lastNameNp) ===
+                normalizeAdmissionName(dto.lastNameNp)
+            : false;
+
+        const nameMatches = nameEnMatches || nameNpMatches;
+
+        const candidatePhones = candidate.guardianLinks
+          ? candidate.guardianLinks
+              .flatMap((link) => [
+                link.guardian.primaryPhone,
+                link.guardian.secondaryPhone,
+              ])
+              .filter((p): p is string => !!p)
+              .map((p) => normalizeGuardianPhone(p))
+          : [];
+
+        const phoneMatches = inputPhones.some((phone) =>
+          candidatePhones.includes(phone),
+        );
+
+        const lastNameEnMatches =
+          normalizeAdmissionName(candidate.lastNameEn) ===
+          normalizeAdmissionName(dto.lastNameEn);
+
+        const lastNameNpMatches =
+          dto.lastNameNp && candidate.lastNameNp
+            ? normalizeAdmissionName(candidate.lastNameNp) ===
+              normalizeAdmissionName(dto.lastNameNp)
+            : false;
+
+        const lastNameMatches = lastNameEnMatches || lastNameNpMatches;
+
+        if (nameMatches && dobMatches) {
+          matchTypes.push('exact_name_dob');
+        }
+        if (nameMatches && phoneMatches) {
+          matchTypes.push('name_phone');
+        }
+        if (lastNameMatches && phoneMatches && !nameMatches) {
+          matchTypes.push('sibling');
+        }
+
+        return {
+          studentId: candidate.id,
+          studentSystemId: candidate.studentSystemId,
+          fullNameEn: `${candidate.firstNameEn} ${candidate.lastNameEn}`.trim(),
+          dateOfBirth: candidate.dateOfBirth,
+          className: candidate.class.name,
+          sectionName: candidate.sectionRef?.name ?? candidate.section ?? null,
+          rollNumber: candidate.rollNumber,
+          matchTypes,
+        };
+      })
+      .filter((match) => match.matchTypes.length > 0);
 
     return {
       hasWarnings: matches.length > 0,
@@ -716,11 +908,22 @@ export class AdmissionsService {
       await this.assertStudentSystemIdAvailable(dto.studentSystemId, actor);
     }
 
+    const guardianPhones = dto.guardians
+      ? dto.guardians
+          .map((g) =>
+            [g.primaryPhone, g.secondaryPhone].filter((p): p is string => !!p),
+          )
+          .flat()
+      : [];
+
     const duplicateWarnings = await this.checkDuplicateAdmissions(
       {
         firstNameEn: dto.firstNameEn,
         lastNameEn: dto.lastNameEn,
         dateOfBirth: dto.dateOfBirth,
+        firstNameNp: dto.firstNameNp,
+        lastNameNp: dto.lastNameNp,
+        guardianPhones,
       },
       actor,
     );

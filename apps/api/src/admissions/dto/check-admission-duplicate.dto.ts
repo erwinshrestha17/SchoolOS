@@ -1,4 +1,4 @@
-import { IsDateString, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsDateString, IsOptional, IsString } from 'class-validator';
 
 export class CheckAdmissionDuplicateDto {
   @IsString()
@@ -9,6 +9,19 @@ export class CheckAdmissionDuplicateDto {
 
   @IsDateString()
   dateOfBirth!: string;
+
+  @IsOptional()
+  @IsString()
+  firstNameNp?: string;
+
+  @IsOptional()
+  @IsString()
+  lastNameNp?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  guardianPhones?: string[];
 
   @IsOptional()
   @IsString()

@@ -959,9 +959,233 @@ Planned enhancements: attendance risk insight, fee collection risk, academic int
 
 ---
 
-## 19. Pilot Functional Acceptance Checklist
+---
 
-Before pilot, manually verify:
+## 19. Architecture Constraints
+
+1. The backend must remain a NestJS modular monolith for the pilot stage.
+2. The system must use PostgreSQL with Prisma for persistent data.
+3. Redis/BullMQ must be used for cache, queues, and background jobs where needed.
+4. The dashboard must continue using Next.js.
+5. The companion app must continue using Flutter.
+6. Browser authentication must be cookie-first.
+7. Mobile/API clients must support bearer-token access.
+8. The system must maintain strict `tenantId` boundaries across modules.
+9. The system must avoid premature migration to microservices.
+10. The system must avoid Angular migration for the current product direction.
+11. Large services/components should be split by responsibility as code-file modularization, not microservices.
+
+---
+
+## 20. Product Planes and Boundaries
+
+SchoolOS must support three separate product planes.
+
+| Plane | Audience | Requirement |
+|---|---|---|
+| Platform Control Plane | SchoolOS operator | Manage SaaS tenants, subscriptions, provider readiness, queues, API keys, support override, audit, billing records. |
+| Tenant Configuration Plane | Principal/admin | Configure academic years, classes, sections, fee settings, school profile, roles, modules, localization. |
+| School Operations Plane | Staff, parents, students | Run daily workflows including students, attendance, fees, accounting, academics, communication, library, transport, canteen, HR. |
+
+System rules:
+1. SchoolOS SaaS billing must not mix with school fee collection.
+2. Platform support override must require explicit tenant, reason, audit, and time-bound design where possible.
+3. Tenant configuration must affect only the selected tenant.
+4. School operation APIs must always be tenant-scoped.
+5. Parent/student/driver/mobile APIs must be purpose-limited and must not expose admin-shaped responses.
+6. Disabled feature routes must fail closed even when accessed directly by URL.
+
+---
+
+## 21. User Classes
+
+The system must support the following user classes with role-based permissions and tenant-scoped access:
+- SchoolOS Platform Operator.
+- School Owner / Principal.
+- School Admin.
+- Accountant / Finance Staff.
+- Cashier.
+- Teacher.
+- Parent / Guardian.
+- Student.
+- Librarian.
+- Transport Staff / Driver.
+- Canteen Operator.
+- HR / Payroll Staff.
+
+---
+
+## 22. Cross-Cutting System Requirements
+
+### 22.1 Tenant Isolation
+1. Every database query, file access, queue job, export, and report must be tenant-scoped.
+2. Same names, phone numbers, admission numbers, class names, or receipt numbers across schools must never cause leakage.
+3. Platform override must require explicit reason and audit trail.
+4. Suspended tenants must be blocked consistently across dashboard, API, mobile, jobs, file downloads, and report generation.
+
+### 22.2 Parent and Student Access
+1. Parents can only access linked children.
+2. Students can only access their own allowed records.
+3. Guardian removal must revoke access immediately.
+4. Shared links must not bypass ownership checks.
+5. Parent/student APIs must fail closed.
+
+### 22.3 File Privacy
+1. Student photos, documents, receipts, report cards, payslips, notices, chat attachments, activity media, and exports must use protected access.
+2. Raw storage keys, public object URLs, and internal file IDs must not be exposed to unauthorized clients.
+3. Signed URLs must be short-lived.
+4. Sensitive file preview/download must be audited.
+
+### 22.4 Money and Accounting
+1. Payment, refund, reversal, payroll, canteen, library fine, and accounting posting flows must be idempotent.
+2. Posted accounting records must be immutable.
+3. Every reversal must have reason, permission check, and audit trail.
+4. Financial reports must reconcile with source ledgers.
+5. Decimal-safe money handling must prevent one-paisa mismatches where possible.
+
+### 22.5 Offline, Slow Network, and Recovery
+1. Long forms should preserve drafts where practical.
+2. Expired sessions should recover safely without duplicate submission.
+3. Offline/reconnect sync must show conflicts instead of overwriting silently.
+4. Low-bandwidth media must fail gracefully.
+
+### 22.6 Background Jobs
+1. Jobs must re-check tenant status, feature status, entity status, and permissions before executing.
+2. Retried jobs must not duplicate messages, payments, reports, exports, or accounting postings.
+3. Failed jobs must expose safe diagnostics without secrets.
+4. Queue retry for sensitive jobs must be audited.
+
+### 22.7 PDFs, Reports, and Exports
+1. Receipt, ID card, report card, payroll, accounting, attendance, fee, library, transport, canteen, notice, and official-reporting exports must be tenant-scoped.
+2. Export failure must not create false success states.
+3. Re-generated PDFs should maintain history where legally or operationally required.
+4. Large reports should use background export when needed.
+5. Exported artifacts must be registered in File Registry where retained.
+
+---
+
+## 23. Payment and Provider Requirements
+
+1. Cash must be supported for pilot.
+2. Manual bank transfer must be supported as a controlled workflow with reference/proof and approval.
+3. eSewa and Khalti must only be enabled after sandbox/staging verification.
+4. Mock provider mode is allowed only for demo/dev and must be clearly shown in UI.
+5. Card/bank host-to-host payments are future scope.
+6. SchoolOS must create its own payment intent/order before provider redirect/initiation.
+7. The system must deduplicate payments by provider reference, SchoolOS order/reference, and amount.
+8. The system must not finalize receipt from redirect/callback alone where provider lookup/status verification is supported.
+9. Pending, expired, failed, canceled, and provider-error states must be retained.
+10. Refund/reversal must create explicit records and must not overwrite original receipt.
+11. Cashier/accounting must be able to reconcile gateway totals against SchoolOS receipts.
+12. Disabled provider mode must block fake real-payment collection.
+
+---
+
+## 24. IEMIS and Official Reporting Requirements
+
+1. IEMIS readiness must be treated as validation and export readiness workflow.
+2. Export states must include Draft, Validation Failed, Ready, Exported, and Archived.
+3. School master profile fields must be complete before official-ready state.
+4. Student identity, guardian, class/section, roll, status, transfer/promote/leave state must be represented.
+5. Scholarship/payment readiness fields must be explicit where required.
+6. Teacher/staff roster must align with timetable and attendance ownership.
+7. Physical/infrastructure profile fields must support school profile readiness where required.
+8. Special flags such as technical, disability, scholarship, transfer, dropout, and status must not be hidden in notes.
+9. Unsupported official fields must be documented instead of guessed.
+10. Claims of final IEMIS compliance require validation against real official templates during pilot/staging.
+
+---
+
+## 25. Non-Functional Requirements
+
+| Area | Requirement / target |
+|---|---|
+| Availability | 99.5% monthly for pilot SaaS environment, excluding announced maintenance. |
+| Common page response | p95 under 2.0 seconds for common dashboard workflows under pilot data size. |
+| Attendance/marks save | p95 write under 1.5 seconds. |
+| Cashier receipt generation | Receipt issued under 2 seconds after confirmed save. |
+| Search | Student/staff lookup under 1 second p95 for pilot data size. |
+| Audit integrity | 100% of configured sensitive actions logged. |
+| Backup | Daily full backup plus intra-day snapshot/incremental strategy. |
+| Recovery | Target RPO 24 hours or better; target RTO 8 business hours for pilot. |
+| Access control | Role checks on all business actions; step-up approval for reversals, refunds, bulk export. |
+| Localization | Nepali + English UI baseline; BS/AD date support; printable formats configurable. |
+| Data portability | CSV/Excel export for major masters and transactions; archival export for tenant offboarding. |
+| Observability | Failed payments, failed jobs, failed exports, and provider problems visible to operators. |
+| Mobile/low bandwidth | Mobile screens must degrade gracefully on intermittent connections. |
+| List scalability | Growing lists must be paginated and server-filtered. |
+
+---
+
+## 26. Security Requirements
+
+1. Browser auth must be cookie-first.
+2. Mobile/API access must support bearer tokens.
+3. No raw browser token storage.
+4. RBAC must protect all business actions.
+5. Tenant isolation must be enforced on every backend operation.
+6. Support override must require reason, explicit tenant, audit, and expiry/time-bound handling where possible.
+7. File access must be protected and signed URLs short-lived.
+8. Provider secrets must be masked in UI, logs, diagnostics, queue screens, and failure screens.
+9. Sensitive data must be masked unless the user has permission.
+10. Bulk export must require permission and audit.
+11. Parent/student access must fail closed.
+
+---
+
+## 27. Data Requirements
+
+The system must maintain canonical backend models for:
+- Tenant, User, Role and permission, Student, Guardian, Staff, Class, Section, Academic year, Fiscal year.
+- Fee head, Fee plan, Invoice, Payment, Receipt, Ledger, Journal entry.
+- Attendance session and attendance record.
+- Subject, Exam term, Marks and CAS, Report card.
+- Homework, Timetable.
+- Notice and message.
+- File Registry entry.
+- Book and copy.
+- Route, trip, vehicle, driver.
+- Canteen wallet, POS sale, inventory movement.
+- Payroll run and payslip.
+- Audit log.
+
+All tenant-owned records must carry tenant ownership either directly or through a tenant-owned parent chain.
+
+---
+
+## 28. Error Handling Requirements
+
+1. Duplicate payment submissions must return an existing safe result or deterministic duplicate error.
+2. File upload/database save partial failures must be recoverable or clearly reported.
+3. Export generation failure must not show success.
+4. Provider-disabled mode must block dependent actions.
+5. Offline sync conflicts must show user choices.
+6. Expired sessions must not duplicate submissions after re-authentication.
+7. Suspended tenants must receive consistent blocked responses.
+8. Unauthorzed parent/student access must fail closed.
+
+---
+
+## 29. Pilot Verification Requirements
+
+Before controlled pilot, the following must pass or be explicitly waived:
+- `pnpm db:generate`.
+- `pnpm db:validate`.
+- `pnpm verify:openapi`.
+- `pnpm lint`.
+- `pnpm typecheck`.
+- `pnpm test`.
+- `pnpm test:e2e`.
+- `pnpm build`.
+- `pnpm verify:production`.
+- `pnpm smoke:phase1` with API, web, Postgres, and Redis running.
+
+Browser routes that must load without fatal error:
+- Platform dashboard, Tenant dashboard, Students, Attendance, Fees/finance, Academics, Accounting, Homework/timetable, HR/payroll, Library, Transport, Canteen, Notices/communication, Settings.
+
+---
+
+## 30. High-Risk Manual Verification Scenarios
 
 1. School A cannot access School B students, files, reports, fees, or messages.
 2. Parent can only view linked children.
@@ -979,15 +1203,3 @@ Before pilot, manually verify:
 14. Suspended tenant is blocked consistently.
 15. Report exports are stored and downloaded through protected access.
 
----
-
-## 20. Relationship to Other Documents
-
-| Document | Purpose |
-|---|---|
-| PRD | Product direction, module scope, user needs, edge cases, acceptance criteria. |
-| BRD | Business need, market, customer value, risks, success metrics. |
-| SRS | System-level software behavior, constraints, NFRs, security, data, verification. |
-| FRS | Detailed feature-level functions, flows, validation, states, acceptance criteria. |
-| Technical Design | Architecture, APIs, database, queues, integrations, deployment. |
-| Test Plan | Manual and automated validation strategy. |

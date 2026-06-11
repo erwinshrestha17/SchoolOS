@@ -1554,3 +1554,58 @@ The researched content was informed by public Nepal education/legal/payment cont
 
 Final implementation claims must still be validated against real pilot-school workflows, official export templates, provider sandbox/staging flows, production security review, and legal/policy review.
 
+---
+
+## 25. Business Opportunity, Target Customers, and Commercial Assumptions
+
+### 25.1 Target Customers
+- **Primary customers:** Private Nepali schools from Montessori to Class 10. Small to mid-sized schools that currently rely on manual records, Excel, messaging apps, or disconnected tools.
+- **Future customers:** +2 colleges and K-12 institutions, multi-branch school groups, and schools requiring deeper transport, canteen, HR/payroll, accounting, or reporting workflows.
+
+### 25.2 Target Users and Business Value
+
+| User | Business value SchoolOS must deliver |
+|---|---|
+| School Owner / Principal | Operational visibility, collections overview, attendance gaps, reporting readiness, risk alerts. |
+| School Admin | Faster student, guardian, class, document, notice, and setup workflows. |
+| Accountant / Finance Staff | Accurate invoices, payments, receipts, refunds, reversals, ledgers, reconciliation, accounting reports. |
+| Cashier | Fast fee collection, partial payments, receipt printing/sharing, day-end close. |
+| Teacher | Simple attendance, homework, marks/CAS, timetable, and class communication workflows. |
+| Parent / Guardian | Child-specific dues, receipts, attendance, homework, notices, report cards, and future transport/canteen visibility. |
+| Student | Own timetable, homework, notices, attendance, report cards, and allowed library/canteen information. |
+| Librarian | Book/copy control, issue/return, fines, borrower lookup, reports. |
+| Transport Staff / Driver | Route/trip/student boarding workflows and future live/stale location support. |
+| Canteen Operator | Fast POS, wallet, QR serving, meal plans, spending controls, inventory. |
+| HR / Payroll Staff | Staff records, leave, salary, payroll, payslips, payroll posting. |
+| SchoolOS Platform Operator | Tenant management, subscriptions, provider readiness, feature control, audit, support override. |
+
+### 25.3 Revenue and Commercial Assumptions
+1. SchoolOS is a B2B SaaS product sold to schools, not directly to parents.
+2. Pricing may be based on school size, active students, enabled modules, support tier, and storage/report usage.
+3. Future plans may include module-based tiers such as Core, Finance, Parent Portal, Advanced Operations, and Enterprise/Multi-branch.
+4. Real payment-provider integration should not be monetized until verified in sandbox/staging and reconciled against SchoolOS receipts.
+5. Support, onboarding, data import, and custom report setup may be billed separately for larger schools.
+
+### 25.4 Business Constraints
+1. Pilot reliability is more important than feature breadth.
+2. Financial correctness is more important than UI polish alone.
+3. Tenant isolation and file privacy are non-negotiable.
+4. Provider integrations must be honest: disabled/mock/configured modes must be visible.
+5. Official-reporting exports must not guess unmapped fields.
+6. AI/analytics should wait until reliable production data exists.
+7. Microservices and Angular migration are out of scope for immediate pilot.
+
+---
+
+## 26. Business Acceptance Criteria
+
+SchoolOS is business-ready for controlled pilot when:
+1. One pilot school can operate core student, attendance, fee, receipt, accounting, notice, and academic workflows without fatal blockers.
+2. Fee ledgers, receipts, and accounting reports reconcile.
+3. Parent access is child-scoped and safe.
+4. School A cannot access School B data, files, reports, or messages.
+5. Suspended tenants are blocked consistently.
+6. Protected exports and files work through File Registry.
+7. Pilot users can complete daily cashier, teacher, admin, and principal workflows.
+8. Known gaps are documented and accepted before pilot launch.
+

@@ -174,7 +174,7 @@ describe('AdmissionsService production hardening', () => {
     expect(prisma.academicYear.findFirst).not.toHaveBeenCalled();
   });
 
-  it('detects duplicates only within the actor tenant', async () => {
+  it('detects duplicates only within the actor tenant (exact name + DOB)', async () => {
     const prisma = buildPrisma({
       studentFindManyResult: [
         {
@@ -187,6 +187,7 @@ describe('AdmissionsService production hardening', () => {
           section: null,
           class: { name: 'Class 1' },
           sectionRef: null,
+          guardianLinks: [],
         },
       ],
     });
@@ -204,17 +205,114 @@ describe('AdmissionsService production hardening', () => {
     expect(prisma.student.findMany).toHaveBeenCalledWith({
       where: {
         tenantId: actor.tenantId,
-        dateOfBirth: new Date('2020-01-02'),
+        OR: [
+          {
+            dateOfBirth: new Date('2020-01-02'),
+            OR: [
+              {
+                firstNameEn: { equals: '  Asha ', mode: 'insensitive' },
+                lastNameEn: { equals: 'Tamang', mode: 'insensitive' },
+              },
+            ],
+          },
+        ],
       },
       include: {
         class: true,
         sectionRef: true,
+        guardianLinks: {
+          include: {
+            guardian: true,
+          },
+        },
       },
       orderBy: [{ createdAt: 'desc' }],
       take: 100,
     });
 
     expect(result.hasWarnings).toBe(true);
+    expect(result.matches[0].matchTypes).toContain('exact_name_dob');
+  });
+
+  it('detects name + phone duplicate matches (even if DOB differs)', async () => {
+    const prisma = buildPrisma({
+      studentFindManyResult: [
+        {
+          id: 'student-existing-2',
+          studentSystemId: 'SCH-2026-0010',
+          firstNameEn: 'Asha',
+          lastNameEn: 'Tamang',
+          dateOfBirth: new Date('2019-05-05'),
+          rollNumber: null,
+          section: null,
+          class: { name: 'Class 1' },
+          sectionRef: null,
+          guardianLinks: [
+            {
+              guardian: {
+                primaryPhone: '9801234567',
+                secondaryPhone: null,
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.checkDuplicateAdmissions(
+      {
+        firstNameEn: 'Asha',
+        lastNameEn: 'Tamang',
+        dateOfBirth: '2020-01-02',
+        guardianPhones: ['9801234567'],
+      },
+      actor,
+    );
+
+    expect(result.hasWarnings).toBe(true);
+    expect(result.matches[0].matchTypes).toContain('name_phone');
+    expect(result.matches[0].matchTypes).not.toContain('exact_name_dob');
+  });
+
+  it('detects sibling matches (same last name + matching guardian phone)', async () => {
+    const prisma = buildPrisma({
+      studentFindManyResult: [
+        {
+          id: 'sibling-existing',
+          studentSystemId: 'SCH-2026-0011',
+          firstNameEn: 'Prem',
+          lastNameEn: 'Tamang',
+          dateOfBirth: new Date('2018-03-03'),
+          rollNumber: null,
+          section: null,
+          class: { name: 'Class 2' },
+          sectionRef: null,
+          guardianLinks: [
+            {
+              guardian: {
+                primaryPhone: '9801234567',
+                secondaryPhone: null,
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.checkDuplicateAdmissions(
+      {
+        firstNameEn: 'Asha',
+        lastNameEn: 'Tamang',
+        dateOfBirth: '2020-01-02',
+        guardianPhones: ['9801234567'],
+      },
+      actor,
+    );
+
+    expect(result.hasWarnings).toBe(true);
+    expect(result.matches[0].matchTypes).toContain('sibling');
   });
 
   it('blocks manual roll number conflicts for tenant year class and section', async () => {
@@ -460,6 +558,8 @@ function buildTransaction() {
         studentSystemId: 'SCH-2026-0001',
         firstNameEn: 'Asha',
         lastNameEn: 'Tamang',
+        admissionDate: new Date('2026-04-01T00:00:00.000Z'),
+        classId: 'class-1',
       }),
       findFirst: jest.fn().mockResolvedValue(null),
     },
@@ -493,6 +593,11 @@ function buildTransaction() {
         classId: 'class-1',
         sectionId: 'section-1',
         rollNumber: 4,
+      }),
+    },
+    studentLifecycleTransition: {
+      create: jest.fn().mockResolvedValue({
+        id: 'slt-1',
       }),
     },
     auditLog: {

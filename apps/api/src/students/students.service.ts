@@ -2815,6 +2815,69 @@ export class StudentsService {
     };
   }
 
+  async getIemisValidationList(
+    options: {
+      classId?: string;
+      sectionId?: string;
+      status?: 'all' | 'ready' | 'has_issues';
+    },
+    actor: AuthContext,
+  ) {
+    const students = await this.prisma.student.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(options.classId ? { classId: options.classId } : {}),
+        ...(options.sectionId ? { sectionId: options.sectionId } : {}),
+      },
+      include: {
+        tenant: true,
+        class: true,
+        sectionRef: true,
+        guardianLinks: {
+          include: { guardian: true },
+        },
+        enrollments: {
+          include: {
+            academicYear: true,
+            section: true,
+          },
+          orderBy: [{ createdAt: 'desc' }],
+        },
+      },
+      orderBy: [{ studentSystemId: 'asc' }],
+    });
+
+    const list = students.map((student) => {
+      const issues = validateIemisStudent(student);
+      const score = Math.max(0, Math.round(((12 - issues.length) / 12) * 100));
+
+      return {
+        studentId: student.id,
+        studentSystemId: student.studentSystemId,
+        fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+        className: student.class.name,
+        sectionName: student.sectionRef?.name ?? student.section ?? null,
+        eligible: issues.length === 0,
+        score,
+        issuesCount: issues.length,
+        issues: issues.map((issue) => ({
+          field: issue.field,
+          message: issue.message,
+        })),
+      };
+    });
+
+    if (options.status === 'ready') {
+      return list.filter((item) => item.eligible);
+    }
+
+    if (options.status === 'has_issues') {
+      return list.filter((item) => !item.eligible);
+    }
+
+    return list;
+  }
+
   async generateStudentDocumentPdf(
     studentId: string,
     documentKind: string,

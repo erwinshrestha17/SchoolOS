@@ -211,4 +211,71 @@ describe('StudentRecordsService', () => {
     });
     expect(result).toEqual({ url: 'https://signed.example/birth.pdf' });
   });
+
+  it('lists expiring and expired documents with correct metadata', async () => {
+    const expiredDate = new Date();
+    expiredDate.setDate(expiredDate.getDate() - 5);
+
+    const expiringDate = new Date();
+    expiringDate.setDate(expiringDate.getDate() + 10);
+
+    prisma.studentDocument.findMany.mockResolvedValue([
+      {
+        id: 'doc-expired',
+        studentId: 'student-1',
+        fileId: 'asset-1',
+        kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+        status: 'ACTIVE',
+        title: 'Expired document',
+        fileName: 'expired.pdf',
+        expiryDate: expiredDate,
+        student: {
+          id: 'student-1',
+          studentSystemId: 'STU-0001',
+          firstNameEn: 'Asha',
+          lastNameEn: 'Tamang',
+        },
+      },
+      {
+        id: 'doc-expiring',
+        studentId: 'student-1',
+        fileId: 'asset-2',
+        kind: StudentDocumentKind.OTHER,
+        status: 'ACTIVE',
+        title: 'Expiring document',
+        fileName: 'expiring.pdf',
+        expiryDate: expiringDate,
+        student: {
+          id: 'student-1',
+          studentSystemId: 'STU-0001',
+          firstNameEn: 'Asha',
+          lastNameEn: 'Tamang',
+        },
+      },
+    ]);
+
+    const resultAll = await service.getExpiringDocuments(actor, { days: 30 });
+
+    expect(resultAll).toHaveLength(2);
+    expect(resultAll[0].id).toBe('doc-expired');
+    expect(resultAll[0].isExpired).toBe(true);
+    expect(resultAll[1].id).toBe('doc-expiring');
+    expect(resultAll[1].isExpired).toBe(false);
+    expect(resultAll[1].daysUntilExpiry).toBe(10);
+
+    // Exclude expired test
+    const resultActiveOnly = await service.getExpiringDocuments(actor, {
+      days: 30,
+      excludeExpired: true,
+    });
+    expect(prisma.studentDocument.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          expiryDate: expect.objectContaining({
+            gte: expect.any(Date),
+          }),
+        }),
+      }),
+    );
+  });
 });

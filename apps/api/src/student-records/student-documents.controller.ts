@@ -51,6 +51,21 @@ export class StudentDocumentsController {
     return this.studentRecordsService.uploadDocument(dto, auth);
   }
 
+  @Get('expiring')
+  @Permissions('students:read')
+  async getExpiringDocuments(
+    @CurrentAuth() auth: AuthContext,
+    @Query('days') days?: string,
+    @Query('excludeExpired') excludeExpired?: string,
+  ) {
+    const daysNum = days ? parseInt(days, 10) : 30;
+    const excludeExpiredBool = excludeExpired === 'true';
+    return this.studentRecordsService.getExpiringDocuments(auth, {
+      days: isNaN(daysNum) ? 30 : daysNum,
+      excludeExpired: excludeExpiredBool,
+    });
+  }
+
   @Get(':id/preview')
   @Permissions('students:read')
   async previewDocument(

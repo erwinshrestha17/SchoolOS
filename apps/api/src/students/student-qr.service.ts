@@ -305,7 +305,15 @@ export class StudentQrService {
         tenantId,
         resource: 'student_qr',
         resourceId: { in: credentialIds },
-        action: { in: ['QR_RESOLVED', 'QR_RESOLVE_FAILED'] },
+        action: {
+          in: [
+            'QR_GENERATED',
+            'QR_ROTATED',
+            'QR_REVOKED',
+            'QR_RESOLVED',
+            'QR_RESOLVE_FAILED',
+          ],
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
@@ -334,11 +342,20 @@ export class StudentQrService {
         action: a.action,
         scannedBy: a.userId,
         scannedByEmail: a.userId ? (userMap.get(a.userId) ?? null) : null,
+        performedBy: a.userId,
+        performedByEmail: a.userId ? (userMap.get(a.userId) ?? null) : null,
         purpose: (details.purpose as string | undefined) ?? null,
         success:
-          (details.success as boolean | undefined) ??
-          a.action === 'QR_RESOLVED',
+          a.action === 'QR_RESOLVED' ||
+          a.action === 'QR_GENERATED' ||
+          a.action === 'QR_ROTATED' ||
+          a.action === 'QR_REVOKED'
+            ? true
+            : a.action === 'QR_RESOLVE_FAILED'
+              ? false
+              : (details.success as boolean | undefined) ?? null,
         failureCode: (details.failureCode as string | undefined) ?? null,
+        reason: (details.reason as string | undefined) ?? null,
         timestamp: a.createdAt.toISOString(),
       };
     });
