@@ -525,6 +525,61 @@ describe('PlatformService provider config hardening', () => {
     expect(storageService.testConnection).not.toHaveBeenCalled();
   });
 
+  it('includes payment gateway in aggregate provider readiness', async () => {
+    prisma.providerConfig.findFirst.mockResolvedValue(null);
+
+    const readiness = await service.getProvidersReadiness();
+    const paymentGateway = readiness.find(
+      (item) => item.providerKey === 'payment_gateway',
+    );
+
+    expect(paymentGateway).toEqual(
+      expect.objectContaining({
+        providerKey: 'payment_gateway',
+        displayName: 'Payment Gateway',
+        status: 'MISSING_CONFIG',
+        requiredConfigMissing: ['merchantId'],
+      }),
+    );
+  });
+
+  it('fails aggregate production payment gateway readiness without validated sandbox', async () => {
+    const productionGateway = {
+      id: 'pg-prod',
+      type: 'PAYMENT_GATEWAY',
+      name: 'esewa',
+      enabled: true,
+      environment: 'PRODUCTION',
+      configEncrypted: { merchantId: 'merchant-1' },
+      secretKeys: [],
+      updatedAt: new Date(),
+    };
+    prisma.providerConfig.findFirst.mockImplementation(({ where }) => {
+      if (where?.type === 'PAYMENT_GATEWAY' && where?.environment === 'TEST') {
+        return Promise.resolve(null);
+      }
+      if (where?.type === 'PAYMENT_GATEWAY') {
+        return Promise.resolve(productionGateway);
+      }
+      return Promise.resolve(null);
+    });
+
+    const readiness = await service.getProvidersReadiness();
+    const paymentGateway = readiness.find(
+      (item) => item.providerKey === 'payment_gateway',
+    );
+
+    expect(paymentGateway).toEqual(
+      expect.objectContaining({
+        providerKey: 'payment_gateway',
+        status: 'FAILED',
+        message: expect.stringContaining(
+          'does not have a validated TEST sandbox configuration',
+        ),
+      }),
+    );
+  });
+
   it('returns provider readiness failure details without exposing secrets', async () => {
     const provider = {
       id: 'sms-provider-1',

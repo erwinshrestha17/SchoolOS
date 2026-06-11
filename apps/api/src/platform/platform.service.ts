@@ -20,6 +20,7 @@ import {
   PlatformProviderConfigSummary,
   PlatformProviderReadinessDetail,
   PlatformQueueSummary,
+  PlatformFailedJobSummary,
   PlatformSaaSInvoiceSummary,
   PlatformTenantDetail,
   PlatformTenantSummary,
@@ -53,7 +54,6 @@ import { encryptSensitiveField } from '../common/security/field-encryption';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PlansService } from '../plans/plans.service';
-import { PlatformFailedJobSummary } from '@schoolos/core';
 import { buildSimplePdf } from '../common/pdf/simple-pdf';
 import QRCode from 'qrcode';
 
@@ -98,6 +98,50 @@ const USAGE_KEYS = [
   'api.requests',
   'ai.credits',
 ];
+
+const SECURITY_AUDIT_CATEGORIES = {
+  authentication: ['login_failed', 'login_locked', 'api_key_validation_failed'],
+  permissions: [
+    'assign_roles',
+    'assign_permissions',
+    'create',
+    'update_status',
+    'reset_password',
+    'force_logout',
+  ],
+  tenant_status: [
+    'tenant_activated',
+    'tenant_suspended',
+    'tenant_status_noop',
+    'tenant_billing_suspended',
+    'tenant_billing_reactivated',
+  ],
+  support_access: [
+    'tenant_override',
+    'support_override_entered',
+    'support_override_exited',
+  ],
+} as const;
+
+const SECURITY_AUDIT_CATEGORY_KEYS = Object.keys(
+  SECURITY_AUDIT_CATEGORIES,
+) as SecurityAuditCategory[];
+
+const SECURITY_AUDIT_ACTIONS = Array.from(
+  new Set(Object.values(SECURITY_AUDIT_CATEGORIES).flat()),
+);
+
+const SECURITY_AUDIT_RESOURCE_BY_CATEGORY: Record<
+  SecurityAuditCategory,
+  string[]
+> = {
+  authentication: ['auth', 'platform_api_key'],
+  permissions: ['role', 'user'],
+  tenant_status: ['tenant', 'billing'],
+  support_access: ['auth', 'support_override'],
+};
+
+type SecurityAuditCategory = keyof typeof SECURITY_AUDIT_CATEGORIES;
 
 const ONBOARDING_ITEMS = [
   {
@@ -577,6 +621,96 @@ export class PlatformService {
     if (query.action) where.action = query.action;
     if (query.userId) where.userId = query.userId;
     if (query.resource) where.resource = query.resource;
+    if (query.resourceId) where.resourceId = query.resourceId;
+
+    if (query.startDate || query.endDate) {
+      where.createdAt = {};
+      if (query.startDate) where.createdAt.gte = new Date(query.startDate);
+      if (query.endDate) where.createdAt.lte = new Date(query.endDate);
+    }
+
+    const [logs, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          action: true,
+          resource: true,
+          resourceId: true,
+          tenantId: true,
+          userId: true,
+          before: true,
+          after: true,
+          ipAddress: true,
+          userAgent: true,
+          requestId: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              phone: true,
+            },
+          },
+        },
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    return {
+      items: logs.map((log) => this.toAuditLog(log)),
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
+  }
+
+  async listSecurityAuditLogs(query: {
+    page?: number;
+    limit?: number;
+    tenantId?: string;
+    category?: string;
+    action?: string;
+    userId?: string;
+    resource?: string;
+    resourceId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<PaginatedResponse<PlatformAuditLog>> {
+    const page = Number(query.page) || 1;
+    const limit = Math.min(Number(query.limit) || 25, 100);
+    const skip = (page - 1) * limit;
+    const category = normalizeSecurityAuditCategory(query.category);
+    const scopedActions = category
+      ? SECURITY_AUDIT_CATEGORIES[category]
+      : SECURITY_AUDIT_ACTIONS;
+    const scopedResources = category
+      ? SECURITY_AUDIT_RESOURCE_BY_CATEGORY[category]
+      : Array.from(
+          new Set(Object.values(SECURITY_AUDIT_RESOURCE_BY_CATEGORY).flat()),
+        );
+
+    const where: Prisma.AuditLogWhereInput = {
+      action: { in: [...scopedActions] },
+      resource: { in: scopedResources },
+    };
+
+    if (query.tenantId) where.tenantId = query.tenantId;
+    if (query.action) {
+      where.action = {
+        in: [...scopedActions].filter((a) => a === query.action),
+      };
+    }
+    if (query.userId) where.userId = query.userId;
+    if (query.resource) {
+      where.resource = {
+        in: scopedResources.filter((resource) => resource === query.resource),
+      };
+    }
     if (query.resourceId) where.resourceId = query.resourceId;
 
     if (query.startDate || query.endDate) {
@@ -1826,7 +1960,18 @@ export class PlatformService {
       ),
     );
 
-    // 5. PDF/Report Generation Dependency
+    // 5. Payment Gateway
+    const paymentGatewayProvider = await this.prisma.providerConfig.findFirst({
+      where: { type: 'PAYMENT_GATEWAY' },
+    });
+    result.push(
+      await this.checkPaymentGatewayReadiness(
+        paymentGatewayProvider,
+        checkedAt,
+      ),
+    );
+
+    // 6. PDF/Report Generation Dependency
     result.push(await this.checkPdfReadiness(checkedAt));
 
     return result;
@@ -1835,7 +1980,7 @@ export class PlatformService {
   private async checkServiceReadiness(
     type: string,
     displayName: string,
-    provider: { enabled: boolean; configEncrypted: unknown } | null | undefined,
+    provider: DynamicRecord | null | undefined,
     checkedAt: Date,
   ) {
     if (!provider && type === 'OBJECT_STORAGE') {
@@ -1897,6 +2042,55 @@ export class PlatformService {
       message: `${displayName} passed dry-run configuration validation safely. No paid calls made.`,
       checkedAt: checkedAt.toISOString(),
       requiredConfigMissing: [],
+    };
+  }
+
+  private async checkPaymentGatewayReadiness(
+    provider: DynamicRecord | null | undefined,
+    checkedAt: Date,
+  ) {
+    const baseReadiness = await this.checkServiceReadiness(
+      'PAYMENT_GATEWAY',
+      'Payment Gateway',
+      provider,
+      checkedAt,
+    );
+
+    if (!provider || !provider.enabled || baseReadiness.status !== 'READY') {
+      return baseReadiness;
+    }
+
+    const environment = String(provider.environment ?? '').toUpperCase();
+    const providerName = String(provider.name ?? '');
+
+    if (environment !== 'PRODUCTION') {
+      return {
+        ...baseReadiness,
+        message:
+          'Payment gateway test configuration passed dry-run validation. No paid external call was made.',
+      };
+    }
+
+    const validatedSandbox = await this.prisma.providerConfig.findFirst({
+      where: {
+        type: 'PAYMENT_GATEWAY',
+        name: providerName,
+        environment: 'TEST',
+        validationStatus: 'VALID',
+      },
+    });
+
+    if (!validatedSandbox) {
+      return {
+        ...baseReadiness,
+        status: 'FAILED' as const,
+        message: `Payment gateway ${providerName} is configured for production but does not have a validated TEST sandbox configuration.`,
+      };
+    }
+
+    return {
+      ...baseReadiness,
+      message: `Payment gateway production configuration passed dry-run validation with validated TEST sandbox coverage for ${providerName}. No paid external call was made.`,
     };
   }
 
@@ -2751,6 +2945,7 @@ export class PlatformService {
       after: log.after,
       ipAddress: nullableString(log.ipAddress),
       userAgent: nullableString(log.userAgent),
+      requestId: nullableString(log.requestId),
       createdAt: toDate(log.createdAt).toISOString(),
       user: asNullableUser(log.user),
     };
@@ -3229,6 +3424,24 @@ function safeErrorMessage(error: unknown) {
       '$1$2=********',
     )
     .slice(0, 240);
+}
+
+function normalizeSecurityAuditCategory(
+  category?: string,
+): SecurityAuditCategory | undefined {
+  if (!category) {
+    return undefined;
+  }
+
+  if (
+    SECURITY_AUDIT_CATEGORY_KEYS.includes(category as SecurityAuditCategory)
+  ) {
+    return category as SecurityAuditCategory;
+  }
+
+  throw new BadRequestException(
+    `Unsupported security audit category. Expected one of: ${SECURITY_AUDIT_CATEGORY_KEYS.join(', ')}`,
+  );
 }
 
 const APPROVED_INBOUND_WEBHOOK_PROVIDERS = new Set([

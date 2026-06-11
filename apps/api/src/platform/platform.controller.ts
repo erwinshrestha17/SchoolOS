@@ -10,7 +10,6 @@ import {
   Query,
   Post,
   Delete,
-  NotFoundException,
 } from '@nestjs/common';
 import { PlatformService } from './platform.service';
 import { PlatformQueuesService } from './platform-queues.service';
@@ -582,6 +581,35 @@ export class PlatformController {
       page,
       limit,
       tenantId,
+      action,
+      userId: actorId ?? userId,
+      resource,
+      resourceId,
+      startDate,
+      endDate,
+    });
+  }
+
+  @Get('audit-logs/security')
+  @Permissions('platform:audit:read')
+  async listSecurityAuditLogs(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('tenantId') tenantId?: string,
+    @Query('category') category?: string,
+    @Query('action') action?: string,
+    @Query('userId') userId?: string,
+    @Query('actorId') actorId?: string,
+    @Query('resource') resource?: string,
+    @Query('resourceId') resourceId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ): Promise<PaginatedResponse<PlatformAuditLog>> {
+    return this.platformService.listSecurityAuditLogs({
+      page,
+      limit,
+      tenantId,
+      category,
       action,
       userId: actorId ?? userId,
       resource,

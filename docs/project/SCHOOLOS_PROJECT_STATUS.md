@@ -80,10 +80,12 @@ Full SchoolOS product complete: No
 Auth / Security
 - Suspended-tenant denial on file registry, report exports, and entitled controllers.
 - TenantActiveGuard on /files routes; queue processors skip suspended tenants.
+- 2026-06-12: platform high-risk security audit queries added for failed logins, permission changes, tenant status changes, and support access; active role/permission changes and expiring support override enforcement verified from source.
 
 M0 Platform
 - Mobile parent per-module entitlement gates; finance-compat and ledger entitlement guards.
 - Activity-feed RequiredModule gate; processor-tenant skip helper.
+- 2026-06-12: aggregate provider readiness now includes payment gateways and fails production gateway readiness unless a validated TEST sandbox configuration exists.
 - 2026-06-07: platform queue monitoring now includes reports and canteen-alerts; failed-job discard requires and audits an operator reason from the platform settings UI/API.
 - Repo-truth correction: onboarding checklist UI and provider/storage readiness surfaces are already implemented; remaining M0 provider work is staging/provider-specific verification depth.
 

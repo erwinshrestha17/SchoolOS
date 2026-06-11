@@ -122,26 +122,24 @@ Before adding or expanding visible features:
   - Secure token refresh/logout hardening, role-aware route guards, session-expired/forbidden states.
   - Device smoke for teacher/staff/driver/parent flows.
 
-### Auth, Security, and Tenant Isolation (93-97%)
-* **Current Status:** Strong backend/browser-session foundation, JWT, CSRF, throttling, TenantActiveGuard, suspended-tenant file/export denial, mobile per-module gates, and sub-controller entitlement gating.
+### Auth, Security, and Tenant Isolation (94-97%)
+* **Current Status:** Strong backend/browser-session foundation, JWT, CSRF, throttling, TenantActiveGuard, suspended-tenant file/export denial, active-session role/permission changes enforced from database lookups, reasoned and expiring platform support override checks with audit, mobile per-module gates, sub-controller entitlement gating, and platform high-risk security audit queries for failed logins, permission changes, tenant status changes, and support access.
 * **Staging / Verification Remaining:**
   - Continue cross-tenant denial tests across all tenant-owned read/write paths.
   - Full browser session smoke for suspended-tenant UX messaging.
   - Permission-denied and session-expiry UX polish on web and mobile.
 * **Backend Backlog:**
-  - Enforce role changes during active sessions through backend permission checks.
-  - Add support override expiry checks, reason requirements, and detailed audit entries.
-  - Add high-risk security audit queries for failed logins, permission changes, tenant status changes, and support access.
+  - No source-confirmed Auth/Security backend implementation gap remains after the 2026-06-12 audit-query slice; continue verification and cross-tenant denial expansion before claiming production readiness.
 * **Web Frontend Backlog:**
   - Add admin role/permission inspection UI: "What can this role access?".
   - Add support override warning banner when platform support is acting inside a tenant.
 
-### M0 Platform Core (86-91%)
-* **Current Status:** Tenants, plans, usage tracking, SaaS billing foundation, platform audit logs, API keys, provider readiness queues, File Registry, report exports, onboarding, and structured platform operation DTOs.
+### M0 Platform Core (87-91%)
+* **Current Status:** Tenants, plans, usage tracking, SaaS billing foundation, platform audit logs, API keys, provider readiness queues, payment gateway aggregate readiness with validated-sandbox enforcement, File Registry, report exports, onboarding, and structured platform operation DTOs.
 * **Staging / Verification Remaining:**
   - Provider-specific readiness staging (SMS/email/FCM/storage/gateway).
 * **Backend Backlog:**
-  - Add provider-specific readiness checks for SMS, email, FCM, object storage, and payment gateways.
+  - Continue provider-specific staging verification for SMS, email, FCM, object storage, and payment gateways using real provider/env setup.
   - Add queue failure grouping, retry reason, discard reason, and retry idempotency checks.
   - Add platform SaaS billing lifecycle without mixing it with school fee collection.
   - Add storage readiness verification for local, S3, R2, MinIO, and future adapters.
