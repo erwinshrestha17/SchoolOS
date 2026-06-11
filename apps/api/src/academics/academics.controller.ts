@@ -44,6 +44,7 @@ import { GenerateReportCardDto } from './dto/generate-report-card.dto';
 import {
   ApplyReportCardCorrectionDto,
   RequestReportCardCorrectionDto,
+  ReviewReportCardCorrectionDto,
 } from './dto/report-card-correction.dto';
 import { PromoteStudentDto } from './dto/promote-student.dto';
 import { BatchPromoteDto } from './dto/batch-promote.dto';
@@ -424,6 +425,26 @@ export class AcademicsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.reportCardsService.listHistory(reportCardId, auth);
+  }
+
+  @Get('report-cards/corrections')
+  @Permissions('academics:read')
+  listReportCardCorrections(
+    @CurrentAuth() auth: AuthContext,
+    @Query('examTermId') examTermId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.reportCardsService.listCorrections(auth, { examTermId, status });
+  }
+
+  @Patch('report-cards/corrections/:id/review')
+  @Permissions('academics:manage_report_cards')
+  reviewReportCardCorrection(
+    @Param('id') requestId: string,
+    @Body() dto: ReviewReportCardCorrectionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.reportCardsService.reviewCorrection(requestId, dto, auth);
   }
 
   @Get('subjects/:id/syllabus')

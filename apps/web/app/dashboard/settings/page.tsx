@@ -228,6 +228,20 @@ const SETTINGS_SECTIONS: SettingSectionConfig[] = [
       },
       { key: 'grading_scheme_label', label: 'Grading Scheme', type: 'text', placeholder: 'Letter Grade 2078' },
       {
+        key: 'grading_scale',
+        label: 'Grading Scale',
+        description: 'Configure grade bands, minimum percentages, grade points, and outcomes.',
+        type: 'text',
+        defaultValue: [],
+      },
+      {
+        key: 'grading_rounding_policy',
+        label: 'Rounding Policy',
+        description: 'Configure decimal rounding modes and decimal places for marks, GPAs, and percentages.',
+        type: 'text',
+        defaultValue: { mode: 'HALF_UP', percentageDecimals: 2, gpaDecimals: 2, marksDecimals: 2 },
+      },
+      {
         key: 'promotion_rule_mode',
         label: 'Promotion Mode',
         type: 'select',
@@ -1202,6 +1216,250 @@ function EditableSettingsSection({
   );
 }
 
+// ─── Custom Grading Editors ───────────────────────────────────────────────────
+
+function GradingRoundingPolicyEditor({
+  value,
+  onChange,
+}: {
+  value: any;
+  onChange: (v: any) => void;
+}) {
+  const policy = value || { mode: 'HALF_UP', percentageDecimals: 2, gpaDecimals: 2, marksDecimals: 2 };
+  
+  const updatePolicy = (key: string, val: any) => {
+    onChange({
+      ...policy,
+      [key]: val,
+    });
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6 space-y-6">
+      <div className="grid gap-6 sm:grid-cols-2">
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rounding Mode</label>
+          <select
+            value={policy.mode ?? 'HALF_UP'}
+            onChange={(e) => updatePolicy('mode', e.target.value)}
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+          >
+            <option value="HALF_UP">Half Up (Round half towards positive infinity)</option>
+            <option value="FLOOR">Floor (Round towards negative infinity)</option>
+            <option value="CEIL">Ceiling (Round towards positive infinity)</option>
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Percentage Decimals (0 - 4)</label>
+          <input
+            type="number"
+            min={0}
+            max={4}
+            value={policy.percentageDecimals ?? 2}
+            onChange={(e) => updatePolicy('percentageDecimals', Number(e.target.value))}
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">GPA Decimals (0 - 4)</label>
+          <input
+            type="number"
+            min={0}
+            max={4}
+            value={policy.gpaDecimals ?? 2}
+            onChange={(e) => updatePolicy('gpaDecimals', Number(e.target.value))}
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Marks Decimals (0 - 4)</label>
+          <input
+            type="number"
+            min={0}
+            max={4}
+            value={policy.marksDecimals ?? 2}
+            onChange={(e) => updatePolicy('marksDecimals', Number(e.target.value))}
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GradingScaleEditor({
+  value,
+  onChange,
+}: {
+  value: any;
+  onChange: (v: any) => void;
+}) {
+  const bands = Array.isArray(value) ? (value as any[]) : [];
+
+  const updateBand = (index: number, key: string, val: any) => {
+    const next = [...bands];
+    next[index] = {
+      ...next[index],
+      [key]: val,
+    };
+    if (key === 'minPercentage') {
+      next.sort((a, b) => (b.minPercentage || 0) - (a.minPercentage || 0));
+    }
+    onChange(next);
+  };
+
+  const removeBand = (index: number) => {
+    const next = bands.filter((_, idx) => idx !== index);
+    onChange(next);
+  };
+
+  const addBand = () => {
+    const next = [
+      ...bands,
+      {
+        grade: 'New',
+        minPercentage: 0,
+        maxPercentage: 100,
+        gradePoint: 0,
+        label: 'Description',
+        passed: true,
+      },
+    ].sort((a, b) => b.minPercentage - a.minPercentage);
+    onChange(next);
+  };
+
+  const hasFailingBand = bands.some(b => !b.passed);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6 space-y-4">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <table className="min-w-full text-left border-collapse text-xs">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+              <th className="py-3 px-4">Grade</th>
+              <th className="py-3 px-4">Min %</th>
+              <th className="py-3 px-4">Max %</th>
+              <th className="py-3 px-4">GPA</th>
+              <th className="py-3 px-4">Label</th>
+              <th className="py-3 px-4 text-center">Status</th>
+              <th className="py-3 px-4 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+            {bands.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="py-8 text-center text-slate-400">
+                  No grading bands configured. Click "Add Grade Band" to start.
+                </td>
+              </tr>
+            ) : (
+              bands.map((band, index) => (
+                <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                  <td className="py-2.5 px-4 w-20">
+                    <input
+                      type="text"
+                      value={band.grade || ''}
+                      onChange={(e) => updateBand(index, 'grade', e.target.value)}
+                      placeholder="A+"
+                      className="h-8 w-16 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-900 outline-none focus:border-indigo-400"
+                    />
+                  </td>
+                  <td className="py-2.5 px-4 w-24">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="any"
+                      value={band.minPercentage ?? 0}
+                      onChange={(e) => updateBand(index, 'minPercentage', Number(e.target.value))}
+                      placeholder="90"
+                      className="h-8 w-20 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-900 outline-none focus:border-indigo-400"
+                    />
+                  </td>
+                  <td className="py-2.5 px-4 w-24">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="any"
+                      value={band.maxPercentage ?? 100}
+                      onChange={(e) => updateBand(index, 'maxPercentage', Number(e.target.value))}
+                      placeholder="100"
+                      className="h-8 w-20 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-900 outline-none focus:border-indigo-400"
+                    />
+                  </td>
+                  <td className="py-2.5 px-4 w-24">
+                    <input
+                      type="number"
+                      min={0}
+                      max={4}
+                      step="any"
+                      value={band.gradePoint ?? 0}
+                      onChange={(e) => updateBand(index, 'gradePoint', Number(e.target.value))}
+                      placeholder="4.0"
+                      className="h-8 w-20 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-900 outline-none focus:border-indigo-400"
+                    />
+                  </td>
+                  <td className="py-2.5 px-4">
+                    <input
+                      type="text"
+                      value={band.label || ''}
+                      onChange={(e) => updateBand(index, 'label', e.target.value)}
+                      placeholder="Outstanding"
+                      className="h-8 w-full min-w-[120px] rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-900 outline-none focus:border-indigo-400"
+                    />
+                  </td>
+                  <td className="py-2.5 px-4 text-center w-24">
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={band.passed ?? true}
+                        onChange={(e) => updateBand(index, 'passed', e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-200 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-[10px] uppercase font-bold text-slate-500">
+                        {band.passed ? 'Pass' : 'Fail'}
+                      </span>
+                    </label>
+                  </td>
+                  <td className="py-2.5 px-4 text-right w-16">
+                    <button
+                      type="button"
+                      onClick={() => removeBand(index)}
+                      className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-rose-600 transition"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex items-center justify-between">
+        {!hasFailingBand && bands.length > 0 && (
+          <p className="text-[11px] font-bold text-rose-600">
+            ⚠️ Warning: At least one band must be configured as a Failing band (Pass = false).
+          </p>
+        )}
+        <div className="flex-grow" />
+        <button
+          type="button"
+          onClick={addBand}
+          className="h-8 px-4 rounded-xl border border-slate-200 bg-white flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-100 transition"
+        >
+          + Add Grade Band
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Field Row ────────────────────────────────────────────────────────────────
 
 function FieldRow({
@@ -1213,6 +1471,41 @@ function FieldRow({
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
+  const isCustomGradingScale = field.key === 'grading_scale';
+  const isCustomRoundingPolicy = field.key === 'grading_rounding_policy';
+
+  if (isCustomGradingScale) {
+    return (
+      <div className="flex flex-col gap-4 px-6 py-6 border-t border-slate-100">
+        <div>
+          <p className="text-sm font-bold text-slate-800">{field.label}</p>
+          {field.description && (
+            <p className="mt-1 text-xs leading-5 text-slate-500">{field.description}</p>
+          )}
+        </div>
+        <div className="w-full">
+          <GradingScaleEditor value={value} onChange={onChange} />
+        </div>
+      </div>
+    );
+  }
+
+  if (isCustomRoundingPolicy) {
+    return (
+      <div className="flex flex-col gap-4 px-6 py-6 border-t border-slate-100">
+        <div>
+          <p className="text-sm font-bold text-slate-800">{field.label}</p>
+          {field.description && (
+            <p className="mt-1 text-xs leading-5 text-slate-500">{field.description}</p>
+          )}
+        </div>
+        <div className="w-full">
+          <GradingRoundingPolicyEditor value={value} onChange={onChange} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="sm:w-[240px] sm:shrink-0">

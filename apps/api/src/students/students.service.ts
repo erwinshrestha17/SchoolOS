@@ -2341,6 +2341,8 @@ export class StudentsService {
       );
     }
 
+    const expiryDate = parseOptionalStudentDocumentExpiryDate(dto.expiryDate);
+
     const stored = await this.storageService.saveBase64Object({
       tenantId: actor.tenantId,
       prefix: `students/${student.id}/documents/${dto.kind}`,
@@ -2364,7 +2366,7 @@ export class StudentsService {
       metadata: {
         kind: dto.kind,
         title: dto.title,
-        expiryDate: dto.expiryDate,
+        expiryDate: expiryDate?.toISOString() ?? null,
       },
     });
 
@@ -2381,7 +2383,7 @@ export class StudentsService {
         objectKey: stored.objectKey,
         uploadedById: actor.userId,
         notes: dto.notes,
-        expiryDate: dto.expiryDate ? new Date(dto.expiryDate) : null,
+        expiryDate,
       },
     });
 
@@ -2397,6 +2399,7 @@ export class StudentsService {
         metadata: {
           assetId: asset.id,
           originalFilename: dto.fileName,
+          expiryDate: expiryDate?.toISOString() ?? null,
         },
       },
     });
@@ -2411,6 +2414,7 @@ export class StudentsService {
         studentId: student.id,
         kind: document.kind,
         fileName: document.fileName,
+        expiryDate: expiryDate?.toISOString() ?? null,
       },
     });
 
@@ -3360,6 +3364,19 @@ export class StudentsService {
 
     return document;
   }
+}
+
+function parseOptionalStudentDocumentExpiryDate(value?: string) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException('Document expiry date must be a valid date');
+  }
+
+  return parsed;
 }
 
 type GeneratedStudentDocumentKind =

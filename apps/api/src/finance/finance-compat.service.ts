@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -75,6 +79,128 @@ export class FinanceCompatService {
             }
           : null,
       })),
+    };
+  }
+
+  async verifyReceipt(receiptNumber: string, actor: AuthContext) {
+    const normalizedReceiptNumber = receiptNumber.trim();
+
+    if (!normalizedReceiptNumber) {
+      throw new BadRequestException('Receipt number is required');
+    }
+
+    const receipt = await this.prisma.receipt.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        receiptNumber: normalizedReceiptNumber,
+      },
+      include: {
+        tenant: {
+          select: {
+            name: true,
+            panNumber: true,
+          },
+        },
+        payment: {
+          include: {
+            invoice: true,
+            student: true,
+            collectedBy: {
+              select: {
+                id: true,
+                email: true,
+              },
+            },
+            refunds: {
+              orderBy: [{ refundDate: 'asc' }, { createdAt: 'asc' }],
+            },
+          },
+        },
+      },
+    });
+
+    if (!receipt) {
+      throw new NotFoundException('Receipt not found in this tenant');
+    }
+
+    const refundedAmount = receipt.payment.refunds.reduce(
+      (sum, refund) => sum.add(refund.amount),
+      new Prisma.Decimal(0),
+    );
+    const reversed = Boolean(receipt.payment.reversedAt);
+    const status = reversed
+      ? 'REVERSED'
+      : refundedAmount.gte(receipt.payment.amount)
+        ? 'REFUNDED'
+        : refundedAmount.gt(0)
+          ? 'PARTIALLY_REFUNDED'
+          : 'VALID';
+    const warnings = [
+      reversed ? 'Payment has been reversed' : null,
+      refundedAmount.gt(0)
+        ? `Refunded amount: ${refundedAmount.toFixed(2)}`
+        : null,
+    ].filter((warning): warning is string => Boolean(warning));
+
+    await this.auditService.record({
+      action: 'verify_receipt',
+      resource: 'receipt',
+      resourceId: receipt.id,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        receiptNumber: receipt.receiptNumber,
+        paymentId: receipt.paymentId,
+        invoiceId: receipt.payment.invoiceId,
+        studentId: receipt.payment.studentId,
+        status,
+      },
+    });
+
+    return {
+      verified: true,
+      status,
+      warnings,
+      receipt: {
+        id: receipt.id,
+        receiptNumber: receipt.receiptNumber,
+        issuedAt: receipt.issuedAt,
+        fiscalYear: receipt.fiscalYear,
+        schoolPan: receipt.schoolPan ?? receipt.tenant.panNumber ?? null,
+      },
+      school: {
+        name: receipt.tenant.name,
+        panNumber: receipt.tenant.panNumber,
+      },
+      student: {
+        id: receipt.payment.student.id,
+        studentSystemId: receipt.payment.student.studentSystemId,
+        name: `${receipt.payment.student.firstNameEn} ${receipt.payment.student.lastNameEn}`.trim(),
+      },
+      invoice: {
+        id: receipt.payment.invoice.id,
+        invoiceNumber: receipt.payment.invoice.invoiceNumber,
+        status: receipt.payment.invoice.status,
+        totalAmount: Number(receipt.payment.invoice.totalAmount),
+      },
+      payment: {
+        id: receipt.payment.id,
+        method: receipt.payment.method,
+        status: receipt.payment.status,
+        amount: Number(receipt.payment.amount),
+        refundedAmount: Number(refundedAmount),
+        netAmount: Number(receipt.payment.amount.sub(refundedAmount)),
+        paidAt: receipt.payment.paidAt,
+        referenceNumber: receipt.payment.referenceNumber,
+        reversedAt: receipt.payment.reversedAt,
+        reversalReason: receipt.payment.reversalReason,
+        collectedBy: receipt.payment.collectedBy
+          ? {
+              id: receipt.payment.collectedBy.id,
+              email: receipt.payment.collectedBy.email,
+            }
+          : null,
+      },
     };
   }
 

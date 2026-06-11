@@ -42,9 +42,9 @@ Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
 M0 Platform Core: Foundation complete; provider/queue/API-key/File Registry hardening implemented; platform DTO validation and status/support-override request shaping refined on 2026-06-04; staging/object-storage/browser coverage remains
-M1 Admissions & Student Profiles: Pilot-ready plus Student QR, storage/photo/logo, iEMIS artifact registration, duplicate candidate review, document audit, mobile child profile foundation, and satellite-controller entitlement gating
+M1 Admissions & Student Profiles: Pilot-ready plus Student QR scan audit UI, storage/photo/logo, iEMIS artifact registration, duplicate candidate review, document audit/checklist expiry hardening, mobile child profile foundation, and satellite-controller entitlement gating
 M2 Smart Attendance: Pilot-ready plus correction/offline-draft, rejected replay regressions, correction-review UI, mobile teacher scope, real-data teacher dashboard, and mobile parent attendance summary query validation
-M3 Fees & Receipts: Pilot-ready plus receipt reprint, reversal, cashier close, reconciliation, Analysis CSV exports, protected day-end PDF snapshots, transaction-race coverage, and secure online payment webhook signature verification
+M3 Fees & Receipts: Pilot-ready plus receipt reprint history UI, printed receipt QR verification, reversal, cashier close, reconciliation, Analysis CSV exports, protected day-end PDF snapshots, transaction-race coverage, and secure online payment webhook signature verification
 M4 Academics / Exams / CAS / Report Cards: Completed / Pilot-Ready with PDF/report/correction/snapshot polish
 M5 Activity Feed & Milestones: Strong foundation with media privacy, consent-aware blocking, optimized previews, moderation controls, teacher media gallery, and media-access entitlement gating
 M6 Homework / Timetable: Completed / Pilot-Ready with File Registry attachments, reminder hardening, absence/substitution conflict coverage, mobile homework/timetable views, and improved substitution slot selection / absence recording UI

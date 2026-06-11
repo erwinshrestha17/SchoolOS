@@ -302,11 +302,17 @@ describe('StudentsService (iEMIS Export)', () => {
     it('filters by status ready or has_issues', async () => {
       (prisma.student.findMany as jest.Mock).mockResolvedValue(mockStudents);
 
-      const readyOnly = await service.getIemisValidationList({ status: 'ready' }, mockAuth);
+      const readyOnly = await service.getIemisValidationList(
+        { status: 'ready' },
+        mockAuth,
+      );
       expect(readyOnly).toHaveLength(1);
       expect(readyOnly[0].studentId).toBe('student-valid');
 
-      const issuesOnly = await service.getIemisValidationList({ status: 'has_issues' }, mockAuth);
+      const issuesOnly = await service.getIemisValidationList(
+        { status: 'has_issues' },
+        mockAuth,
+      );
       expect(issuesOnly).toHaveLength(1);
       expect(issuesOnly[0].studentId).toBe('student-invalid');
     });

@@ -243,6 +243,7 @@ export class FinanceService {
       paidAmount: Number(receipt.payment.amount),
       balance: Number(invoice.totalAmount.sub(receipt.payment.amount)),
       isReprint: true,
+      qrToken: receipt.receiptNumber,
     });
     const fileName = `Receipt_${receipt.receiptNumber}_Reprint.pdf`;
     const fileAsset = this.fileRegistryService
@@ -4763,6 +4764,7 @@ export class FinanceService {
       total,
       paidAmount,
       balance,
+      qrToken: receipt.receiptNumber,
     };
 
     if (existingFile && this.fileRegistryService) {

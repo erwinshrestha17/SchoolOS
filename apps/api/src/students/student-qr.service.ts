@@ -353,7 +353,7 @@ export class StudentQrService {
             ? true
             : a.action === 'QR_RESOLVE_FAILED'
               ? false
-              : (details.success as boolean | undefined) ?? null,
+              : ((details.success as boolean | undefined) ?? null),
         failureCode: (details.failureCode as string | undefined) ?? null,
         reason: (details.reason as string | undefined) ?? null,
         timestamp: a.createdAt.toISOString(),

@@ -67,9 +67,12 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
     onSuccess: (data) => {
       invalidate();
       setBatchConfirmOpen(false);
+      const queuedMessage = data.queued
+        ? `Large batch queued as job ${data.jobId ?? 'pending'}.`
+        : `${data.generated} report cards generated.`;
       setNotice({
-        title: 'Report cards queued',
-        description: `${data.length} report cards were queued for generation.`,
+        title: data.queued ? 'Report-card batch queued' : 'Report cards generated',
+        description: queuedMessage,
         tone: 'success',
       });
     },

@@ -611,6 +611,8 @@ describe('finance production controls', () => {
       },
     });
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+    expect(pdf.toString('latin1')).toContain('VERIFY RECEIPT');
+    expect(pdf.toString('latin1')).toContain(receipt.receiptNumber);
   });
 
   it('returns parent-scoped receipt PDFs only for the requested student', async () => {

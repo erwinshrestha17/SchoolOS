@@ -14,7 +14,17 @@ import {
 } from './client';
 
 export const activityApi = {
-  listActivityPosts: () => request<ActivityPost[]>('/activity-feed/posts'),
+  listActivityPosts: (params?: {
+    studentId?: string | null;
+    classId?: string | null;
+    sectionId?: string | null;
+    category?: string | null;
+    month?: string | null;
+    status?: string | null;
+  }) =>
+    request<ActivityPost[]>(
+      withQuery('/activity-feed/posts', params ?? {}),
+    ),
   listActivityGallery: (params?: {
     studentId?: string | null;
     classId?: string | null;

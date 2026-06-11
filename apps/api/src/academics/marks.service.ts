@@ -108,6 +108,32 @@ export class MarksService {
       }
     }
 
+    const approvedCorrections = await this.prisma.reportCardCorrectionRequest.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        status: 'APPROVED',
+        reportCard: {
+          examTermId: dto.examTermId,
+          studentId: { in: studentIds },
+        },
+      },
+      include: {
+        reportCard: true,
+      },
+    });
+    const approvedStudentIds = new Set(
+      approvedCorrections.map((c) => c.reportCard.studentId),
+    );
+
+    if (examTerm.isLocked) {
+      const unapprovedStudents = studentIds.filter((id) => !approvedStudentIds.has(id));
+      if (unapprovedStudents.length > 0) {
+        throw new ConflictException(
+          `Cannot enter or update marks because the exam term is locked and no approved correction request exists for student(s): ${unapprovedStudents.join(', ')}`,
+        );
+      }
+    }
+
     const existingMarks = await this.prisma.markEntry.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -115,9 +141,13 @@ export class MarksService {
         studentId: { in: studentIds },
       },
     });
-    const lockedMarks = existingMarks.filter((m) => m.isLocked);
-    if (lockedMarks.length > 0) {
-      throw new ConflictException('Cannot update locked mark entries');
+
+    for (const mark of existingMarks) {
+      if (mark.isLocked && !approvedStudentIds.has(mark.studentId)) {
+        throw new ConflictException(
+          `Cannot update locked mark entry for student ${mark.studentId} without an approved correction request`,
+        );
+      }
     }
 
     const results = await this.prisma.$transaction(
@@ -142,6 +172,7 @@ export class MarksService {
             status,
             remarks: entry.remarks || null,
             enteredById: actor.userId,
+            isLocked: examTerm.isLocked,
           },
           create: {
             tenantId: actor.tenantId,
@@ -153,6 +184,7 @@ export class MarksService {
             marksObtained: new Prisma.Decimal(val),
             status,
             remarks: entry.remarks || null,
+            isLocked: examTerm.isLocked,
           },
         });
       }),
@@ -313,15 +345,36 @@ export class MarksService {
       throw new NotFoundException('Mark entry not found');
     }
 
-    if (existingMark.isLocked) {
-      await this.auditService.record({
-        action: 'ACADEMICS_MARK_UPDATE_REJECTED_LOCKED',
-        resource: 'mark_entry',
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        resourceId: id,
+    const examTerm = await this.prisma.examTerm.findFirst({
+      where: { id: existingMark.examTermId, tenantId: actor.tenantId },
+    });
+
+    const isLocked = examTerm?.isLocked || existingMark.isLocked;
+
+    if (isLocked) {
+      const correction = await this.prisma.reportCardCorrectionRequest.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          status: 'APPROVED',
+          reportCard: {
+            studentId: existingMark.studentId,
+            examTermId: existingMark.examTermId,
+          },
+        },
       });
-      throw new ConflictException('Cannot update a locked mark entry');
+
+      if (!correction) {
+        await this.auditService.record({
+          action: 'ACADEMICS_MARK_UPDATE_REJECTED_LOCKED',
+          resource: 'mark_entry',
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          resourceId: id,
+        });
+        throw new ConflictException(
+          'Cannot update locked mark entry or locked exam term marks without an approved correction request',
+        );
+      }
     }
 
     const isAbsent =
@@ -384,6 +437,7 @@ export class MarksService {
         status,
         remarks: dto.remarks !== undefined ? dto.remarks : existingMark.remarks,
         enteredById: actor.userId,
+        isLocked: examTerm?.isLocked || existingMark.isLocked,
       },
     });
 

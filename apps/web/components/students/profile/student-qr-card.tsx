@@ -3,9 +3,20 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import type { StudentQrScanAudit } from '@/lib/api/students';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { QrCode, RefreshCw, XCircle, FileText, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock3,
+  FileText,
+  Loader2,
+  QrCode,
+  RefreshCw,
+  ShieldCheck,
+  XCircle,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type QrCredentialInfo = {
@@ -35,8 +46,13 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
     queryKey: ['student-qr-status', studentId],
     queryFn: () => api.getStudentQrStatus(studentId),
   });
+  const qrScansQuery = useQuery({
+    queryKey: ['student-qr-scans', studentId],
+    queryFn: () => api.listStudentQrScans(studentId),
+  });
   const currentCredential = qrStatusQuery.data?.activeCredential ?? qrCredential ?? null;
   const credentialHistory = qrStatusQuery.data?.history ?? [];
+  const scanHistory = qrScansQuery.data ?? [];
 
   const generateMutation = useMutation({
     mutationFn: () => api.generateStudentQr(studentId),
@@ -49,6 +65,7 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
       }
       void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
       void queryClient.invalidateQueries({ queryKey: ['student-qr-status', studentId] });
+      void queryClient.invalidateQueries({ queryKey: ['student-qr-scans', studentId] });
     },
   });
 
@@ -65,6 +82,7 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
       setRotateReason('');
       void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
       void queryClient.invalidateQueries({ queryKey: ['student-qr-status', studentId] });
+      void queryClient.invalidateQueries({ queryKey: ['student-qr-scans', studentId] });
     },
   });
 
@@ -77,6 +95,7 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
       setRevokeReason('');
       void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
       void queryClient.invalidateQueries({ queryKey: ['student-qr-status', studentId] });
+      void queryClient.invalidateQueries({ queryKey: ['student-qr-scans', studentId] });
     },
   });
 
@@ -274,6 +293,40 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
           </div>
         )}
 
+        <div className="rounded-2xl border border-slate-100 bg-white p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Scan audit history</p>
+              <p className="mt-1 text-[0.65rem] font-medium text-slate-500">
+                Recent QR lifecycle and resolve attempts recorded by the backend audit log.
+              </p>
+            </div>
+            {qrScansQuery.isLoading ? (
+              <Loader2 size={16} className="shrink-0 animate-spin text-slate-400" />
+            ) : (
+              <Clock3 size={16} className="shrink-0 text-slate-400" />
+            )}
+          </div>
+
+          {qrScansQuery.isError ? (
+            <div className="mt-3 rounded-xl border border-danger-100 bg-danger-50 px-3 py-2 text-[0.65rem] font-bold text-danger-600">
+              {qrScansQuery.error instanceof Error
+                ? qrScansQuery.error.message
+                : 'QR scan audit history could not be loaded.'}
+            </div>
+          ) : scanHistory.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {scanHistory.slice(0, 6).map((entry) => (
+                <QrScanAuditRow key={entry.id} entry={entry} />
+              ))}
+            </div>
+          ) : !qrScansQuery.isLoading ? (
+            <p className="mt-3 rounded-xl bg-slate-50 px-3 py-3 text-center text-[0.65rem] font-semibold text-slate-500">
+              No QR scan audit events recorded yet.
+            </p>
+          ) : null}
+        </div>
+
         <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
            <div className="flex items-center gap-2 text-slate-400 mb-2">
              <ShieldCheck size={14} />
@@ -286,4 +339,48 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
       </div>
     </SectionCard>
   );
+}
+
+function QrScanAuditRow({ entry }: { entry: StudentQrScanAudit }) {
+  const success = entry.success !== false;
+  const actor = entry.performedByEmail ?? entry.scannedByEmail ?? entry.performedBy ?? 'System';
+  const detail = [
+    formatQrAction(entry.action),
+    entry.purpose ? entry.purpose.replaceAll('_', ' ').toLowerCase() : null,
+    entry.reason ?? entry.failureCode,
+  ]
+    .filter(Boolean)
+    .join(' - ');
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          {success ? (
+            <CheckCircle2 size={13} className="shrink-0 text-success-600" />
+          ) : (
+            <AlertCircle size={13} className="shrink-0 text-danger-600" />
+          )}
+          <p className="truncate text-[0.7rem] font-bold text-slate-700">
+            {detail || formatQrAction(entry.action)}
+          </p>
+        </div>
+        <p className="mt-1 truncate text-[0.65rem] font-medium text-slate-500">
+          {actor}
+        </p>
+      </div>
+      <span className="shrink-0 text-[0.62rem] font-bold text-slate-400">
+        {new Date(entry.timestamp).toLocaleDateString('en-NP', {
+          dateStyle: 'medium',
+        })}
+      </span>
+    </div>
+  );
+}
+
+function formatQrAction(action: string) {
+  return action
+    .replace(/^QR_/, '')
+    .replaceAll('_', ' ')
+    .toLowerCase();
 }

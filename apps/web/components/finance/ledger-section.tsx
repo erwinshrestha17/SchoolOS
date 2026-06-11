@@ -6,6 +6,7 @@ import { FeeLedger } from './fee-ledger';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { ReceiptVerificationPanel } from './receipt-verification-panel';
 
 export function LedgerSection() {
   const invoicesQuery = useQuery({
@@ -15,6 +16,8 @@ export function LedgerSection() {
 
   return (
     <div className="space-y-6">
+      <ReceiptVerificationPanel />
+
       <FilterBar label="Ledger Filters">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
           <input 

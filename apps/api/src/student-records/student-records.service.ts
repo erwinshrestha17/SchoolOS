@@ -115,6 +115,8 @@ export class StudentRecordsService {
       );
     }
 
+    const expiryDate = parseOptionalDocumentExpiryDate(dto.expiryDate);
+
     const stored = await this.storageService.saveBase64Object({
       tenantId: actor.tenantId,
       prefix: `students/${student.id}/documents`,
@@ -137,7 +139,7 @@ export class StudentRecordsService {
         publicUrl: stored.publicUrl,
         uploadedById: actor.userId,
         notes: dto.notes,
-        expiryDate: dto.expiryDate ? new Date(dto.expiryDate) : null,
+        expiryDate,
       },
     });
 
@@ -178,6 +180,7 @@ export class StudentRecordsService {
         metadata: {
           originalFilename: dto.fileName,
           sizeBytes: stored.sizeBytes,
+          expiryDate: expiryDate?.toISOString() ?? null,
         },
       },
     });
@@ -192,6 +195,7 @@ export class StudentRecordsService {
         studentId: student.id,
         kind: document.kind,
         fileName: document.fileName,
+        expiryDate: expiryDate?.toISOString() ?? null,
       },
     });
 
@@ -496,7 +500,8 @@ export class StudentRecordsService {
       id: doc.id,
       studentId: doc.studentId,
       studentSystemId: doc.student.studentSystemId,
-      studentName: `${doc.student.firstNameEn} ${doc.student.lastNameEn}`.trim(),
+      studentName:
+        `${doc.student.firstNameEn} ${doc.student.lastNameEn}`.trim(),
       fileId: doc.fileId,
       kind: doc.kind,
       status: doc.status,
@@ -509,4 +514,17 @@ export class StudentRecordsService {
       ),
     }));
   }
+}
+
+function parseOptionalDocumentExpiryDate(value?: string) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException('Document expiry date must be a valid date');
+  }
+
+  return parsed;
 }

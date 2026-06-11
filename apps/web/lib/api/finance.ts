@@ -49,6 +49,69 @@ export type ReportSnapshotsPage = {
   hasNextPage: boolean;
 };
 
+export type ReceiptReprintHistory = {
+  receiptId: string;
+  receiptNumber: string;
+  items: Array<{
+    id: string;
+    paymentId: string | null;
+    studentId: string | null;
+    fileAssetId: string | null;
+    reprintedAt: string;
+    reason: string;
+    format: string;
+    delivery: string | null;
+    reprintedBy: {
+      id: string;
+      email: string | null;
+    } | null;
+  }>;
+};
+
+export type ReceiptVerificationResult = {
+  verified: true;
+  status: 'VALID' | 'PARTIALLY_REFUNDED' | 'REFUNDED' | 'REVERSED';
+  warnings: string[];
+  receipt: {
+    id: string;
+    receiptNumber: string;
+    issuedAt: string;
+    fiscalYear: string | null;
+    schoolPan: string | null;
+  };
+  school: {
+    name: string;
+    panNumber: string | null;
+  };
+  student: {
+    id: string;
+    studentSystemId: string;
+    name: string;
+  };
+  invoice: {
+    id: string;
+    invoiceNumber: string;
+    status: string;
+    totalAmount: number;
+  };
+  payment: {
+    id: string;
+    method: string;
+    status: string;
+    amount: number;
+    refundedAmount: number;
+    netAmount: number;
+    paidAt: string;
+    referenceNumber: string | null;
+    reversedAt: string | null;
+    reversalReason: string | null;
+    collectedBy: {
+      id: string;
+      email: string | null;
+    } | null;
+  };
+};
+
 export const financeApi = {
   listFeeHeads: () => request<FeeHeadSummary[]>('/fees/heads'),
   listFeePlans: () => request<FeePlanSummary[]>('/fees/plans'),
@@ -153,6 +216,14 @@ export const financeApi = {
       },
     ),
   listReceipts: () => request<ReceiptView[]>('/receipts'),
+  getReceiptReprintHistory: (receiptId: string) =>
+    request<ReceiptReprintHistory>(
+      `/receipts/${encodeURIComponent(receiptId)}/reprint-history`,
+    ),
+  verifyReceipt: (receiptNumber: string) =>
+    request<ReceiptVerificationResult>(
+      `/receipts/verify/${encodeURIComponent(receiptNumber)}`,
+    ),
   openReceiptPdf: async (receiptNumber: string) => {
     const response = await fetch(
       `${API_BASE_URL}/receipts/${encodeURIComponent(receiptNumber)}.pdf`,

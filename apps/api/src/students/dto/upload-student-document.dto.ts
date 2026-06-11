@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
 import { StudentDocumentKind } from '@prisma/client';
 
 export class UploadStudentDocumentDto {
@@ -23,7 +23,7 @@ export class UploadStudentDocumentDto {
   reason?: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString()
   expiryDate?: string;
 
   @IsOptional()

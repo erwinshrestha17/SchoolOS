@@ -111,6 +111,8 @@ describe('FinanceService - Dues & Reprints', () => {
       expect(prisma.receiptReprintHistory.create).toHaveBeenCalled();
       expect(result.pdf).toBeDefined();
       expect(result.fileName).toContain('REC-001');
+      expect(result.pdf.toString('latin1')).toContain('VERIFY RECEIPT');
+      expect(result.pdf.toString('latin1')).toContain('REC-001');
     });
   });
 

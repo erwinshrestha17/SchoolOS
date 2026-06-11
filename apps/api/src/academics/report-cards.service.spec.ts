@@ -43,7 +43,10 @@ describe('ReportCardsService', () => {
       student: { findFirst: jest.fn() },
       tenantSetting: { findFirst: jest.fn() },
       assessmentComponent: { findMany: jest.fn() },
-      markEntry: { findMany: jest.fn() },
+      markEntry: {
+        findMany: jest.fn(),
+        updateMany: jest.fn(),
+      },
       reportCard: {
         findUnique: jest.fn(),
         findFirst: jest.fn(),
@@ -53,6 +56,8 @@ describe('ReportCardsService', () => {
       reportCardCorrectionRequest: {
         create: jest.fn(),
         findMany: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
       },
       reportCardHistory: {
         create: jest.fn(),
@@ -391,8 +396,13 @@ describe('ReportCardsService', () => {
       publishedById: 'user-old',
       examTerm: { isLocked: true },
     });
-    prisma.reportCardCorrectionRequest.create.mockResolvedValue({
+    prisma.reportCardCorrectionRequest.findFirst.mockResolvedValue({
       id: 'corr-1',
+      status: 'APPROVED',
+    });
+    prisma.reportCardCorrectionRequest.update.mockResolvedValue({
+      id: 'corr-1',
+      status: 'COMPLETED',
     });
     prisma.reportCardHistory.create.mockResolvedValue({ id: 'hist-1' });
     prisma.reportCard.update.mockResolvedValue({
@@ -400,6 +410,7 @@ describe('ReportCardsService', () => {
       version: 2,
       publishStatus: 'CORRECTED_DRAFT',
     });
+    prisma.markEntry.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await service.applyCorrectionAndRegenerate(
       'report-card-1',

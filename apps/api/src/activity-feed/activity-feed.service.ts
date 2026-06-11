@@ -66,6 +66,7 @@ export class ActivityFeedService {
       sectionId?: string;
       category?: string;
       month?: string;
+      status?: string;
     } = {},
   ) {
     const monthRange = filters.month ? getMonthRange(filters.month) : null;
@@ -82,13 +83,19 @@ export class ActivityFeedService {
       });
     }
 
+    if (filters.status && filters.status !== ActivityPostStatus.APPROVED && !canManageAllActivity(actor)) {
+      throw new ForbiddenException('You do not have permission to filter posts by status');
+    }
+
     const posts = await this.prisma.activityPost.findMany({
       where: {
         tenantId: actor.tenantId,
         softDeletedAt: null,
-        ...(canManageAllActivity(actor)
-          ? {}
-          : { status: ActivityPostStatus.APPROVED }),
+        status: filters.status
+          ? (filters.status as ActivityPostStatus)
+          : canManageAllActivity(actor)
+            ? { in: [ActivityPostStatus.APPROVED, ActivityPostStatus.PENDING_APPROVAL] }
+            : ActivityPostStatus.APPROVED,
         ...(filters.classId ? { classId: filters.classId } : {}),
         ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
         ...(filters.category
@@ -317,9 +324,9 @@ export class ActivityFeedService {
         tenantId: actor.tenantId,
         activityPost: {
           softDeletedAt: null,
-          ...(canManageAllActivity(actor)
-            ? {}
-            : { status: ActivityPostStatus.APPROVED }),
+          status: canManageAllActivity(actor)
+            ? { in: [ActivityPostStatus.APPROVED, ActivityPostStatus.PENDING_APPROVAL] }
+            : ActivityPostStatus.APPROVED,
           ...(filters.classId ? { classId: filters.classId } : {}),
           ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
           ...(filters.category

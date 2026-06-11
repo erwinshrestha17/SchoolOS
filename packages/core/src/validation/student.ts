@@ -34,7 +34,10 @@ export const studentDocumentFormSchema = z.object({
   title: z.string().optional().nullable(),
   fileName: z.string().min(1),
   contentType: z.string().min(1),
-  base64Content: z.string().min(1)
+  base64Content: z.string().min(1),
+  expiryDate: z.iso.datetime().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  reason: z.string().optional().nullable()
 });
 
 export const admissionFormSchema = z.object({

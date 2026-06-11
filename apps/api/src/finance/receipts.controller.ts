@@ -33,6 +33,15 @@ export class ReceiptsController {
     return this.financeService.listReceipts(auth);
   }
 
+  @Get('verify/:receiptNumber')
+  @Permissions('receipts:read')
+  verifyReceipt(
+    @Param('receiptNumber') receiptNumber: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeCompatService.verifyReceipt(receiptNumber, auth);
+  }
+
   @Get(':receiptNumber.pdf')
   @Permissions('receipts:read')
   async getReceiptPdf(

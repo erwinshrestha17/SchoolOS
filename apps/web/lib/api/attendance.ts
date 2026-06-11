@@ -29,6 +29,8 @@ export const attendanceApi = {
   }) => request<AttendanceRoster>(withQuery('/attendance/rosters', params)),
   listAttendanceAnalytics: () =>
     request<AttendanceAnalytics>('/attendance/analytics'),
+  listAttendanceAnomalies: () =>
+    request<AttendanceAnomalies>('/attendance/anomalies'),
   getAttendanceSummary: (params: {
     academicYearId: string;
     classId: string;
@@ -233,3 +235,57 @@ export const attendanceApi = {
     request<any[]>(`/hr/staff/${encodeURIComponent(staffId)}/attendance-history`),
 };
 
+export type AttendanceAnomalies = {
+  absenceStreaks: Array<{
+    studentId: string;
+    studentName: string;
+    className: string;
+    sectionName: string | null;
+    streakCount: number;
+  }>;
+  repeatedLates: Array<{
+    studentId: string;
+    studentName: string;
+    className: string;
+    sectionName: string | null;
+    lateCount: number;
+  }>;
+  anomalies: {
+    rosterDivergences: Array<{
+      sessionId: string;
+      attendanceDate: string;
+      className: string;
+      sectionName: string | null;
+      expectedCount: number;
+      actualCount: number;
+      missing: string[];
+      unexpected: string[];
+    }>;
+    lateSubmissions: Array<{
+      sessionId: string;
+      attendanceDate: string;
+      className: string;
+      sectionName: string | null;
+      submittedAt: string;
+      submittedBy: string;
+      delayHours: number;
+    }>;
+    attendanceDrops: Array<{
+      classId: string;
+      sectionId: string | null;
+      className: string;
+      sectionName: string | null;
+      attendanceDate: string;
+      previousAverage: number;
+      currentRate: number;
+      dropPercentage: number;
+    }>;
+    unsubmittedWorkingDays: Array<{
+      attendanceDate: string;
+      classId: string;
+      sectionId: string | null;
+      className: string;
+      sectionName: string | null;
+    }>;
+  };
+};

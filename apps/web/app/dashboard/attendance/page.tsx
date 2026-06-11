@@ -20,6 +20,10 @@ export default function AttendancePage() {
     queryKey: ['attendance-analytics'],
     queryFn: api.listAttendanceAnalytics,
   });
+  const anomaliesQuery = useQuery({
+    queryKey: ['attendance-anomalies'],
+    queryFn: api.listAttendanceAnomalies,
+  });
 
   const conflictsQuery = useQuery({
     queryKey: ['attendance-conflicts'],
@@ -71,7 +75,16 @@ export default function AttendancePage() {
 
           {activeTab === 'analytics' && (
             <div className="space-y-6 animate-in fade-in duration-300">
-              <AttendanceAnalytics analytics={analyticsQuery.data} />
+              <AttendanceAnalytics
+                analytics={analyticsQuery.data}
+                anomalies={anomaliesQuery.data}
+                isLoadingAnomalies={anomaliesQuery.isLoading}
+                anomaliesError={
+                  anomaliesQuery.error instanceof Error
+                    ? anomaliesQuery.error.message
+                    : ''
+                }
+              />
             </div>
           )}
 

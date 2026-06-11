@@ -145,10 +145,13 @@ export const academicsApi = {
       json: body,
     }),
   batchGenerateReportCards: (body: JsonBody) =>
-    request<ReportCardSummary[]>('/academics/report-cards/batch', {
-      method: 'POST',
-      json: body,
-    }),
+    request<BatchReportCardGenerationResult>(
+      '/academics/report-cards/batch',
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
   requestReportCardCorrection: (id: string, body: JsonBody) =>
     request<any>(
       `/academics/report-cards/${encodeURIComponent(id)}/corrections`,
@@ -167,6 +170,16 @@ export const academicsApi = {
     ),
   listReportCardHistory: (id: string) =>
     request<any>(`/academics/report-cards/${encodeURIComponent(id)}/history`),
+  listReportCardCorrections: (params?: { examTermId?: string; status?: string }) =>
+    request<any[]>(withQuery('/academics/report-cards/corrections', params ?? {})),
+  reviewReportCardCorrection: (id: string, body: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string }) =>
+    request<any>(
+      `/academics/report-cards/corrections/${encodeURIComponent(id)}/review`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
   listPromotionReadiness: (params: {
     academicYearId: string;
     classId?: string | null;
@@ -633,4 +646,11 @@ export const academicsApi = {
     ),
 
   // Communications - Deliveries
+};
+
+export type BatchReportCardGenerationResult = {
+  queued: boolean;
+  jobId?: string | number;
+  generated: number;
+  reports: ReportCardSummary[];
 };

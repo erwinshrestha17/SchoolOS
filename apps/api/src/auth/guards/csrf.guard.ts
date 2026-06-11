@@ -40,6 +40,7 @@ export class CsrfGuard implements CanActivate {
       '/api/v1/auth/password-recovery/',
       '/api/v1/tenants/register',
       '/api/v1/demo-requests',
+      '/api/v1/payments/online/webhook/',
     ];
     if (publicPrefixes.some((prefix) => path.startsWith(prefix))) {
       return true;

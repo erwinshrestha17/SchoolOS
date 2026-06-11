@@ -527,7 +527,7 @@ describe('Student Lifecycle Hardening (E2E)', () => {
       actor,
     );
 
-    const { rawToken, credential } = await qrService.generateQr(
+    const { rawToken } = await qrService.generateQr(
       tenantId,
       student.id,
       actor,
@@ -541,8 +541,10 @@ describe('Student Lifecycle Hardening (E2E)', () => {
     );
 
     const scans = await qrService.getQrScanHistory(tenantId, student.id, actor);
-    expect(scans).toHaveLength(1);
-    expect(scans[0].action).toBe('QR_RESOLVED');
+    expect(scans.map((scan) => scan.action)).toEqual([
+      'QR_RESOLVED',
+      'QR_GENERATED',
+    ]);
     expect(scans[0].purpose).toBe('GENERAL_STUDENT_LOOKUP');
     expect(scans[0].success).toBe(true);
   });

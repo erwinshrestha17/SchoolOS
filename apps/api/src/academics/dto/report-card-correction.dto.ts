@@ -23,3 +23,13 @@ export class ApplyReportCardCorrectionDto {
   @IsString()
   remarks?: string;
 }
+
+export class ReviewReportCardCorrectionDto {
+  @IsString()
+  @IsNotEmpty()
+  status!: 'APPROVED' | 'REJECTED';
+
+  @IsOptional()
+  @IsString()
+  reviewNote?: string;
+}

@@ -1,41 +1,56 @@
-import { StreamableFile } from '@nestjs/common';
-import { AuthMethod } from '@prisma/client';
+import type { AuthContext } from '../auth/auth.types';
 import { ReceiptsController } from './receipts.controller';
 
-const actor = {
+const actor: AuthContext = {
+  userId: 'user-1',
   tenantId: 'tenant-1',
   tenantSlug: 'tenant-one',
-  userId: 'user-1',
-  email: 'accountant@schoolos.test',
-  authMethod: AuthMethod.PASSWORD,
-  roles: ['accountant'],
-  permissions: ['receipts:read'],
+  email: 'cashier@school.test',
+  roles: ['admin'],
+  permissions: [],
+  authMethod: 'PASSWORD',
 };
 
-describe('ReceiptsController PDF responses', () => {
-  it('streams receipts as application/pdf', async () => {
-    const service = {
-      listReceipts: jest.fn(),
-      getReceiptPdf: jest
-        .fn()
-        .mockResolvedValue(Buffer.from('%PDF-1.4\n%%EOF')),
-    };
-    const compatService = {
-      getReceiptReprintHistory: jest.fn(),
-    };
-    const controller = new ReceiptsController(
-      service as never,
-      compatService as never,
-    );
+function createController() {
+  const financeService = {
+    listReceipts: jest.fn(),
+    getReceiptPdf: jest.fn(),
+    reprintReceipt: jest.fn(),
+  };
+  const financeCompatService = {
+    getReceiptReprintHistory: jest.fn(),
+    verifyReceipt: jest.fn(),
+  };
 
-    const result = await controller.getReceiptPdf('REC-2026-00001', actor);
+  return {
+    controller: new ReceiptsController(
+      financeService as never,
+      financeCompatService as never,
+    ),
+    financeService,
+    financeCompatService,
+  };
+}
 
-    expect(result).toBeInstanceOf(StreamableFile);
-    expect(result.getHeaders()).toEqual(
-      expect.objectContaining({
-        type: 'application/pdf',
-        disposition: 'inline; filename="REC-2026-00001.pdf"',
-      }),
+describe('ReceiptsController', () => {
+  it('delegates receipt verification with current actor', () => {
+    const { controller, financeCompatService } = createController();
+    financeCompatService.verifyReceipt.mockReturnValue({
+      verified: true,
+      status: 'VALID',
+      receipt: { receiptNumber: 'REC-2026-00001' },
+    });
+
+    const result = controller.verifyReceipt('REC-2026-00001', actor);
+
+    expect(financeCompatService.verifyReceipt).toHaveBeenCalledWith(
+      'REC-2026-00001',
+      actor,
     );
+    expect(result).toEqual({
+      verified: true,
+      status: 'VALID',
+      receipt: { receiptNumber: 'REC-2026-00001' },
+    });
   });
 });

@@ -89,9 +89,13 @@ export function ReportCardsWorkspace() {
 
   const generateMutation = useMutation({
     mutationFn: api.batchGenerateReportCards,
-    onSuccess: () => {
+    onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['report-cards'] });
-      setMessage('Report cards generated from locked backend marks.');
+      setMessage(
+        data.queued
+          ? `Report-card generation queued as job ${data.jobId ?? 'pending'}. Refresh after the background job completes.`
+          : `${data.generated} report cards generated from locked backend marks.`,
+      );
       setError(null);
       setGenerationStudentIds(null);
     },

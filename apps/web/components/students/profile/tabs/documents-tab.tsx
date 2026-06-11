@@ -11,6 +11,10 @@ import {
   ShieldCheck,
   FileType,
   History,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  XCircle,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -30,6 +34,13 @@ const generatedTypes = [
   ['character-certificate', 'Character Certificate'],
 ] as const;
 
+const requiredDocuments = [
+  { kind: 'BIRTH_CERTIFICATE', label: 'Birth Certificate', required: true },
+  { kind: 'TRANSFER_CERTIFICATE', label: 'Transfer Certificate', required: false },
+  { kind: 'PHOTO', label: 'Student Photo', required: true },
+  { kind: 'ID_CARD', label: 'Guardian ID Card', required: true },
+] as const;
+
 export function DocumentsTab({
   studentId,
   documents,
@@ -45,6 +56,18 @@ export function DocumentsTab({
     queryFn: () => api.listStudentDocumentHistory(studentId),
     enabled: Boolean(studentId),
   });
+  const documentChecklist = buildDocumentChecklist(documents);
+  const documentRiskCounts = documentChecklist.reduce(
+    (counts, item) => {
+      if (item.state === 'missing') counts.missing += 1;
+      if (item.state === 'rejected') counts.rejected += 1;
+      if (item.state === 'expired') counts.expired += 1;
+      if (item.state === 'expiring') counts.expiring += 1;
+      if (item.state === 'unverified') counts.unverified += 1;
+      return counts;
+    },
+    { missing: 0, rejected: 0, expired: 0, expiring: 0, unverified: 0 },
+  );
 
   async function openUploadedDocument(documentId: string) {
     setDocumentAccessError('');
@@ -116,6 +139,79 @@ export function DocumentsTab({
         title="Uploaded Documents"
         description="Scanned copies and attachments provided during enrollment."
       >
+        <div className="mb-5 rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                Required Checklist
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-700">
+                {formatChecklistSummary(documentRiskCounts)}
+              </p>
+            </div>
+            <Badge
+              variant={
+                documentRiskCounts.missing ||
+                documentRiskCounts.rejected ||
+                documentRiskCounts.expired
+                  ? 'destructive'
+                  : documentRiskCounts.expiring || documentRiskCounts.unverified
+                    ? 'warning'
+                    : 'success'
+              }
+              className="w-fit uppercase tracking-wide"
+            >
+              {documentRiskCounts.missing ||
+              documentRiskCounts.rejected ||
+              documentRiskCounts.expired
+                ? 'Action needed'
+                : documentRiskCounts.expiring || documentRiskCounts.unverified
+                  ? 'Review needed'
+                  : 'Ready'}
+            </Badge>
+          </div>
+          <div className="mt-4 grid gap-2">
+            {documentChecklist.map((item) => {
+              const Icon = checklistIcon(item.state);
+              return (
+                <div
+                  key={item.kind}
+                  className="flex items-start justify-between gap-3 rounded-xl border border-white bg-white/80 p-3"
+                >
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div
+                      className={cn(
+                        'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                        checklistIconClass(item.state),
+                      )}
+                    >
+                      <Icon size={16} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-slate-900">
+                        {item.label}
+                        {item.required ? (
+                          <span className="ml-1 text-danger-500">*</span>
+                        ) : null}
+                      </p>
+                      <p className="mt-0.5 text-xs font-medium text-slate-500">
+                        {item.message}
+                      </p>
+                    </div>
+                  </div>
+                  {item.document ? (
+                    <Badge
+                      variant={documentStatusVariant(item.document.status)}
+                      className="shrink-0 uppercase tracking-wide"
+                    >
+                      {formatDocumentStatus(item.document.status)}
+                    </Badge>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
         {documentAccessError ? (
           <div className="mb-4 rounded-2xl border border-danger-100 bg-danger-50 p-4 text-sm font-semibold text-danger-700">
             {documentAccessError}
@@ -259,6 +355,156 @@ function documentStatusVariant(
   if (status === 'REJECTED' || status === 'ARCHIVED') return 'destructive';
   if (status === 'PENDING' || status === 'UPLOADED') return 'warning';
   return 'neutral';
+}
+
+type ChecklistState =
+  | 'ready'
+  | 'missing'
+  | 'rejected'
+  | 'expired'
+  | 'expiring'
+  | 'unverified'
+  | 'optional';
+
+function buildDocumentChecklist(documents: StudentDocument[]) {
+  return requiredDocuments.map((spec) => {
+    const document = documents.find((item) => item.kind === spec.kind);
+    if (!document) {
+      return {
+        ...spec,
+        document: null,
+        state: spec.required ? 'missing' : 'optional',
+        message: spec.required ? 'Missing required document.' : 'Optional document not uploaded.',
+      } as const;
+    }
+
+    if (document.status === 'REJECTED') {
+      return {
+        ...spec,
+        document,
+        state: 'rejected',
+        message: 'Rejected document needs replacement.',
+      } as const;
+    }
+
+    const expiry = getExpiryState(document.expiryDate);
+    if (expiry.state === 'expired') {
+      return {
+        ...spec,
+        document,
+        state: 'expired',
+        message: `Expired on ${formatDateOnly(document.expiryDate)}.`,
+      } as const;
+    }
+
+    if (expiry.state === 'expiring') {
+      return {
+        ...spec,
+        document,
+        state: 'expiring',
+        message: `Expires in ${expiry.daysUntilExpiry} day${expiry.daysUntilExpiry === 1 ? '' : 's'}.`,
+      } as const;
+    }
+
+    if (document.status !== 'VERIFIED') {
+      return {
+        ...spec,
+        document,
+        state: 'unverified',
+        message: 'Uploaded and awaiting verification.',
+      } as const;
+    }
+
+    return {
+      ...spec,
+      document,
+      state: 'ready',
+      message: document.expiryDate
+        ? `Verified until ${formatDateOnly(document.expiryDate)}.`
+        : 'Verified document on file.',
+    } as const;
+  });
+}
+
+function getExpiryState(value?: string | null) {
+  if (!value) {
+    return { state: 'none' as const, daysUntilExpiry: null };
+  }
+
+  const expiry = new Date(value);
+  if (Number.isNaN(expiry.getTime())) {
+    return { state: 'none' as const, daysUntilExpiry: null };
+  }
+
+  const now = new Date();
+  const daysUntilExpiry = Math.ceil(
+    (expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+  );
+
+  if (daysUntilExpiry < 0) {
+    return { state: 'expired' as const, daysUntilExpiry };
+  }
+
+  if (daysUntilExpiry <= 30) {
+    return { state: 'expiring' as const, daysUntilExpiry };
+  }
+
+  return { state: 'valid' as const, daysUntilExpiry };
+}
+
+function formatChecklistSummary(counts: {
+  missing: number;
+  rejected: number;
+  expired: number;
+  expiring: number;
+  unverified: number;
+}) {
+  const blocking = counts.missing + counts.rejected + counts.expired;
+  if (blocking > 0) {
+    return `${blocking} required document issue${blocking === 1 ? '' : 's'} need staff action.`;
+  }
+
+  const review = counts.expiring + counts.unverified;
+  if (review > 0) {
+    return `${review} document${review === 1 ? '' : 's'} should be reviewed before clearance.`;
+  }
+
+  return 'Required student documents are verified and current.';
+}
+
+function checklistIcon(state: ChecklistState) {
+  if (state === 'ready') return CheckCircle2;
+  if (state === 'missing' || state === 'rejected' || state === 'expired') {
+    return XCircle;
+  }
+  if (state === 'expiring') return Clock;
+  if (state === 'unverified') return AlertTriangle;
+  return FileText;
+}
+
+function checklistIconClass(state: ChecklistState) {
+  if (state === 'ready') return 'bg-success-50 text-success-600';
+  if (state === 'missing' || state === 'rejected' || state === 'expired') {
+    return 'bg-danger-50 text-danger-600';
+  }
+  if (state === 'expiring' || state === 'unverified') {
+    return 'bg-warning-50 text-warning-700';
+  }
+  return 'bg-slate-100 text-slate-500';
+}
+
+function formatDateOnly(value?: string | null) {
+  if (!value) {
+    return 'not recorded';
+  }
+
+  try {
+    return new Intl.DateTimeFormat('en-NP', {
+      dateStyle: 'medium',
+    }).format(new Date(value));
+  } catch {
+    return 'date not recorded';
+  }
 }
 
 function formatDateTime(value: string) {

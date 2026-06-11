@@ -13,9 +13,9 @@
 * **Phase 1A:** Completed / Pilot-Ready
 * **Phase 1B:** Completed / Pilot-Ready
 * **M0 Platform Core:** Foundation complete; provider/queue/API-key/File Registry hardening implemented; DTO validation added for provider status/support override/billing reason payloads; staging/object-storage/browser coverage remains.
-* **M1 Admissions & Student Profiles:** Pilot-ready plus Student QR, storage/photo/logo, iEMIS artifact registration, duplicate candidate review, document audit, mobile child profile foundation, and satellite-controller entitlement gating.
+* **M1 Admissions & Student Profiles:** Pilot-ready plus Student QR scan audit UI, storage/photo/logo, iEMIS artifact registration, duplicate candidate review, document audit/checklist expiry hardening, mobile child profile foundation, and satellite-controller entitlement gating.
 * **M2 Smart Attendance:** Pilot-ready plus correction/offline-draft, rejected replay regressions, correction-review UI, mobile teacher scope, real-data teacher dashboard, and mobile parent attendance summary query validation.
-* **M3 Fees & Receipts:** Pilot-ready plus receipt reprint, reversal, cashier close, reconciliation, Analysis CSV exports, protected day-end PDF snapshots, transaction-race coverage, and HMAC-secured online payment webhook verification.
+* **M3 Fees & Receipts:** Pilot-ready plus receipt reprint history UI, printed receipt QR verification, reversal, cashier close, reconciliation, Analysis CSV exports, protected day-end PDF snapshots, transaction-race coverage, and HMAC-secured online payment webhook verification.
 * **M4 Academics / Exams / CAS / Report Cards:** Completed / Pilot-Ready with PDF/report/correction/snapshot polish.
 * **M5 Activity Feed & Milestones:** Strong foundation with media privacy, consent-aware blocking, optimized previews, moderation controls, teacher media gallery, and media-access gating.
 * **M6 Homework / Timetable:** Completed / Pilot-Ready with File Registry attachments, reminder hardening, absence/substitution conflict coverage, mobile homework/timetable views, and improved substitution slot selection / absence recording UI.
@@ -154,23 +154,23 @@ Before adding or expanding visible features:
   - Storage readiness panel and report export history.
 
 ### M1 Admissions & Student Profiles (93-97%)
-* **Current Status:** Admissions, student records, guardian links, classes, sections, academic year context, Student QR, protected photos/documents, logo storage, duplicate candidate review, document audit, and parent-safe mobile child profile foundation. Gated by EntitlementGuard.
+* **Current Status:** Admissions, student records, guardian links, classes, sections, academic year context, Student QR with backend scan audit surfaced in the profile UI, protected photos/documents, logo storage, duplicate candidate review, document audit/checklist expiry hardening, and parent-safe mobile child profile foundation. Gated by EntitlementGuard.
 * **Staging / Verification Remaining:**
   - Continue ownership and document-access cross-tenant tests.
   - Duplicate warning and sibling/guardian relationship resolution.
 * **Backend Backlog:**
   - Stronger duplicate detection (Nepali/English/mixed names, guardian phone reuse, siblings).
   - Student lifecycle timeline API (admitted, class changed, transferred, withdrawn, graduated, rejoined, archived).
-  - QR revoke/rotate history and QR scan audit.
-  - Document expiry/reminder metadata.
+  - Deeper QR operational analytics beyond credential history and scan audit.
+  - Automated document expiry reminder jobs and notification templates.
   - Student-level iEMIS readiness score and missing-field reasons.
   - Import review queue for legacy records.
 * **Web Frontend Backlog:**
   - Admission draft autosave and recovery.
   - Sibling/guardian relationship resolution UI.
   - Unified student profile timeline (admissions, attendance, fees, documents, academics, communication, lifecycle).
-  - QR management UI (generate, revoke, rotate, audit).
-  - Document checklist with missing/expired/verified status.
+  - QR management UI (generate, revoke, rotate, credential history, scan audit).
+  - Bulk document checklist review and export for admissions/admin teams.
   - iEMIS readiness panel per student and class.
 * **Mobile Frontend Backlog:**
   - Child switcher, QR identity, and safe document previews.
@@ -195,7 +195,7 @@ Before adding or expanding visible features:
   - Parent/student monthly attendance calendar with reason display.
 
 ### M3 Fees & Receipts (94-97%)
-* **Current Status:** Fee setup, invoices, student ledger, payments, receipts, receipt reprint, reversal, cashier close, reconciliation, CSV exports, protected day-end PDFs, and HMAC online payment webhook verification.
+* **Current Status:** Fee setup, invoices, student ledger, payments, receipts, printed receipt QR verification, receipt reprint with audit history UI, reversal, cashier close, reconciliation, CSV exports, protected day-end PDFs, and HMAC online payment webhook verification.
 * **Staging / Verification Remaining:**
   - Reversal/refund/cashier-close isolation tests and gateway sandbox verification.
 * **Backend Backlog:**
@@ -207,7 +207,7 @@ Before adding or expanding visible features:
 * **Web Frontend Backlog:**
   - Cashier-first collection screen (search student, partial/full collect, print/share).
   - Reusable fee templates by class, transport, canteen, exam, activity, scholarship, discount.
-  - Receipt QR verification and reprint history UI.
+  - Receipt QR verification public-facing wording polish after pilot school feedback.
   - Day-end cashier close by cash, bank, manual reference, and future gateway mode.
   - Overdue reminder preview and defaulter segmentation.
 * **Mobile Frontend Backlog:**

@@ -84,6 +84,7 @@ export class ActivityFeedController {
     @Query('sectionId') sectionId?: string,
     @Query('category') category?: string,
     @Query('month') month?: string,
+    @Query('status') status?: string,
   ) {
     return this.activityFeedService.listPosts(auth, {
       studentId,
@@ -91,6 +92,7 @@ export class ActivityFeedController {
       sectionId,
       category,
       month,
+      status,
     });
   }
 

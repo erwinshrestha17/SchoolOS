@@ -400,6 +400,20 @@ export class ReportCardsService {
       );
     }
 
+    const approvedRequest = await this.prisma.reportCardCorrectionRequest.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        reportCardId,
+        status: 'APPROVED',
+      },
+    });
+
+    if (!approvedRequest) {
+      throw new ConflictException(
+        'No approved correction request found for this report card. A request must be approved before correction can be applied.',
+      );
+    }
+
     const recalculated = await this.calculateRegeneratedValues(
       {
         academicYearId: reportCard.academicYearId,
@@ -412,17 +426,24 @@ export class ReportCardsService {
     );
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const request = await tx.reportCardCorrectionRequest.create({
+      const request = await tx.reportCardCorrectionRequest.update({
+        where: { id: approvedRequest.id },
         data: {
-          tenantId: actor.tenantId,
-          reportCardId,
-          requestedById: actor.userId,
+          status: 'COMPLETED',
+          reviewNote: dto.reviewNote ?? approvedRequest.reviewNote,
           reviewedById: actor.userId,
-          status: 'APPROVED',
-          reason,
-          reviewNote: dto.reviewNote ?? null,
           reviewedAt: new Date(),
         },
+      });
+
+      // Ensure all marks are locked again for this student/term scope
+      await tx.markEntry.updateMany({
+        where: {
+          tenantId: actor.tenantId,
+          examTermId: reportCard.examTermId,
+          studentId: reportCard.studentId,
+        },
+        data: { isLocked: true },
       });
 
       const history = await tx.reportCardHistory.create({
@@ -510,6 +531,92 @@ export class ReportCardsService {
     });
 
     return result.reportCard;
+  }
+
+  async listCorrections(
+    actor: AuthContext,
+    filters: { examTermId?: string; status?: string } = {},
+  ) {
+    const where: Prisma.ReportCardCorrectionRequestWhereInput = {
+      tenantId: actor.tenantId,
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.examTermId
+        ? {
+            reportCard: {
+              examTermId: filters.examTermId,
+            },
+          }
+        : {}),
+    };
+
+    return this.prisma.reportCardCorrectionRequest.findMany({
+      where,
+      include: {
+        reportCard: {
+          include: {
+            student: true,
+            class: true,
+            section: true,
+            examTerm: true,
+          },
+        },
+        requestedBy: true,
+        reviewedBy: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async reviewCorrection(
+    requestId: string,
+    dto: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string },
+    actor: AuthContext,
+  ) {
+    const request = await this.prisma.reportCardCorrectionRequest.findFirst({
+      where: { id: requestId, tenantId: actor.tenantId },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Report card correction request not found');
+    }
+
+    if (request.status !== 'PENDING') {
+      throw new ConflictException(
+        'Only pending correction requests can be reviewed',
+      );
+    }
+
+    if (dto.status === 'REJECTED' && !dto.reviewNote?.trim()) {
+      throw new ConflictException('Rejection requires a review note');
+    }
+
+    const updated = await this.prisma.reportCardCorrectionRequest.update({
+      where: { id: requestId },
+      data: {
+        status: dto.status,
+        reviewNote: dto.reviewNote?.trim() || null,
+        reviewedById: actor.userId,
+        reviewedAt: new Date(),
+      },
+    });
+
+    await this.auditService.record({
+      action:
+        dto.status === 'APPROVED'
+          ? 'ACADEMICS_REPORT_CARD_CORRECTION_APPROVED'
+          : 'ACADEMICS_REPORT_CARD_CORRECTION_REJECTED',
+      resource: 'report_card',
+      resourceId: request.reportCardId,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        requestId,
+        status: dto.status,
+        reviewNote: dto.reviewNote,
+      },
+    });
+
+    return updated;
   }
 
   async listHistory(reportCardId: string, actor: AuthContext) {

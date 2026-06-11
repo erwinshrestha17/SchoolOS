@@ -114,6 +114,7 @@ export function buildReceiptPdf(input: {
   paidAmount: number;
   balance: number;
   isReprint?: boolean;
+  qrToken?: string | null;
   logo?: PdfImage | null;
 }) {
   const contentParts = [
@@ -183,6 +184,15 @@ export function buildReceiptPdf(input: {
     contentParts.push(
       text('Balance Due', 350, y - 40, 10, 'F2'),
       moneyText(input.balance, 482, y - 40, 'F2'),
+    );
+  }
+
+  if (input.qrToken) {
+    contentParts.push(
+      renderQrTokenAsPdfBlocks(input.qrToken, 60, 150, 64),
+      text('VERIFY RECEIPT', 136, 198, 8, 'F2'),
+      text(input.receiptNumber, 136, 184, 8, 'F1'),
+      text('Scan or enter this number in Fees > Ledger.', 136, 170, 7, 'F1'),
     );
   }
 

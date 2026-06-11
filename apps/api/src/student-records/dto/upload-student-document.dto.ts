@@ -1,5 +1,11 @@
 import { StudentDocumentKind } from '@prisma/client';
-import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
 export class UploadStudentDocumentDto {
   @IsOptional()
@@ -27,7 +33,7 @@ export class UploadStudentDocumentDto {
   reason?: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString()
   expiryDate?: string;
 
   @IsOptional()

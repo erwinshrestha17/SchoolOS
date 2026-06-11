@@ -135,6 +135,10 @@ export const studentsApi = {
     request<StudentQrStatusHistory>(
       `/students/${encodeURIComponent(studentId)}/qr`,
     ),
+  listStudentQrScans: (studentId: string) =>
+    request<StudentQrScanAudit[]>(
+      `/students/${encodeURIComponent(studentId)}/qr/scans`,
+    ),
   rotateStudentQr: (studentId: string, body: { reason: string }) =>
     request<{
       credential: any;
@@ -313,4 +317,18 @@ export const studentsApi = {
 
     await openPdfBlob(response);
   },
+};
+
+export type StudentQrScanAudit = {
+  id: string;
+  action: string;
+  scannedBy: string | null;
+  scannedByEmail: string | null;
+  performedBy: string | null;
+  performedByEmail: string | null;
+  purpose: string | null;
+  success: boolean | null;
+  failureCode: string | null;
+  reason: string | null;
+  timestamp: string;
 };

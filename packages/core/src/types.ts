@@ -2713,6 +2713,9 @@ export type UploadStudentDocumentPayload = {
   fileName: string;
   contentType: string;
   base64Content: string;
+  expiryDate?: string | null;
+  notes?: string | null;
+  reason?: string | null;
 };
 
 export type DuplicateStudentMergeCounts = {

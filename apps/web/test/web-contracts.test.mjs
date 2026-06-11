@@ -1270,6 +1270,12 @@ describe('SchoolOS web production contracts', () => {
 
     assert.match(detailPage, /System Generated Docs/);
     assert.match(detailPage, /Uploaded Documents/);
+    assert.match(detailPage, /Required Checklist/);
+    assert.match(detailPage, /buildDocumentChecklist\(documents\)/);
+    assert.match(detailPage, /getExpiryState\(document\.expiryDate\)/);
+    assert.match(detailPage, /Missing required document/);
+    assert.match(detailPage, /Rejected document needs replacement/);
+    assert.match(detailPage, /Expires in/);
     assert.match(detailPage, /generatedDocuments/);
     assert.match(
       detailPage,
@@ -1612,6 +1618,19 @@ describe('SchoolOS web production contracts', () => {
     assert.match(financeForm, /Approve waiver/);
     assert.match(financeForm, /Remind all filtered/);
     assert.match(financeForm, /Remind selected/);
+  });
+
+  it('keeps receipt QR verification wired to the backend receipt verifier', () => {
+    const financeApi = read('lib/api/finance.ts');
+    const ledgerSection = read('components/finance/ledger-section.tsx');
+    const verificationPanel = read('components/finance/receipt-verification-panel.tsx');
+
+    assert.match(financeApi, /verifyReceipt/);
+    assert.match(financeApi, /\/receipts\/verify\/\$\{encodeURIComponent\(receiptNumber\)\}/);
+    assert.match(ledgerSection, /ReceiptVerificationPanel/);
+    assert.match(verificationPanel, /api\.verifyReceipt/);
+    assert.match(verificationPanel, /receipt-verification-result/);
+    assert.doesNotMatch(verificationPanel, /localStorage|sessionStorage|mock/i);
   });
 
   it('adds a fee collection export action to the finance screen', () => {

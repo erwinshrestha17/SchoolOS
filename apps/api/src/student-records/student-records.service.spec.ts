@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import {
   AuthMethod,
   StorageProvider,
@@ -132,6 +132,27 @@ describe('StudentRecordsService', () => {
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(storageService.saveBase64Object).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed document expiry dates before storing files', async () => {
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+
+    await expect(
+      service.uploadDocument(
+        {
+          studentId: 'student-1',
+          kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+          title: 'Birth certificate',
+          fileName: 'birth.pdf',
+          contentType: 'application/pdf',
+          base64Content: 'aGVsbG8=',
+          expiryDate: 'not-a-date',
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(storageService.saveBase64Object).not.toHaveBeenCalled();
+    expect(fileRegistryService.registerFile).not.toHaveBeenCalled();
   });
 
   it('lists student documents without raw storage keys or public URLs', async () => {
