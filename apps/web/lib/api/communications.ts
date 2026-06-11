@@ -117,11 +117,15 @@ export const communicationsApi = {
     ),
 
   // Academics - Assessment Components
-  retryNotificationDelivery: (deliveryId: string) =>
+  retryNotificationDelivery: (
+    deliveryId: string,
+    body?: { reason?: string },
+  ) =>
     request<any>(
       `/communications/deliveries/${encodeURIComponent(deliveryId)}/retry`,
       {
         method: 'POST',
+        json: body ?? {},
       },
     ),
   listNotificationDeliveryFailures: () =>
@@ -129,8 +133,11 @@ export const communicationsApi = {
       total: number;
       items: NotificationDeliveryFailureSummary[];
     }>('/communications/deliveries/failures'),
-  retryFailedNotificationDeliveries: () =>
-    request<any>('/communications/deliveries/retry-failed', { method: 'POST' }),
+  retryFailedNotificationDeliveries: (body?: { reason?: string }) =>
+    request<any>('/communications/deliveries/retry-failed', {
+      method: 'POST',
+      json: body ?? {},
+    }),
 
   // Payroll - PDFs
 };

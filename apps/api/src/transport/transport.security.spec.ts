@@ -231,6 +231,38 @@ describe('Transport Security Boundaries', () => {
       );
     });
 
+    it('returns persisted latest-location fallback with confidence metadata', async () => {
+      const recordedAt = new Date(Date.now() - 11 * 60 * 1000);
+
+      prisma.transportTrip.findFirst.mockResolvedValue({
+        id: 'trip-1',
+        status: TransportTripStatus.ACTIVE,
+        driverAssignmentId: 'assignment-1',
+        vehicleId: 'v-1',
+      });
+      redisClient.get.mockResolvedValueOnce(null);
+      prisma.transportLocationPing.findFirst.mockResolvedValue({
+        tenantId,
+        tripId: 'trip-1',
+        vehicleId: 'v-1',
+        driverAssignmentId: 'assignment-1',
+        latitude: { toNumber: () => 27.7172 },
+        longitude: { toNumber: () => 85.324 },
+        speedKph: null,
+        heading: null,
+        recordedAt,
+      });
+
+      const result = await service.getLatestTripLocation('trip-1', adminActor);
+
+      expect(result).toMatchObject({
+        source: 'history',
+        confidence: 'stale',
+        isStale: true,
+      });
+      expect(result.ageSeconds).toBeGreaterThanOrEqual(600);
+    });
+
     it('rejects location ingestion pressure before cache or database writes', async () => {
       prisma.transportTrip.findFirst.mockResolvedValue({
         id: 'trip-1',
@@ -268,15 +300,44 @@ describe('Transport Security Boundaries', () => {
 
       prisma.transportTripStudentStatus.findFirst.mockResolvedValue({
         tripId: 'trip-1',
+        status: 'BOARDED',
+        boardedAt: new Date(),
+        droppedAt: null,
         trip: {
           id: 'trip-1',
           status: 'ACTIVE',
-          route: { id: 'r-1', name: 'Route 1' },
-          vehicle: { id: 'v-1', registrationNumber: 'BA1' },
-          driverAssignment: { staff: { firstName: 'Driver' } },
+          direction: 'PICKUP',
+          startedAt: new Date(),
+          route: { id: 'r-1', name: 'Route 1', code: 'R1' },
+          vehicle: { id: 'v-1', registrationNumber: 'BA1', model: 'Bus' },
+          driverAssignment: {
+            staff: {
+              id: 'staff-1',
+              firstName: 'Driver',
+              lastName: 'One',
+            },
+          },
         },
-        stop: { name: 'Home' },
+        stop: { id: 'stop-1', name: 'Home', sequence: 1 },
       });
+      prisma.transportTrip.findFirst.mockResolvedValue({
+        id: 'trip-1',
+        tenantId,
+        status: TransportTripStatus.ACTIVE,
+        driverAssignmentId: 'assignment-1',
+        vehicleId: 'v-1',
+      });
+      redisClient.get.mockResolvedValueOnce(
+        JSON.stringify({
+          tenantId,
+          tripId: 'trip-1',
+          vehicleId: 'v-1',
+          driverAssignmentId: 'assignment-1',
+          latitude: 27.7172,
+          longitude: 85.324,
+          recordedAt: new Date().toISOString(),
+        }),
+      );
 
       const result = await hardeningService.getParentStudentActiveTrip(
         studentId,
@@ -284,6 +345,11 @@ describe('Transport Security Boundaries', () => {
       );
       expect(result.student.id).toBe(studentId);
       expect(result.trip).toBeDefined();
+      expect(result.latestLocation).toMatchObject({
+        source: 'cache',
+        confidence: 'fresh',
+      });
+      expect(prisma.transportDriverAssignment.findFirst).not.toHaveBeenCalled();
     });
 
     it('denies parent from viewing active trip of another child', async () => {

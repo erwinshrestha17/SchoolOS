@@ -48,6 +48,9 @@ export default function ActivityPostDetailRoute() {
         queryKey: ['activity-post-detail', postId],
       }),
       queryClient.invalidateQueries({ queryKey: ['activity-posts'] }),
+      queryClient.invalidateQueries({ queryKey: ['activity-gallery'] }),
+      queryClient.invalidateQueries({ queryKey: ['parent-activity-posts'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard-activity-posts'] }),
     ]);
   };
 
@@ -81,7 +84,14 @@ export default function ActivityPostDetailRoute() {
       }),
     onSuccess: async () => {
       setActionMessage('Activity post removed from the feed.');
-      await queryClient.invalidateQueries({ queryKey: ['activity-posts'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['activity-posts'] }),
+        queryClient.invalidateQueries({ queryKey: ['activity-gallery'] }),
+        queryClient.invalidateQueries({ queryKey: ['parent-activity-posts'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['dashboard-activity-posts'],
+        }),
+      ]);
       router.push('/dashboard/activity');
     },
   });

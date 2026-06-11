@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { api } from '../../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Badge } from '../ui/badge';
@@ -85,6 +86,7 @@ export function JournalDetailDialog({ isOpen, onClose, entry }: JournalDetailDia
   };
 
   if (!entry) return null;
+  const sourceDrilldown = buildSourceDrilldown(entry);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NP', {
@@ -214,6 +216,35 @@ export function JournalDetailDialog({ isOpen, onClose, entry }: JournalDetailDia
             )}
           </div>
 
+          <div
+            className="rounded-2xl border border-slate-200 bg-white p-4"
+            data-testid="accounting-source-drilldown"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Source record</p>
+                <p className="mt-1 text-sm font-bold text-slate-900">
+                  {entry.sourceModule ?? 'Accounting'} / {entry.sourceType}
+                </p>
+                <p className="mt-1 break-all text-xs font-semibold text-slate-500">
+                  {entry.sourceId ? `Source ID: ${entry.sourceId}` : 'Source ID not recorded'}
+                </p>
+              </div>
+              {sourceDrilldown ? (
+                <Link
+                  href={sourceDrilldown.href}
+                  className="rounded-xl border border-[var(--color-mod-accounting-border)] bg-[var(--color-mod-accounting-bg)] px-3 py-2 text-xs font-black text-[var(--color-mod-accounting-text)] transition hover:bg-white"
+                >
+                  Open source record
+                </Link>
+              ) : (
+                <span className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
+                  Source route unavailable
+                </span>
+              )}
+            </div>
+          </div>
+
           <div className="space-y-3">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Ledger Impact</p>
             <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm bg-white">
@@ -313,4 +344,30 @@ export function JournalDetailDialog({ isOpen, onClose, entry }: JournalDetailDia
       </DialogContent>
     </Dialog>
   );
+}
+
+function buildSourceDrilldown(entry: JournalEntryView) {
+  if (!entry.sourceId) return null;
+
+  const moduleName = entry.sourceModule?.toUpperCase() ?? '';
+  const sourceType = entry.sourceType.toUpperCase();
+  const sourceId = encodeURIComponent(entry.sourceId);
+
+  if (moduleName === 'PAYROLL') {
+    return { href: `/dashboard/hr/payroll?runId=${sourceId}` };
+  }
+
+  if (moduleName === 'CANTEEN') {
+    return { href: `/dashboard/canteen/pos?saleId=${sourceId}` };
+  }
+
+  if (moduleName === 'LIBRARY') {
+    return { href: `/dashboard/library?fineId=${sourceId}` };
+  }
+
+  if (moduleName === 'FINANCE' || sourceType === 'INVOICE') {
+    return { href: `/dashboard/finance?invoiceId=${sourceId}` };
+  }
+
+  return null;
 }

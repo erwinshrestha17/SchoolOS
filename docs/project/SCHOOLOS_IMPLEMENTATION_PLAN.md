@@ -215,12 +215,11 @@ Before adding or expanding visible features:
   - Payment initiation remains disabled until gateway verification is staging-proven.
 
 ### M4 Academics / Exams / CAS / Report Cards (98-100%)
-* **Current Status:** Subjects, exams, marks, CAS, locks, report-card PDFs, and report/correction/history/snapshot polish.
+* **Current Status:** Subjects, exams, marks, CAS, locks, tenant grading scale/rounding policy, report-card PDFs, and report/correction/history/snapshot/grading-policy workspace polish.
 * **Staging / Verification Remaining:**
   - Report generation failure and correction tests.
   - Smoke `/dashboard/academics/report-cards`.
 * **Backend Backlog:**
-  - Tenant-configurable grading scale and rounding policy.
   - Marks lock/unlock approval workflow with reason and audit.
   - Retest/make-up exam handling.
   - Result withholding policy integration with dues where enabled.
@@ -236,14 +235,12 @@ Before adding or expanding visible features:
   - Show only published results and permission-safe data.
 
 ### M5 Activity Feed & Milestones (91-96%)
-* **Current Status:** Private media, consent-aware media blocking, optimized previews, moderation controls, teacher media gallery, and media-access gating.
+* **Current Status:** Private media, consent-aware media blocking, optimized previews, moderation controls, teacher media gallery, media-access gating, post-create media/database cleanup on downstream failures, and cross-surface feed/gallery/parent/dashboard invalidation after post mutations.
 * **Staging / Verification Remaining:**
   - Consent/media cross-tenant tests.
   - Protected media browser smoke.
 * **Backend Backlog:**
   - Stronger consent-aware media tests across guardian changes and removed students.
-  - Media upload cleanup for post-create failures.
-  - Moderation state cache invalidation and removed-content disappearance checks.
   - Delivery retry idempotency for activity notifications.
 * **Web Frontend Backlog:**
   - Improved teacher post composer with class/section/student audience preview.
@@ -256,7 +253,7 @@ Before adding or expanding visible features:
   - Signed media preview/download refresh behavior.
 
 ### M6 Homework & Timetable (98-100%)
-* **Current Status:** Reminders, attachments, timetable conflicts, substitutions, slot selection, and absence recording.
+* **Current Status:** Reminders, attachments, timetable conflicts, substitutions, slot selection, absence recording, and homework create/publish UI payload alignment with backend `dueDate`, `submissionRequired`, and publish endpoint contracts.
 * **Staging / Verification Remaining:**
   - Attachment and conflict lifecycle tests.
   - Dashboard route smoke and substitution mutation smoke.
@@ -276,7 +273,7 @@ Before adding or expanding visible features:
   - Weekly timetable and substitution alerts.
 
 ### M7 HR & Payroll (96-100%)
-* **Current Status:** Posting locks, reversals, PII masking, payroll reports, and statutory deduction retrieval from active salary structures.
+* **Current Status:** Posting locks, reversals, PII masking, payroll reports, statutory deduction retrieval from active salary structures, and payroll-run UI boundaries that stop at review/approve/post without exposing disbursement or mark-paid controls.
 * **Staging / Verification Remaining:**
   - PII/approval/post/reverse tests.
   - HR/payroll mutation smoke.
@@ -296,7 +293,7 @@ Before adding or expanding visible features:
   - Salary/bank fields masked unless permission allows.
 
 ### M8A Library (92-96%)
-* **Current Status:** CRUD, book copies, fines, QR lookup, staff borrowers, fine-to-fees/accounting boundary, scanner-first UI, and reports/export polish.
+* **Current Status:** CRUD, book copies, fines, QR lookup, staff borrowers, fine-to-fees/accounting boundary, scanner-first UI, reports/export polish, and required audited reasons for lost/damaged copy status changes.
 * **Staging / Verification Remaining:**
   - Lost/damaged/fine posting tests.
   - Reports/export smoke.
@@ -315,18 +312,16 @@ Before adding or expanding visible features:
   - Librarian scanner workflows after device QA.
 
 ### M8B Transport (91-95%)
-* **Current Status:** Routes, stops, vehicles, assignments, trips, Redis GPS latest-location cache, driver/parent mobile surfaces, and trip-history exports.
+* **Current Status:** Routes, stops, vehicles, assignments, trips, Redis GPS latest-location cache with persisted-history fallback metadata, driver/parent scoped trip surfaces, and trip-history exports.
 * **Staging / Verification Remaining:**
-  - Driver/parent scope and GPS retention tests.
+  - Route and end-to-end GPS retention smoke.
   - Route and CSV smoke.
 * **Backend Backlog:**
   - Background/automated driver GPS ping flow after device-auth contracts.
-  - Stale-location metrics and Redis outage fallback behavior.
   - GPS ingestion acceptance/rejection reports.
   - Route deviation, overspeed, geofence, and ETA (deferred until live tracking approved).
   - Vehicle/driver overlapping trip validation and one-day route changes.
 * **Web Frontend Backlog:**
-  - Admin stale-location labels and latest-location confidence indicators.
   - Trip history and GPS quality reports.
   - Live map only after SSE/WebSocket decision and load testing (intentionally deferred).
 * **Mobile Frontend Backlog:**
@@ -335,15 +330,15 @@ Before adding or expanding visible features:
   - Parent bus status: not started, en route, delayed, arrived, stale GPS.
 
 ### M8C Canteen (93-97%)
-* **Current Status:** Menu, plans, POS, wallets, inventory, vendors, receipt JSON/PDF, stock hardening, wallet guards, linked invoice handoff, parent mobile views, and workspace polish.
+* **Current Status:** Menu, plans, POS, wallets, inventory, vendors, receipt JSON/PDF, stock hardening with atomic manual decrement guards, wallet guards, linked invoice handoff, parent mobile views, and workspace polish.
 * **Staging / Verification Remaining:**
-  - Stock/POS reversal/wallet guard tests.
+  - POS reversal/wallet guard smoke.
   - POS/report smoke.
 * **Backend Backlog:**
   - POS double-submit and receipt reprint idempotency tests.
   - Allergy/medical warning enforcement before serving.
   - Daily/monthly spending controls and low-balance events.
-  - Stock close, wastage, vendor bill edit locks, negative stock prevention.
+  - Stock close, wastage reports, and vendor bill edit locks.
 * **Web Frontend Backlog:**
   - Fast POS mode with QR/student search, wallet balance, allergy warning, receipt.
   - Daily/weekly menu planner.
@@ -355,7 +350,7 @@ Before adding or expanding visible features:
   - Canteen scanner and serve meal flow after device QA.
 
 ### M9 Accounting & Finance (98-100%)
-* **Current Status:** Accounts, journals, reports, reconciliation, PDFs, snapshots, audit, bank statement DTO/import validation, and reconciliation DTOs.
+* **Current Status:** Accounts, journals, source-record drilldown, reports, reconciliation, PDFs, snapshots, audit, bank statement DTO/import validation, and reconciliation DTOs.
 * **Staging / Verification Remaining:**
   - Fiscal lock/reversal/export failure and bank reconciliation browser tests.
   - Report/export/import/reconciliation smoke.
@@ -369,24 +364,23 @@ Before adding or expanding visible features:
   - Accountant dashboard for fiscal status, unreconciled items, pending postings, export history.
   - Bank reconciliation review with manual confirmation polish.
   - Report snapshots and large export progress UI.
-  - Source-ledger drilldown from accounting entries back to original module records.
 * **Mobile Frontend Backlog:**
   - Principal read-only finance snapshot only; no full COA/journal editing on mobile.
 
-### M10 Notices / Communication / Chat (93-97%)
-* **Current Status:** Notices, deliveries, events, consents, notice-detail, notification-center, parent-teacher chat, and messaging-hardening. Gated by EntitlementGuard.
+### M10 Notices / Communication / Chat (94-97%)
+* **Current Status:** Notices, deliveries, events, consents, notice-detail, notification-center, parent-teacher chat, messaging-hardening, and audited delivery retry reasons. Delivery retry now preserves existing tenant-scoped/idempotent backend claims, records operator reasons for single and bulk retry attempts, and the web retry panel requires those reasons while showing backend `RETRY_PENDING` state.
 * **Staging / Verification Remaining:**
   - Provider failure, retry, moderation, attachment tests.
   - Provider-mode browser smoke.
 * **Backend Backlog:**
   - Real provider callback verification (duplicate, forged, failed, delayed, out-of-order).
-  - Notification retry idempotency and provider-disabled fail-closed behavior.
+  - Provider-disabled fail-closed behavior for retry dispatch.
   - Quiet-hours and moderation policy enforcement for chat.
   - Attachment access tests after guardian removal or role change.
 * **Web Frontend Backlog:**
   - Notice templates (holiday, fee reminder, emergency, exam, transport delay, event).
   - Recipient preview before high-impact notices.
-  - Failed-recipient retry and unread follow-up UI polish.
+  - Unread follow-up UI polish.
   - Communication audit for emergency and high-impact messages.
 * **Mobile Frontend Backlog:**
   - Push notifications, notification center polish, notice attachment preview.

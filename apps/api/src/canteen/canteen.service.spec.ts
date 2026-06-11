@@ -359,6 +359,7 @@ describe('CanteenService Phase 3C hardening', () => {
         currentStock: new Prisma.Decimal(2),
         unitCost: new Prisma.Decimal(25),
       },
+      inventoryUpdateManyCount: 0,
     });
 
     await expect(
@@ -386,6 +387,45 @@ describe('CanteenService Phase 3C hardening', () => {
 
     expect(tx.canteenWastage.create).not.toHaveBeenCalled();
     expect(tx.canteenStockMovement.create).not.toHaveBeenCalled();
+  });
+
+  it('uses an atomic stock guard for negative manual adjustments', async () => {
+    const { service, tx } = buildService({
+      inventoryItem: {
+        id: 'stock-1',
+        tenantId: actor.tenantId,
+        currentStock: new Prisma.Decimal(10),
+        unitCost: new Prisma.Decimal(25),
+      },
+    });
+
+    await service.manualStockAdjustment(
+      {
+        inventoryItemId: 'stock-1',
+        quantity: -3,
+        reason: 'Kitchen issue count',
+      },
+      actor,
+    );
+
+    expect(tx.canteenInventoryItem.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'stock-1',
+        tenantId: actor.tenantId,
+        currentStock: { gte: new Prisma.Decimal(3) },
+      },
+      data: { currentStock: { decrement: new Prisma.Decimal(3) } },
+    });
+    expect(tx.canteenStockMovement.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        inventoryItemId: 'stock-1',
+        type: 'OUT',
+        quantity: new Prisma.Decimal(3),
+        referenceType: 'MANUAL',
+        reason: 'Kitchen issue count',
+      }),
+    });
   });
 
   it('prevents inactive menu items from being sold', async () => {
@@ -483,6 +523,7 @@ function buildService(
     duplicateEnrollment?: unknown;
     supplier?: unknown;
     inventoryItem?: unknown;
+    inventoryUpdateManyCount?: number;
   } = {},
 ) {
   const student =
@@ -655,7 +696,9 @@ function buildService(
         ...(inventoryItem as Record<string, unknown>),
         currentStock: new Prisma.Decimal(14),
       }),
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      updateMany: jest
+        .fn()
+        .mockResolvedValue({ count: options.inventoryUpdateManyCount ?? 1 }),
     },
     canteenPurchaseBill: {
       create: jest.fn().mockResolvedValue(purchaseBill),

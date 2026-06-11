@@ -4,6 +4,7 @@ export type JournalEntryView = {
   entryDate: string;
   narration: string;
   status: string;
+  sourceModule?: string | null;
   sourceType: string;
   sourceId?: string | null;
   reference?: string | null;

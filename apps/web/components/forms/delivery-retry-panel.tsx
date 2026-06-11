@@ -3,6 +3,7 @@
 import type { NotificationDeliveryFailureSummary } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useState } from 'react';
 import { RefreshCcw, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { LoadingState } from '../ui/loading-state';
 import { EmptyState } from '../ui/empty-state';
@@ -11,7 +12,12 @@ import { cn } from '../../lib/utils';
 import { api } from '../../lib/api';
 import { useSession } from '../session-provider';
 
-const retryableStatuses = new Set(['FAILED', 'RETRYING', 'QUEUED']);
+const retryableStatuses = new Set([
+  'FAILED',
+  'RETRYING',
+  'RETRY_PENDING',
+  'QUEUED',
+]);
 
 type DeliveryRecord = {
   id: string;
@@ -56,6 +62,8 @@ type BulkDeliveryRetryResult = {
 export function DeliveryRetryPanel() {
   const { status } = useSession();
   const queryClient = useQueryClient();
+  const [batchRetryReason, setBatchRetryReason] = useState('');
+  const [retryReasons, setRetryReasons] = useState<Record<string, string>>({});
   const deliveriesQuery = useQuery({
     queryKey: ['notification-deliveries'],
     queryFn: async () =>
@@ -69,8 +77,19 @@ export function DeliveryRetryPanel() {
   });
 
   const retryMutation = useMutation({
-    mutationFn: api.retryNotificationDelivery,
-    onSuccess: () => {
+    mutationFn: ({
+      deliveryId,
+      reason,
+    }: {
+      deliveryId: string;
+      reason: string;
+    }) => api.retryNotificationDelivery(deliveryId, { reason }),
+    onSuccess: (data) => {
+      setRetryReasons((current) => {
+        const next = { ...current };
+        delete next[data.deliveryId];
+        return next;
+      });
       void queryClient.invalidateQueries({
         queryKey: ['notification-deliveries'],
       });
@@ -82,8 +101,10 @@ export function DeliveryRetryPanel() {
   });
 
   const retryAllMutation = useMutation({
-    mutationFn: api.retryFailedNotificationDeliveries,
+    mutationFn: (reason: string) =>
+      api.retryFailedNotificationDeliveries({ reason }),
     onSuccess: () => {
+      setBatchRetryReason('');
       void queryClient.invalidateQueries({
         queryKey: ['notification-deliveries'],
       });
@@ -102,8 +123,8 @@ export function DeliveryRetryPanel() {
   const failedDeliveries = deliveries.filter(
     (delivery) => delivery.status === 'FAILED',
   );
-  const retryingDeliveries = deliveries.filter(
-    (delivery) => delivery.status === 'RETRYING',
+  const retryingDeliveries = deliveries.filter((delivery) =>
+    ['RETRYING', 'RETRY_PENDING'].includes(delivery.status),
   );
   const retryableDeliveries = deliveries.filter((delivery) =>
     retryableStatuses.has(delivery.status),
@@ -125,23 +146,39 @@ export function DeliveryRetryPanel() {
           </p>
         </div>
 
-        <button
-          type="button"
-          className="inline-flex min-h-12 items-center justify-center gap-3 rounded-2xl bg-[var(--color-mod-notices-accent)] px-8 font-black text-xs uppercase tracking-widest text-white transition-all hover:bg-[var(--color-mod-notices-text)] shadow-sm active:scale-95 disabled:opacity-50"
-          disabled={failedDeliveries.length === 0 || retryAllMutation.isPending}
-          onClick={() => retryAllMutation.mutate()}
-        >
-          <RefreshCcw
-            size={14}
-            className={cn(
-              'stroke-[3]',
-              retryAllMutation.isPending ? 'animate-spin' : '',
-            )}
-          />
-          {retryAllMutation.isPending
-            ? 'Retrying Batch...'
-            : `Retry All Failed (${failedDeliveries.length})`}
-        </button>
+        <div className="w-full max-w-md space-y-3">
+          <label className="block text-xs font-black uppercase tracking-widest text-slate-500">
+            Batch retry reason
+            <textarea
+              value={batchRetryReason}
+              onChange={(event) => setBatchRetryReason(event.target.value)}
+              className="mt-2 min-h-20 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium normal-case tracking-normal text-slate-700 shadow-sm outline-none transition focus:border-[var(--color-mod-notices-accent)] focus:ring-2 focus:ring-[var(--color-mod-notices-accent)]/15"
+              placeholder="Provider outage resolved after status check"
+              maxLength={500}
+            />
+          </label>
+          <button
+            type="button"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl bg-[var(--color-mod-notices-accent)] px-8 font-black text-xs uppercase tracking-widest text-white transition-all hover:bg-[var(--color-mod-notices-text)] shadow-sm active:scale-95 disabled:opacity-50"
+            disabled={
+              failedDeliveries.length === 0 ||
+              !batchRetryReason.trim() ||
+              retryAllMutation.isPending
+            }
+            onClick={() => retryAllMutation.mutate(batchRetryReason.trim())}
+          >
+            <RefreshCcw
+              size={14}
+              className={cn(
+                'stroke-[3]',
+                retryAllMutation.isPending ? 'animate-spin' : '',
+              )}
+            />
+            {retryAllMutation.isPending
+              ? 'Retrying Batch...'
+              : `Retry All Failed (${failedDeliveries.length})`}
+          </button>
+        </div>
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-4">
@@ -194,6 +231,9 @@ export function DeliveryRetryPanel() {
           message={`Retry batch completed for ${retryAllMutation.data.retried} delivery record${retryAllMutation.data.retried === 1 ? '' : 's'}.`}
         />
       ) : null}
+      <p className="mt-4 text-xs font-semibold text-slate-500">
+        Retry reason is recorded in delivery audit metadata.
+      </p>
 
       <div className="mt-8 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/50">
         {deliveriesQuery.isLoading ? (
@@ -265,20 +305,45 @@ export function DeliveryRetryPanel() {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={retryMutation.isPending}
-                      onClick={() => retryMutation.mutate(delivery.id)}
-                    >
-                      <RefreshCcw
-                        size={16}
-                        className={
-                          retryMutation.isPending ? 'animate-spin' : ''
+                    <div className="w-full max-w-xs space-y-2">
+                      <label className="block text-[0.68rem] font-black uppercase tracking-widest text-slate-500">
+                        Retry reason
+                        <textarea
+                          value={retryReasons[delivery.id] ?? ''}
+                          onChange={(event) =>
+                            setRetryReasons((current) => ({
+                              ...current,
+                              [delivery.id]: event.target.value,
+                            }))
+                          }
+                          className="mt-2 min-h-20 w-full rounded-2xl border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-700 outline-none transition focus:border-[var(--color-mod-notices-accent)] focus:ring-2 focus:ring-[var(--color-mod-notices-accent)]/15"
+                          placeholder="Reason for retry"
+                          maxLength={500}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={
+                          retryMutation.isPending ||
+                          !(retryReasons[delivery.id] ?? '').trim()
                         }
-                      />
-                      Retry
-                    </button>
+                        onClick={() =>
+                          retryMutation.mutate({
+                            deliveryId: delivery.id,
+                            reason: (retryReasons[delivery.id] ?? '').trim(),
+                          })
+                        }
+                      >
+                        <RefreshCcw
+                          size={16}
+                          className={
+                            retryMutation.isPending ? 'animate-spin' : ''
+                          }
+                        />
+                        Retry
+                      </button>
+                    </div>
                   </article>
                 );
               })(),
@@ -334,7 +399,7 @@ function StatusBadge({ status }: { status: string }) {
   const tone =
     status === 'FAILED'
       ? 'bg-rose-100 text-rose-700'
-      : status === 'RETRYING'
+      : status === 'RETRYING' || status === 'RETRY_PENDING'
         ? 'bg-amber-100 text-amber-700'
         : 'bg-blue-100 text-blue-700';
 

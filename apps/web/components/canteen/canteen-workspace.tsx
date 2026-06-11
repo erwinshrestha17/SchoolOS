@@ -441,6 +441,7 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
   const suppliers = itemsFromResult(suppliersQuery.data);
   const inventoryItems = itemsFromResult(inventoryItemsQuery.data);
   const stockLedgerRows = itemsFromResult(stockLedgerQuery.data);
+  const walletTransactions = itemsFromResult(transactionsQuery.data);
   const allergyWarnings = servings.filter((serving) => Boolean(serving.dietaryWarning));
 
   const stats = {
@@ -808,7 +809,7 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
               </form>
             ) : null}
             <div className="mt-4 space-y-3">
-              {(transactionsQuery.data ?? []).slice(0, 10).map((tx) => (
+              {walletTransactions.slice(0, 10).map((tx) => (
                 <RecordCard
                   key={tx.id}
                   title={`${tx.type} • ${money(tx.amount)}`}

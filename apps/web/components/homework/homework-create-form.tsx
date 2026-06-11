@@ -14,6 +14,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { FileUploader } from '@/components/ui/file-uploader';
 
+type HomeworkCreateResult = {
+  id?: string;
+  recurrenceSeriesId?: string | null;
+  items?: Array<{ id: string }>;
+};
+
 export function HomeworkCreateForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -27,7 +33,7 @@ export function HomeworkCreateForm() {
     instructions: '',
     dueAt: '',
     maxScore: 10,
-    isSubmissionRequired: true,
+    submissionRequired: true,
     attachmentFileIds: [] as string[],
   });
 
@@ -56,10 +62,36 @@ export function HomeworkCreateForm() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => api.createHomework(data),
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['homework'] });
-      router.push(`/dashboard/homework/${result.id}`);
+    mutationFn: async ({ publish }: { publish: boolean }) => {
+      const dueDate = new Date(formData.dueAt).toISOString();
+      const created = (await api.createHomework({
+        academicYearId: formData.academicYearId,
+        classId: formData.classId,
+        sectionId: formData.sectionId || undefined,
+        subjectId: formData.subjectId,
+        title: formData.title.trim(),
+        instructions: formData.instructions.trim(),
+        dueDate,
+        dueAt: dueDate,
+        maxScore: formData.maxScore,
+        submissionRequired: formData.submissionRequired,
+        attachmentFileIds: formData.attachmentFileIds,
+      })) as HomeworkCreateResult;
+
+      if (publish && created.id) {
+        return api.assignHomework(created.id);
+      }
+
+      return created;
+    },
+    onSuccess: (result: HomeworkCreateResult) => {
+      void queryClient.invalidateQueries({ queryKey: ['homework'] });
+      const targetId = result.id ?? result.items?.[0]?.id;
+      if (targetId) {
+        router.push(`/dashboard/homework/${targetId}`);
+        return;
+      }
+      router.push('/dashboard/homework');
     },
     onError: (error: any) => {
       setErrors({ submit: error.message || 'Failed to create homework' });
@@ -84,11 +116,7 @@ export function HomeworkCreateForm() {
   const handleSubmit = (publish = false) => {
     if (!validate()) return;
 
-    createMutation.mutate({
-      ...formData,
-      status: publish ? 'ASSIGNED' : 'DRAFT',
-      dueAt: new Date(formData.dueAt).toISOString(),
-    });
+    createMutation.mutate({ publish });
   };
 
   return (
@@ -231,8 +259,8 @@ export function HomeworkCreateForm() {
             </div>
             <input
               type="checkbox"
-              checked={formData.isSubmissionRequired}
-              onChange={(e) => setFormData({ ...formData, isSubmissionRequired: e.target.checked })}
+              checked={formData.submissionRequired}
+              onChange={(e) => setFormData({ ...formData, submissionRequired: e.target.checked })}
               className="h-5 w-5 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary-soft)]"
             />
           </div>

@@ -157,6 +157,10 @@ export type TransportLocationPing = {
   speedKph?: string | number | null;
   heading?: string | number | null;
   recordedAt: string;
+  source?: 'cache' | 'history';
+  ageSeconds?: number;
+  confidence?: 'fresh' | 'delayed' | 'stale';
+  isStale?: boolean;
   createdAt?: string;
 };
 

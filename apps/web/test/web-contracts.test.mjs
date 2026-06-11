@@ -180,10 +180,17 @@ describe('SchoolOS web production contracts', () => {
     assert.match(form, /text-\[var\(--primary\)\]/);
     assert.match(form, /focus:ring-\[var\(--primary-soft\)\]/);
     assert.match(form, /api\.createHomework/);
+    assert.match(form, /api\.assignHomework/);
     assert.match(form, /api\.listAcademicYears/);
     assert.match(form, /api\.listClasses/);
     assert.match(form, /api\.listSections/);
     assert.match(form, /api\.listSubjects/);
+    assert.match(form, /dueDate,/);
+    assert.match(form, /dueAt: dueDate/);
+    assert.match(form, /submissionRequired: formData\.submissionRequired/);
+    assert.match(form, /createMutation\.mutate\(\{ publish \}\)/);
+    assert.doesNotMatch(form, /isSubmissionRequired/);
+    assert.doesNotMatch(form, /status: publish/);
     assert.doesNotMatch(
       form,
       /text-primary-(50|100|200|300|400|500|600|700|800|900)|focus:ring-primary-(50|100|200|300|400|500|600|700|800|900)|shadow-xl|shadow-2xl|bg-slate-900|bg-slate-950|rounded-3xl|rounded-\[/,
@@ -495,6 +502,14 @@ describe('SchoolOS web production contracts', () => {
       'Posting failed',
       'Reversal failed',
       'Correction failed',
+      'accounting-source-drilldown',
+      'buildSourceDrilldown',
+      'Open source record',
+      'Source route unavailable',
+      '/dashboard/finance?invoiceId=',
+      '/dashboard/canteen/pos?saleId=',
+      '/dashboard/library?fineId=',
+      '/dashboard/hr/payroll?runId=',
     ]) {
       assert.ok(polishedSurfaces.includes(marker), `Missing marker: ${marker}`);
     }
@@ -1723,6 +1738,34 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(reportCardsWorkspace, /confirm\(/);
   });
 
+  it('keeps report-card generation explicit about the applied grading policy', () => {
+    const reportCardsWorkspace = read(
+      'components/academics/report-cards/report-cards-workspace.tsx',
+    );
+    const academicsClient = read('lib/api/academics.ts');
+
+    for (const marker of [
+      'getGradingPolicy',
+      '/academics/grading-policy',
+    ]) {
+      assert.ok(academicsClient.includes(marker), `Missing client marker: ${marker}`);
+    }
+
+    for (const marker of [
+      "queryKey: ['academic-grading-policy']",
+      'api.getGradingPolicy',
+      'data-testid="grading-policy-panel"',
+      'Percentage Decimals',
+      'Rounding Mode',
+      'No failing band is configured',
+    ]) {
+      assert.ok(
+        reportCardsWorkspace.includes(marker),
+        `Missing workspace marker: ${marker}`,
+      );
+    }
+  });
+
   it('keeps M4 academics workspaces tokenized and production-backed', () => {
     const academicsSurfaces = readMany([
       'components/academics/exams/exam-list.tsx',
@@ -1907,9 +1950,13 @@ describe('SchoolOS web production contracts', () => {
       'transport-location-freshness-panel',
       'getLocationFreshness',
       'LocationMetric',
-      'Latest backend coordinate is fresh enough',
+      'Latest backend coordinate from',
       'Confirm with the driver before sharing transport updates',
       'Treat the trip position as approximate',
+      'Persisted history',
+      'Redis latest cache',
+      'formatLocationSignal',
+      'No backend coordinate',
     ]) {
       assert.ok(
         transportWorkspace.includes(marker),
@@ -2033,6 +2080,7 @@ describe('SchoolOS web production contracts', () => {
       'recordWastage',
       'adjustStock',
       'getStockLedger',
+      'listWalletTransactions',
     ]) {
       assert.match(
         canteenClient,
@@ -2057,6 +2105,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(canteenWorkspace, /purchaseBillMutation/);
     assert.match(canteenWorkspace, /wastageMutation/);
     assert.match(canteenWorkspace, /stockAdjustmentMutation/);
+    assert.match(canteenWorkspace, /walletTransactions = itemsFromResult/);
     assert.match(canteenWorkspace, /Stock ledger/);
     assert.equal(
       existsSync(join(webRoot, 'app/dashboard/canteen/inventory/page.tsx')),
@@ -2143,6 +2192,24 @@ describe('SchoolOS web production contracts', () => {
     );
     assert.doesNotMatch(activityForm, /publicUrl:\s*file|URL\.createObjectURL/);
     assert.doesNotMatch(activityForm, /replace-me/i);
+  });
+
+  it('keeps activity post mutations invalidating every feed surface', () => {
+    const activityForm = read('components/forms/activity-feed-form.tsx');
+    const activityDetail = read('app/dashboard/activity/[postId]/page.tsx');
+
+    for (const source of [activityForm, activityDetail]) {
+      for (const marker of [
+        "queryKey: ['activity-posts']",
+        "queryKey: ['parent-activity-posts']",
+        "queryKey: ['dashboard-activity-posts']",
+      ]) {
+        assert.ok(source.includes(marker), `Missing cache marker: ${marker}`);
+      }
+    }
+
+    assert.match(activityForm, /queryKey: \['activity-gallery'\]/);
+    assert.match(activityDetail, /queryKey: \['activity-gallery'\]/);
   });
 
   it('keeps M5 activity feed surfaces tokenized and production-backed', () => {
@@ -2342,6 +2409,18 @@ describe('SchoolOS web production contracts', () => {
         assert.doesNotMatch(source, pattern, `${surface} contains ${pattern}`);
       }
     }
+
+    const retryPanel = read('components/forms/delivery-retry-panel.tsx');
+    for (const marker of [
+      'Batch retry reason',
+      'Retry reason is recorded in delivery audit metadata.',
+      'RETRY_PENDING',
+      'retryReasons',
+      'api.retryNotificationDelivery(deliveryId, { reason })',
+      'api.retryFailedNotificationDeliveries({ reason })',
+    ]) {
+      assert.ok(retryPanel.includes(marker), `Missing marker: ${marker}`);
+    }
   });
 
   it('removes default emergency sample copy from communications', () => {
@@ -2429,6 +2508,19 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(
       payrollPreview,
       /\/accounting\/journal-entries|\/accounting\/ledger/i,
+    );
+
+    const payrollRuns = read('components/hr/payroll-runs.tsx');
+    const payrollActionDialog = read('components/hr/payroll-action-dialog.tsx');
+    assert.match(payrollRuns, /Post to M9 Accounting/);
+    assert.match(
+      payrollRuns,
+      /Salary disbursement is handled outside this workspace/,
+    );
+    assert.doesNotMatch(payrollActionDialog, /MARK_PAID|markPayrollRunPaid/);
+    assert.doesNotMatch(
+      payrollActionDialog,
+      /paymentAccountCode|Payment Disbursement Account Code|Mark Paid/,
     );
 
     assert.doesNotMatch(hrWorkspace, /replace-me|demo-staff|fake-contract/i);

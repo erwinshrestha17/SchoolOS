@@ -19,6 +19,7 @@ import {
   type TransportVehiclePayload,
   type TransportRoute,
   type TransportStop,
+  type TransportLocationPing,
 } from '../../lib/transport-api';
 import { EmptyState } from '../ui/empty-state';
 import { LoadingState } from '../ui/loading-state';
@@ -330,7 +331,7 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
   const activeTrips = activeTripsQuery.data ?? [];
   const trips = tripsQuery.data ?? [];
   const selectedTrip = activeTrips.find((trip) => trip.id === selectedTripId) ?? trips.find((trip) => trip.id === selectedTripId);
-  const locationFreshness = getLocationFreshness(locationQuery.data?.recordedAt);
+  const locationFreshness = getLocationFreshness(locationQuery.data);
   const activeTripStudentStatuses = activeTrips.flatMap(
     (trip) => trip.studentStatuses ?? [],
   );
@@ -832,6 +833,9 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
             {locationQuery.isFetching ? (
               <LoadingState label="Loading latest location..." />
             ) : null}
+            {locationQuery.error ? (
+              <Notice tone="error" message={locationQuery.error.message} />
+            ) : null}
             {locationQuery.data ? (
               <div className="mt-4 space-y-4">
                 <div
@@ -875,6 +879,14 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
                       label="Recorded"
                       value={formatDateTime(locationQuery.data.recordedAt)}
                     />
+                    <LocationMetric
+                      label="Signal"
+                      value={formatLocationSignal(locationQuery.data)}
+                    />
+                    <LocationMetric
+                      label="Source"
+                      value={locationQuery.data.source === 'history' ? 'Persisted history' : 'Redis latest cache'}
+                    />
                   </div>
                   <div
                     className={cn(
@@ -891,6 +903,11 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
                   <span className="ml-2 font-semibold">Map Preview Deferred</span>
                 </div>
               </div>
+            ) : selectedTripId && !locationQuery.isFetching && !locationQuery.error ? (
+              <EmptyState
+                title="No backend coordinate"
+                description="This trip has no Redis latest-location cache or persisted GPS history yet."
+              />
             ) : (
               <EmptyState
                 title="No location selected"
@@ -1320,8 +1337,8 @@ function formatDateTime(value?: string | null) {
   return new Date(value).toLocaleString();
 }
 
-function getLocationFreshness(recordedAt?: string | null) {
-  if (!recordedAt) {
+function getLocationFreshness(location?: TransportLocationPing | null) {
+  if (!location?.recordedAt) {
     return {
       label: 'No ping',
       className: 'bg-slate-100 text-slate-600',
@@ -1330,24 +1347,33 @@ function getLocationFreshness(recordedAt?: string | null) {
     };
   }
 
-  const ageMs = Date.now() - new Date(recordedAt).getTime();
-  const ageMinutes = Math.max(0, Math.round(ageMs / 60000));
+  const ageSeconds =
+    location.ageSeconds ??
+    Math.max(0, Math.round((Date.now() - new Date(location.recordedAt).getTime()) / 1000));
+  const ageMinutes = Math.max(0, Math.round(ageSeconds / 60));
+  const confidence =
+    location.confidence ??
+    (ageSeconds > 600 ? 'stale' : ageSeconds > 120 ? 'delayed' : 'fresh');
+  const source =
+    location.source === 'history'
+      ? 'persisted GPS history'
+      : 'Redis latest-location cache';
 
-  if (ageMs > 10 * 60 * 1000) {
+  if (confidence === 'stale') {
     return {
       label: 'Stale',
       className: 'bg-red-100 text-red-700',
       noticeClassName: 'bg-red-100 text-red-700',
-      message: `Last backend coordinate is ${ageMinutes} minutes old. Confirm with the driver before sharing transport updates.`,
+      message: `Last backend coordinate from ${source} is ${ageMinutes} minutes old. Confirm with the driver before sharing transport updates.`,
     };
   }
 
-  if (ageMs > 2 * 60 * 1000) {
+  if (confidence === 'delayed') {
     return {
       label: 'Delayed',
       className: 'bg-amber-100 text-amber-700',
       noticeClassName: 'bg-amber-100 text-amber-800',
-      message: `Last backend coordinate is ${ageMinutes} minutes old. Treat the trip position as approximate.`,
+      message: `Last backend coordinate from ${source} is ${ageMinutes} minutes old. Treat the trip position as approximate.`,
     };
   }
 
@@ -1355,8 +1381,15 @@ function getLocationFreshness(recordedAt?: string | null) {
     label: 'Fresh',
     className: 'bg-emerald-100 text-emerald-700',
     noticeClassName: 'bg-emerald-100 text-emerald-800',
-    message: 'Latest backend coordinate is fresh enough for admin monitoring.',
+    message: `Latest backend coordinate from ${source} is fresh enough for admin monitoring.`,
   };
+}
+
+function formatLocationSignal(location: TransportLocationPing) {
+  const ageSeconds =
+    location.ageSeconds ??
+    Math.max(0, Math.round((Date.now() - new Date(location.recordedAt).getTime()) / 1000));
+  return `${formatStatus(location.confidence ?? 'fresh')} - ${ageSeconds}s old`;
 }
 
 function cleanRoute(form: TransportRoutePayload): TransportRoutePayload {

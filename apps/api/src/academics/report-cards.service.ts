@@ -400,13 +400,14 @@ export class ReportCardsService {
       );
     }
 
-    const approvedRequest = await this.prisma.reportCardCorrectionRequest.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        reportCardId,
-        status: 'APPROVED',
-      },
-    });
+    const approvedRequest =
+      await this.prisma.reportCardCorrectionRequest.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          reportCardId,
+          status: 'APPROVED',
+        },
+      });
 
     if (!approvedRequest) {
       throw new ConflictException(

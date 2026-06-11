@@ -72,4 +72,79 @@ describe('DeliveryRetryService failure dashboard', () => {
       }),
     );
   });
+
+  it('stores the operator reason when failed deliveries are retried in bulk', async () => {
+    const prisma = {
+      notificationDelivery: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'delivery-1',
+            tenantId: 'tenant-1',
+            status: NotificationStatus.FAILED,
+            channel: NotificationChannel.EMAIL,
+            sourceType: 'notice',
+            sourceId: 'notice-1',
+            destination: 'guardian@example.edu',
+            title: 'Fee reminder',
+            body: 'Please review the latest invoice.',
+          },
+        ]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn(),
+      },
+    };
+    const notificationsService = {
+      sendEmail: jest.fn().mockResolvedValue(undefined),
+    };
+    const auditService = {
+      record: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new DeliveryRetryService(
+      prisma as never,
+      notificationsService as never,
+      auditService as never,
+    );
+
+    await expect(
+      service.retryFailedDeliveries(actor, {
+        reason: 'Provider incident recovered',
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        requested: 1,
+        retried: 1,
+      }),
+    );
+
+    expect(prisma.notificationDelivery.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 'delivery-1',
+          tenantId: 'tenant-1',
+        }),
+        data: expect.objectContaining({
+          retryReason: 'Provider incident recovered',
+          requestedById: 'admin-1',
+          status: NotificationStatus.RETRY_PENDING,
+        }),
+      }),
+    );
+    expect(notificationsService.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          notificationDeliveryId: 'delivery-1',
+          retry: 'true',
+        }),
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'retry_failed',
+        tenantId: 'tenant-1',
+        after: expect.objectContaining({
+          reason: 'Provider incident recovered',
+        }),
+      }),
+    );
+  });
 });

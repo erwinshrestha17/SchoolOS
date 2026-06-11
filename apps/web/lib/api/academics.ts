@@ -36,6 +36,25 @@ import {
   withQuery,
 } from './client';
 
+export type AcademicGradeScaleEntry = {
+  grade: string;
+  minPercentage: number;
+  maxPercentage: number;
+  gradePoint: number;
+  label: string;
+  passed: boolean;
+};
+
+export type AcademicGradingPolicy = {
+  scale: AcademicGradeScaleEntry[];
+  rounding: {
+    percentageDecimals: number;
+    gpaDecimals: number;
+    marksDecimals: number;
+    mode: 'HALF_UP' | 'FLOOR' | 'CEIL';
+  };
+};
+
 export const academicsApi = {
   listAcademicYears: () => request<AcademicYearSummary[]>('/academic-years'),
   createAcademicYear: (body: JsonBody) =>
@@ -83,6 +102,8 @@ export const academicsApi = {
         method: 'DELETE',
       },
     ),
+  getGradingPolicy: () =>
+    request<AcademicGradingPolicy>('/academics/grading-policy'),
   createAssessmentComponent: (body: JsonBody) =>
     request<AssessmentComponentSummary>('/academics/assessment-components', {
       method: 'POST',

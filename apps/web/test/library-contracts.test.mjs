@@ -130,6 +130,10 @@ describe('Phase 3B Library frontend contracts', () => {
     assert.match(workspace, /library-fine-post-to-fees/);
     assert.match(workspace, /library-fine-open-invoice/);
     assert.match(workspace, /\/dashboard\/finance\?invoiceId=/);
+    assert.match(workspace, /copyStatusReasons/);
+    assert.match(workspace, /Audit reason/);
+    assert.match(workspace, /confirmDisabled=/);
+    assert.match(workspace, /reason: copyStatusReasons\[copy\.id\]/);
     assert.match(workspace, /overdueQuery\.data\?\.items/);
     assert.match(workspace, /LoadingState/);
     assert.match(workspace, /EmptyState/);

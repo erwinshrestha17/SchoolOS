@@ -7,15 +7,16 @@ import { FilterBar } from '@/components/ui/filter-bar';
 import { Select, TextArea } from '@/components/ui/form-field';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
-import { 
-  FileText, 
-  Play, 
-  Download, 
-  Search, 
-  CheckCircle2, 
-  History, 
+import {
+  AlertTriangle,
+  FileText,
+  Play,
+  Download,
+  Search,
+  CheckCircle2,
+  History,
   RotateCcw,
-  ClipboardList 
+  ClipboardList,
 } from 'lucide-react';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatCard } from '@/components/ui/stat-card';
@@ -65,6 +66,10 @@ export function ReportCardsWorkspace() {
   const examsQuery = useQuery({ queryKey: ['exam-terms'], queryFn: api.listExamTerms });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
+  const gradingPolicyQuery = useQuery({
+    queryKey: ['academic-grading-policy'],
+    queryFn: api.getGradingPolicy,
+  });
   
   const studentsQuery = useQuery({
     queryKey: ['students', classId, sectionId],
@@ -349,6 +354,81 @@ export function ReportCardsWorkspace() {
               </div>
 
               <div className="space-y-6">
+                <SectionCard
+                  title="Grading Policy"
+                  description="Tenant policy used by report-card calculations."
+                >
+                  {gradingPolicyQuery.isLoading ? (
+                    <div className="space-y-3">
+                      <div className="h-10 animate-pulse rounded-xl bg-slate-50" />
+                      <div className="h-10 animate-pulse rounded-xl bg-slate-50" />
+                    </div>
+                  ) : gradingPolicyQuery.isError ? (
+                    <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-xs font-bold text-rose-700">
+                      {gradingPolicyQuery.error.message}
+                    </div>
+                  ) : (
+                    <div className="space-y-4" data-testid="grading-policy-panel">
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <PolicyMetric
+                          label="Percentage Decimals"
+                          value={`${gradingPolicyQuery.data?.rounding.percentageDecimals ?? 2} dp`}
+                        />
+                        <PolicyMetric
+                          label="GPA"
+                          value={`${gradingPolicyQuery.data?.rounding.gpaDecimals ?? 2} dp`}
+                        />
+                        <PolicyMetric
+                          label="Marks Decimals"
+                          value={`${gradingPolicyQuery.data?.rounding.marksDecimals ?? 2} dp`}
+                        />
+                        <PolicyMetric
+                          label="Rounding Mode"
+                          value={formatRoundingMode(
+                            gradingPolicyQuery.data?.rounding.mode ?? 'HALF_UP',
+                          )}
+                        />
+                      </div>
+                      <div className="max-h-64 overflow-y-auto rounded-2xl border border-slate-100">
+                        {(gradingPolicyQuery.data?.scale ?? []).map((band) => (
+                          <div
+                            key={`${band.grade}-${band.minPercentage}`}
+                            className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 last:border-b-0"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-black text-slate-900">
+                                {band.grade}
+                              </p>
+                              <p className="truncate text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                {band.label}
+                              </p>
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <p className="text-xs font-bold text-slate-700">
+                                {band.minPercentage}-{band.maxPercentage}%
+                              </p>
+                              <p className="text-[10px] font-bold text-slate-400">
+                                GPA {Number(band.gradePoint).toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {(gradingPolicyQuery.data?.scale ?? []).some(
+                        (band) => !band.passed,
+                      ) ? null : (
+                        <div className="flex items-start gap-2 rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+                          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                          <p>
+                            No failing band is configured in the current policy.
+                            Review school settings before generating locked report
+                            cards.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </SectionCard>
                 <SectionCard title="Batch Settings" description="Configure generation parameters.">
                   <div className="space-y-4">
                     <TextArea 
@@ -538,6 +618,21 @@ function CorrectionMeta({ label, value }: { label: string; value: string }) {
       <p className="mt-1 font-bold text-slate-800">{value}</p>
     </div>
   );
+}
+
+function PolicyMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        {label}
+      </p>
+      <p className="mt-1 font-black text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function formatRoundingMode(mode: string) {
+  return mode.replace(/_/g, ' ');
 }
 
 function reportCardStudentName(reportCard?: ReportCardRow) {

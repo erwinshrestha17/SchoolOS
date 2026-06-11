@@ -434,7 +434,10 @@ export class AcademicsController {
     @Query('examTermId') examTermId?: string,
     @Query('status') status?: string,
   ) {
-    return this.reportCardsService.listCorrections(auth, { examTermId, status });
+    return this.reportCardsService.listCorrections(auth, {
+      examTermId,
+      status,
+    });
   }
 
   @Patch('report-cards/corrections/:id/review')

@@ -308,6 +308,35 @@ describe('LibraryService Phase 3A foundation', () => {
     );
   });
 
+  it('requires an audit reason when marking a copy lost or damaged', async () => {
+    const { service, prisma } = buildService();
+
+    await expect(
+      service.markCopyStatus(
+        'copy-1',
+        {
+          status: LibraryCopyStatus.LOST,
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Reason is required when marking a library copy lost or damaged',
+    );
+
+    expect(prisma.libraryIssue.findFirst).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: LibraryIssueStatus.ISSUED,
+        }),
+      }),
+    );
+    expect(prisma.libraryCopy.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: LibraryCopyStatus.LOST },
+      }),
+    );
+  });
+
   it('calculates fine and creates fine record during return', async () => {
     const { service, tx, prisma } = buildService();
     const issue = {

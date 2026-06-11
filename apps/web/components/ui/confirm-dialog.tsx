@@ -19,6 +19,7 @@ type ConfirmDialogProps = {
   cancelLabel?: string;
   destructive?: boolean;
   isConfirming?: boolean;
+  confirmDisabled?: boolean;
   variant?: 'default' | 'warning' | 'destructive';
   onConfirm: () => void;
   onClose: () => void;
@@ -34,6 +35,7 @@ export function ConfirmDialog({
   destructive,
   variant,
   isConfirming,
+  confirmDisabled,
   onConfirm,
   onClose,
   children,
@@ -59,7 +61,7 @@ export function ConfirmDialog({
           </Button>
           <Button
             type="button"
-            disabled={isConfirming}
+            disabled={isConfirming || confirmDisabled}
             variant={variant === 'destructive' || destructive ? 'destructive' : 'default'}
             onClick={onConfirm}
           >

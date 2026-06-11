@@ -1352,7 +1352,7 @@ function GradingScaleEditor({
             {bands.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-8 text-center text-slate-400">
-                  No grading bands configured. Click "Add Grade Band" to start.
+                  No grading bands configured. Click &quot;Add Grade Band&quot; to start.
                 </td>
               </tr>
             ) : (

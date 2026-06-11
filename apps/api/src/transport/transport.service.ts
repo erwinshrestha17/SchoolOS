@@ -47,6 +47,10 @@ export interface LocationPayload {
   speedKph?: number;
   heading?: number;
   recordedAt: string;
+  source?: 'cache' | 'history';
+  ageSeconds?: number;
+  confidence?: 'fresh' | 'delayed' | 'stale';
+  isStale?: boolean;
 }
 
 @Injectable()
@@ -1124,12 +1128,14 @@ export class TransportService {
       });
     }
 
+    const enrichedPayload = this.enrichLocationPayload(payload, 'cache');
+
     await redis.publish(
       this.locationUpdateChannel(actor.tenantId, trip.id),
-      JSON.stringify(payload),
+      JSON.stringify(enrichedPayload),
     );
 
-    return payload;
+    return enrichedPayload;
   }
 
   async getLatestTripLocation(tripId: string, actor: AuthContext) {
@@ -1139,22 +1145,40 @@ export class TransportService {
       trip.driverAssignmentId,
       'view this trip location',
     );
+    return this.readLatestTripLocation(actor.tenantId, tripId);
+  }
+
+  /**
+   * Caller must already prove a scoped transport relationship, such as a
+   * guardian's own child active-trip status. This keeps the driver/admin
+   * public endpoint strict while allowing parent-safe latest-location display.
+   */
+  async getLatestTripLocationForScopedTrip(tripId: string, actor: AuthContext) {
+    await this.getTrip(actor.tenantId, tripId);
+    return this.readLatestTripLocation(actor.tenantId, tripId);
+  }
+
+  private async readLatestTripLocation(tenantId: string, tripId: string) {
     const cached = await this.redisService
       .getClient()
-      .get(this.latestLocationKey(actor.tenantId, tripId));
+      .get(this.latestLocationKey(tenantId, tripId));
 
     if (cached) {
       try {
-        return JSON.parse(cached) as LocationPayload;
+        const payload = JSON.parse(cached) as LocationPayload;
+        if (!Number.isNaN(new Date(payload.recordedAt).getTime())) {
+          return this.enrichLocationPayload(payload, 'cache');
+        }
       } catch {
-        await this.redisService
-          .getClient()
-          .del(this.latestLocationKey(actor.tenantId, tripId));
+        // Corrupt cache is ignored below and replaced by persisted history.
       }
+      await this.redisService
+        .getClient()
+        .del(this.latestLocationKey(tenantId, tripId));
     }
 
     const latest = await this.prisma.transportLocationPing.findFirst({
-      where: { tenantId: actor.tenantId, tripId },
+      where: { tenantId, tripId },
       orderBy: [{ recordedAt: 'desc' }],
     });
 
@@ -1162,16 +1186,39 @@ export class TransportService {
       throw new NotFoundException('No location ping found for this trip');
     }
 
+    return this.enrichLocationPayload(
+      {
+        tenantId: latest.tenantId,
+        tripId: latest.tripId,
+        vehicleId: latest.vehicleId,
+        driverAssignmentId: latest.driverAssignmentId ?? '',
+        latitude: latest.latitude.toNumber(),
+        longitude: latest.longitude.toNumber(),
+        ...(latest.speedKph ? { speedKph: latest.speedKph.toNumber() } : {}),
+        ...(latest.heading ? { heading: latest.heading.toNumber() } : {}),
+        recordedAt: latest.recordedAt.toISOString(),
+      },
+      'history',
+    );
+  }
+
+  private enrichLocationPayload(
+    payload: LocationPayload,
+    source: 'cache' | 'history',
+  ): LocationPayload {
+    const recordedAtMs = new Date(payload.recordedAt).getTime();
+    const ageSeconds = Number.isNaN(recordedAtMs)
+      ? 0
+      : Math.max(0, Math.floor((Date.now() - recordedAtMs) / 1000));
+    const confidence =
+      ageSeconds > 600 ? 'stale' : ageSeconds > 120 ? 'delayed' : 'fresh';
+
     return {
-      tenantId: latest.tenantId,
-      tripId: latest.tripId,
-      vehicleId: latest.vehicleId,
-      driverAssignmentId: latest.driverAssignmentId ?? '',
-      latitude: latest.latitude.toNumber(),
-      longitude: latest.longitude.toNumber(),
-      ...(latest.speedKph ? { speedKph: latest.speedKph.toNumber() } : {}),
-      ...(latest.heading ? { heading: latest.heading.toNumber() } : {}),
-      recordedAt: latest.recordedAt.toISOString(),
+      ...payload,
+      source,
+      ageSeconds,
+      confidence,
+      isStale: confidence === 'stale',
     };
   }
 

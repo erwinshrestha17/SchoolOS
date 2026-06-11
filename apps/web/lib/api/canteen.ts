@@ -431,7 +431,10 @@ export const canteenApi = {
   getOrCreateWallet: (studentId: string) => request<CanteenWallet>(`/canteen/wallets/student/${encodeURIComponent(studentId)}`, { method: 'POST', json: {} }),
   getWalletBalance: (studentId: string) => request<CanteenWallet>(`/canteen/wallets/student/${encodeURIComponent(studentId)}/balance`),
   topUpWallet: (studentId: string, body: CanteenTopUpPayload) => request<CanteenWalletTransaction>(`/canteen/wallets/student/${encodeURIComponent(studentId)}/top-up`, { method: 'POST', json: body }),
-  listWalletTransactions: (studentId: string) => request<CanteenWalletTransaction[]>(`/canteen/wallets/student/${encodeURIComponent(studentId)}/transactions`),
+  listWalletTransactions: (studentId: string) =>
+    request<CanteenPaginatedResult<CanteenWalletTransaction>>(
+      `/canteen/wallets/student/${encodeURIComponent(studentId)}/transactions`,
+    ),
   reverseWalletTransaction: (transactionId: string, body: { reason: string }) => request<CanteenWalletTransaction>(`/canteen/wallets/transactions/${encodeURIComponent(transactionId)}/reverse`, { method: 'POST', json: body }),
   correctWalletTransaction: (transactionId: string, body: { amount: number; reason: string; note?: string }) => request<CanteenWalletTransaction>(`/canteen/wallets/transactions/${encodeURIComponent(transactionId)}/correct`, { method: 'POST', json: body }),
   createPosSale: (body: CanteenPosSalePayload) =>

@@ -5,11 +5,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
-import { FormField, Input, TextArea } from '../ui/form-field';
+import { FormField, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
-import { X, ShieldAlert, Landmark, ShieldCheck, Ban, CreditCard } from 'lucide-react';
+import { X, ShieldAlert, Landmark, ShieldCheck, Ban } from 'lucide-react';
 
-export type PayrollActionType = 'SUBMIT_REVIEW' | 'APPROVE' | 'REJECT' | 'POST' | 'MARK_PAID';
+export type PayrollActionType = 'SUBMIT_REVIEW' | 'APPROVE' | 'REJECT' | 'POST';
 
 interface PayrollActionDialogProps {
   isOpen: boolean;
@@ -28,15 +28,11 @@ export function PayrollActionDialog({
 }: PayrollActionDialogProps) {
   const queryClient = useQueryClient();
   const [toastError, setToastError] = useState<string | null>(null);
-
-  // Form states
   const [reason, setReason] = useState('');
-  const [paymentAccountCode, setPaymentAccountCode] = useState('');
 
   const actionMutation = useMutation({
     mutationFn: async () => {
       const trimmedReason = reason.trim();
-      const trimmedPaymentAccountCode = paymentAccountCode.trim();
 
       switch (actionType) {
         case 'SUBMIT_REVIEW':
@@ -47,8 +43,6 @@ export function PayrollActionDialog({
           return api.rejectPayrollRun(runId, { reason: trimmedReason });
         case 'POST':
           return api.postPayrollRun(runId);
-        case 'MARK_PAID':
-          return api.markPayrollRunPaid(runId, { paymentAccountCode: trimmedPaymentAccountCode, reason: trimmedReason });
         default:
           throw new Error('Unsupported payroll action');
       }
@@ -56,9 +50,7 @@ export function PayrollActionDialog({
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
       onClose();
-      // Reset state
       setReason('');
-      setPaymentAccountCode('');
     },
     onError: (error: any) => {
       setToastError(error.message || `Failed to perform ${actionType.toLowerCase()} action.`);
@@ -74,7 +66,6 @@ export function PayrollActionDialog({
           icon: <ShieldAlert size={20} className="text-[var(--color-mod-hr-text)]" />,
           warning: 'This will lock the draft and alert reviewers. No direct edits are allowed during review.',
           requiresReason: false,
-          requiresAccount: false,
           confirmText: 'Submit Review',
           confirmVariant: 'default' as const,
         };
@@ -85,7 +76,6 @@ export function PayrollActionDialog({
           icon: <ShieldCheck size={20} className="text-emerald-500" />,
           warning: 'Approve locks the calculations. Approved runs are ready for M9 posting and payslip downloads. This action is irreversible.',
           requiresReason: false,
-          requiresAccount: false,
           confirmText: 'Approve',
           confirmVariant: 'default' as const,
         };
@@ -96,7 +86,6 @@ export function PayrollActionDialog({
           icon: <Ban size={20} className="text-red-500" />,
           warning: 'Rejection returns the run to generated/draft state for recalculation or modifications.',
           requiresReason: true,
-          requiresAccount: false,
           confirmText: 'Reject Run',
           confirmVariant: 'destructive' as const,
         };
@@ -107,19 +96,7 @@ export function PayrollActionDialog({
           icon: <Landmark size={20} className="text-purple-500" />,
           warning: 'Posting generates the M9 payroll accrual journal entries. This action locks the run against deletions or changes.',
           requiresReason: false,
-          requiresAccount: false,
           confirmText: 'Post to M9',
-          confirmVariant: 'default' as const,
-        };
-      case 'MARK_PAID':
-        return {
-          title: 'Mark as Paid',
-          description: 'Record salary disbursement and mark this posted payroll run as paid.',
-          icon: <CreditCard size={20} className="text-emerald-600" />,
-          warning: 'This action creates disbursement journal entries in M9 Accounting. It indicates that payments have been sent to bank accounts.',
-          requiresReason: true,
-          requiresAccount: true,
-          confirmText: 'Mark Paid',
           confirmVariant: 'default' as const,
         };
     }
@@ -135,11 +112,6 @@ export function PayrollActionDialog({
       setToastError('Please provide a reason or remarks for this action.');
       return;
     }
-    if (config.requiresAccount && !paymentAccountCode.trim()) {
-      setToastError('Please specify the payment disbursement account code.');
-      return;
-    }
-
     actionMutation.mutate();
   };
 
@@ -179,18 +151,6 @@ export function PayrollActionDialog({
           <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4 text-xs text-amber-800 leading-relaxed">
             <strong>Warning:</strong> {config.warning}
           </div>
-
-          {config.requiresAccount && (
-            <FormField label="Payment Disbursement Account Code">
-              <Input
-                type="text"
-                placeholder="e.g. 1101 (Bank Account)"
-                value={paymentAccountCode}
-                onChange={(e) => setPaymentAccountCode(e.target.value)}
-                required
-              />
-            </FormField>
-          )}
 
           {config.requiresReason && (
             <FormField label="Reason / Remarks">

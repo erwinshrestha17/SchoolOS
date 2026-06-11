@@ -562,8 +562,8 @@ export function PayrollRuns() {
 
               <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-xs leading-relaxed text-slate-700 space-y-1">
                 <p><strong>Payroll Status:</strong> {selectedRun.status}</p>
-                {selectedRun.status === 'POSTED' && <p>Accruals have been posted to M9 General Ledger. Salaries can now be paid.</p>}
-                {selectedRun.status === 'PAID' && <p>Payments completed and disbursement journal recorded.</p>}
+                {selectedRun.status === 'POSTED' && <p>Accruals have been posted to M9 General Ledger. Salary disbursement is handled outside this workspace.</p>}
+                {selectedRun.status === 'PAID' && <p>Payment status is read-only here; disbursement evidence remains in audited accounting controls.</p>}
                 {selectedRun.status === 'VOID' && <p className="text-red-600 font-semibold">This run has been voided/reversed.</p>}
               </div>
 

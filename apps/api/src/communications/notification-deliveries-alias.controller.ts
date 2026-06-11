@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
@@ -8,6 +8,7 @@ import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from './communications.service';
 import { DeliveryRetryService } from './delivery-retry.service';
+import { RetryDeliveryDto } from './dto/m10-hardening.dto';
 
 @Controller('notifications/deliveries')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -40,14 +41,22 @@ export class NotificationDeliveriesAliasController {
   @Permissions('communications:retry_deliveries')
   retryDelivery(
     @Param('deliveryId') deliveryId: string,
+    @Body() dto: RetryDeliveryDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.deliveryRetryService.retryDelivery(deliveryId, auth);
+    return this.deliveryRetryService.retryDelivery(deliveryId, auth, {
+      reason: dto?.reason ?? null,
+    });
   }
 
   @Post('retry-failed')
   @Permissions('communications:retry_deliveries')
-  retryFailedDeliveries(@CurrentAuth() auth: AuthContext) {
-    return this.deliveryRetryService.retryFailedDeliveries(auth);
+  retryFailedDeliveries(
+    @Body() dto: RetryDeliveryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.deliveryRetryService.retryFailedDeliveries(auth, {
+      reason: dto?.reason ?? null,
+    });
   }
 }

@@ -43,6 +43,17 @@ interface ActorMediaAccess {
   reason?: string;
 }
 
+interface StoredActivityAttachment {
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  provider: StorageProvider;
+  objectKey: string;
+  fileAssetId: string;
+  publicUrl: string | null;
+  sortOrder: number;
+}
+
 @Injectable()
 export class ActivityFeedService {
   private readonly logger = new Logger(ActivityFeedService.name);
@@ -83,8 +94,14 @@ export class ActivityFeedService {
       });
     }
 
-    if (filters.status && filters.status !== ActivityPostStatus.APPROVED && !canManageAllActivity(actor)) {
-      throw new ForbiddenException('You do not have permission to filter posts by status');
+    if (
+      filters.status &&
+      filters.status !== ActivityPostStatus.APPROVED &&
+      !canManageAllActivity(actor)
+    ) {
+      throw new ForbiddenException(
+        'You do not have permission to filter posts by status',
+      );
     }
 
     const posts = await this.prisma.activityPost.findMany({
@@ -94,7 +111,12 @@ export class ActivityFeedService {
         status: filters.status
           ? (filters.status as ActivityPostStatus)
           : canManageAllActivity(actor)
-            ? { in: [ActivityPostStatus.APPROVED, ActivityPostStatus.PENDING_APPROVAL] }
+            ? {
+                in: [
+                  ActivityPostStatus.APPROVED,
+                  ActivityPostStatus.PENDING_APPROVAL,
+                ],
+              }
             : ActivityPostStatus.APPROVED,
         ...(filters.classId ? { classId: filters.classId } : {}),
         ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
@@ -325,7 +347,12 @@ export class ActivityFeedService {
         activityPost: {
           softDeletedAt: null,
           status: canManageAllActivity(actor)
-            ? { in: [ActivityPostStatus.APPROVED, ActivityPostStatus.PENDING_APPROVAL] }
+            ? {
+                in: [
+                  ActivityPostStatus.APPROVED,
+                  ActivityPostStatus.PENDING_APPROVAL,
+                ],
+              }
             : ActivityPostStatus.APPROVED,
           ...(filters.classId ? { classId: filters.classId } : {}),
           ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
@@ -492,16 +519,7 @@ export class ActivityFeedService {
       this.validateActivityAttachment(attachment);
     }
 
-    const storedAttachments: Array<{
-      fileName: string;
-      contentType: string;
-      sizeBytes: number;
-      provider: StorageProvider;
-      objectKey: string;
-      fileAssetId: string;
-      publicUrl: string | null;
-      sortOrder: number;
-    }> = [];
+    const storedAttachments: StoredActivityAttachment[] = [];
 
     try {
       for (let index = 0; index < dto.attachments.length; index++) {
@@ -545,19 +563,7 @@ export class ActivityFeedService {
         });
       }
     } catch (error) {
-      for (const att of storedAttachments) {
-        try {
-          await this.storageService.deleteObject(att.objectKey);
-          await this.prisma.fileAsset.delete({
-            where: { id: att.fileAssetId },
-          });
-        } catch (cleanupErr) {
-          this.logger.error(
-            `Failed to clean up uploaded file: ${att.objectKey}`,
-            cleanupErr instanceof Error ? cleanupErr.stack : undefined,
-          );
-        }
-      }
+      await this.cleanupStoredActivityAttachments(storedAttachments);
       throw error;
     }
 
@@ -674,19 +680,19 @@ export class ActivityFeedService {
 
       this.eventEmitter.emit('feed.post.created', post);
     } catch (error) {
-      for (const att of storedAttachments) {
+      if (post?.id) {
         try {
-          await this.storageService.deleteObject(att.objectKey);
-          await this.prisma.fileAsset.delete({
-            where: { id: att.fileAssetId },
+          await this.prisma.activityPost.deleteMany({
+            where: { id: post.id, tenantId: actor.tenantId },
           });
         } catch (cleanupErr) {
           this.logger.error(
-            `Failed to clean up uploaded file: ${att.objectKey}`,
+            `Failed to clean up activity post after create failure: ${post.id}`,
             cleanupErr instanceof Error ? cleanupErr.stack : undefined,
           );
         }
       }
+      await this.cleanupStoredActivityAttachments(storedAttachments);
       throw error;
     }
 
@@ -941,6 +947,24 @@ export class ActivityFeedService {
       orderBy: [{ logDate: 'desc' }, { createdAt: 'desc' }],
       take: 100,
     });
+  }
+
+  private async cleanupStoredActivityAttachments(
+    attachments: StoredActivityAttachment[],
+  ) {
+    for (const attachment of attachments) {
+      try {
+        await this.storageService.deleteObject(attachment.objectKey);
+        await this.prisma.fileAsset.delete({
+          where: { id: attachment.fileAssetId },
+        });
+      } catch (cleanupErr) {
+        this.logger.error(
+          `Failed to clean up uploaded file: ${attachment.objectKey}`,
+          cleanupErr instanceof Error ? cleanupErr.stack : undefined,
+        );
+      }
+    }
   }
 
   async createMoodLog(dto: CreateMoodLogDto, actor: AuthContext) {

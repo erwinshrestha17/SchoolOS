@@ -1989,17 +1989,17 @@ export class CanteenService {
         );
       }
 
-      const nextStock = item.currentStock.add(quantity);
-      if (nextStock.lt(0)) {
-        throw new ConflictException(
-          'Stock adjustment cannot make stock negative',
-        );
-      }
-
-      const updatedItem = await tx.canteenInventoryItem.update({
-        where: { id: item.id },
-        data: { currentStock: nextStock },
-      });
+      const updatedItem = quantity.gt(0)
+        ? await tx.canteenInventoryItem.update({
+            where: { id: item.id },
+            data: { currentStock: { increment: quantity } },
+          })
+        : await this.decrementInventoryStockForAdjustment(
+            tx,
+            actor.tenantId,
+            item.id,
+            quantity.abs(),
+          );
 
       return tx.canteenStockMovement.create({
         data: {
@@ -2025,6 +2025,32 @@ export class CanteenService {
       adjustment,
     );
     return adjustment;
+  }
+
+  private async decrementInventoryStockForAdjustment(
+    tx: Tx,
+    tenantId: string,
+    inventoryItemId: string,
+    quantity: Prisma.Decimal,
+  ) {
+    const stockUpdate = await tx.canteenInventoryItem.updateMany({
+      where: {
+        id: inventoryItemId,
+        tenantId,
+        currentStock: { gte: quantity },
+      },
+      data: { currentStock: { decrement: quantity } },
+    });
+
+    if (stockUpdate.count !== 1) {
+      throw new ConflictException(
+        'Stock adjustment cannot make stock negative',
+      );
+    }
+
+    return tx.canteenInventoryItem.findUniqueOrThrow({
+      where: { id: inventoryItemId },
+    });
   }
 
   private parseEnrollmentStatus(status: string) {

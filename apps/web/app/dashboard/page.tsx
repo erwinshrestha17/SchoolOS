@@ -90,7 +90,7 @@ export default function DashboardPage() {
   });
   const activityPostsQuery = useQuery({
     queryKey: ['dashboard-activity-posts'],
-    queryFn: api.listActivityPosts,
+    queryFn: () => api.listActivityPosts(),
     enabled: status === 'authenticated',
   });
   const noticesQuery = useQuery({

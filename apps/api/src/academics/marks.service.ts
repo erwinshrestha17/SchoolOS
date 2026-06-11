@@ -108,25 +108,28 @@ export class MarksService {
       }
     }
 
-    const approvedCorrections = await this.prisma.reportCardCorrectionRequest.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        status: 'APPROVED',
-        reportCard: {
-          examTermId: dto.examTermId,
-          studentId: { in: studentIds },
+    const approvedCorrections =
+      await this.prisma.reportCardCorrectionRequest.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          status: 'APPROVED',
+          reportCard: {
+            examTermId: dto.examTermId,
+            studentId: { in: studentIds },
+          },
         },
-      },
-      include: {
-        reportCard: true,
-      },
-    });
+        include: {
+          reportCard: true,
+        },
+      });
     const approvedStudentIds = new Set(
       approvedCorrections.map((c) => c.reportCard.studentId),
     );
 
     if (examTerm.isLocked) {
-      const unapprovedStudents = studentIds.filter((id) => !approvedStudentIds.has(id));
+      const unapprovedStudents = studentIds.filter(
+        (id) => !approvedStudentIds.has(id),
+      );
       if (unapprovedStudents.length > 0) {
         throw new ConflictException(
           `Cannot enter or update marks because the exam term is locked and no approved correction request exists for student(s): ${unapprovedStudents.join(', ')}`,
@@ -352,16 +355,17 @@ export class MarksService {
     const isLocked = examTerm?.isLocked || existingMark.isLocked;
 
     if (isLocked) {
-      const correction = await this.prisma.reportCardCorrectionRequest.findFirst({
-        where: {
-          tenantId: actor.tenantId,
-          status: 'APPROVED',
-          reportCard: {
-            studentId: existingMark.studentId,
-            examTermId: existingMark.examTermId,
+      const correction =
+        await this.prisma.reportCardCorrectionRequest.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            status: 'APPROVED',
+            reportCard: {
+              studentId: existingMark.studentId,
+              examTermId: existingMark.examTermId,
+            },
           },
-        },
-      });
+        });
 
       if (!correction) {
         await this.auditService.record({

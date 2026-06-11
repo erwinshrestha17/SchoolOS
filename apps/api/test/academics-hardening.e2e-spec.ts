@@ -45,6 +45,7 @@ describe('Academics Hardening (Service Layer)', () => {
         upsert: jest.Mock;
         findFirst: jest.Mock;
       };
+      reportCardCorrectionRequest: { findMany: jest.Mock };
       $transaction: jest.Mock;
     };
 
@@ -67,6 +68,10 @@ describe('Academics Hardening (Service Layer)', () => {
     p.student.findMany.mockResolvedValue([
       { id: 'student-1', tenantId: 'tenant-a', classId: 'class-1' },
     ]);
+    p.reportCardCorrectionRequest = p.reportCardCorrectionRequest ?? {
+      findMany: jest.fn(),
+    };
+    p.reportCardCorrectionRequest.findMany.mockResolvedValue([]);
     p.markEntry.findMany.mockResolvedValue([]);
     p.markEntry.upsert.mockResolvedValue({ id: 'mark-1' });
     p.$transaction.mockImplementation((queries: unknown[]) =>

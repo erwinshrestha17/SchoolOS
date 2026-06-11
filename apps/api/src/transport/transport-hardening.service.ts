@@ -132,7 +132,7 @@ export class TransportHardeningService {
     }
 
     const latestLocation = await this.transportService
-      .getLatestTripLocation(status.tripId, actor)
+      .getLatestTripLocationForScopedTrip(status.tripId, actor)
       .catch(() => null);
 
     return {

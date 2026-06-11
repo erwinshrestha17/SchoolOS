@@ -18,6 +18,7 @@ describe('ActivityFeedService', () => {
   let communicationsService: any;
   let auditService: any;
   let fileRegistry: any;
+  let mediaQueue: any;
   let service: ActivityFeedService;
   let actor: AuthContext;
 
@@ -44,6 +45,7 @@ describe('ActivityFeedService', () => {
       },
       activityPost: {
         create: jest.fn(),
+        deleteMany: jest.fn(),
         findMany: jest.fn(),
         findFirst: jest.fn(),
       },
@@ -53,6 +55,7 @@ describe('ActivityFeedService', () => {
         groupBy: jest.fn(),
       },
       fileAsset: {
+        delete: jest.fn(),
         update: jest.fn(),
       },
       moodLog: {
@@ -65,6 +68,7 @@ describe('ActivityFeedService', () => {
       },
     };
     storageService = {
+      deleteObject: jest.fn(),
       saveBase64Object: jest.fn(),
     };
     communicationsService = {
@@ -89,6 +93,7 @@ describe('ActivityFeedService', () => {
       getSignedUrl: jest.fn(),
       auditAccess: jest.fn(),
     };
+    mediaQueue = { add: jest.fn() };
 
     service = new ActivityFeedService(
       prisma,
@@ -97,7 +102,7 @@ describe('ActivityFeedService', () => {
       auditService,
       { emit: jest.fn() } as any,
       fileRegistry,
-      { add: jest.fn() } as any,
+      mediaQueue,
     );
   });
 
@@ -368,9 +373,6 @@ describe('ActivityFeedService', () => {
     prisma.activityPost.create.mockRejectedValue(
       new Error('DB connection lost'),
     );
-    prisma.fileAsset.delete = jest.fn().mockResolvedValue({});
-    storageService.deleteObject = jest.fn().mockResolvedValue({});
-
     await expect(
       service.createPost(
         {
@@ -392,6 +394,64 @@ describe('ActivityFeedService', () => {
       ),
     ).rejects.toThrow('DB connection lost');
 
+    expect(storageService.deleteObject).toHaveBeenCalledWith(
+      'tenant-1/activity-feed/class-1/photo.jpg',
+    );
+    expect(prisma.fileAsset.delete).toHaveBeenCalledWith({
+      where: { id: 'file-asset-1' },
+    });
+  });
+
+  it('deletes the created post if downstream activity-post setup fails', async () => {
+    prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    storageService.saveBase64Object.mockResolvedValue({
+      provider: StorageProvider.LOCAL,
+      objectKey: 'tenant-1/activity-feed/class-1/photo.jpg',
+      sizeBytes: 42,
+    });
+    fileRegistry.registerFile.mockResolvedValue({ id: 'file-asset-1' });
+    prisma.activityPost.create.mockResolvedValue({
+      id: 'post-1',
+      classId: 'class-1',
+      sectionId: null,
+      title: 'Science day',
+      caption: 'Students built plant life-cycle charts.',
+      audienceType: AudienceType.CLASS,
+      attachments: [
+        {
+          id: 'attachment-1',
+          fileAssetId: 'file-asset-1',
+        },
+      ],
+      studentTags: [],
+    });
+    mediaQueue.add.mockRejectedValue(new Error('queue unavailable'));
+
+    await expect(
+      service.createPost(
+        {
+          classId: 'class-1',
+          title: 'Science day',
+          caption: 'Students built plant life-cycle charts.',
+          category: ActivityCategory.LEARNING,
+          attachments: [
+            {
+              fileName: 'photo.jpg',
+              contentType: 'image/jpeg',
+              base64Content: Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString(
+                'base64',
+              ),
+            },
+          ],
+        },
+        actor,
+      ),
+    ).rejects.toThrow('queue unavailable');
+
+    expect(prisma.activityPost.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'post-1', tenantId: 'tenant-1' },
+    });
     expect(storageService.deleteObject).toHaveBeenCalledWith(
       'tenant-1/activity-feed/class-1/photo.jpg',
     );

@@ -231,7 +231,7 @@ export function ActivityFeedForm() {
   });
   const postsQuery = useQuery({
     queryKey: ['activity-posts'],
-    queryFn: api.listActivityPosts,
+    queryFn: () => api.listActivityPosts(),
   });
   const galleryQuery = useQuery({
     queryKey: ['activity-gallery', galleryFilters],
@@ -317,6 +317,10 @@ export function ActivityFeedForm() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['activity-posts'] });
       void queryClient.invalidateQueries({ queryKey: ['activity-gallery'] });
+      void queryClient.invalidateQueries({ queryKey: ['parent-activity-posts'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['dashboard-activity-posts'],
+      });
       void queryClient.invalidateQueries({
         queryKey: ['notification-deliveries'],
       });
@@ -349,8 +353,13 @@ export function ActivityFeedForm() {
         guardianId,
         studentId,
       }),
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ['activity-posts'] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['activity-posts'] });
+      void queryClient.invalidateQueries({ queryKey: ['parent-activity-posts'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['dashboard-activity-posts'],
+      });
+    },
   });
   const milestoneMutation = useMutation({
     mutationFn: api.createDevelopmentalMilestone,

@@ -432,6 +432,12 @@ export class LibraryService {
       status === LibraryCopyStatus.LOST ||
       status === LibraryCopyStatus.DAMAGED
     ) {
+      if (!dto.reason?.trim()) {
+        throw new BadRequestException(
+          'Reason is required when marking a library copy lost or damaged',
+        );
+      }
+
       const activeIssue = await this.prisma.libraryIssue.findFirst({
         where: {
           tenantId: actor.tenantId,
@@ -460,7 +466,7 @@ export class LibraryService {
       userId: actor.userId,
       resourceId: updated.id,
       before: { status: copy.status },
-      after: { status: updated.status, reason: dto.reason ?? null },
+      after: { status: updated.status, reason: dto.reason?.trim() ?? null },
     });
 
     return updated;

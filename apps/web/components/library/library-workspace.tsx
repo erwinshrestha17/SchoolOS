@@ -132,6 +132,7 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
   const [notice, setNotice] = useState<string | null>(null);
   const [isConfirmingReturn, setIsConfirmingReturn] = useState<string | null>(null);
   const [viewingHistory, setViewingHistory] = useState<{ type: 'book' | 'copy'; id: string } | null>(null);
+  const [copyStatusReasons, setCopyStatusReasons] = useState<Record<string, string>>({});
 
   const queryClient = useQueryClient();
 
@@ -296,10 +297,12 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
     mutationFn: ({
       id,
       status,
+      reason,
     }: {
       id: string;
       status: LibraryCopyStatus;
-    }) => libraryApi.updateCopyStatus(id, { status }),
+      reason?: string;
+    }) => libraryApi.updateCopyStatus(id, { status, reason }),
     onSuccess: () => {
       setNotice('Copy status updated.');
       invalidateLibrary();
@@ -496,7 +499,18 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
           onEdit={editCopy}
           onViewHistory={(type, id) => setViewingHistory({ type, id })}
           onStatusChange={(copy, status) =>
-            copyStatusMutation.mutate({ id: copy.id, status })
+            copyStatusMutation.mutate({
+              id: copy.id,
+              status,
+              reason: copyStatusReasons[copy.id]?.trim() || undefined,
+            })
+          }
+          reasons={copyStatusReasons}
+          setReason={(copyId, reason) =>
+            setCopyStatusReasons((current) => ({
+              ...current,
+              [copyId]: reason,
+            }))
           }
           isLoading={copiesQuery.isLoading}
           isSaving={createCopyMutation.isPending || updateCopyMutation.isPending}
@@ -805,6 +819,8 @@ function CopiesPanel(props: {
   onEdit: (copy: LibraryCopy) => void;
   onViewHistory: (type: 'book' | 'copy', id: string) => void;
   onStatusChange: (copy: LibraryCopy, status: LibraryCopyStatus) => void;
+  reasons: Record<string, string>;
+  setReason: (copyId: string, reason: string) => void;
   isLoading: boolean;
   isSaving: boolean;
   error: Error | null;
@@ -876,8 +892,32 @@ function CopiesPanel(props: {
           title={`Mark copy ${formatStatus(pendingStatusChange?.status ?? '')}?`}
           description="This changes the physical copy status used by issue/return workflows. Use this only after confirming the book is actually lost or damaged."
           confirmLabel="Confirm status change"
+          confirmDisabled={
+            pendingStatusChange
+              ? !(props.reasons[pendingStatusChange.copy.id] ?? '').trim()
+              : false
+          }
           variant="destructive"
-        />
+        >
+          {pendingStatusChange ? (
+            <label className="block px-6 pb-2">
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                Audit reason
+              </span>
+              <textarea
+                value={props.reasons[pendingStatusChange.copy.id] ?? ''}
+                onChange={(event) =>
+                  props.setReason(
+                    pendingStatusChange.copy.id,
+                    event.target.value,
+                  )
+                }
+                className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                placeholder="Record who confirmed the loss or damage and any replacement/fine context."
+              />
+            </label>
+          ) : null}
+        </ConfirmDialog>
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

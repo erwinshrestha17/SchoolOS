@@ -116,6 +116,7 @@ export class DeliveryRetryService {
 
   async retryFailedDeliveries(
     actor: AuthContext,
+    options: RetryDeliveryOptions = {},
   ): Promise<BulkDeliveryRetryResult> {
     const deliveries = await this.prisma.notificationDelivery.findMany({
       where: {
@@ -129,7 +130,7 @@ export class DeliveryRetryService {
     const results: DeliveryRetryResult[] = [];
 
     for (const delivery of deliveries) {
-      results.push(await this.dispatchRetry(delivery, actor));
+      results.push(await this.dispatchRetry(delivery, actor, options));
     }
 
     await this.auditService.record({
@@ -143,6 +144,7 @@ export class DeliveryRetryService {
         failedAfterRetry: results.filter(
           (result) => result.status === NotificationStatus.FAILED,
         ).length,
+        reason: options.reason ?? null,
       },
     });
 
