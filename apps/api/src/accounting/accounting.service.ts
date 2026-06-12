@@ -2204,6 +2204,12 @@ export class AccountingService {
         `Journal entry belongs to a closed fiscal period "${entry.fiscalPeriod.label}" and is immutable`,
       );
     }
+
+    if (entry.fiscalPeriod?.status === AccountingPeriodStatus.LOCKED) {
+      throw new ConflictException(
+        `Journal entry belongs to a locked fiscal period "${entry.fiscalPeriod.label}" and is immutable. Unlock the period first.`,
+      );
+    }
   }
 }
 

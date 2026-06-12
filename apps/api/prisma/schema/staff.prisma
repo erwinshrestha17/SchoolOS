@@ -61,6 +61,8 @@ model Staff {
   classTeacherSections       Section[]                   @relation("ClassTeacherSections")
   documents                  StaffDocument[]
   lifecycleEvents            StaffLifecycleEvent[]
+  learningActivities         LearningActivity[]
+  learningSessions           LearningSession[]
 
   @@unique([tenantId, employeeId])
   @@unique([tenantId, staffCode])

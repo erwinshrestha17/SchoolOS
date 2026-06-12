@@ -98,6 +98,9 @@ model Student {
   canteenSpendingControls      CanteenSpendingControl[]
   attendanceCorrectionRequests AttendanceCorrectionRequest[]
   qrCredentials                StudentQrCredential[]
+  learningParticipants         LearningParticipant[]
+  learningAttempts             LearningAttempt[]
+  learningProgress             LearningProgress[]
 
   @@unique([tenantId, studentSystemId])
   @@index([tenantId, classId, sectionId])

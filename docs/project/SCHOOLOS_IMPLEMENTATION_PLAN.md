@@ -1,6 +1,6 @@
 # SchoolOS Implementation Plan
 
-**Last updated:** 2026-06-06  
+**Last updated:** 2026-06-12
 **Status:** Consolidated active implementation plan and module backlogs  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard, Flutter companion app
 
@@ -25,6 +25,7 @@
 * **M8C Canteen:** Admin/wallet/POS/inventory/vendor/report foundation plus receipt JSON/PDF, stock hardening, wallet guards, linked invoice handoff, parent mobile views, and canteen workspace polish.
 * **M9 Accounting:** Production-candidate / Pilot-Ready with PDFs, snapshots, audit trail, reconciliation suggestions, File Registry export support, and hardened bank statement import/reconciliation DTO validation.
 * **M10 Notices / Communication / Chat:** Strong foundation with provider modes, attachments, failure dashboard, moderation/escalation, unread-recipient follow-up, mobile notification/chat surfaces, and full communications/messaging sub-controller entitlement gating.
+* **M12 Learning Layer:** Backend MVP foundation implemented and verified under `apps/api/src/learning`: activity builder APIs, school-only sessions, QR/code join, lab attempts, autosave/submit, answer evaluation, progress recording, parent child-scoped summary, tenant isolation, RBAC, entitlement, audit logging, Prisma models/migration, and focused E2E coverage.
 * **Public Demo Requests:** Public POST intake plus platform operator list/detail/status-follow-up APIs and `/platform/demo-requests` review workspace with RBAC, audit logging, pagination/filtering, internal notes, public rate limiting, and tests.
 * **Settings / Audit Visibility:** Settings audit-log access and UI depth added with access-control tests.
 * **M11 School Intelligence / AI:** Roadmap only.
@@ -82,7 +83,13 @@ This order is mandatory. Do not start a later phase until the previous phase's e
 * **Focus:** Secure storage, refresh token flow, role routing, error mapper, offline banner, network retry, push notifications.
 * **Rules:** Use purpose-limited APIs, do not reuse admin-shaped responses directly, add ownership tests before release, and keep parent/student/driver data fail-closed.
 
-### Phase 6 — M11 Intelligence / AI Readiness
+### Phase 6 — M12 Learning Frontend and Runtime Completion
+* **Scope:** Teacher Learning dashboard, activity builder UI, smart-board route, student lab/session UI, parent learning summary UI, mobile summary surfaces, and resource-library UX.
+* **Current backend state:** M12 backend MVP is implemented and verified; do not re-scatter learning logic into academics/students/homework.
+* **Focus:** Wire frontend screens to the existing `/learning/*` and `/parent/learning/summary` APIs, preserve school-only defaults, avoid public leaderboards, keep parent/student data child/self-scoped, and add browser E2E for activity builder, board, lab, and parent summary flows.
+* **Exit criteria:** One teacher can create and launch an activity, one student can join and submit in a lab/session, progress records update, and a parent can view a non-comparative child summary from real APIs.
+
+### Phase 7 — M11 Intelligence / AI Readiness
 * **Scope:** Roadmap only.
 * **Rules:** No AI/ML runtime or LLM calls until approved, no automated punishment/risk action, human review is mandatory for recommendations, and tenant isolation + audit logging are mandatory.
 
@@ -383,6 +390,31 @@ Before adding or expanding visible features:
 * **Mobile Frontend Backlog:**
   - Push notifications, notification center polish, notice attachment preview.
   - Chat read receipts, quiet-hours banner, report/block/escalation flow.
+
+### M12 Learning Layer (Backend MVP Implemented)
+* **Current Status:** Backend MVP foundation implemented on 2026-06-12. Dedicated `LearningModule` is registered in the API and owns activities, questions, sessions, participants, attempts, answers, progress, resources, and parent summaries.
+* **Implemented Backend/API:**
+  - Activity CRUD/archive with Easy / Medium / Hard difficulty, activity modes, language modes, question attachment, pagination/filtering, and teacher assignment validation.
+  - School-only session launch/control with generated session codes, QR token hashes, pause/resume/end, expiry handling, and safe student session payloads.
+  - Attempt start/autosave/submit with idempotent writes, MCQ/true-false/normalized short-answer evaluation, score/accuracy calculation, and progress updates only after final submission.
+  - Class/student progress APIs and parent child-scoped non-comparative learning summary.
+  - `module.learning`, `feature.learning.basic`, `feature.learning.full`, learning permission catalog, role defaults, audit logs, and tenant-scoped Prisma queries.
+* **Database:** `LearningActivity`, `LearningQuestion`, `LearningSession`, `LearningParticipant`, `LearningAttempt`, `LearningAnswer`, `LearningProgress`, and `LearningResource` models plus migration `20260612120000_m12_learning_layer_foundation`.
+* **Staging / Verification Remaining:**
+  - Apply migration in staging and verify with real school fixtures.
+  - Browser E2E once frontend screens exist.
+  - School-only network/device policy hardening beyond authenticated membership and expiring code/QR token.
+* **Backend Backlog:**
+  - Dedicated resource-library endpoints if product needs resource management outside activity payloads.
+  - Matching/order question types only after a stable answer shape is approved.
+  - Optional scheduled-session lifecycle/expiry job if sessions need background expiration beyond fail-closed reads.
+* **Web Frontend Backlog:**
+  - Teacher activity builder and activities list/detail.
+  - Smart-board launch/control route and student-safe board payload rendering.
+  - Computer-lab join/session/attempt UI.
+  - Progress dashboard and parent learning summary route.
+* **Mobile Frontend Backlog:**
+  - Parent/student summary views only; do not build full lab or smart-board runtime first.
 
 ### M11 School Intelligence & AI (Roadmap Only - 0%)
 * **Current Status:** No active implementation.

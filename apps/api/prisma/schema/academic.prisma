@@ -65,6 +65,8 @@ model Class {
   conversations             Conversation[]
   examTimetableSlots        ExamTimetableSlot[]
   attendanceDrafts          AttendanceDraft[]
+  learningActivities        LearningActivity[]
+  learningSessions          LearningSession[]
 
   @@unique([tenantId, name])
 }
@@ -102,6 +104,8 @@ model Section {
   conversations             Conversation[]
   examTimetableSlots        ExamTimetableSlot[]
   attendanceDrafts          AttendanceDraft[]
+  learningActivities        LearningActivity[]
+  learningSessions          LearningSession[]
 
   @@unique([tenantId, classId, name])
 }
@@ -129,6 +133,10 @@ model Subject {
   subjectWeeklyRequirements SubjectWeeklyRequirement[]
   examTimetableSlots        ExamTimetableSlot[]
   syllabusTopics            SyllabusTopic[]
+  learningActivities        LearningActivity[]
+  learningSessions          LearningSession[]
+  learningProgress          LearningProgress[]
+  learningResources         LearningResource[]
 
   @@unique([tenantId, classId, code])
 }
@@ -192,6 +200,9 @@ model SyllabusTopic {
   tenant           Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   subject          Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   completedByStaff Staff?  @relation(fields: [completedByStaffId], references: [id], onDelete: SetNull)
+  learningActivities LearningActivity[]
+  learningProgress   LearningProgress[]
+  learningResources  LearningResource[]
 
   @@index([tenantId, subjectId])
 }

@@ -4,7 +4,7 @@ SchoolOS is a production-grade, multi-tenant SaaS School Operating System for Ne
 
 It is designed as a modular school operating platform covering admissions, student records, attendance, fees, notices, activity feed, academics, homework, timetable, HR/payroll, accounting, library, transport, canteen, classroom learning, parent engagement, and future intelligence/analytics.
 
-The current implemented core remains focused on controlled pilot readiness for existing management modules. KG-12 and the Learning Layer are product-direction and staged-expansion goals, not a claim that every KG-12 feature is already implemented.
+The current implemented core remains focused on controlled pilot readiness for existing management modules. M12 Learning Layer now has a verified backend MVP foundation; KG-12 breadth and Learning frontend/runtime depth remain staged expansion goals, not a claim that every KG-12 feature is already implemented.
 
 ---
 
@@ -58,7 +58,7 @@ Stage E: Grade 9-10
 Stage F: Grade 11-12
 ```
 
-The current management modules remain the foundation. The Learning Layer must be implemented as a separate M12 domain that reuses existing students, teachers, classes, subjects, timetable, communication, File Registry, audit, RBAC, and tenant isolation.
+The current management modules remain the foundation. The Learning Layer is implemented backend-first as a separate M12 domain that reuses existing students, teachers, classes, subjects, timetable, communication, File Registry, audit, RBAC, and tenant isolation.
 
 ---
 
@@ -76,7 +76,7 @@ M8A Library, M8B Transport, M8C Canteen: Admin/backend foundations implemented w
 M9 Accounting: Completed / Pilot-Ready
 M10 Notices/Communication/Chat: Foundation plus provider/attachment/retry depth implemented
 M11 Intelligence/AI: Roadmap only
-M12 Learning Layer: Product/architecture plan added; implementation should start only after current phase gates remain stable
+M12 Learning Layer: Backend MVP foundation implemented and verified; frontend teacher/student/parent screens remain staged
 KG-12 Expansion: Product direction added; Grade 11-12 and advanced learning features are staged future scope
 ```
 

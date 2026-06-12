@@ -777,3 +777,79 @@ enum FinanceRequestStatus {
   APPROVED
   REJECTED
 }
+
+enum LearningActivityType {
+  PRACTICE
+  QUIZ
+  EXPLANATION
+  REVISION
+  OBSERVATION
+}
+
+enum LearningDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum LearningMode {
+  SMART_BOARD
+  GROUP
+  COMPUTER_LAB
+  WORKSHEET
+  HYBRID
+}
+
+enum LearningAccessType {
+  SCHOOL_ONLY
+  CLASS_ONLY
+}
+
+enum LearningLanguageMode {
+  ENGLISH
+  NEPALI
+  MIXED
+}
+
+enum LearningActivityStatus {
+  DRAFT
+  READY
+  ARCHIVED
+}
+
+enum LearningSessionStatus {
+  LIVE
+  PAUSED
+  ENDED
+  EXPIRED
+}
+
+enum LearningParticipantStatus {
+  JOINED
+  LEFT
+  REMOVED
+}
+
+enum LearningAttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+}
+
+enum LearningQuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+}
+
+enum LearningProgressLabel {
+  NEEDS_PRACTICE
+  IMPROVING
+  READY
+  STRONG
+}
+
+enum LearningResourceType {
+  FILE
+  LINK
+  NOTE
+}

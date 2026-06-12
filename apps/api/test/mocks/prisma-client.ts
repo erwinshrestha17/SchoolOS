@@ -730,3 +730,79 @@ export const CanteenPaymentMethod = {
   WALLET: 'WALLET',
   STAFF_CREDIT: 'STAFF_CREDIT',
 } as const;
+
+export const LearningActivityType = {
+  PRACTICE: 'PRACTICE',
+  QUIZ: 'QUIZ',
+  EXPLANATION: 'EXPLANATION',
+  REVISION: 'REVISION',
+  OBSERVATION: 'OBSERVATION',
+} as const;
+
+export const LearningDifficulty = {
+  EASY: 'EASY',
+  MEDIUM: 'MEDIUM',
+  HARD: 'HARD',
+} as const;
+
+export const LearningMode = {
+  SMART_BOARD: 'SMART_BOARD',
+  GROUP: 'GROUP',
+  COMPUTER_LAB: 'COMPUTER_LAB',
+  WORKSHEET: 'WORKSHEET',
+  HYBRID: 'HYBRID',
+} as const;
+
+export const LearningAccessType = {
+  SCHOOL_ONLY: 'SCHOOL_ONLY',
+  CLASS_ONLY: 'CLASS_ONLY',
+} as const;
+
+export const LearningLanguageMode = {
+  ENGLISH: 'ENGLISH',
+  NEPALI: 'NEPALI',
+  MIXED: 'MIXED',
+} as const;
+
+export const LearningActivityStatus = {
+  DRAFT: 'DRAFT',
+  READY: 'READY',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+
+export const LearningSessionStatus = {
+  LIVE: 'LIVE',
+  PAUSED: 'PAUSED',
+  ENDED: 'ENDED',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export const LearningParticipantStatus = {
+  JOINED: 'JOINED',
+  LEFT: 'LEFT',
+  REMOVED: 'REMOVED',
+} as const;
+
+export const LearningAttemptStatus = {
+  IN_PROGRESS: 'IN_PROGRESS',
+  SUBMITTED: 'SUBMITTED',
+} as const;
+
+export const LearningQuestionType = {
+  MULTIPLE_CHOICE: 'MULTIPLE_CHOICE',
+  TRUE_FALSE: 'TRUE_FALSE',
+  SHORT_ANSWER: 'SHORT_ANSWER',
+} as const;
+
+export const LearningProgressLabel = {
+  NEEDS_PRACTICE: 'NEEDS_PRACTICE',
+  IMPROVING: 'IMPROVING',
+  READY: 'READY',
+  STRONG: 'STRONG',
+} as const;
+
+export const LearningResourceType = {
+  FILE: 'FILE',
+  LINK: 'LINK',
+  NOTE: 'NOTE',
+} as const;

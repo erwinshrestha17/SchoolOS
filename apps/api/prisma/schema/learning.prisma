@@ -1,0 +1,244 @@
+model LearningActivity {
+  id               String                 @id @default(uuid())
+  tenantId         String
+  title            String
+  description      String?
+  classId          String
+  sectionId        String?
+  subjectId        String
+  chapterId        String?
+  topicId          String?
+  teacherId        String
+  activityType     LearningActivityType
+  difficulty       LearningDifficulty
+  mode             LearningMode
+  accessType       LearningAccessType     @default(SCHOOL_ONLY)
+  languageMode     LearningLanguageMode   @default(ENGLISH)
+  estimatedMinutes Int?
+  status           LearningActivityStatus @default(DRAFT)
+  createdBy        String
+  approvedBy       String?
+  archivedAt       DateTime?
+  archivedBy       String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  class      Class              @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section    Section?           @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subject    Subject            @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  topic      SyllabusTopic?     @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  teacher    Staff              @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  creator    User               @relation("CreatedLearningActivities", fields: [createdBy], references: [id], onDelete: Restrict)
+  approver   User?              @relation("ApprovedLearningActivities", fields: [approvedBy], references: [id], onDelete: SetNull)
+  archiver   User?              @relation("ArchivedLearningActivities", fields: [archivedBy], references: [id], onDelete: SetNull)
+  questions  LearningQuestion[]
+  sessions   LearningSession[]
+  attempts   LearningAttempt[]
+  progress   LearningProgress[]
+  resources  LearningResource[]
+
+  @@index([tenantId])
+  @@index([tenantId, classId])
+  @@index([tenantId, sectionId])
+  @@index([tenantId, subjectId])
+  @@index([tenantId, teacherId])
+  @@index([tenantId, status, updatedAt])
+}
+
+model LearningQuestion {
+  id             String               @id @default(uuid())
+  tenantId       String
+  activityId     String
+  type           LearningQuestionType
+  prompt         String
+  options        Json?
+  correctAnswer  Json?
+  explanation    String?
+  points         Int                  @default(1)
+  sortOrder      Int                  @default(0)
+  metadata       Json?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  activity LearningActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  answers  LearningAnswer[]
+
+  @@index([tenantId, activityId])
+}
+
+model LearningSession {
+  id                 String                @id @default(uuid())
+  tenantId           String
+  activityId         String
+  classId            String
+  sectionId          String?
+  subjectId          String
+  teacherId          String
+  mode               LearningMode
+  sessionCode        String
+  qrTokenHash        String?
+  status             LearningSessionStatus @default(LIVE)
+  schoolOnly         Boolean               @default(true)
+  startedAt          DateTime              @default(now())
+  endedAt            DateTime?
+  expiresAt          DateTime
+  teacherHeartbeatAt DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  activity     LearningActivity      @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  class        Class                 @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?              @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subject      Subject               @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teacher      Staff                 @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  participants LearningParticipant[]
+  attempts     LearningAttempt[]
+
+  @@unique([tenantId, sessionCode])
+  @@index([tenantId])
+  @@index([tenantId, classId])
+  @@index([tenantId, sectionId])
+  @@index([tenantId, subjectId])
+  @@index([tenantId, teacherId])
+  @@index([tenantId, activityId])
+  @@index([tenantId, status, expiresAt])
+  @@index([tenantId, qrTokenHash])
+}
+
+model LearningParticipant {
+  id        String                    @id @default(uuid())
+  tenantId  String
+  sessionId String
+  studentId String
+  status    LearningParticipantStatus @default(JOINED)
+  joinedAt  DateTime                  @default(now())
+  leftAt    DateTime?
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  session LearningSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sessionId, studentId])
+  @@index([tenantId, sessionId])
+  @@index([tenantId, studentId])
+}
+
+model LearningAttempt {
+  id               String                @id @default(uuid())
+  tenantId         String
+  sessionId        String
+  activityId       String
+  studentId        String
+  startedAt        DateTime              @default(now())
+  submittedAt      DateTime?
+  score            Decimal?              @db.Decimal(8, 2)
+  accuracy         Decimal?              @db.Decimal(5, 2)
+  timeSpentSeconds Int                   @default(0)
+  hintsUsed        Int                   @default(0)
+  attemptNumber    Int                   @default(1)
+  status           LearningAttemptStatus @default(IN_PROGRESS)
+  metadata         Json?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  session  LearningSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  activity LearningActivity @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  student  Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  answers  LearningAnswer[]
+  progressSnapshots LearningProgress[]
+
+  @@index([tenantId])
+  @@index([tenantId, sessionId])
+  @@index([tenantId, activityId])
+  @@index([tenantId, studentId])
+  @@index([tenantId, studentId, activityId])
+}
+
+model LearningAnswer {
+  id          String   @id @default(uuid())
+  tenantId    String
+  attemptId   String
+  questionId  String
+  answer      Json?
+  isCorrect   Boolean?
+  score       Decimal? @db.Decimal(8, 2)
+  answeredAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  attempt  LearningAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question LearningQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, attemptId, questionId])
+  @@index([tenantId, attemptId])
+  @@index([tenantId, questionId])
+}
+
+model LearningProgress {
+  id                 String                @id @default(uuid())
+  tenantId           String
+  studentId          String
+  progressKey        String
+  subjectId          String
+  topicId            String?
+  activityId         String?
+  completedCount     Int                   @default(0)
+  totalScore         Decimal               @default(0) @db.Decimal(10, 2)
+  totalPossibleScore Decimal               @default(0) @db.Decimal(10, 2)
+  averageAccuracy    Decimal?              @db.Decimal(5, 2)
+  label              LearningProgressLabel @default(NEEDS_PRACTICE)
+  lastAttemptId      String?
+  lastAttemptAt      DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student     Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject     Subject           @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  topic       SyllabusTopic?    @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  activity    LearningActivity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  lastAttempt LearningAttempt?  @relation(fields: [lastAttemptId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, studentId, progressKey])
+  @@index([tenantId])
+  @@index([tenantId, studentId])
+  @@index([tenantId, subjectId])
+  @@index([tenantId, activityId])
+  @@index([tenantId, studentId, subjectId])
+}
+
+model LearningResource {
+  id          String               @id @default(uuid())
+  tenantId    String
+  activityId  String?
+  subjectId   String?
+  topicId     String?
+  fileAssetId String?
+  type        LearningResourceType
+  title       String
+  url         String?
+  metadata    Json?
+  createdBy   String
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  activity  LearningActivity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  subject   Subject?          @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  topic     SyllabusTopic?    @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  fileAsset FileAsset?        @relation(fields: [fileAssetId], references: [id], onDelete: SetNull)
+  creator   User              @relation("CreatedLearningResources", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([tenantId, activityId])
+  @@index([tenantId, subjectId])
+  @@index([tenantId, topicId])
+  @@index([tenantId, fileAssetId])
+}

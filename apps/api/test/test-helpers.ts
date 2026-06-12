@@ -10,6 +10,7 @@ export interface MockState {
   users: Record<string, unknown>[];
   userRoles: Record<string, unknown>[];
   classes: Record<string, unknown>[];
+  subjects: Record<string, unknown>[];
   students: Record<string, unknown>[];
   enrollments: Record<string, unknown>[];
   staff: Record<string, unknown>[];
@@ -69,6 +70,14 @@ export interface MockState {
   canteenWalletTransactions: Record<string, unknown>[];
   guardianConsents: Record<string, unknown>[];
   demoRequests: Record<string, unknown>[];
+  learningActivities: Record<string, unknown>[];
+  learningQuestions: Record<string, unknown>[];
+  learningSessions: Record<string, unknown>[];
+  learningParticipants: Record<string, unknown>[];
+  learningAttempts: Record<string, unknown>[];
+  learningAnswers: Record<string, unknown>[];
+  learningProgress: Record<string, unknown>[];
+  learningResources: Record<string, unknown>[];
   [key: string]: Record<string, unknown>[];
 }
 
@@ -244,6 +253,7 @@ export function createPrismaMock() {
     users: [] as Record<string, unknown>[],
     userRoles: [] as Record<string, unknown>[],
     classes: [] as Record<string, unknown>[],
+    subjects: [] as Record<string, unknown>[],
     students: [
       {
         id: 'student-a',
@@ -330,6 +340,14 @@ export function createPrismaMock() {
     siblingGroups: [] as Record<string, unknown>[],
     siblingGroupMembers: [] as Record<string, unknown>[],
     studentQrCredentials: [] as Record<string, unknown>[],
+    learningActivities: [] as Record<string, unknown>[],
+    learningQuestions: [] as Record<string, unknown>[],
+    learningSessions: [] as Record<string, unknown>[],
+    learningParticipants: [] as Record<string, unknown>[],
+    learningAttempts: [] as Record<string, unknown>[],
+    learningAnswers: [] as Record<string, unknown>[],
+    learningProgress: [] as Record<string, unknown>[],
+    learningResources: [] as Record<string, unknown>[],
   };
 
   const nextId = (prefix: string) =>
@@ -2285,6 +2303,7 @@ export function createPrismaMock() {
     'guardian',
     'attendanceCorrectionRequest',
     'section',
+    'subject',
     'subjectTeacherAssignment',
     'attendanceSession',
     'schoolCalendarDay',
@@ -2312,6 +2331,14 @@ export function createPrismaMock() {
     'siblingGroup',
     'siblingGroupMember',
     'studentQrCredential',
+    'learningActivity',
+    'learningQuestion',
+    'learningSession',
+    'learningParticipant',
+    'learningAttempt',
+    'learningAnswer',
+    'learningProgress',
+    'learningResource',
   ];
 
   for (const model of dummyModels) {
@@ -2319,9 +2346,11 @@ export function createPrismaMock() {
       // Basic pluralization for state key
       const stateKey = model.endsWith('Status')
         ? model + 'es'
-        : model.endsWith('s')
-          ? model
-          : model + 's';
+        : model.endsWith('y')
+          ? model.slice(0, -1) + 'ies'
+          : model.endsWith('s')
+            ? model
+            : model + 's';
       const actualStateKey = (state as any)[stateKey]
         ? stateKey
         : (state as any)[model + 's']
@@ -2378,6 +2407,122 @@ export function createPrismaMock() {
             enriched.student = state.students.find(
               (s) => s.id === enriched.studentId,
             );
+          }
+        }
+        if (model === 'guardian') {
+          if (qInclude.studentLinks) {
+            enriched.studentLinks = state.studentGuardians.filter(
+              (link) => link.guardianId === enriched.id,
+            );
+          }
+        }
+        if (model === 'learningActivity') {
+          if (qInclude.questions) {
+            enriched.questions = state.learningQuestions
+              .filter((q) => q.activityId === enriched.id)
+              .sort(
+                (a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0),
+              );
+          }
+          if (qInclude.resources) {
+            enriched.resources = state.learningResources.filter(
+              (r) => r.activityId === enriched.id,
+            );
+          }
+          if (qInclude.class) {
+            enriched.class = state.classes.find(
+              (c) => c.id === enriched.classId,
+            );
+          }
+          if (qInclude.section) {
+            enriched.section =
+              state.sections.find((s) => s.id === enriched.sectionId) ?? null;
+          }
+          if (qInclude.subject) {
+            enriched.subject =
+              state.subjects.find((s) => s.id === enriched.subjectId) ?? null;
+          }
+          if (qInclude.teacher) {
+            enriched.teacher =
+              state.staff.find((s) => s.id === enriched.teacherId) ?? null;
+          }
+          if (qInclude._count) {
+            enriched._count = {
+              questions: state.learningQuestions.filter(
+                (q) => q.activityId === enriched.id,
+              ).length,
+              sessions: state.learningSessions.filter(
+                (s) => s.activityId === enriched.id,
+              ).length,
+            };
+          }
+        }
+        if (model === 'learningSession') {
+          if (qInclude.activity) {
+            const activity = state.learningActivities.find(
+              (a) => a.id === enriched.activityId,
+            );
+            enriched.activity = activity
+              ? {
+                  ...activity,
+                  questions: state.learningQuestions
+                    .filter((q) => q.activityId === activity.id)
+                    .sort(
+                      (a, b) =>
+                        Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0),
+                    ),
+                }
+              : null;
+          }
+          if (qInclude._count) {
+            enriched._count = {
+              participants: state.learningParticipants.filter(
+                (p) => p.sessionId === enriched.id,
+              ).length,
+              attempts: state.learningAttempts.filter(
+                (a) => a.sessionId === enriched.id,
+              ).length,
+            };
+          }
+        }
+        if (model === 'learningAttempt') {
+          if (qInclude.session) {
+            enriched.session = state.learningSessions.find(
+              (s) => s.id === enriched.sessionId,
+            );
+          }
+          if (qInclude.activity) {
+            const activity = state.learningActivities.find(
+              (a) => a.id === enriched.activityId,
+            );
+            enriched.activity = activity
+              ? {
+                  ...activity,
+                  questions: state.learningQuestions
+                    .filter((q) => q.activityId === activity.id)
+                    .sort(
+                      (a, b) =>
+                        Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0),
+                    ),
+                }
+              : null;
+          }
+          if (qInclude.answers) {
+            enriched.answers = state.learningAnswers.filter(
+              (a) => a.attemptId === enriched.id,
+            );
+          }
+        }
+        if (model === 'learningProgress') {
+          if (qInclude.subject) {
+            enriched.subject =
+              state.subjects.find((s) => s.id === enriched.subjectId) ?? null;
+          }
+          if (qInclude.activity) {
+            enriched.activity =
+              state.learningActivities.find(
+                (a) => a.id === enriched.activityId,
+              ) ?? null;
           }
         }
         return enriched;
@@ -2557,6 +2702,9 @@ export function createPrismaMock() {
 
           if ((state as any)[actualStateKey]) {
             (state as any)[actualStateKey].push(item);
+          }
+          if (q.include) {
+            return Promise.resolve(applyIncludes(item, q.include));
           }
           return Promise.resolve(applySelect(item, q.select));
         }),

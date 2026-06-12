@@ -5,7 +5,7 @@
 **Target schools:** Kindergarten / Montessori to Grade 12 as the long-term product direction; current implementation remains staged around controlled pilot readiness for existing core modules  
 **Document type:** Combined master PRD merged from the original pilot-hardening PRD and the researched 2026 PRD draft  
 **Status:** Active product requirements document for controlled pilot hardening, KG-12 product planning, and M12 Learning Layer alignment  
-**Last updated:** 2026-06-11
+**Last updated:** 2026-06-12
 
 ---
 
@@ -16,9 +16,9 @@ This document is the active PRD for SchoolOS. It keeps the existing pilot-harden
 Important distinction:
 
 ```text
-Current implemented core = pilot-ready school management foundation
+Current implemented core = pilot-ready school management foundation plus M12 backend MVP foundation
 KG-12 SchoolOS = staged product direction
-M12 Learning Layer = planned product vertical, not yet implemented until code/tests are complete
+M12 Learning Layer = backend MVP implemented and verified; frontend/runtime depth remains staged
 ```
 
 Implementation claims must still be validated against real pilot-school workflows, official reporting templates, provider sandbox/staging flows, production security review, and the verification commands in the implementation plan.
@@ -245,7 +245,7 @@ Stage F: Grade 11-12
 
 ## 8. M12 Learning Layer Summary
 
-M12 Learning Layer is a planned product vertical. It should not be implemented until the active phase gates allow it.
+M12 Learning Layer now has a verified backend MVP foundation. The product vertical is not complete until teacher/student/parent frontend workflows, staging fixtures, and browser E2E are implemented and verified.
 
 M12 must include:
 
@@ -260,6 +260,20 @@ Parent Learning Summary
 Learning Resource Library
 Adaptive Recommendations later
 Safe AI Assistant later
+```
+
+Backend MVP implemented on 2026-06-12:
+
+```text
+Teacher Activity Builder APIs
+Easy / Medium / Hard difficulty
+Smart Board and Computer Lab session backend
+School-Only Learning Sessions
+Practice & Quiz Engine for MCQ, true/false, and normalized short answer
+Attempt autosave and idempotent submission
+Progress & Mastery Tracking foundation
+Parent Learning Summary foundation
+Tenant isolation, RBAC, entitlement, audit logs, and E2E coverage
 ```
 
 M12 must reuse:

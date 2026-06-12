@@ -26,6 +26,7 @@ export const CUSTOMER_MODULES = [
   'canteen', // M8C Canteen Management
   'accounting', // M9 Accounting & Finance
   'notices', // M10 Notices & Communication
+  'learning', // M12 Learning Layer
 ];
 
 export const FEATURE_KEYS = {
@@ -54,6 +55,10 @@ export const FEATURE_KEYS = {
   TIMETABLE_BASIC: 'feature.timetable.basic',
   TIMETABLE_CONFLICTS: 'feature.timetable.conflicts',
   TIMETABLE_ADVANCED: 'feature.timetable.advanced',
+
+  // M12 Learning Layer
+  LEARNING_BASIC: 'feature.learning.basic',
+  LEARNING_FULL: 'feature.learning.full',
 
   // M7 HR & Payroll
   HR_STAFF_RECORDS: 'feature.hr.staff_records',
@@ -173,6 +178,7 @@ export const ENTITLEMENT_MATRIX: Record<
       'canteen',
       'accounting',
       'notices',
+      'learning',
     ],
     features: [
       FEATURE_KEYS.FEES_BASIC,
@@ -187,6 +193,8 @@ export const ENTITLEMENT_MATRIX: Record<
       FEATURE_KEYS.ACTIVITY_MODERATION,
       FEATURE_KEYS.HOMEWORK_BASIC,
       FEATURE_KEYS.HOMEWORK_FULL,
+      FEATURE_KEYS.LEARNING_BASIC,
+      FEATURE_KEYS.LEARNING_FULL,
       FEATURE_KEYS.TIMETABLE_VIEW,
       FEATURE_KEYS.TIMETABLE_BASIC,
       FEATURE_KEYS.TIMETABLE_CONFLICTS,
@@ -224,6 +232,7 @@ export const ENTITLEMENT_MATRIX: Record<
       'canteen',
       'accounting',
       'notices',
+      'learning',
     ],
     features: [
       FEATURE_KEYS.FEES_BASIC,
@@ -240,6 +249,8 @@ export const ENTITLEMENT_MATRIX: Record<
       FEATURE_KEYS.ACTIVITY_CONSENT_MEDIA,
       FEATURE_KEYS.HOMEWORK_BASIC,
       FEATURE_KEYS.HOMEWORK_FULL,
+      FEATURE_KEYS.LEARNING_BASIC,
+      FEATURE_KEYS.LEARNING_FULL,
       FEATURE_KEYS.TIMETABLE_VIEW,
       FEATURE_KEYS.TIMETABLE_BASIC,
       FEATURE_KEYS.TIMETABLE_CONFLICTS,

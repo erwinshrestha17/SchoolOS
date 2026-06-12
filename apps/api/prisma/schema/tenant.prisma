@@ -156,6 +156,14 @@ model Tenant {
   staffLifecycleEvents          StaffLifecycleEvent[]
   supportOverrides              SupportOverride[]
   financeApprovalRequests       FinanceApprovalRequest[]
+  learningActivities            LearningActivity[]
+  learningQuestions             LearningQuestion[]
+  learningSessions              LearningSession[]
+  learningParticipants          LearningParticipant[]
+  learningAttempts              LearningAttempt[]
+  learningAnswers               LearningAnswer[]
+  learningProgress              LearningProgress[]
+  learningResources             LearningResource[]
 }
 
 model TenantSetting {
@@ -202,6 +210,7 @@ model FileAsset {
   studentDocuments    StudentDocument[]    @relation("DocumentFile")
   reportCards         ReportCard[]         @relation("ReportCardFile")
   reportCardHistories ReportCardHistory[]  @relation("ReportCardHistoryFile")
+  learningResources   LearningResource[]
 
   @@index([tenantId, module, entityId])
   @@index([tenantId, ownerType, ownerId])

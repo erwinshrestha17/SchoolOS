@@ -707,6 +707,48 @@ export const permissionCatalog = [
     description: "Adjust staff leave balances",
   },
 
+  // ─── Compiled from catalog/learning.ts ───
+  {
+    resource: "learning",
+    action: "read",
+    description: "Read learning activities, sessions, and progress",
+  },
+  {
+    resource: "learning",
+    action: "manage",
+    description: "Manage learning activities and classroom sessions",
+  },
+  {
+    resource: "learning",
+    action: "create",
+    description: "Create learning activities for assigned classes and subjects",
+  },
+  {
+    resource: "learning",
+    action: "update",
+    description: "Update learning activities and session state",
+  },
+  {
+    resource: "learning",
+    action: "delete",
+    description: "Archive learning activities",
+  },
+  {
+    resource: "learning",
+    action: "launch",
+    description: "Launch and control school-only learning sessions",
+  },
+  {
+    resource: "learning",
+    action: "attempt",
+    description: "Join learning sessions and submit activity attempts",
+  },
+  {
+    resource: "learning",
+    action: "progress",
+    description: "Read learning progress summaries",
+  },
+
   // ─── Compiled from catalog/library.ts ───
   {
     resource: "library",
@@ -1366,6 +1408,11 @@ export const systemRolePermissions: Record<string, string[]> = {
     "homework:update",
     "homework:review",
     "homework:notify",
+    "learning:read",
+    "learning:create",
+    "learning:update",
+    "learning:launch",
+    "learning:progress",
     "messaging:create",
     "messaging:read",
     "activity_feed:create",
@@ -1400,6 +1447,11 @@ export const systemRolePermissions: Record<string, string[]> = {
     "homework:update",
     "homework:review",
     "homework:notify",
+    "learning:read",
+    "learning:create",
+    "learning:update",
+    "learning:launch",
+    "learning:progress",
     "messaging:create",
     "messaging:read",
     "activity_feed:create",
@@ -1430,6 +1482,9 @@ export const systemRolePermissions: Record<string, string[]> = {
     "timetable:read",
     "homework:read",
     "homework:submit",
+    "learning:read",
+    "learning:attempt",
+    "learning:progress",
     "settings:read_public",
   ],
   parent: [
@@ -1440,6 +1495,8 @@ export const systemRolePermissions: Record<string, string[]> = {
     "timetable:read",
     "homework:read",
     "homework:submit",
+    "learning:read",
+    "learning:progress",
     "messaging:create",
     "messaging:read",
     "transport:tracking:parent",

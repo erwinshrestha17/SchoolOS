@@ -1,8 +1,8 @@
 # SchoolOS Learning Layer Plan
 
-**Status:** Product and architecture plan for M12 Learning Layer  
+**Status:** M12 backend MVP foundation implemented; frontend/runtime depth remains planned
 **Scope:** Kindergarten / Montessori to Grade 12 classroom learning support  
-**Implementation state:** Planned. Do not treat this as implemented functionality until code, tests, and verification are complete.  
+**Implementation state:** Backend implemented and verified on 2026-06-12 under `apps/api/src/learning`. Do not treat Learning frontend screens, mobile runtime, adaptive learning, or AI tutor as implemented until matching code, tests, and verification exist.
 **Relationship to SchoolOS Core:** Separate learning domain that reuses SchoolOS management data, tenant isolation, RBAC, File Registry, audit logs, and communication services.
 
 ---
@@ -47,7 +47,33 @@ SchoolOS should be positioned as a KG-12 school operating platform with three co
 3. Intelligence & Insight Layer later
 ```
 
-The Learning Layer should be implemented as **M12 Learning Layer**.
+The Learning Layer is implemented backend-first as **M12 Learning Layer**.
+
+Current implementation summary:
+
+```text
+Implemented:
+- M12 backend MVP foundation under apps/api/src/learning
+- Teacher activity builder APIs
+- Easy / Medium / Hard difficulty
+- School-only smart-board/lab session backend
+- Session code and QR-token-hash join flow
+- Basic practice/quiz attempt engine
+- Autosave and idempotent submission
+- Progress recording
+- Parent child-scoped learning summary
+- Tenant isolation, RBAC, entitlement checks, audit logging, and E2E coverage
+
+Not yet implemented:
+- Web teacher activity-builder screens
+- Web smart-board runtime
+- Web student lab/session attempt UI
+- Web parent learning summary UI
+- Mobile learning summary surfaces
+- Resource-library management endpoints
+- Matching/order question support
+- Adaptive learning, subject labs, heavy simulations, and AI tutor
+```
 
 Submodules:
 
@@ -333,7 +359,7 @@ Strong
 
 ## 7. Backend Architecture
 
-Add a dedicated domain:
+The dedicated backend domain is implemented:
 
 ```text
 apps/api/src/learning/
@@ -348,7 +374,7 @@ apps/api/src/learning/
 └── parent-summary/
 ```
 
-MVP services:
+Implemented MVP services:
 
 ```text
 LearningActivitiesService
@@ -361,7 +387,7 @@ LearningProgressService
 ParentLearningSummaryService
 ```
 
-MVP models:
+Implemented MVP models:
 
 ```text
 LearningActivity
@@ -374,7 +400,7 @@ LearningProgress
 LearningResource
 ```
 
-Every learning table/query must be tenant-scoped.
+Every learning table/query must be tenant-scoped. The backend enforces `module.learning`, learning permissions, actor tenant scope, teacher assignment validation, student session access validation, parent child scope, and audit logging for state changes.
 
 ---
 
@@ -417,7 +443,7 @@ Mobile MVP should show only parent/student learning summaries and teacher notifi
 
 ---
 
-## 9. Database and API Draft
+## 9. Database and API
 
 Important `LearningActivity` fields:
 
@@ -459,16 +485,38 @@ GET    /learning/progress/student/:studentId
 GET    /parent/learning/summary
 ```
 
+Implemented Prisma migration:
+
+```text
+apps/api/prisma/migrations/20260612120000_m12_learning_layer_foundation/migration.sql
+```
+
+Implemented permission and entitlement surface:
+
+```text
+module.learning
+feature.learning.basic
+feature.learning.full
+learning:read
+learning:manage
+learning:create
+learning:update
+learning:delete
+learning:launch
+learning:attempt
+learning:progress
+```
+
 ---
 
 ## 10. Implementation Phases
 
 ```text
-M12-0 Design and schema readiness
-M12-1 Backend activity foundation
-M12-2 Smart Board MVP
-M12-3 Computer Lab MVP
-M12-4 Progress and parent summary
+M12-0 Design and schema readiness - complete for backend
+M12-1 Backend activity foundation - complete
+M12-2 Smart Board MVP - backend complete, web runtime pending
+M12-3 Computer Lab MVP - backend complete, web student/lab UI pending
+M12-4 Progress and parent summary - backend complete, web/mobile UI pending
 M12-5 Low-bandwidth hardening
 M12-6 Subject activity labs
 M12-7 Safe AI later
@@ -487,7 +535,7 @@ Progress Recording
 Parent Summary foundation
 ```
 
-Do not include in MVP:
+Not included in current backend MVP:
 
 ```text
 AI tutor
@@ -504,7 +552,7 @@ subject labs for every grade
 
 ## 11. Testing Requirements
 
-Backend E2E tests:
+Implemented backend E2E tests:
 
 ```text
 learning-activity-permissions.e2e-spec.ts
@@ -536,6 +584,20 @@ autosave is idempotent
 submit is idempotent
 progress updates only after valid submission
 school-only session code expires correctly
+```
+
+Verification completed on 2026-06-12:
+
+```text
+pnpm db:generate
+pnpm db:validate
+pnpm verify:openapi
+pnpm --filter @schoolos/api typecheck
+pnpm --filter @schoolos/api test
+pnpm --filter @schoolos/api test:e2e
+focused Learning E2E specs
+pnpm build
+pnpm test:web:e2e outside sandbox after sandbox-only ::1:3101 listen EPERM
 ```
 
 ---

@@ -4,8 +4,8 @@
 **Market:** Nepal-focused school operating SaaS  
 **Target schools:** Kindergarten / Montessori to Grade 12 as the long-term product direction; current implementation remains staged around controlled pilot readiness for existing core modules  
 **Document type:** Functional Requirements Specification  
-**Status:** Active FRS aligned with KG-12 product direction and M12 Learning Layer planning  
-**Last updated:** 2026-06-11
+**Status:** Active FRS aligned with KG-12 product direction and M12 Learning Layer backend MVP implementation
+**Last updated:** 2026-06-12
 
 ---
 
@@ -20,7 +20,7 @@ Important distinction:
 ```text
 Current core = implemented/pilot-ready management modules with remaining hardening
 KG-12 expansion = staged product direction
-M12 Learning Layer = planned product vertical until implemented and verified
+M12 Learning Layer = backend MVP implemented and verified; frontend/runtime depth remains staged
 ```
 
 ---
@@ -290,6 +290,8 @@ Manage academic structure, subjects, exams, assessment components, CAS, report c
 
 Provide teacher-led, school-controlled learning workflows through smart-board activities, computer-lab practice, progress tracking, and parent learning summaries.
 
+Implementation note: the backend MVP for this section is implemented under `apps/api/src/learning`; web/mobile screens and advanced learning depth remain staged.
+
 ### 8.2 Primary actors
 
 - Teacher.
@@ -352,6 +354,7 @@ Provide teacher-led, school-controlled learning workflows through smart-board ac
 5. Parent cannot view another child summary.
 6. Progress updates only after valid submission.
 7. Tenant isolation tests pass for activity, session, attempt, and progress records.
+8. Backend M12 E2E coverage passes for teacher assignment denial, inactive/expired/wrong-class session denial, cross-tenant denial, parent child-scope denial, autosave/submit idempotency, and progress-after-submit behavior.
 
 ---
 

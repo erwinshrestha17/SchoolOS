@@ -1470,19 +1470,23 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
     it('getProvidersReadiness returns readiness list for SMS, Email, FCM, Object Storage, and PDF generator', async () => {
       const readiness = await platformService.getProvidersReadiness();
       expect(Array.isArray(readiness)).toBe(true);
-      expect(readiness.length).toBe(5);
+      expect(readiness.length).toBe(6);
 
       const sms = readiness.find((r) => r.providerKey === 'sms');
       const email = readiness.find((r) => r.providerKey === 'email');
       const fcm = readiness.find((r) => r.providerKey === 'fcm');
       const storage = readiness.find((r) => r.providerKey === 'object_storage');
       const pdf = readiness.find((r) => r.providerKey === 'pdf_generator');
+      const paymentGateway = readiness.find(
+        (r) => r.providerKey === 'payment_gateway',
+      );
 
       expect(sms).toBeDefined();
       expect(email).toBeDefined();
       expect(fcm).toBeDefined();
       expect(storage).toBeDefined();
       expect(pdf).toBeDefined();
+      expect(paymentGateway).toBeDefined();
       expect(pdf!.status).toBe('READY');
     });
 

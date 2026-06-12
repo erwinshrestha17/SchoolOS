@@ -56,11 +56,30 @@ export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
+  private readonly _client: Record<string, unknown>;
+
   constructor(private readonly cls: ClsService) {
     const adapter = new PrismaPg({
       connectionString: process.env.DATABASE_URL,
     });
     super({ adapter });
+    this._client = this.client;
+
+    return new Proxy(this, {
+      get: (target, prop, receiver) => {
+        if (
+          prop === 'onModuleInit' ||
+          prop === 'onModuleDestroy' ||
+          prop === '$connect' ||
+          prop === '$disconnect'
+        ) {
+          const val = Reflect.get(target, prop, receiver);
+          return typeof val === 'function' ? val.bind(target) : val;
+        }
+        const val = Reflect.get(target._client, prop);
+        return typeof val === 'function' ? val.bind(target._client) : val;
+      },
+    });
   }
 
   get client() {

@@ -69,6 +69,10 @@ model User {
   supportOverrides               SupportOverride[]                @relation("UserSupportOverrides")
   requestedFinanceApprovals      FinanceApprovalRequest[]         @relation("RequestedFinanceApprovals")
   reviewedFinanceApprovals       FinanceApprovalRequest[]         @relation("ReviewedFinanceApprovals")
+  createdLearningActivities      LearningActivity[]               @relation("CreatedLearningActivities")
+  approvedLearningActivities     LearningActivity[]               @relation("ApprovedLearningActivities")
+  archivedLearningActivities     LearningActivity[]               @relation("ArchivedLearningActivities")
+  createdLearningResources       LearningResource[]               @relation("CreatedLearningResources")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])

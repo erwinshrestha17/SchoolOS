@@ -95,6 +95,29 @@ describe('accounting reversals', () => {
     ).rejects.toThrow(ConflictException);
   });
 
+  it('blocks reversals if original journal entry belongs to a locked period', async () => {
+    const original = buildOriginalJournal();
+    (original as any).fiscalPeriod = { status: 'LOCKED', label: '2026-04' };
+    const { service } = buildService({
+      original,
+      existingReversal: null,
+      closedPeriod: null,
+      createdReversal: null,
+      journalCount: 1,
+    });
+
+    await expect(
+      service.reverseJournalEntry(
+        original.id,
+        {
+          reversalDate: '2026-04-27',
+          reason: 'Test reversal in locked period',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('locked fiscal period');
+  });
+
   it('prevents duplicate reversals for the same journal entry', async () => {
     const original = buildOriginalJournal();
     const { service } = buildService({
