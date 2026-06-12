@@ -1,8 +1,8 @@
 # SchoolOS Architecture and Security
 
-**Last updated:** 2026-06-02  
-**Status:** Consolidated source of truth for storage boundaries, database scaling, tenant isolation, and security rules.  
-**Architecture:** PostgreSQL-first, NestJS modular monolith, Redis/BullMQ, private object storage.
+**Last updated:** 2026-06-13  
+**Status:** Consolidated source of truth for storage boundaries, database scaling, cost-aware performance, tenant isolation, and security rules.  
+**Architecture:** PostgreSQL-first, NestJS modular monolith, Redis/BullMQ, private object storage, cost-aware performance budgets.
 
 ---
 
@@ -284,7 +284,187 @@ High-volume operational data needs retention limits. Expire temporary exports, a
 
 ---
 
-## 4. Tenant Isolation and Security Rules
+## 4. Cost and Performance Architecture Policy
+
+### Core Principle
+Do not buy more server capacity to hide inefficient architecture. SchoolOS must reduce compute waste first, then scale infrastructure only when real usage patterns justify it.
+
+Cost-aware performance order:
+```text
+Database efficiency
+-> file/image optimization
+-> API payload control
+-> async/background work
+-> selective caching
+-> selective real-time
+-> infrastructure scaling
+```
+
+### Low-Resource Baseline Architecture
+The default low-resource architecture remains:
+```text
+Next.js dashboard / Flutter app
+        ↓
+NestJS modular monolith API
+        ↓
+PostgreSQL with tenant-scoped indexes
+        ↓
+Private object storage through File Registry
+        ↓
+Redis + BullMQ for async work
+        ↓
+Provider adapters for email/SMS/payment/storage
+```
+
+Avoid by default:
+- Microservices
+- Kubernetes
+- Separate search clusters
+- Separate analytics databases
+- GPU workers
+- Live subscriptions for normal dashboard data
+- AI inference inside request/response flows
+
+These may be introduced only after a measured bottleneck, owner approval, and documented rollback plan.
+
+### Performance Budgets
+Every new module or major endpoint should target the following budgets unless the module documents a stronger reason:
+
+| Area | Target |
+|---|---:|
+| Simple lookup API | Under 200 ms server processing |
+| Growing list API | Under 300-700 ms with pagination/filtering |
+| Admin dashboard summary API | Under 500 ms using precomputed summaries where practical |
+| Database query target | Usually under 100-200 ms for common paths |
+| API page size | 20-100 records by default |
+| Profile image display variant | Under 300 KB |
+| Thumbnail variant | Under 60 KB |
+| Report/PDF generation | Background job, not synchronous request |
+| Large import/export | Background job with progress/status |
+| Mobile first-visible state | Fast skeleton/partial data, then lazy detail load |
+
+If a common endpoint exceeds these budgets, optimize query shape, indexes, pagination, summaries, or payload size before increasing server size.
+
+### API Payload Rules
+- List endpoints return summary rows only.
+- Detail endpoints fetch detail data only for the selected entity.
+- Do not return full attendance, fee, exam, document, audit, or message history inside list responses.
+- Do not filter growing datasets only in the browser.
+- Use server-side filtering, pagination, and purpose-limited response DTOs.
+- Parent/student/mobile APIs must not reuse admin-shaped payloads if a smaller purpose-limited DTO is enough.
+
+### Image and File Cost Rules
+All user-visible images must have optimized display variants. Original uploads may be retained only when needed for audit, document fidelity, future regeneration, or legal/business requirements.
+
+Recommended variants:
+
+| File type | Required variants |
+|---|---|
+| Student/staff/parent profile photo | 512x512 display image + 128x128 thumbnail |
+| School logo | SVG when possible, otherwise optimized 512px display image |
+| Notice/activity image | Max-width 1200px display image + thumbnail |
+| Document/admission scan | Max-width 1600-2000px preview; original retained if required |
+| Receipt/report card PDF | Store generated PDF once; reuse until source data changes |
+
+Rules:
+- Do not serve original uploaded photos in normal dashboards or mobile views.
+- Do not store base64 files in PostgreSQL.
+- Do not expose raw object keys or permanent public storage URLs.
+- Image optimization should run in a BullMQ job when processing may be slow.
+- File metadata must record size, MIME type, checksum where practical, owner, tenant, and variant type.
+
+### Dashboard and Summary Rules
+Dashboards must not recalculate high-volume summaries from raw tables on every request.
+
+Prefer summary tables/materialized summaries for:
+- `student_attendance_summary`
+- `student_fee_summary`
+- `student_exam_summary`
+- `class_attendance_summary`
+- `class_performance_summary`
+- `school_dashboard_summary`
+- `tenant_usage_summary`
+
+Update summaries through:
+- Transactional write-side updates for small deterministic counters.
+- Scheduled BullMQ jobs for heavier summaries.
+- Event-triggered recalculation where correctness requires it.
+
+### Report and Export Rules
+Reports, PDFs, Excel files, and large exports must be generated once and reused when source data has not changed.
+
+Required behavior:
+- Create a job record with status: queued, processing, completed, failed.
+- Store the generated file in private storage with File Registry metadata.
+- Serve re-downloads from stored files.
+- Regenerate only when source data changes, the user explicitly requests regeneration, or the report policy requires a fresh snapshot.
+- Never block a normal API request while generating large reports.
+
+### Notification Cost Rules
+Use the cheapest reliable channel that satisfies the business risk.
+
+Default priority:
+```text
+In-app notification
+-> push notification
+-> email
+-> SMS only for high-priority or legally/operationally important events
+```
+
+SMS should be reserved for:
+- Absence alerts where the school has enabled SMS.
+- Fee overdue escalation after cheaper channels fail or policy requires SMS.
+- Emergency notices.
+- Login/security OTP.
+- Critical account or payment events.
+
+Avoid SMS for low-priority notices, general homework updates, routine marketing, and repeated reminders that can be batched.
+
+### Real-Time Cost Rules
+Use real-time only where immediate updates materially improve the workflow.
+
+Approved or likely-justified use cases:
+- Live class attendance session state.
+- Critical admin notifications.
+- Admin-only transport latest-location state, after load testing.
+- Parent-teacher chat only after ownership and retention rules are approved.
+
+Use polling, manual refresh, cached summaries, or scheduled refresh for:
+- Fee dashboards.
+- Exam summaries.
+- Student lists.
+- Notice lists.
+- Report/export history.
+- Static settings.
+
+### AI/Intelligence Cost Rules
+M11 Intelligence and future AI features must not run expensive inference on every page load.
+
+Default policy:
+- Run analytics/risk scoring asynchronously on a schedule or after source data changes.
+- Store and show the latest result with `generatedAt`, model/version/rule metadata, and explanation where practical.
+- Use rules/aggregates first; add ML/LLM only when product value and cost controls are clear.
+- Keep AI outputs teacher/admin-reviewed for student-facing or parent-facing decisions.
+- Track per-tenant AI usage if AI credits or pricing will exist.
+
+### Cost-Control Gate for New Features
+Before implementing a feature, answer:
+1. Can the first version run inside the existing modular monolith?
+2. Is the data tenant-scoped and indexed for its main query path?
+3. Is every growing list paginated and filtered server-side?
+4. Can heavy work run through BullMQ instead of blocking the request?
+5. Are files stored in object storage with optimized variants?
+6. Can dashboard data use summaries instead of raw scans?
+7. Is real-time necessary, or is polling/refresh enough?
+8. Is SMS necessary, or can in-app/push/email handle it?
+9. Is AI necessary now, or can rules/analytics handle the first version?
+10. What metric proves the feature is fast enough without over-provisioning?
+
+A feature is not cost/performance-ready until these are answered.
+
+---
+
+## 5. Tenant Isolation and Security Rules
 
 ### Tenant Isolation Rule
 1. Every query must filter by `tenantId`.
