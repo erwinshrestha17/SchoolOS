@@ -1,8 +1,8 @@
 # SchoolOS Learning Layer Plan
 
-**Status:** M12 backend MVP foundation implemented; frontend/runtime depth remains planned
+**Status:** M12 Learning Layer production foundation implemented across backend, web runtime, and mobile summaries
 **Scope:** Kindergarten / Montessori to Grade 12 classroom learning support  
-**Implementation state:** Backend implemented and verified on 2026-06-12 under `apps/api/src/learning`. Do not treat Learning frontend screens, mobile runtime, adaptive learning, or AI tutor as implemented until matching code, tests, and verification exist.
+**Implementation state:** Backend, web Learning workspace/runtime routes, parent/student web summary, and Flutter parent/student summary foundation implemented and verified on 2026-06-12. Adaptive learning, AI tutor, heavy simulations, full mobile lab runtime, and public leaderboard scope remain explicitly deferred.
 **Relationship to SchoolOS Core:** Separate learning domain that reuses SchoolOS management data, tenant isolation, RBAC, File Registry, audit logs, and communication services.
 
 ---
@@ -53,26 +53,28 @@ Current implementation summary:
 
 ```text
 Implemented:
-- M12 backend MVP foundation under apps/api/src/learning
-- Teacher activity builder APIs
+- M12 backend foundation under apps/api/src/learning
+- Teacher activity builder APIs and web workspace
 - Easy / Medium / Hard difficulty
-- School-only smart-board/lab session backend
+- School-only smart-board/lab session backend and web runtime routes
+- Session list, monitoring, heartbeat, and participant monitor
 - Session code and QR-token-hash join flow
 - Basic practice/quiz attempt engine
 - Autosave and idempotent submission
 - Progress recording
-- Parent child-scoped learning summary
+- Parent child-scoped learning summary on web and Flutter mobile
+- Student self-scoped Flutter learning summary
+- Learning Resource Library endpoints and activity resource panel
+- Matching and ordering question support with stable JSON shapes
 - Tenant isolation, RBAC, entitlement checks, audit logging, and E2E coverage
 
-Not yet implemented:
-- Web teacher activity-builder screens
-- Web smart-board runtime
-- Web student lab/session attempt UI
-- Web parent learning summary UI
-- Mobile learning summary surfaces
-- Resource-library management endpoints
-- Matching/order question support
-- Adaptive learning, subject labs, heavy simulations, and AI tutor
+Explicitly deferred:
+- Full adaptive learning and recommendations
+- AI tutor or open chat
+- Heavy simulations and advanced subject labs
+- Public leaderboards or comparative ranking
+- Full Flutter smart-board/lab runtime
+- School-only network/location hardening beyond authenticated membership and expiring code/QR token
 ```
 
 Submodules:
@@ -101,7 +103,8 @@ apps/web/app/dashboard/learning/
 apps/web/app/classroom/board/
 apps/web/app/student/learning/
 apps/web/app/parent/learning/
-packages/core/src/learning/
+apps/schoolos_mobile/lib/features/learning/
+packages/core/src/permissions/
 ```
 
 Do not scatter learning logic into `students`, `academics`, `timetable`, or `communications`. Those modules provide data and rules; `learning` owns activity/session/attempt/progress logic.
@@ -472,7 +475,10 @@ GET    /learning/activities/:id
 PATCH  /learning/activities/:id
 DELETE /learning/activities/:id
 POST   /learning/activities/:id/sessions
+GET    /learning/sessions
 GET    /learning/sessions/:id
+POST   /learning/sessions/:id/heartbeat
+GET    /learning/sessions/:id/participants
 POST   /learning/sessions/:id/pause
 POST   /learning/sessions/:id/resume
 POST   /learning/sessions/:id/end
@@ -483,12 +489,20 @@ POST   /learning/attempts/:id/submit
 GET    /learning/progress/class/:classId
 GET    /learning/progress/student/:studentId
 GET    /parent/learning/summary
+GET    /learning/resources
+POST   /learning/resources
+GET    /learning/resources/:id
+PATCH  /learning/resources/:id
+DELETE /learning/resources/:id
+GET    /learning/activities/:id/resources
+POST   /learning/activities/:id/resources
 ```
 
 Implemented Prisma migration:
 
 ```text
 apps/api/prisma/migrations/20260612120000_m12_learning_layer_foundation/migration.sql
+apps/api/prisma/migrations/20260612143000_m12_learning_completion/migration.sql
 ```
 
 Implemented permission and entitlement surface:
@@ -513,13 +527,15 @@ learning:progress
 
 ```text
 M12-0 Design and schema readiness - complete for backend
-M12-1 Backend activity foundation - complete
-M12-2 Smart Board MVP - backend complete, web runtime pending
-M12-3 Computer Lab MVP - backend complete, web student/lab UI pending
-M12-4 Progress and parent summary - backend complete, web/mobile UI pending
-M12-5 Low-bandwidth hardening
-M12-6 Subject activity labs
-M12-7 Safe AI later
+M12-1 Backend activity/session/attempt/progress foundation - complete
+M12-2 Smart Board MVP backend and web runtime - complete
+M12-3 Computer Lab MVP backend and web student/lab UI - complete
+M12-4 Progress and parent/student summaries on web/mobile - complete
+M12-5 Resource library foundation and matching/order questions - complete
+M12-6 Staging fixture validation and seeded browser E2E depth - remaining
+M12-7 School-only network/device hardening - later explicit policy
+M12-8 Subject activity labs and advanced simulations - later
+M12-9 Safe AI later
 ```
 
 MVP includes:
@@ -535,7 +551,7 @@ Progress Recording
 Parent Summary foundation
 ```
 
-Not included in current backend MVP:
+Not included in current M12 production foundation:
 
 ```text
 AI tutor
@@ -560,15 +576,27 @@ learning-session-school-only.e2e-spec.ts
 learning-attempt-progress.e2e-spec.ts
 learning-parent-summary-scope.e2e-spec.ts
 learning-cross-tenant-denial.e2e-spec.ts
+learning-session-monitoring.e2e-spec.ts
+learning-resources.e2e-spec.ts
+learning-question-types.e2e-spec.ts
 ```
 
-Web E2E tests:
+Implemented web/mobile contract tests:
+
+```text
+apps/web/test/learning-contracts.test.mjs
+apps/schoolos_mobile/test/learning_summary_models_test.dart
+```
+
+Seeded browser E2E tests still recommended:
 
 ```text
 learning-activity-builder.spec.ts
 learning-smart-board.spec.ts
 learning-lab-session.spec.ts
 learning-parent-summary.spec.ts
+learning-session-monitor.spec.ts
+learning-resources.spec.ts
 ```
 
 Required cases:

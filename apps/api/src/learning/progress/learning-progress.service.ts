@@ -12,6 +12,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { LearningActivityPermissionsService } from '../activities/learning-activity-permissions.service';
 import { LEARNING_PROGRESS_LABELS } from '../learning.constants';
+import { LearningProgressQueryDto } from './dto/learning-progress-query.dto';
 
 @Injectable()
 export class LearningProgressService {
@@ -88,7 +89,11 @@ export class LearningProgressService {
     });
   }
 
-  async getClassProgress(actor: AuthContext, classId: string) {
+  async getClassProgress(
+    actor: AuthContext,
+    classId: string,
+    query: LearningProgressQueryDto = {},
+  ) {
     const classRecord = await this.prisma.class.findFirst({
       where: { id: classId, tenantId: actor.tenantId },
       select: { id: true, name: true },
@@ -112,7 +117,12 @@ export class LearningProgressService {
     }
 
     const students = await this.prisma.student.findMany({
-      where: { tenantId: actor.tenantId, classId, lifecycleStatus: 'ACTIVE' },
+      where: {
+        tenantId: actor.tenantId,
+        classId,
+        lifecycleStatus: 'ACTIVE',
+        ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+      },
       select: {
         id: true,
         firstNameEn: true,
@@ -128,6 +138,15 @@ export class LearningProgressService {
       where: {
         tenantId: actor.tenantId,
         studentId: { in: students.map((student) => student.id) },
+        ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+        ...(query.from || query.to
+          ? {
+              lastAttemptAt: {
+                ...(query.from ? { gte: new Date(query.from) } : {}),
+                ...(query.to ? { lte: new Date(query.to) } : {}),
+              },
+            }
+          : {}),
       },
       include: {
         subject: { select: { id: true, name: true, code: true } },
@@ -154,7 +173,11 @@ export class LearningProgressService {
     };
   }
 
-  async getStudentProgress(actor: AuthContext, studentId: string) {
+  async getStudentProgress(
+    actor: AuthContext,
+    studentId: string,
+    query: LearningProgressQueryDto = {},
+  ) {
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, tenantId: actor.tenantId },
       select: {
@@ -172,7 +195,19 @@ export class LearningProgressService {
     await this.assertCanReadStudent(actor, student);
 
     const progress = await this.prisma.learningProgress.findMany({
-      where: { tenantId: actor.tenantId, studentId },
+      where: {
+        tenantId: actor.tenantId,
+        studentId,
+        ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+        ...(query.from || query.to
+          ? {
+              lastAttemptAt: {
+                ...(query.from ? { gte: new Date(query.from) } : {}),
+                ...(query.to ? { lte: new Date(query.to) } : {}),
+              },
+            }
+          : {}),
+      },
       include: {
         subject: { select: { id: true, name: true, code: true } },
         activity: { select: { id: true, title: true, difficulty: true } },

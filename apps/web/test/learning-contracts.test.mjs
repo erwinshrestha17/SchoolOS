@@ -57,8 +57,11 @@ describe('M12 Learning frontend contracts', () => {
       'updateActivity',
       'archiveActivity',
       'launchSession',
+      'listSessions',
       'getSession',
       'pauseSession',
+      'heartbeatSession',
+      'listParticipants',
       'resumeSession',
       'endSession',
       'joinSession',
@@ -68,12 +71,24 @@ describe('M12 Learning frontend contracts', () => {
       'getClassProgress',
       'getStudentProgress',
       'getParentSummary',
+      'listResources',
+      'createResource',
+      'getResource',
+      'updateResource',
+      'archiveResource',
+      'listActivityResources',
+      'attachActivityResource',
     ]) {
       assert.match(client, new RegExp(`${helper}:`), `Missing ${helper}`);
     }
 
     for (const endpoint of [
       '/learning/activities',
+      '/learning/sessions',
+      '/heartbeat',
+      '/participants',
+      '/learning/resources',
+      '/resources',
       '/learning/sessions/join',
       '/learning/attempts/',
       '/learning/progress/class/',
@@ -84,6 +99,9 @@ describe('M12 Learning frontend contracts', () => {
     }
 
     assert.match(client, /LearningActivityStatus[\s\S]*'READY'/);
+    assert.match(client, /LearningQuestionType[\s\S]*'MATCHING'/);
+    assert.match(client, /LearningQuestionType[\s\S]*'ORDERING'/);
+    assert.match(client, /LearningResourceStatus[\s\S]*'ARCHIVED'/);
     assert.doesNotMatch(client, /PUBLISHED/);
     assert.match(barrel, /export \* from '\.\/learning'/);
   });
@@ -91,17 +109,14 @@ describe('M12 Learning frontend contracts', () => {
   it('uses real Learning APIs and production states in the workspaces', () => {
     const workspace = read('components/learning/learning-workspace.tsx');
     const runtime = read('components/learning/learning-runtime.tsx');
+    const sessions = read('components/learning/learning-sessions-panel.tsx');
+    const resources = read('components/learning/learning-resources-panel.tsx');
 
     for (const apiCall of [
       'learningApi.listActivities',
       'learningApi.createActivity',
       'learningApi.updateActivity',
       'learningApi.archiveActivity',
-      'learningApi.launchSession',
-      'learningApi.getSession',
-      'learningApi.pauseSession',
-      'learningApi.resumeSession',
-      'learningApi.endSession',
       'learningApi.getClassProgress',
       'learningApi.getStudentProgress',
     ]) {
@@ -114,15 +129,52 @@ describe('M12 Learning frontend contracts', () => {
       'learningApi.autosaveAttempt',
       'learningApi.submitAttempt',
       'learningApi.getParentSummary',
+      'learningApi.heartbeatSession',
     ]) {
       assert.match(runtime, new RegExp(apiCall.replace('.', '\\.')));
+    }
+
+    for (const apiCall of [
+      'learningApi.listSessions',
+      'learningApi.launchSession',
+      'learningApi.pauseSession',
+      'learningApi.resumeSession',
+      'learningApi.endSession',
+      'learningApi.heartbeatSession',
+      'learningApi.listParticipants',
+    ]) {
+      assert.match(sessions, new RegExp(apiCall.replace('.', '\\.')));
+    }
+
+    for (const apiCall of [
+      'learningApi.listActivityResources',
+      'learningApi.attachActivityResource',
+      'learningApi.archiveResource',
+    ]) {
+      assert.match(resources, new RegExp(apiCall.replace('.', '\\.')));
     }
 
     assert.match(workspace, /EmptyState/);
     assert.match(workspace, /LoadingState/);
     assert.match(runtime, /PermissionDenied/);
     assert.match(runtime, /module\.learning/);
+    assert.match(workspace, /MATCHING/);
+    assert.match(workspace, /ORDERING/);
+    assert.match(runtime, /Confirm submit/);
+    assert.match(runtime, /heartbeat/i);
     assert.doesNotMatch(workspace, /mockLearning|fakeLearning|placeholderData/);
     assert.doesNotMatch(runtime, /mockLearning|fakeLearning|placeholderData/);
+  });
+
+  it('keeps parent and student Learning views non-comparative and answer-safe', () => {
+    const runtime = read('components/learning/learning-runtime.tsx');
+    const sessions = read('components/learning/learning-sessions-panel.tsx');
+
+    assert.match(runtime, /Child/);
+    assert.match(runtime, /supportiveLabel/);
+    assert.match(runtime, /Recent completed activities/);
+    assert.doesNotMatch(runtime, /leaderboard|ranking|rank/i);
+    assert.doesNotMatch(runtime, /correctAnswer/);
+    assert.doesNotMatch(sessions, /learningApi\.listAnswers|correctAnswer/);
   });
 });

@@ -73,6 +73,7 @@ model User {
   approvedLearningActivities     LearningActivity[]               @relation("ApprovedLearningActivities")
   archivedLearningActivities     LearningActivity[]               @relation("ArchivedLearningActivities")
   createdLearningResources       LearningResource[]               @relation("CreatedLearningResources")
+  archivedLearningResources      LearningResource[]               @relation("ArchivedLearningResources")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])

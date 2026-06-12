@@ -792,6 +792,8 @@ export const LearningQuestionType = {
   MULTIPLE_CHOICE: 'MULTIPLE_CHOICE',
   TRUE_FALSE: 'TRUE_FALSE',
   SHORT_ANSWER: 'SHORT_ANSWER',
+  MATCHING: 'MATCHING',
+  ORDERING: 'ORDERING',
 } as const;
 
 export const LearningProgressLabel = {
@@ -805,4 +807,9 @@ export const LearningResourceType = {
   FILE: 'FILE',
   LINK: 'LINK',
   NOTE: 'NOTE',
+} as const;
+
+export const LearningResourceStatus = {
+  ACTIVE: 'ACTIVE',
+  ARCHIVED: 'ARCHIVED',
 } as const;

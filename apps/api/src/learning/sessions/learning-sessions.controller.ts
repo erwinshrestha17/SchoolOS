@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import type { AuthContext } from '../../auth/auth.types';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { Entitlement } from '../../auth/decorators/entitlement.decorator';
@@ -10,6 +18,7 @@ import { LEARNING_MODULE_ENTITLEMENT } from '../learning.constants';
 import { LEARNING_PERMISSIONS } from '../learning.permissions';
 import { CreateLearningSessionDto } from './dto/create-learning-session.dto';
 import { JoinLearningSessionDto } from './dto/join-learning-session.dto';
+import { ListLearningSessionsDto } from './dto/list-learning-sessions.dto';
 import { LearningSessionsService } from './learning-sessions.service';
 
 @Controller()
@@ -30,6 +39,15 @@ export class LearningSessionsController {
     return this.learningSessionsService.launchSession(activityId, dto, auth);
   }
 
+  @Get('learning/sessions')
+  @Permissions(LEARNING_PERMISSIONS.READ)
+  listSessions(
+    @Query() query: ListLearningSessionsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.learningSessionsService.listSessions(auth, query);
+  }
+
   @Get('learning/sessions/:id')
   @Permissions(LEARNING_PERMISSIONS.READ)
   getSession(@Param('id') sessionId: string, @CurrentAuth() auth: AuthContext) {
@@ -43,6 +61,24 @@ export class LearningSessionsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.learningSessionsService.pauseSession(auth, sessionId);
+  }
+
+  @Post('learning/sessions/:id/heartbeat')
+  @Permissions(LEARNING_PERMISSIONS.LAUNCH)
+  heartbeatSession(
+    @Param('id') sessionId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.learningSessionsService.heartbeatSession(auth, sessionId);
+  }
+
+  @Get('learning/sessions/:id/participants')
+  @Permissions(LEARNING_PERMISSIONS.READ)
+  listParticipants(
+    @Param('id') sessionId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.learningSessionsService.listParticipants(auth, sessionId);
   }
 
   @Post('learning/sessions/:id/resume')

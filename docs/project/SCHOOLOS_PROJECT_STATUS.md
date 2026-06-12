@@ -1,6 +1,6 @@
 # SchoolOS Project Status
 
-**Status:** 2026-06-12 implementation updates recorded: M12 Learning Layer backend MVP foundation implemented and verified, including activity/session/attempt/progress/parent-summary APIs, Prisma models/migration, learning permissions/entitlements, audit logging, and E2E coverage. Prior 2026-06-06 updates: suspended-tenant file/export denial, M0 mobile/queue entitlement hardening, M1/M5/M10 satellite-controller entitlement gating, platform `/platform/demo-requests` operator workspace, and Section 11 remaining-work inventory for M1–M10.
+**Status:** 2026-06-12 implementation updates recorded: M12 Learning Layer production foundation implemented and verified across backend, web runtime, and Flutter summaries, including activity/session/attempt/progress/parent-summary/resource APIs, session monitoring/heartbeat/participants, matching/order questions, Prisma migrations, learning permissions/entitlements, audit logging, web routes, mobile summaries, and E2E/contract/mobile coverage. Prior 2026-06-06 updates: suspended-tenant file/export denial, M0 mobile/queue entitlement hardening, M1/M5/M10 satellite-controller entitlement gating, platform `/platform/demo-requests` operator workspace, and Section 11 remaining-work inventory for M1–M10.
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard, Flutter companion app
 
@@ -55,7 +55,7 @@ M8B Transport: Admin/trip/location/report foundation plus Redis GPS/cache/pressu
 M8C Canteen: Admin/wallet/POS/inventory/vendor/report foundation plus receipt JSON/PDF, stock hardening, wallet guards, linked invoice handoff, parent mobile views, and canteen workspace UI polish
 M9 Accounting: Production-candidate / Pilot-Ready with PDFs, snapshots, audit trail, reconciliation suggestions, File Registry export support, and validated bank statement import DTO/service hardening
 M10 Notices / Communication / Chat: Strong foundation with provider modes, attachments, failure dashboard, moderation/escalation, unread-recipient follow-up, mobile notification/chat surfaces, and full communications/messaging sub-controller entitlement gating
-M12 Learning Layer: Backend MVP foundation implemented and verified under apps/api/src/learning with activity builder APIs, school-only sessions, lab attempts, autosave/submit, progress, parent child-scoped summary, Prisma models/migration, permissions, entitlement, audit logging, and focused E2E coverage
+M12 Learning Layer: Production foundation implemented and verified under apps/api/src/learning plus web Learning routes and Flutter summaries, with activity builder, school-only sessions, session monitoring/heartbeat/participants, lab attempts, autosave/submit, resources, matching/order questions, progress, parent child-scoped summary, student self-scoped summary, Prisma migrations, permissions, entitlement, audit logging, and focused E2E/contract/mobile coverage
 Public marketing/demo intake: Public POST API plus platform `/platform/demo-requests` operator workspace, internal notes, RBAC, audit logging, rate limiting, and tests (public form on 2026-06-04; platform UI on 2026-06-06)
 Settings / audit visibility: Settings audit-log access and UI depth added on 2026-06-04
 M11 School Intelligence / AI: Roadmap only
@@ -72,7 +72,7 @@ Multi-school production-ready: Not yet
 Full SchoolOS product complete: No
 ```
 
-**Remaining M1–M10 work:** Core modules are pilot-ready; enhancement depth, staging smoke, and mobile polish remain. M12 backend MVP is implemented; frontend/runtime and staging depth remain. See `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md`.
+**Remaining M1–M10 work:** Core modules are pilot-ready; enhancement depth, staging smoke, and mobile polish remain. M12 production foundation is implemented; staging fixture validation, seeded browser E2E depth, and future AI/adaptive/simulation scope remain. See `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md`.
 
 ---
 
@@ -106,25 +106,28 @@ Documentation
 
 ---
 
-## 2.2 2026-06-12 M12 Learning Layer Backend Update
+## 2.2 2026-06-12 M12 Learning Layer Completion Update
 
 ```text
 M12 Learning Layer
 - Dedicated backend domain added under apps/api/src/learning and registered once in AppModule.
 - Prisma schema/migration added for LearningActivity, LearningQuestion, LearningSession, LearningParticipant, LearningAttempt, LearningAnswer, LearningProgress, and LearningResource.
 - Learning permissions and module/feature entitlements added for admin/principal/teacher/subject_teacher/student/parent role defaults.
-- Implemented authenticated, tenant-scoped APIs for activities, sessions, attempts, progress, and parent learning summaries.
+- Implemented authenticated, tenant-scoped APIs for activities, sessions, attempts, progress, parent learning summaries, and resources.
+- Added session list, teacher heartbeat, participant monitor, resource CRUD/archive/attach, matching/order question types, and progress filters.
 - Teacher activity/session writes validate active staff, same tenant, class/section/subject scope, subject curriculum, and SubjectTeacherAssignment.
 - Student session access validates active same-tenant student, live/unexpired session, class/section match, school-only default, and valid session code or QR token hash.
-- Attempts support idempotent start/autosave/submit, basic answer evaluation, score/accuracy, audit logging, and progress update after valid final submission.
+- Attempts support idempotent start/autosave/submit, MCQ/true-false/short-answer/matching/ordering evaluation, score/accuracy, audit logging, and progress update after valid final submission.
 - Parent learning summary is linked-child scoped only and non-comparative; no raw private answers or leaderboards are exposed.
-- Verification: db:generate, db:validate, verify:openapi, API typecheck, API unit tests, API E2E, focused Learning E2E, root build, and web E2E passed. Sandboxed verify:production hit the known Playwright listen EPERM on ::1:3101 at the final web gate; elevated pnpm test:web:e2e passed.
+- Web Learning client/routes now cover teacher/admin workspace, activity builder, resources, session monitor, smart-board runtime, student lab runtime, progress, and parent summary.
+- Flutter mobile now includes parent/student Learning summary foundation only; no mobile smart-board or full lab runtime.
+- Verification: compile:artifacts, db:generate, db:validate, API typecheck, focused Learning E2E, API unit tests, full API E2E, web tests, web lint, web typecheck, web build, Flutter analyze/test, root typecheck, root lint, root build, and web E2E passed.
 
 Remaining M12 work
 - Apply the migration in staging and validate against real school fixtures.
-- Build web teacher activity builder, smart-board route, student lab attempt flow, progress dashboard, and parent summary screens.
-- Add browser E2E for those M12 frontend flows.
-- Defer resource-library endpoints, matching/order questions, advanced simulations, adaptive learning, and AI tutor.
+- Add seeded browser E2E for completed Learning flows.
+- Harden school-only network/device policy if the product owner wants location/device-level enforcement.
+- Defer advanced simulations, adaptive learning, AI tutor, open chat, and public leaderboard scope.
 ```
 
 ---

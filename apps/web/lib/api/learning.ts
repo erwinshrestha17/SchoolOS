@@ -21,12 +21,19 @@ export type LearningActivityStatus =
   | 'ARCHIVED';
 export type LearningSessionStatus = 'LIVE' | 'PAUSED' | 'ENDED' | 'EXPIRED';
 export type LearningAttemptStatus = 'IN_PROGRESS' | 'SUBMITTED';
-export type LearningQuestionType = 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER';
+export type LearningQuestionType =
+  | 'MULTIPLE_CHOICE'
+  | 'TRUE_FALSE'
+  | 'SHORT_ANSWER'
+  | 'MATCHING'
+  | 'ORDERING';
 export type LearningProgressLabel =
   | 'NEEDS_PRACTICE'
   | 'IMPROVING'
   | 'READY'
   | 'STRONG';
+export type LearningResourceType = 'FILE' | 'LINK' | 'NOTE';
+export type LearningResourceStatus = 'ACTIVE' | 'ARCHIVED';
 
 export type LearningLookup = {
   id: string;
@@ -50,6 +57,19 @@ export type LearningQuestion = {
   points?: number;
   sortOrder?: number;
   metadata?: unknown;
+};
+
+export type LearningMatchingOptions = {
+  pairs: Array<{
+    leftId: string;
+    leftText: string;
+    rightId: string;
+    rightText: string;
+  }>;
+};
+
+export type LearningOrderingOptions = {
+  items: Array<{ id: string; text: string }>;
 };
 
 export type LearningActivity = {
@@ -139,6 +159,10 @@ export type LearningSession = {
   activity: LearningActivity;
   participantCount?: number;
   attemptCount?: number;
+  submittedCount?: number;
+  class?: LearningLookup | null;
+  section?: LearningLookup | null;
+  subject?: LearningLookup | null;
 };
 
 export type LearningLaunchSessionResponse = LearningSession & {
@@ -150,6 +174,53 @@ export type LearningSessionPayload = {
   schoolOnly?: boolean;
   expiresInMinutes?: number;
   expiresAt?: string;
+};
+
+export type LearningSessionFilters = {
+  classId?: string | null;
+  sectionId?: string | null;
+  subjectId?: string | null;
+  teacherId?: string | null;
+  activityId?: string | null;
+  status?: LearningSessionStatus | null;
+  startedFrom?: string | null;
+  startedTo?: string | null;
+  page?: number;
+  limit?: number;
+};
+
+export type LearningSessionListResponse = {
+  items: LearningSession[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+export type LearningSessionParticipantsResponse = {
+  session: LearningSession;
+  items: Array<{
+    participant: {
+      id: string;
+      status: string;
+      joinedAt: string;
+      leftAt?: string | null;
+    };
+    student: {
+      id: string;
+      name: string;
+      classId: string;
+      sectionId?: string | null;
+    };
+    attempt: {
+      id: string;
+      status: LearningAttemptStatus;
+      attemptNumber: number;
+      submittedAt?: string | null;
+      accuracy?: number | null;
+      score?: number | null;
+      lastActivityAt?: string | null;
+    } | null;
+  }>;
 };
 
 export type LearningJoinSessionResponse = {
@@ -202,6 +273,13 @@ export type LearningProgressItem = {
   lastAttemptAt?: string | null;
 };
 
+export type LearningProgressFilters = {
+  sectionId?: string | null;
+  subjectId?: string | null;
+  from?: string | null;
+  to?: string | null;
+};
+
 export type LearningClassProgress = {
   class: LearningLookup;
   items: Array<{
@@ -252,6 +330,66 @@ export type ParentLearningSummary = {
   }>;
 };
 
+export type LearningResource = {
+  id: string;
+  activityId?: string | null;
+  subjectId?: string | null;
+  topicId?: string | null;
+  fileAssetId?: string | null;
+  type: LearningResourceType;
+  title: string;
+  url?: string | null;
+  metadata?: unknown;
+  status: LearningResourceStatus;
+  createdBy: string;
+  archivedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  activity?: Pick<LearningActivity, 'id' | 'title' | 'classId' | 'sectionId' | 'subjectId' | 'teacherId'> | null;
+  subject?: LearningLookup | null;
+  topic?: { id: string; title?: string | null } | null;
+  fileAsset?: {
+    id: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    module?: string | null;
+    entityId?: string | null;
+  } | null;
+};
+
+export type LearningResourceListResponse = {
+  items: LearningResource[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+export type LearningActivityResourcesResponse = {
+  items: LearningResource[];
+};
+
+export type LearningResourceFilters = {
+  activityId?: string | null;
+  subjectId?: string | null;
+  topicId?: string | null;
+  type?: LearningResourceType | null;
+  status?: LearningResourceStatus | null;
+  page?: number;
+  limit?: number;
+};
+
+export type LearningResourcePayload = {
+  activityId?: string;
+  subjectId?: string;
+  topicId?: string;
+  fileAssetId?: string;
+  type: LearningResourceType;
+  title: string;
+  url?: string;
+  metadata?: unknown;
+};
+
 export const learningApi = {
   listActivities: (params?: LearningActivityFilters) =>
     request<LearningActivityListResponse>(
@@ -287,6 +425,10 @@ export const learningApi = {
       `/learning/activities/${encodeURIComponent(activityId)}/sessions`,
       { method: 'POST', json: body as unknown as JsonBody },
     ),
+  listSessions: (params?: LearningSessionFilters) =>
+    request<LearningSessionListResponse>(
+      withQuery('/learning/sessions', params ?? {}),
+    ),
   getSession: (sessionId: string) =>
     request<LearningSession>(
       `/learning/sessions/${encodeURIComponent(sessionId)}`,
@@ -295,6 +437,15 @@ export const learningApi = {
     request<LearningSession>(
       `/learning/sessions/${encodeURIComponent(sessionId)}/pause`,
       { method: 'POST', json: {} },
+    ),
+  heartbeatSession: (sessionId: string) =>
+    request<LearningSession>(
+      `/learning/sessions/${encodeURIComponent(sessionId)}/heartbeat`,
+      { method: 'POST', json: {} },
+    ),
+  listParticipants: (sessionId: string) =>
+    request<LearningSessionParticipantsResponse>(
+      `/learning/sessions/${encodeURIComponent(sessionId)}/participants`,
     ),
   resumeSession: (sessionId: string) =>
     request<LearningSession>(
@@ -326,16 +477,54 @@ export const learningApi = {
       `/learning/attempts/${encodeURIComponent(attemptId)}/submit`,
       { method: 'POST', json: body as unknown as JsonBody },
     ),
-  getClassProgress: (classId: string) =>
+  getClassProgress: (classId: string, params?: LearningProgressFilters) =>
     request<LearningClassProgress>(
-      `/learning/progress/class/${encodeURIComponent(classId)}`,
+      withQuery(
+        `/learning/progress/class/${encodeURIComponent(classId)}`,
+        params ?? {},
+      ),
     ),
-  getStudentProgress: (studentId: string) =>
+  getStudentProgress: (studentId: string, params?: LearningProgressFilters) =>
     request<LearningStudentProgress>(
-      `/learning/progress/student/${encodeURIComponent(studentId)}`,
+      withQuery(
+        `/learning/progress/student/${encodeURIComponent(studentId)}`,
+        params ?? {},
+      ),
     ),
   getParentSummary: (params?: { studentId?: string | null }) =>
     request<ParentLearningSummary>(
       withQuery('/parent/learning/summary', params ?? {}),
+    ),
+  listResources: (params?: LearningResourceFilters) =>
+    request<LearningResourceListResponse>(
+      withQuery('/learning/resources', params ?? {}),
+    ),
+  createResource: (body: LearningResourcePayload) =>
+    request<LearningResource>('/learning/resources', {
+      method: 'POST',
+      json: body as unknown as JsonBody,
+    }),
+  getResource: (resourceId: string) =>
+    request<LearningResource>(
+      `/learning/resources/${encodeURIComponent(resourceId)}`,
+    ),
+  updateResource: (resourceId: string, body: Partial<LearningResourcePayload>) =>
+    request<LearningResource>(
+      `/learning/resources/${encodeURIComponent(resourceId)}`,
+      { method: 'PATCH', json: body as unknown as JsonBody },
+    ),
+  archiveResource: (resourceId: string) =>
+    request<LearningResource>(
+      `/learning/resources/${encodeURIComponent(resourceId)}`,
+      { method: 'DELETE' },
+    ),
+  listActivityResources: (activityId: string) =>
+    request<LearningActivityResourcesResponse>(
+      `/learning/activities/${encodeURIComponent(activityId)}/resources`,
+    ),
+  attachActivityResource: (activityId: string, body: LearningResourcePayload) =>
+    request<LearningResource>(
+      `/learning/activities/${encodeURIComponent(activityId)}/resources`,
+      { method: 'POST', json: body as unknown as JsonBody },
     ),
 };

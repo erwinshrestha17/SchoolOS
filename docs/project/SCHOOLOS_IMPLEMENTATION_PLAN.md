@@ -25,7 +25,7 @@
 * **M8C Canteen:** Admin/wallet/POS/inventory/vendor/report foundation plus receipt JSON/PDF, stock hardening, wallet guards, linked invoice handoff, parent mobile views, and canteen workspace polish.
 * **M9 Accounting:** Production-candidate / Pilot-Ready with PDFs, snapshots, audit trail, reconciliation suggestions, File Registry export support, and hardened bank statement import/reconciliation DTO validation.
 * **M10 Notices / Communication / Chat:** Strong foundation with provider modes, attachments, failure dashboard, moderation/escalation, unread-recipient follow-up, mobile notification/chat surfaces, and full communications/messaging sub-controller entitlement gating.
-* **M12 Learning Layer:** Backend MVP foundation implemented and verified under `apps/api/src/learning`: activity builder APIs, school-only sessions, QR/code join, lab attempts, autosave/submit, answer evaluation, progress recording, parent child-scoped summary, tenant isolation, RBAC, entitlement, audit logging, Prisma models/migration, and focused E2E coverage.
+* **M12 Learning Layer:** Production foundation implemented and verified under `apps/api/src/learning`, `apps/web` Learning routes, and `apps/schoolos_mobile/lib/features/learning`: activity builder, school-only sessions, session monitoring/heartbeat/participants, resource library, QR/code join, lab attempts, autosave/submit, MCQ/true-false/short-answer/matching/ordering evaluation, progress recording, parent child-scoped summary, student self-scoped mobile summary, tenant isolation, RBAC, entitlement, audit logging, Prisma migrations, and focused E2E/contract/mobile coverage.
 * **Public Demo Requests:** Public POST intake plus platform operator list/detail/status-follow-up APIs and `/platform/demo-requests` review workspace with RBAC, audit logging, pagination/filtering, internal notes, public rate limiting, and tests.
 * **Settings / Audit Visibility:** Settings audit-log access and UI depth added with access-control tests.
 * **M11 School Intelligence / AI:** Roadmap only.
@@ -83,11 +83,11 @@ This order is mandatory. Do not start a later phase until the previous phase's e
 * **Focus:** Secure storage, refresh token flow, role routing, error mapper, offline banner, network retry, push notifications.
 * **Rules:** Use purpose-limited APIs, do not reuse admin-shaped responses directly, add ownership tests before release, and keep parent/student/driver data fail-closed.
 
-### Phase 6 — M12 Learning Frontend and Runtime Completion
-* **Scope:** Teacher Learning dashboard, activity builder UI, smart-board route, student lab/session UI, parent learning summary UI, mobile summary surfaces, and resource-library UX.
-* **Current backend state:** M12 backend MVP is implemented and verified; do not re-scatter learning logic into academics/students/homework.
-* **Focus:** Wire frontend screens to the existing `/learning/*` and `/parent/learning/summary` APIs, preserve school-only defaults, avoid public leaderboards, keep parent/student data child/self-scoped, and add browser E2E for activity builder, board, lab, and parent summary flows.
-* **Exit criteria:** One teacher can create and launch an activity, one student can join and submit in a lab/session, progress records update, and a parent can view a non-comparative child summary from real APIs.
+### Phase 6 — M12 Learning Runtime Hardening
+* **Scope:** Staging smoke, seeded browser E2E depth, UX polish, protected file upload picker integration, and school-only policy hardening for the implemented Learning foundation.
+* **Current state:** M12 backend, web Learning workspace/runtime routes, parent/student web summary, and Flutter parent/student summary foundation are implemented and verified. Do not re-scatter learning logic into academics/students/homework.
+* **Focus:** Validate real school fixtures, add end-to-end browser scenarios for activity create/edit/archive, matching/order creation, resource attach/archive, session launch/list/control, participant monitor, board heartbeat, student join/autosave/submit, parent child-scoped summary, and permission/module-denied states.
+* **Exit criteria:** Staging proves one teacher can create/launch/monitor an activity, one student can join/autosave/submit, progress updates, and parent/student summaries remain non-comparative and child/self scoped.
 
 ### Phase 7 — M11 Intelligence / AI Readiness
 * **Scope:** Roadmap only.
@@ -391,30 +391,37 @@ Before adding or expanding visible features:
   - Push notifications, notification center polish, notice attachment preview.
   - Chat read receipts, quiet-hours banner, report/block/escalation flow.
 
-### M12 Learning Layer (Backend MVP Implemented)
-* **Current Status:** Backend MVP foundation implemented on 2026-06-12. Dedicated `LearningModule` is registered in the API and owns activities, questions, sessions, participants, attempts, answers, progress, resources, and parent summaries.
+### M12 Learning Layer (Production Foundation Implemented)
+* **Current Status:** M12 foundation implemented on 2026-06-12. Dedicated `LearningModule` is registered in the API and owns activities, questions, sessions, participants, attempts, answers, progress, resources, and parent summaries. Web and Flutter summary/runtime surfaces consume real APIs.
 * **Implemented Backend/API:**
   - Activity CRUD/archive with Easy / Medium / Hard difficulty, activity modes, language modes, question attachment, pagination/filtering, and teacher assignment validation.
-  - School-only session launch/control with generated session codes, QR token hashes, pause/resume/end, expiry handling, and safe student session payloads.
-  - Attempt start/autosave/submit with idempotent writes, MCQ/true-false/normalized short-answer evaluation, score/accuracy calculation, and progress updates only after final submission.
-  - Class/student progress APIs and parent child-scoped non-comparative learning summary.
+  - School-only session launch/list/detail/control with generated session codes, QR token hashes, pause/resume/end, heartbeat, participant monitor, expiry fail-closed behavior, and safe student/teacher payloads.
+  - Attempt start/autosave/submit with idempotent writes, MCQ/true-false/normalized short-answer/matching/ordering evaluation, score/accuracy calculation, and progress updates only after final submission.
+  - Class/student progress APIs with section/subject/date filters and parent child-scoped non-comparative learning summary.
+  - Resource library CRUD/archive/list/attach endpoints with FileAsset-backed private-file references and audit logging.
   - `module.learning`, `feature.learning.basic`, `feature.learning.full`, learning permission catalog, role defaults, audit logs, and tenant-scoped Prisma queries.
-* **Database:** `LearningActivity`, `LearningQuestion`, `LearningSession`, `LearningParticipant`, `LearningAttempt`, `LearningAnswer`, `LearningProgress`, and `LearningResource` models plus migration `20260612120000_m12_learning_layer_foundation`.
+* **Implemented Web/Mobile:**
+  - Typed web API client for activities, sessions, attempts, progress, parent summary, resources, heartbeat, participants, and matching/order payloads.
+  - Teacher/admin Learning workspace with activity builder, question editor, resource panel, session list/control/monitor, board/lab launch links, and progress views.
+  - Smart-board runtime with question navigation, status/expiry banner, and heartbeat integration.
+  - Student lab runtime with join, idempotent start/resume, autosave status, submit confirmation, unanswered warning, and safe submitted summary.
+  - Parent web summary with child switcher and supportive labels only.
+  - Flutter parent/student Learning summary foundation with child/self-scoped API calls.
+* **Database:** `LearningActivity`, `LearningQuestion`, `LearningSession`, `LearningParticipant`, `LearningAttempt`, `LearningAnswer`, `LearningProgress`, and `LearningResource` models plus migrations `20260612120000_m12_learning_layer_foundation` and `20260612143000_m12_learning_completion`.
 * **Staging / Verification Remaining:**
-  - Apply migration in staging and verify with real school fixtures.
-  - Browser E2E once frontend screens exist.
+  - Apply migrations in staging and verify with real school fixtures.
+  - Add seeded browser E2E for the completed Learning frontend flows.
   - School-only network/device policy hardening beyond authenticated membership and expiring code/QR token.
 * **Backend Backlog:**
-  - Dedicated resource-library endpoints if product needs resource management outside activity payloads.
-  - Matching/order question types only after a stable answer shape is approved.
   - Optional scheduled-session lifecycle/expiry job if sessions need background expiration beyond fail-closed reads.
+  - Protected file upload picker workflow for Learning resources if teachers need file registration from the Learning UI.
+  - Future resource recommendation/library search depth after pilot usage.
 * **Web Frontend Backlog:**
-  - Teacher activity builder and activities list/detail.
-  - Smart-board launch/control route and student-safe board payload rendering.
-  - Computer-lab join/session/attempt UI.
-  - Progress dashboard and parent learning summary route.
+  - Browser E2E coverage for activity builder, board, lab, resources, participant monitor, and parent summary.
+  - Selector UX polish for large class/subject/student datasets.
+  - More polished protected file-picker integration for resources.
 * **Mobile Frontend Backlog:**
-  - Parent/student summary views only; do not build full lab or smart-board runtime first.
+  - Continue parent/student summary polish only; do not build full lab or smart-board runtime first.
 
 ### M11 School Intelligence & AI (Roadmap Only - 0%)
 * **Current Status:** No active implementation.

@@ -19,6 +19,7 @@ class AppRoutes {
   static const parentTimetable = '/parent/timetable';
   static const parentReportCards = '/parent/report-cards';
   static const parentActivity = '/parent/activity';
+  static const parentLearning = '/parent/learning';
   static const parentTransport = '/parent/transport';
   static const parentCanteen = '/parent/canteen';
   static const parentChat = '/parent/chat';
@@ -27,6 +28,7 @@ class AppRoutes {
   static const studentAttendance = '/student/attendance';
   static const studentHomework = '/student/homework';
   static const studentTimetable = '/student/timetable';
+  static const studentLearning = '/student/learning';
   static const teacherHome = '/teacher/home';
   static const teacherClasses = '/teacher/classes';
   static const teacherAttendance = '/teacher/attendance';

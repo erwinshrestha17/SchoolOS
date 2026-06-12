@@ -16,9 +16,9 @@ This document is the active PRD for SchoolOS. It keeps the existing pilot-harden
 Important distinction:
 
 ```text
-Current implemented core = pilot-ready school management foundation plus M12 backend MVP foundation
+Current implemented core = pilot-ready school management foundation plus M12 production foundation
 KG-12 SchoolOS = staged product direction
-M12 Learning Layer = backend MVP implemented and verified; frontend/runtime depth remains staged
+M12 Learning Layer = backend, web runtime, parent/student web summary, and Flutter summary foundation implemented and verified; AI/adaptive/simulation depth remains staged
 ```
 
 Implementation claims must still be validated against real pilot-school workflows, official reporting templates, provider sandbox/staging flows, production security review, and the verification commands in the implementation plan.
@@ -245,7 +245,7 @@ Stage F: Grade 11-12
 
 ## 8. M12 Learning Layer Summary
 
-M12 Learning Layer now has a verified backend MVP foundation. The product vertical is not complete until teacher/student/parent frontend workflows, staging fixtures, and browser E2E are implemented and verified.
+M12 Learning Layer now has a verified production foundation across backend, web runtime, and Flutter parent/student summaries. The product vertical still needs staging fixtures, seeded browser E2E depth, school-only policy hardening, and later advanced learning phases before it is considered complete.
 
 M12 must include:
 
@@ -262,18 +262,21 @@ Adaptive Recommendations later
 Safe AI Assistant later
 ```
 
-Backend MVP implemented on 2026-06-12:
+Implemented on 2026-06-12:
 
 ```text
-Teacher Activity Builder APIs
+Teacher Activity Builder APIs and web workspace
 Easy / Medium / Hard difficulty
-Smart Board and Computer Lab session backend
+Smart Board and Computer Lab session backend plus web runtime routes
 School-Only Learning Sessions
-Practice & Quiz Engine for MCQ, true/false, and normalized short answer
+Session list, heartbeat, and participant monitor
+Practice & Quiz Engine for MCQ, true/false, normalized short answer, matching, and ordering
 Attempt autosave and idempotent submission
 Progress & Mastery Tracking foundation
-Parent Learning Summary foundation
-Tenant isolation, RBAC, entitlement, audit logs, and E2E coverage
+Parent Learning Summary foundation on web and mobile
+Student self-scoped mobile learning summary
+Learning Resource Library endpoints and activity resource panel
+Tenant isolation, RBAC, entitlement, audit logs, E2E, web contract, and mobile test coverage
 ```
 
 M12 must reuse:

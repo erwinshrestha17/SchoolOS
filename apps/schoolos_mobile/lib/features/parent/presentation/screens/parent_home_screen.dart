@@ -102,6 +102,16 @@ class ParentHomeScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DashboardCard(
+                  title: 'Learning progress',
+                  value: 'School activities',
+                  icon: Icons.school_rounded,
+                  iconColor: AppColors.studentAccent,
+                  subtitle:
+                      'Child-scoped learning summary with supportive labels.',
+                  onTap: () => context.go(AppRoutes.parentLearning),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DashboardCard(
                   title: 'Transport status',
                   value: state.dashboard!.transportStatus,
                   icon: Icons.directions_bus_rounded,

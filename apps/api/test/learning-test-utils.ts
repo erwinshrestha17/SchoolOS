@@ -17,6 +17,7 @@ import { LearningAnswerEvaluatorService } from '../src/learning/attempts/learnin
 import { LearningAttemptsService } from '../src/learning/attempts/learning-attempts.service';
 import { ParentLearningSummaryService } from '../src/learning/parent-summary/parent-learning-summary.service';
 import { LearningProgressService } from '../src/learning/progress/learning-progress.service';
+import { LearningResourcesService } from '../src/learning/resources/learning-resources.service';
 import { LearningSessionAccessService } from '../src/learning/sessions/learning-session-access.service';
 import { LearningSessionsService } from '../src/learning/sessions/learning-sessions.service';
 import {
@@ -47,6 +48,11 @@ export function createLearningHarness() {
       prisma as any,
       permissions,
       access,
+      auditService as any,
+    ),
+    resources: new LearningResourcesService(
+      prisma as any,
+      permissions,
       auditService as any,
     ),
     attempts: new LearningAttemptsService(

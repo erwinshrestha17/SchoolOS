@@ -855,6 +855,8 @@ enum LearningQuestionType {
   MULTIPLE_CHOICE
   TRUE_FALSE
   SHORT_ANSWER
+  MATCHING
+  ORDERING
 }
 
 enum LearningProgressLabel {
@@ -868,6 +870,11 @@ enum LearningResourceType {
   FILE
   LINK
   NOTE
+}
+
+enum LearningResourceStatus {
+  ACTIVE
+  ARCHIVED
 }
 
 
@@ -1781,6 +1788,7 @@ model User {
   approvedLearningActivities     LearningActivity[]               @relation("ApprovedLearningActivities")
   archivedLearningActivities     LearningActivity[]               @relation("ArchivedLearningActivities")
   createdLearningResources       LearningResource[]               @relation("CreatedLearningResources")
+  archivedLearningResources      LearningResource[]               @relation("ArchivedLearningResources")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -3417,7 +3425,10 @@ model LearningResource {
   title       String
   url         String?
   metadata    Json?
+  status      LearningResourceStatus @default(ACTIVE)
   createdBy   String
+  archivedAt  DateTime?
+  archivedBy  String?
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
 
@@ -3427,8 +3438,10 @@ model LearningResource {
   topic     SyllabusTopic?    @relation(fields: [topicId], references: [id], onDelete: SetNull)
   fileAsset FileAsset?        @relation(fields: [fileAssetId], references: [id], onDelete: SetNull)
   creator   User              @relation("CreatedLearningResources", fields: [createdBy], references: [id], onDelete: Restrict)
+  archiver  User?             @relation("ArchivedLearningResources", fields: [archivedBy], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
+  @@index([tenantId, status])
   @@index([tenantId, activityId])
   @@index([tenantId, subjectId])
   @@index([tenantId, topicId])

@@ -839,6 +839,8 @@ enum LearningQuestionType {
   MULTIPLE_CHOICE
   TRUE_FALSE
   SHORT_ANSWER
+  MATCHING
+  ORDERING
 }
 
 enum LearningProgressLabel {
@@ -852,4 +854,9 @@ enum LearningResourceType {
   FILE
   LINK
   NOTE
+}
+
+enum LearningResourceStatus {
+  ACTIVE
+  ARCHIVED
 }

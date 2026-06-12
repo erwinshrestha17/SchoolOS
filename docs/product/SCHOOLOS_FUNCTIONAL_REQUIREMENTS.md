@@ -4,7 +4,7 @@
 **Market:** Nepal-focused school operating SaaS  
 **Target schools:** Kindergarten / Montessori to Grade 12 as the long-term product direction; current implementation remains staged around controlled pilot readiness for existing core modules  
 **Document type:** Functional Requirements Specification  
-**Status:** Active FRS aligned with KG-12 product direction and M12 Learning Layer backend MVP implementation
+**Status:** Active FRS aligned with KG-12 product direction and M12 Learning Layer production foundation implementation
 **Last updated:** 2026-06-12
 
 ---
@@ -20,7 +20,7 @@ Important distinction:
 ```text
 Current core = implemented/pilot-ready management modules with remaining hardening
 KG-12 expansion = staged product direction
-M12 Learning Layer = backend MVP implemented and verified; frontend/runtime depth remains staged
+M12 Learning Layer = backend, web runtime, parent/student web summary, and Flutter summary foundation implemented and verified; AI/adaptive/simulation depth remains staged
 ```
 
 ---
@@ -290,7 +290,7 @@ Manage academic structure, subjects, exams, assessment components, CAS, report c
 
 Provide teacher-led, school-controlled learning workflows through smart-board activities, computer-lab practice, progress tracking, and parent learning summaries.
 
-Implementation note: the backend MVP for this section is implemented under `apps/api/src/learning`; web/mobile screens and advanced learning depth remain staged.
+Implementation note: the production foundation for this section is implemented under `apps/api/src/learning`, `apps/web` Learning routes, and `apps/schoolos_mobile/lib/features/learning`; advanced learning depth remains staged.
 
 ### 8.2 Primary actors
 
@@ -310,13 +310,13 @@ Implementation note: the backend MVP for this section is implemented under `apps
 5. Save activity as draft.
 6. Publish/schedule activity.
 7. Launch smart-board session.
-8. Pause/resume/end smart-board session.
+8. List, monitor, heartbeat, pause/resume/end smart-board session.
 9. Start computer-lab session.
 10. Generate session code/QR.
 11. Allow student to join valid school-only session.
 12. Autosave student attempt.
 13. Submit student attempt.
-14. Evaluate answers backend-side.
+14. Evaluate answers backend-side, including MCQ, true/false, short answer, matching, and ordering.
 15. Update learning progress.
 16. Show teacher class/topic progress.
 17. Show parent child-only learning summary.
@@ -354,7 +354,9 @@ Implementation note: the backend MVP for this section is implemented under `apps
 5. Parent cannot view another child summary.
 6. Progress updates only after valid submission.
 7. Tenant isolation tests pass for activity, session, attempt, and progress records.
-8. Backend M12 E2E coverage passes for teacher assignment denial, inactive/expired/wrong-class session denial, cross-tenant denial, parent child-scope denial, autosave/submit idempotency, and progress-after-submit behavior.
+8. Backend M12 E2E coverage passes for teacher assignment denial, inactive/expired/wrong-class session denial, session monitoring, resource handling, matching/order evaluation, cross-tenant denial, parent child-scope denial, autosave/submit idempotency, and progress-after-submit behavior.
+9. Web contract coverage passes for Learning API helpers, routes, runtime safety, and no fake data.
+10. Flutter tests pass for parent/student Learning summary parsing and supportive labels.
 
 ---
 

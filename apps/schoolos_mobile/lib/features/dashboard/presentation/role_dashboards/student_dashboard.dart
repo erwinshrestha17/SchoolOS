@@ -226,6 +226,12 @@ class _StudentDashboardContent extends StatelessWidget {
                 color: AppColors.info,
                 onTap: () => context.go(AppRoutes.studentTimetable),
               ),
+              QuickActionCard(
+                title: 'Learning',
+                icon: Icons.school_rounded,
+                color: AppColors.success,
+                onTap: () => context.go(AppRoutes.studentLearning),
+              ),
             ],
           ),
         ],

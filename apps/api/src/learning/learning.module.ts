@@ -11,6 +11,8 @@ import { ParentLearningSummaryController } from './parent-summary/parent-learnin
 import { ParentLearningSummaryService } from './parent-summary/parent-learning-summary.service';
 import { LearningProgressController } from './progress/learning-progress.controller';
 import { LearningProgressService } from './progress/learning-progress.service';
+import { LearningResourcesController } from './resources/learning-resources.controller';
+import { LearningResourcesService } from './resources/learning-resources.service';
 import { LearningSessionAccessService } from './sessions/learning-session-access.service';
 import { LearningSessionsController } from './sessions/learning-sessions.controller';
 import { LearningSessionsService } from './sessions/learning-sessions.service';
@@ -23,6 +25,7 @@ import { LearningSessionsService } from './sessions/learning-sessions.service';
     LearningAttemptsController,
     LearningProgressController,
     ParentLearningSummaryController,
+    LearningResourcesController,
   ],
   providers: [
     LearningActivitiesService,
@@ -33,6 +36,7 @@ import { LearningSessionsService } from './sessions/learning-sessions.service';
     LearningAnswerEvaluatorService,
     LearningProgressService,
     ParentLearningSummaryService,
+    LearningResourcesService,
   ],
   exports: [
     LearningActivitiesService,
@@ -40,6 +44,7 @@ import { LearningSessionsService } from './sessions/learning-sessions.service';
     LearningAttemptsService,
     LearningProgressService,
     ParentLearningSummaryService,
+    LearningResourcesService,
   ],
 })
 export class LearningModule {}

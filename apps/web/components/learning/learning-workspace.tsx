@@ -7,15 +7,10 @@ import {
   Archive,
   BookOpenCheck,
   ClipboardCheck,
-  Copy,
   GraduationCap,
   MonitorPlay,
-  Pause,
-  Play,
   Plus,
-  RotateCcw,
   Save,
-  Send,
   Users,
 } from 'lucide-react';
 import { learningApi } from '../../lib/api/learning';
@@ -29,14 +24,15 @@ import type {
   LearningMode,
   LearningQuestion,
   LearningQuestionType,
-  LearningSession,
 } from '../../lib/api/learning';
 import { api } from '../../lib/api';
 import { cn } from '../../lib/utils';
 import { EmptyState } from '../ui/empty-state';
 import { LoadingState } from '../ui/loading-state';
 import { StatCard } from '../ui/stat-card';
-import { StatusBadge, type StatusTone } from '../ui/status-badge';
+import { StatusBadge } from '../ui/status-badge';
+import { LearningResourcesPanel } from './learning-resources-panel';
+import { LearningSessionsPanel } from './learning-sessions-panel';
 
 type LearningTab =
   | 'overview'
@@ -73,6 +69,8 @@ const questionTypes: LearningQuestionType[] = [
   'MULTIPLE_CHOICE',
   'TRUE_FALSE',
   'SHORT_ANSWER',
+  'MATCHING',
+  'ORDERING',
 ];
 
 const emptyQuestion: LearningQuestion = {
@@ -123,12 +121,6 @@ export function LearningWorkspace({
     activityId ?? null,
   );
   const [notice, setNotice] = useState<string | null>(null);
-  const [sessionActivityId, setSessionActivityId] = useState<string>('');
-  const [sessionLookupId, setSessionLookupId] = useState<string>('');
-  const [selectedSessionId, setSelectedSessionId] = useState<string>('');
-  const [launchedSession, setLaunchedSession] =
-    useState<(LearningSession & { qrToken?: string }) | null>(null);
-  const [expiresInMinutes, setExpiresInMinutes] = useState(45);
   const [progressClassId, setProgressClassId] = useState('');
   const [progressStudentId, setProgressStudentId] = useState('');
 
@@ -152,10 +144,9 @@ export function LearningWorkspace({
     queryFn: () => learningApi.getActivity(editingActivityId as string),
     enabled: Boolean(editingActivityId),
   });
-  const sessionQuery = useQuery({
-    queryKey: ['learning-session', selectedSessionId],
-    queryFn: () => learningApi.getSession(selectedSessionId),
-    enabled: Boolean(selectedSessionId),
+  const liveSessionsQuery = useQuery({
+    queryKey: ['learning-sessions-live-count'],
+    queryFn: () => learningApi.listSessions({ status: 'LIVE', limit: 1 }),
   });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
@@ -180,13 +171,12 @@ export function LearningWorkspace({
   });
 
   const activities = activitiesQuery.data?.items ?? [];
-  const selectedSession = launchedSession ?? sessionQuery.data ?? null;
   const students = studentsQuery.data?.items ?? [];
 
   const readyCount = activities.filter(
     (activity) => activity.status === 'READY',
   ).length;
-  const liveSessionCount = selectedSession?.status === 'LIVE' ? 1 : 0;
+  const liveSessionCount = liveSessionsQuery.data?.total ?? 0;
   const questionCount = activities.reduce(
     (sum, activity) => sum + (activity._count?.questions ?? activity.questions?.length ?? 0),
     0,
@@ -217,38 +207,6 @@ export function LearningWorkspace({
       void queryClient.invalidateQueries({ queryKey: ['learning-activities'] });
     },
   });
-  const launchSessionMutation = useMutation({
-    mutationFn: (input: { activityId: string; expiresInMinutes: number }) =>
-      learningApi.launchSession(input.activityId, {
-        expiresInMinutes: input.expiresInMinutes,
-        schoolOnly: true,
-      }),
-    onSuccess: (session) => {
-      setLaunchedSession(session);
-      setSelectedSessionId(session.id);
-      setNotice('Learning session launched.');
-    },
-  });
-  const pauseSessionMutation = useMutation({
-    mutationFn: learningApi.pauseSession,
-    onSuccess: (session) => updateSelectedSession(session, 'Session paused.'),
-  });
-  const resumeSessionMutation = useMutation({
-    mutationFn: learningApi.resumeSession,
-    onSuccess: (session) => updateSelectedSession(session, 'Session resumed.'),
-  });
-  const endSessionMutation = useMutation({
-    mutationFn: learningApi.endSession,
-    onSuccess: (session) => updateSelectedSession(session, 'Session ended.'),
-  });
-
-  function updateSelectedSession(session: LearningSession, message: string) {
-    setLaunchedSession(session);
-    setSelectedSessionId(session.id);
-    setNotice(message);
-    void queryClient.invalidateQueries({ queryKey: ['learning-session', session.id] });
-  }
-
   function selectActivity(activity: LearningActivity) {
     setEditingActivityId(activity.id);
     setForm(activityToForm(activity));
@@ -295,12 +253,6 @@ export function LearningWorkspace({
         { ...emptyQuestion, sortOrder: current.questions?.length ?? 0 },
       ],
     }));
-  }
-
-  function copySessionText(value: string) {
-    if (!navigator.clipboard) return;
-    void navigator.clipboard.writeText(value);
-    setNotice('Copied to clipboard.');
   }
 
   const currentActivity = activityDetailQuery.data;
@@ -377,10 +329,7 @@ export function LearningWorkspace({
             isLoading={activitiesQuery.isLoading}
             onSelect={selectActivity}
             onArchive={(id) => archiveActivityMutation.mutate(id)}
-            onLaunch={(id) => {
-              setSessionActivityId(id);
-              setActiveTab('sessions');
-            }}
+            onLaunch={() => setActiveTab('sessions')}
           />
         </section>
       )}
@@ -444,10 +393,7 @@ export function LearningWorkspace({
             isLoading={activitiesQuery.isLoading}
             onSelect={selectActivity}
             onArchive={(id) => archiveActivityMutation.mutate(id)}
-            onLaunch={(id) => {
-              setSessionActivityId(id);
-              setActiveTab('sessions');
-            }}
+            onLaunch={() => setActiveTab('sessions')}
           />
         </section>
       )}
@@ -628,6 +574,10 @@ export function LearningWorkspace({
                 </div>
               </div>
 
+              {currentActivity && (
+                <LearningResourcesPanel activityId={currentActivity.id} />
+              )}
+
               <div className="flex flex-wrap gap-3">
                 <button
                   type="submit"
@@ -642,10 +592,7 @@ export function LearningWorkspace({
                 {currentActivity && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setSessionActivityId(currentActivity.id);
-                      setActiveTab('sessions');
-                    }}
+                    onClick={() => setActiveTab('sessions')}
                     className="inline-flex h-11 items-center gap-2 rounded-xl border border-emerald-100 bg-white px-5 text-sm font-black text-emerald-800 hover:bg-emerald-50"
                   >
                     <MonitorPlay size={17} />
@@ -659,40 +606,15 @@ export function LearningWorkspace({
       )}
 
       {activeTab === 'sessions' && (
-        <SessionPanel
-          activities={activities}
-          sessionActivityId={sessionActivityId}
-          onSessionActivityChange={setSessionActivityId}
-          expiresInMinutes={expiresInMinutes}
-          onExpiresInMinutesChange={setExpiresInMinutes}
-          selectedSession={selectedSession}
-          sessionLookupId={sessionLookupId}
-          onSessionLookupIdChange={setSessionLookupId}
-          onLookup={() => {
-            setLaunchedSession(null);
-            setSelectedSessionId(sessionLookupId.trim());
-          }}
-          onLaunch={() =>
-            sessionActivityId &&
-            launchSessionMutation.mutate({
-              activityId: sessionActivityId,
-              expiresInMinutes,
-            })
-          }
-          onPause={(id) => pauseSessionMutation.mutate(id)}
-          onResume={(id) => resumeSessionMutation.mutate(id)}
-          onEnd={(id) => endSessionMutation.mutate(id)}
-          onCopy={copySessionText}
-          isLoading={sessionQuery.isLoading || launchSessionMutation.isPending}
-        />
+        <LearningSessionsPanel activities={activities} />
       )}
 
       {activeTab === 'board' && (
-        <BoardLaunchPanel selectedSession={selectedSession} />
+        <BoardLaunchPanel />
       )}
 
       {activeTab === 'lab' && (
-        <LabPanel selectedSession={selectedSession} />
+        <LabPanel />
       )}
 
       {activeTab === 'progress' && (
@@ -722,8 +644,6 @@ export function LearningWorkspace({
         createActivityMutation.error ||
         updateActivityMutation.error ||
         archiveActivityMutation.error ||
-        launchSessionMutation.error ||
-        sessionQuery.error ||
         classProgressQuery.error ||
         studentProgressQuery.error) && (
         <ErrorNotice
@@ -732,8 +652,6 @@ export function LearningWorkspace({
             createActivityMutation.error ??
             updateActivityMutation.error ??
             archiveActivityMutation.error ??
-            launchSessionMutation.error ??
-            sessionQuery.error ??
             classProgressQuery.error ??
             studentProgressQuery.error
           }
@@ -826,213 +744,27 @@ function ActivityList({
   );
 }
 
-function SessionPanel(props: {
-  activities: LearningActivity[];
-  sessionActivityId: string;
-  onSessionActivityChange: (value: string) => void;
-  expiresInMinutes: number;
-  onExpiresInMinutesChange: (value: number) => void;
-  selectedSession: (LearningSession & { qrToken?: string }) | null;
-  sessionLookupId: string;
-  onSessionLookupIdChange: (value: string) => void;
-  onLookup: () => void;
-  onLaunch: () => void;
-  onPause: (id: string) => void;
-  onResume: (id: string) => void;
-  onEnd: (id: string) => void;
-  onCopy: (value: string) => void;
-  isLoading: boolean;
-}) {
-  return (
-    <section className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-      <div className="shell-card space-y-4 p-5">
-        <h2 className="text-lg font-black text-slate-950">Launch Session</h2>
-        <SelectField
-          label="Activity"
-          value={props.sessionActivityId}
-          onChange={props.onSessionActivityChange}
-          options={props.activities.map((activity) => ({
-            value: activity.id,
-            label: activity.title,
-          }))}
-        />
-        <InputField
-          label="Expires in minutes"
-          type="number"
-          value={String(props.expiresInMinutes)}
-          onChange={(value) => props.onExpiresInMinutesChange(Number(value || 45))}
-        />
-        <button
-          type="button"
-          disabled={!props.sessionActivityId || props.isLoading}
-          onClick={props.onLaunch}
-          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 text-sm font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <Play size={17} />
-          Launch school-only session
-        </button>
-        <div className="border-t border-slate-100 pt-4">
-          <InputField
-            label="Open session by ID"
-            value={props.sessionLookupId}
-            onChange={props.onSessionLookupIdChange}
-          />
-          <button
-            type="button"
-            onClick={props.onLookup}
-            disabled={!props.sessionLookupId.trim()}
-            className="mt-3 inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <RotateCcw size={16} />
-            Load session
-          </button>
-        </div>
-      </div>
-
-      <div className="shell-card p-5">
-        <h2 className="text-lg font-black text-slate-950">Session Controls</h2>
-        {props.isLoading ? (
-          <LoadingState label="Loading session" />
-        ) : !props.selectedSession ? (
-          <EmptyState
-            icon={<MonitorPlay size={28} />}
-            title="No active session selected"
-            description="Launch a session or load one by ID to manage board and lab access."
-            className="mt-4"
-          />
-        ) : (
-          <div className="mt-4 space-y-4">
-            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-                    {props.selectedSession.activity?.title ?? 'Learning session'}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <StatusBadge status={props.selectedSession.status} />
-                    <StatusBadge
-                      status={props.selectedSession.schoolOnly ? 'SCHOOL_ONLY' : 'RESTRICTED'}
-                      label={props.selectedSession.schoolOnly ? 'School only' : 'Restricted'}
-                      tone={props.selectedSession.schoolOnly ? 'approved' : 'conflict'}
-                    />
-                  </div>
-                </div>
-                <p className="text-sm font-bold text-slate-500">
-                  Expires {formatDateTime(props.selectedSession.expiresAt)}
-                </p>
-              </div>
-              {props.selectedSession.sessionCode && (
-                <div className="mt-4 rounded-xl border border-white bg-white p-4">
-                  <p className="text-xs font-black uppercase tracking-wide text-slate-400">
-                    Session code
-                  </p>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <p className="text-3xl font-black tracking-widest text-slate-950">
-                      {props.selectedSession.sessionCode}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => props.onCopy(props.selectedSession?.sessionCode ?? '')}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50"
-                    >
-                      <Copy size={17} />
-                    </button>
-                  </div>
-                </div>
-              )}
-              {props.selectedSession.qrToken && (
-                <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50 p-4">
-                  <p className="text-xs font-black uppercase tracking-wide text-amber-800">
-                    QR token shown once
-                  </p>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <code className="min-w-0 break-all text-xs font-bold text-amber-950">
-                      {props.selectedSession.qrToken}
-                    </code>
-                    <button
-                      type="button"
-                      onClick={() => props.onCopy(props.selectedSession?.qrToken ?? '')}
-                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-white text-amber-900 hover:bg-amber-100"
-                    >
-                      <Copy size={17} />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => props.onPause(props.selectedSession!.id)}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
-              >
-                <Pause size={16} />
-                Pause
-              </button>
-              <button
-                type="button"
-                onClick={() => props.onResume(props.selectedSession!.id)}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 text-sm font-bold text-emerald-800 hover:bg-emerald-100"
-              >
-                <Play size={16} />
-                Resume
-              </button>
-              <button
-                type="button"
-                onClick={() => props.onEnd(props.selectedSession!.id)}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-4 text-sm font-bold text-rose-700 hover:bg-rose-100"
-              >
-                <Archive size={16} />
-                End
-              </button>
-              <Link
-                href={`/classroom/board/session/${props.selectedSession.id}`}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white hover:bg-slate-800"
-              >
-                <MonitorPlay size={16} />
-                Board view
-              </Link>
-            </div>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function BoardLaunchPanel({
-  selectedSession,
-}: {
-  selectedSession: LearningSession | null;
-}) {
+function BoardLaunchPanel() {
   return (
     <div className="shell-card p-5">
       <h2 className="text-lg font-black text-slate-950">Smart Board Runtime</h2>
       <p className="mt-1 text-sm text-slate-500">
-        Use a launched session to open the classroom board. The board route reads safe
-        session data and never exposes answer keys to students.
+        Open a monitored session from the Sessions tab to launch the classroom
+        board. The board route reads safe session data and never exposes answer
+        keys to students.
       </p>
-      {selectedSession ? (
-        <Link
-          href={`/classroom/board/session/${selectedSession.id}`}
-          className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-slate-950 px-5 text-sm font-black text-white hover:bg-slate-800"
-        >
-          <MonitorPlay size={17} />
-          Open smart board
-        </Link>
-      ) : (
-        <EmptyState
-          icon={<MonitorPlay size={28} />}
-          title="Launch or load a session first"
-          description="The smart-board route needs a real backend session ID."
-          className="mt-5"
-        />
-      )}
+      <Link
+        href="/dashboard/learning/sessions"
+        className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-slate-950 px-5 text-sm font-black text-white hover:bg-slate-800"
+      >
+        <MonitorPlay size={17} />
+        Open sessions
+      </Link>
     </div>
   );
 }
 
-function LabPanel({ selectedSession }: { selectedSession: LearningSession | null }) {
+function LabPanel() {
   return (
     <div className="shell-card p-5">
       <h2 className="text-lg font-black text-slate-950">Computer Lab Access</h2>
@@ -1047,15 +779,6 @@ function LabPanel({ selectedSession }: { selectedSession: LearningSession | null
           <Users size={17} />
           Open student join
         </Link>
-        {selectedSession && (
-          <Link
-            href={`/student/learning/session/${selectedSession.id}`}
-            className="inline-flex h-11 items-center gap-2 rounded-xl border border-emerald-100 bg-white px-5 text-sm font-black text-emerald-800 hover:bg-emerald-50"
-          >
-            <Send size={17} />
-            Open current session
-          </Link>
-        )}
       </div>
     </div>
   );
@@ -1164,6 +887,14 @@ function QuestionEditor({
   const optionsText = Array.isArray(question.options)
     ? question.options.join('\n')
     : '';
+  const matchingPairsText =
+    question.type === 'MATCHING'
+      ? matchingPairsToText(question.options)
+      : '';
+  const orderingItemsText =
+    question.type === 'ORDERING'
+      ? orderingItemsToText(question.options)
+      : '';
 
   return (
     <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
@@ -1171,7 +902,9 @@ function QuestionEditor({
         <SelectField
           label={`Question ${index + 1}`}
           value={question.type}
-          onChange={(value) => onChange({ type: value as LearningQuestionType })}
+          onChange={(value) =>
+            onChange(questionDefaultsForType(value as LearningQuestionType))
+          }
           options={questionTypes.map((value) => ({ value, label: labelize(value) }))}
         />
         <InputField
@@ -1202,12 +935,60 @@ function QuestionEditor({
           className="mt-3"
         />
       )}
-      <InputField
-        label="Correct answer"
-        value={String(question.correctAnswer ?? '')}
-        onChange={(value) => onChange({ correctAnswer: value })}
-        className="mt-3"
-      />
+      {question.type === 'MATCHING' && (
+        <TextAreaField
+          label="Pairs: leftId | leftText | rightId | rightText"
+          value={matchingPairsText}
+          onChange={(value) => {
+            const pairs = parseMatchingPairs(value);
+            onChange({
+              options: { pairs },
+              correctAnswer: pairs.map((pair) => ({
+                leftId: pair.leftId,
+                rightId: pair.rightId,
+              })),
+            });
+          }}
+          className="mt-3"
+        />
+      )}
+      {question.type === 'ORDERING' && (
+        <TextAreaField
+          label="Ordered items: id | text"
+          value={orderingItemsText}
+          onChange={(value) => {
+            const items = parseOrderingItems(value);
+            onChange({
+              options: { items },
+              correctAnswer: items.map((item) => item.id),
+            });
+          }}
+          className="mt-3"
+        />
+      )}
+      {question.type === 'TRUE_FALSE' ? (
+        <SelectField
+          label="Correct answer"
+          value={String(question.correctAnswer ?? 'true')}
+          onChange={(value) => onChange({ correctAnswer: value === 'true' })}
+          options={[
+            { value: 'true', label: 'True' },
+            { value: 'false', label: 'False' },
+          ]}
+          className="mt-3"
+        />
+      ) : question.type === 'MATCHING' || question.type === 'ORDERING' ? (
+        <p className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-500">
+          Correct answer is derived from the ordered rows above.
+        </p>
+      ) : (
+        <InputField
+          label="Correct answer"
+          value={String(question.correctAnswer ?? '')}
+          onChange={(value) => onChange({ correctAnswer: value })}
+          className="mt-3"
+        />
+      )}
       <InputField
         label="Explanation"
         value={question.explanation ?? ''}
@@ -1288,15 +1069,17 @@ function SelectField({
   onChange,
   options,
   required = false,
+  className,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
   required?: boolean;
+  className?: string;
 }) {
   return (
-    <label className="block">
+    <label className={cn('block', className)}>
       <span className="text-xs font-black uppercase tracking-wide text-slate-500">
         {label}
       </span>
@@ -1385,6 +1168,109 @@ function normalizeActivityPayload(
         sortOrder: index,
       })),
   };
+}
+
+function questionDefaultsForType(type: LearningQuestionType): Partial<LearningQuestion> {
+  if (type === 'MULTIPLE_CHOICE') {
+    return {
+      type,
+      options: ['Option A', 'Option B'],
+      correctAnswer: 'Option A',
+    };
+  }
+  if (type === 'TRUE_FALSE') {
+    return { type, options: undefined, correctAnswer: true };
+  }
+  if (type === 'MATCHING') {
+    const pairs = [
+      {
+        leftId: 'left-1',
+        leftText: 'Prompt 1',
+        rightId: 'right-1',
+        rightText: 'Match 1',
+      },
+      {
+        leftId: 'left-2',
+        leftText: 'Prompt 2',
+        rightId: 'right-2',
+        rightText: 'Match 2',
+      },
+    ];
+    return {
+      type,
+      options: { pairs },
+      correctAnswer: pairs.map((pair) => ({
+        leftId: pair.leftId,
+        rightId: pair.rightId,
+      })),
+    };
+  }
+  if (type === 'ORDERING') {
+    const items = [
+      { id: 'item-1', text: 'First step' },
+      { id: 'item-2', text: 'Second step' },
+    ];
+    return {
+      type,
+      options: { items },
+      correctAnswer: items.map((item) => item.id),
+    };
+  }
+  return { type, options: undefined, correctAnswer: '' };
+}
+
+function parseMatchingPairs(value: string) {
+  return value
+    .split('\n')
+    .map((line) => line.split('|').map((part) => part.trim()))
+    .filter((parts) => parts.length >= 4 && parts.every(Boolean))
+    .map(([leftId, leftText, rightId, rightText]) => ({
+      leftId,
+      leftText,
+      rightId,
+      rightText,
+    }));
+}
+
+function matchingPairsToText(options: unknown) {
+  if (!isRecord(options) || !Array.isArray(options.pairs)) return '';
+  return options.pairs
+    .map((pair) => {
+      if (!isRecord(pair)) return '';
+      return [
+        pair.leftId,
+        pair.leftText,
+        pair.rightId,
+        pair.rightText,
+      ]
+        .map((value) => String(value ?? ''))
+        .join(' | ');
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+function parseOrderingItems(value: string) {
+  return value
+    .split('\n')
+    .map((line) => line.split('|').map((part) => part.trim()))
+    .filter((parts) => parts.length >= 2 && parts[0] && parts[1])
+    .map(([id, text]) => ({ id, text }));
+}
+
+function orderingItemsToText(options: unknown) {
+  if (!isRecord(options) || !Array.isArray(options.items)) return '';
+  return options.items
+    .map((item) => {
+      if (!isRecord(item)) return '';
+      return [item.id, item.text].map((value) => String(value ?? '')).join(' | ');
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function labelize(value: string) {

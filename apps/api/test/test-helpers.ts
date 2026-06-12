@@ -11,6 +11,7 @@ export interface MockState {
   userRoles: Record<string, unknown>[];
   classes: Record<string, unknown>[];
   subjects: Record<string, unknown>[];
+  syllabusTopics: Record<string, unknown>[];
   students: Record<string, unknown>[];
   enrollments: Record<string, unknown>[];
   staff: Record<string, unknown>[];
@@ -254,6 +255,7 @@ export function createPrismaMock() {
     userRoles: [] as Record<string, unknown>[],
     classes: [] as Record<string, unknown>[],
     subjects: [] as Record<string, unknown>[],
+    syllabusTopics: [] as Record<string, unknown>[],
     students: [
       {
         id: 'student-a',
@@ -848,11 +850,7 @@ export function createPrismaMock() {
       ),
       findFirst: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
-          state.staff.find(
-            (item) =>
-              item.tenantId === q.where?.tenantId &&
-              (!q.where?.employeeId || item.employeeId === q.where.employeeId),
-          ),
+          state.staff.find((item) => matchesWhere(item, q.where)),
         ),
       ),
       create: jest.fn((q: PrismaQuery) => {
@@ -2474,6 +2472,24 @@ export function createPrismaMock() {
                 }
               : null;
           }
+          if (qInclude.class) {
+            enriched.class = state.classes.find(
+              (c) => c.id === enriched.classId,
+            );
+          }
+          if (qInclude.section) {
+            enriched.section =
+              state.sections.find((s) => s.id === enriched.sectionId) ?? null;
+          }
+          if (qInclude.subject) {
+            enriched.subject =
+              state.subjects.find((s) => s.id === enriched.subjectId) ?? null;
+          }
+          if (qInclude.attempts) {
+            enriched.attempts = state.learningAttempts.filter(
+              (a) => a.sessionId === enriched.id,
+            );
+          }
           if (qInclude._count) {
             enriched._count = {
               participants: state.learningParticipants.filter(
@@ -2483,6 +2499,12 @@ export function createPrismaMock() {
                 (a) => a.sessionId === enriched.id,
               ).length,
             };
+          }
+        }
+        if (model === 'learningParticipant') {
+          if (qInclude.student) {
+            enriched.student =
+              state.students.find((s) => s.id === enriched.studentId) ?? null;
           }
         }
         if (model === 'learningAttempt') {
@@ -2522,6 +2544,29 @@ export function createPrismaMock() {
             enriched.activity =
               state.learningActivities.find(
                 (a) => a.id === enriched.activityId,
+              ) ?? null;
+          }
+        }
+        if (model === 'learningResource') {
+          if (qInclude.activity) {
+            enriched.activity =
+              state.learningActivities.find(
+                (a) => a.id === enriched.activityId,
+              ) ?? null;
+          }
+          if (qInclude.subject) {
+            enriched.subject =
+              state.subjects.find((s) => s.id === enriched.subjectId) ?? null;
+          }
+          if (qInclude.topic) {
+            enriched.topic =
+              state.syllabusTopics.find((t) => t.id === enriched.topicId) ??
+              null;
+          }
+          if (qInclude.fileAsset) {
+            enriched.fileAsset =
+              state.fileAssets.find(
+                (asset) => asset.id === enriched.fileAssetId,
               ) ?? null;
           }
         }

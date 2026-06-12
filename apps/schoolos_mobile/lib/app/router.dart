@@ -15,6 +15,7 @@ import '../features/dashboard/presentation/role_dashboards/teacher_dashboard.dar
 import '../features/attendance/presentation/screens/parent_attendance_screen.dart';
 import '../features/attendance/presentation/screens/teacher_classes_screen.dart';
 import '../features/attendance/presentation/screens/teacher_attendance_screen.dart';
+import '../features/learning/presentation/screens/learning_summary_screen.dart';
 import '../features/notices/presentation/screens/notice_detail_screen.dart';
 import '../features/notices/presentation/screens/notice_list_screen.dart';
 import '../features/notices/presentation/screens/notification_center_screen.dart';
@@ -125,6 +126,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ParentActivityScreen(),
       ),
       GoRoute(
+        path: AppRoutes.parentLearning,
+        builder: (context, state) => const LearningSummaryScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.parentTransport,
         builder: (context, state) => const ParentTransportScreen(),
       ),
@@ -162,6 +167,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           role: 'STUDENT',
           selectedIndex: 2,
           title: 'Timetable',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.studentLearning,
+        builder: (context, state) => const LearningSummaryScreen(
+          role: 'STUDENT',
+          selectedIndex: 4,
+          title: 'Learning',
         ),
       ),
       GoRoute(
@@ -244,7 +257,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         if ((location == AppRoutes.studentHome ||
                 location == AppRoutes.studentAttendance ||
                 location == AppRoutes.studentHomework ||
-                location == AppRoutes.studentTimetable) &&
+                location == AppRoutes.studentTimetable ||
+                location == AppRoutes.studentLearning) &&
             role != MobileRole.student) {
           return AppRoutes.home;
         }
@@ -317,6 +331,7 @@ bool _isParentRoute(String location) {
       location == AppRoutes.parentTimetable ||
       location == AppRoutes.parentReportCards ||
       location == AppRoutes.parentActivity ||
+      location == AppRoutes.parentLearning ||
       location == AppRoutes.parentTransport ||
       location == AppRoutes.parentCanteen ||
       location == AppRoutes.parentChat ||
