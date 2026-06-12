@@ -276,7 +276,7 @@ pnpm test
 pnpm test:e2e
 pnpm build
 pnpm verify:production
-pnpm smoke:phase1
+pnpm smoke:pilot          # Legacy alias: pnpm smoke:phase1
 ```
 
 For mobile changes:

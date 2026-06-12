@@ -249,6 +249,7 @@ export const teacherActor = () =>
       'learning:read',
       'learning:create',
       'learning:update',
+      'learning:delete',
       'learning:launch',
       'learning:progress',
     ],

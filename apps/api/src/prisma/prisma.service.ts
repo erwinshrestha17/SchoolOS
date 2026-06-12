@@ -15,6 +15,9 @@ const TENANT_SCOPE_EXCLUDED_MODELS = [
   'RefreshToken',
   'OtpCode',
   'RolePermission',
+  'ProviderConfig',
+  'PlatformPlan',
+  'PlatformPlanFeature',
 ];
 const TENANT_SCOPED_READ_WRITE_OPERATIONS = [
   'findUnique',

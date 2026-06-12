@@ -52,14 +52,14 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
       { route: '/dashboard/admissions', visible: /New Enrollment|Personal Information/i },
       { route: '/dashboard/attendance', visible: /Attendance Roster|Smart Attendance/i },
       { route: '/dashboard/finance', visible: /Collection Counter|Find student or invoice/i },
-      { route: '/dashboard/academics', visible: /Academic Workflow/i },
+      { route: '/dashboard/academics', visible: /Academics|Active Exam Terms|Workflow Readiness/i },
       { route: '/dashboard/accounting', visible: /Fiscal Status|Financial Reporting Hub/i },
       { route: '/dashboard/reports', visible: /Reports & Exports|Recent Exports|Module Locked/i },
       { route: '/dashboard/library/issues', visible: /Issue \/ Return|Issue copy/i },
       { route: '/dashboard/canteen/pos', visible: /POS|Create POS sale/i },
       { route: '/dashboard/canteen/serving', visible: /Student ID \/ QR Serving|Serve meal now/i },
       { route: '/dashboard/transport/trips', visible: /Trip Monitor|Start trip/i },
-      { route: '/dashboard/settings', visible: /School Settings|Communication Rules/i },
+      { route: '/dashboard/settings', visible: /Setup readiness|School Profile/i },
     ] as const;
 
     for (const target of targets) {

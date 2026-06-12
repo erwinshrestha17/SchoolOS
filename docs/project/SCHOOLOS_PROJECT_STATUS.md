@@ -155,7 +155,7 @@ Today's commits added or updated the following:
 Verification note:
 
 ```text
-These updates are recorded from commit inspection. Full local/staging verification must still be run before changing readiness claims: db generate/validate, OpenAPI gate, lint, typecheck, unit tests, API E2E, web E2E, build, verify:production, and smoke:phase1.
+These updates are recorded from commit inspection. Full local/staging verification must still be run before changing readiness claims: db generate/validate, OpenAPI gate, lint, typecheck, unit tests, API E2E, web E2E, build, verify:production, and smoke:pilot (or legacy alias smoke:phase1).
 ```
 
 ---
@@ -272,7 +272,7 @@ pnpm test
 pnpm test:e2e
 pnpm build
 pnpm verify:production
-pnpm smoke:phase1
+pnpm smoke:pilot          # Legacy alias: pnpm smoke:phase1
 ```
 
 For mobile changes:

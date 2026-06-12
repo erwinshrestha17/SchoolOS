@@ -53,7 +53,7 @@ This order is mandatory. Do not start a later phase until the previous phase's e
   1. Prisma generate and validate pass.
   2. OpenAPI gate passes.
   3. Lint, typecheck, unit tests, API E2E, web E2E, build, verify:production pass.
-  4. Local/staging smoke:phase1 runs with API, web, Postgres, and Redis.
+  4. Local/staging smoke:pilot runs with API, web, Postgres, and Redis (or legacy alias `smoke:phase1`).
   5. Pending migrations are applied or intentionally parked with written reason.
   6. Seed data supports every dashboard module route used in browser smoke.
   7. No stale docs claim a module is next when it is already implemented.
@@ -119,7 +119,7 @@ Before adding or expanding visible features:
 * **Current Status:** Basic foundations complete.
 * **Staging / Verification Remaining:**
   - Broader cross-tenant denial tests on tenant-owned read/write paths.
-  - Staging verification: `pnpm smoke:phase1` with Postgres, Redis, API, and web.
+  - Staging verification: `pnpm smoke:pilot` with Postgres, Redis, API, and web (or legacy alias `pnpm smoke:phase1`).
   - OpenAPI gate and full E2E/browser smoke rerun in a port-bindable environment.
 * **Web Frontend Backlog:**
   - Permission-denied screens for direct route access.
@@ -453,7 +453,7 @@ pnpm test
 pnpm test:e2e
 pnpm build
 pnpm verify:production
-pnpm smoke:phase1
+pnpm smoke:pilot          # Legacy alias: pnpm smoke:phase1
 ```
 
 For mobile changes:

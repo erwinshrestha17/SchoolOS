@@ -1602,7 +1602,7 @@ export default function PlatformSchoolDetail() {
             <Button 
               variant={tenant.isActive ? "destructive" : "default"}
               className="rounded-xl font-bold"
-              disabled={updating}
+              disabled={statusReason.trim().length < 5 || updating}
               onClick={handleStatusUpdate}
             >
               {updating ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}

@@ -25,6 +25,11 @@
     "verify:deploy:core": "pnpm compile:artifacts && pnpm verify:env:deploy && pnpm verify:tracked-artifacts && pnpm db:generate && pnpm db:validate && pnpm verify:openapi && pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build",
     "verify:deploy": "pnpm verify:deploy:core && pnpm test:web:e2e",
     "verify:production": "pnpm verify:deploy",
-    "smoke:phase1": "node scripts/smoke-phase1-local.mjs"
+    "smoke:pilot": "node scripts/smoke-runner-local.mjs pilot",
+    "smoke:core": "node scripts/smoke-runner-local.mjs core",
+    "smoke:platform": "node scripts/smoke-runner-local.mjs platform",
+    "smoke:learning": "node scripts/smoke-runner-local.mjs learning",
+    "smoke:full": "node scripts/smoke-runner-local.mjs full",
+    "smoke:phase1": "pnpm smoke:pilot"
   }
 }

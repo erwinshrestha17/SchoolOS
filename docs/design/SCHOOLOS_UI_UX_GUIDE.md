@@ -1328,7 +1328,7 @@ When services are available:
 
 ```bash
 pnpm --filter @schoolos/web test:e2e
-pnpm smoke:phase1
+pnpm smoke:pilot          # Legacy alias: pnpm smoke:phase1
 ```
 
 Manual checks:

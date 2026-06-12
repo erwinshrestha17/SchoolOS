@@ -179,8 +179,8 @@ pnpm verify:production
 
 If Docker/API/web are running:
 ```bash
-pnpm smoke:phase1
-SMOKE_LOGIN=true pnpm smoke:phase1
+pnpm smoke:pilot          # Legacy alias: pnpm smoke:phase1
+SMOKE_LOGIN=true pnpm smoke:pilot
 ```
 
 ---
@@ -271,7 +271,7 @@ Expected URLs:
 - Verify notification providers are stubbed or explicitly configured.
 - Verify `FRONTEND_ORIGIN`, cookies, CORS, and HTTPS settings.
 - Verify `LOCAL_STORAGE_ROOT` exists and is backed up.
-- Run `pnpm verify:production` and `pnpm smoke:phase1`.
+- Run `pnpm verify:production` and `pnpm smoke:pilot` (or legacy alias `pnpm smoke:phase1`).
 - Run browser smoke with PDF checks.
 
 ### Staff Training Checklist

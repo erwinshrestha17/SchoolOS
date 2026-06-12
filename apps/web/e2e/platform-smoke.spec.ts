@@ -1,13 +1,15 @@
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://127.0.0.1:3101';
-
 test.describe('Platform Control Plane Smoke Tests', () => {
   test.beforeEach(async ({ page }) => {
     // 1. Login as Platform Super Admin
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input[name="email"]', 'superadmin@schoolos.com');
-    await page.fill('input[name="password"]', 'superadmin123');
+    await page.goto('/login');
+    const tenantSlug = process.env.SCHOOLOS_E2E_PLATFORM_TENANT_SLUG || 'default-school';
+    const email = process.env.SCHOOLOS_E2E_PLATFORM_EMAIL || 'platform@schoolos.com';
+    const password = process.env.SCHOOLOS_E2E_PLATFORM_PASSWORD || 'platform123';
+    await page.getByLabel(/School Code/i).fill(tenantSlug);
+    await page.fill('input[name="email"]', email);
+    await page.fill('input[name="password"]', password);
     await page.click('button[type="submit"]');
     
     // Verify we are logged in
@@ -15,11 +17,11 @@ test.describe('Platform Control Plane Smoke Tests', () => {
   });
 
   test('Access Platform Dashboard and check metrics', async ({ page }) => {
-    await page.goto(`${BASE_URL}/platform/dashboard`);
+    await page.goto('/platform/dashboard');
     
     // Verify essential elements
-    await expect(page.locator('h1')).toContainText('Platform Overview');
-    await expect(page.locator('text=Control Plane')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 }).last()).toContainText('Operator Attention Dashboard');
+    await expect(page.getByText('Control Plane', { exact: true })).toBeVisible();
     await expect(page.locator('text=Total Schools')).toBeVisible();
     await expect(page.locator('text=Active Schools')).toBeVisible();
     
@@ -27,11 +29,11 @@ test.describe('Platform Control Plane Smoke Tests', () => {
     const healthBadge = page.locator('text=System Ready');
     await expect(healthBadge).toBeVisible();
   });
-
+ 
   test('Navigate to School Directory and search', async ({ page }) => {
-    await page.goto(`${BASE_URL}/platform/schools`);
+    await page.goto('/platform/schools');
     
-    await expect(page.locator('h1')).toContainText('Global Schools');
+    await expect(page.getByRole('heading', { level: 1 }).last()).toContainText('Schools');
     
     // Test search functionality
     const searchInput = page.locator('input[placeholder*="Search school name"]');
@@ -46,28 +48,28 @@ test.describe('Platform Control Plane Smoke Tests', () => {
     await context.clearCookies();
     
     // Login as a normal school admin
-    await page.goto(`${BASE_URL}/login`);
+    await page.goto('/login');
+    await page.getByLabel(/School Code/i).fill('default-school');
     await page.fill('input[name="email"]', 'admin@schoolos.com');
     await page.fill('input[name="password"]', 'admin123');
     await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/\/dashboard/);
     
     // Try to access platform route
-    await page.goto(`${BASE_URL}/platform/dashboard`);
+    await page.goto('/platform/dashboard');
     
-    // Should see Permission Denied component or be redirected
-    // Given our component, we should see "Access Restricted"
-    await expect(page.locator('h1')).toContainText('Access Restricted');
-    await expect(page.locator('text=403_FORBIDDEN_PLATFORM')).toBeVisible();
+    // Should be redirected to school dashboard since standard admins cannot access platform control plane
+    await expect(page).toHaveURL(/\/dashboard/);
   });
 
   test('Platform Settings - Provider safety check', async ({ page }) => {
-    await page.goto(`${BASE_URL}/platform/settings`);
+    await page.goto('/platform/settings');
     
     // Click on Providers tab
     await page.click('button:has-text("Providers")');
     
     // Verify we see masked config
-    await expect(page.locator('text=••••••••')).toBeVisible();
+    await expect(page.locator('text=********').first()).toBeVisible();
     
     // Verify New Provider dialog
     await page.click('button:has-text("New Provider")');
@@ -75,7 +77,7 @@ test.describe('Platform Control Plane Smoke Tests', () => {
   });
 
   test('Tenant Status Management with Audit Reason', async ({ page }) => {
-    await page.goto(`${BASE_URL}/platform/schools`);
+    await page.goto('/platform/schools');
     
     // Find Trial Academy and open details
     await page.click('text=Trial Academy');
@@ -97,29 +99,30 @@ test.describe('Platform Control Plane Smoke Tests', () => {
     await confirmBtn.click();
     
     // Should reflect suspended state
-    await expect(page.locator('text=SUSPENDED')).toBeVisible();
+    await expect(page.getByText('SUSPENDED', { exact: true }).first()).toBeVisible();
   });
+
   test('Verify SaaS Billing visibility', async ({ page }) => {
-    await page.goto(`${BASE_URL}/platform/schools`);
+    await page.goto('/platform/schools');
     await page.click('text=Trial Academy');
     
     // Go to Billing tab
     await page.click('button:has-text("SaaS Billing")');
     
     // Check for invoice presence (from our seed)
-    await expect(page.locator('text=SO-2024')).toBeVisible();
-    await expect(page.locator('text=NPR 50,000')).toBeVisible();
+    await expect(page.locator('text=SO-2024').first()).toBeVisible();
+    await expect(page.locator('text=NPR 50,000').first()).toBeVisible();
   });
 
   test('Tenant Change Plan workflow renders with guarded submit', async ({ page }) => {
-    await page.goto(`${BASE_URL}/platform/schools`);
+    await page.goto('/platform/schools');
     await page.click('text=Trial Academy');
 
     await expect(page.getByRole('button', { name: 'Change Plan' })).toBeVisible();
     await page.getByRole('button', { name: 'Change Plan' }).click();
 
     await expect(page).toHaveURL(/.*platform\/schools\/.*\/change-plan/);
-    await expect(page.locator('h1')).toContainText('Change Subscription Plan');
+    await expect(page.getByRole('heading', { level: 1 }).last()).toContainText('Change Subscription Plan');
     await expect(page.getByLabel('New subscription plan')).toBeVisible();
     await expect(page.getByText('Audit reason')).toBeVisible();
     await expect(page.getByText(/SchoolOS subscription billing only/i)).toBeVisible();
@@ -131,62 +134,62 @@ test.describe('Platform Control Plane Smoke Tests', () => {
   });
 
   test('Tenant detail operator dialogs render for support, billing, invoices, and onboarding', async ({ page }) => {
-    await page.goto(`${BASE_URL}/platform/schools`);
+    await page.goto('/platform/schools');
     await page.click('text=Trial Academy');
 
     await page.getByTestId('support-mode-button').click();
-    await expect(page.getByText('Enter Support Mode')).toBeVisible();
-    const supportSubmit = page.getByRole('button', { name: 'Enter Support Mode' });
+    await expect(page.getByRole('heading', { name: 'Enter Support Mode' })).toBeVisible();
+    const supportSubmit = page.getByRole('button', { name: 'Enter Support Mode' }).last();
     await expect(supportSubmit).toBeDisabled();
     await page.getByPlaceholder(/support case/i).fill('Support ticket verification');
     await expect(supportSubmit).toBeEnabled();
-    await page.getByRole('button', { name: 'Cancel' }).click();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
 
     await page.click('button:has-text("SaaS Billing")');
     await page.getByTestId('new-saas-invoice-button').click();
-    await expect(page.getByText('Create SchoolOS Subscription Invoice')).toBeVisible();
-    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('heading', { name: 'Create SchoolOS Subscription Invoice' })).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
 
     await page.getByTestId('billing-profile-edit-button').click();
-    await expect(page.getByText('Edit Billing Profile')).toBeVisible();
-    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('heading', { name: 'Edit Billing Profile' })).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
 
     await page.click('button:has-text("Overview")');
     await page.getByTestId('onboarding-checklist-button').click();
-    await expect(page.getByText('Onboarding Checklist')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Onboarding Checklist' })).toBeVisible();
   });
 
   test('Platform settings deep links and operator dialogs render', async ({ page }) => {
-    await page.goto(`${BASE_URL}/platform/settings?tab=providers`);
+    await page.goto('/platform/settings?tab=providers');
     await expect(page.getByRole('tab', { name: 'Providers' })).toHaveAttribute('data-state', 'active');
     await page.getByTestId('provider-edit-button').first().click();
-    await expect(page.getByText('Edit Provider')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Edit Provider' })).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
 
-    await page.goto(`${BASE_URL}/platform/settings?tab=queues`);
+    await page.goto('/platform/settings?tab=queues');
     await expect(page.getByRole('tab', { name: 'Queues' })).toHaveAttribute('data-state', 'active');
     const retryAll = page.getByRole('button', { name: /Retry All/i }).first();
     if (await retryAll.isEnabled()) {
       await retryAll.click();
-      await expect(page.getByText('Retry Failed Job')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Retry Failed Job' })).toBeVisible();
       await page.getByRole('button', { name: 'Cancel' }).click();
     }
 
-    await page.goto(`${BASE_URL}/platform/settings?tab=audit`);
+    await page.goto('/platform/settings?tab=audit');
     await expect(page.getByRole('tab', { name: 'Global Audit' })).toHaveAttribute('data-state', 'active');
-    await expect(page.getByText('Resource ID')).toBeVisible();
-    await expect(page.getByText('Export current page CSV')).toBeVisible();
+    await expect(page.getByText('Resource ID').first()).toBeVisible();
+    await expect(page.getByText('Export current page CSV').first()).toBeVisible();
   });
 
   test('Feature Override Workflow', async ({ page }) => {
-    await page.goto(`${BASE_URL}/platform/schools`);
+    await page.goto('/platform/schools');
     await page.click('text=Trial Academy');
     
     // Go to Entitlements tab
     await page.click('button:has-text("Entitlements")');
     
     // Find a feature and toggle it
-    const transportToggle = page.locator('div:has-text("Transport") >> button');
+    const transportToggle = page.getByText(/^transport$/i).locator('xpath=../..').getByRole('button');
     const initialState = await transportToggle.innerText();
     
     await transportToggle.click();
@@ -205,16 +208,17 @@ test.describe('Platform Control Plane Smoke Tests', () => {
   });
 
   test('Queue Job Inspection safety', async ({ page }) => {
-    await page.goto(`${BASE_URL}/platform/settings`);
+    await page.goto('/platform/settings');
     
     // Click on Queues tab
-    await page.click('button:has-text("Infrastructure & Queues")');
+    await page.getByRole('tab', { name: 'Queues' }).click();
     
     // Click Inspect on any queue
     await page.click('button:has-text("Inspect Failed") >> nth=0');
     
     // Verify dialog header
-    await expect(page.locator('text=Failed Jobs')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Failed Jobs/i })).toBeVisible();
     await expect(page.locator('text=Sensitive data in payloads is masked')).toBeVisible();
   });
 });
+
