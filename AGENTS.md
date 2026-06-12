@@ -49,7 +49,7 @@ For each module:
 7. Ensure all reads are tenant-scoped.
 8. Add or update tests where appropriate.
 9. Run verification before moving on.
-10. Review the diff for regressions, security issues, fake data, broken flows, and tenant leakage.
+10. Review the diff for regressions, security issues, fake data, broken flows, tenant leakage, and avoidable compute/storage/provider cost.
 
 ### Definition of Done for Each Module
 - No fake/mock/placeholder/in-memory production data remains.
@@ -63,6 +63,10 @@ For each module:
 - Validation exists on frontend and backend.
 - Relevant tests pass.
 - Existing working behavior is not broken.
+- Growing lists are paginated and filtered server-side.
+- Heavy work is queued instead of blocking user requests.
+- File/media flows use File Registry, StorageService, and optimized variants where applicable.
+- The feature does not introduce avoidable SMS, storage, bandwidth, real-time, AI, or database cost.
 
 ### Running Progress Log
 Maintain this after every major step:
@@ -103,7 +107,7 @@ When stopped or finished, provide:
 - Keep SchoolOS as a **NestJS modular monolith first**.
 - Do not introduce microservices unless scale, team ownership, deployment isolation, or compliance isolation clearly justifies the cost and the owner explicitly requests it.
 - Keep PostgreSQL with Prisma.
-- Keep Redis with BullMQ for queues, background jobs, retries, scheduled operational tasks, heavy exports, PDF/report generation, and future real-time fanout where appropriate.
+- Keep Redis with BullMQ for queues, background jobs, retries, scheduled operational tasks, heavy exports, PDF/report generation, media/image variant generation, notification batching, and future real-time fanout where appropriate.
 - Keep the Next.js dashboard in `apps/web`.
 - Keep the Flutter companion app in `apps/schoolos_mobile` as a standalone Flutter app outside pnpm workspaces.
 - Do not migrate to Angular yet.
@@ -111,6 +115,7 @@ When stopped or finished, provide:
 - Backend-first for data integrity.
 - UI must consume real APIs.
 - Mobile must consume existing SchoolOS APIs with bearer auth, secure refresh-token storage, tenant slug login, and readable mobile error mapping.
+- Optimize database queries, file sizes, API payloads, and queued work before increasing server size or introducing new infrastructure.
 
 ### Product Planes and Route Boundaries
 SchoolOS has three logical planes inside the same modular monolith:
@@ -119,7 +124,7 @@ SchoolOS has three logical planes inside the same modular monolith:
 |---|---|---|---|
 | Platform Control Plane | `/platform/*` | `/platform/*` | SchoolOS company/operator administration |
 | Tenant Configuration Plane | `/dashboard/settings/*` | `/settings/*` or `/tenant-settings/*` | One school's settings/configuration |
-| School Operations Plane | `/dashboard/*` | Module APIs (e.g. `/students`, `/attendance`, `/finance`, etc.) | Daily school workflows |
+| School Operations Plane | `/dashboard/*` | Module APIs (e.g. `/students`, `/attendance`, etc.) | Daily school workflows |
 
 Rules:
 - Platform Control Plane manages SchoolOS SaaS/customer administration.
@@ -197,10 +202,24 @@ utils/<module>-constants.ts
 - Super-admin/platform support tenant override must be explicit, validated, and audited.
 - List endpoints for growing data must use pagination and filtering.
 - Add/review indexes for high-volume tenant-scoped query patterns.
-- Move slow/retryable/provider/report/PDF jobs to BullMQ where appropriate.
+- Move slow/retryable/provider/report/PDF/media/notification jobs to BullMQ where appropriate.
 - Do not bypass service boundaries by writing another module's internal tables directly.
 - Do not bypass `AccountingPostingService` for ledger writes.
 - File/media writes must go through `StorageService`/`FileRegistryService` boundaries.
+
+### Cost and Performance Rules
+- Keep the modular monolith until measured scale pressure proves otherwise.
+- Do not add Kubernetes, microservices, separate search clusters, GPU workers, or new databases for first-version module work without explicit approval.
+- Optimize query shape, indexes, pagination, and payload size before increasing CPU/RAM.
+- Do not calculate heavy dashboard summaries from raw tables on every page load; use summaries, cached aggregates, or queued recalculation where practical.
+- Do not generate PDFs, Excel exports, report cards, large imports, image variants, or notification batches inside the normal request/response cycle.
+- Do not serve original uploaded photos in normal frontend/mobile views; use optimized display and thumbnail variants.
+- Do not store images, PDFs, documents, or base64 file content in PostgreSQL.
+- Do not use SMS for low-priority notifications when in-app, push, or email is enough.
+- Do not make normal dashboards real-time unless the workflow requires immediate updates.
+- Do not run AI/ML/LLM inference on every page load; scheduled or event-triggered background scoring is the default.
+- Keep logs useful but bounded. Do not log large request/response bodies or sensitive school data.
+- Review `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` before adding any cost-sensitive storage, report, notification, real-time, or AI work.
 
 ### Frontend Rules
 - UI must consume real APIs.
@@ -214,6 +233,7 @@ utils/<module>-constants.ts
 - Large dashboard workspaces should become thin shells with tab files, hooks, smaller components, and pure utilities.
 - `apps/web/lib/api/client.ts` should remain the base HTTP client; domain-specific APIs belong in separate files.
 - Follow `docs/design/SCHOOLOS_UI_UX_GUIDE.md` for visual/UI rules.
+- Load only visible dashboard sections first; lazy-load charts, history, reports, and heavy detail panels.
 
 ### Security Rules
 - Tenant isolation is mandatory.
@@ -243,6 +263,8 @@ utils/<module>-constants.ts
 - Student documents, photos, activity media, homework attachments, receipts, report cards, payslips, and exports must remain tenant-scoped.
 - Modules must use `FileRegistryService` and `StorageService`, not provider SDKs directly.
 - Follow consolidated architecture docs for storage details.
+- Generate optimized image variants for normal display and thumbnail usage.
+- Keep originals only when required for document fidelity, audit, regeneration, or business/legal reasons.
 
 ### Scalability Gate for Every Feature
 Before implementing a feature, answer:
@@ -261,6 +283,7 @@ Before implementing a feature, answer:
 13. If pricing/tiered access is involved, which feature key, entitlement, and usage limit controls access?
 14. If intelligence/AI is involved, is the output explainable and human-reviewed?
 15. Is the touched code already too large, and should this task include a small file-level modularization step?
+16. What prevents this feature from increasing avoidable compute, storage, bandwidth, SMS, real-time, or AI cost?
 
 A feature is not production-ready until these are answered.
 
