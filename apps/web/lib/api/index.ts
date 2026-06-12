@@ -15,3 +15,4 @@ export * from './users';
 export * from './canteen';
 export * from './library';
 export * from './transport';
+export * from './learning';

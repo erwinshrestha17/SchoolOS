@@ -43,6 +43,17 @@ const dashboardRouteGates: RouteGate[] = [
     permissions: ['homework:read'],
   },
   {
+    prefix: '/dashboard/learning',
+    label: 'Learning',
+    permissions: [
+      'learning:read',
+      'learning:create',
+      'learning:update',
+      'learning:launch',
+      'learning:progress',
+    ],
+  },
+  {
     prefix: '/dashboard/timetable',
     label: 'Timetable',
     permissions: ['timetable:read'],
@@ -152,6 +163,7 @@ function getRequiredModuleForHref(href: string): string | null {
   if (href.startsWith('/dashboard/attendance')) return 'attendance';
   if (href.startsWith('/dashboard/academics')) return 'exams';
   if (href.startsWith('/dashboard/homework')) return 'homework';
+  if (href.startsWith('/dashboard/learning')) return 'learning';
   if (href.startsWith('/dashboard/fees')) return 'fees';
   if (href.startsWith('/dashboard/accounting')) return 'accounting';
   if (href.startsWith('/dashboard/hr')) return 'hr';

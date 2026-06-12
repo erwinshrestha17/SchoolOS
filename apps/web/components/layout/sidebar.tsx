@@ -29,6 +29,7 @@ import {
   CalendarDays,
   GraduationCap,
   FileText,
+  MonitorPlay,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -52,6 +53,13 @@ export type NavGroup = {
 const academicPermissions: PermissionKey[] = ['academics:read', 'academics:manage'];
 const timetablePermissions: PermissionKey[] = ['timetable:read'];
 const homeworkPermissions: PermissionKey[] = ['homework:read'];
+const learningPermissions: PermissionKey[] = [
+  'learning:read',
+  'learning:create',
+  'learning:update',
+  'learning:launch',
+  'learning:progress',
+];
 
 function getRequiredModuleForHref(href: string): string | null {
   if (href.startsWith('/dashboard/students')) return 'students';
@@ -59,6 +67,7 @@ function getRequiredModuleForHref(href: string): string | null {
   if (href.startsWith('/dashboard/attendance')) return 'attendance';
   if (href.startsWith('/dashboard/academics')) return 'exams';
   if (href.startsWith('/dashboard/homework')) return 'homework';
+  if (href.startsWith('/dashboard/learning')) return 'learning';
   if (href.startsWith('/dashboard/fees')) return 'fees';
   if (href.startsWith('/dashboard/accounting')) return 'accounting';
   if (href.startsWith('/dashboard/hr')) return null;
@@ -109,6 +118,12 @@ export const dashboardNavGroups: NavGroup[] = [
         label: 'Homework',
         icon: BookOpen,
         permissions: homeworkPermissions,
+      },
+      {
+        href: '/dashboard/learning',
+        label: 'Learning',
+        icon: MonitorPlay,
+        permissions: learningPermissions,
       },
     ],
   },
