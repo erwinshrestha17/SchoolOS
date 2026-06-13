@@ -1,8 +1,19 @@
-import { IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsArray,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class CreateLibraryBookDto {
   @IsString()
   title!: string;
+
+  @IsOptional()
+  @IsString()
+  subtitle?: string;
 
   @IsString()
   author!: string;
@@ -22,11 +33,40 @@ export class CreateLibraryBookDto {
 
   @IsOptional()
   @IsString()
+  edition?: string;
+
+  @IsOptional()
+  @IsString()
+  language?: string;
+
+  @IsOptional()
+  @IsString()
+  deweyDecimal?: string;
+
+  @IsOptional()
+  @IsString()
+  materialType?: string;
+
+  @IsOptional()
+  @IsString()
   subjectCategory?: string;
 
   @IsOptional()
   @IsString()
   classLevel?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  keywords?: string[];
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  coverImageUrl?: string;
 
   @IsOptional()
   @IsNumber()

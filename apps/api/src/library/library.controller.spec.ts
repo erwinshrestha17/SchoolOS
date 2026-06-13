@@ -14,29 +14,34 @@ const actor: AuthContext = {
 function createController() {
   const libraryService = {
     listBooks: jest.fn(),
-    createBook: jest.fn(),
-    updateBook: jest.fn(),
     listCopies: jest.fn(),
-    createCopy: jest.fn(),
-    updateCopy: jest.fn(),
-    markCopyStatus: jest.fn(),
-    listIssues: jest.fn(),
-    issueCopy: jest.fn(),
-    returnCopy: jest.fn(),
     listOverdue: jest.fn(),
     getBorrowedStudents: jest.fn(),
     listFines: jest.fn(),
     createFine: jest.fn(),
     updateFine: jest.fn(),
-    getPopularBooksReport: jest.fn(),
     getBookHistory: jest.fn(),
     getCopyHistory: jest.fn(),
-    getLibrarySettings: jest.fn(),
-    updateLibrarySettings: jest.fn(),
     resolveQrBorrower: jest.fn(),
   };
   const libraryHardeningService = {
+    createBook: jest.fn(),
+    updateBook: jest.fn(),
     archiveBook: jest.fn(),
+    createCopy: jest.fn(),
+    updateCopy: jest.fn(),
+    markCopyStatus: jest.fn(),
+    archiveCopy: jest.fn(),
+    listIssuesScoped: jest.fn(),
+    issueCopy: jest.fn(),
+    issueCopyByScanner: jest.fn(),
+    returnCopy: jest.fn(),
+    returnCopyByScanner: jest.fn(),
+    resolveCopyByScanCode: jest.fn(),
+    createReservation: jest.fn(),
+    listReservations: jest.fn(),
+    cancelReservation: jest.fn(),
+    fulfillReservation: jest.fn(),
     sendOverdueRemindersIdempotent: jest.fn(),
     getIssuedBooksReport: jest.fn(),
     getOverdueBooksReport: jest.fn(),
@@ -44,6 +49,11 @@ function createController() {
     getFineSummary: jest.fn(),
     getBorrowerHistory: jest.fn(),
     exportIssuedBooksCsv: jest.fn(),
+    postFineToFeesIdempotent: jest.fn(),
+    reconcileFinePayment: jest.fn(),
+    getPopularBooksReport: jest.fn(),
+    getLibrarySettings: jest.fn(),
+    updateLibrarySettings: jest.fn(),
   };
 
   return {
@@ -65,12 +75,14 @@ describe('LibraryController M8A contracts', () => {
       author: 'SchoolOS Press',
       isbn: 'ISBN-001',
       subjectCategory: 'English',
+      edition: '2nd',
+      language: 'English',
     };
     const updateDto = { title: 'English Reader Updated' };
     const archiveDto = { reason: 'Outdated edition' };
     libraryService.listBooks.mockReturnValue({ items: [] });
-    libraryService.createBook.mockReturnValue({ id: 'book-1' });
-    libraryService.updateBook.mockReturnValue({ id: 'book-1' });
+    libraryHardeningService.createBook.mockReturnValue({ id: 'book-1' });
+    libraryHardeningService.updateBook.mockReturnValue({ id: 'book-1' });
     libraryHardeningService.archiveBook.mockReturnValue({ id: 'book-1' });
 
     expect(controller.listBooks(actor, 'English', '1', '20')).toEqual({
@@ -90,8 +102,11 @@ describe('LibraryController M8A contracts', () => {
       page: '1',
       limit: '20',
     });
-    expect(libraryService.createBook).toHaveBeenCalledWith(createDto, actor);
-    expect(libraryService.updateBook).toHaveBeenCalledWith(
+    expect(libraryHardeningService.createBook).toHaveBeenCalledWith(
+      createDto,
+      actor,
+    );
+    expect(libraryHardeningService.updateBook).toHaveBeenCalledWith(
       'book-1',
       updateDto,
       actor,
@@ -103,23 +118,31 @@ describe('LibraryController M8A contracts', () => {
     );
   });
 
-  it('delegates copy list/create/update/status workflows with current actor', () => {
-    const { controller, libraryService } = createController();
+  it('delegates copy metadata, scanner lookup, lifecycle, and archive workflows', () => {
+    const { controller, libraryService, libraryHardeningService } =
+      createController();
     const createDto = {
       bookId: 'book-1',
       barcode: 'LIB-001',
+      qrCode: 'QR-LIB-001',
       shelfLocation: 'A1',
+      conditionNote: 'New',
     };
-    const updateDto = { shelfLocation: 'B2' };
+    const updateDto = { shelfLocation: 'B2', conditionNote: 'Good' };
     const statusDto = { status: 'DAMAGED', reason: 'Water damage' };
     libraryService.listCopies.mockReturnValue({ items: [] });
-    libraryService.createCopy.mockReturnValue({ id: 'copy-1' });
-    libraryService.updateCopy.mockReturnValue({ id: 'copy-1' });
-    libraryService.markCopyStatus.mockReturnValue({ status: 'DAMAGED' });
+    libraryHardeningService.resolveCopyByScanCode.mockReturnValue({ id: 'copy-1' });
+    libraryHardeningService.createCopy.mockReturnValue({ id: 'copy-1' });
+    libraryHardeningService.updateCopy.mockReturnValue({ id: 'copy-1' });
+    libraryHardeningService.markCopyStatus.mockReturnValue({ status: 'DAMAGED' });
+    libraryHardeningService.archiveCopy.mockReturnValue({ status: 'ARCHIVED' });
 
     expect(
       controller.listCopies(actor, 'book-1', 'AVAILABLE', 'LIB', '1', '50'),
     ).toEqual({ items: [] });
+    expect(controller.resolveScannedCopy(actor, 'QR-LIB-001')).toEqual({
+      id: 'copy-1',
+    });
     expect(controller.createCopy(createDto as never, actor)).toEqual({
       id: 'copy-1',
     });
@@ -128,106 +151,114 @@ describe('LibraryController M8A contracts', () => {
     });
     expect(
       controller.markCopyStatus('copy-1', statusDto as never, actor),
-    ).toEqual({
-      status: 'DAMAGED',
-    });
-    expect(libraryService.listCopies).toHaveBeenCalledWith(actor, {
-      bookId: 'book-1',
-      status: 'AVAILABLE',
-      barcode: 'LIB',
-      page: '1',
-      limit: '50',
-    });
-    expect(libraryService.createCopy).toHaveBeenCalledWith(createDto, actor);
-    expect(libraryService.updateCopy).toHaveBeenCalledWith(
-      'copy-1',
-      updateDto,
-      actor,
+    ).toEqual({ status: 'DAMAGED' });
+    expect(controller.archiveCopy('copy-1', { reason: 'Disposed' }, actor)).toEqual(
+      { status: 'ARCHIVED' },
     );
-    expect(libraryService.markCopyStatus).toHaveBeenCalledWith(
+
+    expect(libraryHardeningService.resolveCopyByScanCode).toHaveBeenCalledWith(
+      actor,
+      'QR-LIB-001',
+    );
+    expect(libraryHardeningService.archiveCopy).toHaveBeenCalledWith(
       'copy-1',
-      statusDto,
+      'Disposed',
       actor,
     );
   });
 
-  it('delegates issue and return workflows through transactional service methods', () => {
-    const { controller, libraryService } = createController();
+  it('delegates scoped issue and scanner-first issue/return workflows', () => {
+    const { controller, libraryHardeningService } = createController();
     const issueDto = {
       copyId: 'copy-1',
       borrowerStudentId: 'student-1',
-      dueAt: '2026-05-20T00:00:00.000Z',
     };
-    const returnDto = {
-      returnCondition: 'Good',
-      fineAmount: 10,
-      notes: 'Returned late',
+    const scannerIssueDto = {
+      code: 'QR-LIB-001',
+      borrowerStudentId: 'student-1',
     };
-    libraryService.listIssues.mockReturnValue({ items: [] });
-    libraryService.issueCopy.mockReturnValue({ id: 'issue-1' });
-    libraryService.returnCopy.mockReturnValue({
-      id: 'issue-1',
-      status: 'RETURNED',
-    });
+    const returnDto = { returnCondition: 'Good', fineAmount: 10 };
+    const scannerReturnDto = { code: 'QR-LIB-001', returnCondition: 'Good' };
+    libraryHardeningService.listIssuesScoped.mockReturnValue({ items: [] });
+    libraryHardeningService.issueCopy.mockReturnValue({ id: 'issue-1' });
+    libraryHardeningService.issueCopyByScanner.mockReturnValue({ id: 'issue-1' });
+    libraryHardeningService.returnCopy.mockReturnValue({ status: 'RETURNED' });
+    libraryHardeningService.returnCopyByScanner.mockReturnValue({ status: 'RETURNED' });
 
     expect(
       controller.listIssues(actor, 'ISSUED', 'student-1', undefined, '1', '20'),
     ).toEqual({ items: [] });
+    expect(controller.listMyIssues(actor, 'ISSUED', '1', '20')).toEqual({
+      items: [],
+    });
     expect(controller.issueCopy(issueDto as never, actor)).toEqual({
       id: 'issue-1',
     });
-    expect(controller.returnCopy('issue-1', returnDto as never, actor)).toEqual(
-      {
-        id: 'issue-1',
-        status: 'RETURNED',
-      },
+    expect(controller.issueCopyByScanner(scannerIssueDto as never, actor)).toEqual({
+      id: 'issue-1',
+    });
+    expect(controller.returnCopy('issue-1', returnDto as never, actor)).toEqual({
+      status: 'RETURNED',
+    });
+    expect(controller.returnCopyByScanner(scannerReturnDto as never, actor)).toEqual(
+      { status: 'RETURNED' },
     );
-    expect(libraryService.listIssues).toHaveBeenCalledWith(actor, {
+
+    expect(libraryHardeningService.listIssuesScoped).toHaveBeenCalledWith(actor, {
       status: 'ISSUED',
       studentId: 'student-1',
       staffId: undefined,
       page: '1',
       limit: '20',
     });
-    expect(libraryService.issueCopy).toHaveBeenCalledWith(issueDto, actor);
-    expect(libraryService.returnCopy).toHaveBeenCalledWith(
-      'issue-1',
-      returnDto,
+    expect(libraryHardeningService.issueCopyByScanner).toHaveBeenCalledWith(
+      scannerIssueDto,
       actor,
     );
   });
 
-  it('delegates overdue reminder through idempotent hardening service', () => {
-    const { controller, libraryService, libraryHardeningService } =
-      createController();
-    libraryService.listOverdue.mockReturnValue([{ id: 'issue-1' }]);
-    libraryHardeningService.sendOverdueRemindersIdempotent.mockReturnValue({
-      skipped: false,
-      deliveryCount: 1,
-    });
+  it('delegates reservation queue workflows', () => {
+    const { controller, libraryHardeningService } = createController();
+    const reservationDto = {
+      bookId: 'book-1',
+      borrowerStudentId: 'student-1',
+    };
+    const fulfillDto = { copyId: 'copy-1' };
+    libraryHardeningService.listReservations.mockReturnValue({ items: [] });
+    libraryHardeningService.createReservation.mockReturnValue({ id: 'reservation-1' });
+    libraryHardeningService.cancelReservation.mockReturnValue({ status: 'CANCELLED' });
+    libraryHardeningService.fulfillReservation.mockReturnValue({ id: 'issue-1' });
 
-    expect(controller.listOverdue(actor, '1', '20')).toEqual([
-      { id: 'issue-1' },
-    ]);
-    expect(controller.sendOverdueReminders(actor)).toEqual({
-      skipped: false,
-      deliveryCount: 1,
+    expect(controller.listReservations(actor, 'ACTIVE', 'book-1', '1', '10')).toEqual(
+      { items: [] },
+    );
+    expect(controller.createReservation(actor, reservationDto as never)).toEqual({
+      id: 'reservation-1',
     });
-    expect(libraryService.listOverdue).toHaveBeenCalledWith(actor, {
-      page: '1',
-      limit: '20',
+    expect(controller.cancelReservation(actor, 'reservation-1')).toEqual({
+      status: 'CANCELLED',
     });
     expect(
-      libraryHardeningService.sendOverdueRemindersIdempotent,
-    ).toHaveBeenCalledWith(actor);
+      controller.fulfillReservation(actor, 'reservation-1', fulfillDto as never),
+    ).toEqual({ id: 'issue-1' });
+
+    expect(libraryHardeningService.listReservations).toHaveBeenCalledWith(actor, {
+      status: 'ACTIVE',
+      bookId: 'book-1',
+      page: '1',
+      limit: '10',
+    });
+    expect(libraryHardeningService.fulfillReservation).toHaveBeenCalledWith(
+      'reservation-1',
+      fulfillDto,
+      actor,
+    );
   });
 
-  it('delegates library reports and CSV export from backend service', () => {
+  it('delegates reporting and CSV export from hardening service', () => {
     const { controller, libraryHardeningService } = createController();
     libraryHardeningService.getIssuedBooksReport.mockReturnValue({ items: [] });
-    libraryHardeningService.getOverdueBooksReport.mockReturnValue({
-      items: [],
-    });
+    libraryHardeningService.getOverdueBooksReport.mockReturnValue({ items: [] });
     libraryHardeningService.getLostDamagedReport.mockReturnValue({ items: [] });
     libraryHardeningService.getFineSummary.mockReturnValue({
       summary: { totalFine: '0' },
@@ -236,6 +267,7 @@ describe('LibraryController M8A contracts', () => {
     libraryHardeningService.exportIssuedBooksCsv.mockReturnValue(
       'Issue ID,Book Title\nissue-1,English Reader',
     );
+    libraryHardeningService.getPopularBooksReport.mockReturnValue({ items: [] });
 
     expect(controller.getIssuedBooksReport(actor, '1', '25')).toEqual({
       items: [],
@@ -251,55 +283,81 @@ describe('LibraryController M8A contracts', () => {
     expect(controller.exportIssuedBooksCsv(actor)).toBe(
       'Issue ID,Book Title\nissue-1,English Reader',
     );
-    expect(libraryHardeningService.getIssuedBooksReport).toHaveBeenCalledWith(
-      actor,
-      { page: '1', limit: '25' },
-    );
-    expect(libraryHardeningService.getBorrowerHistory).toHaveBeenCalledWith(
-      actor,
-      { studentId: 'student-1', staffId: undefined, page: '1', limit: '25' },
-    );
-    expect(libraryHardeningService.exportIssuedBooksCsv).toHaveBeenCalledWith(
-      actor,
-    );
-  });
-
-  it('delegates new hardening endpoints to service methods', () => {
-    const { controller, libraryService } = createController();
-    libraryService.getBorrowedStudents.mockReturnValue({ items: [] });
-    libraryService.listFines.mockReturnValue({ items: [] });
-    libraryService.getPopularBooksReport.mockReturnValue({ items: [] });
-    libraryService.getLibrarySettings.mockReturnValue({ finePerDay: '10' });
-    libraryService.resolveQrBorrower.mockReturnValue({ name: 'Student' });
-
-    expect(controller.getBorrowedStudents(actor, '1', '10')).toEqual({
-      items: [],
-    });
-    expect(controller.listFines(actor, '1', '10')).toEqual({ items: [] });
     expect(controller.getPopularBooksReport(actor, '1', '10')).toEqual({
       items: [],
     });
-    expect(controller.getSettings(actor)).toEqual({ finePerDay: '10' });
-    expect(controller.resolveQrBorrower(actor, 'token')).toEqual({
-      name: 'Student',
+  });
+
+  it('delegates fine posting idempotency and payment reconciliation', () => {
+    const { controller, libraryService, libraryHardeningService } =
+      createController();
+    libraryService.listFines.mockReturnValue({ items: [] });
+    libraryService.createFine.mockReturnValue({ id: 'fine-1' });
+    libraryService.updateFine.mockReturnValue({ id: 'fine-1' });
+    libraryHardeningService.postFineToFeesIdempotent.mockReturnValue({
+      feeInvoiceId: 'invoice-1',
+      alreadyPosted: true,
+    });
+    libraryHardeningService.reconcileFinePayment.mockReturnValue({
+      status: 'PAID',
+      alreadyReconciled: false,
     });
 
-    expect(libraryService.getBorrowedStudents).toHaveBeenCalledWith(actor, {
-      page: '1',
-      limit: '10',
-    });
-    expect(libraryService.listFines).toHaveBeenCalledWith(actor, {
-      page: '1',
-      limit: '10',
-    });
-    expect(libraryService.getPopularBooksReport).toHaveBeenCalledWith(actor, {
-      page: '1',
-      limit: '10',
-    });
-    expect(libraryService.getLibrarySettings).toHaveBeenCalledWith(actor);
-    expect(libraryService.resolveQrBorrower).toHaveBeenCalledWith(
-      actor,
-      'token',
+    expect(controller.listFines(actor, '1', '10')).toEqual({ items: [] });
+    expect(controller.createFine(actor, { issueId: 'issue-1', amount: 25 })).toEqual(
+      { id: 'fine-1' },
     );
+    expect(controller.updateFine(actor, 'fine-1', { notes: 'Corrected' })).toEqual({
+      id: 'fine-1',
+    });
+    expect(
+      controller.postFineToFees(actor, 'fine-1', { reason: 'Approved' }),
+    ).toEqual({ feeInvoiceId: 'invoice-1', alreadyPosted: true });
+    expect(controller.reconcileFinePayment(actor, 'fine-1')).toEqual({
+      status: 'PAID',
+      alreadyReconciled: false,
+    });
+
+    expect(libraryHardeningService.postFineToFeesIdempotent).toHaveBeenCalledWith(
+      actor,
+      'fine-1',
+      'Approved',
+    );
+    expect(libraryHardeningService.reconcileFinePayment).toHaveBeenCalledWith(
+      actor,
+      'fine-1',
+    );
+  });
+
+  it('delegates settings, borrower QR lookup, overdue reminder, and legacy history reads', () => {
+    const { controller, libraryService, libraryHardeningService } =
+      createController();
+    libraryService.listOverdue.mockReturnValue({ items: [] });
+    libraryService.getBorrowedStudents.mockReturnValue({ items: [] });
+    libraryService.getBookHistory.mockReturnValue({ history: [] });
+    libraryService.getCopyHistory.mockReturnValue({ history: [] });
+    libraryService.resolveQrBorrower.mockReturnValue({ name: 'Student' });
+    libraryHardeningService.sendOverdueRemindersIdempotent.mockReturnValue({
+      skipped: false,
+      deliveryCount: 1,
+    });
+    libraryHardeningService.getLibrarySettings.mockReturnValue({ finePerDay: '10' });
+    libraryHardeningService.updateLibrarySettings.mockReturnValue({ finePerDay: '20' });
+
+    expect(controller.listOverdue(actor, '1', '20')).toEqual({ items: [] });
+    expect(controller.sendOverdueReminders(actor)).toEqual({
+      skipped: false,
+      deliveryCount: 1,
+    });
+    expect(controller.getBorrowedStudents(actor, '1', '10')).toEqual({
+      items: [],
+    });
+    expect(controller.getBookHistory(actor, 'book-1')).toEqual({ history: [] });
+    expect(controller.getCopyHistory(actor, 'copy-1')).toEqual({ history: [] });
+    expect(controller.getSettings(actor)).toEqual({ finePerDay: '10' });
+    expect(controller.updateSettings(actor, { finePerDay: 20 })).toEqual({
+      finePerDay: '20',
+    });
+    expect(controller.resolveQrBorrower(actor, 'token')).toEqual({ name: 'Student' });
   });
 });

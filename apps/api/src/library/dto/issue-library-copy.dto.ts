@@ -1,9 +1,4 @@
-import {
-  IsDateString,
-  IsOptional,
-  IsString,
-  ValidateIf,
-} from 'class-validator';
+import { IsDateString, IsOptional, IsString, ValidateIf } from 'class-validator';
 
 export class IssueLibraryCopyDto {
   @IsString()
@@ -17,8 +12,9 @@ export class IssueLibraryCopyDto {
   @IsString()
   borrowerStaffId?: string;
 
+  @IsOptional()
   @IsDateString()
-  dueAt!: string;
+  dueAt?: string;
 
   @IsOptional()
   @IsString()

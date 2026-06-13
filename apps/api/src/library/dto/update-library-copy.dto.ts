@@ -24,6 +24,14 @@ export class UpdateLibraryCopyDto {
   shelfLocation?: string;
 
   @IsOptional()
+  @IsString()
+  acquisitionSource?: string;
+
+  @IsOptional()
+  @IsString()
+  conditionNote?: string;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   replacementCost?: number;
@@ -31,4 +39,8 @@ export class UpdateLibraryCopyDto {
   @IsOptional()
   @IsDateString()
   purchasedAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  lastInventoryAt?: string;
 }

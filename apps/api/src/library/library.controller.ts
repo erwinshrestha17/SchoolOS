@@ -20,8 +20,16 @@ import { ArchiveLibraryBookDto } from './dto/archive-library-book.dto';
 import { CreateLibraryBookDto } from './dto/create-library-book.dto';
 import { CreateLibraryCopyDto } from './dto/create-library-copy.dto';
 import { IssueLibraryCopyDto } from './dto/issue-library-copy.dto';
+import {
+  CreateLibraryReservationDto,
+  FulfillLibraryReservationDto,
+} from './dto/library-reservation.dto';
 import { MarkLibraryCopyStatusDto } from './dto/mark-library-copy-status.dto';
 import { ReturnLibraryCopyDto } from './dto/return-library-copy.dto';
+import {
+  ScannerIssueLibraryCopyDto,
+  ScannerReturnLibraryCopyDto,
+} from './dto/scanner-library.dto';
 import { UpdateLibraryBookDto } from './dto/update-library-book.dto';
 import { UpdateLibraryCopyDto } from './dto/update-library-copy.dto';
 import {
@@ -59,7 +67,7 @@ export class LibraryController {
     @Body() dto: CreateLibraryBookDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.libraryService.createBook(dto, auth);
+    return this.libraryHardeningService.createBook(dto, auth);
   }
 
   @Patch('books/:id')
@@ -69,7 +77,7 @@ export class LibraryController {
     @Body() dto: UpdateLibraryBookDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.libraryService.updateBook(bookId, dto, auth);
+    return this.libraryHardeningService.updateBook(bookId, dto, auth);
   }
 
   @Post('books/:id/archive')
@@ -101,13 +109,22 @@ export class LibraryController {
     });
   }
 
+  @Get('copies/scan/:code')
+  @Permissions('library:copies:read')
+  resolveScannedCopy(
+    @CurrentAuth() auth: AuthContext,
+    @Param('code') code: string,
+  ) {
+    return this.libraryHardeningService.resolveCopyByScanCode(auth, code);
+  }
+
   @Post('copies')
   @Permissions('library:copies:create')
   createCopy(
     @Body() dto: CreateLibraryCopyDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.libraryService.createCopy(dto, auth);
+    return this.libraryHardeningService.createCopy(dto, auth);
   }
 
   @Patch('copies/:id')
@@ -117,7 +134,7 @@ export class LibraryController {
     @Body() dto: UpdateLibraryCopyDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.libraryService.updateCopy(copyId, dto, auth);
+    return this.libraryHardeningService.updateCopy(copyId, dto, auth);
   }
 
   @Patch('copies/:id/status')
@@ -127,7 +144,7 @@ export class LibraryController {
     @Body() dto: MarkLibraryCopyStatusDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.libraryService.markCopyStatus(copyId, dto, auth);
+    return this.libraryHardeningService.markCopyStatus(copyId, dto, auth);
   }
 
   @Post('copies/:id/archive')
@@ -137,7 +154,7 @@ export class LibraryController {
     @Body() dto: ArchiveLibraryBookDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.libraryService.archiveCopy(copyId, dto.reason, auth);
+    return this.libraryHardeningService.archiveCopy(copyId, dto.reason, auth);
   }
 
   @Get('issues')
@@ -150,7 +167,7 @@ export class LibraryController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.libraryService.listIssues(auth, {
+    return this.libraryHardeningService.listIssuesScoped(auth, {
       status,
       studentId,
       staffId,
@@ -159,13 +176,37 @@ export class LibraryController {
     });
   }
 
+  @Get('my/issues')
+  @Permissions('library:issues:read')
+  listMyIssues(
+    @CurrentAuth() auth: AuthContext,
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.libraryHardeningService.listIssuesScoped(auth, {
+      status,
+      page,
+      limit,
+    });
+  }
+
+  @Post('issues/scanner')
+  @Permissions('library:issues:create')
+  issueCopyByScanner(
+    @Body() dto: ScannerIssueLibraryCopyDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.libraryHardeningService.issueCopyByScanner(dto, auth);
+  }
+
   @Post('issues')
   @Permissions('library:issues:create')
   issueCopy(
     @Body() dto: IssueLibraryCopyDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.libraryService.issueCopy(dto, auth);
+    return this.libraryHardeningService.issueCopy(dto, auth);
   }
 
   @Patch('issues/:id/return')
@@ -175,7 +216,65 @@ export class LibraryController {
     @Body() dto: ReturnLibraryCopyDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.libraryService.returnCopy(issueId, dto, auth);
+    return this.libraryHardeningService.returnCopy(issueId, dto, auth);
+  }
+
+  @Post('returns/scanner')
+  @Permissions('library:issues:return')
+  returnCopyByScanner(
+    @Body() dto: ScannerReturnLibraryCopyDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.libraryHardeningService.returnCopyByScanner(dto, auth);
+  }
+
+  @Get('reservations')
+  @Permissions('library:issues:read')
+  listReservations(
+    @CurrentAuth() auth: AuthContext,
+    @Query('status') status?: string,
+    @Query('bookId') bookId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.libraryHardeningService.listReservations(auth, {
+      status,
+      bookId,
+      page,
+      limit,
+    });
+  }
+
+  @Post('reservations')
+  @Permissions('library:issues:create')
+  createReservation(
+    @CurrentAuth() auth: AuthContext,
+    @Body() dto: CreateLibraryReservationDto,
+  ) {
+    return this.libraryHardeningService.createReservation(dto, auth);
+  }
+
+  @Patch('reservations/:id/cancel')
+  @Permissions('library:issues:create')
+  cancelReservation(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') reservationId: string,
+  ) {
+    return this.libraryHardeningService.cancelReservation(reservationId, auth);
+  }
+
+  @Post('reservations/:id/fulfill')
+  @Permissions('library:issues:create')
+  fulfillReservation(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') reservationId: string,
+    @Body() dto: FulfillLibraryReservationDto,
+  ) {
+    return this.libraryHardeningService.fulfillReservation(
+      reservationId,
+      dto,
+      auth,
+    );
   }
 
   @Get('overdue')
@@ -299,7 +398,20 @@ export class LibraryController {
     @Param('id') fineId: string,
     @Body() dto: PostLibraryFineToFeesDto,
   ) {
-    return this.libraryService.postFineToFees(auth, fineId, dto.reason);
+    return this.libraryHardeningService.postFineToFeesIdempotent(
+      auth,
+      fineId,
+      dto.reason,
+    );
+  }
+
+  @Post('fines/:id/reconcile-payment')
+  @Permissions('library:fines:post')
+  reconcileFinePayment(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') fineId: string,
+  ) {
+    return this.libraryHardeningService.reconcileFinePayment(auth, fineId);
   }
 
   @Get('reports/popular')
@@ -309,7 +421,10 @@ export class LibraryController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.libraryService.getPopularBooksReport(auth, { page, limit });
+    return this.libraryHardeningService.getPopularBooksReport(auth, {
+      page,
+      limit,
+    });
   }
 
   @Get('books/:id/history')
@@ -333,7 +448,7 @@ export class LibraryController {
   @Get('settings')
   @Permissions('library:books:read')
   getSettings(@CurrentAuth() auth: AuthContext) {
-    return this.libraryService.getLibrarySettings(auth);
+    return this.libraryHardeningService.getLibrarySettings(auth);
   }
 
   @Patch('settings')
@@ -342,7 +457,7 @@ export class LibraryController {
     @CurrentAuth() auth: AuthContext,
     @Body() dto: UpdateLibrarySettingDto,
   ) {
-    return this.libraryService.updateLibrarySettings(auth, dto);
+    return this.libraryHardeningService.updateLibrarySettings(auth, dto);
   }
 
   @Post('qr-lookup')
