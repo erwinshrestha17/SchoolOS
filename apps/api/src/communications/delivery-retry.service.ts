@@ -262,6 +262,46 @@ export class DeliveryRetryService {
       throw new BadRequestException('Delivery is no longer retryable');
     }
 
+    const readiness = await this.notificationsService.getProviderReadiness?.(
+      delivery.channel,
+    );
+
+    if (readiness && !readiness.enabled) {
+      const errorMessage = sanitizeFailureReason(readiness.failureReason);
+      await this.prisma.notificationDelivery.update({
+        where: { id: delivery.id },
+        data: {
+          status: NotificationStatus.FAILED,
+          errorMessage,
+          failureCode: readiness.failureCode ?? 'PROVIDER_NOT_READY',
+          failureReason: errorMessage,
+          failedAt: new Date(),
+        },
+      });
+
+      await this.auditService.record({
+        action: 'retry_blocked',
+        resource: 'notification_delivery',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: delivery.id,
+        after: {
+          channel: delivery.channel,
+          sourceType: delivery.sourceType,
+          sourceId: delivery.sourceId,
+          failureCode: readiness.failureCode ?? 'PROVIDER_NOT_READY',
+          reason: options.reason ?? null,
+        },
+      });
+
+      return {
+        deliveryId: delivery.id,
+        status: NotificationStatus.FAILED,
+        errorMessage,
+        retriedAt: retriedAt.toISOString(),
+      };
+    }
+
     try {
       if (!delivery.destination) {
         throw new Error(`No destination resolved for ${delivery.channel}`);
@@ -304,8 +344,9 @@ export class DeliveryRetryService {
         retriedAt: retriedAt.toISOString(),
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Notification retry failed';
+      const errorMessage = sanitizeFailureReason(
+        error instanceof Error ? error.message : 'Notification retry failed',
+      );
 
       await this.prisma.notificationDelivery.update({
         where: { id: delivery.id },
@@ -342,4 +383,12 @@ function maskDestination(destination: string | null) {
   }
   if (destination.length <= 4) return '***';
   return `${destination.slice(0, 3)}***${destination.slice(-2)}`;
+}
+
+function sanitizeFailureReason(reason: string | null | undefined) {
+  if (!reason) return 'Notification provider is not ready.';
+  return reason
+    .replace(/(secret|token|key|password|authorization|bearer)=[^\s,;]+/gi, '$1=***')
+    .replace(/Bearer\s+[^\s,;]+/gi, 'Bearer ***')
+    .slice(0, 240);
 }
