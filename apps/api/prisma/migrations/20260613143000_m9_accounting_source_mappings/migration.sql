@@ -1,5 +1,7 @@
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 CREATE TABLE IF NOT EXISTS "AccountingSourceMapping" (
-  "id" TEXT NOT NULL,
+  "id" TEXT NOT NULL DEFAULT gen_random_uuid()::text,
   "tenantId" TEXT NOT NULL,
   "sourceModule" TEXT NOT NULL,
   "sourceType" TEXT NOT NULL,
