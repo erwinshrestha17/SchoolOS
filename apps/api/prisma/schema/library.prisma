@@ -109,6 +109,12 @@ model LibrarySetting {
   maxFineAmount            Decimal? @db.Decimal(12, 2)
   gracePeriodDays          Int      @default(0)
   lostBookChargeMultiplier Decimal  @default(1) @db.Decimal(12, 2)
+  maxBooksPerStudent       Int      @default(3)
+  maxBooksPerStaff         Int      @default(5)
+  studentLoanDays          Int      @default(14)
+  staffLoanDays            Int      @default(30)
+  includeHolidaysInFine    Boolean  @default(false)
+  reservationHoldDays      Int      @default(3)
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
