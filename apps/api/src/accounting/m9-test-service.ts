@@ -5,7 +5,11 @@ import { PrismaService } from '../prisma/prisma.service';
 export class M9TestService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list() {
-    return this.prisma.chartAccount.findMany();
+  writeSample() {
+    return this.prisma.chartAccount.upsert({
+      where: { tenantId_code: { tenantId: 'tenant', code: '1000' } },
+      update: { name: 'Cash' },
+      create: { tenantId: 'tenant', code: '1000', name: 'Cash', type: 'ASSET' as any },
+    });
   }
 }
