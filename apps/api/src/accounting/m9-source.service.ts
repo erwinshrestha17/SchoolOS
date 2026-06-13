@@ -9,7 +9,11 @@ export class M9SourceService {
   constructor(private readonly prisma: PrismaService) {}
 
   listMappings(actor: AuthContext) {
-    return (this.prisma as AnyDb).accountingSourceMapping.findMany({
+    const db = this.prisma as AnyDb;
+    if (!db.accountingSourceMapping) {
+      return [];
+    }
+    return db.accountingSourceMapping.findMany({
       where: { tenantId: actor.tenantId },
     });
   }
