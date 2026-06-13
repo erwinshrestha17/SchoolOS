@@ -15,3 +15,9 @@ CREATE TABLE IF NOT EXISTS "AccountingSourceMapping" (
   "updatedById" TEXT,
   CONSTRAINT "AccountingSourceMapping_pkey" PRIMARY KEY ("id")
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS "AccountingSourceMapping_tenantId_sourceModule_sourceType_postingType_key"
+  ON "AccountingSourceMapping"("tenantId", "sourceModule", "sourceType", "postingType");
+
+CREATE INDEX IF NOT EXISTS "AccountingSourceMapping_tenantId_sourceModule_sourceType_isActive_idx"
+  ON "AccountingSourceMapping"("tenantId", "sourceModule", "sourceType", "isActive");
