@@ -16,3 +16,17 @@ export class CreateStaffLeaveRequestDto {
   @IsString()
   reason!: string;
 }
+
+export class CreateMyStaffLeaveRequestDto {
+  @IsString()
+  leaveType!: string;
+
+  @IsDateString()
+  startsOn!: string;
+
+  @IsDateString()
+  endsOn!: string;
+
+  @IsString()
+  reason!: string;
+}
