@@ -9,7 +9,9 @@ import {
   AttendanceSyncRejectionReason,
   AttendanceSyncStatus,
   AttendanceStatus,
+  AudienceType,
   AuthMethod,
+  ConsentType,
   EnrollmentStatus,
   NotificationChannel,
   Prisma,
@@ -295,7 +297,7 @@ describe('attendance production hardening', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('emits attendance domain events for M10 notification workflows', async () => {
+  it('emits attendance domain events and records child-scoped parent notifications', async () => {
     const finalSession = buildAttendanceSession({
       records: [
         {
@@ -306,13 +308,14 @@ describe('attendance production hardening', () => {
         },
       ],
     });
-    const { service, eventEmitter } = buildService({
-      academicYear: { id: 'ay-1' },
-      classroom: { id: 'class-1', name: 'Grade 1' },
-      section: { id: 'section-1', name: 'A', classId: 'class-1' },
-      students: [buildStudent({ id: 'student-1' })],
-      finalSession,
-    });
+    const { service, eventEmitter, communicationsService, auditService } =
+      buildService({
+        academicYear: { id: 'ay-1' },
+        classroom: { id: 'class-1', name: 'Grade 1' },
+        section: { id: 'section-1', name: 'A', classId: 'class-1' },
+        students: [buildStudent({ id: 'student-1' })],
+        finalSession,
+      });
 
     await service.submitAttendance(
       {
@@ -336,6 +339,75 @@ describe('attendance production hardening', () => {
         tenantId: adminActor.tenantId,
         studentId: 'student-1',
         status: AttendanceStatus.ABSENT,
+      }),
+    );
+    expect(communicationsService.recordDeliveryRecords).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: 'attendance_parent_absence_notification',
+        sourceId: 'session-1:student-1:ABSENT',
+        audienceType: AudienceType.ALL,
+        studentIds: ['student-1'],
+        channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+        requiredConsentTypes: [ConsentType.MESSAGING],
+        communicationCategory: 'ESSENTIAL',
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'parent_status_notifications',
+        resource: 'attendance_session',
+        tenantId: adminActor.tenantId,
+        resourceId: 'session-1',
+      }),
+    );
+  });
+
+  it('returns a repeated absence and late follow-up queue', async () => {
+    const { service } = buildService({});
+    jest.spyOn(service, 'getAttendanceAnomalies').mockResolvedValue({
+      absenceStreaks: [
+        {
+          studentId: 'student-1',
+          studentName: 'Asha Tamang',
+          className: 'Grade 1',
+          sectionName: 'A',
+          streakCount: 5,
+        },
+      ],
+      repeatedLates: [
+        {
+          studentId: 'student-2',
+          studentName: 'Bimal Rai',
+          className: 'Grade 2',
+          sectionName: null,
+          lateCount: 3,
+        },
+      ],
+      anomalies: {
+        rosterDivergences: [],
+        lateSubmissions: [],
+        attendanceDrops: [],
+        unsubmittedWorkingDays: [],
+      },
+    });
+
+    const result = await service.getFollowUpQueue(adminActor);
+
+    expect(result.total).toBe(2);
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        type: 'consecutive_absence',
+        studentId: 'student-1',
+        priority: 'high',
+        count: 5,
+      }),
+    );
+    expect(result.items[1]).toEqual(
+      expect.objectContaining({
+        type: 'repeated_late',
+        studentId: 'student-2',
+        priority: 'medium',
+        count: 3,
       }),
     );
   });

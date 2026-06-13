@@ -69,6 +69,22 @@ export class ActivityFeedService {
     private readonly mediaQueue: Queue,
   ) {}
 
+  listMilestoneTemplates(filters: { stage?: string; domain?: string } = {}) {
+    const normalizedStage = filters.stage?.trim().toLowerCase();
+    const normalizedDomain = filters.domain?.trim().toLowerCase();
+
+    return MILESTONE_TEMPLATE_CATALOG.filter((template) => {
+      const matchesStage =
+        !normalizedStage ||
+        template.stage.toLowerCase() === normalizedStage ||
+        template.stageAliases.some((alias) => alias === normalizedStage);
+      const matchesDomain =
+        !normalizedDomain || template.domain.toLowerCase() === normalizedDomain;
+
+      return matchesStage && matchesDomain;
+    }).map(({ stageAliases, ...template }) => template);
+  }
+
   async listPosts(
     actor: AuthContext,
     filters: {
@@ -1465,6 +1481,49 @@ function canManageAllActivity(actor: AuthContext) {
     ['platform_super_admin', 'admin', 'principal'].includes(role),
   );
 }
+
+const MILESTONE_TEMPLATE_CATALOG = [
+  {
+    key: 'ecd-social-shares-materials',
+    stage: 'ECD',
+    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
+    domain: 'Social',
+    milestone: 'Shares classroom materials with peers',
+    suggestedStatus: 'EMERGING',
+    observationPrompt:
+      'Observed during group play, material sharing, or pair activity.',
+  },
+  {
+    key: 'ecd-language-follows-two-step',
+    stage: 'ECD',
+    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
+    domain: 'Language',
+    milestone: 'Follows two-step classroom instructions',
+    suggestedStatus: 'ACHIEVED',
+    observationPrompt:
+      'Record the instruction and whether the child completed both steps independently.',
+  },
+  {
+    key: 'ecd-motor-pencil-grip',
+    stage: 'ECD',
+    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
+    domain: 'Motor',
+    milestone: 'Uses age-appropriate pencil grip',
+    suggestedStatus: 'EMERGING',
+    observationPrompt:
+      'Capture grip, control, and comfort during writing or drawing work.',
+  },
+  {
+    key: 'primary-self-help-organizes-bag',
+    stage: 'Primary',
+    stageAliases: ['grade-1', 'grade-2', 'grade-3', 'grade-4', 'grade-5'],
+    domain: 'Self-help',
+    milestone: 'Organizes school bag and materials with minimal support',
+    suggestedStatus: 'ACHIEVED',
+    observationPrompt:
+      'Note whether the student prepares books, copies, and stationery independently.',
+  },
+] as const;
 
 function hasAllowedImageSignature(buffer: Buffer, contentType: string) {
   if (buffer.length < 4) {

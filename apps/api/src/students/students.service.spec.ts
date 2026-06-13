@@ -1073,6 +1073,138 @@ describe('students lifecycle hardening', () => {
     );
   });
 
+  it('uses tenant document expiry templates for reminder copy', async () => {
+    const expiringDocument = {
+      id: 'student-doc-1',
+      tenantId: actor.tenantId,
+      studentId: 'student-1',
+      kind: 'BIRTH_CERTIFICATE',
+      status: 'ACTIVE',
+      title: 'Birth Certificate',
+      fileName: 'birth.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: 512,
+      objectKey: 'tenant-1/students/student-1/birth.pdf',
+      expiryDate: new Date('2026-03-20T00:00:00.000Z'),
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      tenant: { slug: 'school-one' },
+      student: {
+        id: 'student-1',
+        tenantId: actor.tenantId,
+        studentSystemId: 'SCH-2026-0001',
+        firstNameEn: 'Asha',
+        lastNameEn: 'Shrestha',
+        guardianLinks: [
+          {
+            isPrimary: true,
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+            guardian: {
+              email: 'guardian@example.com',
+              primaryPhone: '9800000000',
+              receivesAlerts: true,
+            },
+          },
+        ],
+      },
+    };
+    const prisma = buildPrisma({
+      studentDocumentFindManyResult: [expiringDocument],
+      studentDocumentExpiryTemplateFindManyResult: [
+        {
+          id: 'email-template-1',
+          tenantId: actor.tenantId,
+          channel: 'email',
+          reminderStatus: 'expiring',
+          subjectTemplate: '{{studentName}} needs {{documentTitle}}',
+          messageTemplate:
+            '{{tenantSlug}}: {{documentTitle}} expires on {{expiryLabel}}',
+        },
+        {
+          id: 'sms-template-1',
+          tenantId: actor.tenantId,
+          channel: 'sms',
+          reminderStatus: 'expiring',
+          subjectTemplate: null,
+          messageTemplate:
+            '{{studentName}} {{documentTitle}} expires in {{daysUntilExpiry}} days',
+        },
+      ],
+    });
+    const { service, notificationsService } = buildService(prisma);
+
+    await service.processStudentDocumentExpiryReminders(
+      new Date('2026-03-01T10:30:00.000Z'),
+    );
+
+    expect(notificationsService.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: 'Asha Shrestha needs Birth Certificate',
+        text: 'school-one: Birth Certificate expires on 2026-03-20',
+      }),
+    );
+    expect(notificationsService.sendSms).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Asha Shrestha Birth Certificate expires in 19 days',
+      }),
+    );
+    expect(prisma.studentDocumentHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        metadata: expect.objectContaining({
+          templateIds: {
+            email: 'email-template-1',
+            sms: 'sms-template-1',
+          },
+        }),
+      }),
+    });
+  });
+
+  it('upserts document expiry templates with audit', async () => {
+    const prisma = buildPrisma({});
+    const { service, auditService } = buildService(prisma);
+
+    const result = await service.upsertDocumentExpiryTemplate(
+      {
+        channel: 'email',
+        reminderStatus: 'expiring',
+        subjectTemplate: '{{studentName}} document expires soon',
+        messageTemplate: '{{documentTitle}} expires on {{expiryLabel}}',
+        daysBeforeExpiry: 14,
+        isActive: true,
+      },
+      actor,
+    );
+
+    expect(prisma.studentDocumentExpiryTemplate.upsert).toHaveBeenCalledWith({
+      where: {
+        tenantId_channel_reminderStatus: {
+          tenantId: actor.tenantId,
+          channel: 'email',
+          reminderStatus: 'expiring',
+        },
+      },
+      update: expect.objectContaining({
+        messageTemplate: '{{documentTitle}} expires on {{expiryLabel}}',
+        daysBeforeExpiry: 14,
+        updatedById: actor.userId,
+      }),
+      create: expect.objectContaining({
+        tenantId: actor.tenantId,
+        channel: 'email',
+        reminderStatus: 'expiring',
+      }),
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'document_expiry_template_upsert',
+        resource: 'student_document_expiry_template',
+        tenantId: actor.tenantId,
+        resourceId: 'template-1',
+      }),
+    );
+    expect(result.id).toBe('template-1');
+  });
+
   it('does not send duplicate student document expiry reminders on the same day', async () => {
     const document = {
       id: 'student-doc-1',
@@ -1605,6 +1737,8 @@ function buildPrisma(options: {
   transactionGuardianIdentityVerificationUpdateResult?: unknown;
   transactionStudentUpdateResult?: unknown;
   attendanceRecordFindManyResult?: unknown[];
+  studentDocumentExpiryTemplateFindManyResult?: unknown[];
+  studentDocumentExpiryTemplateUpsertResult?: unknown;
 }) {
   const transaction = {
     enrollment: {
@@ -1777,6 +1911,28 @@ function buildPrisma(options: {
         .fn()
         .mockResolvedValue(options.studentDocumentHistoryFindManyResult ?? []),
       create: jest.fn().mockResolvedValue({ id: 'document-history-1' }),
+    },
+    studentDocumentExpiryTemplate: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue(
+          options.studentDocumentExpiryTemplateFindManyResult ?? [],
+        ),
+      upsert: jest.fn().mockResolvedValue(
+        options.studentDocumentExpiryTemplateUpsertResult ?? {
+          id: 'template-1',
+          channel: 'email',
+          reminderStatus: 'expiring',
+          subjectTemplate: '{{studentName}} document reminder',
+          messageTemplate:
+            '{{documentTitle}} for {{studentName}} expires on {{expiryLabel}}',
+          daysBeforeExpiry: 30,
+          isActive: true,
+          updatedById: actor.userId,
+          createdAt: new Date('2026-03-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-03-01T00:00:00.000Z'),
+        },
+      ),
     },
     invoice: {
       findMany: jest

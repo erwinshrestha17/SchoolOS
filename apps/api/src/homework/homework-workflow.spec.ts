@@ -147,6 +147,57 @@ describe('Homework Workflow', () => {
     service = module.get<HomeworkService>(HomeworkService);
   });
 
+  it('lists metadata-backed homework templates with tenant-scoped filters', async () => {
+    const template = {
+      ...mockAssignment,
+      id: 'hw-template-1',
+      title: 'Fractions practice',
+      attachmentMetadata: {
+        homeworkTemplate: {
+          isTemplate: true,
+          name: 'Fractions practice',
+        },
+      },
+      updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+    };
+    prisma.homeworkAssignment.findMany.mockResolvedValue([
+      template,
+      {
+        ...mockAssignment,
+        id: 'hw-normal-1',
+        attachmentMetadata: { homeworkTemplate: { isTemplate: false } },
+      },
+    ]);
+
+    const result = await service.listTemplates(mockActor, {
+      classId: 'class-1',
+      subjectId: 'sub-1',
+      search: 'fractions',
+      limit: 20,
+    });
+
+    expect(prisma.homeworkAssignment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: mockActor.tenantId,
+          classId: 'class-1',
+          subjectId: 'sub-1',
+          OR: [
+            { title: { contains: 'fractions', mode: 'insensitive' } },
+            {
+              instructions: {
+                contains: 'fractions',
+                mode: 'insensitive',
+              },
+            },
+          ],
+        }),
+        take: 20,
+      }),
+    );
+    expect(result).toEqual([template]);
+  });
+
   describe('Assignment Lifecycle', () => {
     it('should create a draft homework with attachments', async () => {
       prisma.academicYear.findFirst.mockResolvedValue({ id: 'year-1' });

@@ -361,6 +361,131 @@ export class StudentQrService {
     });
   }
 
+  async getQrAnalytics(
+    tenantId: string,
+    studentId: string,
+    _actor: AuthContext,
+  ) {
+    await this.assertTenantStudent(tenantId, studentId);
+
+    const credentials = await this.prisma.studentQrCredential.findMany({
+      where: { tenantId, studentId },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        rotatedAt: true,
+        revokedAt: true,
+        lastScannedAt: true,
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+    const credentialIds = credentials.map((credential) => credential.id);
+
+    const audits =
+      credentialIds.length > 0
+        ? await this.prisma.auditLog.findMany({
+            where: {
+              tenantId,
+              resource: 'student_qr',
+              resourceId: { in: credentialIds },
+              action: {
+                in: ['QR_RESOLVED', 'QR_RESOLVE_FAILED'],
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 1000,
+          })
+        : [];
+
+    const byPurpose = new Map<
+      string,
+      { purpose: string; successfulScans: number; failedScans: number }
+    >();
+    const failuresByCode = new Map<string, number>();
+    const daily = new Map<
+      string,
+      { date: string; successfulScans: number; failedScans: number }
+    >();
+
+    for (const audit of audits) {
+      const details =
+        audit.after &&
+        typeof audit.after === 'object' &&
+        !Array.isArray(audit.after)
+          ? (audit.after as Record<string, unknown>)
+          : {};
+      const purpose = String(details.purpose ?? 'UNKNOWN');
+      const failureCode = String(details.failureCode ?? 'unknown');
+      const date = audit.createdAt.toISOString().slice(0, 10);
+      const success = audit.action === 'QR_RESOLVED';
+
+      const purposeBucket = byPurpose.get(purpose) ?? {
+        purpose,
+        successfulScans: 0,
+        failedScans: 0,
+      };
+      const dayBucket = daily.get(date) ?? {
+        date,
+        successfulScans: 0,
+        failedScans: 0,
+      };
+
+      if (success) {
+        purposeBucket.successfulScans += 1;
+        dayBucket.successfulScans += 1;
+      } else {
+        purposeBucket.failedScans += 1;
+        dayBucket.failedScans += 1;
+        failuresByCode.set(
+          failureCode,
+          (failuresByCode.get(failureCode) ?? 0) + 1,
+        );
+      }
+
+      byPurpose.set(purpose, purposeBucket);
+      daily.set(date, dayBucket);
+    }
+
+    return {
+      studentId,
+      credentialCount: credentials.length,
+      activeCredentialCount: credentials.filter(
+        (credential) => credential.status === StudentQrStatus.ACTIVE,
+      ).length,
+      rotatedCredentialCount: credentials.filter(
+        (credential) => credential.status === StudentQrStatus.ROTATED,
+      ).length,
+      revokedCredentialCount: credentials.filter(
+        (credential) => credential.status === StudentQrStatus.REVOKED,
+      ).length,
+      firstIssuedAt:
+        credentials.length > 0
+          ? credentials[credentials.length - 1].createdAt.toISOString()
+          : null,
+      lastScannedAt:
+        credentials
+          .map((credential) => credential.lastScannedAt)
+          .filter((value): value is Date => Boolean(value))
+          .sort((a, b) => b.getTime() - a.getTime())[0]
+          ?.toISOString() ?? null,
+      successfulScans: audits.filter((audit) => audit.action === 'QR_RESOLVED')
+        .length,
+      failedScans: audits.filter(
+        (audit) => audit.action === 'QR_RESOLVE_FAILED',
+      ).length,
+      scansByPurpose: [...byPurpose.values()].sort((a, b) =>
+        a.purpose.localeCompare(b.purpose),
+      ),
+      failuresByCode: [...failuresByCode.entries()]
+        .map(([failureCode, count]) => ({ failureCode, count }))
+        .sort((a, b) => b.count - a.count),
+      dailyScans: [...daily.values()].sort((a, b) =>
+        a.date.localeCompare(b.date),
+      ),
+    };
+  }
+
   async resolveQr(
     tenantId: string,
     token: string,

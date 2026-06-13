@@ -21,6 +21,7 @@ import { CollectPaymentDto } from './dto/collect-payment.dto';
 import { CreateCashierCloseDto } from './dto/create-cashier-close.dto';
 import { CreatePaymentRefundDto } from './dto/create-payment-refund.dto';
 import { DuesQueryDto } from './dto/dues-query.dto';
+import { ListDefaultersDto } from './dto/list-defaulters.dto';
 import { ListCashierClosesDto } from './dto/list-cashier-closes.dto';
 import { ReprintReceiptDto } from './dto/reprint-receipt.dto';
 import { SendDefaulterRemindersDto } from './dto/send-defaulter-reminders.dto';
@@ -46,10 +47,9 @@ export class FinanceCompatController {
   @Permissions('fees:manage')
   listDefaulters(
     @CurrentAuth() auth: AuthContext,
-    @Query('classId') classId?: string,
-    @Query('feeHeadId') feeHeadId?: string,
+    @Query() query: ListDefaultersDto,
   ) {
-    return this.financeService.listDefaulters(auth, { classId, feeHeadId });
+    return this.financeService.listDefaulters(auth, query);
   }
 
   @Post('defaulters/reminders')

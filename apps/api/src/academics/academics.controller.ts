@@ -66,6 +66,7 @@ import { PreviewStudentResultDto } from './dto/preview-student-result.dto';
 import { PreviewClassResultsDto } from './dto/preview-class-results.dto';
 import { GradeCalculatorService } from './grade-calculator.service';
 import { ResultsService } from './results.service';
+import { ApplyAssessmentTemplateDto } from './dto/apply-assessment-template.dto';
 
 @Controller('academics')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -93,6 +94,21 @@ export class AcademicsController {
     @Query() dto: ListExamTermsDto,
   ) {
     return this.academicsFoundationService.listExamTerms(auth, dto);
+  }
+
+  @Get('assessment-templates')
+  @Permissions('assessment-components:read', 'academics:read')
+  listAssessmentTemplates() {
+    return this.academicsFoundationService.listAssessmentTemplates();
+  }
+
+  @Post('assessment-templates/apply')
+  @Permissions('assessment-components:manage', 'academics:create')
+  applyAssessmentTemplate(
+    @Body() dto: ApplyAssessmentTemplateDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsFoundationService.applyAssessmentTemplate(dto, auth);
   }
 
   @Get('exam-terms/:id')

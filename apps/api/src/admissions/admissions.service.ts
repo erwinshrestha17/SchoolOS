@@ -29,7 +29,14 @@ import {
   normalizeAdmissionName,
   parseAdmissionCsv,
 } from './admissions.utils';
+import {
+  ADMISSION_APPLICATION_STATUSES,
+  CreateAdmissionApplicationDto,
+  ListAdmissionApplicationsDto,
+  UpdateAdmissionApplicationStatusDto,
+} from './dto/admission-application.dto';
 import { BulkAdmissionImportDto } from './dto/bulk-admission-import.dto';
+import { ListAdmissionImportBatchesDto } from './dto/list-admission-import-batches.dto';
 import { ListAdmissionsDto } from './dto/list-admissions.dto';
 import { CheckAdmissionDuplicateDto } from './dto/check-admission-duplicate.dto';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
@@ -776,8 +783,229 @@ export class AdmissionsService {
     };
   }
 
+  async listApplications(
+    query: ListAdmissionApplicationsDto,
+    actor: AuthContext,
+  ) {
+    const { page = 1, limit = 25, search, status, classId } = query;
+    const skip = (page - 1) * limit;
+    const where: Prisma.AdmissionApplicationWhereInput = {
+      tenantId: actor.tenantId,
+      ...(status ? { status } : {}),
+      ...(classId ? { classId } : {}),
+      ...(search
+        ? {
+            OR: [
+              { firstNameEn: { contains: search, mode: 'insensitive' } },
+              { lastNameEn: { contains: search, mode: 'insensitive' } },
+              { guardianFullName: { contains: search, mode: 'insensitive' } },
+              { guardianPhone: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const [total, items] = await Promise.all([
+      this.prisma.admissionApplication.count({ where }),
+      this.prisma.admissionApplication.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      items: items.map(formatAdmissionApplication),
+      total,
+      page,
+      limit,
+      hasNextPage: total > skip + items.length,
+    };
+  }
+
+  async createApplication(
+    dto: CreateAdmissionApplicationDto,
+    actor: AuthContext,
+  ) {
+    await this.assertOptionalApplicationReferences(dto, actor);
+
+    const duplicateReview =
+      dto.dateOfBirth && (dto.guardianPhone || dto.firstNameEn)
+        ? await this.checkDuplicateAdmissions(
+            {
+              firstNameEn: dto.firstNameEn,
+              lastNameEn: dto.lastNameEn,
+              firstNameNp: dto.firstNameNp,
+              lastNameNp: dto.lastNameNp,
+              dateOfBirth: dto.dateOfBirth,
+              guardianPhones: dto.guardianPhone ? [dto.guardianPhone] : [],
+            },
+            actor,
+          )
+        : null;
+
+    const application = await this.prisma.admissionApplication.create({
+      data: {
+        tenantId: actor.tenantId,
+        status: 'INQUIRY',
+        firstNameEn: dto.firstNameEn.trim(),
+        lastNameEn: dto.lastNameEn.trim(),
+        firstNameNp: dto.firstNameNp?.trim() || null,
+        lastNameNp: dto.lastNameNp?.trim() || null,
+        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
+        gender: dto.gender ?? null,
+        guardianFullName: dto.guardianFullName?.trim() || null,
+        guardianRelation: dto.guardianRelation?.trim() || null,
+        guardianPhone: dto.guardianPhone
+          ? normalizeGuardianPhone(dto.guardianPhone)
+          : null,
+        guardianEmail: dto.guardianEmail?.trim() || null,
+        academicYearId: dto.academicYearId ?? null,
+        classId: dto.classId ?? null,
+        sectionId: dto.sectionId ?? null,
+        previousSchool: dto.previousSchool?.trim() || null,
+        source: dto.source?.trim() || null,
+        notes: dto.notes?.trim() || null,
+        duplicateReview: duplicateReview
+          ? (duplicateReview as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
+        createdById: actor.userId,
+        updatedById: actor.userId,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'admission_application_create',
+      resource: 'admission_application',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: application.id,
+      after: {
+        status: application.status,
+        classId: application.classId,
+        duplicateWarnings:
+          duplicateReview?.matches?.length && duplicateReview.matches.length > 0
+            ? duplicateReview.matches.length
+            : 0,
+      },
+    });
+
+    return formatAdmissionApplication(application);
+  }
+
+  async updateApplicationStatus(
+    applicationId: string,
+    dto: UpdateAdmissionApplicationStatusDto,
+    actor: AuthContext,
+  ) {
+    const application = await this.findTenantApplication(applicationId, actor);
+    if (!isAllowedApplicationTransition(application.status, dto.status)) {
+      throw new BadRequestException(
+        `Admission application transition ${application.status} -> ${dto.status} is not allowed`,
+      );
+    }
+
+    if (dto.status === 'REJECTED' && !dto.reason?.trim()) {
+      throw new BadRequestException(
+        'A reason is required to reject an admission application',
+      );
+    }
+
+    const updated = await this.prisma.admissionApplication.update({
+      where: { id: application.id },
+      data: {
+        status: dto.status,
+        rejectedReason:
+          dto.status === 'REJECTED' ? (dto.reason?.trim() ?? null) : null,
+        updatedById: actor.userId,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'admission_application_status_update',
+      resource: 'admission_application',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: application.id,
+      before: { status: application.status },
+      after: { status: updated.status, reason: dto.reason?.trim() ?? null },
+    });
+
+    return formatAdmissionApplication(updated);
+  }
+
+  async enrollApplication(
+    applicationId: string,
+    dto: CreateAdmissionDto,
+    actor: AuthContext,
+  ) {
+    const application = await this.findTenantApplication(applicationId, actor);
+    if (
+      !['ACCEPTED', 'APPLICATION', 'DOCUMENT_PENDING'].includes(
+        application.status,
+      )
+    ) {
+      throw new BadRequestException(
+        'Only accepted or in-progress applications can be enrolled',
+      );
+    }
+
+    const admission = await this.createAdmission(
+      {
+        ...dto,
+        confirmDuplicate: true,
+      },
+      actor,
+    );
+
+    const updated = await this.prisma.admissionApplication.update({
+      where: { id: application.id },
+      data: {
+        status: 'ENROLLED',
+        convertedStudentId: admission.student.id,
+        updatedById: actor.userId,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'admission_application_enroll',
+      resource: 'admission_application',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: application.id,
+      before: { status: application.status },
+      after: {
+        status: updated.status,
+        studentId: admission.student.id,
+      },
+    });
+
+    return {
+      application: formatAdmissionApplication(updated),
+      admission,
+    };
+  }
+
   async bulkImport(dto: BulkAdmissionImportDto, actor: AuthContext) {
     const rows = parseAdmissionCsv(dto.csvContent);
+    const startedAt = new Date();
+    const batch = await this.prisma.admissionImportBatch.create({
+      data: {
+        tenantId: actor.tenantId,
+        sourceFileName: dto.sourceFileName?.trim() || null,
+        dryRun: dto.dryRun ?? false,
+        confirmDuplicates: dto.confirmDuplicates ?? false,
+        status: 'PROCESSING',
+        totalRows: rows.length,
+        createdById: actor.userId,
+        startedAt,
+        metadata: {
+          source: 'admissions.bulk_import',
+          hasHeader: dto.csvContent.trim().split(/\r?\n/).length > 1,
+        },
+      },
+    });
     const results: Array<{
       rowNumber: number;
       status: 'created' | 'validated' | 'failed';
@@ -846,7 +1074,9 @@ export class AdmissionsService {
       resource: 'admission',
       tenantId: actor.tenantId,
       userId: actor.userId,
+      resourceId: batch.id,
       after: {
+        batchId: batch.id,
         totalRows: rows.length,
         dryRun: dto.dryRun ?? false,
         created: results.filter((result) => result.status === 'created').length,
@@ -856,14 +1086,155 @@ export class AdmissionsService {
       },
     });
 
+    const errorReportCsv = buildBulkImportErrorCsv(results);
+    const created = results.filter(
+      (result) => result.status === 'created',
+    ).length;
+    const validated = results.filter(
+      (result) => result.status === 'validated',
+    ).length;
+    const failed = results.filter(
+      (result) => result.status === 'failed',
+    ).length;
+
+    await this.prisma.$transaction(async (tx) => {
+      if (results.length > 0) {
+        await tx.admissionImportRow.createMany({
+          data: results.map((result) => {
+            const sourceRow = rows.find(
+              (row) => row.rowNumber === result.rowNumber,
+            );
+            return {
+              tenantId: actor.tenantId,
+              batchId: batch.id,
+              rowNumber: result.rowNumber,
+              status: result.status.toUpperCase(),
+              studentId: result.studentId ?? null,
+              studentSystemId: result.studentSystemId ?? null,
+              errors: result.errors
+                ? (result.errors as Prisma.InputJsonValue)
+                : Prisma.JsonNull,
+              duplicates: result.duplicates
+                ? (result.duplicates as Prisma.InputJsonValue)
+                : Prisma.JsonNull,
+              rawData: sourceRow?.raw
+                ? (sourceRow.raw as Prisma.InputJsonValue)
+                : Prisma.JsonNull,
+            };
+          }),
+        });
+      }
+
+      await tx.admissionImportBatch.update({
+        where: { id: batch.id },
+        data: {
+          status: failed > 0 ? 'COMPLETED_WITH_ERRORS' : 'COMPLETED',
+          createdRows: created,
+          validatedRows: validated,
+          failedRows: failed,
+          errorReportCsv,
+          completedAt: new Date(),
+        },
+      });
+    });
+
     return {
+      batchId: batch.id,
       totalRows: rows.length,
-      created: results.filter((result) => result.status === 'created').length,
-      validated: results.filter((result) => result.status === 'validated')
-        .length,
-      failed: results.filter((result) => result.status === 'failed').length,
+      created,
+      validated,
+      failed,
       results,
-      errorReportCsv: buildBulkImportErrorCsv(results),
+      errorReportCsv,
+    };
+  }
+
+  async listImportBatches(
+    query: ListAdmissionImportBatchesDto,
+    actor: AuthContext,
+  ) {
+    const { page = 1, limit = 25, status } = query;
+    const skip = (page - 1) * limit;
+    const where: Prisma.AdmissionImportBatchWhereInput = {
+      tenantId: actor.tenantId,
+      ...(status ? { status } : {}),
+    };
+
+    const [total, items] = await Promise.all([
+      this.prisma.admissionImportBatch.count({ where }),
+      this.prisma.admissionImportBatch.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          sourceFileName: true,
+          dryRun: true,
+          confirmDuplicates: true,
+          status: true,
+          totalRows: true,
+          createdRows: true,
+          validatedRows: true,
+          failedRows: true,
+          createdById: true,
+          startedAt: true,
+          completedAt: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    return {
+      items: items.map((item) => ({
+        ...item,
+        startedAt: item.startedAt.toISOString(),
+        completedAt: item.completedAt?.toISOString() ?? null,
+        createdAt: item.createdAt.toISOString(),
+      })),
+      total,
+      page,
+      limit,
+      hasNextPage: total > skip + items.length,
+    };
+  }
+
+  async getImportBatch(batchId: string, actor: AuthContext) {
+    const batch = await this.prisma.admissionImportBatch.findFirst({
+      where: { id: batchId, tenantId: actor.tenantId },
+      include: {
+        rows: {
+          orderBy: { rowNumber: 'asc' },
+        },
+      },
+    });
+
+    if (!batch) {
+      throw new NotFoundException('Admission import batch not found');
+    }
+
+    return {
+      id: batch.id,
+      sourceFileName: batch.sourceFileName,
+      dryRun: batch.dryRun,
+      confirmDuplicates: batch.confirmDuplicates,
+      status: batch.status,
+      totalRows: batch.totalRows,
+      created: batch.createdRows,
+      validated: batch.validatedRows,
+      failed: batch.failedRows,
+      errorReportCsv: batch.errorReportCsv ?? '',
+      startedAt: batch.startedAt.toISOString(),
+      completedAt: batch.completedAt?.toISOString() ?? null,
+      rows: batch.rows.map((row) => ({
+        rowNumber: row.rowNumber,
+        status: row.status.toLowerCase(),
+        studentId: row.studentId ?? undefined,
+        studentSystemId: row.studentSystemId ?? undefined,
+        errors: normalizeJsonArray(row.errors),
+        duplicates: normalizeJsonArray(row.duplicates),
+        rawData: row.rawData ?? null,
+      })),
     };
   }
 
@@ -983,6 +1354,54 @@ export class AdmissionsService {
     if (!hasValidPrimaryPhone) {
       throw new BadRequestException(
         'At least one guardian with a valid primary phone number is required',
+      );
+    }
+  }
+
+  private async assertOptionalApplicationReferences(
+    dto: Pick<
+      CreateAdmissionApplicationDto,
+      'academicYearId' | 'classId' | 'sectionId'
+    >,
+    actor: AuthContext,
+  ) {
+    if (!dto.academicYearId && !dto.classId && !dto.sectionId) {
+      return;
+    }
+
+    const [academicYear, classroom, section] = await Promise.all([
+      dto.academicYearId
+        ? this.prisma.academicYear.findFirst({
+            where: { id: dto.academicYearId, tenantId: actor.tenantId },
+            select: { id: true },
+          })
+        : Promise.resolve({ id: null }),
+      dto.classId
+        ? this.prisma.class.findFirst({
+            where: { id: dto.classId, tenantId: actor.tenantId },
+            select: { id: true },
+          })
+        : Promise.resolve({ id: null }),
+      dto.sectionId
+        ? this.prisma.section.findFirst({
+            where: { id: dto.sectionId, tenantId: actor.tenantId },
+            select: { id: true, classId: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    if (dto.academicYearId && !academicYear?.id) {
+      throw new NotFoundException('Academic year not found in this tenant');
+    }
+    if (dto.classId && !classroom?.id) {
+      throw new NotFoundException('Class not found in this tenant');
+    }
+    if (dto.sectionId && !section) {
+      throw new NotFoundException('Section not found in this tenant');
+    }
+    if (section && dto.classId && section.classId !== dto.classId) {
+      throw new BadRequestException(
+        'Section must belong to the selected class in this tenant',
       );
     }
   }
@@ -1125,6 +1544,21 @@ export class AdmissionsService {
       actor,
     );
   }
+
+  private async findTenantApplication(
+    applicationId: string,
+    actor: AuthContext,
+  ) {
+    const application = await this.prisma.admissionApplication.findFirst({
+      where: { id: applicationId, tenantId: actor.tenantId },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Admission application not found');
+    }
+
+    return application;
+  }
 }
 
 function buildBulkImportErrorCsv(
@@ -1155,6 +1589,76 @@ function buildBulkImportErrorCsv(
   ];
 
   return lines.join('\n');
+}
+
+function formatAdmissionApplication(application: {
+  id: string;
+  status: string;
+  firstNameEn: string;
+  lastNameEn: string;
+  firstNameNp: string | null;
+  lastNameNp: string | null;
+  dateOfBirth: Date | null;
+  gender: string | null;
+  guardianFullName: string | null;
+  guardianRelation: string | null;
+  guardianPhone: string | null;
+  guardianEmail: string | null;
+  academicYearId: string | null;
+  classId: string | null;
+  sectionId: string | null;
+  previousSchool: string | null;
+  source: string | null;
+  notes: string | null;
+  duplicateReview: Prisma.JsonValue | null;
+  convertedStudentId: string | null;
+  rejectedReason: string | null;
+  createdById: string | null;
+  updatedById: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    ...application,
+    fullNameEn: `${application.firstNameEn} ${application.lastNameEn}`.trim(),
+    dateOfBirth: application.dateOfBirth?.toISOString() ?? null,
+    createdAt: application.createdAt.toISOString(),
+    updatedAt: application.updatedAt.toISOString(),
+  };
+}
+
+function isAllowedApplicationTransition(current: string, next: string) {
+  if (!ADMISSION_APPLICATION_STATUSES.includes(next as never)) {
+    return false;
+  }
+
+  if (current === next) {
+    return true;
+  }
+
+  if (current === 'ENROLLED' || current === 'REJECTED') {
+    return false;
+  }
+
+  const allowed: Record<string, string[]> = {
+    INQUIRY: ['APPLICATION', 'DOCUMENT_PENDING', 'REJECTED'],
+    APPLICATION: [
+      'DOCUMENT_PENDING',
+      'ENTRANCE_INTERVIEW',
+      'ACCEPTED',
+      'REJECTED',
+    ],
+    DOCUMENT_PENDING: [
+      'APPLICATION',
+      'ENTRANCE_INTERVIEW',
+      'ACCEPTED',
+      'REJECTED',
+    ],
+    ENTRANCE_INTERVIEW: ['DOCUMENT_PENDING', 'ACCEPTED', 'REJECTED'],
+    ACCEPTED: ['ENROLLED', 'REJECTED'],
+  };
+
+  return allowed[current]?.includes(next) ?? false;
 }
 
 function normalizeGuardianPhone(phone: string) {
@@ -1207,6 +1711,10 @@ function extractImportDuplicates(error: unknown): BulkImportDuplicateWarning[] {
   }
 
   return [];
+}
+
+function normalizeJsonArray(value: Prisma.JsonValue | null) {
+  return Array.isArray(value) ? value : [];
 }
 
 function isBulkImportDuplicateWarning(

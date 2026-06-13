@@ -106,6 +106,23 @@ describe('ActivityFeedService', () => {
     );
   });
 
+  it('returns milestone templates filtered by stage aliases and domain', () => {
+    const templates = service.listMilestoneTemplates({
+      stage: 'montessori',
+      domain: 'Language',
+    });
+
+    expect(templates).toEqual([
+      expect.objectContaining({
+        key: 'ecd-language-follows-two-step',
+        stage: 'ECD',
+        domain: 'Language',
+        milestone: 'Follows two-step classroom instructions',
+      }),
+    ]);
+    expect(templates[0]).not.toHaveProperty('stageAliases');
+  });
+
   it('stores post attachments, student tags, delivery records, and audit trail in one tenant scope', async () => {
     prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
     prisma.section.findFirst.mockResolvedValue({

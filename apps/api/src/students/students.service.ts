@@ -42,6 +42,7 @@ import { ListDuplicateStudentCandidatesDto } from './dto/list-duplicate-student-
 import { MergeDuplicateStudentDto } from './dto/merge-duplicate-student.dto';
 import { MergeDuplicateStudentPreviewDto } from './dto/merge-duplicate-student-preview.dto';
 import { CreateGuardianIdentityVerificationDto } from './dto/create-guardian-identity-verification.dto';
+import { UpsertDocumentExpiryTemplateDto } from './dto/document-expiry-template.dto';
 import { RequestStudentTransferDto } from './dto/request-student-transfer.dto';
 import { RevokeGeneratedStudentDocumentDto } from './dto/revoke-generated-student-document.dto';
 import { ReviewGuardianIdentityVerificationDto } from './dto/review-guardian-identity-verification.dto';
@@ -3198,6 +3199,7 @@ export class StudentsService {
         },
       },
       include: {
+        tenant: true,
         student: {
           include: {
             guardianLinks: {
@@ -3234,6 +3236,18 @@ export class StudentsService {
 
     let remindedDocuments = 0;
     let skippedDocuments = 0;
+    const tenantIds = [
+      ...new Set(candidates.map((document) => document.tenantId)),
+    ];
+    const templates =
+      tenantIds.length > 0
+        ? await this.prisma.studentDocumentExpiryTemplate.findMany({
+            where: {
+              tenantId: { in: tenantIds },
+              isActive: true,
+            },
+          })
+        : [];
 
     for (const document of candidates) {
       if (!document.expiryDate) {
@@ -3275,7 +3289,8 @@ export class StudentsService {
         dayStart,
         startOfDay(document.expiryDate),
       );
-      const reminderStatus = daysUntilExpiry < 0 ? 'expired' : 'expiring';
+      const reminderStatus: 'expired' | 'expiring' =
+        daysUntilExpiry < 0 ? 'expired' : 'expiring';
       const studentName = formatStudentDisplayName(document.student);
       const documentTitle = document.title || formatDocumentKind(document.kind);
       const expiryLabel = document.expiryDate.toISOString().slice(0, 10);
@@ -3290,13 +3305,51 @@ export class StudentsService {
         daysUntilExpiry,
         reminderStatus,
       });
+      const templateContext = {
+        studentName,
+        documentTitle,
+        expiryLabel,
+        daysUntilExpiry,
+        reminderStatus,
+        tenantSlug: document.tenant?.slug ?? document.tenantId,
+      };
+      const emailTemplate = selectDocumentExpiryTemplate(
+        templates,
+        document.tenantId,
+        'email',
+        reminderStatus,
+      );
+      const smsTemplate = selectDocumentExpiryTemplate(
+        templates,
+        document.tenantId,
+        'sms',
+        reminderStatus,
+      );
+      const emailSubject = emailTemplate?.subjectTemplate
+        ? renderDocumentExpiryTemplate(
+            emailTemplate.subjectTemplate,
+            templateContext,
+          )
+        : subject;
+      const emailText = emailTemplate
+        ? renderDocumentExpiryTemplate(
+            emailTemplate.messageTemplate,
+            templateContext,
+          )
+        : text;
+      const smsText = smsTemplate
+        ? renderDocumentExpiryTemplate(
+            smsTemplate.messageTemplate,
+            templateContext,
+          )
+        : text;
 
       for (const recipient of recipients) {
         if (recipient.email) {
           await this.notificationsService.sendEmail({
             to: recipient.email,
-            subject,
-            text,
+            subject: emailSubject,
+            text: emailText,
             metadata: {
               tenantId: document.tenantId,
               studentId: document.studentId,
@@ -3309,7 +3362,7 @@ export class StudentsService {
         if (recipient.phone) {
           await this.notificationsService.sendSms({
             to: recipient.phone,
-            message: text,
+            message: smsText,
             metadata: {
               tenantId: document.tenantId,
               studentId: document.studentId,
@@ -3338,6 +3391,10 @@ export class StudentsService {
             daysUntilExpiry,
             reminderStatus,
             recipientCount: recipients.length,
+            templateIds: {
+              email: emailTemplate?.id ?? null,
+              sms: smsTemplate?.id ?? null,
+            },
           },
         },
       });
@@ -3367,6 +3424,89 @@ export class StudentsService {
       candidateDocuments: candidates.length,
       remindedDocuments,
       skippedDocuments,
+    };
+  }
+
+  async listDocumentExpiryTemplates(actor: AuthContext) {
+    const templates = await this.prisma.studentDocumentExpiryTemplate.findMany({
+      where: { tenantId: actor.tenantId },
+      orderBy: [
+        { channel: 'asc' },
+        { reminderStatus: 'asc' },
+        { createdAt: 'asc' },
+      ],
+    });
+
+    return templates.map((template) => ({
+      id: template.id,
+      channel: template.channel,
+      reminderStatus: template.reminderStatus,
+      subjectTemplate: template.subjectTemplate,
+      messageTemplate: template.messageTemplate,
+      daysBeforeExpiry: template.daysBeforeExpiry,
+      isActive: template.isActive,
+      updatedById: template.updatedById,
+      createdAt: template.createdAt.toISOString(),
+      updatedAt: template.updatedAt.toISOString(),
+    }));
+  }
+
+  async upsertDocumentExpiryTemplate(
+    dto: UpsertDocumentExpiryTemplateDto,
+    actor: AuthContext,
+  ) {
+    const template = await this.prisma.studentDocumentExpiryTemplate.upsert({
+      where: {
+        tenantId_channel_reminderStatus: {
+          tenantId: actor.tenantId,
+          channel: dto.channel,
+          reminderStatus: dto.reminderStatus,
+        },
+      },
+      update: {
+        subjectTemplate: dto.subjectTemplate?.trim() || null,
+        messageTemplate: dto.messageTemplate.trim(),
+        daysBeforeExpiry: dto.daysBeforeExpiry ?? 30,
+        isActive: dto.isActive ?? true,
+        updatedById: actor.userId,
+      },
+      create: {
+        tenantId: actor.tenantId,
+        channel: dto.channel,
+        reminderStatus: dto.reminderStatus,
+        subjectTemplate: dto.subjectTemplate?.trim() || null,
+        messageTemplate: dto.messageTemplate.trim(),
+        daysBeforeExpiry: dto.daysBeforeExpiry ?? 30,
+        isActive: dto.isActive ?? true,
+        updatedById: actor.userId,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'document_expiry_template_upsert',
+      resource: 'student_document_expiry_template',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: template.id,
+      after: {
+        channel: template.channel,
+        reminderStatus: template.reminderStatus,
+        isActive: template.isActive,
+        daysBeforeExpiry: template.daysBeforeExpiry,
+      },
+    });
+
+    return {
+      id: template.id,
+      channel: template.channel,
+      reminderStatus: template.reminderStatus,
+      subjectTemplate: template.subjectTemplate,
+      messageTemplate: template.messageTemplate,
+      daysBeforeExpiry: template.daysBeforeExpiry,
+      isActive: template.isActive,
+      updatedById: template.updatedById,
+      createdAt: template.createdAt.toISOString(),
+      updatedAt: template.updatedAt.toISOString(),
     };
   }
 
@@ -3644,6 +3784,46 @@ function buildDocumentExpiryReminderText(input: {
     `Expiry date: ${input.expiryLabel}.`,
     'Please contact the school office to update the document.',
   ].join(' ');
+}
+
+function selectDocumentExpiryTemplate(
+  templates: Array<{
+    id: string;
+    tenantId: string;
+    channel: string;
+    reminderStatus: string;
+    subjectTemplate: string | null;
+    messageTemplate: string;
+  }>,
+  tenantId: string,
+  channel: 'email' | 'sms',
+  reminderStatus: 'expired' | 'expiring',
+) {
+  return (
+    templates.find(
+      (template) =>
+        template.tenantId === tenantId &&
+        template.channel === channel &&
+        template.reminderStatus === reminderStatus,
+    ) ?? null
+  );
+}
+
+function renderDocumentExpiryTemplate(
+  template: string,
+  context: {
+    studentName: string;
+    documentTitle: string;
+    expiryLabel: string;
+    daysUntilExpiry: number;
+    reminderStatus: 'expired' | 'expiring';
+    tenantSlug: string;
+  },
+) {
+  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) => {
+    const value = context[key as keyof typeof context];
+    return value === undefined ? match : String(value);
+  });
 }
 
 type GeneratedStudentDocumentKind =

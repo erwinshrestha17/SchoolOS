@@ -25,6 +25,7 @@ import { ProcessFeeDueScheduleDto } from './dto/process-fee-due-schedule.dto';
 import { SendDefaulterRemindersDto } from './dto/send-defaulter-reminders.dto';
 import { VoidInvoiceDto } from './dto/void-invoice.dto';
 import { DuesQueryDto } from './dto/dues-query.dto';
+import { ListDefaultersDto } from './dto/list-defaulters.dto';
 import { FinanceService } from './finance.service';
 
 @Controller('fees')
@@ -126,10 +127,9 @@ export class FeesController {
   @Permissions('fees:manage')
   listDefaulters(
     @CurrentAuth() auth: AuthContext,
-    @Query('classId') classId?: string,
-    @Query('feeHeadId') feeHeadId?: string,
+    @Query() query: ListDefaultersDto,
   ) {
-    return this.financeService.listDefaulters(auth, { classId, feeHeadId });
+    return this.financeService.listDefaulters(auth, query);
   }
 
   @Get('due-schedules')

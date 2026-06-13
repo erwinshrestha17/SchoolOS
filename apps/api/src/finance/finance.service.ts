@@ -72,6 +72,7 @@ import { VoidInvoiceDto } from './dto/void-invoice.dto';
 import { resolveCashAccountCode } from './finance.defaults';
 import { ReprintReceiptDto } from './dto/reprint-receipt.dto';
 import { DuesQueryDto } from './dto/dues-query.dto';
+import { FeeAgingBucket, ListDefaultersDto } from './dto/list-defaulters.dto';
 
 export interface FeeCollectionReportRow {
   receiptNumber: string;
@@ -2449,15 +2450,13 @@ export class FinanceService {
     return { disabled: false, applied, skipped };
   }
 
-  async listDefaulters(
-    actor: AuthContext,
-    filters: { classId?: string; feeHeadId?: string } = {},
-  ) {
+  async listDefaulters(actor: AuthContext, filters: ListDefaultersDto = {}) {
     const today = new Date();
+    const overdueFilter = resolveDefaulterOverdueFilter(filters, today);
     const invoices = await this.prisma.invoice.findMany({
       where: {
         tenantId: actor.tenantId,
-        dueDate: { lt: today },
+        dueDate: overdueFilter,
         status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
         ...(filters.classId
           ? {
@@ -2491,40 +2490,64 @@ export class FinanceService {
       take: 100,
     });
 
-    return invoices.map((invoice) => {
-      const paidAmount = Number(sumNetPaidAmount(invoice.payments));
-      const outstanding = Number(invoice.totalAmount) - paidAmount;
-      const daysOverdue = Math.max(
-        0,
-        Math.floor((today.getTime() - invoice.dueDate.getTime()) / 86_400_000),
-      );
+    const items = invoices
+      .map((invoice) => {
+        const paidAmount = Number(sumNetPaidAmount(invoice.payments));
+        const outstanding = Number(invoice.totalAmount) - paidAmount;
+        const daysOverdue = Math.max(
+          0,
+          Math.floor(
+            (today.getTime() - invoice.dueDate.getTime()) / 86_400_000,
+          ),
+        );
 
-      return {
-        invoiceId: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
-        studentId: invoice.studentId,
-        studentName:
-          `${invoice.student.firstNameEn} ${invoice.student.lastNameEn}`.trim(),
-        className: invoice.student.class.name,
-        sectionName: invoice.student.sectionRef?.name ?? null,
-        dueDate: invoice.dueDate,
-        outstanding,
-        daysOverdue,
-        agingBucket: getAgingBucket(daysOverdue),
-        reportCardBlocked: invoice.reportCardBlocked || outstanding > 0,
-        hallTicketBlocked: invoice.hallTicketBlocked || outstanding > 0,
-      };
-    });
+        return {
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          studentId: invoice.studentId,
+          studentName:
+            `${invoice.student.firstNameEn} ${invoice.student.lastNameEn}`.trim(),
+          className: invoice.student.class.name,
+          sectionName: invoice.student.sectionRef?.name ?? null,
+          dueDate: invoice.dueDate,
+          outstanding,
+          daysOverdue,
+          agingBucket: getAgingBucket(daysOverdue),
+          reportCardBlocked: invoice.reportCardBlocked || outstanding > 0,
+          hallTicketBlocked: invoice.hallTicketBlocked || outstanding > 0,
+        };
+      })
+      .filter((defaulter) => defaulter.outstanding > 0);
+
+    return {
+      filters: {
+        classId: filters.classId ?? null,
+        feeHeadId: filters.feeHeadId ?? null,
+        agingBucket: filters.agingBucket ?? null,
+        minDaysOverdue: filters.minDaysOverdue ?? null,
+        maxDaysOverdue: filters.maxDaysOverdue ?? null,
+      },
+      total: items.length,
+      totalOutstanding: roundMoney(
+        items.reduce((sum, item) => sum + item.outstanding, 0),
+      ),
+      segments: buildDefaulterSegmentSummary(items),
+      items,
+    };
   }
 
   async sendDefaulterReminders(
     dto: SendDefaulterRemindersDto,
     actor: AuthContext,
   ) {
-    const defaulters = await this.listDefaulters(actor, {
+    const defaulterResult = await this.listDefaulters(actor, {
       classId: dto.classId,
       feeHeadId: dto.feeHeadId,
+      agingBucket: dto.agingBucket,
+      minDaysOverdue: dto.minDaysOverdue,
+      maxDaysOverdue: dto.maxDaysOverdue,
     });
+    const defaulters = defaulterResult.items;
     const selectedDefaulters = dto.invoiceIds?.length
       ? defaulters.filter((defaulter) =>
           dto.invoiceIds?.includes(defaulter.invoiceId),
@@ -2547,14 +2570,15 @@ export class FinanceService {
         sourceId: defaulter.invoiceId,
         audienceType: AudienceType.ALL,
         studentIds: [defaulter.studentId],
-        title: 'Fee payment reminder',
+        title: `Fee payment reminder (${defaulter.agingBucket} overdue)`,
         body:
           dto.message ??
           `Outstanding fee balance Rs ${defaulter.outstanding.toFixed(
             2,
-          )} is overdue for invoice ${defaulter.invoiceNumber}.`,
+          )} is ${defaulter.daysOverdue} days overdue for invoice ${defaulter.invoiceNumber}.`,
         channels,
         requiredConsentTypes: [ConsentType.MESSAGING],
+        communicationCategory: 'ESSENTIAL',
       });
 
       deliveryResults.push({
@@ -2585,6 +2609,8 @@ export class FinanceService {
       userId: actor.userId,
       after: {
         invoiceIds: selectedDefaulters.map((defaulter) => defaulter.invoiceId),
+        filters: defaulterResult.filters,
+        segments: buildDefaulterSegmentSummary(selectedDefaulters),
         channels,
       },
     });
@@ -2592,6 +2618,8 @@ export class FinanceService {
     return {
       requested: dto.invoiceIds?.length ?? defaulters.length,
       reminded: selectedDefaulters.length,
+      filters: defaulterResult.filters,
+      segments: buildDefaulterSegmentSummary(selectedDefaulters),
       channels,
       deliveryResults,
     };
@@ -5474,7 +5502,7 @@ function ledgerEventOrder(
 function getAgingBucket(
   dueDateOrDays: Date | number,
   asOf: Date = new Date(),
-): string {
+): FeeAgingBucket | '0' {
   const diffDays =
     dueDateOrDays instanceof Date
       ? Math.ceil(
@@ -5482,10 +5510,85 @@ function getAgingBucket(
         )
       : dueDateOrDays;
   if (diffDays <= 0) return '0';
-  if (diffDays <= 30) return dueDateOrDays instanceof Date ? '0-30' : '1-30';
+  if (diffDays <= 30) return '0-30';
   if (diffDays <= 60) return '31-60';
   if (diffDays <= 90) return '61-90';
   return '90+';
+}
+
+function resolveDefaulterOverdueFilter(
+  filters: Pick<
+    ListDefaultersDto,
+    'agingBucket' | 'minDaysOverdue' | 'maxDaysOverdue'
+  >,
+  today: Date,
+): Prisma.DateTimeFilter {
+  const bucketRange = filters.agingBucket
+    ? getAgingBucketRange(filters.agingBucket)
+    : null;
+  const minDaysOverdue = Math.max(
+    filters.minDaysOverdue ?? bucketRange?.min ?? 1,
+    bucketRange?.min ?? 1,
+  );
+  const maxDaysOverdue =
+    filters.maxDaysOverdue === undefined
+      ? bucketRange?.max
+      : bucketRange?.max === undefined
+        ? filters.maxDaysOverdue
+        : Math.min(filters.maxDaysOverdue, bucketRange.max);
+
+  if (maxDaysOverdue !== undefined && minDaysOverdue > maxDaysOverdue) {
+    throw new BadRequestException(
+      'minDaysOverdue cannot be greater than maxDaysOverdue for the selected aging segment.',
+    );
+  }
+
+  const dueDateFilter: Prisma.DateTimeFilter = {
+    lt: today,
+    lte: dateDaysAgo(today, minDaysOverdue),
+  };
+
+  if (maxDaysOverdue !== undefined) {
+    dueDateFilter.gte = dateDaysAgo(today, maxDaysOverdue + 1);
+  }
+
+  return dueDateFilter;
+}
+
+function getAgingBucketRange(bucket: FeeAgingBucket) {
+  switch (bucket) {
+    case '0-30':
+      return { min: 1, max: 30 };
+    case '31-60':
+      return { min: 31, max: 60 };
+    case '61-90':
+      return { min: 61, max: 90 };
+    case '90+':
+      return { min: 91, max: undefined };
+  }
+}
+
+function dateDaysAgo(date: Date, days: number) {
+  return new Date(date.getTime() - days * 86_400_000);
+}
+
+function buildDefaulterSegmentSummary(
+  items: Array<{ agingBucket: string; outstanding: number }>,
+) {
+  return ['0-30', '31-60', '61-90', '90+'].map((bucket) => {
+    const bucketItems = items.filter((item) => item.agingBucket === bucket);
+    return {
+      agingBucket: bucket,
+      count: bucketItems.length,
+      outstanding: roundMoney(
+        bucketItems.reduce((sum, item) => sum + item.outstanding, 0),
+      ),
+    };
+  });
+}
+
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
 }
 
 function sumRefundedAmount(refunds: Array<{ amount: Prisma.Decimal }>) {
@@ -5959,7 +6062,9 @@ function normalizeOnlinePaymentWebhookStatus(value: unknown) {
     normalized === 'COMPLETED' ||
     normalized === 'PAID' ||
     normalized === 'PAYMENT_SUCCESS' ||
-    normalized === 'PAYMENT_COMPLETED'
+    normalized === 'PAYMENT_COMPLETED' ||
+    normalized === 'PAYMENT.SUCCESS' ||
+    normalized === 'PAYMENT.COMPLETED'
   ) {
     return 'SUCCESS';
   }
@@ -5970,7 +6075,10 @@ function normalizeOnlinePaymentWebhookStatus(value: unknown) {
     normalized === 'CANCELLED' ||
     normalized === 'CANCELED' ||
     normalized === 'EXPIRED' ||
-    normalized === 'DECLINED'
+    normalized === 'DECLINED' ||
+    normalized === 'PAYMENT.FAILED' ||
+    normalized === 'PAYMENT.CANCELLED' ||
+    normalized === 'PAYMENT.CANCELED'
   ) {
     return 'FAILED';
   }
@@ -5980,7 +6088,9 @@ function normalizeOnlinePaymentWebhookStatus(value: unknown) {
     normalized === 'PROCESSING' ||
     normalized === 'AUTHORIZED' ||
     normalized === 'INITIATED' ||
-    normalized === 'DELAYED'
+    normalized === 'DELAYED' ||
+    normalized === 'PAYMENT.PENDING' ||
+    normalized === 'PAYMENT.PROCESSING'
   ) {
     return 'PENDING';
   }

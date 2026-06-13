@@ -500,6 +500,12 @@ export class AttendanceService {
             }
           }
         }
+
+        await this.recordParentStatusNotifications(
+          session,
+          notifyRecords,
+          actor,
+        );
       }
 
       return {
@@ -3264,6 +3270,106 @@ export class AttendanceService {
     };
   }
 
+  async getFollowUpQueue(actor: AuthContext) {
+    const anomalies = await this.getAttendanceAnomalies(actor);
+    const items = [
+      ...anomalies.absenceStreaks.map((item) => ({
+        type: 'consecutive_absence' as const,
+        studentId: item.studentId,
+        studentName: item.studentName,
+        className: item.className,
+        sectionName: item.sectionName,
+        priority: item.streakCount >= 5 ? 'high' : 'medium',
+        count: item.streakCount,
+        reason: `${item.streakCount} consecutive absences`,
+      })),
+      ...anomalies.repeatedLates.map((item) => ({
+        type: 'repeated_late' as const,
+        studentId: item.studentId,
+        studentName: item.studentName,
+        className: item.className,
+        sectionName: item.sectionName,
+        priority: item.lateCount >= 5 ? 'high' : 'medium',
+        count: item.lateCount,
+        reason: `${item.lateCount} late marks in the last 30 days`,
+      })),
+    ].sort((a, b) => {
+      const priority = priorityWeight(b.priority) - priorityWeight(a.priority);
+      return (
+        priority ||
+        b.count - a.count ||
+        a.studentName.localeCompare(b.studentName)
+      );
+    });
+
+    return {
+      generatedAt: new Date().toISOString(),
+      total: items.length,
+      items,
+    };
+  }
+
+  private async recordParentStatusNotifications(
+    session: {
+      id: string;
+      attendanceDate: Date;
+      classId: string;
+      sectionId: string | null;
+      records: Array<{ studentId: string; status: AttendanceStatus }>;
+    },
+    records: Array<{ studentId: string; status: AttendanceStatus }>,
+    actor: AuthContext,
+  ) {
+    const parentNotificationRecords = records.filter(
+      (record) =>
+        record.status === AttendanceStatus.ABSENT ||
+        record.status === AttendanceStatus.LATE,
+    );
+
+    if (parentNotificationRecords.length === 0) {
+      return;
+    }
+
+    let deliveryCount = 0;
+    for (const record of parentNotificationRecords) {
+      const isLate = record.status === AttendanceStatus.LATE;
+      const sourceType = isLate
+        ? 'attendance_parent_late_notification'
+        : 'attendance_parent_absence_notification';
+      const sourceId = `${session.id}:${record.studentId}:${record.status}`;
+      const delivery = await this.communicationsService.recordDeliveryRecords({
+        actor,
+        sourceType,
+        sourceId,
+        audienceType: AudienceType.ALL,
+        studentIds: [record.studentId],
+        title: isLate ? 'Late attendance update' : 'Absence attendance update',
+        body: isLate
+          ? 'Your child was marked late today. Please contact the school office if this needs review.'
+          : 'Your child was marked absent today. Please contact the school office if this needs review.',
+        channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+        requiredConsentTypes: [ConsentType.MESSAGING],
+        communicationCategory: 'ESSENTIAL',
+      });
+      deliveryCount += delivery.count;
+    }
+
+    await this.auditService.record({
+      action: 'parent_status_notifications',
+      resource: 'attendance_session',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: session.id,
+      after: {
+        attendanceDate: session.attendanceDate.toISOString(),
+        classId: session.classId,
+        sectionId: session.sectionId,
+        notifiedRecords: parentNotificationRecords.length,
+        deliveryCount,
+      },
+    });
+  }
+
   private async validateAttendanceScope(
     actor: AuthContext,
     scope: {
@@ -4472,6 +4578,10 @@ function calculateAttendancePercent(
   ).length;
 
   return Math.round((presentCount / records.length) * 10000) / 100;
+}
+
+function priorityWeight(priority: string) {
+  return priority === 'high' ? 2 : priority === 'medium' ? 1 : 0;
 }
 
 function eachDateInclusive(startsOn: Date, endsOn: Date) {

@@ -224,6 +224,15 @@ export class ActivityFeedController {
     return this.activityFeedService.listMilestones(auth, { studentId, month });
   }
 
+  @Get('milestone-templates')
+  @Permissions('activity_feed:read')
+  listMilestoneTemplates(
+    @Query('stage') stage?: string,
+    @Query('domain') domain?: string,
+  ) {
+    return this.activityFeedService.listMilestoneTemplates({ stage, domain });
+  }
+
   @Post('milestones')
   @Permissions('activity_feed:create')
   createMilestone(

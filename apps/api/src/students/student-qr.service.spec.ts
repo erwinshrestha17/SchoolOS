@@ -282,6 +282,68 @@ describe('StudentQrService', () => {
     expect(result.history[0]).not.toHaveProperty('tokenHash');
   });
 
+  it('summarizes QR operational analytics from tenant-scoped audit logs', async () => {
+    const { service, prisma } = createService();
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.studentQrCredential.findMany.mockResolvedValue([
+      {
+        ...baseCredential,
+        lastScannedAt: new Date('2026-05-13T02:00:00.000Z'),
+      },
+      {
+        ...baseCredential,
+        id: 'qr-old',
+        status: StudentQrStatus.REVOKED,
+        createdAt: new Date('2026-05-12T00:00:00.000Z'),
+      },
+    ]);
+    prisma.auditLog.findMany.mockResolvedValue([
+      {
+        id: 'audit-1',
+        action: 'QR_RESOLVED',
+        userId: 'user-admin',
+        after: { purpose: StudentQrResolvePurpose.ATTENDANCE },
+        createdAt: new Date('2026-05-13T02:00:00.000Z'),
+      },
+      {
+        id: 'audit-2',
+        action: 'QR_RESOLVE_FAILED',
+        userId: 'user-admin',
+        after: {
+          purpose: StudentQrResolvePurpose.ATTENDANCE,
+          failureCode: 'revoked',
+        },
+        createdAt: new Date('2026-05-13T03:00:00.000Z'),
+      },
+    ]);
+
+    const result = await service.getQrAnalytics(
+      'tenant-1',
+      'student-1',
+      adminAuth,
+    );
+
+    expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          resource: 'student_qr',
+          resourceId: { in: ['qr-1', 'qr-old'] },
+        }),
+      }),
+    );
+    expect(result).toMatchObject({
+      studentId: 'student-1',
+      credentialCount: 2,
+      activeCredentialCount: 1,
+      revokedCredentialCount: 1,
+      successfulScans: 1,
+      failedScans: 1,
+      failuresByCode: [{ failureCode: 'revoked', count: 1 }],
+    });
+    expect(result).not.toHaveProperty('tokenHash');
+  });
+
   it('keeps QR scans tenant-scoped', async () => {
     const { service, prisma } = createService();
     prisma.studentQrCredential.findFirst.mockResolvedValue(null);

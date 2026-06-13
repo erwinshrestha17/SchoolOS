@@ -57,6 +57,16 @@ export class StudentQrController {
     );
   }
 
+  @Get(':studentId/qr/analytics')
+  @Permissions('students:qr:read')
+  @ApiOperation({ summary: 'Get operational QR scan analytics for a student' })
+  async getQrAnalytics(
+    @Param('studentId') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentQrService.getQrAnalytics(auth.tenantId, studentId, auth);
+  }
+
   @Post(':studentId/qr')
   @Permissions('students:qr:generate')
   @ApiOperation({

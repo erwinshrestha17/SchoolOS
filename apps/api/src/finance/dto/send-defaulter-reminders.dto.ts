@@ -1,11 +1,16 @@
 import { NotificationChannel } from '@prisma/client';
+import { Type } from 'class-transformer';
 import {
   ArrayUnique,
   IsArray,
   IsEnum,
+  IsIn,
+  IsInt,
   IsOptional,
   IsString,
+  Min,
 } from 'class-validator';
+import { FEE_AGING_BUCKETS, FeeAgingBucket } from './list-defaulters.dto';
 
 export class SendDefaulterRemindersDto {
   @IsOptional()
@@ -21,6 +26,22 @@ export class SendDefaulterRemindersDto {
   @IsOptional()
   @IsString()
   feeHeadId?: string;
+
+  @IsOptional()
+  @IsIn(FEE_AGING_BUCKETS)
+  agingBucket?: FeeAgingBucket;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minDaysOverdue?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxDaysOverdue?: number;
 
   @IsOptional()
   @IsArray()

@@ -27,6 +27,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { HomeworkQueryDto } from './dto/homework-query.dto';
+import { HomeworkTemplateQueryDto } from './dto/homework-template-query.dto';
 import { HomeworkSubmissionQueryDto } from './dto/homework-submission-query.dto';
 import {
   CreateHomeworkSubmissionDto,
@@ -178,15 +179,33 @@ export class HomeworkService {
     return this.findAssignmentOrThrow(actor, id);
   }
 
-  async listTemplates(actor: AuthContext) {
+  async listTemplates(
+    actor: AuthContext,
+    query: HomeworkTemplateQueryDto = {},
+  ) {
     const candidates = await this.prisma.homeworkAssignment.findMany({
       where: {
         tenantId: actor.tenantId,
+        ...(query.classId ? { classId: query.classId } : {}),
+        ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+        ...(query.search
+          ? {
+              OR: [
+                { title: { contains: query.search, mode: 'insensitive' } },
+                {
+                  instructions: {
+                    contains: query.search,
+                    mode: 'insensitive',
+                  },
+                },
+              ],
+            }
+          : {}),
         attachmentMetadata: { not: Prisma.JsonNull },
       },
       include: homeworkAssignmentInclude(),
       orderBy: [{ updatedAt: 'desc' }],
-      take: 100,
+      take: query.limit ?? 100,
     });
 
     return candidates.filter((assignment) =>

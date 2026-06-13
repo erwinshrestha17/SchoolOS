@@ -18,6 +18,7 @@ import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { HomeworkQueryDto } from './dto/homework-query.dto';
+import { HomeworkTemplateQueryDto } from './dto/homework-template-query.dto';
 import { HomeworkSubmissionQueryDto } from './dto/homework-submission-query.dto';
 import {
   LegacyReviewHomeworkSubmissionDto,
@@ -69,8 +70,11 @@ export class HomeworkController {
 
   @Get('templates')
   @Permissions('homework:read')
-  listHomeworkTemplates(@CurrentAuth() auth: AuthContext) {
-    return this.homeworkService.listTemplates(auth);
+  listHomeworkTemplates(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: HomeworkTemplateQueryDto,
+  ) {
+    return this.homeworkService.listTemplates(auth, query);
   }
 
   @Get(':id')

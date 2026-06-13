@@ -13,12 +13,12 @@
 * **Phase 1A:** Completed / Pilot-Ready
 * **Phase 1B:** Completed / Pilot-Ready
 * **M0 Platform Core:** Foundation complete; provider/queue/API-key/File Registry hardening implemented; DTO validation added for provider status/support override/billing reason payloads; queue retry/discard race checks and single-job retry UX added; staging/object-storage/browser coverage remains.
-* **M1 Admissions & Student Profiles:** Pilot-ready plus Student QR scan audit UI, storage/photo/logo, iEMIS artifact registration and class readiness review, duplicate candidate review, structured bulk-import duplicate review, document audit/checklist expiry hardening, automated document-expiry reminders, mobile child profile foundation, and satellite-controller entitlement gating.
-* **M2 Smart Attendance:** Pilot-ready plus lock-window enforcement, working-day calendar policy, concurrent-session conflict handling, correction/offline-draft, rejected replay regressions, correction-review UI, operational anomaly dashboard, app-controlled monthly register exports, mobile teacher scope, real-data teacher dashboard, and mobile parent attendance summary query validation.
-* **M3 Fees & Receipts:** Pilot-ready plus receipt reprint history UI, printed receipt QR verification, reversal/refund approval foundation, cashier close, reconciliation, Analysis CSV exports, protected day-end PDF snapshots, transaction-race coverage, and HMAC-secured online payment webhook verification with duplicate/already-paid/failed-event guards.
-* **M4 Academics / Exams / CAS / Report Cards:** Completed / Pilot-Ready with PDF/report/correction/snapshot polish and protected/app-controlled report-card PDF opening.
-* **M5 Activity Feed & Milestones:** Strong foundation with media privacy, consent-aware blocking, optimized previews, app-controlled private media preview/download helpers, moderation controls, teacher media gallery, and media-access gating.
-* **M6 Homework / Timetable:** Completed / Pilot-Ready with File Registry attachments, homework-specific attachment access helpers, reminder hardening, absence/substitution conflict coverage, mobile homework/timetable views, and improved substitution slot selection / absence recording UI.
+* **M1 Admissions & Student Profiles:** Pilot-ready plus admission application pipeline, Student QR scan audit UI and operational analytics, storage/photo/logo, iEMIS artifact registration and class readiness review, duplicate candidate review, structured bulk-import duplicate review with persistent batch/row history, document audit/checklist expiry hardening, configurable automated document-expiry reminders, mobile child profile foundation, and satellite-controller entitlement gating.
+* **M2 Smart Attendance:** Pilot-ready plus lock-window enforcement, working-day calendar policy, concurrent-session conflict handling, correction/offline-draft, rejected replay regressions, correction-review UI, operational anomaly dashboard, app-controlled monthly register exports, parent absence/late notifications and follow-up queue, mobile teacher scope, real-data teacher dashboard, and mobile parent attendance summary query validation.
+* **M3 Fees & Receipts:** Pilot-ready plus receipt reprint history UI, printed receipt QR verification, reversal/refund approval foundation, cashier close, reconciliation, Analysis CSV exports, protected day-end PDF snapshots, transaction-race coverage, segmented overdue reminder backend, and HMAC-secured online payment webhook verification with duplicate/already-paid/failed-event guards plus dotted provider event fixtures.
+* **M4 Academics / Exams / CAS / Report Cards:** Completed / Pilot-Ready with PDF/report/correction/snapshot polish, protected/app-controlled report-card PDF opening, and backend assessment template presets that create audited exam-term/component structures.
+* **M5 Activity Feed & Milestones:** Strong foundation with media privacy, consent-aware blocking, optimized previews, app-controlled private media preview/download helpers, moderation controls, teacher media gallery, media-access gating, and backend milestone template presets.
+* **M6 Homework / Timetable:** Completed / Pilot-Ready with File Registry attachments, homework-specific attachment access helpers, filtered homework template APIs, reminder hardening, absence/substitution conflict coverage, mobile homework/timetable views, and improved substitution slot selection / absence recording UI.
 * **M7 HR / Payroll:** Completed / Pilot-Ready with posting locks, accounting integration, reversals, PII/self-service bank masking, payroll reports, mobile staff self-service, and statutory deduction retrieval from active salary structures.
 * **M8A Library:** Admin/backend foundation plus QR lookup, fines, staff borrowers, fine-to-fees/accounting tests, scanner-first UI, copy archive workflow, and reports/export polish.
 * **M8B Transport:** Admin/trip/location/report foundation plus Redis GPS/cache/pressure/retention hardening, driver mobile surfaces, parent latest-GPS view, and trip-history exports.
@@ -157,15 +157,14 @@ Before adding or expanding visible features:
   - Queue timeline and failure diagnostics without exposing secrets.
   - Storage readiness panel and report export history.
 
-### M1 Admissions & Student Profiles (94-97%)
-* **Current Status:** Admissions, student records, guardian links, classes, sections, academic year context, Student QR generate/rotate/revoke with credential history and backend scan audit surfaced in the profile UI, protected photos/documents, logo storage, duplicate candidate review, structured CSV bulk-import row review with duplicate candidate metadata, student lifecycle timeline API/UI, student-level iEMIS readiness score/issues, class/section iEMIS readiness review in the student directory, document audit/checklist expiry hardening, automated document-expiry reminder jobs, and parent-safe mobile child profile foundation. Gated by EntitlementGuard.
+### M1 Admissions & Student Profiles (96-98%)
+* **Current Status:** Admissions, admission application pipeline states, student records, guardian links, classes, sections, academic year context, Student QR generate/rotate/revoke with credential history, backend scan audit, and operational analytics surfaced through backend APIs, protected photos/documents, logo storage, duplicate candidate review, structured CSV bulk-import row review with duplicate candidate metadata plus persistent import batch/row history, student lifecycle timeline API/UI, student-level iEMIS readiness score/issues, class/section iEMIS readiness review in the student directory, document audit/checklist expiry hardening, configurable automated document-expiry reminder templates/jobs, and parent-safe mobile child profile foundation. Gated by EntitlementGuard.
 * **Staging / Verification Remaining:**
   - Continue ownership and document-access cross-tenant tests.
   - Duplicate warning and sibling/guardian relationship resolution.
 * **Backend Backlog:**
-  - Deeper QR operational analytics beyond credential history and scan audit.
-  - Customizable document-expiry notification templates beyond the built-in guardian reminder copy.
-  - Persistent import-batch queue/history for legacy records after the current CSV row-review step.
+  - Continue ownership/document cross-tenant regression depth for generated document, import-history, QR analytics, admission-application, and guardian-removal file access paths.
+  - Pilot feedback refinements for transfer-certificate / ID-card wording, application workflow labels, and import-review workflows.
 * **Web Frontend Backlog:**
   - Admission draft autosave and recovery.
   - Sibling/guardian relationship resolution UI.
@@ -176,13 +175,14 @@ Before adding or expanding visible features:
   - Child switcher, QR identity, and safe document previews.
   - Teacher quick student profile scoped to assigned classes only.
 
-### M2 Smart Attendance (94-98%)
-* **Current Status:** Roster, lock-window enforcement, correction/offline drafts, rejected replay, concurrent submission conflict handling, working-day calendar policy, correction review UI, monthly register reports/exports, operational anomaly dashboard, mobile teacher scope, parent attendance, and real-data teacher dashboard.
+### M2 Smart Attendance (96-98%)
+* **Current Status:** Roster, lock-window enforcement, correction/offline drafts, rejected replay, concurrent submission conflict handling, working-day calendar policy, correction review UI, monthly register reports/exports, operational anomaly dashboard, child-scoped parent absence/late notifications, repeated absence/late follow-up queue, mobile teacher scope, parent attendance, and real-data teacher dashboard.
 * **Staging / Verification Remaining:**
   - Continue browser/mobile smoke and UX depth for correction/offline states.
 * **Backend Backlog:**
   - Continue regression coverage for lock-window override, correction audit, duplicate-session conflicts, anomaly calculations, and calendar policy edge cases before claiming production readiness.
   - Exam-day policy refinements after pilot timetable/exam fixture feedback.
+  - Pilot feedback tuning for parent notification wording, channels, and follow-up queue thresholds.
 * **Web Frontend Backlog:**
   - Dedicated attendance workspace polish around bulk present, exception workflows, correction queue filtering, and report discoverability.
   - Attendance anomaly dashboard filters and principal/admin triage polish.
@@ -191,27 +191,27 @@ Before adding or expanding visible features:
   - Teacher assigned-class roster and bulk present.
   - Parent/student monthly attendance calendar with reason display.
 
-### M3 Fees & Receipts (94-97%)
-* **Current Status:** Fee setup, invoices, student ledger, payments, receipts, printed receipt QR verification, receipt reprint with audit history UI, reversal/refund approval foundation, cashier close, reconciliation, CSV exports, protected day-end PDFs, and HMAC online payment webhook verification with duplicate, already-paid, missing-reference, zero-amount, and failed/pending event guards.
+### M3 Fees & Receipts (96-98%)
+* **Current Status:** Fee setup, invoices, student ledger, payments, receipts, printed receipt QR verification, receipt reprint with audit history UI, reversal/refund approval foundation, cashier close, reconciliation, CSV exports, protected day-end PDFs, aging-bucket/min-max overdue defaulter segmentation with child-scoped reminder delivery/audit, and HMAC online payment webhook verification with duplicate, already-paid, missing-reference, zero-amount, dotted success/failure/pending provider events, and failed/pending event guards.
 * **Staging / Verification Remaining:**
   - Reversal/refund/cashier-close isolation tests and gateway sandbox verification.
 * **Backend Backlog:**
   - Sandbox/staging payment gateway verification before enabling real gateways.
-  - Provider-specific gateway callback fixtures and sandbox smoke before enabling real gateways.
+  - Provider-specific gateway sandbox smoke before enabling real gateways.
   - Scholarship/discount adjustment workflow after invoice creation.
-  - Cashier-close concurrency and idempotency coverage.
+  - Additional cashier-close concurrency and idempotency coverage.
 * **Web Frontend Backlog:**
   - Cashier-first collection screen (search student, partial/full collect, print/share).
   - Reusable fee templates by class, transport, canteen, exam, activity, scholarship, discount.
   - Receipt QR verification public-facing wording polish after pilot school feedback.
   - Day-end cashier close by cash, bank, manual reference, and future gateway mode.
-  - Overdue reminder preview and defaulter segmentation.
+  - Overdue reminder preview UI for the existing backend defaulter segmentation.
 * **Mobile Frontend Backlog:**
   - Parent fee dashboard, invoice/receipt list/detail, PDF download/share, due alerts.
   - Payment initiation remains disabled until gateway verification is staging-proven.
 
 ### M4 Academics / Exams / CAS / Report Cards (98-100%)
-* **Current Status:** Subjects, exams, marks, CAS, mark lock/unlock workflow, tenant grading scale/rounding policy, dues-aware result withholding, queued large-batch report-card generation, protected report-card PDFs, and report/correction/history/snapshot/grading-policy workspace polish.
+* **Current Status:** Subjects, exams, marks, CAS, mark lock/unlock workflow, tenant grading scale/rounding policy, dues-aware result withholding, queued large-batch report-card generation, protected report-card PDFs, backend assessment template presets for terminal and theory/practical exam structures, and report/correction/history/snapshot/grading-policy workspace polish.
 * **Staging / Verification Remaining:**
   - Report generation failure and correction tests.
   - Smoke `/dashboard/academics/report-cards`.
@@ -220,7 +220,7 @@ Before adding or expanding visible features:
   - Retest/make-up exam handling.
   - Pilot tuning for large batch thresholds and queue observability after staging fixtures.
 * **Web Frontend Backlog:**
-  - Exam-term and assessment-component templates.
+  - UI polish for the backend exam-term and assessment-component template presets.
   - Teacher-friendly marks grid with autosave and absent/withheld/retest states.
   - Rubric-based CAS entry and progress timeline.
   - Report-card template polish with school branding and remarks after the protected PDF helper path.
@@ -230,7 +230,7 @@ Before adding or expanding visible features:
   - Show only published results and permission-safe data.
 
 ### M5 Activity Feed & Milestones (92-96%)
-* **Current Status:** Private media, consent-aware media blocking, optimized previews, app-controlled media preview/download helpers, moderation controls, teacher media gallery, media-access gating, post-create media/database cleanup on downstream failures, and cross-surface feed/gallery/parent/dashboard invalidation after post mutations.
+* **Current Status:** Private media, consent-aware media blocking, optimized previews, app-controlled media preview/download helpers, moderation controls, teacher media gallery, media-access gating, deterministic Montessori/ECD/primary milestone template presets, post-create media/database cleanup on downstream failures, and cross-surface feed/gallery/parent/dashboard invalidation after post mutations.
 * **Staging / Verification Remaining:**
   - Consent/media cross-tenant tests.
   - Protected media browser smoke.
@@ -240,7 +240,7 @@ Before adding or expanding visible features:
 * **Web Frontend Backlog:**
   - Improved teacher post composer with class/section/student audience preview.
   - Image compression, upload retry, and low-bandwidth preview behavior after the protected media helper path.
-  - Montessori/ECD milestone templates.
+  - UI picker for the backend Montessori/ECD/primary milestone template presets.
   - Moderation queue with reason, restore/archive, and audit trail.
 * **Mobile Frontend Backlog:**
   - Parent child-specific feed and activity detail.
@@ -248,18 +248,18 @@ Before adding or expanding visible features:
   - Signed media preview/download refresh behavior.
 
 ### M6 Homework & Timetable (98-100%)
-* **Current Status:** Reminders, homework-specific attachment access helpers, timetable conflicts, substitutions, slot selection, absence recording, and homework create/publish UI payload alignment with backend `dueDate`, `submissionRequired`, and publish endpoint contracts.
+* **Current Status:** Reminders, homework-specific attachment access helpers, filtered metadata-backed homework template APIs, timetable conflicts, substitutions, slot selection, absence recording, and homework create/publish UI payload alignment with backend `dueDate`, `submissionRequired`, and publish endpoint contracts.
 * **Staging / Verification Remaining:**
   - Attachment and conflict lifecycle tests.
   - Dashboard route smoke and substitution mutation smoke.
 * **Backend Backlog:**
-  - Homework templates, recurring homework, and scheduled reminders.
+  - Continue pilot tuning for homework templates, recurring homework, and scheduled reminders.
   - Attachment lifecycle and reminder re-check tests.
   - Timetable workload balancing and conflict scoring.
   - Substitution workflows linked to staff leave/absence.
 * **Web Frontend Backlog:**
   - Drag-and-drop timetable builder polish.
-  - Homework template library and recurring assignment UI.
+  - Homework template library UI backed by the filtered template endpoint and recurring assignment UI.
   - Homework completion reports and teacher workload report.
   - Substitution calendar with teacher availability.
 * **Mobile Frontend Backlog:**

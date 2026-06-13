@@ -77,6 +77,12 @@ export class AttendanceController {
     return this.attendanceService.getAttendanceAnomalies(auth);
   }
 
+  @Get('follow-ups')
+  @Permissions('attendance:read')
+  getFollowUpQueue(@CurrentAuth() auth: AuthContext) {
+    return this.attendanceService.getFollowUpQueue(auth);
+  }
+
   @Get('summary')
   @Permissions('attendance:read')
   getSummary(

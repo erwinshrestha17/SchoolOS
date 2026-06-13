@@ -29,6 +29,8 @@ function createController() {
   };
   const academicsFoundationService = {
     listExamTerms: jest.fn(),
+    listAssessmentTemplates: jest.fn(),
+    applyAssessmentTemplate: jest.fn(),
     createExamTerm: jest.fn(),
     updateExamTerm: jest.fn(),
     deleteExamTerm: jest.fn(),
@@ -233,6 +235,33 @@ describe('AcademicsController M4 contracts', () => {
       unlockDto,
       actor,
     );
+  });
+
+  it('delegates assessment template listing and application with current actor', () => {
+    const { controller, academicsFoundationService } = createController();
+    const dto = {
+      academicYearId: 'year-1',
+      classId: 'class-1',
+      templateKey: 'basic-terminal',
+      startsOn: '2026-06-01',
+      endsOn: '2026-06-15',
+    };
+    academicsFoundationService.listAssessmentTemplates.mockReturnValue([
+      { key: 'basic-terminal' },
+    ]);
+    academicsFoundationService.applyAssessmentTemplate.mockReturnValue({
+      examTerm: { id: 'term-1' },
+    });
+
+    expect(controller.listAssessmentTemplates()).toEqual([
+      { key: 'basic-terminal' },
+    ]);
+    expect(controller.applyAssessmentTemplate(dto as never, actor)).toEqual({
+      examTerm: { id: 'term-1' },
+    });
+    expect(
+      academicsFoundationService.applyAssessmentTemplate,
+    ).toHaveBeenCalledWith(dto, actor);
   });
 
   it('delegates report card generation and batch generation to report card service', () => {

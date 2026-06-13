@@ -6,6 +6,7 @@ import {
   InvoiceStatus,
   JournalLineSide,
   JournalSourceType,
+  NotificationChannel,
   PaymentMethod,
   Prisma,
 } from '@prisma/client';
@@ -653,6 +654,115 @@ describe('finance production controls', () => {
         actor,
       ),
     ).rejects.toThrow('Receipt not found for this student');
+  });
+
+  it('segments defaulters by overdue bucket with server-side due-date bounds', async () => {
+    const invoice = buildDefaulterInvoice({
+      id: 'invoice-overdue-1',
+      invoiceNumber: 'INV-2026-OVERDUE',
+      dueDate: new Date(Date.now() - 45 * 86_400_000),
+      totalAmount: new Prisma.Decimal(1000),
+      payments: [
+        buildInvoicePayment({
+          amount: new Prisma.Decimal(250),
+          refunds: [],
+        }),
+      ],
+    });
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: null,
+      invoices: [invoice],
+    });
+
+    const result = await service.listDefaulters(actor, {
+      agingBucket: '31-60',
+    });
+
+    expect(prisma.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: actor.tenantId,
+          dueDate: expect.objectContaining({
+            lt: expect.any(Date),
+            lte: expect.any(Date),
+            gte: expect.any(Date),
+          }),
+          status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
+        }),
+      }),
+    );
+    expect(result.filters.agingBucket).toBe('31-60');
+    expect(result.total).toBe(1);
+    expect(result.totalOutstanding).toBe(750);
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        invoiceId: 'invoice-overdue-1',
+        outstanding: 750,
+        agingBucket: '31-60',
+      }),
+    );
+    expect(result.segments).toContainEqual({
+      agingBucket: '31-60',
+      count: 1,
+      outstanding: 750,
+    });
+  });
+
+  it('sends segmented overdue reminders with child-scoped delivery records and audit context', async () => {
+    const invoice = buildDefaulterInvoice({
+      id: 'invoice-overdue-2',
+      invoiceNumber: 'INV-2026-OLD',
+      dueDate: new Date(Date.now() - 95 * 86_400_000),
+      totalAmount: new Prisma.Decimal(1200),
+      payments: [],
+    });
+    const communicationsService = {
+      recordDeliveryRecords: jest.fn().mockResolvedValue({ count: 2 }),
+    };
+    const { service, auditService } = buildService({
+      invoice: null,
+      feeHead: null,
+      invoices: [invoice],
+      communicationsService,
+    });
+
+    const result = await service.sendDefaulterReminders(
+      {
+        agingBucket: '90+',
+        channels: [NotificationChannel.PUSH],
+      },
+      actor,
+    );
+
+    expect(communicationsService.recordDeliveryRecords).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: 'fee_defaulter_reminder',
+        sourceId: 'invoice-overdue-2',
+        studentIds: ['student-1'],
+        title: 'Fee payment reminder (90+ overdue)',
+        channels: [NotificationChannel.PUSH],
+        communicationCategory: 'ESSENTIAL',
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'send',
+        resource: 'fee_defaulter_reminders',
+        after: expect.objectContaining({
+          filters: expect.objectContaining({ agingBucket: '90+' }),
+          segments: expect.arrayContaining([
+            { agingBucket: '90+', count: 1, outstanding: 1200 },
+          ]),
+        }),
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        reminded: 1,
+        filters: expect.objectContaining({ agingBucket: '90+' }),
+      }),
+    );
   });
 
   it('voids unpaid invoices with an audit trail', async () => {
@@ -1577,14 +1687,33 @@ function buildInvoice(overrides: Record<string, unknown> = {}) {
     id: 'invoice-1',
     tenantId: actor.tenantId,
     studentId: 'student-1',
+    invoiceNumber: 'INV-2026-00001',
     status: InvoiceStatus.ISSUED,
     subtotal: new Prisma.Decimal(1000),
     vatAmount: new Prisma.Decimal(117),
     totalAmount: new Prisma.Decimal(1117),
+    dueDate: new Date('2026-05-01T00:00:00.000Z'),
+    issuedAt: new Date('2026-04-01T00:00:00.000Z'),
+    reportCardBlocked: false,
+    hallTicketBlocked: false,
     paidAt: null,
     payments: [],
     ...overrides,
   };
+}
+
+function buildDefaulterInvoice(overrides: Record<string, unknown> = {}) {
+  return buildInvoice({
+    student: {
+      id: 'student-1',
+      firstNameEn: 'Erwin',
+      lastNameEn: 'Shrestha',
+      class: { name: 'Class 1' },
+      sectionRef: { name: 'A' },
+    },
+    payments: [],
+    ...overrides,
+  });
 }
 
 function buildInvoicePayment(overrides: Record<string, unknown> = {}) {
@@ -1709,6 +1838,7 @@ function buildService(options: {
   gatewayProvider?: unknown;
   cashierClosePdfFiles?: unknown[];
   fileRegistryService?: unknown;
+  communicationsService?: unknown;
 }) {
   const prisma = {
     student: {
@@ -1720,6 +1850,7 @@ function buildService(options: {
       count: jest.fn().mockResolvedValue(options.invoiceCount ?? 0),
       create: jest.fn().mockResolvedValue(options.createdInvoice),
       update: jest.fn().mockResolvedValue(options.updatedInvoice),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     discountRule: {
       create: jest.fn().mockResolvedValue(options.createdDiscount),
@@ -1847,7 +1978,9 @@ function buildService(options: {
   const auditService = {
     record: jest.fn(),
   };
-  const communicationsService = {};
+  const communicationsService = options.communicationsService ?? {
+    recordDeliveryRecords: jest.fn().mockResolvedValue({ count: 0 }),
+  };
   const accountingPostingService = {
     postFeePayment: jest
       .fn()

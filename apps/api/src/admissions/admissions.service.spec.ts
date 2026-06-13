@@ -373,6 +373,7 @@ describe('AdmissionsService production hardening', () => {
     );
 
     expect(result.totalRows).toBe(2);
+    expect(result.batchId).toBe('import-batch-1');
     expect(result.validated).toBe(1);
     expect(result.failed).toBe(1);
     expect(result.results[1]).toEqual(
@@ -388,8 +389,33 @@ describe('AdmissionsService production hardening', () => {
         action: 'bulk_import_validate',
         resource: 'admission',
         tenantId: actor.tenantId,
+        resourceId: 'import-batch-1',
       }),
     );
+    expect(tx.admissionImportRow.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          tenantId: actor.tenantId,
+          batchId: 'import-batch-1',
+          rowNumber: 2,
+          status: 'VALIDATED',
+        }),
+        expect.objectContaining({
+          tenantId: actor.tenantId,
+          batchId: 'import-batch-1',
+          rowNumber: 3,
+          status: 'FAILED',
+        }),
+      ]),
+    });
+    expect(tx.admissionImportBatch.update).toHaveBeenCalledWith({
+      where: { id: 'import-batch-1' },
+      data: expect.objectContaining({
+        status: 'COMPLETED_WITH_ERRORS',
+        validatedRows: 1,
+        failedRows: 1,
+      }),
+    });
   });
 
   it('keeps duplicate candidates structured in bulk import review rows', async () => {
@@ -431,6 +457,7 @@ describe('AdmissionsService production hardening', () => {
     );
 
     expect(result.failed).toBe(1);
+    expect(result.batchId).toBe('import-batch-1');
     expect(result.results[0]).toEqual(
       expect.objectContaining({
         rowNumber: 2,
@@ -452,6 +479,103 @@ describe('AdmissionsService production hardening', () => {
       }),
     );
     expect(result.errorReportCsv).toContain('SCH-2026-0007 Asha Tamang');
+  });
+
+  it('creates a tenant-scoped admission application with duplicate review metadata', async () => {
+    const prisma = buildPrisma({
+      studentFindManyResult: [],
+    });
+    const { service, auditService } = buildService(prisma);
+
+    const result = await service.createApplication(
+      {
+        firstNameEn: 'Asha',
+        lastNameEn: 'Tamang',
+        dateOfBirth: '2020-01-02',
+        gender: Gender.FEMALE,
+        guardianFullName: 'Maya Tamang',
+        guardianRelation: 'mother',
+        guardianPhone: '9800000000',
+        academicYearId: 'ay-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
+      actor,
+    );
+
+    expect(prisma.admissionApplication.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        status: 'INQUIRY',
+        firstNameEn: 'Asha',
+        guardianPhone: '9800000000',
+        duplicateReview: expect.objectContaining({ hasWarnings: false }),
+        createdById: actor.userId,
+      }),
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'admission_application_create',
+        resource: 'admission_application',
+        tenantId: actor.tenantId,
+        resourceId: 'application-1',
+      }),
+    );
+    expect(result.id).toBe('application-1');
+  });
+
+  it('requires a reason when rejecting an admission application', async () => {
+    const prisma = buildPrisma({
+      admissionApplicationFindFirstResult: {
+        ...buildApplication(),
+        status: 'APPLICATION',
+      },
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.updateApplicationStatus(
+        'application-1',
+        { status: 'REJECTED' },
+        actor,
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('enrolls an accepted application through the existing admission flow', async () => {
+    const prisma = buildPrisma({
+      admissionApplicationFindFirstResult: {
+        ...buildApplication(),
+        status: 'ACCEPTED',
+      },
+    });
+    const tx = buildTransaction();
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    const { service, auditService } = buildService(prisma);
+
+    const result = await service.enrollApplication(
+      'application-1',
+      buildAdmissionDto(),
+      actor,
+    );
+
+    expect(prisma.admissionApplication.update).toHaveBeenCalledWith({
+      where: { id: 'application-1' },
+      data: expect.objectContaining({
+        status: 'ENROLLED',
+        convertedStudentId: 'student-1',
+        updatedById: actor.userId,
+      }),
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'admission_application_enroll',
+        resource: 'admission_application',
+        resourceId: 'application-1',
+      }),
+    );
+    expect(result.application.status).toBe('ENROLLED');
+    expect(result.admission.student.id).toBe('student-1');
   });
 
   it('rejects missing tenant-owned references before writing', async () => {
@@ -487,6 +611,37 @@ function buildAdmissionDto(): CreateAdmissionDto {
         receivesAlerts: true,
       },
     ],
+  };
+}
+
+function buildApplication() {
+  return {
+    id: 'application-1',
+    tenantId: actor.tenantId,
+    status: 'INQUIRY',
+    firstNameEn: 'Asha',
+    lastNameEn: 'Tamang',
+    firstNameNp: null,
+    lastNameNp: null,
+    dateOfBirth: new Date('2020-01-02T00:00:00.000Z'),
+    gender: Gender.FEMALE,
+    guardianFullName: 'Maya Tamang',
+    guardianRelation: 'mother',
+    guardianPhone: '9800000000',
+    guardianEmail: null,
+    academicYearId: 'ay-1',
+    classId: 'class-1',
+    sectionId: 'section-1',
+    previousSchool: null,
+    source: null,
+    notes: null,
+    duplicateReview: null,
+    convertedStudentId: null,
+    rejectedReason: null,
+    createdById: actor.userId,
+    updatedById: actor.userId,
+    createdAt: new Date('2026-04-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-04-01T00:00:00.000Z'),
   };
 }
 
@@ -562,6 +717,7 @@ function buildService(prisma = buildPrisma()) {
 }
 
 function buildPrisma(overrides: Partial<PrismaMockOptions> = {}) {
+  const tx = buildTransaction();
   return {
     academicYear: {
       findFirst: jest
@@ -606,7 +762,47 @@ function buildPrisma(overrides: Partial<PrismaMockOptions> = {}) {
     role: {
       findUnique: jest.fn(),
     },
-    $transaction: jest.fn(),
+    admissionImportBatch: {
+      create: jest.fn().mockResolvedValue({
+        id: 'import-batch-1',
+        tenantId: actor.tenantId,
+        dryRun: false,
+        confirmDuplicates: false,
+        status: 'PROCESSING',
+        totalRows: 0,
+        createdRows: 0,
+        validatedRows: 0,
+        failedRows: 0,
+        sourceFileName: null,
+        errorReportCsv: null,
+        createdById: actor.userId,
+        startedAt: new Date('2026-04-15T00:00:00.000Z'),
+        completedAt: null,
+        createdAt: new Date('2026-04-15T00:00:00.000Z'),
+      }),
+      count: jest.fn().mockResolvedValue(0),
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    admissionImportRow: {
+      createMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    admissionApplication: {
+      count: jest.fn().mockResolvedValue(0),
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(
+          overrides.admissionApplicationFindFirstResult ?? null,
+        ),
+      create: jest.fn().mockResolvedValue(buildApplication()),
+      update: jest.fn().mockResolvedValue({
+        ...buildApplication(),
+        status: 'ENROLLED',
+        convertedStudentId: 'student-1',
+      }),
+    },
+    $transaction: jest.fn(async (callback) => callback(tx)),
   };
 }
 
@@ -665,6 +861,14 @@ function buildTransaction() {
     auditLog: {
       create: jest.fn().mockResolvedValue({ id: 'audit-1' }),
     },
+    admissionImportRow: {
+      createMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    admissionImportBatch: {
+      update: jest.fn().mockResolvedValue({
+        id: 'import-batch-1',
+      }),
+    },
   };
 }
 
@@ -675,4 +879,5 @@ interface PrismaMockOptions {
   studentFindManyResult: unknown[];
   studentFindFirstResult: unknown;
   enrollmentFindFirstResult: unknown;
+  admissionApplicationFindFirstResult: unknown;
 }

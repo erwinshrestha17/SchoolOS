@@ -20,6 +20,7 @@ function createController() {
     listMoodLogs: jest.fn(),
     createMoodLog: jest.fn(),
     listMilestones: jest.fn(),
+    listMilestoneTemplates: jest.fn(),
     createMilestone: jest.fn(),
   };
   const activityMediaService = {
@@ -188,5 +189,20 @@ describe('ActivityFeedController M5 contracts', () => {
       milestoneDto,
       actor,
     );
+  });
+
+  it('delegates milestone template listing with filters', () => {
+    const { controller, activityFeedService } = createController();
+    activityFeedService.listMilestoneTemplates.mockReturnValue([
+      { key: 'ecd-language-follows-two-step' },
+    ]);
+
+    const result = controller.listMilestoneTemplates('montessori', 'Language');
+
+    expect(activityFeedService.listMilestoneTemplates).toHaveBeenCalledWith({
+      stage: 'montessori',
+      domain: 'Language',
+    });
+    expect(result).toEqual([{ key: 'ecd-language-follows-two-step' }]);
   });
 });

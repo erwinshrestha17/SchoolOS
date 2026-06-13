@@ -16,7 +16,13 @@ import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { AdmissionsService } from './admissions.service';
+import {
+  CreateAdmissionApplicationDto,
+  ListAdmissionApplicationsDto,
+  UpdateAdmissionApplicationStatusDto,
+} from './dto/admission-application.dto';
 import { ListAdmissionsDto } from './dto/list-admissions.dto';
+import { ListAdmissionImportBatchesDto } from './dto/list-admission-import-batches.dto';
 import { BulkAdmissionImportDto } from './dto/bulk-admission-import.dto';
 import { CheckAdmissionDuplicateDto } from './dto/check-admission-duplicate.dto';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
@@ -46,6 +52,48 @@ export class AdmissionsController {
     return this.admissionsService.createAdmission(dto, auth);
   }
 
+  @Get('applications')
+  @Permissions('enrollments:read', 'students:read', 'guardians:read')
+  listApplications(
+    @Query() query: ListAdmissionApplicationsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.admissionsService.listApplications(query, auth);
+  }
+
+  @Post('applications')
+  @Permissions('enrollments:create', 'students:create', 'guardians:create')
+  createApplication(
+    @Body() dto: CreateAdmissionApplicationDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.admissionsService.createApplication(dto, auth);
+  }
+
+  @Post('applications/:id/status')
+  @Permissions('enrollments:create', 'students:create', 'guardians:create')
+  updateApplicationStatus(
+    @Param('id') applicationId: string,
+    @Body() dto: UpdateAdmissionApplicationStatusDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.admissionsService.updateApplicationStatus(
+      applicationId,
+      dto,
+      auth,
+    );
+  }
+
+  @Post('applications/:id/enroll')
+  @Permissions('enrollments:create', 'students:create', 'guardians:create')
+  enrollApplication(
+    @Param('id') applicationId: string,
+    @Body() dto: CreateAdmissionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.admissionsService.enrollApplication(applicationId, dto, auth);
+  }
+
   @Post('duplicates')
   @Permissions('students:read')
   checkDuplicates(
@@ -62,6 +110,24 @@ export class AdmissionsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.admissionsService.bulkImport(dto, auth);
+  }
+
+  @Get('bulk-import/batches')
+  @Permissions('enrollments:read', 'students:read')
+  listImportBatches(
+    @Query() query: ListAdmissionImportBatchesDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.admissionsService.listImportBatches(query, auth);
+  }
+
+  @Get('bulk-import/batches/:id')
+  @Permissions('enrollments:read', 'students:read')
+  getImportBatch(
+    @Param('id') batchId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.admissionsService.getImportBatch(batchId, auth);
   }
 
   @Post('students/:id/transfer')

@@ -6,6 +6,10 @@ export class BulkAdmissionImportDto {
   csvContent!: string;
 
   @IsOptional()
+  @IsString()
+  sourceFileName?: string;
+
+  @IsOptional()
   @IsBoolean()
   dryRun?: boolean;
 

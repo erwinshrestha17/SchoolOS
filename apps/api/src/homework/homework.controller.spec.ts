@@ -18,6 +18,7 @@ function createController() {
     legacyReview: jest.fn(),
     legacySubmit: jest.fn(),
     getAssignment: jest.fn(),
+    listTemplates: jest.fn(),
     createAssignment: jest.fn(),
     updateAssignment: jest.fn(),
     deleteOrCancelHomework: jest.fn(),
@@ -64,6 +65,22 @@ describe('HomeworkController M6 contracts', () => {
 
     expect(homeworkService.listAssignments).toHaveBeenCalledWith(actor, query);
     expect(result).toEqual([{ id: 'homework-1' }]);
+  });
+
+  it('delegates template list filters with current actor', () => {
+    const { controller, homeworkService } = createController();
+    const query = {
+      classId: 'class-1',
+      subjectId: 'subject-1',
+      search: 'fractions',
+      limit: 20,
+    };
+    homeworkService.listTemplates.mockReturnValue([{ id: 'template-1' }]);
+
+    const result = controller.listHomeworkTemplates(actor, query as never);
+
+    expect(homeworkService.listTemplates).toHaveBeenCalledWith(actor, query);
+    expect(result).toEqual([{ id: 'template-1' }]);
   });
 
   it('delegates assignment lifecycle commands with current actor', () => {

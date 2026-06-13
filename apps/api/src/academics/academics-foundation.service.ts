@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { AssessmentType, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,6 +12,10 @@ import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateExamTermDto } from './dto/update-exam-term.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { ListExamTermsDto } from './dto/list-exam-terms.dto';
+import {
+  ApplyAssessmentTemplateDto,
+  AssessmentTemplateKey,
+} from './dto/apply-assessment-template.dto';
 
 interface SubjectFilters {
   classId?: string;
@@ -23,6 +27,125 @@ export class AcademicsFoundationService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
   ) {}
+
+  listAssessmentTemplates() {
+    return ASSESSMENT_TEMPLATE_CATALOG.map((template) => ({
+      key: template.key,
+      name: template.name,
+      description: template.description,
+      defaultExamTermName: template.defaultExamTermName,
+      components: template.components,
+    }));
+  }
+
+  async applyAssessmentTemplate(
+    dto: ApplyAssessmentTemplateDto,
+    actor: AuthContext,
+  ) {
+    await Promise.all([
+      this.ensureAcademicYear(actor, dto.academicYearId),
+      this.ensureClass(actor, dto.classId),
+    ]);
+
+    const template = getAssessmentTemplate(dto.templateKey);
+    const startsOn = this.parseIsoDateOrThrow(dto.startsOn, 'startsOn');
+    const endsOn = this.parseIsoDateOrThrow(dto.endsOn, 'endsOn');
+    this.ensureDateRange(startsOn, endsOn);
+
+    const termWeight = new Prisma.Decimal(100);
+    await this.ensureExamTermWeightLimit(actor, dto.academicYearId, termWeight);
+
+    const subjects = await this.prisma.subject.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        classId: dto.classId,
+        ...(dto.subjectIds?.length ? { id: { in: dto.subjectIds } } : {}),
+      },
+      orderBy: [{ code: 'asc' }],
+    });
+
+    if (subjects.length === 0) {
+      throw new NotFoundException(
+        'No tenant-owned subjects found for this assessment template',
+      );
+    }
+
+    const missingSubjectIds = (dto.subjectIds ?? []).filter(
+      (subjectId) => !subjects.some((subject) => subject.id === subjectId),
+    );
+    if (missingSubjectIds.length > 0) {
+      throw new NotFoundException(
+        'One or more selected subjects were not found in this tenant/class',
+      );
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const examTerm = await tx.examTerm.create({
+        data: {
+          tenantId: actor.tenantId,
+          academicYearId: dto.academicYearId,
+          name: (dto.examTermName ?? template.defaultExamTermName).trim(),
+          startsOn,
+          endsOn,
+          weightPercent: termWeight,
+          status: 'DRAFT',
+        },
+      });
+
+      const components: Prisma.AssessmentComponentGetPayload<{
+        include: { subject: true };
+      }>[] = [];
+      for (const subject of subjects) {
+        for (const component of resolveTemplateComponents(template, subject)) {
+          components.push(
+            await tx.assessmentComponent.create({
+              data: {
+                tenantId: actor.tenantId,
+                examTermId: examTerm.id,
+                subjectId: subject.id,
+                name: component.name,
+                type: component.type,
+                maxMarks: new Prisma.Decimal(component.maxMarks),
+                weightPercent: new Prisma.Decimal(component.weightPercent),
+                passMarks:
+                  component.passMarks === null
+                    ? null
+                    : new Prisma.Decimal(component.passMarks),
+              },
+              include: { subject: true },
+            }),
+          );
+        }
+      }
+
+      return { examTerm, components };
+    });
+
+    await this.auditService.record({
+      action: 'apply_template',
+      resource: 'assessment_template',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: result.examTerm.id,
+      after: {
+        templateKey: template.key,
+        academicYearId: dto.academicYearId,
+        classId: dto.classId,
+        examTermId: result.examTerm.id,
+        subjectCount: subjects.length,
+        componentCount: result.components.length,
+        reason: dto.reason?.trim() || null,
+      },
+    });
+
+    return {
+      templateKey: template.key,
+      examTerm: result.examTerm,
+      subjectCount: subjects.length,
+      componentCount: result.components.length,
+      components: result.components,
+    };
+  }
 
   async listExamTerms(actor: AuthContext, dto: ListExamTermsDto = {}) {
     if (dto.academicYearId) {
@@ -595,4 +718,109 @@ export class AcademicsFoundationService {
       passMarks: dto.passMarks ?? null,
     };
   }
+}
+
+interface AssessmentTemplate {
+  key: AssessmentTemplateKey;
+  name: string;
+  description: string;
+  defaultExamTermName: string;
+  components: Array<{
+    name: string;
+    type: AssessmentType;
+    maxMarks: number;
+    weightPercent: number;
+    passMarks: number | null;
+    practicalOnly?: boolean;
+  }>;
+}
+
+type TemplateSubject = {
+  hasPractical: boolean;
+  theoryMarks: number | null;
+  practicalMarks: number | null;
+  passMarks: number | null;
+};
+
+const ASSESSMENT_TEMPLATE_CATALOG: AssessmentTemplate[] = [
+  {
+    key: 'basic-terminal',
+    name: 'Basic Terminal Exam',
+    description: 'One 100-mark terminal component per subject.',
+    defaultExamTermName: 'Terminal Exam',
+    components: [
+      {
+        name: 'Terminal',
+        type: AssessmentType.TERMINAL,
+        maxMarks: 100,
+        weightPercent: 100,
+        passMarks: 35,
+      },
+    ],
+  },
+  {
+    key: 'theory-practical',
+    name: 'Theory + Practical',
+    description:
+      'Theory/practical split for practical subjects; single terminal component for non-practical subjects.',
+    defaultExamTermName: 'Theory Practical Exam',
+    components: [
+      {
+        name: 'Theory',
+        type: AssessmentType.THEORY,
+        maxMarks: 75,
+        weightPercent: 75,
+        passMarks: 30,
+      },
+      {
+        name: 'Practical',
+        type: AssessmentType.PRACTICAL,
+        maxMarks: 25,
+        weightPercent: 25,
+        passMarks: 10,
+        practicalOnly: true,
+      },
+    ],
+  },
+];
+
+function getAssessmentTemplate(key: AssessmentTemplateKey) {
+  const template = ASSESSMENT_TEMPLATE_CATALOG.find((item) => item.key === key);
+
+  if (!template) {
+    throw new NotFoundException('Assessment template not found');
+  }
+
+  return template;
+}
+
+function resolveTemplateComponents(
+  template: AssessmentTemplate,
+  subject: TemplateSubject,
+) {
+  if (template.key !== 'theory-practical' || subject.hasPractical) {
+    return template.components.map((component) => ({
+      ...component,
+      maxMarks:
+        component.type === AssessmentType.THEORY
+          ? (subject.theoryMarks ?? component.maxMarks)
+          : component.type === AssessmentType.PRACTICAL
+            ? (subject.practicalMarks ?? component.maxMarks)
+            : component.maxMarks,
+      passMarks:
+        component.type === AssessmentType.TERMINAL && subject.passMarks !== null
+          ? subject.passMarks
+          : component.passMarks,
+    }));
+  }
+
+  return [
+    {
+      name: 'Terminal',
+      type: AssessmentType.TERMINAL,
+      maxMarks: 100,
+      weightPercent: 100,
+      passMarks: subject.passMarks ?? 35,
+    },
+  ];
 }

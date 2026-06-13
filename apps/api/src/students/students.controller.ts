@@ -25,6 +25,7 @@ import { ListDuplicateStudentCandidatesDto } from './dto/list-duplicate-student-
 import { MergeDuplicateStudentDto } from './dto/merge-duplicate-student.dto';
 import { MergeDuplicateStudentPreviewDto } from './dto/merge-duplicate-student-preview.dto';
 import { CreateGuardianIdentityVerificationDto } from './dto/create-guardian-identity-verification.dto';
+import { UpsertDocumentExpiryTemplateDto } from './dto/document-expiry-template.dto';
 import { RequestStudentTransferDto } from './dto/request-student-transfer.dto';
 import { RevokeGeneratedStudentDocumentDto } from './dto/revoke-generated-student-document.dto';
 import { ReviewGuardianIdentityVerificationDto } from './dto/review-guardian-identity-verification.dto';
@@ -138,6 +139,21 @@ export class StudentsController {
       { academicYearId, classId, sectionId },
       auth,
     );
+  }
+
+  @Get('document-expiry/templates')
+  @Permissions('students:read')
+  listDocumentExpiryTemplates(@CurrentAuth() auth: AuthContext) {
+    return this.studentsService.listDocumentExpiryTemplates(auth);
+  }
+
+  @Post('document-expiry/templates')
+  @Permissions('students:update')
+  upsertDocumentExpiryTemplate(
+    @Body() dto: UpsertDocumentExpiryTemplateDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.upsertDocumentExpiryTemplate(dto, auth);
   }
 
   @Post('duplicates/merge')

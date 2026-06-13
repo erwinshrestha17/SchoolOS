@@ -4677,6 +4677,107 @@ model StudentQrCredential {
   @@index([tenantId, status])
 }
 
+model AdmissionImportBatch {
+  id             String    @id @default(uuid())
+  tenantId       String
+  sourceFileName String?
+  dryRun         Boolean   @default(false)
+  confirmDuplicates Boolean @default(false)
+  status         String    @default("COMPLETED")
+  totalRows      Int       @default(0)
+  createdRows    Int       @default(0)
+  validatedRows  Int       @default(0)
+  failedRows     Int       @default(0)
+  errorReportCsv String?
+  metadata       Json?
+  createdById    String?
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  tenant Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  rows   AdmissionImportRow[]
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status, createdAt])
+}
+
+model AdmissionImportRow {
+  id              String   @id @default(uuid())
+  tenantId        String
+  batchId         String
+  rowNumber       Int
+  status          String
+  studentId       String?
+  studentSystemId String?
+  errors          Json?
+  duplicates      Json?
+  rawData         Json?
+  createdAt       DateTime @default(now())
+
+  tenant Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  batch  AdmissionImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, rowNumber])
+  @@index([tenantId, batchId])
+  @@index([tenantId, status, createdAt])
+}
+
+model AdmissionApplication {
+  id                  String    @id @default(uuid())
+  tenantId            String
+  status              String    @default("INQUIRY")
+  firstNameEn         String
+  lastNameEn          String
+  firstNameNp         String?
+  lastNameNp          String?
+  dateOfBirth         DateTime?
+  gender              Gender?
+  guardianFullName    String?
+  guardianRelation    String?
+  guardianPhone       String?
+  guardianEmail       String?
+  academicYearId      String?
+  classId             String?
+  sectionId           String?
+  previousSchool      String?
+  source              String?
+  notes               String?
+  duplicateReview     Json?
+  convertedStudentId  String?
+  rejectedReason      String?
+  createdById         String?
+  updatedById         String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, classId, status])
+  @@index([tenantId, guardianPhone])
+  @@index([tenantId, convertedStudentId])
+}
+
+model StudentDocumentExpiryTemplate {
+  id               String   @id @default(uuid())
+  tenantId         String
+  channel          String
+  reminderStatus   String
+  subjectTemplate  String?
+  messageTemplate  String
+  daysBeforeExpiry Int      @default(30)
+  isActive         Boolean  @default(true)
+  updatedById      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, channel, reminderStatus])
+  @@index([tenantId, isActive])
+}
+
 model StudentDocumentHistory {
   id            String   @id @default(uuid())
   tenantId      String
@@ -4924,6 +5025,10 @@ model Tenant {
   accountingReportMappings      AccountingReportAccountMapping[]
   bankStatements                BankStatement[]
   studentQrCredentials          StudentQrCredential[]
+  admissionImportBatches        AdmissionImportBatch[]
+  admissionImportRows           AdmissionImportRow[]
+  admissionApplications         AdmissionApplication[]
+  studentDocumentExpiryTemplates StudentDocumentExpiryTemplate[]
   staffDocuments                StaffDocument[]
   staffLifecycleEvents          StaffLifecycleEvent[]
   supportOverrides              SupportOverride[]
