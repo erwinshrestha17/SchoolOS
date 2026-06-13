@@ -1,6 +1,6 @@
 # SchoolOS Project Status
 
-**Status:** 2026-06-12 implementation updates recorded: M12 Learning Layer production foundation implemented and verified across backend, web runtime, and Flutter summaries, including activity/session/attempt/progress/parent-summary/resource APIs, session monitoring/heartbeat/participants, matching/order questions, Prisma migrations, learning permissions/entitlements, audit logging, web routes, mobile summaries, and E2E/contract/mobile coverage. Prior 2026-06-06 updates: suspended-tenant file/export denial, M0 mobile/queue entitlement hardening, M1/M5/M10 satellite-controller entitlement gating, platform `/platform/demo-requests` operator workspace, and Section 11 remaining-work inventory for M1–M10.
+**Status:** 2026-06-13 documentation update recorded: pre-AI Advanced Operations Plan added as a module-wise implementation blueprint for Nepal-school operational depth before M11 AI. 2026-06-12 implementation updates recorded: M12 Learning Layer production foundation implemented and verified across backend, web runtime, and Flutter summaries, including activity/session/attempt/progress/parent-summary/resource APIs, session monitoring/heartbeat/participants, matching/order questions, Prisma migrations, learning permissions/entitlements, audit logging, web routes, mobile summaries, and E2E/contract/mobile coverage. Prior 2026-06-06 updates: suspended-tenant file/export denial, M0 mobile/queue entitlement hardening, M1/M5/M10 satellite-controller entitlement gating, platform `/platform/demo-requests` operator workspace, and Section 11 remaining-work inventory for M1–M10.
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard, Flutter companion app
 
@@ -19,6 +19,7 @@ docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
 
 docs/project/SCHOOLOS_PROJECT_STATUS.md
 docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
+docs/project/SCHOOLOS_ADVANCED_OPERATIONS_PLAN.md
 docs/project/SCHOOLOS_LEARNING_LAYER_PLAN.md
 
 docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
@@ -55,6 +56,7 @@ M8B Transport: Admin/trip/location/report foundation plus Redis GPS/cache/pressu
 M8C Canteen: Admin/wallet/POS/inventory/vendor/report foundation plus receipt JSON/PDF, stock hardening, wallet guards, linked invoice handoff, parent mobile views, and canteen workspace UI polish
 M9 Accounting: Production-candidate / Pilot-Ready with PDFs, snapshots, audit trail, reconciliation suggestions, File Registry export support, and validated bank statement import DTO/service hardening
 M10 Notices / Communication / Chat: Strong foundation with provider modes, attachments, failure dashboard, moderation/escalation, unread-recipient follow-up, mobile notification/chat surfaces, and full communications/messaging sub-controller entitlement gating
+Pre-AI Advanced Operations Plan: Active module-wise implementation blueprint added on 2026-06-13 for tenant onboarding, student lifecycle, attendance automation, fee workflows, parent/student mobile self-service, communications, exams/report cards, timetable/substitution, transport, canteen, library, HR/payroll, accounting, approvals, rules-based automation, analytics, and document templates
 M12 Learning Layer: Production foundation implemented and verified under apps/api/src/learning plus web Learning routes and Flutter summaries, with activity builder, school-only sessions, session monitoring/heartbeat/participants, lab attempts, autosave/submit, resources, matching/order questions, progress, parent child-scoped summary, student self-scoped summary, Prisma migrations, permissions, entitlement, audit logging, and focused E2E/contract/mobile coverage
 Public marketing/demo intake: Public POST API plus platform `/platform/demo-requests` operator workspace, internal notes, RBAC, audit logging, rate limiting, and tests (public form on 2026-06-04; platform UI on 2026-06-06)
 Settings / audit visibility: Settings audit-log access and UI depth added on 2026-06-04
@@ -72,7 +74,20 @@ Multi-school production-ready: Not yet
 Full SchoolOS product complete: No
 ```
 
-**Remaining M1–M10 work:** Core modules are pilot-ready; enhancement depth, staging smoke, and mobile polish remain. M12 production foundation is implemented; staging fixture validation, seeded browser E2E depth, and future AI/adaptive/simulation scope remain. See `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md`.
+**Remaining M1–M10 work:** Core modules are pilot-ready; enhancement depth, staging smoke, and mobile polish remain. M12 production foundation is implemented; staging fixture validation, seeded browser E2E depth, future non-AI Advanced Operations depth, and later AI/adaptive/simulation scope remain. See `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md` and `docs/project/SCHOOLOS_ADVANCED_OPERATIONS_PLAN.md`.
+
+---
+
+## 2.0 2026-06-13 Pre-AI Advanced Operations Planning Update
+
+```text
+Pre-AI Advanced Operations
+- Added docs/project/SCHOOLOS_ADVANCED_OPERATIONS_PLAN.md as the module-wise implementation blueprint for advanced non-AI SchoolOS features.
+- The plan covers Nepal-school operating realities: cash/bank/QR references, mixed Nepali/English communication, weak connectivity, IEMIS-ready data validation, SEE/+2 academic workflows, transport safety, parent adoption, and low-bandwidth school-office usage.
+- The plan defines build phases before AI: pilot depth, premium private-school operations, and SaaS maturity.
+- It adds implementation direction for reusable approval workflows, rules-based automation, descriptive analytics dashboards, document/certificate templates, mobile/offline reliability, and module-specific advanced backlogs across M0-M12.
+- M11 Intelligence/AI remains explicitly deferred until production data quality, aggregation, audit, and human-review foundations exist.
+```
 
 ---
 
@@ -156,174 +171,4 @@ Verification note:
 
 ```text
 These updates are recorded from commit inspection. Full local/staging verification must still be run before changing readiness claims: db generate/validate, OpenAPI gate, lint, typecheck, unit tests, API E2E, web E2E, build, verify:production, and smoke:pilot (or legacy alias smoke:phase1).
-```
-
----
-
-## 3. Core Architecture
-
-```text
-Monorepo: pnpm
-Backend: NestJS modular monolith
-Database: PostgreSQL + Prisma
-Cache/queues: Redis + BullMQ
-Shared package: packages/core
-Current frontend: Next.js dashboard in apps/web
-Mobile app: Flutter companion app in apps/schoolos_mobile
-```
-
-Rules:
-
-- Keep the modular monolith first.
-- Do not introduce microservices unless scale/team/deployment/compliance clearly justify it and the owner explicitly requests it.
-- Do not migrate to Angular yet.
-- Do not rename `tenantId` to `schoolId` without a deliberate migration.
-- Backend-first for data integrity.
-- UI must consume real APIs.
-- Mobile must consume existing SchoolOS APIs with purpose-limited, tenant-scoped, ownership-tested responses.
-- Every tenant-owned query must be scoped by authenticated `tenantId`.
-- Every business-critical write must be audited.
-
----
-
-## 4. Product Planes
-
-| Plane | Purpose | Frontend | Backend |
-|---|---|---|---|
-| Platform Control Plane | SchoolOS company/operator administration | `/platform/*` | `/platform/*` |
-| Tenant Configuration Plane | School-owned settings/configuration | `/dashboard/settings/*` | `/settings/*` or `/tenant-settings/*` |
-| School Operations Plane | Daily school workflows | `/dashboard/*` | Module APIs such as `/students`, `/attendance`, `/finance`, `/notices`, `/academics`, `/homework`, `/timetable`, `/payroll`, `/accounting`, `/library`, `/transport`, `/canteen` |
-| Public Marketing / Demo Intake | Public lead capture and sales/demo request intake | `/request-demo` | `/demo-requests` |
-
-Rules:
-
-- Do not mix SchoolOS SaaS billing with school fee collection.
-- School users must not access platform settings.
-- Platform support/tenant override must require explicit reason and audit log.
-- Keep public marketing/demo intake separate from tenant school operations.
-- Keep all planes inside the modular monolith for now.
-
----
-
-## 5. Non-Negotiable Product Rules
-
-```text
-1. Tenant isolation is mandatory.
-2. Parent/student/mobile APIs must be purpose-limited and fail closed.
-3. SchoolOS SaaS billing must not mix with school M3/M9 finance.
-4. Money flows must be idempotent and auditable.
-5. Confirmed financial records must use reversal/correction workflows.
-6. Private files must use StorageService/FileRegistryService boundaries.
-7. Provider-disabled/mock modes must be honest in UI.
-8. Do not implement AI/analytics until reliable production data exists.
-9. Do not introduce microservices or Angular migration without explicit owner approval.
-10. Apply code-file modularization gradually in touched areas, not as a risky repo-wide rewrite.
-```
-
----
-
-## 6. Current Implementation Plan
-
-Use this active plan:
-
-```text
-docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
-```
-
-Mandatory near-term order:
-
-```text
-Phase Gate 0 — stabilize verification, migrations, seed data, smoke tests, stale docs
-Phase 1 — harden pilot reliability for existing core
-Phase 2 — finish academic/accounting staging and large-report polish
-Phase 3 — harden homework/timetable and HR/payroll staging/browser/device verification
-Phase 4 — harden library, transport, and canteen operation-specific QA
-Phase 5 — deepen Flutter mobile only through purpose-limited APIs and ownership tests
-Phase 6 — M11 intelligence only after reliable production data exists
-```
-
-The module-wise feature and enhancement backlog is maintained in the active implementation plan. Use it for feature planning after the active phase gate allows new or deeper module work. It does not override verification, tenant-isolation, permission, File Registry, mobile ownership, or provider-disabled/mock-mode rules.
-
-Explicitly deferred unless requested:
-
-```text
-Angular migration
-AI/ML implementation
-Deep parent/mobile expansion without ownership-tested APIs
-Driver live-trip workflow beyond the started mobile shell
-Live transport map/WebSocket/SSE UI
-Microservices
-Biometric workflows
-```
-
----
-
-## 7. Verification Commands
-
-Run relevant checks after meaningful changes:
-
-```bash
-pnpm db:generate
-pnpm db:validate
-pnpm verify:openapi
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:e2e
-pnpm build
-pnpm verify:production
-pnpm smoke:pilot          # Legacy alias: pnpm smoke:phase1
-```
-
-For mobile changes:
-
-```bash
-cd apps/schoolos_mobile
-flutter pub get
-dart format .
-flutter analyze
-flutter test
-```
-
-Do not claim verification passed unless the commands were actually run.
-
----
-
-## 8. Future Codex Prompt Format
-
-```text
-Read these first:
-- AGENTS.md (incorporates development guidelines)
-- docs/project/SCHOOLOS_PROJECT_STATUS.md
-- docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
-- docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md when touching storage/files/media/exports/scaling/tenant isolation
-- docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md when touching platform/settings/queues/transports boundaries
-- docs/design/SCHOOLOS_UI_UX_GUIDE.md when touching web UI
-- apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md when touching mobile
-
-Task:
-[exact feature/change]
-
-Constraints:
-- Do not rewrite unrelated files.
-- Keep NestJS modular monolith.
-- Keep tenantId as the tenant/school boundary.
-- Keep all tenant-owned reads/writes tenant-scoped.
-- Keep platform, tenant settings, public marketing/demo intake, and school operations route boundaries separate.
-- Add pagination/filtering for growing lists.
-- Review/add indexes for high-volume queries.
-- Move slow/retryable/provider/report/PDF/intelligence jobs to BullMQ where appropriate.
-- Add validation, error handling, audit logs, and tests.
-- Do not implement AI features until reliable production data and M11 foundations exist.
-- Enforce plan/feature access backend-side; frontend gating is display only.
-- Run relevant verification commands.
-
-Return:
-- Summary
-- Files changed
-- Backend/API/frontend ownership decisions
-- Scalability decisions
-- Tests run
-- Verification results
-- Remaining gaps
 ```
