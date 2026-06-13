@@ -87,6 +87,7 @@ model StaffAttendance {
   leaveType      String?
   note           String?
   checkInAt      DateTime?
+  checkOutAt     DateTime?
   approvedById   String?
   createdAt      DateTime         @default(now())
 
