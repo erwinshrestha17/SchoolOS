@@ -1,0 +1,2 @@
+-- M9 Accounting source mapping foundation.
+-- Full generated SQL should be produced after prisma schema generation.
