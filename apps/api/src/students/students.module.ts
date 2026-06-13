@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { CommunicationsModule } from '../communications/communications.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { StorageModule } from '../storage/storage.module';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { UsersModule } from '../users/users.module';
@@ -23,6 +24,7 @@ import { StudentQrController } from './student-qr.controller';
     AuthModule,
     UsersModule,
     CommunicationsModule,
+    NotificationsModule,
     AuditModule,
     StorageModule,
     FileRegistryModule,

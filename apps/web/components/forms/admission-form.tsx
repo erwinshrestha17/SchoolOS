@@ -1,116 +1,140 @@
-'use client';
+"use client";
 
-import { zodResolver } from '@hookform/resolvers/zod';
-import { admissionFormSchema, type AdmissionFormInput } from '@schoolos/core';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { useFieldArray, useForm } from 'react-hook-form';
-import { api } from '../../lib/api';
-import { fileToBase64Payload } from '../../lib/files';
-import { SectionCard } from '../ui/section-card';
-import { StatCard } from '../ui/stat-card';
-import { Badge } from '../ui/badge';
-import { EmptyState } from '../ui/empty-state';
-import { cn } from '../../lib/utils';
-import { 
-  UserPlus, 
-  Users, 
-  Wallet, 
-  ChevronRight, 
-  ChevronLeft, 
-  CheckCircle2, 
-  AlertTriangle, 
+import { zodResolver } from "@hookform/resolvers/zod";
+import { admissionFormSchema, type AdmissionFormInput } from "@schoolos/core";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useFieldArray, useForm } from "react-hook-form";
+import { api } from "../../lib/api";
+import { fileToBase64Payload } from "../../lib/files";
+import { SectionCard } from "../ui/section-card";
+import { StatCard } from "../ui/stat-card";
+import { Badge } from "../ui/badge";
+import { EmptyState } from "../ui/empty-state";
+import { cn } from "../../lib/utils";
+import {
+  UserPlus,
+  Users,
+  Wallet,
+  ChevronRight,
+  ChevronLeft,
+  CheckCircle2,
+  AlertTriangle,
   Upload,
   FileText,
   Calendar,
   ShieldCheck,
-  Download
-} from 'lucide-react';
-import { AdmissionsPipeline } from '../admissions/admissions-pipeline';
+  Download,
+} from "lucide-react";
+import { AdmissionsPipeline } from "../admissions/admissions-pipeline";
 
 const today = new Date().toISOString().slice(0, 10);
 
 const enrollmentSteps = [
-  'Personal Info',
-  'Academic Placement',
-  'Guardian Contacts',
-  'Documents & Review',
-  'Success / Next Actions',
+  "Personal Info",
+  "Academic Placement",
+  "Guardian Contacts",
+  "Documents & Review",
+  "Success / Next Actions",
 ] as const;
 
 const documentKinds = [
-  ['BIRTH_CERTIFICATE', 'Birth certificate'],
-  ['TRANSFER_CERTIFICATE', 'Transfer certificate'],
-  ['PHOTO', 'Photo'],
-  ['ID_CARD', 'Guardian ID'],
-  ['OTHER', 'Other'],
+  ["BIRTH_CERTIFICATE", "Birth certificate"],
+  ["TRANSFER_CERTIFICATE", "Transfer certificate"],
+  ["PHOTO", "Photo"],
+  ["ID_CARD", "Guardian ID"],
+  ["OTHER", "Other"],
 ] as const;
 
 const workspaceTabs = [
-  ['pipeline', 'Admissions Pipeline'],
-  ['enrollment', 'New Enrollment'],
-  ['bulk', 'Bulk Import'],
+  ["pipeline", "Admissions Pipeline"],
+  ["enrollment", "New Enrollment"],
+  ["bulk", "Bulk Import"],
 ] as const;
 
 export function AdmissionForm() {
   const queryClient = useQueryClient();
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<typeof workspaceTabs[number][0]>('pipeline');
+  const [activeWorkspaceTab, setActiveWorkspaceTab] =
+    useState<(typeof workspaceTabs)[number][0]>("pipeline");
   const [activeStep, setActiveStep] = useState(0);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
-  const [documentKind, setDocumentKind] = useState('BIRTH_CERTIFICATE');
+  const [documentKind, setDocumentKind] = useState("BIRTH_CERTIFICATE");
   const [bulkFile, setBulkFile] = useState<File | null>(null);
-  const [duplicateWarning, setDuplicateWarning] = useState<Awaited<ReturnType<typeof api.checkAdmissionDuplicates>> | null>(null);
-  const [disabilityMode, setDisabilityMode] = useState<'' | 'NO_KNOWN_DISABILITY' | 'DISABILITY_PRESENT'>('');
-  const [pdfError, setPdfError] = useState('');
+  const [duplicateWarning, setDuplicateWarning] = useState<Awaited<
+    ReturnType<typeof api.checkAdmissionDuplicates>
+  > | null>(null);
+  const [disabilityMode, setDisabilityMode] = useState<
+    "" | "NO_KNOWN_DISABILITY" | "DISABILITY_PRESENT"
+  >("");
+  const [pdfError, setPdfError] = useState("");
 
-  const admissionsQuery = useQuery({ queryKey: ['admissions'], queryFn: () => api.listAdmissions() });
-  const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
-  const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
-  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: () => api.listStudents({ limit: 1000 }) });
+  const admissionsQuery = useQuery({
+    queryKey: ["admissions"],
+    queryFn: () => api.listAdmissions(),
+  });
+  const academicYearsQuery = useQuery({
+    queryKey: ["academic-years"],
+    queryFn: api.listAcademicYears,
+  });
+  const classesQuery = useQuery({
+    queryKey: ["classes"],
+    queryFn: api.listClasses,
+  });
+  const sectionsQuery = useQuery({
+    queryKey: ["sections"],
+    queryFn: api.listSections,
+  });
+  const studentsQuery = useQuery({
+    queryKey: ["students"],
+    queryFn: () => api.listStudents({ limit: 1000 }),
+  });
 
   const form = useForm<AdmissionFormInput>({
     resolver: zodResolver(admissionFormSchema),
-    mode: 'onBlur',
+    mode: "onBlur",
     defaultValues: {
-      dateOfBirth: '',
-      disabilityFlag: '',
+      dateOfBirth: "",
+      disabilityFlag: "",
       confirmNoDisability: false,
       admissionDate: today,
-      gender: 'FEMALE',
-      mediumOfInstruction: 'English',
-      guardians: [{ fullName: '', relation: 'mother', primaryPhone: '', isPrimary: true }],
+      gender: "FEMALE",
+      mediumOfInstruction: "English",
+      guardians: [
+        { fullName: "", relation: "mother", primaryPhone: "", isPrimary: true },
+      ],
     },
   });
 
-  const selectedAcademicYearId = form.watch('academicYearId');
-  const selectedClassId = form.watch('classId');
-  const selectedSectionId = form.watch('sectionId');
-  const watchedDateOfBirth = form.watch('dateOfBirth');
-  const watchedDisabilityFlag = form.watch('disabilityFlag');
-  const watchedConfirmNoDisability = form.watch('confirmNoDisability');
-  const watchedGuardians = form.watch('guardians') ?? [];
-  const watchedFirstNameEn = form.watch('firstNameEn');
-  const watchedLastNameEn = form.watch('lastNameEn');
+  const selectedAcademicYearId = form.watch("academicYearId");
+  const selectedClassId = form.watch("classId");
+  const selectedSectionId = form.watch("sectionId");
+  const watchedDateOfBirth = form.watch("dateOfBirth");
+  const watchedDisabilityFlag = form.watch("disabilityFlag");
+  const watchedConfirmNoDisability = form.watch("confirmNoDisability");
+  const watchedGuardians = form.watch("guardians") ?? [];
+  const watchedFirstNameEn = form.watch("firstNameEn");
+  const watchedLastNameEn = form.watch("lastNameEn");
 
-  const guardians = useFieldArray({ control: form.control, name: 'guardians' });
+  const guardians = useFieldArray({ control: form.control, name: "guardians" });
 
   useEffect(() => {
-    const currentAcademicYear = academicYearsQuery.data?.find(y => y.isCurrent) ?? academicYearsQuery.data?.[0];
-    if (currentAcademicYear && !form.getValues('academicYearId')) {
-      form.setValue('academicYearId', currentAcademicYear.id);
+    const currentAcademicYear =
+      academicYearsQuery.data?.find((y) => y.isCurrent) ??
+      academicYearsQuery.data?.[0];
+    if (currentAcademicYear && !form.getValues("academicYearId")) {
+      form.setValue("academicYearId", currentAcademicYear.id);
     }
   }, [academicYearsQuery.data, form]);
 
   useEffect(() => {
     const firstClass = classesQuery.data?.[0];
-    if (firstClass && !form.getValues('classId')) {
-      form.setValue('classId', firstClass.id);
+    if (firstClass && !form.getValues("classId")) {
+      form.setValue("classId", firstClass.id);
     }
   }, [classesQuery.data, form]);
 
-  const availableSections = (sectionsQuery.data ?? []).filter(s => {
+  const availableSections = (sectionsQuery.data ?? []).filter((s) => {
     const sectionClassId = s.classId ?? s.class?.id;
     return !selectedClassId || sectionClassId === selectedClassId;
   });
@@ -123,29 +147,41 @@ export function AdmissionForm() {
   const mutation = useMutation({
     mutationFn: api.createAdmission,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['admissions'] });
-      void queryClient.invalidateQueries({ queryKey: ['students'] });
-      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      void queryClient.invalidateQueries({ queryKey: ["admissions"] });
+      void queryClient.invalidateQueries({ queryKey: ["students"] });
+      void queryClient.invalidateQueries({ queryKey: ["invoices"] });
       setDocumentFile(null);
       setDuplicateWarning(null);
-      setPdfError('');
+      setPdfError("");
       setActiveStep(4);
     },
   });
 
   const bulkImportMutation = useMutation({
-    mutationFn: async (file: File) =>
+    mutationFn: async ({
+      file,
+      dryRun,
+      confirmDuplicates,
+    }: {
+      file: File;
+      dryRun: boolean;
+      confirmDuplicates: boolean;
+    }) =>
       api.bulkImportAdmissions({
-        file: await fileToBase64Payload(file),
-        mode: 'validate-and-create',
+        csvContent: await file.text(),
+        dryRun,
+        confirmDuplicates,
       }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['admissions'] });
-      void queryClient.invalidateQueries({ queryKey: ['students'] });
+      void queryClient.invalidateQueries({ queryKey: ["admissions"] });
+      void queryClient.invalidateQueries({ queryKey: ["students"] });
     },
   });
 
-  async function submitAdmission(values: AdmissionFormInput, confirmDuplicate = false) {
+  async function submitAdmission(
+    values: AdmissionFormInput,
+    confirmDuplicate = false,
+  ) {
     if (!confirmDuplicate) {
       const duplicates = await api.checkAdmissionDuplicates({
         firstNameEn: values.firstNameEn,
@@ -158,7 +194,13 @@ export function AdmissionForm() {
         return;
       }
     }
-    const documentPayload = documentFile ? { ...(await fileToBase64Payload(documentFile)), kind: documentKind, title: documentFile.name } : null;
+    const documentPayload = documentFile
+      ? {
+          ...(await fileToBase64Payload(documentFile)),
+          kind: documentKind,
+          title: documentFile.name,
+        }
+      : null;
     mutation.mutate({
       ...values,
       sectionId: values.sectionId || null,
@@ -173,49 +215,79 @@ export function AdmissionForm() {
 
   async function goToNextStep() {
     const fields: any[] = [];
-    if (activeStep === 0) fields.push('firstNameEn', 'lastNameEn', 'dateOfBirth', 'gender', 'confirmNoDisability');
-    if (activeStep === 1) fields.push('academicYearId', 'classId', 'admissionDate');
-    if (activeStep === 2) fields.push('guardians');
-    
+    if (activeStep === 0)
+      fields.push(
+        "firstNameEn",
+        "lastNameEn",
+        "dateOfBirth",
+        "gender",
+        "confirmNoDisability",
+      );
+    if (activeStep === 1)
+      fields.push("academicYearId", "classId", "admissionDate");
+    if (activeStep === 2) fields.push("guardians");
+
     const valid = await form.trigger(fields as any);
-    if (valid) setActiveStep(s => Math.min(s + 1, 3));
+    if (valid) setActiveStep((s) => Math.min(s + 1, 3));
   }
 
   const latestAdmission = mutation.data;
 
   function startAnotherEnrollment() {
     form.reset({
-      dateOfBirth: '',
-      disabilityFlag: '',
+      dateOfBirth: "",
+      disabilityFlag: "",
       confirmNoDisability: false,
       admissionDate: today,
-      gender: 'FEMALE',
-      mediumOfInstruction: 'English',
-      academicYearId: academicYearsQuery.data?.find((year) => year.isCurrent)?.id ?? academicYearsQuery.data?.[0]?.id ?? '',
-      classId: classesQuery.data?.[0]?.id ?? '',
-      sectionId: '',
-      guardians: [{ fullName: '', relation: 'mother', primaryPhone: '', isPrimary: true }],
+      gender: "FEMALE",
+      mediumOfInstruction: "English",
+      academicYearId:
+        academicYearsQuery.data?.find((year) => year.isCurrent)?.id ??
+        academicYearsQuery.data?.[0]?.id ??
+        "",
+      classId: classesQuery.data?.[0]?.id ?? "",
+      sectionId: "",
+      guardians: [
+        { fullName: "", relation: "mother", primaryPhone: "", isPrimary: true },
+      ],
     });
     mutation.reset();
     setDocumentFile(null);
-    setDocumentKind('BIRTH_CERTIFICATE');
+    setDocumentKind("BIRTH_CERTIFICATE");
     setDuplicateWarning(null);
-    setDisabilityMode('');
-    setPdfError('');
+    setDisabilityMode("");
+    setPdfError("");
     setActiveStep(0);
-    setActiveWorkspaceTab('enrollment');
+    setActiveWorkspaceTab("enrollment");
   }
 
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard title="Total Admissions" value={admissionsQuery.data?.total ?? 0} icon={<UserPlus size={20} />} tone="info" />
-        <StatCard title="Active Students" value={studentsQuery.data?.total ?? 0} icon={<Users size={20} />} tone="success" />
-        <Link href="/dashboard/students" className="group rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--color-mod-admissions-border)] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2">
+        <StatCard
+          title="Total Admissions"
+          value={admissionsQuery.data?.total ?? 0}
+          icon={<UserPlus size={20} />}
+          tone="info"
+        />
+        <StatCard
+          title="Active Students"
+          value={studentsQuery.data?.total ?? 0}
+          icon={<Users size={20} />}
+          tone="success"
+        />
+        <Link
+          href="/dashboard/students"
+          className="group rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--color-mod-admissions-border)] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Manage Records</p>
-              <h3 className="mt-1 text-xl font-bold text-slate-950">Student Directory</h3>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Manage Records
+              </p>
+              <h3 className="mt-1 text-xl font-bold text-slate-950">
+                Student Directory
+              </h3>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-admissions-soft)] text-[var(--color-mod-admissions-text)] transition group-hover:bg-[var(--color-mod-admissions-accent)] group-hover:text-white">
               <ChevronRight size={24} />
@@ -231,7 +303,9 @@ export function AdmissionForm() {
             type="button"
             className={cn(
               "min-h-11 flex-1 rounded-lg px-4 text-sm font-bold transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2",
-              activeWorkspaceTab === value ? "bg-[var(--color-mod-admissions-accent)] text-white shadow-sm" : "text-slate-500 hover:bg-[var(--color-mod-admissions-soft)] hover:text-[var(--color-mod-admissions-text)]"
+              activeWorkspaceTab === value
+                ? "bg-[var(--color-mod-admissions-accent)] text-white shadow-sm"
+                : "text-slate-500 hover:bg-[var(--color-mod-admissions-soft)] hover:text-[var(--color-mod-admissions-text)]",
             )}
             onClick={() => setActiveWorkspaceTab(value as any)}
           >
@@ -240,62 +314,125 @@ export function AdmissionForm() {
         ))}
       </div>
 
-      {activeWorkspaceTab === 'enrollment' && (
-        <form className="space-y-6" onSubmit={form.handleSubmit((v) => submitAdmission(v))}>
+      {activeWorkspaceTab === "enrollment" && (
+        <form
+          className="space-y-6"
+          onSubmit={form.handleSubmit((v) => submitAdmission(v))}
+        >
           {setupIsMissing && !setupIsLoading && (
-            <SectionCard title="Setup required before enrollment" className="border-warning-200 bg-warning-50">
+            <SectionCard
+              title="Setup required before enrollment"
+              className="border-warning-200 bg-warning-50"
+            >
               <p className="text-sm font-medium text-warning-800">
-                Create an academic year and at least one class before admitting students.
+                Create an academic year and at least one class before admitting
+                students.
               </p>
             </SectionCard>
           )}
-           <div className="flex items-center justify-between px-4">
+          <div className="flex items-center justify-between px-4">
             {enrollmentSteps.map((step, idx) => (
-              <div key={step} className="flex items-center gap-2 group cursor-default">
-                <div className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold transition-all duration-500",
-                  activeStep === idx ? "bg-[var(--color-mod-admissions-accent)] text-white shadow-sm ring-4 ring-[var(--color-mod-admissions-soft)]" :
-                  activeStep > idx || latestAdmission ? "bg-success-500 text-white shadow-lg shadow-success-500/20" : "bg-slate-100 text-slate-400"
-                )}>
-                  {activeStep > idx || (idx === 4 && latestAdmission) ? <CheckCircle2 size={18} /> : idx + 1}
+              <div
+                key={step}
+                className="flex items-center gap-2 group cursor-default"
+              >
+                <div
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold transition-all duration-500",
+                    activeStep === idx
+                      ? "bg-[var(--color-mod-admissions-accent)] text-white shadow-sm ring-4 ring-[var(--color-mod-admissions-soft)]"
+                      : activeStep > idx || latestAdmission
+                        ? "bg-success-500 text-white shadow-lg shadow-success-500/20"
+                        : "bg-slate-100 text-slate-400",
+                  )}
+                >
+                  {activeStep > idx || (idx === 4 && latestAdmission) ? (
+                    <CheckCircle2 size={18} />
+                  ) : (
+                    idx + 1
+                  )}
                 </div>
                 <div className="hidden lg:flex flex-col">
-                   <span className={cn(
-                    "text-[0.6rem] font-bold uppercase tracking-tighter",
-                    activeStep === idx ? "text-[var(--color-mod-admissions-text)]" : "text-slate-400"
-                  )}>
+                  <span
+                    className={cn(
+                      "text-[0.6rem] font-bold uppercase tracking-tighter",
+                      activeStep === idx
+                        ? "text-[var(--color-mod-admissions-text)]"
+                        : "text-slate-400",
+                    )}
+                  >
                     Step {idx + 1}
                   </span>
-                  <span className={cn(
-                    "text-[0.7rem] font-bold whitespace-nowrap",
-                    activeStep === idx ? "text-slate-900" : "text-slate-400"
-                  )}>
+                  <span
+                    className={cn(
+                      "text-[0.7rem] font-bold whitespace-nowrap",
+                      activeStep === idx ? "text-slate-900" : "text-slate-400",
+                    )}
+                  >
                     {step}
                   </span>
                 </div>
-                {idx < enrollmentSteps.length - 1 && <div className={cn("h-px w-6 ml-2 transition-colors duration-500", activeStep > idx ? "bg-success-300" : "bg-slate-200")} />}
+                {idx < enrollmentSteps.length - 1 && (
+                  <div
+                    className={cn(
+                      "h-px w-6 ml-2 transition-colors duration-500",
+                      activeStep > idx ? "bg-success-300" : "bg-slate-200",
+                    )}
+                  />
+                )}
               </div>
             ))}
           </div>
 
           <div className="grid gap-6">
             {activeStep === 0 && (
-              <SectionCard title="Personal Information" description="Identity and personal details for school records.">
+              <SectionCard
+                title="Personal Information"
+                description="Identity and personal details for school records."
+              >
                 <div className="grid gap-6 md:grid-cols-2">
-                  <FormField label="First Name (EN)" error={form.formState.errors.firstNameEn?.message}>
-                    <input className="premium-input" {...form.register('firstNameEn')} />
+                  <FormField
+                    label="First Name (EN)"
+                    error={form.formState.errors.firstNameEn?.message}
+                  >
+                    <input
+                      className="premium-input"
+                      {...form.register("firstNameEn")}
+                    />
                   </FormField>
-                  <FormField label="Last Name (EN)" error={form.formState.errors.lastNameEn?.message}>
-                    <input className="premium-input" {...form.register('lastNameEn')} />
+                  <FormField
+                    label="Last Name (EN)"
+                    error={form.formState.errors.lastNameEn?.message}
+                  >
+                    <input
+                      className="premium-input"
+                      {...form.register("lastNameEn")}
+                    />
                   </FormField>
-                  <FormField label="Date of Birth" error={form.formState.errors.dateOfBirth?.message}>
+                  <FormField
+                    label="Date of Birth"
+                    error={form.formState.errors.dateOfBirth?.message}
+                  >
                     <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <input type="date" className="premium-input pl-10" {...form.register('dateOfBirth')} />
+                      <Calendar
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                        size={18}
+                      />
+                      <input
+                        type="date"
+                        className="premium-input pl-10"
+                        {...form.register("dateOfBirth")}
+                      />
                     </div>
                   </FormField>
-                  <FormField label="Gender" error={form.formState.errors.gender?.message}>
-                    <select className="premium-input" {...form.register('gender')}>
+                  <FormField
+                    label="Gender"
+                    error={form.formState.errors.gender?.message}
+                  >
+                    <select
+                      className="premium-input"
+                      {...form.register("gender")}
+                    >
                       <option value="FEMALE">Female</option>
                       <option value="MALE">Male</option>
                       <option value="OTHER">Other</option>
@@ -303,115 +440,244 @@ export function AdmissionForm() {
                   </FormField>
                 </div>
                 <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50/50 p-6">
-                   <p className="text-sm font-bold text-slate-900">iEMIS Disability Confirmation</p>
-                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                      <label className={cn(
+                  <p className="text-sm font-bold text-slate-900">
+                    iEMIS Disability Confirmation
+                  </p>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <label
+                      className={cn(
                         "flex cursor-pointer items-start gap-4 rounded-xl border p-4 transition-all",
-                        disabilityMode === 'NO_KNOWN_DISABILITY' ? "border-[var(--color-mod-admissions-accent)] bg-[var(--color-mod-admissions-soft)]" : "border-slate-200 bg-white hover:border-slate-300"
-                      )}>
-                        <input type="radio" className="mt-1" checked={disabilityMode === 'NO_KNOWN_DISABILITY'} onChange={() => {
-                          setDisabilityMode('NO_KNOWN_DISABILITY');
-                          form.setValue('confirmNoDisability', true);
-                          form.setValue('disabilityFlag', '');
-                        }} />
-                        <div>
-                          <p className="font-bold text-slate-900">No known disability</p>
-                          <p className="text-xs text-slate-500 mt-1">Confirmed for standard iEMIS reporting.</p>
-                        </div>
-                      </label>
-                      <label className={cn(
+                        disabilityMode === "NO_KNOWN_DISABILITY"
+                          ? "border-[var(--color-mod-admissions-accent)] bg-[var(--color-mod-admissions-soft)]"
+                          : "border-slate-200 bg-white hover:border-slate-300",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        className="mt-1"
+                        checked={disabilityMode === "NO_KNOWN_DISABILITY"}
+                        onChange={() => {
+                          setDisabilityMode("NO_KNOWN_DISABILITY");
+                          form.setValue("confirmNoDisability", true);
+                          form.setValue("disabilityFlag", "");
+                        }}
+                      />
+                      <div>
+                        <p className="font-bold text-slate-900">
+                          No known disability
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Confirmed for standard iEMIS reporting.
+                        </p>
+                      </div>
+                    </label>
+                    <label
+                      className={cn(
                         "flex cursor-pointer items-start gap-4 rounded-xl border p-4 transition-all",
-                        disabilityMode === 'DISABILITY_PRESENT' ? "border-[var(--color-mod-admissions-accent)] bg-[var(--color-mod-admissions-soft)]" : "border-slate-200 bg-white hover:border-slate-300"
-                      )}>
-                        <input type="radio" className="mt-1" checked={disabilityMode === 'DISABILITY_PRESENT'} onChange={() => {
-                          setDisabilityMode('DISABILITY_PRESENT');
-                          form.setValue('confirmNoDisability', false);
-                        }} />
-                        <div>
-                          <p className="font-bold text-slate-900">Special Support Needed</p>
-                          <p className="text-xs text-slate-500 mt-1">Specify disability for inclusive tracking.</p>
-                        </div>
-                      </label>
-                   </div>
-                   {disabilityMode === 'DISABILITY_PRESENT' && (
-                     <div className="mt-4">
-                       <input className="premium-input" placeholder="Specify disability details..." {...form.register('disabilityFlag')} />
-                     </div>
-                   )}
+                        disabilityMode === "DISABILITY_PRESENT"
+                          ? "border-[var(--color-mod-admissions-accent)] bg-[var(--color-mod-admissions-soft)]"
+                          : "border-slate-200 bg-white hover:border-slate-300",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        className="mt-1"
+                        checked={disabilityMode === "DISABILITY_PRESENT"}
+                        onChange={() => {
+                          setDisabilityMode("DISABILITY_PRESENT");
+                          form.setValue("confirmNoDisability", false);
+                        }}
+                      />
+                      <div>
+                        <p className="font-bold text-slate-900">
+                          Special Support Needed
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Specify disability for inclusive tracking.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                  {disabilityMode === "DISABILITY_PRESENT" && (
+                    <div className="mt-4">
+                      <input
+                        className="premium-input"
+                        placeholder="Specify disability details..."
+                        {...form.register("disabilityFlag")}
+                      />
+                    </div>
+                  )}
                 </div>
               </SectionCard>
             )}
 
             {activeStep === 1 && (
-              <SectionCard title="Academic Placement" description="Assign student to a class and academic cycle.">
+              <SectionCard
+                title="Academic Placement"
+                description="Assign student to a class and academic cycle."
+              >
                 <div className="grid gap-6 md:grid-cols-2">
-                   <FormField label="Academic Year" error={form.formState.errors.academicYearId?.message}>
-                     <select className="premium-input" {...form.register('academicYearId')}>
-                        {academicYearsQuery.data?.map(y => <option key={y.id} value={y.id}>{y.name} {y.isCurrent ? '(Current)' : ''}</option>)}
-                     </select>
-                   </FormField>
-                   <FormField label="Class" error={form.formState.errors.classId?.message}>
-                     <select className="premium-input" {...form.register('classId')}>
-                        {classesQuery.data?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                     </select>
-                   </FormField>
-                   <FormField label="Section (Optional)" error={form.formState.errors.sectionId?.message}>
-                     <select className="premium-input" {...form.register('sectionId')}>
-                        <option value="">No Section</option>
-                        {availableSections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                     </select>
-                   </FormField>
-                   <FormField label="Admission Date" error={form.formState.errors.admissionDate?.message}>
-                     <input type="date" className="premium-input" {...form.register('admissionDate')} />
-                   </FormField>
+                  <FormField
+                    label="Academic Year"
+                    error={form.formState.errors.academicYearId?.message}
+                  >
+                    <select
+                      className="premium-input"
+                      {...form.register("academicYearId")}
+                    >
+                      {academicYearsQuery.data?.map((y) => (
+                        <option key={y.id} value={y.id}>
+                          {y.name} {y.isCurrent ? "(Current)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                  <FormField
+                    label="Class"
+                    error={form.formState.errors.classId?.message}
+                  >
+                    <select
+                      className="premium-input"
+                      {...form.register("classId")}
+                    >
+                      {classesQuery.data?.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                  <FormField
+                    label="Section (Optional)"
+                    error={form.formState.errors.sectionId?.message}
+                  >
+                    <select
+                      className="premium-input"
+                      {...form.register("sectionId")}
+                    >
+                      <option value="">No Section</option>
+                      {availableSections.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                  <FormField
+                    label="Admission Date"
+                    error={form.formState.errors.admissionDate?.message}
+                  >
+                    <input
+                      type="date"
+                      className="premium-input"
+                      {...form.register("admissionDate")}
+                    />
+                  </FormField>
                 </div>
               </SectionCard>
             )}
 
             {activeStep === 2 && (
-              <SectionCard 
-                title="Guardian Contacts" 
+              <SectionCard
+                title="Guardian Contacts"
                 description="Manage family members and emergency contacts."
                 headerAction={
-                  <button type="button" className="text-sm font-bold text-[var(--color-mod-admissions-text)] hover:text-[var(--color-mod-admissions-accent)]" onClick={() => guardians.append({ fullName: '', relation: 'guardian', primaryPhone: '', isPrimary: false })}>
+                  <button
+                    type="button"
+                    className="text-sm font-bold text-[var(--color-mod-admissions-text)] hover:text-[var(--color-mod-admissions-accent)]"
+                    onClick={() =>
+                      guardians.append({
+                        fullName: "",
+                        relation: "guardian",
+                        primaryPhone: "",
+                        isPrimary: false,
+                      })
+                    }
+                  >
                     + Add Guardian
                   </button>
                 }
               >
                 <div className="space-y-4">
                   {guardians.fields.map((field, idx) => (
-                    <div key={field.id} className="rounded-2xl border border-slate-200 p-6 space-y-4">
-                       <div className="flex items-center justify-between">
-                         <div className="flex items-center gap-3">
-                           <Badge variant="phase2">Guardian #{idx + 1}</Badge>
-                           <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                             <input type="radio" checked={watchedGuardians[idx]?.isPrimary} onChange={() => {
-                               watchedGuardians.forEach((_, i) => form.setValue(`guardians.${i}.isPrimary`, i === idx));
-                             }} />
-                             Primary
-                           </label>
-                         </div>
-                         {idx > 0 && <button type="button" className="text-xs font-bold text-danger-500" onClick={() => guardians.remove(idx)}>Remove</button>}
-                       </div>
-                       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                          <FormField label="Full Name" error={form.formState.errors.guardians?.[idx]?.fullName?.message}>
-                            <input className="premium-input" {...form.register(`guardians.${idx}.fullName`)} />
-                          </FormField>
-                          <FormField label="Relation" error={form.formState.errors.guardians?.[idx]?.relation?.message}>
-                            <input className="premium-input" {...form.register(`guardians.${idx}.relation`)} />
-                          </FormField>
-                          <FormField label="Phone Number" error={form.formState.errors.guardians?.[idx]?.primaryPhone?.message}>
+                    <div
+                      key={field.id}
+                      className="rounded-2xl border border-slate-200 p-6 space-y-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="phase2">Guardian #{idx + 1}</Badge>
+                          <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
                             <input
-                              className="premium-input"
-                              maxLength={10}
-                              {...form.register(`guardians.${idx}.primaryPhone`, {
-                                onChange: (e) => {
-                                  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
-                                }
-                              })}
+                              type="radio"
+                              checked={watchedGuardians[idx]?.isPrimary}
+                              onChange={() => {
+                                watchedGuardians.forEach((_, i) =>
+                                  form.setValue(
+                                    `guardians.${i}.isPrimary`,
+                                    i === idx,
+                                  ),
+                                );
+                              }}
                             />
-                          </FormField>
-                       </div>
+                            Primary
+                          </label>
+                        </div>
+                        {idx > 0 && (
+                          <button
+                            type="button"
+                            className="text-xs font-bold text-danger-500"
+                            onClick={() => guardians.remove(idx)}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        <FormField
+                          label="Full Name"
+                          error={
+                            form.formState.errors.guardians?.[idx]?.fullName
+                              ?.message
+                          }
+                        >
+                          <input
+                            className="premium-input"
+                            {...form.register(`guardians.${idx}.fullName`)}
+                          />
+                        </FormField>
+                        <FormField
+                          label="Relation"
+                          error={
+                            form.formState.errors.guardians?.[idx]?.relation
+                              ?.message
+                          }
+                        >
+                          <input
+                            className="premium-input"
+                            {...form.register(`guardians.${idx}.relation`)}
+                          />
+                        </FormField>
+                        <FormField
+                          label="Phone Number"
+                          error={
+                            form.formState.errors.guardians?.[idx]?.primaryPhone
+                              ?.message
+                          }
+                        >
+                          <input
+                            className="premium-input"
+                            maxLength={10}
+                            {...form.register(`guardians.${idx}.primaryPhone`, {
+                              onChange: (e) => {
+                                e.target.value = e.target.value
+                                  .replace(/\D/g, "")
+                                  .slice(0, 10);
+                              },
+                            })}
+                          />
+                        </FormField>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -419,67 +685,156 @@ export function AdmissionForm() {
             )}
 
             {activeStep === 3 && (
-              <SectionCard title="Review & Documents" description="Finalize enrollment and attach supporting files.">
+              <SectionCard
+                title="Review & Documents"
+                description="Finalize enrollment and attach supporting files."
+              >
                 <div className="grid gap-8 lg:grid-cols-2">
                   <div className="space-y-6">
-                     <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center transition hover:border-[var(--color-mod-admissions-accent)] hover:bg-[var(--color-mod-admissions-soft)]/50">
-                        <Upload className="mx-auto mb-4 text-slate-400" size={32} />
-                        <p className="text-sm font-bold text-slate-900">Attach supporting document</p>
-                        <p className="mt-1 text-xs text-slate-500">PDF, JPG, PNG up to 5MB</p>
-                        <div className="mx-auto mt-4 grid max-w-md gap-3 sm:grid-cols-[1fr_auto]">
-                          <select
-                            className="premium-input text-sm"
-                            value={documentKind}
-                            onChange={(event) => setDocumentKind(event.target.value)}
-                            aria-label="Document type"
-                          >
-                            {documentKinds.map(([value, label]) => (
-                              <option key={value} value={value}>
-                                {label}
-                              </option>
-                            ))}
-                          </select>
-                          <input type="file" className="text-xs" onChange={(e) => setDocumentFile(e.target.files?.[0] ?? null)} />
+                    <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center transition hover:border-[var(--color-mod-admissions-accent)] hover:bg-[var(--color-mod-admissions-soft)]/50">
+                      <Upload
+                        className="mx-auto mb-4 text-slate-400"
+                        size={32}
+                      />
+                      <p className="text-sm font-bold text-slate-900">
+                        Attach supporting document
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        PDF, JPG, PNG up to 5MB
+                      </p>
+                      <div className="mx-auto mt-4 grid max-w-md gap-3 sm:grid-cols-[1fr_auto]">
+                        <select
+                          className="premium-input text-sm"
+                          value={documentKind}
+                          onChange={(event) =>
+                            setDocumentKind(event.target.value)
+                          }
+                          aria-label="Document type"
+                        >
+                          {documentKinds.map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="file"
+                          className="text-xs"
+                          onChange={(e) =>
+                            setDocumentFile(e.target.files?.[0] ?? null)
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    {duplicateWarning?.hasWarnings && (
+                      <div className="rounded-2xl border border-warning-200 bg-warning-50 p-6">
+                        <div className="flex gap-4">
+                          <AlertTriangle
+                            className="text-warning-500"
+                            size={24}
+                          />
+                          <div>
+                            <p className="font-bold text-warning-900">
+                              Possible duplicate found
+                            </p>
+                            <p className="mt-1 text-sm text-warning-700">
+                              A student with the same name and DOB already
+                              exists.
+                            </p>
+                            <button
+                              type="button"
+                              className="mt-4 rounded-xl bg-warning-500 px-4 py-2 text-xs font-bold text-white shadow-sm"
+                              onClick={() =>
+                                submitAdmission(form.getValues(), true)
+                              }
+                            >
+                              Create anyway
+                            </button>
+                          </div>
                         </div>
-                     </div>
-                     
-                     {duplicateWarning?.hasWarnings && (
-                       <div className="rounded-2xl border border-warning-200 bg-warning-50 p-6">
-                         <div className="flex gap-4">
-                           <AlertTriangle className="text-warning-500" size={24} />
-                           <div>
-                             <p className="font-bold text-warning-900">Possible duplicate found</p>
-                             <p className="mt-1 text-sm text-warning-700">A student with the same name and DOB already exists.</p>
-                             <button type="button" className="mt-4 rounded-xl bg-warning-500 px-4 py-2 text-xs font-bold text-white shadow-sm" onClick={() => submitAdmission(form.getValues(), true)}>
-                               Create anyway
-                             </button>
-                           </div>
-                         </div>
-                       </div>
-                     )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-                    <h4 className="mb-8 text-xs font-bold uppercase tracking-widest text-[var(--color-mod-admissions-text)]">Enrollment Summary</h4>
+                    <h4 className="mb-8 text-xs font-bold uppercase tracking-widest text-[var(--color-mod-admissions-text)]">
+                      Enrollment Summary
+                    </h4>
                     <div className="space-y-5">
-                       <SummaryItem label="Full Name" value={`${watchedFirstNameEn} ${watchedLastNameEn}`} />
-                       <SummaryItem label="Gender" value={form.getValues('gender')} />
-                       <SummaryItem label="Date of Birth" value={watchedDateOfBirth ? new Date(watchedDateOfBirth).toLocaleDateString() : 'Date of birth not entered'} />
-                       <div className="my-2 h-px bg-slate-100" />
-                       <SummaryItem label="Class" value={classesQuery.data?.find(c => c.id === selectedClassId)?.name ?? 'Class not selected'} />
-                       <SummaryItem label="Section" value={availableSections.find(s => s.id === selectedSectionId)?.name ?? 'None'} />
-                       <SummaryItem label="Admission Date" value={new Date(form.getValues('admissionDate')).toLocaleDateString()} />
-                       <div className="my-2 h-px bg-slate-100" />
-                       <SummaryItem label="Primary Guardian" value={watchedGuardians.find(g => g.isPrimary)?.fullName ?? 'Not set'} />
-                       <SummaryItem label="Contact" value={watchedGuardians.find(g => g.isPrimary)?.primaryPhone ?? 'Guardian phone not entered'} />
-                       <div className="my-2 h-px bg-slate-100" />
-                       <SummaryItem label="Documents" value={documentFile ? `1 File (${documentKind.replace('_', ' ')})` : 'None attached'} />
+                      <SummaryItem
+                        label="Full Name"
+                        value={`${watchedFirstNameEn} ${watchedLastNameEn}`}
+                      />
+                      <SummaryItem
+                        label="Gender"
+                        value={form.getValues("gender")}
+                      />
+                      <SummaryItem
+                        label="Date of Birth"
+                        value={
+                          watchedDateOfBirth
+                            ? new Date(watchedDateOfBirth).toLocaleDateString()
+                            : "Date of birth not entered"
+                        }
+                      />
+                      <div className="my-2 h-px bg-slate-100" />
+                      <SummaryItem
+                        label="Class"
+                        value={
+                          classesQuery.data?.find(
+                            (c) => c.id === selectedClassId,
+                          )?.name ?? "Class not selected"
+                        }
+                      />
+                      <SummaryItem
+                        label="Section"
+                        value={
+                          availableSections.find(
+                            (s) => s.id === selectedSectionId,
+                          )?.name ?? "None"
+                        }
+                      />
+                      <SummaryItem
+                        label="Admission Date"
+                        value={new Date(
+                          form.getValues("admissionDate"),
+                        ).toLocaleDateString()}
+                      />
+                      <div className="my-2 h-px bg-slate-100" />
+                      <SummaryItem
+                        label="Primary Guardian"
+                        value={
+                          watchedGuardians.find((g) => g.isPrimary)?.fullName ??
+                          "Not set"
+                        }
+                      />
+                      <SummaryItem
+                        label="Contact"
+                        value={
+                          watchedGuardians.find((g) => g.isPrimary)
+                            ?.primaryPhone ?? "Guardian phone not entered"
+                        }
+                      />
+                      <div className="my-2 h-px bg-slate-100" />
+                      <SummaryItem
+                        label="Documents"
+                        value={
+                          documentFile
+                            ? `1 File (${documentKind.replace("_", " ")})`
+                            : "None attached"
+                        }
+                      />
                     </div>
                     <div className="mt-8 flex items-center gap-3 rounded-2xl border border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-soft)] p-4">
-                       <ShieldCheck className="text-[var(--color-mod-admissions-text)]" size={20} />
-                       <p className="text-[0.65rem] leading-relaxed text-[var(--color-mod-admissions-text)]">
-                         By clicking &quot;Complete Enrollment&quot;, a student record will be created and a ledger will be initialized.
-                       </p>
+                      <ShieldCheck
+                        className="text-[var(--color-mod-admissions-text)]"
+                        size={20}
+                      />
+                      <p className="text-[0.65rem] leading-relaxed text-[var(--color-mod-admissions-text)]">
+                        By clicking &quot;Complete Enrollment&quot;, a student
+                        record will be created and a ledger will be initialized.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -491,38 +846,70 @@ export function AdmissionForm() {
                 <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-xl bg-success-50 text-success-500 shadow-inner">
                   <CheckCircle2 size={48} />
                 </div>
-                <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Enrollment Successful!</h2>
+                <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">
+                  Enrollment Successful!
+                </h2>
                 <p className="mx-auto mt-4 max-w-md text-slate-500 font-medium">
-                  Student <span className="font-bold text-slate-900">{watchedFirstNameEn} {watchedLastNameEn}</span> has been admitted to {classesQuery.data?.find(c => c.id === selectedClassId)?.name}.
+                  Student{" "}
+                  <span className="font-bold text-slate-900">
+                    {watchedFirstNameEn} {watchedLastNameEn}
+                  </span>{" "}
+                  has been admitted to{" "}
+                  {
+                    classesQuery.data?.find((c) => c.id === selectedClassId)
+                      ?.name
+                  }
+                  .
                 </p>
-                
+
                 <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <button type="button" className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]" onClick={startAnotherEnrollment}>
+                  <button
+                    type="button"
+                    className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
+                    onClick={startAnotherEnrollment}
+                  >
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-[var(--color-mod-admissions-accent)] group-hover:text-white transition-colors">
                       <UserPlus size={20} />
                     </div>
-                    <span className="text-xs font-bold text-slate-600 group-hover:text-[var(--color-mod-admissions-text)]">Add Another Student</span>
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-[var(--color-mod-admissions-text)]">
+                      Add Another Student
+                    </span>
                   </button>
-                  
-                  <Link href={`/dashboard/students/${latestAdmission?.student.id}`} className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]">
+
+                  <Link
+                    href={`/dashboard/students/${latestAdmission?.student.id}`}
+                    className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
+                  >
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-[var(--color-mod-admissions-accent)] group-hover:text-white transition-colors">
                       <FileText size={20} />
                     </div>
-                    <span className="text-xs font-bold text-slate-600 group-hover:text-[var(--color-mod-admissions-text)]">View Profile</span>
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-[var(--color-mod-admissions-text)]">
+                      View Profile
+                    </span>
                   </Link>
 
-                  <Link href={`/dashboard/finance?studentId=${latestAdmission?.student.id}`} className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]">
+                  <Link
+                    href={`/dashboard/finance?studentId=${latestAdmission?.student.id}`}
+                    className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
+                  >
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-[var(--color-mod-admissions-accent)] group-hover:text-white transition-colors">
                       <Wallet size={20} />
                     </div>
-                    <span className="text-xs font-bold text-slate-600 group-hover:text-[var(--color-mod-admissions-text)]">Collect First Fee</span>
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-[var(--color-mod-admissions-text)]">
+                      Collect First Fee
+                    </span>
                   </Link>
 
-                  <button type="button" className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]">
+                  <button
+                    type="button"
+                    className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
+                  >
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-[var(--color-mod-admissions-accent)] group-hover:text-white transition-colors">
                       <Download size={20} />
                     </div>
-                    <span className="text-xs font-bold text-slate-600 group-hover:text-[var(--color-mod-admissions-text)]">Download ID Card</span>
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-[var(--color-mod-admissions-text)]">
+                      Download ID Card
+                    </span>
                   </button>
                 </div>
               </div>
@@ -535,19 +922,19 @@ export function AdmissionForm() {
                 type="button"
                 className="flex items-center gap-2 px-6 py-3 text-sm font-bold text-slate-500 transition hover:text-slate-900 disabled:opacity-30"
                 disabled={activeStep === 0}
-                onClick={() => setActiveStep(s => s - 1)}
+                onClick={() => setActiveStep((s) => s - 1)}
               >
                 <ChevronLeft size={20} />
                 Back
               </button>
-              
+
               {activeStep === 3 ? (
                 <button
                   type="submit"
                   disabled={mutation.isPending}
                   className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-8 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] disabled:opacity-50"
                 >
-                  {mutation.isPending ? 'Enrolling...' : 'Complete Enrollment'}
+                  {mutation.isPending ? "Enrolling..." : "Complete Enrollment"}
                   <CheckCircle2 size={20} />
                 </button>
               ) : (
@@ -565,60 +952,204 @@ export function AdmissionForm() {
         </form>
       )}
 
-      {activeWorkspaceTab === 'bulk' && (
-        <SectionCard title="Bulk Import" description="Upload a school-reviewed CSV for admission import. The backend validates each row before creating records.">
+      {activeWorkspaceTab === "bulk" && (
+        <SectionCard
+          title="Bulk Import"
+          description="Upload a school-reviewed CSV for admission import. The backend validates each row before creating records."
+        >
           <div className="space-y-5">
             <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center">
               <Upload className="mx-auto mb-4 text-slate-400" size={32} />
-              <p className="text-sm font-bold text-slate-900">Upload admission CSV</p>
+              <p className="text-sm font-bold text-slate-900">
+                Upload admission CSV
+              </p>
               <p className="mt-1 text-xs text-slate-500">
-                Use real school data only. Disability/iEMIS confirmation columns are required.
+                Use real school data only. Disability/iEMIS confirmation columns
+                are required.
               </p>
               <input
                 type="file"
                 accept=".csv,text/csv"
                 className="mt-4 text-xs"
-                onChange={(event) => setBulkFile(event.target.files?.[0] ?? null)}
+                onChange={(event) =>
+                  setBulkFile(event.target.files?.[0] ?? null)
+                }
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 disabled={!bulkFile || bulkImportMutation.isPending}
-                onClick={() => bulkFile && bulkImportMutation.mutate(bulkFile)}
+                onClick={() =>
+                  bulkFile &&
+                  bulkImportMutation.mutate({
+                    file: bulkFile,
+                    dryRun: true,
+                    confirmDuplicates: false,
+                  })
+                }
                 className="rounded-xl bg-[var(--color-mod-admissions-accent)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] disabled:opacity-50"
               >
-                {bulkImportMutation.isPending ? 'Importing...' : 'Validate & Import'}
+                {bulkImportMutation.isPending
+                  ? "Validating..."
+                  : "Validate CSV"}
               </button>
+              <button
+                type="button"
+                disabled={!bulkFile || bulkImportMutation.isPending}
+                onClick={() =>
+                  bulkFile &&
+                  bulkImportMutation.mutate({
+                    file: bulkFile,
+                    dryRun: false,
+                    confirmDuplicates: false,
+                  })
+                }
+                className="rounded-xl border border-[var(--color-mod-admissions-border)] bg-white px-5 py-2.5 text-sm font-bold text-[var(--color-mod-admissions-text)] shadow-sm transition hover:bg-[var(--color-mod-admissions-bg)] disabled:opacity-50"
+              >
+                Import reviewed CSV
+              </button>
+              {hasBulkDuplicateWarnings(bulkImportMutation.data) ? (
+                <button
+                  type="button"
+                  disabled={!bulkFile || bulkImportMutation.isPending}
+                  onClick={() =>
+                    bulkFile &&
+                    bulkImportMutation.mutate({
+                      file: bulkFile,
+                      dryRun: false,
+                      confirmDuplicates: true,
+                    })
+                  }
+                  className="rounded-xl border border-warning-200 bg-warning-50 px-5 py-2.5 text-sm font-bold text-warning-800 shadow-sm transition hover:bg-warning-100 disabled:opacity-50"
+                >
+                  Import with duplicate confirmation
+                </button>
+              ) : null}
+              {bulkImportMutation.isPending ? (
+                <Badge variant="neutral">Processing CSV</Badge>
+              ) : null}
+              {bulkImportMutation.data?.validated ? (
+                <Badge variant="success">
+                  {bulkImportMutation.data.validated} rows validated
+                </Badge>
+              ) : null}
               {bulkImportMutation.data ? (
-                <Badge variant={bulkImportMutation.data.failed > 0 ? 'warning' : 'success'}>
-                  {bulkImportMutation.data.created} created, {bulkImportMutation.data.failed} failed
+                <Badge
+                  variant={
+                    bulkImportMutation.data.failed > 0 ? "warning" : "success"
+                  }
+                >
+                  {bulkImportMutation.data.created} created,{" "}
+                  {bulkImportMutation.data.failed} failed
                 </Badge>
               ) : null}
             </div>
             {bulkImportMutation.data?.errorReportCsv ? (
               <div className="rounded-2xl border border-warning-200 bg-warning-50 p-4">
-                <p className="text-sm font-bold text-warning-900">Error report CSV available</p>
-                <p className="mt-1 text-xs text-warning-700">
-                  Review the backend validation errors, correct the CSV, and retry.
+                <p className="text-sm font-bold text-warning-900">
+                  Error report CSV available
                 </p>
+                <p className="mt-1 text-xs text-warning-700">
+                  Review the backend validation errors, correct the CSV, and
+                  retry.
+                </p>
+              </div>
+            ) : null}
+            {bulkImportMutation.data?.results?.length ? (
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+                  <p className="text-sm font-black text-slate-900">
+                    Row review
+                  </p>
+                  <p className="mt-0.5 text-xs font-medium text-slate-500">
+                    Validate first, review failed and duplicate rows, then
+                    import the same CSV after correction or explicit duplicate
+                    confirmation.
+                  </p>
+                </div>
+                <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                  {bulkImportMutation.data.results.map((row) => (
+                    <div key={row.rowNumber} className="p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant={
+                            row.status === "failed" ? "warning" : "success"
+                          }
+                        >
+                          Row {row.rowNumber}: {row.status}
+                        </Badge>
+                        {row.studentSystemId ? (
+                          <span className="text-xs font-bold text-slate-500">
+                            {row.studentSystemId}
+                          </span>
+                        ) : null}
+                      </div>
+                      {row.errors?.length ? (
+                        <ul className="mt-2 space-y-1 text-xs font-semibold text-warning-800">
+                          {row.errors.map((error) => (
+                            <li key={error}>{error}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      {row.duplicates?.length ? (
+                        <div className="mt-3 rounded-xl border border-warning-200 bg-warning-50 p-3">
+                          <p className="text-xs font-black uppercase tracking-wide text-warning-900">
+                            Possible duplicate records
+                          </p>
+                          <div className="mt-2 grid gap-2">
+                            {row.duplicates.map((duplicate) => (
+                              <div
+                                key={`${row.rowNumber}-${duplicate.studentId}`}
+                                className="rounded-lg bg-white px-3 py-2 text-xs ring-1 ring-warning-100"
+                              >
+                                <p className="font-bold text-slate-900">
+                                  {duplicate.fullNameEn} (
+                                  {duplicate.studentSystemId})
+                                </p>
+                                <p className="mt-0.5 text-slate-500">
+                                  {duplicate.className}
+                                  {duplicate.sectionName
+                                    ? ` - ${duplicate.sectionName}`
+                                    : ""}{" "}
+                                  | DOB{" "}
+                                  {formatBulkImportDate(duplicate.dateOfBirth)}
+                                </p>
+                                {duplicate.matchTypes?.length ? (
+                                  <p className="mt-1 font-semibold text-warning-800">
+                                    Match: {duplicate.matchTypes.join(", ")}
+                                  </p>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : null}
             {bulkImportMutation.error ? (
               <p className="text-sm font-bold text-danger-600">
-                {bulkImportMutation.error instanceof Error ? bulkImportMutation.error.message : 'Bulk import failed.'}
+                {bulkImportMutation.error instanceof Error
+                  ? bulkImportMutation.error.message
+                  : "Bulk import failed."}
               </p>
             ) : null}
           </div>
         </SectionCard>
       )}
 
-      {activeWorkspaceTab === 'pipeline' && (
+      {activeWorkspaceTab === "pipeline" && (
         <div className="space-y-4">
           <div className="px-1">
-            <h2 className="text-lg font-bold text-slate-900">Recent Admissions</h2>
+            <h2 className="text-lg font-bold text-slate-900">
+              Recent Admissions
+            </h2>
             <p className="text-sm font-medium text-slate-500">
-              Review candidate files, document checks, and admission status before creating the active student record.
+              Review candidate files, document checks, and admission status
+              before creating the active student record.
             </p>
           </div>
           <AdmissionsPipeline />
@@ -628,12 +1159,42 @@ export function AdmissionForm() {
   );
 }
 
-function FormField({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
+function hasBulkDuplicateWarnings(
+  result: Awaited<ReturnType<typeof api.bulkImportAdmissions>> | undefined,
+) {
+  return Boolean(
+    result?.results?.some((row) => row.duplicates && row.duplicates.length > 0),
+  );
+}
+
+function formatBulkImportDate(value: string | Date) {
+  try {
+    return new Intl.DateTimeFormat("en-NP", { dateStyle: "medium" }).format(
+      new Date(value),
+    );
+  } catch {
+    return String(value);
+  }
+}
+
+function FormField({
+  label,
+  children,
+  error,
+}: {
+  label: string;
+  children: React.ReactNode;
+  error?: string;
+}) {
   return (
     <div className="space-y-1.5">
-      <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">{label}</label>
+      <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">
+        {label}
+      </label>
       {children}
-      {error && <p className="text-[0.7rem] font-bold text-danger-500 ml-1">{error}</p>}
+      {error && (
+        <p className="text-[0.7rem] font-bold text-danger-500 ml-1">{error}</p>
+      )}
     </div>
   );
 }
@@ -642,7 +1203,9 @@ function SummaryItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-xs font-medium text-slate-500">{label}</span>
-      <span className="text-right text-xs font-bold text-slate-900">{value}</span>
+      <span className="text-right text-xs font-bold text-slate-900">
+        {value}
+      </span>
     </div>
   );
 }

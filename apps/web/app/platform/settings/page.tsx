@@ -154,7 +154,7 @@ export default function PlatformSettings() {
   const [disableReason, setDisableReason] = useState('');
   const [retryDialog, setRetryDialog] = useState<{
     queueName: string;
-    jobId?: string;
+    jobId: string;
   } | null>(null);
   const [retryReason, setRetryReason] = useState('');
   const [discardDialog, setDiscardDialog] =
@@ -270,40 +270,26 @@ export default function PlatformSettings() {
     [auditFilters],
   );
 
-  const retryQueue = async (queueName: string) => {
-    setRetryDialog({ queueName });
-    setRetryReason('');
-  };
-
   const submitRetry = async () => {
     if (!retryDialog || retryReason.trim().length < 5) return;
     setRetrying(retryDialog.queueName);
     try {
-      const failedInQueue = retryDialog.jobId
-        ? safeFailedJobs.filter(
-            (job) =>
-              job.queueName === retryDialog.queueName &&
-              job.id === retryDialog.jobId,
-          )
-        : safeFailedJobs.filter((job) => job.queueName === retryDialog.queueName);
-      if (failedInQueue.length === 0) {
-        setActionMessage('No failed jobs found in this queue.');
+      const failedJob = safeFailedJobs.find(
+        (job) =>
+          job.queueName === retryDialog.queueName && job.id === retryDialog.jobId,
+      );
+      if (!failedJob) {
+        setActionMessage('This failed job is no longer in the visible failed-job list. Refresh queue data before retrying.');
         return;
       }
 
-      await Promise.all(
-        failedInQueue.map((job) =>
-          api.retryPlatformFailedJob({
-            queueName: job.queueName,
-            jobId: job.id,
-            reason: retryReason.trim(),
-          }),
-        ),
-      );
+      await api.retryPlatformFailedJob({
+        queueName: failedJob.queueName,
+        jobId: failedJob.id,
+        reason: retryReason.trim(),
+      });
 
-      setActionMessage(
-        `Retry requested for ${failedInQueue.length} failed job(s).`,
-      );
+      setActionMessage(`Retry requested for job ${failedJob.id}.`);
       setRetryDialog(null);
       await load(true);
     } catch (err: any) {
@@ -1129,19 +1115,10 @@ export default function PlatformSettings() {
                     >
                       Inspect Failed
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full rounded-xl font-bold border-slate-200 gap-2"
-                      onClick={() => retryQueue(queue.name)}
-                      disabled={retrying === queue.name || queue.failed === 0}
-                    >
-                      {retrying === queue.name ? (
-                        <RefreshCw size={16} className="animate-spin" />
-                      ) : (
-                        <RefreshCw size={16} />
-                      )}
-                      Retry All
-                    </Button>
+                    <div className="w-full rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-800">
+                      Retry is per job. Open failed jobs to inspect payload,
+                      history, and audit reason before retry.
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -1717,9 +1694,8 @@ export default function PlatformSettings() {
               Retry Failed Job
             </DialogTitle>
             <DialogDescription>
-              {retryDialog?.jobId ? `Job ${retryDialog.jobId}` : 'Bulk retry'}{' '}
-              in queue {retryDialog?.queueName}. Retry is audited and requires
-              an operator reason.
+              Job {retryDialog?.jobId} in queue {retryDialog?.queueName}. Retry
+              is audited, single-job only, and requires an operator reason.
             </DialogDescription>
           </DialogHeader>
           <Textarea

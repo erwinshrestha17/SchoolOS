@@ -170,6 +170,11 @@ export type BulkAdmissionImportResult = {
     studentId?: string;
     studentSystemId?: string;
     errors?: string[];
+    duplicates?: Array<
+      AdmissionDuplicateWarning & {
+        matchTypes?: string[];
+      }
+    >;
   }>;
   errorReportCsv: string;
 };

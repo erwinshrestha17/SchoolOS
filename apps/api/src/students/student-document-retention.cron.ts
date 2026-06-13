@@ -11,14 +11,19 @@ export class StudentDocumentRetentionCron {
   @Cron(CronExpression.EVERY_DAY_AT_1AM)
   async processGeneratedDocumentRetention() {
     try {
-      const result =
-        await this.studentsService.processGeneratedDocumentRetention();
+      const [retentionResult, expiryResult] = await Promise.all([
+        this.studentsService.processGeneratedDocumentRetention(),
+        this.studentsService.processStudentDocumentExpiryReminders(),
+      ]);
       this.logger.log(
-        `Generated student document retention review complete: ${result.markedDocuments} marked, ${result.eligibleDocuments} eligible.`,
+        `Generated student document retention review complete: ${retentionResult.markedDocuments} marked, ${retentionResult.eligibleDocuments} eligible.`,
+      );
+      this.logger.log(
+        `Student document expiry reminder review complete: ${expiryResult.remindedDocuments} reminded, ${expiryResult.skippedDocuments} skipped, ${expiryResult.candidateDocuments} candidates.`,
       );
     } catch (error) {
       this.logger.error(
-        'Generated student document retention review failed',
+        'Student document retention/expiry review failed',
         error instanceof Error ? error.stack : String(error),
       );
     }

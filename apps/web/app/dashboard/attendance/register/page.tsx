@@ -33,6 +33,11 @@ export default function AttendanceRegisterPage() {
   const [sectionId, setSectionId] = useState('');
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [year, setYear] = useState(today.getFullYear());
+  const [exportingFormat, setExportingFormat] = useState<'csv' | 'pdf' | null>(
+    null,
+  );
+  const [exportMessage, setExportMessage] = useState('');
+  const [exportError, setExportError] = useState('');
 
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
@@ -82,27 +87,35 @@ export default function AttendanceRegisterPage() {
     return !classId || sectionClassId === classId;
   });
 
-  const handleExportCsv = () => {
+  const handleExport = async (format: 'csv' | 'pdf') => {
     if (!academicYearId || !classId || !month || !year) return;
-    const url = new URL(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1'}/attendance/register/export`);
-    url.searchParams.set('academicYearId', academicYearId);
-    url.searchParams.set('classId', classId);
-    if (sectionId) url.searchParams.set('sectionId', sectionId);
-    url.searchParams.set('month', month.toString());
-    url.searchParams.set('year', year.toString());
-    window.open(url.toString(), '_blank');
-  };
+    setExportingFormat(format);
+    setExportError('');
+    setExportMessage('');
 
-  const handleExportPdf = () => {
-    if (!academicYearId || !classId || !month || !year) return;
-    const url = new URL(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1'}/attendance/register/export`);
-    url.searchParams.set('academicYearId', academicYearId);
-    url.searchParams.set('classId', classId);
-    if (sectionId) url.searchParams.set('sectionId', sectionId);
-    url.searchParams.set('month', month.toString());
-    url.searchParams.set('year', year.toString());
-    url.searchParams.set('format', 'pdf');
-    window.open(url.toString(), '_blank');
+    try {
+      await api.exportAttendanceRegister(
+        {
+          academicYearId,
+          classId,
+          sectionId: sectionId || null,
+          month,
+          year,
+        },
+        format,
+      );
+      setExportMessage(
+        `Attendance register export prepared as ${format.toUpperCase()}.`,
+      );
+    } catch (error) {
+      setExportError(
+        error instanceof Error
+          ? error.message
+          : 'Attendance register export failed',
+      );
+    } finally {
+      setExportingFormat(null);
+    }
   };
 
   const months = [
@@ -223,24 +236,55 @@ export default function AttendanceRegisterPage() {
             <button
               type="button"
               className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
-              disabled={!academicYearId || !classId || !registerQuery.data?.students?.length}
-              onClick={handleExportCsv}
+              disabled={
+                !academicYearId ||
+                !classId ||
+                !registerQuery.data?.students?.length ||
+                exportingFormat !== null
+              }
+              onClick={() => void handleExport('csv')}
             >
-              <Download size={16} />
-              CSV
+              {exportingFormat === 'csv' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download size={16} />
+              )}
+              {exportingFormat === 'csv' ? 'Preparing...' : 'CSV'}
             </button>
             <button
               type="button"
               className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
-              disabled={!academicYearId || !classId || !registerQuery.data?.students?.length}
-              onClick={handleExportPdf}
+              disabled={
+                !academicYearId ||
+                !classId ||
+                !registerQuery.data?.students?.length ||
+                exportingFormat !== null
+              }
+              onClick={() => void handleExport('pdf')}
             >
-              <FileText size={16} />
-              PDF
+              {exportingFormat === 'pdf' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText size={16} />
+              )}
+              {exportingFormat === 'pdf' ? 'Preparing...' : 'PDF'}
             </button>
           </div>
         </div>
       </section>
+
+      {exportError || exportMessage ? (
+        <div
+          className={cn(
+            'rounded-xl border px-4 py-3 text-sm font-semibold',
+            exportError
+              ? 'border-danger-100 bg-danger-50 text-danger-700'
+              : 'border-success-100 bg-success-50 text-success-700',
+          )}
+        >
+          {exportError || exportMessage}
+        </div>
+      ) : null}
 
       {registerQuery.isFetching ? (
         <LoadingState label="Preparing attendance matrix..." />

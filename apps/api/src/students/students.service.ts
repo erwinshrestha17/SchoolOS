@@ -13,7 +13,6 @@ import {
   Prisma,
   StudentLifecycleStatus,
   StudentDocumentKind,
-  StudentDocumentStatus,
 } from '@prisma/client';
 import {
   StudentAttendanceHistory,
@@ -29,6 +28,7 @@ import {
   buildRosterPdf,
 } from '../common/pdf/simple-pdf';
 import { FileRegistryService } from '../file-registry/file-registry.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { UsageService } from '../usage/usage.service';
@@ -56,6 +56,7 @@ export class StudentsService {
     private readonly prisma: PrismaService,
     private readonly usersService: UsersService,
     private readonly communicationsService: CommunicationsService,
+    private readonly notificationsService: NotificationsService,
     private readonly auditService: AuditService,
     private readonly storageService: StorageService,
     private readonly fileRegistryService: FileRegistryService,
@@ -3183,6 +3184,192 @@ export class StudentsService {
     };
   }
 
+  async processStudentDocumentExpiryReminders(now = new Date()) {
+    const reminderWindowEnd = addDays(startOfDay(now), 30);
+    const dayStart = startOfDay(now);
+    const dayEnd = addDays(dayStart, 1);
+    const candidates = await this.prisma.studentDocument.findMany({
+      where: {
+        status: {
+          in: ['ACTIVE', 'VERIFIED'],
+        },
+        expiryDate: {
+          lte: reminderWindowEnd,
+        },
+      },
+      include: {
+        student: {
+          include: {
+            guardianLinks: {
+              include: { guardian: true },
+              orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+            },
+          },
+        },
+      },
+      orderBy: [{ expiryDate: 'asc' }, { createdAt: 'asc' }],
+      take: 500,
+    });
+
+    const documentIds = candidates.map((document) => document.id);
+    const existingReminderRows =
+      documentIds.length > 0
+        ? await this.prisma.studentDocumentHistory.findMany({
+            where: {
+              documentId: { in: documentIds },
+              action: 'EXPIRY_REMINDER_SENT',
+              createdAt: {
+                gte: dayStart,
+                lt: dayEnd,
+              },
+            },
+            select: { documentId: true },
+          })
+        : [];
+    const alreadyRemindedDocumentIds = new Set(
+      existingReminderRows
+        .map((row) => row.documentId)
+        .filter((id): id is string => Boolean(id)),
+    );
+
+    let remindedDocuments = 0;
+    let skippedDocuments = 0;
+
+    for (const document of candidates) {
+      if (!document.expiryDate) {
+        skippedDocuments += 1;
+        continue;
+      }
+
+      if (alreadyRemindedDocumentIds.has(document.id)) {
+        skippedDocuments += 1;
+        continue;
+      }
+
+      const recipients = selectDocumentExpiryRecipients(
+        document.student.guardianLinks,
+      );
+
+      if (recipients.length === 0) {
+        await this.prisma.studentDocumentHistory.create({
+          data: {
+            tenantId: document.tenantId,
+            documentId: document.id,
+            action: 'EXPIRY_REMINDER_SKIPPED',
+            documentTitle: document.title,
+            documentKind: document.kind,
+            performedBy: 'system',
+            reason:
+              'No active guardian contact is available for expiry reminder',
+            metadata: {
+              studentId: document.studentId,
+              expiryDate: document.expiryDate.toISOString(),
+            },
+          },
+        });
+        skippedDocuments += 1;
+        continue;
+      }
+
+      const daysUntilExpiry = daysBetween(
+        dayStart,
+        startOfDay(document.expiryDate),
+      );
+      const reminderStatus = daysUntilExpiry < 0 ? 'expired' : 'expiring';
+      const studentName = formatStudentDisplayName(document.student);
+      const documentTitle = document.title || formatDocumentKind(document.kind);
+      const expiryLabel = document.expiryDate.toISOString().slice(0, 10);
+      const subject =
+        reminderStatus === 'expired'
+          ? `${studentName}: document expired`
+          : `${studentName}: document expires soon`;
+      const text = buildDocumentExpiryReminderText({
+        studentName,
+        documentTitle,
+        expiryLabel,
+        daysUntilExpiry,
+        reminderStatus,
+      });
+
+      for (const recipient of recipients) {
+        if (recipient.email) {
+          await this.notificationsService.sendEmail({
+            to: recipient.email,
+            subject,
+            text,
+            metadata: {
+              tenantId: document.tenantId,
+              studentId: document.studentId,
+              documentId: document.id,
+              reminderType: 'student_document_expiry',
+            },
+          });
+        }
+
+        if (recipient.phone) {
+          await this.notificationsService.sendSms({
+            to: recipient.phone,
+            message: text,
+            metadata: {
+              tenantId: document.tenantId,
+              studentId: document.studentId,
+              documentId: document.id,
+              reminderType: 'student_document_expiry',
+            },
+          });
+        }
+      }
+
+      await this.prisma.studentDocumentHistory.create({
+        data: {
+          tenantId: document.tenantId,
+          documentId: document.id,
+          action: 'EXPIRY_REMINDER_SENT',
+          documentTitle: document.title,
+          documentKind: document.kind,
+          performedBy: 'system',
+          reason:
+            reminderStatus === 'expired'
+              ? 'Document already expired'
+              : 'Document expiry is within reminder window',
+          metadata: {
+            studentId: document.studentId,
+            expiryDate: document.expiryDate.toISOString(),
+            daysUntilExpiry,
+            reminderStatus,
+            recipientCount: recipients.length,
+          },
+        },
+      });
+
+      await this.auditService.record({
+        action: 'expiry_reminder_sent',
+        resource: 'student_document',
+        tenantId: document.tenantId,
+        userId: null,
+        resourceId: document.id,
+        after: {
+          studentId: document.studentId,
+          kind: document.kind,
+          expiryDate: document.expiryDate.toISOString(),
+          daysUntilExpiry,
+          reminderStatus,
+          recipientCount: recipients.length,
+        },
+      });
+
+      remindedDocuments += 1;
+    }
+
+    return {
+      reviewedAt: now.toISOString(),
+      reminderWindowEnd: reminderWindowEnd.toISOString(),
+      candidateDocuments: candidates.length,
+      remindedDocuments,
+      skippedDocuments,
+    };
+  }
+
   private async recordLifecycleTransition(
     studentId: string,
     fromStatus: StudentLifecycleStatus | null,
@@ -3377,6 +3564,86 @@ function parseOptionalStudentDocumentExpiryDate(value?: string) {
   }
 
   return parsed;
+}
+
+function startOfDay(value: Date) {
+  return new Date(
+    Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()),
+  );
+}
+
+function addDays(value: Date, days: number) {
+  return new Date(value.getTime() + days * 86_400_000);
+}
+
+function daysBetween(left: Date, right: Date) {
+  return Math.round((right.getTime() - left.getTime()) / 86_400_000);
+}
+
+function selectDocumentExpiryRecipients(
+  guardianLinks: Array<{
+    isPrimary?: boolean | null;
+    guardian?: {
+      fullName?: string | null;
+      email?: string | null;
+      primaryPhone?: string | null;
+      receivesAlerts?: boolean | null;
+    } | null;
+  }>,
+) {
+  const withContact = guardianLinks
+    .map((link) => ({
+      isPrimary: Boolean(link.isPrimary),
+      receivesAlerts: Boolean(link.guardian?.receivesAlerts),
+      email: link.guardian?.email?.trim() || null,
+      phone: link.guardian?.primaryPhone?.trim() || null,
+    }))
+    .filter((guardian) => guardian.email || guardian.phone);
+  const preferred = withContact.filter(
+    (guardian) => guardian.isPrimary || guardian.receivesAlerts,
+  );
+  return preferred.length > 0 ? preferred : withContact.slice(0, 1);
+}
+
+function formatStudentDisplayName(student: {
+  firstNameEn?: string | null;
+  lastNameEn?: string | null;
+  studentSystemId?: string | null;
+}) {
+  return (
+    [student.firstNameEn, student.lastNameEn]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
+    student.studentSystemId ||
+    'Student'
+  );
+}
+
+function formatDocumentKind(kind: string) {
+  return kind
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function buildDocumentExpiryReminderText(input: {
+  studentName: string;
+  documentTitle: string;
+  expiryLabel: string;
+  daysUntilExpiry: number;
+  reminderStatus: 'expired' | 'expiring';
+}) {
+  const timing =
+    input.reminderStatus === 'expired'
+      ? `expired ${Math.abs(input.daysUntilExpiry)} day${Math.abs(input.daysUntilExpiry) === 1 ? '' : 's'} ago`
+      : `expires in ${input.daysUntilExpiry} day${input.daysUntilExpiry === 1 ? '' : 's'}`;
+
+  return [
+    `SchoolOS document reminder: ${input.documentTitle} for ${input.studentName} ${timing}.`,
+    `Expiry date: ${input.expiryLabel}.`,
+    'Please contact the school office to update the document.',
+  ].join(' ');
 }
 
 type GeneratedStudentDocumentKind =

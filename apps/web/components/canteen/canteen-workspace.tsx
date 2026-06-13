@@ -182,6 +182,8 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
   const [receiptPreview, setReceiptPreview] = useState<CanteenPosReceipt | null>(null);
   const [resolvedServingStudent, setResolvedServingStudent] = useState<CanteenQrStudent | null>(null);
   const [resolvedPosStudent, setResolvedPosStudent] = useState<CanteenQrStudent | null>(null);
+  const [servingAllergyAcknowledged, setServingAllergyAcknowledged] =
+    useState(false);
 
   const queryClient = useQueryClient();
   const menuQuery = useQuery({
@@ -314,6 +316,7 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
     mutationFn: canteenApi.serveMeal,
     onSuccess: () => {
       setServingForm(emptyServingForm);
+      setServingAllergyAcknowledged(false);
       setNotice('Meal served.');
       invalidateCanteen();
     },
@@ -453,6 +456,8 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
   };
 
   const selectedServingStudent = servingForm.studentId;
+  const servingHasAllergyWarnings =
+    (resolvedServingStudent?.allergyWarnings?.length ?? 0) > 0;
   const servingStudentControlQuery = useQuery({
     queryKey: ['canteen-serving-control-preview', selectedServingStudent],
     queryFn: () => canteenApi.getSpendingControl(selectedServingStudent!),
@@ -701,6 +706,7 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
                 const student = normalizeScannedStudent(data);
                 if (student) {
                   setResolvedServingStudent(student);
+                  setServingAllergyAcknowledged(false);
                   setServingForm({ ...servingForm, studentId: student.id ?? '' });
                 }
               }}
@@ -721,6 +727,7 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
                 selectedId={servingForm.studentId}
                 onSelect={(studentId) => {
                   setServingForm({ ...servingForm, studentId });
+                  setServingAllergyAcknowledged(false);
                   if (studentId !== resolvedServingStudent?.id) {
                     setResolvedServingStudent(null);
                   }
@@ -732,7 +739,32 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
 
               {servingStudentControlQuery.data?.blockedCategories?.length ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-800">Warning: Parent has blocked items: {servingStudentControlQuery.data.blockedCategories.join(', ')}</div> : null}
 
-              <button type="submit" className="btn-primary w-full h-12" disabled={servingMutation.isPending || !servingForm.studentId}>
+              {servingHasAllergyWarnings ? (
+                <label className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-800">
+                  <input
+                    type="checkbox"
+                    checked={servingAllergyAcknowledged}
+                    onChange={(event) =>
+                      setServingAllergyAcknowledged(event.target.checked)
+                    }
+                    className="mt-0.5 rounded border-red-300 text-red-600 focus:ring-red-200"
+                  />
+                  <span>
+                    I reviewed this student's allergy and medical warnings before
+                    serving the meal.
+                  </span>
+                </label>
+              ) : null}
+
+              <button
+                type="submit"
+                className="btn-primary w-full h-12"
+                disabled={
+                  servingMutation.isPending ||
+                  !servingForm.studentId ||
+                  (servingHasAllergyWarnings && !servingAllergyAcknowledged)
+                }
+              >
                 {servingMutation.isPending ? 'Serving...' : 'Serve meal now'}
               </button>
             </form>

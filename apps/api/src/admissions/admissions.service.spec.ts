@@ -392,6 +392,68 @@ describe('AdmissionsService production hardening', () => {
     );
   });
 
+  it('keeps duplicate candidates structured in bulk import review rows', async () => {
+    const existingStudent = {
+      id: 'student-existing',
+      studentSystemId: 'SCH-2026-0007',
+      firstNameEn: 'Asha',
+      lastNameEn: 'Tamang',
+      firstNameNp: null,
+      lastNameNp: null,
+      dateOfBirth: new Date('2020-01-02T00:00:00.000Z'),
+      class: { name: 'Class 1' },
+      sectionRef: { name: 'A' },
+      section: null,
+      rollNumber: 7,
+      guardianLinks: [
+        {
+          guardian: {
+            primaryPhone: '9800000000',
+            secondaryPhone: null,
+          },
+        },
+      ],
+    };
+    const prisma = buildPrisma({
+      studentFindManyResult: [existingStudent],
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.bulkImport(
+      {
+        dryRun: true,
+        csvContent: [
+          'firstNameEn,lastNameEn,dateOfBirth,gender,admissionDate,academicYearId,classId,guardianFullName,guardianRelation,guardianPhone,confirmNoDisability',
+          'Asha,Tamang,2020-01-02,FEMALE,2026-04-15,ay-1,class-1,Maya Tamang,mother,9800000000,true',
+        ].join('\n'),
+      },
+      actor,
+    );
+
+    expect(result.failed).toBe(1);
+    expect(result.results[0]).toEqual(
+      expect.objectContaining({
+        rowNumber: 2,
+        status: 'failed',
+        errors: expect.arrayContaining([
+          'Possible duplicate admission found. Resubmit with confirmDuplicate=true to continue.',
+        ]),
+        duplicates: [
+          expect.objectContaining({
+            studentId: 'student-existing',
+            studentSystemId: 'SCH-2026-0007',
+            fullNameEn: 'Asha Tamang',
+            matchTypes: expect.arrayContaining([
+              'exact_name_dob',
+              'name_phone',
+            ]),
+          }),
+        ],
+      }),
+    );
+    expect(result.errorReportCsv).toContain('SCH-2026-0007 Asha Tamang');
+  });
+
   it('rejects missing tenant-owned references before writing', async () => {
     const prisma = buildPrisma({ academicYearFindFirstResult: null });
     const { service } = buildService(prisma);

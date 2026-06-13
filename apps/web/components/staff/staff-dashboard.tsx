@@ -196,7 +196,7 @@ export function StaffDashboard() {
                     <div className="space-y-2">
                       <p className="text-sm"><span className="text-muted-foreground">Contract Type:</span> {profile.contractType}</p>
                       <p className="text-sm"><span className="text-muted-foreground">Bank:</span> {profile.bankName || 'Not set'}</p>
-                      <p className="text-sm"><span className="text-muted-foreground">Account:</span> {profile.bankAccount || 'Not set'}</p>
+                      <p className="text-sm"><span className="text-muted-foreground">Account (masked):</span> {maskStaffBankAccount(profile.bankAccount)}</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -235,4 +235,22 @@ export function StaffDashboard() {
       </div>
     </div>
   );
+}
+
+function maskStaffBankAccount(value?: string | null) {
+  const normalized = value?.trim();
+
+  if (!normalized) {
+    return 'Not set';
+  }
+
+  if (normalized.includes('****')) {
+    return normalized;
+  }
+
+  if (normalized.length <= 4) {
+    return '****';
+  }
+
+  return `${normalized.slice(0, 2)}****${normalized.slice(-2)}`;
 }

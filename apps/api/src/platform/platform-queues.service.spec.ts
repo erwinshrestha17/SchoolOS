@@ -190,6 +190,7 @@ describe('PlatformQueuesService', () => {
     const job = {
       id: 'job-1',
       name: 'generate-report',
+      isFailed: jest.fn().mockResolvedValue(true),
       remove,
     };
 
@@ -209,6 +210,7 @@ describe('PlatformQueuesService', () => {
     ).resolves.toEqual({ success: true });
 
     expect(remove).toHaveBeenCalledTimes(1);
+    expect(job.isFailed).toHaveBeenCalledTimes(1);
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'queue_job_removed',
@@ -227,6 +229,34 @@ describe('PlatformQueuesService', () => {
         }),
       }),
     );
+  });
+
+  it('does not discard jobs that already moved out of the failed state', async () => {
+    const remove = jest.fn();
+    const job = {
+      id: 'job-1',
+      name: 'generate-report',
+      isFailed: jest.fn().mockResolvedValue(false),
+      remove,
+    };
+
+    const { service } = buildService({
+      reports: {
+        getJob: jest.fn().mockResolvedValue(job),
+      },
+    });
+
+    await expect(
+      service.removeJob(
+        'reports',
+        'job-1',
+        { reason: 'Report payload obsolete after tenant fix' },
+        'platform-user-1',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(remove).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
   });
 
   it('audits successful failed-job retry requests with the required reason', async () => {
@@ -280,6 +310,37 @@ describe('PlatformQueuesService', () => {
         }),
       }),
     );
+  });
+
+  it('returns a bounded idempotency error when a failed job cannot be retried after state changes', async () => {
+    const retry = jest.fn().mockRejectedValue(new Error('Job is not failed'));
+    const job = {
+      id: 'job-1',
+      failedReason: 'Timeout',
+      attemptsMade: 3,
+      isFailed: jest.fn().mockResolvedValue(true),
+      retry,
+    };
+
+    const { service } = buildService({
+      notifications: {
+        getJob: jest.fn().mockResolvedValue(job),
+      },
+    });
+
+    await expect(
+      service.retryFailedJob(
+        {
+          queueName: 'notifications',
+          jobId: 'job-1',
+          reason: 'Retry after provider outage',
+        },
+        'platform-user-1',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(auditService.record).not.toHaveBeenCalled();
   });
 
   it('returns failed job detail with sanitized payload, stacktrace, timings, and retry audit history', async () => {

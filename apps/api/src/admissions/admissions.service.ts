@@ -784,6 +784,7 @@ export class AdmissionsService {
       studentId?: string;
       studentSystemId?: string;
       errors?: string[];
+      duplicates?: BulkImportDuplicateWarning[];
     }> = [];
 
     for (const row of rows) {
@@ -803,17 +804,20 @@ export class AdmissionsService {
 
       if (dto.dryRun) {
         const errors: string[] = [];
+        let duplicates: BulkImportDuplicateWarning[] = [];
 
         try {
           await this.validateAdmissionForCreate(parsed.dto, actor);
         } catch (error) {
           errors.push(formatImportError(error));
+          duplicates = extractImportDuplicates(error);
         }
 
         results.push({
           rowNumber: row.rowNumber,
           status: errors.length > 0 ? 'failed' : 'validated',
           errors: errors.length > 0 ? errors : undefined,
+          duplicates: duplicates.length > 0 ? duplicates : undefined,
         });
         continue;
       }
@@ -827,10 +831,12 @@ export class AdmissionsService {
           studentSystemId: created.student.studentSystemId,
         });
       } catch (error) {
+        const duplicates = extractImportDuplicates(error);
         results.push({
           rowNumber: row.rowNumber,
           status: 'failed',
           errors: [formatImportError(error)],
+          duplicates: duplicates.length > 0 ? duplicates : undefined,
         });
       }
     }
@@ -1122,16 +1128,28 @@ export class AdmissionsService {
 }
 
 function buildBulkImportErrorCsv(
-  results: Array<{ rowNumber: number; status: string; errors?: string[] }>,
+  results: Array<{
+    rowNumber: number;
+    status: string;
+    errors?: string[];
+    duplicates?: BulkImportDuplicateWarning[];
+  }>,
 ) {
   const failedRows = results.filter((result) => result.status === 'failed');
   const lines = [
-    'rowNumber,status,errors',
+    'rowNumber,status,errors,duplicateCandidates',
     ...failedRows.map((result) =>
       [
         result.rowNumber,
         result.status,
         `"${(result.errors ?? []).join('; ').replace(/"/g, '""')}"`,
+        `"${(result.duplicates ?? [])
+          .map(
+            (duplicate) =>
+              `${duplicate.studentSystemId} ${duplicate.fullNameEn}`,
+          )
+          .join('; ')
+          .replace(/"/g, '""')}"`,
       ].join(','),
     ),
   ];
@@ -1159,6 +1177,48 @@ function formatImportError(error: unknown) {
   }
 
   return error instanceof Error ? error.message : 'Unknown import error';
+}
+
+type BulkImportDuplicateWarning = {
+  studentId: string;
+  studentSystemId: string;
+  fullNameEn: string;
+  dateOfBirth: string | Date;
+  className: string;
+  sectionName: string | null;
+  rollNumber: number | null;
+  matchTypes?: string[];
+};
+
+function extractImportDuplicates(error: unknown): BulkImportDuplicateWarning[] {
+  if (!(error instanceof HttpException)) {
+    return [];
+  }
+
+  const response = error.getResponse();
+
+  if (
+    typeof response === 'object' &&
+    response !== null &&
+    'duplicates' in response &&
+    Array.isArray(response.duplicates)
+  ) {
+    return response.duplicates.filter(isBulkImportDuplicateWarning);
+  }
+
+  return [];
+}
+
+function isBulkImportDuplicateWarning(
+  value: unknown,
+): value is BulkImportDuplicateWarning {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'studentId' in value &&
+    'studentSystemId' in value &&
+    'fullNameEn' in value
+  );
 }
 
 function isErrorResponse(

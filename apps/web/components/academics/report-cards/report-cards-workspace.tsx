@@ -173,16 +173,13 @@ export function ReportCardsWorkspace() {
 
   const openPdf = async (reportCardId: string) => {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1'}/academics/report-cards/${encodeURIComponent(reportCardId)}.pdf`,
-        { credentials: 'include' },
+      await api.openReportCardPdf(reportCardId);
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'Could not load report card PDF',
       );
-      if (!response.ok) throw new Error('Failed to load PDF');
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-    } catch {
-      setError('Could not load report card PDF');
       setMessage(null);
     }
   };

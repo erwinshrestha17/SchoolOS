@@ -1,4 +1,4 @@
-import type { RoleSummary } from '@schoolos/core';
+import type { PermissionKey, RoleSummary } from '@schoolos/core';
 import { JsonBody, request } from './client';
 
 export type SchoolUserStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED';
@@ -16,8 +16,28 @@ export type SchoolUserSummary = {
   createdAt: string;
 };
 
+export type RolePermissionSummary = {
+  id: string;
+  key: PermissionKey;
+};
+
+export type TenantRoleSummary = RoleSummary & {
+  permissions: RolePermissionSummary[];
+};
+
+export type PermissionCatalogItem = {
+  id: string;
+  resource: string;
+  action: string;
+  key: PermissionKey;
+  description: string | null;
+};
+
 export const usersApi = {
   listUsers: () => request<SchoolUserSummary[]>('/users'),
+  listRoleCatalog: () => request<TenantRoleSummary[]>('/roles'),
+  listPermissionCatalog: () =>
+    request<PermissionCatalogItem[]>('/roles/permissions'),
   createUser: (body: JsonBody) =>
     request<SchoolUserSummary>('/users', { method: 'POST', json: body }),
   updateUserStatus: (userId: string, body: { status: SchoolUserStatus }) =>

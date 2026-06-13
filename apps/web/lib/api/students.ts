@@ -13,6 +13,7 @@ import type {
   StudentDocumentHistory,
   StudentDuplicateCandidatesResult,
   StudentFeeClearance,
+  StudentIemisReadinessSummary,
   StudentLifecycleActionResult,
   StudentProfile,
   StudentProfileDetail,
@@ -230,6 +231,14 @@ export const studentsApi = {
 
   exportIemisStudents: () =>
     request<IemisExportResult>('/students/iemis/export'),
+  listIemisReadiness: (params?: {
+    classId?: string;
+    sectionId?: string;
+    status?: 'all' | 'ready' | 'has_issues';
+  }) =>
+    request<StudentIemisReadinessSummary[]>(
+      withQuery('/students/iemis/validation', params ?? {}),
+    ),
   getIemisReadiness: (studentId: string) =>
     request<{
       studentId: string;

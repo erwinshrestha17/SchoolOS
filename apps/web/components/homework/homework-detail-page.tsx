@@ -267,8 +267,9 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                           className="h-9 w-9 rounded-xl text-slate-400 hover:text-[var(--color-mod-homework-text)] hover:bg-[var(--color-mod-homework-bg)]"
                           onClick={async () => {
                             try {
-                              const view = await api.getFileView(attachment.fileAssetId);
-                              window.open(view.url, '_blank');
+                              await api.openHomeworkAttachmentPreview(
+                                attachment.id,
+                              );
                             } catch (err) {
                               setNotice({
                                 title: 'Could not open attachment',

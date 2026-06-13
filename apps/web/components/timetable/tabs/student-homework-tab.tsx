@@ -78,8 +78,7 @@ export function StudentHomeworkTab() {
     setOpeningAttachmentId(attachmentId);
 
     try {
-      const access = await api.getHomeworkAttachmentDownloadUrl(attachmentId);
-      window.open(access.url, '_blank', 'noopener,noreferrer');
+      await api.openHomeworkAttachmentDownload(attachmentId);
     } catch (err: unknown) {
       setAttachmentError(
         err instanceof Error

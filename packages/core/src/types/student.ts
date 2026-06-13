@@ -361,6 +361,18 @@ export type IemisValidationIssue = {
   message: string;
 };
 
+export type StudentIemisReadinessSummary = {
+  studentId: string;
+  studentSystemId: string;
+  fullNameEn: string;
+  className: string;
+  sectionName: string | null;
+  eligible: boolean;
+  score: number;
+  issuesCount: number;
+  issues: Array<{ field: string; message: string }>;
+};
+
 export type IemisExportRow = {
   studentSystemId: string;
   nationalStudentId: string;

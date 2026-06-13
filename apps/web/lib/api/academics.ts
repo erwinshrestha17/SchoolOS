@@ -32,6 +32,8 @@ import {
   JsonBody,
   MarkLockFilters,
   MarkLockRequestSummary,
+  API_BASE_URL,
+  openPdfBlob,
   request,
   withQuery,
 } from './client';
@@ -191,6 +193,14 @@ export const academicsApi = {
     ),
   listReportCardHistory: (id: string) =>
     request<any>(`/academics/report-cards/${encodeURIComponent(id)}/history`),
+  openReportCardPdf: async (id: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/academics/report-cards/${encodeURIComponent(id)}.pdf`,
+      { credentials: 'include' },
+    );
+
+    await openPdfBlob(response);
+  },
   listReportCardCorrections: (params?: { examTermId?: string; status?: string }) =>
     request<any[]>(withQuery('/academics/report-cards/corrections', params ?? {})),
   reviewReportCardCorrection: (id: string, body: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string }) =>
@@ -544,6 +554,18 @@ export const academicsApi = {
     request<HomeworkAttachmentAccess>(
       `/homework/attachments/${encodeURIComponent(attachmentId)}/download-url`,
     ),
+  openHomeworkAttachmentPreview: async (attachmentId: string) => {
+    const access = await request<HomeworkAttachmentAccess>(
+      `/homework/attachments/${encodeURIComponent(attachmentId)}/preview-url`,
+    );
+    openHomeworkAttachmentAccessUrl(access);
+  },
+  openHomeworkAttachmentDownload: async (attachmentId: string) => {
+    const access = await request<HomeworkAttachmentAccess>(
+      `/homework/attachments/${encodeURIComponent(attachmentId)}/download-url`,
+    );
+    openHomeworkAttachmentAccessUrl(access);
+  },
   listHomeworkSubmissions: () =>
     request<HomeworkSubmissionSummary[]>('/homework/submissions'),
   listHomeworkAssignmentSubmissions: (homeworkId: string) =>
@@ -668,6 +690,14 @@ export const academicsApi = {
 
   // Communications - Deliveries
 };
+
+function openHomeworkAttachmentAccessUrl(access: HomeworkAttachmentAccess) {
+  if (!access.url || access.expiresInSeconds <= 0) {
+    throw new Error('The homework attachment link is not available.');
+  }
+
+  window.open(access.url, '_blank', 'noopener,noreferrer');
+}
 
 export type BatchReportCardGenerationResult = {
   queued: boolean;

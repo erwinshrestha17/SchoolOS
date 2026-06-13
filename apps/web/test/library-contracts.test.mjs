@@ -44,6 +44,7 @@ describe('Phase 3B Library frontend contracts', () => {
       'createCopy',
       'updateCopy',
       'updateCopyStatus',
+      'archiveCopy',
       'listIssues',
       'issueCopy',
       'returnIssue',
@@ -75,6 +76,10 @@ describe('Phase 3B Library frontend contracts', () => {
     }
 
     assert.match(libraryApi, /encodeURIComponent\(fineId\).*post-to-fees/s);
+    assert.match(
+      libraryApi,
+      /\/library\/copies\/\$\{encodeURIComponent\(copyId\)\}\/archive/,
+    );
     const clientApi = read('lib/api/client.ts');
     assert.match(clientApi, /credentials:\s*'include'/);
     assert.match(libraryApi, /downloadCsv/);
@@ -132,6 +137,10 @@ describe('Phase 3B Library frontend contracts', () => {
     assert.match(workspace, /\/dashboard\/finance\?invoiceId=/);
     assert.match(workspace, /copyStatusReasons/);
     assert.match(workspace, /Audit reason/);
+    assert.match(workspace, /onArchiveCopy/);
+    assert.match(workspace, /Archive library copy/);
+    assert.match(workspace, /Archive copies instead of deleting them/);
+    assert.match(workspace, /archiveCopyMutation/);
     assert.match(workspace, /confirmDisabled=/);
     assert.match(workspace, /reason: copyStatusReasons\[copy\.id\]/);
     assert.match(workspace, /overdueQuery\.data\?\.items/);

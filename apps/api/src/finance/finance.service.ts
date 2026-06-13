@@ -4270,6 +4270,7 @@ export class FinanceService {
       event?: string;
       amount?: number | string;
       reference?: string;
+      status?: string;
       tenantId?: string;
     };
 
@@ -4304,14 +4305,35 @@ export class FinanceService {
       throw new ForbiddenException('Invalid signature.');
     }
 
+    const webhookStatus = normalizeOnlinePaymentWebhookStatus(
+      data.status ?? data.event,
+    );
+
+    if (webhookStatus !== 'SUCCESS') {
+      return {
+        status: 'ignored',
+        postedToLedger: false,
+        message: `Webhook event ${webhookStatus.toLowerCase()} was acknowledged without creating a payment.`,
+      };
+    }
+
+    const reference = data.reference ? String(data.reference).trim() : '';
+    if (!reference) {
+      throw new BadRequestException('Webhook reference is required.');
+    }
+
+    const requestedAmount = new Prisma.Decimal(data.amount || 0);
+    if (requestedAmount.lte(0)) {
+      throw new BadRequestException(
+        'Webhook amount must be greater than zero.',
+      );
+    }
+
     let tenantId = headers['x-tenant-id'] || data?.tenantId;
-    if (!tenantId && data?.reference) {
+    if (!tenantId) {
       const invoice = await this.prisma.invoice.findFirst({
         where: {
-          OR: [
-            { id: String(data.reference) },
-            { invoiceNumber: String(data.reference) },
-          ],
+          OR: [{ id: reference }, { invoiceNumber: reference }],
         },
         select: { tenantId: true },
       });
@@ -4324,7 +4346,7 @@ export class FinanceService {
     }
 
     // Duplicate event checking
-    const idempotencyKey = `webhook:${provider.toLowerCase()}:${data.reference}`;
+    const idempotencyKey = `webhook:${provider.toLowerCase()}:${reference}`;
     const existingPayment = await this.prisma.payment.findFirst({
       where: { tenantId, idempotencyKey },
       include: { receipt: true },
@@ -4343,10 +4365,7 @@ export class FinanceService {
     // Look up invoice
     const invoice = await this.prisma.invoice.findFirst({
       where: {
-        OR: [
-          { id: String(data.reference) },
-          { invoiceNumber: String(data.reference) },
-        ],
+        OR: [{ id: reference }, { invoiceNumber: reference }],
         tenantId,
       },
       include: {
@@ -4378,7 +4397,7 @@ export class FinanceService {
       };
     }
 
-    let paymentAmount = new Prisma.Decimal(data.amount || 0);
+    let paymentAmount = requestedAmount;
     if (paymentAmount.gt(remaining)) {
       paymentAmount = remaining;
     }
@@ -4417,7 +4436,7 @@ export class FinanceService {
           collectedById: null, // Online payment has no cashier collector
           method: PaymentMethod.TRANSFER, // Online gateway maps to TRANSFER in our system
           status: PaymentStatus.SUCCESS,
-          referenceNumber: data.reference ?? null,
+          referenceNumber: reference,
           amount: paymentAmount,
           isAdvance: false,
           recognizedAt: new Date(),
@@ -5928,6 +5947,45 @@ function buildPaymentMethodReconciliation(
     reversalsAndRefunds: Number(row.reversalsAndRefunds.toFixed(2)),
     netAmount: Number(row.netAmount.toFixed(2)),
   }));
+}
+
+function normalizeOnlinePaymentWebhookStatus(value: unknown) {
+  const normalized = String(value ?? '')
+    .trim()
+    .toUpperCase();
+
+  if (
+    normalized === 'SUCCESS' ||
+    normalized === 'COMPLETED' ||
+    normalized === 'PAID' ||
+    normalized === 'PAYMENT_SUCCESS' ||
+    normalized === 'PAYMENT_COMPLETED'
+  ) {
+    return 'SUCCESS';
+  }
+
+  if (
+    normalized === 'FAILED' ||
+    normalized === 'FAILURE' ||
+    normalized === 'CANCELLED' ||
+    normalized === 'CANCELED' ||
+    normalized === 'EXPIRED' ||
+    normalized === 'DECLINED'
+  ) {
+    return 'FAILED';
+  }
+
+  if (
+    normalized === 'PENDING' ||
+    normalized === 'PROCESSING' ||
+    normalized === 'AUTHORIZED' ||
+    normalized === 'INITIATED' ||
+    normalized === 'DELAYED'
+  ) {
+    return 'PENDING';
+  }
+
+  return 'UNKNOWN';
 }
 
 function startOfToday() {

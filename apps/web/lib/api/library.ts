@@ -223,6 +223,11 @@ export const libraryApi = {
       `/library/copies/${encodeURIComponent(copyId)}/status`,
       { method: 'PATCH', json: body },
     ),
+  archiveCopy: (copyId: string, body: { reason: string }) =>
+    request<LibraryCopy>(
+      `/library/copies/${encodeURIComponent(copyId)}/archive`,
+      { method: 'POST', json: body },
+    ),
   listIssues: (params?: {
     status?: string | null;
     studentId?: string | null;

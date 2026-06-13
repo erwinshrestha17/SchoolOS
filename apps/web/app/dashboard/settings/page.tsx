@@ -47,10 +47,17 @@ import { SetupForm } from '../../../components/forms/setup-form';
 import { Badge } from '../../../components/ui/badge';
 import { PageHeader } from '../../../components/ui/page-header';
 import { useEntitlements } from '../../../components/entitlements-provider';
-import { api, type SchoolUserSummary, type TenantLogoAccess } from '../../../lib/api';
+import {
+  api,
+  type PermissionCatalogItem,
+  type SchoolUserSummary,
+  type TenantLogoAccess,
+  type TenantRoleSummary,
+} from '../../../lib/api';
 import { cn } from '../../../lib/utils';
 import { systemRoleDefinitions, systemRolePermissions } from '@schoolos/core';
 import type {
+  PermissionKey,
   PlatformAuditLog,
   TenantSettingKey,
   TenantSettingSummary,
@@ -3073,27 +3080,215 @@ const ROLE_MODULE_MAP: Record<string, string[]> = {
 
 function RolesPermissionsPanel() {
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
+  const [permissionSearch, setPermissionSearch] = useState('');
 
-  const tenantRoles = systemRoleDefinitions.filter((r) => !PLATFORM_ROLE_NAMES.has(r.name));
-  const platformRoles = systemRoleDefinitions.filter((r) => PLATFORM_ROLE_NAMES.has(r.name));
+  const roleCatalogQuery = useQuery({
+    queryKey: ['settings', 'role-catalog'],
+    queryFn: api.listRoleCatalog,
+  });
+  const permissionCatalogQuery = useQuery({
+    queryKey: ['settings', 'permission-catalog'],
+    queryFn: api.listPermissionCatalog,
+  });
 
-  function getPermissionCount(roleName: string): number {
-    const perms = systemRolePermissions[roleName];
-    return Array.isArray(perms) ? perms.length : 0;
+  const permissionByKey = useMemo(() => {
+    return new Map<string, PermissionCatalogItem>(
+      (permissionCatalogQuery.data ?? []).map((permission) => [permission.key, permission]),
+    );
+  }, [permissionCatalogQuery.data]);
+
+  const roles = useMemo<TenantRoleSummary[]>(() => {
+    if (roleCatalogQuery.data?.length) {
+      return roleCatalogQuery.data;
+    }
+
+    return systemRoleDefinitions.map((role) => ({
+      id: role.name,
+      name: role.name,
+      description: role.description,
+      isSystem: true,
+      permissions: (systemRolePermissions[role.name] ?? []).map((permission) => ({
+        id: `${role.name}:${permission}`,
+        key: permission as PermissionKey,
+      })),
+    }));
+  }, [roleCatalogQuery.data]);
+
+  const tenantRoles = roles.filter((role) => !PLATFORM_ROLE_NAMES.has(role.name));
+  const platformRoles = roles.filter((role) => PLATFORM_ROLE_NAMES.has(role.name));
+  const isUsingLiveCatalog = Boolean(roleCatalogQuery.data?.length);
+
+  function renderRoleCard(role: TenantRoleSummary, variant: 'tenant' | 'platform') {
+    const modules = ROLE_MODULE_MAP[role.name] ?? [];
+    const isExpanded = expandedRole === role.name;
+    const permissionRows = getRolePermissionRows(role, permissionByKey, permissionSearch);
+    const permissionGroups = groupPermissionsByResource(permissionRows);
+    const isPlatform = variant === 'platform';
+
+    return (
+      <div
+        key={role.id}
+        className={cn(
+          'overflow-hidden rounded-lg border bg-white',
+          isPlatform ? 'border-purple-100 bg-purple-50/40' : 'border-slate-200',
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setExpandedRole(isExpanded ? null : role.name)}
+          className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-50"
+        >
+          <div
+            className={cn(
+              'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border',
+              isPlatform ? 'border-purple-100 bg-purple-50' : 'border-slate-100 bg-slate-100',
+            )}
+          >
+            {isPlatform ? <Shield size={13} className="text-purple-600" /> : <Key size={13} className="text-slate-500" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold capitalize text-slate-800">
+                {role.name.replace(/_/g, ' ')}
+              </p>
+              <span
+                className={cn(
+                  'rounded px-1.5 py-0.5 font-mono text-[10px]',
+                  isPlatform ? 'bg-purple-50 text-purple-600' : 'bg-slate-100 text-slate-500',
+                )}
+              >
+                {role.name}
+              </span>
+              {role.isSystem && (
+                <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold uppercase text-emerald-700">
+                  System
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 text-xs text-slate-500">{role.description ?? 'Tenant role'}</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3 text-right">
+            <div>
+              <p className="text-sm font-bold text-slate-900">{role.permissions.length}</p>
+              <p className="text-[10px] text-slate-400">perms</p>
+            </div>
+            <ChevronRight
+              size={14}
+              className={cn('text-slate-400 transition-transform', isExpanded && 'rotate-90')}
+            />
+          </div>
+        </button>
+
+        {isExpanded && (
+          <div className="border-t border-slate-100 px-4 py-3">
+            {modules.length > 0 && (
+              <div className="mb-3">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Module Coverage</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {modules.map((mod) => (
+                    <span key={mod} className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                      <Check size={10} />
+                      {mod}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                What this role can access ({permissionRows.length}
+                {permissionSearch.trim() ? ` of ${role.permissions.length}` : ''})
+              </p>
+              {permissionRows.length === 0 ? (
+                <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+                  No permissions match the current filter.
+                </div>
+              ) : (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {permissionGroups.map((group) => (
+                    <div key={group.resource} className="rounded-lg border border-slate-100 bg-slate-50 p-2">
+                      <p className="mb-1.5 text-xs font-black uppercase tracking-wide text-slate-600">
+                        {formatPermissionLabel(group.resource)}
+                      </p>
+                      <div className="space-y-1">
+                        {group.permissions.map((permission) => (
+                          <div key={permission.key} className="rounded-md bg-white px-2 py-1 ring-1 ring-slate-100">
+                            <p className="font-mono text-[10px] font-semibold text-slate-600">{permission.key}</p>
+                            <p className="text-[10px] leading-4 text-slate-500">
+                              {permission.description ?? formatPermissionLabel(permission.action)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
     <div className="space-y-5">
       {/* Notice */}
-      <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
         <Key size={15} className="mt-0.5 shrink-0 text-slate-500" />
         <div>
-          <p className="text-sm font-semibold text-slate-700">Read-only permissions overview</p>
+          <p className="text-sm font-semibold text-slate-700">Role access inspection</p>
           <p className="mt-0.5 text-xs leading-5 text-slate-500">
-            All roles are preset by SchoolOS for the pilot scope. Use Users & Access or HR Staff workflows for role assignments; this panel reviews permission coverage.
+            Inspect what each role can access before assigning it. Live tenant roles are loaded from the RBAC API; the seeded catalog is used only when no tenant role data is returned.
           </p>
         </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span
+            className={cn(
+              'rounded px-2 py-1 text-[10px] font-bold uppercase',
+              isUsingLiveCatalog ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700',
+            )}
+          >
+            {isUsingLiveCatalog ? 'Live tenant RBAC' : 'Seeded fallback'}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              void roleCatalogQuery.refetch();
+              void permissionCatalogQuery.refetch();
+            }}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold uppercase text-slate-600 transition hover:bg-slate-50"
+          >
+            <RotateCcw size={11} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {(roleCatalogQuery.isError || permissionCatalogQuery.isError) && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+          <AlertCircle size={14} />
+          <span>
+            Live role inspection could not fully load. Showing any available seeded role coverage until the API is reachable.
+          </span>
+        </div>
+      )}
+
+      <label className="block">
+        <span className="mb-1 block text-xs font-semibold text-slate-600">Filter permissions</span>
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={permissionSearch}
+            onChange={(event) => setPermissionSearch(event.target.value)}
+            className="input-control pl-9"
+            placeholder="Search resource, action, key, or description"
+          />
+        </div>
+      </label>
 
       {/* Tenant roles */}
       <div>
@@ -3101,84 +3296,14 @@ function RolesPermissionsPanel() {
           School Roles ({tenantRoles.length})
         </p>
         <div className="space-y-1.5">
-          {tenantRoles.map((role) => {
-            const permCount = getPermissionCount(role.name);
-            const modules = ROLE_MODULE_MAP[role.name] ?? [];
-            const isExpanded = expandedRole === role.name;
-            const perms = systemRolePermissions[role.name] ?? [];
-
-            return (
-              <div key={role.name} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-                <button
-                  type="button"
-                  onClick={() => setExpandedRole(isExpanded ? null : role.name)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-50"
-                >
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100">
-                    <Key size={13} className="text-slate-500" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold capitalize text-slate-800">
-                        {role.name.replace(/_/g, ' ')}
-                      </p>
-                      <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
-                        {role.name}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-xs text-slate-500">{role.description}</p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-3 text-right">
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">{permCount}</p>
-                      <p className="text-[10px] text-slate-400">perms</p>
-                    </div>
-                    <ChevronRight
-                      size={14}
-                      className={cn('text-slate-400 transition-transform', isExpanded && 'rotate-90')}
-                    />
-                  </div>
-                </button>
-
-                {isExpanded && (
-                  <div className="border-t border-slate-100 px-4 py-3">
-                    {/* Module coverage */}
-                    {modules.length > 0 && (
-                      <div className="mb-3">
-                        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Module Coverage</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {modules.map((mod) => (
-                            <span key={mod} className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                              <Check size={10} />
-                              {mod}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {/* Permission list (first 20) */}
-                    <div>
-                      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                        Permissions ({permCount}){permCount > 20 ? ' — showing first 20' : ''}
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {perms.slice(0, 20).map((perm) => (
-                          <span key={perm} className="rounded bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 ring-1 ring-slate-100">
-                            {perm}
-                          </span>
-                        ))}
-                        {permCount > 20 && (
-                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
-                            +{permCount - 20} more
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {roleCatalogQuery.isLoading ? (
+            <div className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-500">
+              <Loader2 size={15} className="animate-spin" />
+              Loading live tenant roles...
+            </div>
+          ) : (
+            tenantRoles.map((role) => renderRoleCard(role, 'tenant'))
+          )}
         </div>
       </div>
 
@@ -3188,44 +3313,68 @@ function RolesPermissionsPanel() {
           Platform Roles ({platformRoles.length})
         </p>
         <div className="space-y-1.5">
-          {platformRoles.map((role) => {
-            const permCount = getPermissionCount(role.name);
-            const modules = ROLE_MODULE_MAP[role.name] ?? [];
-
-            return (
-              <div key={role.name} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-purple-100 bg-purple-50">
-                  <Shield size={13} className="text-purple-600" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-slate-800">{role.name.replace(/_/g, ' ')}</p>
-                    <span className="rounded bg-purple-50 px-1.5 py-0.5 font-mono text-[10px] text-purple-600">
-                      {role.name}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-slate-500">{role.description}</p>
-                  {modules.length > 0 && (
-                    <div className="mt-1.5 flex flex-wrap gap-1">
-                      {modules.map((mod) => (
-                        <span key={mod} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
-                          {mod}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-sm font-bold text-slate-900">{permCount}</p>
-                  <p className="text-[10px] text-slate-400">perms</p>
-                </div>
-              </div>
-            );
-          })}
+          {platformRoles.map((role) => renderRoleCard(role, 'platform'))}
         </div>
       </div>
     </div>
   );
+}
+
+type RolePermissionRow = {
+  key: string;
+  resource: string;
+  action: string;
+  description: string | null;
+};
+
+function getRolePermissionRows(
+  role: TenantRoleSummary,
+  permissionByKey: Map<string, PermissionCatalogItem>,
+  search: string,
+): RolePermissionRow[] {
+  const normalizedSearch = search.trim().toLowerCase();
+
+  return role.permissions
+    .map((permission) => {
+      const catalogEntry = permissionByKey.get(permission.key);
+      const [fallbackResource, fallbackAction = 'access'] = permission.key.split(':');
+
+      return {
+        key: permission.key,
+        resource: catalogEntry?.resource ?? fallbackResource,
+        action: catalogEntry?.action ?? fallbackAction,
+        description: catalogEntry?.description ?? null,
+      };
+    })
+    .filter((permission) => {
+      if (!normalizedSearch) return true;
+      const haystack = [
+        permission.key,
+        permission.resource,
+        permission.action,
+        permission.description ?? '',
+      ].join(' ').toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+}
+
+function groupPermissionsByResource(permissions: RolePermissionRow[]) {
+  const groups = new Map<string, RolePermissionRow[]>();
+
+  for (const permission of permissions) {
+    groups.set(permission.resource, [...(groups.get(permission.resource) ?? []), permission]);
+  }
+
+  return Array.from(groups.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([resource, rows]) => ({
+      resource,
+      permissions: rows.sort((left, right) => left.key.localeCompare(right.key)),
+    }));
+}
+
+function formatPermissionLabel(value: string) {
+  return value.replace(/[_:-]/g, ' ');
 }
 
 // ─── Data Operations ──────────────────────────────────────────────────────────

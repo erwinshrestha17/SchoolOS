@@ -971,6 +971,163 @@ describe('students lifecycle hardening', () => {
     );
   });
 
+  it('queues guardian reminders for active student documents expiring within the reminder window', async () => {
+    const expiringDocument = {
+      id: 'student-doc-1',
+      tenantId: actor.tenantId,
+      studentId: 'student-1',
+      kind: 'BIRTH_CERTIFICATE',
+      status: 'ACTIVE',
+      title: 'Birth Certificate',
+      fileName: 'birth.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: 512,
+      objectKey: 'tenant-1/students/student-1/birth.pdf',
+      expiryDate: new Date('2026-03-20T00:00:00.000Z'),
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      student: {
+        id: 'student-1',
+        tenantId: actor.tenantId,
+        studentSystemId: 'SCH-2026-0001',
+        firstNameEn: 'Asha',
+        lastNameEn: 'Shrestha',
+        guardianLinks: [
+          {
+            isPrimary: true,
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+            guardian: {
+              email: 'guardian@example.com',
+              primaryPhone: '9800000000',
+              receivesAlerts: true,
+            },
+          },
+        ],
+      },
+    };
+    const prisma = buildPrisma({
+      studentDocumentFindManyResult: [expiringDocument],
+    });
+    const { service, notificationsService, auditService } =
+      buildService(prisma);
+
+    const result = await service.processStudentDocumentExpiryReminders(
+      new Date('2026-03-01T10:30:00.000Z'),
+    );
+
+    expect(result).toEqual({
+      reviewedAt: '2026-03-01T10:30:00.000Z',
+      reminderWindowEnd: '2026-03-31T00:00:00.000Z',
+      candidateDocuments: 1,
+      remindedDocuments: 1,
+      skippedDocuments: 0,
+    });
+    expect(prisma.studentDocument.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: { in: ['ACTIVE', 'VERIFIED'] },
+          expiryDate: { lte: new Date('2026-03-31T00:00:00.000Z') },
+        }),
+        take: 500,
+      }),
+    );
+    expect(notificationsService.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'guardian@example.com',
+        subject: 'Asha Shrestha: document expires soon',
+        text: expect.stringContaining('expires in 19 days'),
+        metadata: expect.objectContaining({
+          tenantId: actor.tenantId,
+          studentId: 'student-1',
+          documentId: 'student-doc-1',
+          reminderType: 'student_document_expiry',
+        }),
+      }),
+    );
+    expect(notificationsService.sendSms).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: '9800000000',
+        message: expect.stringContaining('Birth Certificate for Asha Shrestha'),
+      }),
+    );
+    expect(prisma.studentDocumentHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        documentId: 'student-doc-1',
+        action: 'EXPIRY_REMINDER_SENT',
+        performedBy: 'system',
+        metadata: expect.objectContaining({
+          daysUntilExpiry: 19,
+          reminderStatus: 'expiring',
+          recipientCount: 1,
+        }),
+      }),
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'expiry_reminder_sent',
+        resource: 'student_document',
+        tenantId: actor.tenantId,
+        userId: null,
+        resourceId: 'student-doc-1',
+      }),
+    );
+  });
+
+  it('does not send duplicate student document expiry reminders on the same day', async () => {
+    const document = {
+      id: 'student-doc-1',
+      tenantId: actor.tenantId,
+      studentId: 'student-1',
+      kind: 'ID_CARD',
+      status: 'VERIFIED',
+      title: 'Guardian ID',
+      fileName: 'guardian-id.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: 512,
+      objectKey: 'tenant-1/students/student-1/guardian-id.pdf',
+      expiryDate: new Date('2026-03-02T00:00:00.000Z'),
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      student: {
+        id: 'student-1',
+        tenantId: actor.tenantId,
+        studentSystemId: 'SCH-2026-0001',
+        firstNameEn: 'Asha',
+        lastNameEn: 'Shrestha',
+        guardianLinks: [
+          {
+            isPrimary: true,
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+            guardian: {
+              email: 'guardian@example.com',
+              primaryPhone: '9800000000',
+              receivesAlerts: true,
+            },
+          },
+        ],
+      },
+    };
+    const prisma = buildPrisma({
+      studentDocumentFindManyResult: [document],
+      studentDocumentHistoryFindManyResult: [{ documentId: 'student-doc-1' }],
+    });
+    const { service, notificationsService, auditService } =
+      buildService(prisma);
+
+    const result = await service.processStudentDocumentExpiryReminders(
+      new Date('2026-03-01T10:30:00.000Z'),
+    );
+
+    expect(result.remindedDocuments).toBe(0);
+    expect(result.skippedDocuments).toBe(1);
+    expect(notificationsService.sendEmail).not.toHaveBeenCalled();
+    expect(notificationsService.sendSms).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'expiry_reminder_sent',
+      }),
+    );
+  });
+
   it('creates and approves guardian identity verification records with audit history', async () => {
     const guardian = {
       id: 'guardian-1',
@@ -1383,6 +1540,10 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
   const communicationsService = {
     recordDeliveryRecords: jest.fn(),
   };
+  const notificationsService = {
+    sendEmail: jest.fn(),
+    sendSms: jest.fn(),
+  };
   const auditService = {
     record: jest.fn(),
   };
@@ -1410,6 +1571,7 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
       prisma as never,
       usersService as never,
       communicationsService as never,
+      notificationsService as never,
       auditService as never,
       storageService as never,
       fileRegistryService as never,
@@ -1417,6 +1579,7 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
     ),
     prisma,
     auditService,
+    notificationsService,
     storageService,
     fileRegistryService,
   };
@@ -1425,6 +1588,8 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
 function buildPrisma(options: {
   studentFindFirstQueue?: unknown[];
   studentFindManyResult?: unknown[];
+  studentDocumentFindManyResult?: unknown[];
+  studentDocumentHistoryFindManyResult?: unknown[];
   guardianFindFirstQueue?: unknown[];
   studentGuardianFindFirstResult?: unknown;
   studentDocumentFindFirstQueue?: unknown[];
@@ -1603,6 +1768,15 @@ function buildPrisma(options: {
 
         return queue.shift();
       }),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.studentDocumentFindManyResult ?? []),
+    },
+    studentDocumentHistory: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.studentDocumentHistoryFindManyResult ?? []),
+      create: jest.fn().mockResolvedValue({ id: 'document-history-1' }),
     },
     invoice: {
       findMany: jest

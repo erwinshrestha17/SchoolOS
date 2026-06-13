@@ -409,6 +409,94 @@ describe('FinanceService - Hardening', () => {
           'Invoice is already fully paid. Webhook event ignored to prevent duplicate payment.',
       });
     });
+
+    it('acknowledges failed or pending webhook events without posting payment', async () => {
+      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
+        id: 'prov-3',
+        name: 'ESEWA',
+        configEncrypted: { webhookSecret: 'secret' },
+      });
+      jest
+        .spyOn(service as any, 'verifyWebhookSignature')
+        .mockReturnValue(true);
+
+      const result = await service.handleOnlinePaymentWebhook(
+        'esewa',
+        {
+          reference: 'REF-FAILED',
+          amount: 1500,
+          status: 'FAILED',
+        },
+        {
+          signature: 'valid-signature',
+          'x-tenant-id': actor.tenantId,
+        },
+      );
+
+      expect(result).toEqual({
+        status: 'ignored',
+        postedToLedger: false,
+        message:
+          'Webhook event failed was acknowledged without creating a payment.',
+      });
+      expect(prisma.payment.findFirst).not.toHaveBeenCalled();
+      expect(prisma.invoice.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('rejects successful webhook events without a payment reference', async () => {
+      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
+        id: 'prov-4',
+        name: 'ESEWA',
+        configEncrypted: { webhookSecret: 'secret' },
+      });
+      jest
+        .spyOn(service as any, 'verifyWebhookSignature')
+        .mockReturnValue(true);
+
+      await expect(
+        service.handleOnlinePaymentWebhook(
+          'esewa',
+          {
+            amount: 1500,
+            status: 'SUCCESS',
+          },
+          {
+            signature: 'valid-signature',
+            'x-tenant-id': actor.tenantId,
+          },
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.payment.findFirst).not.toHaveBeenCalled();
+      expect(prisma.invoice.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('rejects successful webhook events with zero amount', async () => {
+      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
+        id: 'prov-5',
+        name: 'KHALTI',
+        configEncrypted: { webhookSecret: 'secret' },
+      });
+      jest
+        .spyOn(service as any, 'verifyWebhookSignature')
+        .mockReturnValue(true);
+
+      await expect(
+        service.handleOnlinePaymentWebhook(
+          'khalti',
+          {
+            reference: 'REF-ZERO',
+            amount: 0,
+            status: 'SUCCESS',
+          },
+          {
+            signature: 'valid-signature',
+            'x-tenant-id': actor.tenantId,
+          },
+        ),
+      ).rejects.toThrow('Webhook amount must be greater than zero.');
+      expect(prisma.payment.findFirst).not.toHaveBeenCalled();
+      expect(prisma.invoice.findFirst).not.toHaveBeenCalled();
+    });
   });
 
   describe('Finance Approval Requests', () => {

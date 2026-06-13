@@ -8,6 +8,7 @@ import { useSession } from '../session-provider';
 import { cn } from '../../lib/utils';
 import { LoadingState } from '../ui/loading-state';
 import { ErrorBoundary } from '../ui/error-boundary';
+import { SupportOverrideBanner } from '../platform/SupportOverrideBanner';
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -46,6 +47,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <SupportOverrideBanner />
         <Header onMobileMenuToggle={() => setMobileOpen(!mobileOpen)} />
 
         <main

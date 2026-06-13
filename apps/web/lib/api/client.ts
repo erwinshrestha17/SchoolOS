@@ -408,6 +408,61 @@ export async function openPdfBlob(response: Response) {
   window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer');
 }
 
+export async function openImageBlob(response: Response) {
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      parseApiErrorMessage(text) ||
+        `Request failed with status ${response.status}`,
+    );
+  }
+
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+
+  if (!contentType.startsWith('image/')) {
+    const text = await response.text();
+    throw new Error(
+      parseApiErrorMessage(text) ||
+        'The server did not return an image preview. Please try again or contact support.',
+    );
+  }
+
+  const blob = await response.blob();
+
+  if (blob.size === 0) {
+    throw new Error('The server returned an empty image preview.');
+  }
+
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+export async function downloadBlob(response: Response, fileName: string) {
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      parseApiErrorMessage(text) ||
+        `Download failed with status ${response.status}`,
+    );
+  }
+
+  const blob = await response.blob();
+
+  if (blob.size === 0) {
+    throw new Error('The server returned an empty file.');
+  }
+
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
 export async function downloadCsv(path: string, fileName: string) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     credentials: 'include',

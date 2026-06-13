@@ -7,8 +7,9 @@ import type {
 } from '@schoolos/core';
 import {
   API_BASE_URL,
+  downloadBlob,
   JsonBody,
-  parseApiErrorMessage,
+  openImageBlob,
   request,
   withQuery,
 } from './client';
@@ -80,17 +81,7 @@ export const activityApi = {
       `${API_BASE_URL}/activity-feed/attachments/${encodeURIComponent(attachmentId)}/preview`,
       { credentials: 'include' },
     );
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(
-        parseApiErrorMessage(text) ||
-          `Preview failed with status ${response.status}`,
-      );
-    }
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank', 'noopener,noreferrer');
-    setTimeout(() => URL.revokeObjectURL(url), 60000); // Cleanup after a minute
+    await openImageBlob(response);
   },
   downloadActivityAttachment: async (
     attachmentId: string,
@@ -100,23 +91,7 @@ export const activityApi = {
       `${API_BASE_URL}/activity-feed/attachments/${encodeURIComponent(attachmentId)}/download`,
       { credentials: 'include' },
     );
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(
-        parseApiErrorMessage(text) ||
-          `Download failed with status ${response.status}`,
-      );
-    }
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+    await downloadBlob(response, fileName);
   },
   createActivityPost: (body: JsonBody) =>
     request('/activity-feed/posts', { method: 'POST', json: body }),

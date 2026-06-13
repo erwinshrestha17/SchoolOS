@@ -201,6 +201,15 @@ export class PlatformQueuesService {
     const job = await queue.getJob(jobId);
     if (!job) throw new NotFoundException(`Job ${jobId} not found`);
 
+    if (typeof job.isFailed === 'function') {
+      const isFailed = await job.isFailed();
+      if (!isFailed) {
+        throw new BadRequestException(
+          `Job ${jobId} is no longer in failed state`,
+        );
+      }
+    }
+
     await job.remove();
 
     await this.auditService.record({
@@ -234,7 +243,14 @@ export class PlatformQueuesService {
       throw new BadRequestException(`Job ${dto.jobId} is not in failed state`);
     }
 
-    await job.retry();
+    try {
+      await job.retry();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new BadRequestException(
+        `Job ${dto.jobId} could not be retried: ${message}`,
+      );
+    }
 
     await this.auditService.record({
       action: 'queue_failed_job_retry_requested',

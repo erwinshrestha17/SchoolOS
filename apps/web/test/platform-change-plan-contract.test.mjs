@@ -157,6 +157,8 @@ describe('Platform tenant subscription change workflow contracts', () => {
       'api.getPlatformProviderReadiness',
       'Provider Readiness Detail',
       'Retry Failed Job',
+      'Retry is per job',
+      'single-job only',
       'Retry audit history',
       'Discard Failed Job',
       'Audit reason',
@@ -183,6 +185,8 @@ describe('Platform tenant subscription change workflow contracts', () => {
     }
 
     assert.doesNotMatch(settings, /failedJobs\.filter/);
+    assert.doesNotMatch(settings, /Retry All/);
+    assert.doesNotMatch(settings, /Promise\.all\(\s*failedInQueue\.map/);
     assert.match(apiClient, /removePlatformJob: \(queueName: string, jobId: string, reason: string\)/);
     assert.match(apiClient, /json: \{ reason \}/);
     assert.doesNotMatch(

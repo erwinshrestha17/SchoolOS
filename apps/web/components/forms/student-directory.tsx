@@ -7,6 +7,7 @@ import type {
   SectionSummary,
   StudentProfile,
   StudentDuplicateCandidate,
+  StudentIemisReadinessSummary,
   PaginatedResponse,
 } from '@schoolos/core';
 import Link from 'next/link';
@@ -34,6 +35,8 @@ import {
   Wallet,
   ChevronRight,
   AlertTriangle,
+  CheckCircle2,
+  ClipboardCheck,
 } from 'lucide-react';
 import { StatusChip } from '../dashboard/status-chip';
 
@@ -58,6 +61,9 @@ type StudentDirectoryProps = {
   onExportIemis: () => void;
   canExportIemis: boolean;
   isExportingIemis: boolean;
+  iemisReadiness: StudentIemisReadinessSummary[];
+  isLoadingIemisReadiness: boolean;
+  iemisReadinessError: string;
   canManageDuplicates: boolean;
   duplicateCandidates: StudentDuplicateCandidate[];
   isLoadingDuplicateCandidates: boolean;
@@ -86,6 +92,9 @@ export function StudentDirectory({
   onExportIemis,
   canExportIemis,
   isExportingIemis,
+  iemisReadiness,
+  isLoadingIemisReadiness,
+  iemisReadinessError,
   canManageDuplicates,
   duplicateCandidates,
   isLoadingDuplicateCandidates,
@@ -111,6 +120,16 @@ export function StudentDirectory({
     return !classId || sectionClassId === classId;
   });
   const selectedSection = availableSections.find((section) => section.id === sectionId);
+  const iemisReadyCount = iemisReadiness.filter((item) => item.eligible).length;
+  const iemisIssueRows = iemisReadiness.filter((item) => !item.eligible);
+  const iemisAverageScore =
+    iemisReadiness.length > 0
+      ? Math.round(
+          iemisReadiness.reduce((sum, item) => sum + item.score, 0) /
+            iemisReadiness.length,
+        )
+      : 0;
+  const topIemisIssues = iemisIssueRows.slice(0, 5);
 
   useEffect(() => {
     if (!academicYearId && currentAcademicYear) {
@@ -296,6 +315,95 @@ export function StudentDirectory({
             </div>
           </div>
         </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Class iEMIS Readiness"
+        description={
+          classId
+            ? `Reviewing ${classes.find((c) => c.id === classId)?.name ?? 'selected class'}${selectedSection ? ` / ${selectedSection.name}` : ''}`
+            : 'Reviewing all currently filtered student records for government export completeness'
+        }
+      >
+        {isLoadingIemisReadiness ? (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="h-20 animate-pulse rounded-2xl bg-slate-50" />
+            <div className="h-20 animate-pulse rounded-2xl bg-slate-50" />
+            <div className="h-20 animate-pulse rounded-2xl bg-slate-50" />
+          </div>
+        ) : iemisReadinessError ? (
+          <div className="rounded-2xl border border-danger-100 bg-danger-50 p-4 text-sm font-semibold text-danger-700">
+            {iemisReadinessError}
+          </div>
+        ) : iemisReadiness.length > 0 ? (
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <div className="flex items-center gap-2 text-slate-500">
+                  <ClipboardCheck size={16} />
+                  <span className="text-[0.65rem] font-black uppercase tracking-wider">Average Score</span>
+                </div>
+                <p className="mt-2 text-2xl font-black text-slate-900">{iemisAverageScore}%</p>
+              </div>
+              <div className="rounded-2xl border border-success-100 bg-success-50 p-4">
+                <div className="flex items-center gap-2 text-success-700">
+                  <CheckCircle2 size={16} />
+                  <span className="text-[0.65rem] font-black uppercase tracking-wider">Ready Records</span>
+                </div>
+                <p className="mt-2 text-2xl font-black text-success-700">{iemisReadyCount}</p>
+              </div>
+              <div className="rounded-2xl border border-warning-100 bg-warning-50 p-4">
+                <div className="flex items-center gap-2 text-warning-700">
+                  <AlertTriangle size={16} />
+                  <span className="text-[0.65rem] font-black uppercase tracking-wider">Need Review</span>
+                </div>
+                <p className="mt-2 text-2xl font-black text-warning-700">{iemisIssueRows.length}</p>
+              </div>
+            </div>
+
+            {topIemisIssues.length > 0 ? (
+              <div className="space-y-2">
+                {topIemisIssues.map((item) => (
+                  <div
+                    key={item.studentId}
+                    className="flex flex-col gap-3 rounded-xl border border-warning-100 bg-white p-4 lg:flex-row lg:items-center lg:justify-between"
+                  >
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-black text-slate-900">{item.fullNameEn}</p>
+                        <Badge variant="warning" className="text-[0.65rem] font-extrabold uppercase">
+                          {item.score}% ready
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">
+                        {item.studentSystemId} / {item.className}
+                        {item.sectionName ? ` / ${item.sectionName}` : ''}
+                      </p>
+                      <p className="mt-2 text-xs font-medium text-slate-600">
+                        {item.issues.slice(0, 2).map((issue) => issue.message).join('; ')}
+                        {item.issuesCount > 2 ? `; ${item.issuesCount - 2} more` : ''}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/dashboard/students/${encodeURIComponent(item.studentId)}`}
+                      className="inline-flex h-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-xs font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
+                    >
+                      Fix Profile
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-success-100 bg-success-50 p-5 text-sm font-semibold text-success-700">
+                All records in this review set are ready for iEMIS export.
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5 text-sm font-semibold text-slate-600">
+            No student records match the current iEMIS readiness filters.
+          </div>
+        )}
       </SectionCard>
 
       {canManageDuplicates ? (

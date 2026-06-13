@@ -138,15 +138,23 @@ describe('SchoolOS Settings Page Contracts', () => {
     const apiBarrel = read('lib/api.ts');
 
     assert.match(page, /api\.listUsers/);
+    assert.match(page, /api\.listRoleCatalog/);
+    assert.match(page, /api\.listPermissionCatalog/);
     assert.match(page, /api\.createUser/);
     assert.match(page, /api\.updateUserStatus/);
     assert.match(page, /api\.resetUserPassword/);
     assert.match(page, /api\.forceLogoutUser/);
     assert.match(page, /Tenant-scoped user management is active/);
+    assert.match(page, /Role access inspection/);
+    assert.match(page, /What this role can access/);
+    assert.match(page, /Live tenant RBAC/);
+    assert.match(page, /Seeded fallback/);
     assert.doesNotMatch(page, /User management backend pending/);
     assert.doesNotMatch(page, /Backend route pending/);
     assert.doesNotMatch(page, /API pending/);
     assert.match(usersApi, /request<SchoolUserSummary\[\]>\('\/users'\)/);
+    assert.match(usersApi, /request<TenantRoleSummary\[\]>\('\/roles'\)/);
+    assert.match(usersApi, /request<PermissionCatalogItem\[\]>\('\/roles\/permissions'\)/);
     assert.match(usersApi, /\/users\/\$\{encodeURIComponent\(userId\)\}\/status/);
     assert.match(usersApi, /\/users\/\$\{encodeURIComponent\(userId\)\}\/reset-password/);
     assert.match(usersApi, /\/users\/\$\{encodeURIComponent\(userId\)\}\/force-logout/);

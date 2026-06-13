@@ -109,19 +109,7 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
 
   const openPdf = async (reportCardId: string) => {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1'}/academics/report-cards/${encodeURIComponent(reportCardId)}.pdf`,
-        { credentials: 'include' },
-      );
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || 'Failed to generate PDF. Marks may be incomplete.');
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener,noreferrer');
+      await api.openReportCardPdf(reportCardId);
     } catch (err: any) {
       setNotice({
         title: 'Could not load report card PDF',

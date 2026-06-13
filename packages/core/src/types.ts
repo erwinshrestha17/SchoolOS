@@ -174,6 +174,11 @@ export type BulkAdmissionImportResult = {
     studentId?: string;
     studentSystemId?: string;
     errors?: string[];
+    duplicates?: Array<
+      AdmissionDuplicateWarning & {
+        matchTypes?: string[];
+      }
+    >;
   }>;
   errorReportCsv: string;
 };
@@ -2797,6 +2802,18 @@ export type IemisValidationIssue = {
   studentSystemId: string;
   field: string;
   message: string;
+};
+
+export type StudentIemisReadinessSummary = {
+  studentId: string;
+  studentSystemId: string;
+  fullNameEn: string;
+  className: string;
+  sectionName: string | null;
+  eligible: boolean;
+  score: number;
+  issuesCount: number;
+  issues: Array<{ field: string; message: string }>;
 };
 
 export type IemisExportRow = {

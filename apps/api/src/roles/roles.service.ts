@@ -35,10 +35,16 @@ export class RolesService {
       name: role.name,
       description: role.description,
       isSystem: role.isSystem,
-      permissions: role.rolePermissions.map(({ permission }) => ({
-        id: permission.id,
-        key: `${permission.resource}:${permission.action}`,
-      })),
+      permissions: [...role.rolePermissions]
+        .sort((left, right) => {
+          const leftKey = `${left.permission.resource}:${left.permission.action}`;
+          const rightKey = `${right.permission.resource}:${right.permission.action}`;
+          return leftKey.localeCompare(rightKey);
+        })
+        .map(({ permission }) => ({
+          id: permission.id,
+          key: `${permission.resource}:${permission.action}`,
+        })),
     }));
   }
 

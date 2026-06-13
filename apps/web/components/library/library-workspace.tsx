@@ -309,6 +309,15 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
     },
   });
 
+  const archiveCopyMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      libraryApi.archiveCopy(id, { reason }),
+    onSuccess: () => {
+      setNotice('Copy archived with audit reason.');
+      invalidateLibrary();
+    },
+  });
+
   const issueMutation = useMutation({
     mutationFn: libraryApi.issueCopy,
     onSuccess: () => {
@@ -505,6 +514,9 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
               reason: copyStatusReasons[copy.id]?.trim() || undefined,
             })
           }
+          onArchiveCopy={(copy, reason) =>
+            archiveCopyMutation.mutate({ id: copy.id, reason })
+          }
           reasons={copyStatusReasons}
           setReason={(copyId, reason) =>
             setCopyStatusReasons((current) => ({
@@ -517,7 +529,8 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
           error={
             createCopyMutation.error ||
             updateCopyMutation.error ||
-            copyStatusMutation.error
+            copyStatusMutation.error ||
+            archiveCopyMutation.error
           }
         />
       )}
@@ -819,6 +832,7 @@ function CopiesPanel(props: {
   onEdit: (copy: LibraryCopy) => void;
   onViewHistory: (type: 'book' | 'copy', id: string) => void;
   onStatusChange: (copy: LibraryCopy, status: LibraryCopyStatus) => void;
+  onArchiveCopy: (copy: LibraryCopy, reason: string) => void;
   reasons: Record<string, string>;
   setReason: (copyId: string, reason: string) => void;
   isLoading: boolean;
@@ -829,6 +843,8 @@ function CopiesPanel(props: {
     copy: LibraryCopy;
     status: LibraryCopyStatus;
   } | null>(null);
+  const [pendingArchiveCopy, setPendingArchiveCopy] =
+    useState<LibraryCopy | null>(null);
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -858,6 +874,15 @@ function CopiesPanel(props: {
                 <div className="flex flex-wrap gap-2">
                   <button type="button" onClick={() => props.onEdit(copy)} className="btn-secondary">Edit</button>
                   <button type="button" onClick={() => props.onViewHistory('copy', copy.id)} className="btn-secondary">History</button>
+                  {copy.status !== 'ISSUED' && (
+                    <button
+                      type="button"
+                      onClick={() => setPendingArchiveCopy(copy)}
+                      className="btn-secondary text-red-600"
+                    >
+                      Archive
+                    </button>
+                  )}
                   {copy.status !== 'ISSUED' && copyStatuses.filter((status) => status !== copy.status).map((status) => (
                     <button
                       key={status}
@@ -914,6 +939,44 @@ function CopiesPanel(props: {
                 }
                 className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
                 placeholder="Record who confirmed the loss or damage and any replacement/fine context."
+              />
+            </label>
+          ) : null}
+        </ConfirmDialog>
+        <ConfirmDialog
+          isOpen={Boolean(pendingArchiveCopy)}
+          onClose={() => setPendingArchiveCopy(null)}
+          onConfirm={() => {
+            if (pendingArchiveCopy) {
+              props.onArchiveCopy(
+                pendingArchiveCopy,
+                props.reasons[pendingArchiveCopy.id]?.trim() ?? '',
+              );
+            }
+            setPendingArchiveCopy(null);
+          }}
+          title="Archive library copy?"
+          description="Archive copies instead of deleting them when circulation history may exist. Issued copies must be returned or resolved before archive."
+          confirmLabel="Archive copy"
+          confirmDisabled={
+            pendingArchiveCopy
+              ? !(props.reasons[pendingArchiveCopy.id] ?? '').trim()
+              : false
+          }
+          variant="destructive"
+        >
+          {pendingArchiveCopy ? (
+            <label className="block px-6 pb-2">
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                Audit reason
+              </span>
+              <textarea
+                value={props.reasons[pendingArchiveCopy.id] ?? ''}
+                onChange={(event) =>
+                  props.setReason(pendingArchiveCopy.id, event.target.value)
+                }
+                className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                placeholder="Record why this copy is being archived and where the physical item is stored."
               />
             </label>
           ) : null}

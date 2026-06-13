@@ -15,6 +15,7 @@ export default function StudentsPage() {
   const [isExportingIemis, setIsExportingIemis] = useState(false);
   const { hasPermissions } = useSession();
   const canManageStudentLifecycle = hasPermissions(['students:manage_lifecycle']);
+  const canReadStudents = hasPermissions(['students:read']);
 
   const [filters, setFilters] = useState<{
     academicYearId?: string;
@@ -52,6 +53,19 @@ export default function StudentsPage() {
     queryKey: ['student-duplicate-candidates'],
     queryFn: () => api.listDuplicateStudentCandidates({ limit: 5 }),
     enabled: canManageStudentLifecycle,
+  });
+  const iemisReadinessQuery = useQuery({
+    queryKey: [
+      'student-iemis-readiness-list',
+      filters.classId,
+      filters.sectionId,
+    ],
+    queryFn: () =>
+      api.listIemisReadiness({
+        classId: filters.classId,
+        sectionId: filters.sectionId,
+      }),
+    enabled: canReadStudents,
   });
 
   async function openStudentPdf(studentId: string, kind: string) {
@@ -143,8 +157,15 @@ export default function StudentsPage() {
           void handleExportRoster(format, filters)
         }
         onExportIemis={() => void handleExportIemis()}
-        canExportIemis={hasPermissions(['students:read'])}
+        canExportIemis={canReadStudents}
         isExportingIemis={isExportingIemis}
+        iemisReadiness={iemisReadinessQuery.data ?? []}
+        isLoadingIemisReadiness={iemisReadinessQuery.isLoading}
+        iemisReadinessError={
+          iemisReadinessQuery.error instanceof Error
+            ? iemisReadinessQuery.error.message
+            : ''
+        }
         canManageDuplicates={canManageStudentLifecycle}
         duplicateCandidates={duplicateCandidatesQuery.data?.candidates ?? []}
         isLoadingDuplicateCandidates={duplicateCandidatesQuery.isLoading}
