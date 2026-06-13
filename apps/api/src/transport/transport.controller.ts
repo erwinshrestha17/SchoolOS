@@ -1,25 +1,21 @@
 import {
+  Body,
   Controller,
   Get,
-  Param,
-  Post,
-  Body,
-  Patch,
-  Delete,
-  Query,
-  Sse,
   Header,
-  MessageEvent,
+  Param,
+  Patch,
+  Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
-import { Observable } from 'rxjs';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
-import { EntitlementGuard } from '../auth/guards/entitlement.guard';
-import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { AssignTransportDriverDto } from './dto/assign-transport-driver.dto';
 import { BroadcastRouteDelayDto } from './dto/broadcast-route-delay.dto';
 import { CancelTransportTripDto } from './dto/cancel-transport-trip.dto';
@@ -28,14 +24,18 @@ import { CreateTransportRouteDto } from './dto/create-transport-route.dto';
 import { CreateTransportStopDto } from './dto/create-transport-stop.dto';
 import { CreateTransportVehicleDto } from './dto/create-transport-vehicle.dto';
 import { EnrollTransportStudentDto } from './dto/enroll-transport-student.dto';
+import { MapTransportFeeDto } from './dto/map-transport-fee.dto';
 import { MarkTransportStudentStatusDto } from './dto/mark-transport-student-status.dto';
+import { RecordTransportEmergencyContactDto } from './dto/record-transport-emergency-contact.dto';
 import { RecordTransportLogDto } from './dto/record-transport-log.dto';
+import { ScheduleOneDayRouteChangeDto } from './dto/schedule-one-day-route-change.dto';
 import { StartTransportTripDto } from './dto/start-transport-trip.dto';
 import { TransportLocationPingDto } from './dto/transport-location-ping.dto';
 import { UpdateTransportRouteDto } from './dto/update-transport-route.dto';
 import { UpdateTransportStopDto } from './dto/update-transport-stop.dto';
 import { UpdateTransportVehicleDto } from './dto/update-transport-vehicle.dto';
 import { TransportHardeningService } from './transport-hardening.service';
+import { TransportM8bService } from './transport-m8b.service';
 import { TransportService } from './transport.service';
 
 @Controller('transport')
@@ -45,6 +45,7 @@ export class TransportController {
   constructor(
     private readonly transportService: TransportService,
     private readonly transportHardeningService: TransportHardeningService,
+    private readonly transportM8bService: TransportM8bService,
   ) {}
 
   @Get('routes')
@@ -70,6 +71,15 @@ export class TransportController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.transportService.updateRoute(routeId, dto, auth);
+  }
+
+  @Post('routes/one-day-changes')
+  @Permissions('transport:routes:update')
+  scheduleOneDayRouteChange(
+    @Body() dto: ScheduleOneDayRouteChangeDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportM8bService.scheduleOneDayRouteChange(dto, auth);
   }
 
   @Get('stops')
@@ -169,6 +179,16 @@ export class TransportController {
     return this.transportService.assignStudent(dto, auth);
   }
 
+  @Patch('assignments/students/:id/fee-mapping')
+  @Permissions('transport:assignments:update')
+  mapTransportFee(
+    @Param('id') assignmentId: string,
+    @Body() dto: MapTransportFeeDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportM8bService.mapTransportFee(assignmentId, dto, auth);
+  }
+
   @Patch('assignments/students/:id/pause')
   @Permissions('transport:assignments:update')
   pauseStudentAssignment(
@@ -205,10 +225,25 @@ export class TransportController {
     );
   }
 
+  @Get('parent/students/:studentId/status')
+  @Permissions('transport:tracking:parent')
+  getParentStudentStatus(
+    @Param('studentId') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportM8bService.getParentStudentStatus(studentId, auth);
+  }
+
   @Get('driver/dashboard')
   @Permissions('transport:operate')
   getDriverDashboard(@CurrentAuth() auth: AuthContext) {
     return this.transportService.getDriverDashboard(auth);
+  }
+
+  @Get('driver/gps-ping-contract')
+  @Permissions('transport:operate')
+  getDriverGpsPingContract(@CurrentAuth() auth: AuthContext) {
+    return this.transportM8bService.getDriverGpsPingContract(auth);
   }
 
   @Get('driver/assignments')
@@ -297,6 +332,34 @@ export class TransportController {
     return this.transportService.recordLocationPing(tripId, dto, auth);
   }
 
+  @Post('driver/trips/:id/gps-ping')
+  @Permissions('transport:operate')
+  recordAutomatedDriverGpsPing(
+    @Param('id') tripId: string,
+    @Body() dto: TransportLocationPingDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportM8bService.recordAutomatedDriverGpsPing(
+      tripId,
+      dto,
+      auth,
+    );
+  }
+
+  @Post('driver/trips/:id/emergency-contact')
+  @Permissions('transport:operate')
+  recordEmergencyContactFlow(
+    @Param('id') tripId: string,
+    @Body() dto: RecordTransportEmergencyContactDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportM8bService.recordEmergencyContactFlow(
+      tripId,
+      dto,
+      auth,
+    );
+  }
+
   @Post('trips')
   @Permissions('transport:trips:create')
   startTrip(
@@ -304,6 +367,31 @@ export class TransportController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.transportService.startTrip(dto, auth);
+  }
+
+  @Get('trips/active')
+  @Permissions('transport:trips:read')
+  listActiveTrips(@CurrentAuth() auth: AuthContext) {
+    return this.transportService.listActiveTrips(auth);
+  }
+
+  @Get('trips/history')
+  @Permissions('transport:trips:read')
+  listTripHistory(
+    @CurrentAuth() auth: AuthContext,
+    @Query('routeId') routeId?: string,
+    @Query('vehicleId') vehicleId?: string,
+  ) {
+    return this.transportService.listTripHistory(auth, { routeId, vehicleId });
+  }
+
+  @Get('trips/:id')
+  @Permissions('transport:trips:read')
+  getTripDetails(
+    @Param('id') tripId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportService.getTripDetails(tripId, auth);
   }
 
   @Patch('trips/:id/complete')
@@ -356,15 +444,6 @@ export class TransportController {
     return this.transportService.markStudentAbsent(tripId, dto, auth);
   }
 
-  @Get('trips/:id')
-  @Permissions('transport:trips:read')
-  getTripDetails(
-    @Param('id') tripId: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.transportService.getTripDetails(tripId, auth);
-  }
-
   @Patch('trips/:id/delay')
   @Permissions('transport:trips:update', 'transport:operate')
   markTripDelay(
@@ -374,22 +453,6 @@ export class TransportController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.transportService.markTripDelay(tripId, dto, auth);
-  }
-
-  @Get('trips/active')
-  @Permissions('transport:trips:read')
-  listActiveTrips(@CurrentAuth() auth: AuthContext) {
-    return this.transportService.listActiveTrips(auth);
-  }
-
-  @Get('trips/history')
-  @Permissions('transport:trips:read')
-  listTripHistory(
-    @CurrentAuth() auth: AuthContext,
-    @Query('routeId') routeId?: string,
-    @Query('vehicleId') vehicleId?: string,
-  ) {
-    return this.transportService.listTripHistory(auth, { routeId, vehicleId });
   }
 
   @Post('trips/:id/location')
@@ -418,15 +481,6 @@ export class TransportController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.transportService.getLatestTripLocation(tripId, auth);
-  }
-
-  @Sse('trips/:id/live')
-  @Permissions('transport:location:read')
-  streamTripLocation(
-    @Param('id') tripId: string,
-    @CurrentAuth() auth: AuthContext,
-  ): Observable<MessageEvent> {
-    return this.transportService.subscribeToTripLocation(tripId, auth);
   }
 
   @Get('logs')
@@ -460,6 +514,55 @@ export class TransportController {
   @Permissions('transport:reports:read')
   getReports(@CurrentAuth() auth: AuthContext) {
     return this.transportService.getReports(auth);
+  }
+
+  @Get('reports/gps-pings')
+  @Permissions('transport:reports:read')
+  getGpsAcceptRejectReport(
+    @CurrentAuth() auth: AuthContext,
+    @Query('routeId') routeId?: string,
+    @Query('vehicleId') vehicleId?: string,
+  ) {
+    return this.transportM8bService.getGpsAcceptRejectReport(auth, {
+      routeId,
+      vehicleId,
+    });
+  }
+
+  @Get('reports/stale-gps')
+  @Permissions('transport:reports:read')
+  getStaleGpsReport(@CurrentAuth() auth: AuthContext) {
+    return this.transportM8bService.getStaleGpsReport(auth);
+  }
+
+  @Get('reports/one-day-route-changes')
+  @Permissions('transport:reports:read')
+  getOneDayRouteChangesReport(
+    @CurrentAuth() auth: AuthContext,
+    @Query('serviceDate') serviceDate?: string,
+  ) {
+    return this.transportM8bService.listOneDayRouteChanges(auth, serviceDate);
+  }
+
+  @Get('reports/vehicle-documents')
+  @Permissions('transport:reports:read')
+  getVehicleDocumentExpiryReport(
+    @CurrentAuth() auth: AuthContext,
+    @Query('days') days?: number,
+  ) {
+    return this.transportM8bService.getVehicleDocumentExpiryReport(auth, days);
+  }
+
+  @Get('reports/maintenance')
+  @Permissions('transport:reports:read')
+  getMaintenanceReminderReport(@CurrentAuth() auth: AuthContext) {
+    return this.transportM8bService.getMaintenanceReminderReport(auth);
+  }
+
+  @Get('reports/assignment-depth')
+  @Permissions('transport:reports:read')
+  getAssignmentDepthReport(@CurrentAuth() auth: AuthContext) {
+    return this.transportM8bService.getAssignmentDepthReport(auth);
   }
 
   @Get('reports/trips')
