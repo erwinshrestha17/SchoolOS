@@ -9,6 +9,10 @@ import { AccountingPostingModule } from './accounting-posting.module';
 import { AccountingReportsController } from './accounting-reports.controller';
 import { AccountingReportsService } from './accounting-reports.service';
 import { AccountingReportExportsService } from './accounting-report-exports.service';
+import { AccountingM9Controller } from './accounting-m9.controller';
+import { AccountingM9Service } from './accounting-m9.service';
+import { M9SourceService } from './m9-source.service';
+import { M9TemplateService } from './m9-template.service';
 
 @Module({
   imports: [
@@ -18,16 +22,26 @@ import { AccountingReportExportsService } from './accounting-report-exports.serv
     AccountingPostingModule,
     FileRegistryModule,
   ],
-  controllers: [AccountingController, AccountingReportsController],
+  controllers: [
+    AccountingController,
+    AccountingReportsController,
+    AccountingM9Controller,
+  ],
   providers: [
     AccountingService,
     AccountingReportsService,
     AccountingReportExportsService,
+    AccountingM9Service,
+    M9SourceService,
+    M9TemplateService,
   ],
   exports: [
     AccountingService,
     AccountingPostingModule,
     AccountingReportsService,
+    AccountingM9Service,
+    M9SourceService,
+    M9TemplateService,
   ],
 })
 export class AccountingModule {}
