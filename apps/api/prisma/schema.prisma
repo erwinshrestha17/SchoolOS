@@ -1561,6 +1561,7 @@ model StaffAttendance {
   leaveType      String?
   note           String?
   checkInAt      DateTime?
+  checkOutAt     DateTime?
   approvedById   String?
   createdAt      DateTime         @default(now())
 
@@ -3454,49 +3455,66 @@ model LibraryBook {
   id              String    @id @default(uuid())
   tenantId        String
   title           String
+  subtitle        String?
   author          String
   isbn            String?
   publisher       String?
   publishedYear   Int?
+  edition         String?
+  language        String?
+  deweyDecimal    String?
+  materialType    String?
   subjectCategory String?
   classLevel      String?
+  keywords        Json?
+  description     String?
+  coverImageUrl   String?
   purchasePrice   Decimal?  @db.Decimal(12, 2)
   archivedAt      DateTime?
   archiveReason   String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  copies LibraryCopy[]
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  copies       LibraryCopy[]
+  reservations LibraryReservation[]
 
   @@unique([tenantId, isbn])
   @@index([tenantId, title])
   @@index([tenantId, author])
   @@index([tenantId, subjectCategory])
+  @@index([tenantId, materialType])
 }
 
 model LibraryCopy {
-  id              String            @id @default(uuid())
-  tenantId        String
-  bookId          String
-  barcode         String
-  qrCode          String?
-  status          LibraryCopyStatus @default(AVAILABLE)
-  shelfLocation   String?
-  replacementCost Decimal?          @db.Decimal(12, 2)
-  purchasedAt     DateTime?
-  archivedAt      DateTime?
-  archiveReason   String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id                String            @id @default(uuid())
+  tenantId          String
+  bookId            String
+  barcode           String
+  qrCode            String?
+  status            LibraryCopyStatus @default(AVAILABLE)
+  shelfLocation     String?
+  acquisitionSource String?
+  conditionNote     String?
+  replacementCost   Decimal?          @db.Decimal(12, 2)
+  purchasedAt       DateTime?
+  lastInventoryAt   DateTime?
+  archivedAt        DateTime?
+  archiveReason     String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
-  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  book   LibraryBook    @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  issues LibraryIssue[]
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  book         LibraryBook          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  issues       LibraryIssue[]
+  reservations LibraryReservation[]
+  history      LibraryCopyHistory[]
 
   @@unique([tenantId, barcode])
+  @@unique([tenantId, qrCode])
   @@index([tenantId, bookId, status])
   @@index([tenantId, barcode])
+  @@index([tenantId, qrCode])
   @@index([tenantId, status])
 }
 
@@ -3554,6 +3572,50 @@ model LibraryFine {
   @@index([tenantId, feeInvoiceId])
 }
 
+model LibraryReservation {
+  id                String    @id @default(uuid())
+  tenantId          String
+  bookId            String
+  copyId            String?
+  borrowerStudentId String?
+  borrowerStaffId   String?
+  status            String    @default("ACTIVE")
+  reservedAt        DateTime  @default(now())
+  expiresAt         DateTime
+  fulfilledIssueId  String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  book   LibraryBook  @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  copy   LibraryCopy? @relation(fields: [copyId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, bookId, status, expiresAt])
+  @@index([tenantId, copyId, status])
+  @@index([tenantId, borrowerStudentId, status])
+  @@index([tenantId, borrowerStaffId, status])
+}
+
+model LibraryCopyHistory {
+  id           String   @id @default(uuid())
+  tenantId     String
+  copyId       String
+  eventType    String
+  statusBefore String?
+  statusAfter  String?
+  reason       String?
+  actorUserId  String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  copy   LibraryCopy @relation(fields: [copyId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, copyId, createdAt])
+  @@index([tenantId, eventType, createdAt])
+}
+
 model LibrarySetting {
   id                       String   @id @default(uuid())
   tenantId                 String   @unique
@@ -3561,6 +3623,12 @@ model LibrarySetting {
   maxFineAmount            Decimal? @db.Decimal(12, 2)
   gracePeriodDays          Int      @default(0)
   lostBookChargeMultiplier Decimal  @default(1) @db.Decimal(12, 2)
+  maxBooksPerStudent       Int      @default(3)
+  maxBooksPerStaff         Int      @default(5)
+  studentLoanDays          Int      @default(14)
+  staffLoanDays            Int      @default(30)
+  includeHolidaysInFine    Boolean  @default(false)
+  reservationHoldDays      Int      @default(3)
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
@@ -4975,6 +5043,8 @@ model Tenant {
   libraryCopies                 LibraryCopy[]
   libraryIssues                 LibraryIssue[]
   libraryFines                  LibraryFine[]
+  libraryReservations           LibraryReservation[]
+  libraryCopyHistories          LibraryCopyHistory[]
   librarySetting                LibrarySetting?
   transportRoutes               TransportRoute[]
   transportStops                TransportStop[]
@@ -5091,60 +5161,6 @@ model FileAsset {
 
   @@index([tenantId, module, entityId])
   @@index([tenantId, ownerType, ownerId])
-  @@index([tenantId, storageProvider])
-  @@index([tenantId, visibility])
-}
-
-model ProviderConfig {
-  id               String              @id @default(uuid())
-  type             ProviderType
-  name             String
-  enabled          Boolean             @default(false)
-  environment      ProviderEnvironment @default(TEST)
-  configEncrypted  Json
-  secretKeys       String[]            @default([])
-  lastValidatedAt  DateTime?
-  validationStatus String?
-  updatedBy        String?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-
-  @@unique([type, name, environment])
-  @@index([type, enabled])
-}
-
-model SupportOverride {
-  id             String    @id @default(uuid())
-  platformUserId String
-  tenantId       String
-  reason         String
-  startsAt       DateTime  @default(now())
-  expiresAt      DateTime
-  isActive       Boolean   @default(true)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  platformUser User   @relation("UserSupportOverrides", fields: [platformUserId], references: [id])
-  tenant       Tenant @relation(fields: [tenantId], references: [id])
-
-  @@index([platformUserId, isActive])
-  @@index([tenantId, isActive])
-  @@index([expiresAt])
-}
-
-model TenantOnboardingChecklistOverride {
-  id        String   @id @default(uuid())
-  tenantId  String
-  itemKey   String
-  completed Boolean
-  reason    String
-  updatedBy String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@unique([tenantId, itemKey])
 }
 
 
