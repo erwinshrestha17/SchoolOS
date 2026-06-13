@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { NotificationChannel } from '@prisma/client';
 
 interface SendEmailInput {
   to: string;
@@ -27,6 +28,12 @@ interface SendAuthCodeEmailInput {
   code: string;
   purpose: 'login' | 'password_recovery' | 'mfa_setup';
   resetUrl?: string;
+}
+
+export interface NotificationProviderReadiness {
+  enabled: boolean;
+  failureCode: 'PROVIDER_DISABLED' | 'PROVIDER_NOT_READY' | null;
+  failureReason: string | null;
 }
 
 import { InjectQueue } from '@nestjs/bullmq';
@@ -89,6 +96,41 @@ export class NotificationsService {
       backoff: { type: 'exponential', delay: 1000 },
     });
   }
+
+  async getProviderReadiness(
+    channel: NotificationChannel,
+  ): Promise<NotificationProviderReadiness> {
+    if (isDisabled(process.env.NOTIFICATIONS_DISABLED)) {
+      return {
+        enabled: false,
+        failureCode: 'PROVIDER_DISABLED',
+        failureReason: 'Notification dispatch is disabled for this environment.',
+      };
+    }
+
+    const channelMode = getChannelMode(channel);
+    if (isDisabled(process.env[channelMode.enabledEnv])) {
+      return {
+        enabled: false,
+        failureCode: 'PROVIDER_DISABLED',
+        failureReason: `${channelMode.label} dispatch is disabled.`,
+      };
+    }
+
+    if (isDisabled(process.env[channelMode.readyEnv])) {
+      return {
+        enabled: false,
+        failureCode: 'PROVIDER_NOT_READY',
+        failureReason: `${channelMode.label} provider is not ready.`,
+      };
+    }
+
+    return {
+      enabled: true,
+      failureCode: null,
+      failureReason: null,
+    };
+  }
 }
 
 function escapeHtml(value: string) {
@@ -98,4 +140,35 @@ function escapeHtml(value: string) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function getChannelMode(channel: NotificationChannel) {
+  if (channel === NotificationChannel.EMAIL) {
+    return {
+      label: 'Email',
+      enabledEnv: 'EMAIL_PROVIDER_ENABLED',
+      readyEnv: 'EMAIL_PROVIDER_READY',
+    };
+  }
+
+  if (channel === NotificationChannel.SMS) {
+    return {
+      label: 'SMS',
+      enabledEnv: 'SMS_PROVIDER_ENABLED',
+      readyEnv: 'SMS_PROVIDER_READY',
+    };
+  }
+
+  return {
+    label: 'Push notification',
+    enabledEnv: 'PUSH_PROVIDER_ENABLED',
+    readyEnv: 'PUSH_PROVIDER_READY',
+  };
+}
+
+function isDisabled(value: string | undefined) {
+  if (!value) return false;
+  return ['0', 'false', 'disabled', 'off', 'no'].includes(
+    value.trim().toLowerCase(),
+  );
 }
