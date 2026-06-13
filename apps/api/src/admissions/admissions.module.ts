@@ -10,6 +10,8 @@ import { StudentsModule } from '../students/students.module';
 import { UsersModule } from '../users/users.module';
 import { AdmissionsController } from './admissions.controller';
 import { AdmissionsService } from './admissions.service';
+import { M1AdmissionsHardeningController } from './m1-admissions-hardening.controller';
+import { M1AdmissionsHardeningService } from './m1-admissions-hardening.service';
 import { UsageModule } from '../usage/usage.module';
 
 @Module({
@@ -25,7 +27,7 @@ import { UsageModule } from '../usage/usage.module';
     FileRegistryModule,
     UsageModule,
   ],
-  controllers: [AdmissionsController],
-  providers: [AdmissionsService],
+  controllers: [AdmissionsController, M1AdmissionsHardeningController],
+  providers: [AdmissionsService, M1AdmissionsHardeningService],
 })
 export class AdmissionsModule {}
