@@ -10,6 +10,8 @@ import { CanteenController } from './canteen.controller';
 import { CanteenHardeningService } from './canteen-hardening.service';
 import { CanteenService } from './canteen.service';
 import { CanteenAlertsProcessor } from './canteen-alerts.processor';
+import { CanteenOperationsController } from './canteen-operations.controller';
+import { CanteenOperationsService } from './canteen-operations.service';
 
 @Module({
   imports: [
@@ -23,8 +25,13 @@ import { CanteenAlertsProcessor } from './canteen-alerts.processor';
       name: 'canteen-alerts',
     }),
   ],
-  controllers: [CanteenController],
-  providers: [CanteenService, CanteenHardeningService, CanteenAlertsProcessor],
-  exports: [CanteenService, CanteenHardeningService],
+  controllers: [CanteenController, CanteenOperationsController],
+  providers: [
+    CanteenService,
+    CanteenHardeningService,
+    CanteenOperationsService,
+    CanteenAlertsProcessor,
+  ],
+  exports: [CanteenService, CanteenHardeningService, CanteenOperationsService],
 })
 export class CanteenModule {}
