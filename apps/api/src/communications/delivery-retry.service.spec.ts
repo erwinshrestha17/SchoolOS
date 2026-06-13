@@ -94,6 +94,11 @@ describe('DeliveryRetryService failure dashboard', () => {
       },
     };
     const notificationsService = {
+      getProviderReadiness: jest.fn().mockResolvedValue({
+        enabled: true,
+        failureCode: null,
+        failureReason: null,
+      }),
       sendEmail: jest.fn().mockResolvedValue(undefined),
     };
     const auditService = {
@@ -143,6 +148,76 @@ describe('DeliveryRetryService failure dashboard', () => {
         tenantId: 'tenant-1',
         after: expect.objectContaining({
           reason: 'Provider incident recovered',
+        }),
+      }),
+    );
+  });
+
+  it('fails closed without enqueueing when a channel provider is disabled', async () => {
+    const prisma = {
+      notificationDelivery: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'delivery-1',
+          tenantId: 'tenant-1',
+          status: NotificationStatus.FAILED,
+          channel: NotificationChannel.SMS,
+          sourceType: 'notice',
+          sourceId: 'notice-1',
+          destination: '+9779800000000',
+          title: 'Emergency notice',
+          body: 'School is closed today.',
+          errorMessage: 'Previous provider outage',
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+    const notificationsService = {
+      getProviderReadiness: jest.fn().mockResolvedValue({
+        enabled: false,
+        failureCode: 'PROVIDER_DISABLED',
+        failureReason: 'SMS dispatch is disabled. token=very-secret-value',
+      }),
+      sendSms: jest.fn(),
+    };
+    const auditService = {
+      record: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new DeliveryRetryService(
+      prisma as never,
+      notificationsService as never,
+      auditService as never,
+    );
+
+    await expect(
+      service.retryDelivery('delivery-1', actor, {
+        reason: 'Retry after provider maintenance',
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        deliveryId: 'delivery-1',
+        status: NotificationStatus.FAILED,
+        errorMessage: 'SMS dispatch is disabled. token=***',
+      }),
+    );
+
+    expect(notificationsService.sendSms).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
+      where: { id: 'delivery-1' },
+      data: expect.objectContaining({
+        status: NotificationStatus.FAILED,
+        failureCode: 'PROVIDER_DISABLED',
+        failureReason: 'SMS dispatch is disabled. token=***',
+      }),
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'retry_blocked',
+        resource: 'notification_delivery',
+        tenantId: 'tenant-1',
+        after: expect.objectContaining({
+          channel: NotificationChannel.SMS,
+          failureCode: 'PROVIDER_DISABLED',
         }),
       }),
     );
