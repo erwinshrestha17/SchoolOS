@@ -1,4 +1,8 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -131,7 +135,9 @@ export class CanteenOperationsService {
       where: { tenantId: actor.tenantId, id: { in: supplierIds } },
       select: { id: true, name: true, phone: true, panNumber: true },
     });
-    const supplierById = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
+    const supplierById = new Map(
+      suppliers.map((supplier) => [supplier.id, supplier]),
+    );
 
     return rows.map((row) => ({
       supplierId: row.supplierId,
@@ -155,7 +161,9 @@ export class CanteenOperationsService {
     });
 
     if (!bill) {
-      throw new NotFoundException('Canteen purchase bill not found in this tenant');
+      throw new NotFoundException(
+        'Canteen purchase bill not found in this tenant',
+      );
     }
 
     return {
@@ -170,7 +178,9 @@ export class CanteenOperationsService {
     });
 
     if (!bill) {
-      throw new NotFoundException('Canteen purchase bill not found in this tenant');
+      throw new NotFoundException(
+        'Canteen purchase bill not found in this tenant',
+      );
     }
 
     return this.getPurchaseBillEditLock(bill, actor);

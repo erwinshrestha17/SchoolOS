@@ -40,8 +40,9 @@ export class StaffLeaveQueueService {
     return {
       pending: pending.length,
       staleDays,
-      stalePending: pending.filter((request) => request.createdAt <= staleBefore)
-        .length,
+      stalePending: pending.filter(
+        (request) => request.createdAt <= staleBefore,
+      ).length,
       oldestPendingAt: pending[0]?.createdAt ?? null,
       byLeaveType,
       byDepartment,

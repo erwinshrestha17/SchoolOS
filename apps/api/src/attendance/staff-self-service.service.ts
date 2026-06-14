@@ -54,14 +54,18 @@ export class StaffSelfServiceService {
     const endsOn = normalizeDate(dto.endsOn, 'endsOn');
 
     if (endsOn < startsOn) {
-      throw new ForbiddenException('Leave end date cannot be before start date');
+      throw new ForbiddenException(
+        'Leave end date cannot be before start date',
+      );
     }
 
     const overlapping = await this.prisma.staffLeaveRequest.findFirst({
       where: {
         tenantId: actor.tenantId,
         staffId: staff.id,
-        status: { in: [LeaveRequestStatus.PENDING, LeaveRequestStatus.APPROVED] },
+        status: {
+          in: [LeaveRequestStatus.PENDING, LeaveRequestStatus.APPROVED],
+        },
         startsOn: { lte: endsOn },
         endsOn: { gte: startsOn },
       },

@@ -125,7 +125,10 @@ export class M2AttendanceHardeningService {
     };
   }
 
-  async getHardeningAnomalies(query: M2AttendanceWindowDto, actor: AuthContext) {
+  async getHardeningAnomalies(
+    query: M2AttendanceWindowDto,
+    actor: AuthContext,
+  ) {
     const { fromDate, toDate } = resolveWindow(query, 30);
     const sessions = await this.prisma.attendanceSession.findMany({
       where: {
@@ -138,7 +141,11 @@ export class M2AttendanceHardeningService {
       orderBy: [{ attendanceDate: 'desc' }],
       take: 250,
     });
-    const calendar = await this.loadCalendarMap(actor.tenantId, fromDate, toDate);
+    const calendar = await this.loadCalendarMap(
+      actor.tenantId,
+      fromDate,
+      toDate,
+    );
     const anomalies: Array<Record<string, unknown>> = [];
 
     for (const session of sessions) {
@@ -153,35 +160,67 @@ export class M2AttendanceHardeningService {
         },
       });
       if (session.records.length === 0) {
-        anomalies.push(baseAnomaly('NOT_MARKED_SESSION', 'Session exists but no student records were marked', session, 'HIGH'));
+        anomalies.push(
+          baseAnomaly(
+            'NOT_MARKED_SESSION',
+            'Session exists but no student records were marked',
+            session,
+            'HIGH',
+          ),
+        );
       }
       if (rosterCount > session.records.length) {
         anomalies.push({
-          ...baseAnomaly('MISSING_ROSTER_RECORDS', 'Some active roster students are missing attendance records', session, 'HIGH'),
+          ...baseAnomaly(
+            'MISSING_ROSTER_RECORDS',
+            'Some active roster students are missing attendance records',
+            session,
+            'HIGH',
+          ),
           expectedRosterCount: rosterCount,
           actualRecordCount: session.records.length,
         });
       }
       if (day && !day.isWorkingDay && session.records.length > 0) {
         anomalies.push({
-          ...baseAnomaly('NON_WORKING_DAY_MARKED', 'Attendance was marked on a non-working calendar day', session, 'MEDIUM'),
+          ...baseAnomaly(
+            'NON_WORKING_DAY_MARKED',
+            'Attendance was marked on a non-working calendar day',
+            session,
+            'MEDIUM',
+          ),
           calendarLabel: day.label,
           holidayType: day.holidayType,
         });
       }
       if (day?.holidayType === 'EXAM_DAY') {
-        const invalid = session.records.filter((record) => record.status === AttendanceStatus.HOLIDAY);
+        const invalid = session.records.filter(
+          (record) => record.status === AttendanceStatus.HOLIDAY,
+        );
         if (invalid.length > 0) {
           anomalies.push({
-            ...baseAnomaly('EXAM_DAY_HOLIDAY_STATUS', 'Exam day should not be treated as a generic holiday for marked students', session, 'MEDIUM'),
+            ...baseAnomaly(
+              'EXAM_DAY_HOLIDAY_STATUS',
+              'Exam day should not be treated as a generic holiday for marked students',
+              session,
+              'MEDIUM',
+            ),
             affectedRecordCount: invalid.length,
           });
         }
       }
       const totals = summarize(session.records);
-      if (session.records.length > 0 && totals.absent / session.records.length >= 0.5) {
+      if (
+        session.records.length > 0 &&
+        totals.absent / session.records.length >= 0.5
+      ) {
         anomalies.push({
-          ...baseAnomaly('HIGH_ABSENCE_RATE', 'More than half of marked students are absent in the same session', session, 'MEDIUM'),
+          ...baseAnomaly(
+            'HIGH_ABSENCE_RATE',
+            'More than half of marked students are absent in the same session',
+            session,
+            'MEDIUM',
+          ),
           totals,
         });
       }
@@ -209,7 +248,9 @@ export class M2AttendanceHardeningService {
           ...(query.sectionId ? { sectionId: query.sectionId } : {}),
         },
       },
-      include: { attendanceSession: { include: { class: true, section: true } } },
+      include: {
+        attendanceSession: { include: { class: true, section: true } },
+      },
       orderBy: [{ createdAt: 'desc' }],
       take: 100,
     });
@@ -230,7 +271,9 @@ export class M2AttendanceHardeningService {
           pendingReview: conflict.status === AttendanceConflictStatus.FLAGGED,
           hasPreviousPayload: Boolean(conflict.previousPayload),
           hasIncomingPayload: Boolean(conflict.incomingPayload),
-          concurrentOrDuplicateLikely: conflict.attendanceSession.conflictStatus === AttendanceConflictStatus.FLAGGED,
+          concurrentOrDuplicateLikely:
+            conflict.attendanceSession.conflictStatus ===
+            AttendanceConflictStatus.FLAGGED,
         },
       })),
     };
@@ -263,17 +306,23 @@ export class M2AttendanceHardeningService {
         status: request.status,
         studentId: request.studentId,
         studentSystemId: request.student.studentSystemId,
-        fullNameEn: `${request.student.firstNameEn} ${request.student.lastNameEn}`.trim(),
+        fullNameEn:
+          `${request.student.firstNameEn} ${request.student.lastNameEn}`.trim(),
         attendanceDate: request.attendanceDate.toISOString(),
-        previousStatus: request.previousStatus ?? request.record?.status ?? null,
+        previousStatus:
+          request.previousStatus ?? request.record?.status ?? null,
         requestedStatus: request.requestedStatus,
         requestedById: request.requestedById,
         reviewedById: request.reviewedById,
         reviewedAt: request.reviewedAt?.toISOString() ?? null,
         auditFlags: {
-          hasBeforeStatus: Boolean(request.previousStatus ?? request.record?.status),
+          hasBeforeStatus: Boolean(
+            request.previousStatus ?? request.record?.status,
+          ),
           hasReviewReason: Boolean(request.reviewReason || request.reviewNote),
-          sessionLocked: request.session ? request.session.lockAt <= new Date() : null,
+          sessionLocked: request.session
+            ? request.session.lockAt <= new Date()
+            : null,
           pending: request.status === 'PENDING',
         },
       })),
@@ -295,26 +344,45 @@ export class M2AttendanceHardeningService {
         holidayType,
         isExamDay: holidayType === 'EXAM_DAY',
         isSchoolEvent: holidayType === 'SCHOOL_EVENT',
-        source: explicit ? 'explicit_calendar_day' : weekend ? 'derived_weekend' : 'derived_working_day',
-        policy: calendarPolicyFor(holidayType, explicit?.isWorkingDay ?? !weekend),
+        source: explicit
+          ? 'explicit_calendar_day'
+          : weekend
+            ? 'derived_weekend'
+            : 'derived_working_day',
+        policy: calendarPolicyFor(
+          holidayType,
+          explicit?.isWorkingDay ?? !weekend,
+        ),
       };
     });
     return { fromDate, toDate, items };
   }
 
-  async upsertCalendarPolicyDay(dto: UpsertM2CalendarPolicyDayDto, actor: AuthContext) {
+  async upsertCalendarPolicyDay(
+    dto: UpsertM2CalendarPolicyDayDto,
+    actor: AuthContext,
+  ) {
     const calendarDate = stripTime(new Date(dto.calendarDate));
     const holidayType = dto.isExamDay
       ? 'EXAM_DAY'
       : dto.isSchoolEvent
         ? 'SCHOOL_EVENT'
-        : dto.holidayType ?? null;
+        : (dto.holidayType ?? null);
     const isWorkingDay =
-      dto.isWorkingDay ?? (dto.isExamDay ? true : dto.isSchoolEvent ? false : true);
+      dto.isWorkingDay ??
+      (dto.isExamDay ? true : dto.isSchoolEvent ? false : true);
     const day = await this.prisma.schoolCalendarDay.upsert({
-      where: { tenantId_calendarDate: { tenantId: actor.tenantId, calendarDate } },
+      where: {
+        tenantId_calendarDate: { tenantId: actor.tenantId, calendarDate },
+      },
       update: { isWorkingDay, holidayType, label: dto.label ?? null },
-      create: { tenantId: actor.tenantId, calendarDate, isWorkingDay, holidayType, label: dto.label ?? null },
+      create: {
+        tenantId: actor.tenantId,
+        calendarDate,
+        isWorkingDay,
+        holidayType,
+        label: dto.label ?? null,
+      },
     });
     await this.auditService.record({
       action: 'm2_calendar_policy_upsert',
@@ -322,25 +390,59 @@ export class M2AttendanceHardeningService {
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: day.id,
-      after: { calendarDate, isWorkingDay, holidayType, label: day.label, policyMetadata: dto.policyMetadata ?? null },
+      after: {
+        calendarDate,
+        isWorkingDay,
+        holidayType,
+        label: day.label,
+        policyMetadata: dto.policyMetadata ?? null,
+      },
     });
-    return { ...day, policy: calendarPolicyFor(day.holidayType, day.isWorkingDay) };
+    return {
+      ...day,
+      policy: calendarPolicyFor(day.holidayType, day.isWorkingDay),
+    };
   }
 
   async runAttendanceCutoff(dto: RunAttendanceCutoffDto, actor: AuthContext) {
     const policy = await this.loadPolicy(actor.tenantId);
-    const attendanceDate = stripTime(dto.attendanceDate ? new Date(dto.attendanceDate) : new Date());
+    const attendanceDate = stripTime(
+      dto.attendanceDate ? new Date(dto.attendanceDate) : new Date(),
+    );
     const cutoffAt = new Date(attendanceDate);
     cutoffAt.setHours(policy.cutoffHour, policy.cutoffMinute, 0, 0);
     const dryRun = dto.dryRun ?? true;
     const academicYear = dto.academicYearId
-      ? await this.prisma.academicYear.findFirst({ where: { tenantId: actor.tenantId, id: dto.academicYearId } })
-      : await this.prisma.academicYear.findFirst({ where: { tenantId: actor.tenantId, isCurrent: true } });
-    if (!academicYear) return { dryRun, attendanceDate, cutoffAt, created: 0, missingScopes: [], skippedReason: 'current_academic_year_not_found' };
-    const calendar = await this.loadCalendarMap(actor.tenantId, attendanceDate, attendanceDate);
+      ? await this.prisma.academicYear.findFirst({
+          where: { tenantId: actor.tenantId, id: dto.academicYearId },
+        })
+      : await this.prisma.academicYear.findFirst({
+          where: { tenantId: actor.tenantId, isCurrent: true },
+        });
+    if (!academicYear)
+      return {
+        dryRun,
+        attendanceDate,
+        cutoffAt,
+        created: 0,
+        missingScopes: [],
+        skippedReason: 'current_academic_year_not_found',
+      };
+    const calendar = await this.loadCalendarMap(
+      actor.tenantId,
+      attendanceDate,
+      attendanceDate,
+    );
     const day = calendar.get(dateKey(attendanceDate));
     if ((day && !day.isWorkingDay) || (!day && isWeekend(attendanceDate))) {
-      return { dryRun, attendanceDate, cutoffAt, created: 0, missingScopes: [], skippedReason: 'non_working_day' };
+      return {
+        dryRun,
+        attendanceDate,
+        cutoffAt,
+        created: 0,
+        missingScopes: [],
+        skippedReason: 'non_working_day',
+      };
     }
     const enrollments = await this.prisma.enrollment.findMany({
       where: {
@@ -353,7 +455,17 @@ export class M2AttendanceHardeningService {
       include: { class: true, section: true },
       take: 3000,
     });
-    const scopes = new Map<string, { academicYearId: string; classId: string; sectionId: string | null; className: string; sectionName: string | null; rosterCount: number }>();
+    const scopes = new Map<
+      string,
+      {
+        academicYearId: string;
+        classId: string;
+        sectionId: string | null;
+        className: string;
+        sectionName: string | null;
+        rosterCount: number;
+      }
+    >();
     for (const enrollment of enrollments) {
       const key = `${enrollment.academicYearId}:${enrollment.classId}:${enrollment.sectionId ?? 'none'}`;
       const existing = scopes.get(key) ?? {
@@ -371,13 +483,32 @@ export class M2AttendanceHardeningService {
     let created = 0;
     for (const scope of scopes.values()) {
       const existing = await this.prisma.attendanceSession.findFirst({
-        where: { tenantId: actor.tenantId, attendanceDate, classId: scope.classId, sectionId: scope.sectionId },
+        where: {
+          tenantId: actor.tenantId,
+          attendanceDate,
+          classId: scope.classId,
+          sectionId: scope.sectionId,
+        },
       });
       if (!existing) {
-        missingScopes.push({ ...scope, virtualStatus: 'NOT_MARKED', action: dryRun ? 'would_create_locked_unmarked_session' : 'created_locked_unmarked_session' });
+        missingScopes.push({
+          ...scope,
+          virtualStatus: 'NOT_MARKED',
+          action: dryRun
+            ? 'would_create_locked_unmarked_session'
+            : 'created_locked_unmarked_session',
+        });
         if (!dryRun) {
           await this.prisma.attendanceSession.create({
-            data: { tenantId: actor.tenantId, academicYearId: scope.academicYearId, classId: scope.classId, sectionId: scope.sectionId, attendanceDate, lockAt: cutoffAt, conflictStatus: AttendanceConflictStatus.FLAGGED },
+            data: {
+              tenantId: actor.tenantId,
+              academicYearId: scope.academicYearId,
+              classId: scope.classId,
+              sectionId: scope.sectionId,
+              attendanceDate,
+              lockAt: cutoffAt,
+              conflictStatus: AttendanceConflictStatus.FLAGGED,
+            },
           });
           created += 1;
         }
@@ -388,58 +519,109 @@ export class M2AttendanceHardeningService {
       resource: 'attendance_session',
       tenantId: actor.tenantId,
       userId: actor.userId,
-      after: { attendanceDate, cutoffAt, missingScopeCount: missingScopes.length, created },
+      after: {
+        attendanceDate,
+        cutoffAt,
+        missingScopeCount: missingScopes.length,
+        created,
+      },
     });
     return { dryRun, attendanceDate, cutoffAt, created, missingScopes };
   }
 
-  async getFollowUpQueue(query: RepeatedAbsenceFollowUpDto, actor: AuthContext) {
+  async getFollowUpQueue(
+    query: RepeatedAbsenceFollowUpDto,
+    actor: AuthContext,
+  ) {
     const policy = await this.loadPolicy(actor.tenantId);
     const threshold = query.threshold ?? policy.repeatedAbsenceThreshold;
     const { fromDate, toDate } = resolveWindow(query, 30);
     const records = await this.prisma.attendanceRecord.findMany({
       where: {
         tenantId: actor.tenantId,
-        status: { in: [AttendanceStatus.ABSENT, AttendanceStatus.LATE, AttendanceStatus.SICK_LEAVE, AttendanceStatus.UNEXCUSED_LEAVE] },
+        status: {
+          in: [
+            AttendanceStatus.ABSENT,
+            AttendanceStatus.LATE,
+            AttendanceStatus.SICK_LEAVE,
+            AttendanceStatus.UNEXCUSED_LEAVE,
+          ],
+        },
         attendanceSession: {
           attendanceDate: { gte: fromDate, lte: toDate },
           ...(query.classId ? { classId: query.classId } : {}),
           ...(query.sectionId ? { sectionId: query.sectionId } : {}),
         },
       },
-      include: { student: { include: { guardianLinks: { include: { guardian: true } }, class: true, sectionRef: true } }, attendanceSession: true },
+      include: {
+        student: {
+          include: {
+            guardianLinks: { include: { guardian: true } },
+            class: true,
+            sectionRef: true,
+          },
+        },
+        attendanceSession: true,
+      },
       orderBy: { attendanceSession: { attendanceDate: 'desc' } },
       take: 3000,
     });
     const byStudent = new Map<string, typeof records>();
-    for (const record of records) byStudent.set(record.studentId, [...(byStudent.get(record.studentId) ?? []), record]);
+    for (const record of records)
+      byStudent.set(record.studentId, [
+        ...(byStudent.get(record.studentId) ?? []),
+        record,
+      ]);
     const items = Array.from(byStudent.entries())
       .map(([studentId, studentRecords]) => {
-        const absences = studentRecords.filter((record) => record.status === AttendanceStatus.ABSENT || record.status === AttendanceStatus.UNEXCUSED_LEAVE).length;
-        const lates = studentRecords.filter((record) => record.status === AttendanceStatus.LATE).length;
-        const consecutiveAbsences = countConsecutive(studentRecords.map((record) => ({ date: record.attendanceSession.attendanceDate, status: record.status })));
+        const absences = studentRecords.filter(
+          (record) =>
+            record.status === AttendanceStatus.ABSENT ||
+            record.status === AttendanceStatus.UNEXCUSED_LEAVE,
+        ).length;
+        const lates = studentRecords.filter(
+          (record) => record.status === AttendanceStatus.LATE,
+        ).length;
+        const consecutiveAbsences = countConsecutive(
+          studentRecords.map((record) => ({
+            date: record.attendanceSession.attendanceDate,
+            status: record.status,
+          })),
+        );
         const sample = studentRecords[0];
         return {
           studentId,
           studentSystemId: sample.student.studentSystemId,
-          fullNameEn: `${sample.student.firstNameEn} ${sample.student.lastNameEn}`.trim(),
+          fullNameEn:
+            `${sample.student.firstNameEn} ${sample.student.lastNameEn}`.trim(),
           className: sample.student.class.name,
-          sectionName: sample.student.sectionRef?.name ?? sample.student.section ?? null,
+          sectionName:
+            sample.student.sectionRef?.name ?? sample.student.section ?? null,
           guardianCount: sample.student.guardianLinks.length,
           absences,
           lates,
           consecutiveAbsences,
           threshold,
-          needsFollowUp: absences >= threshold || consecutiveAbsences >= threshold || lates >= policy.lateFollowUpThreshold,
+          needsFollowUp:
+            absences >= threshold ||
+            consecutiveAbsences >= threshold ||
+            lates >= policy.lateFollowUpThreshold,
           recommendedChannels: policy.parentNotificationChannels,
         };
       })
       .filter((item) => item.needsFollowUp)
-      .sort((a, b) => b.consecutiveAbsences - a.consecutiveAbsences || b.absences - a.absences);
+      .sort(
+        (a, b) =>
+          b.consecutiveAbsences - a.consecutiveAbsences ||
+          b.absences - a.absences,
+      );
     return { fromDate, toDate, threshold, total: items.length, items };
   }
 
-  async runFollowUpAutomation(query: RepeatedAbsenceFollowUpDto, actor: AuthContext) {
+  async runFollowUpAutomation(
+    query: RepeatedAbsenceFollowUpDto,
+    actor: AuthContext,
+  ) {
     const dryRun = query.dryRun ?? true;
     const policy = await this.loadPolicy(actor.tenantId);
     const queue = await this.getFollowUpQueue(query, actor);
@@ -450,18 +632,20 @@ export class M2AttendanceHardeningService {
           .replace('{studentName}', item.fullNameEn)
           .replace('{count}', String(item.absences))
           .replace('{threshold}', String(item.threshold));
-        const delivery = await this.communicationsService.recordDeliveryRecords({
-          actor,
-          sourceType: 'attendance_repeated_absence_follow_up',
-          sourceId: `${dateKey(new Date())}:${item.studentId}:${item.absences}:${item.consecutiveAbsences}`,
-          audienceType: AudienceType.ALL,
-          studentIds: [item.studentId],
-          title: 'Attendance follow-up needed',
-          body,
-          channels: policy.parentNotificationChannels,
-          requiredConsentTypes: [ConsentType.MESSAGING],
-          communicationCategory: 'ESSENTIAL',
-        });
+        const delivery = await this.communicationsService.recordDeliveryRecords(
+          {
+            actor,
+            sourceType: 'attendance_repeated_absence_follow_up',
+            sourceId: `${dateKey(new Date())}:${item.studentId}:${item.absences}:${item.consecutiveAbsences}`,
+            audienceType: AudienceType.ALL,
+            studentIds: [item.studentId],
+            title: 'Attendance follow-up needed',
+            body,
+            channels: policy.parentNotificationChannels,
+            requiredConsentTypes: [ConsentType.MESSAGING],
+            communicationCategory: 'ESSENTIAL',
+          },
+        );
         deliveryCount += delivery.count;
       }
     }
@@ -475,7 +659,10 @@ export class M2AttendanceHardeningService {
     return { dryRun, deliveryCount, ...queue };
   }
 
-  async listOfflineSyncConflicts(query: OfflineSyncConflictRulesDto, actor: AuthContext) {
+  async listOfflineSyncConflicts(
+    query: OfflineSyncConflictRulesDto,
+    actor: AuthContext,
+  ) {
     const { fromDate, toDate } = resolveWindow(query, 30);
     const submissions = await this.prisma.attendanceSyncSubmission.findMany({
       where: {
@@ -483,7 +670,15 @@ export class M2AttendanceHardeningService {
         attendanceDate: { gte: fromDate, lte: toDate },
         ...(query.classId ? { classId: query.classId } : {}),
         ...(query.sectionId ? { sectionId: query.sectionId } : {}),
-        ...(query.status ? { syncStatus: query.status.toUpperCase() as never } : { OR: [{ syncStatus: 'CONFLICTED' }, { syncStatus: 'REJECTED' }, { syncAttemptCount: { gt: 1 } }] }),
+        ...(query.status
+          ? { syncStatus: query.status.toUpperCase() as never }
+          : {
+              OR: [
+                { syncStatus: 'CONFLICTED' },
+                { syncStatus: 'REJECTED' },
+                { syncAttemptCount: { gt: 1 } },
+              ],
+            }),
       },
       orderBy: [{ serverReceivedAt: 'desc' }],
       take: query.limit ?? 50,
@@ -491,10 +686,14 @@ export class M2AttendanceHardeningService {
     return {
       total: submissions.length,
       rules: {
-        idempotency: 'tenantId + clientSubmissionId replays are not applied again; attempt count increments.',
-        staleDeviceTimestamp: 'Older device payloads must not overwrite newer submitted sessions.',
-        ownerMismatch: 'Existing sessions submitted by a different user are flagged as conflicts.',
-        fingerprintMismatch: 'Different device/session fingerprints are conflict metadata, not silent overwrites.',
+        idempotency:
+          'tenantId + clientSubmissionId replays are not applied again; attempt count increments.',
+        staleDeviceTimestamp:
+          'Older device payloads must not overwrite newer submitted sessions.',
+        ownerMismatch:
+          'Existing sessions submitted by a different user are flagged as conflicts.',
+        fingerprintMismatch:
+          'Different device/session fingerprints are conflict metadata, not silent overwrites.',
       },
       items: submissions.map((submission) => ({
         id: submission.id,
@@ -513,11 +712,17 @@ export class M2AttendanceHardeningService {
   }
 
   private async loadPolicy(tenantId: string): Promise<M2AttendancePolicy> {
-    const setting = await this.prisma.tenantSetting.findUnique({ where: { tenantId_key: { tenantId, key: POLICY_KEY } } });
+    const setting = await this.prisma.tenantSetting.findUnique({
+      where: { tenantId_key: { tenantId, key: POLICY_KEY } },
+    });
     return coercePolicy(setting?.value);
   }
 
-  private async loadCalendarMap(tenantId: string, fromDate: Date, toDate: Date) {
+  private async loadCalendarMap(
+    tenantId: string,
+    fromDate: Date,
+    toDate: Date,
+  ) {
     const rows = await this.prisma.schoolCalendarDay.findMany({
       where: { tenantId, calendarDate: { gte: fromDate, lte: toDate } },
     });
@@ -533,7 +738,10 @@ function defaultPolicy(): M2AttendancePolicy {
     lateFollowUpThreshold: 4,
     cutoffHour: 16,
     cutoffMinute: 0,
-    parentNotificationChannels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+    parentNotificationChannels: [
+      NotificationChannel.PUSH,
+      NotificationChannel.SMS,
+    ],
     notifyParentsForLate: true,
     notifyParentsForAbsence: true,
     absenceMessageTemplate:
@@ -550,8 +758,12 @@ function coercePolicy(value: Prisma.JsonValue | undefined): M2AttendancePolicy {
   return {
     ...base,
     ...stripUndefined({
-      lockOverrideMinReasonLength: readNumber(object.lockOverrideMinReasonLength),
-      correctionReviewMinReasonLength: readNumber(object.correctionReviewMinReasonLength),
+      lockOverrideMinReasonLength: readNumber(
+        object.lockOverrideMinReasonLength,
+      ),
+      correctionReviewMinReasonLength: readNumber(
+        object.correctionReviewMinReasonLength,
+      ),
       repeatedAbsenceThreshold: readNumber(object.repeatedAbsenceThreshold),
       lateFollowUpThreshold: readNumber(object.lateFollowUpThreshold),
       cutoffHour: readNumber(object.cutoffHour),
@@ -562,7 +774,11 @@ function coercePolicy(value: Prisma.JsonValue | undefined): M2AttendancePolicy {
       lateMessageTemplate: readString(object.lateMessageTemplate),
     }),
     parentNotificationChannels: Array.isArray(object.parentNotificationChannels)
-      ? normalizeChannels(object.parentNotificationChannels.filter((item): item is string => typeof item === 'string'))
+      ? normalizeChannels(
+          object.parentNotificationChannels.filter(
+            (item): item is string => typeof item === 'string',
+          ),
+        )
       : base.parentNotificationChannels,
   };
 }
@@ -571,13 +787,23 @@ function normalizeChannels(values: string[]): NotificationChannel[] {
   const allowed = new Set(Object.values(NotificationChannel));
   const channels = values
     .map((value) => value.trim().toUpperCase())
-    .filter((value): value is NotificationChannel => allowed.has(value as NotificationChannel));
-  return channels.length > 0 ? [...new Set(channels)] : defaultPolicy().parentNotificationChannels;
+    .filter((value): value is NotificationChannel =>
+      allowed.has(value as NotificationChannel),
+    );
+  return channels.length > 0
+    ? [...new Set(channels)]
+    : defaultPolicy().parentNotificationChannels;
 }
 
-function resolveWindow(query: M2AttendanceWindowDto, defaultDays: number, maxDays = 120) {
+function resolveWindow(
+  query: M2AttendanceWindowDto,
+  defaultDays: number,
+  maxDays = 120,
+) {
   const toDate = stripTime(query.toDate ? new Date(query.toDate) : new Date());
-  const fromDate = stripTime(query.fromDate ? new Date(query.fromDate) : new Date(toDate));
+  const fromDate = stripTime(
+    query.fromDate ? new Date(query.fromDate) : new Date(toDate),
+  );
   if (!query.fromDate) fromDate.setDate(toDate.getDate() - defaultDays + 1);
   const maxFrom = new Date(toDate);
   maxFrom.setDate(toDate.getDate() - maxDays + 1);
@@ -586,13 +812,27 @@ function resolveWindow(query: M2AttendanceWindowDto, defaultDays: number, maxDay
 
 function eachDate(fromDate: Date, toDate: Date) {
   const dates: Date[] = [];
-  for (const cursor = new Date(fromDate); cursor <= toDate; cursor.setDate(cursor.getDate() + 1)) {
+  for (
+    const cursor = new Date(fromDate);
+    cursor <= toDate;
+    cursor.setDate(cursor.getDate() + 1)
+  ) {
     dates.push(new Date(cursor));
   }
   return dates;
 }
 
-function baseAnomaly(code: string, message: string, session: { id: string; attendanceDate: Date; class: { name: string }; section: { name: string } | null }, severity: string) {
+function baseAnomaly(
+  code: string,
+  message: string,
+  session: {
+    id: string;
+    attendanceDate: Date;
+    class: { name: string };
+    section: { name: string } | null;
+  },
+  severity: string,
+) {
   return {
     code,
     severity,
@@ -604,7 +844,13 @@ function baseAnomaly(code: string, message: string, session: { id: string; atten
   };
 }
 
-function formatSession(session: { id: string; attendanceDate: Date; class: { name: string }; section: { name: string } | null; conflictStatus: AttendanceConflictStatus }) {
+function formatSession(session: {
+  id: string;
+  attendanceDate: Date;
+  class: { name: string };
+  section: { name: string } | null;
+  conflictStatus: AttendanceConflictStatus;
+}) {
   return {
     id: session.id,
     attendanceDate: session.attendanceDate.toISOString(),
@@ -625,28 +871,51 @@ function summarize(records: Array<{ status: AttendanceStatus }>) {
         totals.present += 0.5;
         totals.absent += 0.5;
         totals.halfDay += 1;
-      } else if (record.status === AttendanceStatus.HOLIDAY) totals.holiday += 1;
+      } else if (record.status === AttendanceStatus.HOLIDAY)
+        totals.holiday += 1;
       else totals.leave += 1;
       return totals;
     },
-    { present: 0, absent: 0, late: 0, halfDay: 0, leave: 0, holiday: 0, total: 0 },
+    {
+      present: 0,
+      absent: 0,
+      late: 0,
+      halfDay: 0,
+      leave: 0,
+      holiday: 0,
+      total: 0,
+    },
   );
 }
 
-function countConsecutive(records: Array<{ date: Date; status: AttendanceStatus }>) {
-  const sorted = [...records].sort((a, b) => b.date.getTime() - a.date.getTime());
+function countConsecutive(
+  records: Array<{ date: Date; status: AttendanceStatus }>,
+) {
+  const sorted = [...records].sort(
+    (a, b) => b.date.getTime() - a.date.getTime(),
+  );
   let count = 0;
   for (const record of sorted) {
-    if (record.status === AttendanceStatus.ABSENT || record.status === AttendanceStatus.UNEXCUSED_LEAVE) count += 1;
+    if (
+      record.status === AttendanceStatus.ABSENT ||
+      record.status === AttendanceStatus.UNEXCUSED_LEAVE
+    )
+      count += 1;
     else break;
   }
   return count;
 }
 
-function calendarPolicyFor(holidayType: string | null | undefined, isWorkingDay: boolean) {
-  if (holidayType === 'EXAM_DAY') return 'exam_day_attendance_allowed_with_exam_wording';
-  if (holidayType === 'SCHOOL_EVENT') return 'school_event_virtual_state_no_absence_penalty';
-  if (!isWorkingDay) return 'holiday_or_weekend_attendance_blocked_unless_override';
+function calendarPolicyFor(
+  holidayType: string | null | undefined,
+  isWorkingDay: boolean,
+) {
+  if (holidayType === 'EXAM_DAY')
+    return 'exam_day_attendance_allowed_with_exam_wording';
+  if (holidayType === 'SCHOOL_EVENT')
+    return 'school_event_virtual_state_no_absence_penalty';
+  if (!isWorkingDay)
+    return 'holiday_or_weekend_attendance_blocked_unless_override';
   return 'regular_working_day';
 }
 
@@ -668,7 +937,9 @@ function isWeekend(value: Date) {
 }
 
 function readNumber(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined;
 }
 
 function readBoolean(value: unknown) {
@@ -679,6 +950,10 @@ function readString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
-function stripUndefined<T extends Record<string, unknown>>(value: T): Partial<T> {
-  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as Partial<T>;
+function stripUndefined<T extends Record<string, unknown>>(
+  value: T,
+): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) => item !== undefined),
+  ) as Partial<T>;
 }

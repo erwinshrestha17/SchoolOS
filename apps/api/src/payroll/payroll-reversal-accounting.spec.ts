@@ -128,8 +128,9 @@ function buildService(options: {
 }) {
   const tx = {
     journalEntry: {
-      findUnique: jest.fn(async ({ where }: { where: { id: string } }) =>
-        options.journalEntries?.[where.id] ?? null,
+      findUnique: jest.fn(
+        async ({ where }: { where: { id: string } }) =>
+          options.journalEntries?.[where.id] ?? null,
       ),
     },
     payrollLine: {
@@ -154,8 +155,8 @@ function buildService(options: {
         .mockResolvedValue(options.payrollRun ?? buildPayrollRun()),
       update: jest.fn(),
     },
-    $transaction: jest.fn(async (callback: (transaction: typeof tx) => unknown) =>
-      callback(tx),
+    $transaction: jest.fn(
+      async (callback: (transaction: typeof tx) => unknown) => callback(tx),
     ),
   };
 

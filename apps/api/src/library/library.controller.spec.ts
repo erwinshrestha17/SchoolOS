@@ -131,10 +131,14 @@ describe('LibraryController M8A contracts', () => {
     const updateDto = { shelfLocation: 'B2', conditionNote: 'Good' };
     const statusDto = { status: 'DAMAGED', reason: 'Water damage' };
     libraryService.listCopies.mockReturnValue({ items: [] });
-    libraryHardeningService.resolveCopyByScanCode.mockReturnValue({ id: 'copy-1' });
+    libraryHardeningService.resolveCopyByScanCode.mockReturnValue({
+      id: 'copy-1',
+    });
     libraryHardeningService.createCopy.mockReturnValue({ id: 'copy-1' });
     libraryHardeningService.updateCopy.mockReturnValue({ id: 'copy-1' });
-    libraryHardeningService.markCopyStatus.mockReturnValue({ status: 'DAMAGED' });
+    libraryHardeningService.markCopyStatus.mockReturnValue({
+      status: 'DAMAGED',
+    });
     libraryHardeningService.archiveCopy.mockReturnValue({ status: 'ARCHIVED' });
 
     expect(
@@ -152,9 +156,9 @@ describe('LibraryController M8A contracts', () => {
     expect(
       controller.markCopyStatus('copy-1', statusDto as never, actor),
     ).toEqual({ status: 'DAMAGED' });
-    expect(controller.archiveCopy('copy-1', { reason: 'Disposed' }, actor)).toEqual(
-      { status: 'ARCHIVED' },
-    );
+    expect(
+      controller.archiveCopy('copy-1', { reason: 'Disposed' }, actor),
+    ).toEqual({ status: 'ARCHIVED' });
 
     expect(libraryHardeningService.resolveCopyByScanCode).toHaveBeenCalledWith(
       actor,
@@ -181,9 +185,13 @@ describe('LibraryController M8A contracts', () => {
     const scannerReturnDto = { code: 'QR-LIB-001', returnCondition: 'Good' };
     libraryHardeningService.listIssuesScoped.mockReturnValue({ items: [] });
     libraryHardeningService.issueCopy.mockReturnValue({ id: 'issue-1' });
-    libraryHardeningService.issueCopyByScanner.mockReturnValue({ id: 'issue-1' });
+    libraryHardeningService.issueCopyByScanner.mockReturnValue({
+      id: 'issue-1',
+    });
     libraryHardeningService.returnCopy.mockReturnValue({ status: 'RETURNED' });
-    libraryHardeningService.returnCopyByScanner.mockReturnValue({ status: 'RETURNED' });
+    libraryHardeningService.returnCopyByScanner.mockReturnValue({
+      status: 'RETURNED',
+    });
 
     expect(
       controller.listIssues(actor, 'ISSUED', 'student-1', undefined, '1', '20'),
@@ -194,23 +202,30 @@ describe('LibraryController M8A contracts', () => {
     expect(controller.issueCopy(issueDto as never, actor)).toEqual({
       id: 'issue-1',
     });
-    expect(controller.issueCopyByScanner(scannerIssueDto as never, actor)).toEqual({
+    expect(
+      controller.issueCopyByScanner(scannerIssueDto as never, actor),
+    ).toEqual({
       id: 'issue-1',
     });
-    expect(controller.returnCopy('issue-1', returnDto as never, actor)).toEqual({
-      status: 'RETURNED',
-    });
-    expect(controller.returnCopyByScanner(scannerReturnDto as never, actor)).toEqual(
-      { status: 'RETURNED' },
+    expect(controller.returnCopy('issue-1', returnDto as never, actor)).toEqual(
+      {
+        status: 'RETURNED',
+      },
     );
+    expect(
+      controller.returnCopyByScanner(scannerReturnDto as never, actor),
+    ).toEqual({ status: 'RETURNED' });
 
-    expect(libraryHardeningService.listIssuesScoped).toHaveBeenCalledWith(actor, {
-      status: 'ISSUED',
-      studentId: 'student-1',
-      staffId: undefined,
-      page: '1',
-      limit: '20',
-    });
+    expect(libraryHardeningService.listIssuesScoped).toHaveBeenCalledWith(
+      actor,
+      {
+        status: 'ISSUED',
+        studentId: 'student-1',
+        staffId: undefined,
+        page: '1',
+        limit: '20',
+      },
+    );
     expect(libraryHardeningService.issueCopyByScanner).toHaveBeenCalledWith(
       scannerIssueDto,
       actor,
@@ -225,29 +240,44 @@ describe('LibraryController M8A contracts', () => {
     };
     const fulfillDto = { copyId: 'copy-1' };
     libraryHardeningService.listReservations.mockReturnValue({ items: [] });
-    libraryHardeningService.createReservation.mockReturnValue({ id: 'reservation-1' });
-    libraryHardeningService.cancelReservation.mockReturnValue({ status: 'CANCELLED' });
-    libraryHardeningService.fulfillReservation.mockReturnValue({ id: 'issue-1' });
+    libraryHardeningService.createReservation.mockReturnValue({
+      id: 'reservation-1',
+    });
+    libraryHardeningService.cancelReservation.mockReturnValue({
+      status: 'CANCELLED',
+    });
+    libraryHardeningService.fulfillReservation.mockReturnValue({
+      id: 'issue-1',
+    });
 
-    expect(controller.listReservations(actor, 'ACTIVE', 'book-1', '1', '10')).toEqual(
-      { items: [] },
-    );
-    expect(controller.createReservation(actor, reservationDto as never)).toEqual({
+    expect(
+      controller.listReservations(actor, 'ACTIVE', 'book-1', '1', '10'),
+    ).toEqual({ items: [] });
+    expect(
+      controller.createReservation(actor, reservationDto as never),
+    ).toEqual({
       id: 'reservation-1',
     });
     expect(controller.cancelReservation(actor, 'reservation-1')).toEqual({
       status: 'CANCELLED',
     });
     expect(
-      controller.fulfillReservation(actor, 'reservation-1', fulfillDto as never),
+      controller.fulfillReservation(
+        actor,
+        'reservation-1',
+        fulfillDto as never,
+      ),
     ).toEqual({ id: 'issue-1' });
 
-    expect(libraryHardeningService.listReservations).toHaveBeenCalledWith(actor, {
-      status: 'ACTIVE',
-      bookId: 'book-1',
-      page: '1',
-      limit: '10',
-    });
+    expect(libraryHardeningService.listReservations).toHaveBeenCalledWith(
+      actor,
+      {
+        status: 'ACTIVE',
+        bookId: 'book-1',
+        page: '1',
+        limit: '10',
+      },
+    );
     expect(libraryHardeningService.fulfillReservation).toHaveBeenCalledWith(
       'reservation-1',
       fulfillDto,
@@ -258,7 +288,9 @@ describe('LibraryController M8A contracts', () => {
   it('delegates reporting and CSV export from hardening service', () => {
     const { controller, libraryHardeningService } = createController();
     libraryHardeningService.getIssuedBooksReport.mockReturnValue({ items: [] });
-    libraryHardeningService.getOverdueBooksReport.mockReturnValue({ items: [] });
+    libraryHardeningService.getOverdueBooksReport.mockReturnValue({
+      items: [],
+    });
     libraryHardeningService.getLostDamagedReport.mockReturnValue({ items: [] });
     libraryHardeningService.getFineSummary.mockReturnValue({
       summary: { totalFine: '0' },
@@ -267,7 +299,9 @@ describe('LibraryController M8A contracts', () => {
     libraryHardeningService.exportIssuedBooksCsv.mockReturnValue(
       'Issue ID,Book Title\nissue-1,English Reader',
     );
-    libraryHardeningService.getPopularBooksReport.mockReturnValue({ items: [] });
+    libraryHardeningService.getPopularBooksReport.mockReturnValue({
+      items: [],
+    });
 
     expect(controller.getIssuedBooksReport(actor, '1', '25')).toEqual({
       items: [],
@@ -304,10 +338,12 @@ describe('LibraryController M8A contracts', () => {
     });
 
     expect(controller.listFines(actor, '1', '10')).toEqual({ items: [] });
-    expect(controller.createFine(actor, { issueId: 'issue-1', amount: 25 })).toEqual(
-      { id: 'fine-1' },
-    );
-    expect(controller.updateFine(actor, 'fine-1', { notes: 'Corrected' })).toEqual({
+    expect(
+      controller.createFine(actor, { issueId: 'issue-1', amount: 25 }),
+    ).toEqual({ id: 'fine-1' });
+    expect(
+      controller.updateFine(actor, 'fine-1', { notes: 'Corrected' }),
+    ).toEqual({
       id: 'fine-1',
     });
     expect(
@@ -318,11 +354,9 @@ describe('LibraryController M8A contracts', () => {
       alreadyReconciled: false,
     });
 
-    expect(libraryHardeningService.postFineToFeesIdempotent).toHaveBeenCalledWith(
-      actor,
-      'fine-1',
-      'Approved',
-    );
+    expect(
+      libraryHardeningService.postFineToFeesIdempotent,
+    ).toHaveBeenCalledWith(actor, 'fine-1', 'Approved');
     expect(libraryHardeningService.reconcileFinePayment).toHaveBeenCalledWith(
       actor,
       'fine-1',
@@ -341,8 +375,12 @@ describe('LibraryController M8A contracts', () => {
       skipped: false,
       deliveryCount: 1,
     });
-    libraryHardeningService.getLibrarySettings.mockReturnValue({ finePerDay: '10' });
-    libraryHardeningService.updateLibrarySettings.mockReturnValue({ finePerDay: '20' });
+    libraryHardeningService.getLibrarySettings.mockReturnValue({
+      finePerDay: '10',
+    });
+    libraryHardeningService.updateLibrarySettings.mockReturnValue({
+      finePerDay: '20',
+    });
 
     expect(controller.listOverdue(actor, '1', '20')).toEqual({ items: [] });
     expect(controller.sendOverdueReminders(actor)).toEqual({
@@ -358,6 +396,8 @@ describe('LibraryController M8A contracts', () => {
     expect(controller.updateSettings(actor, { finePerDay: 20 })).toEqual({
       finePerDay: '20',
     });
-    expect(controller.resolveQrBorrower(actor, 'token')).toEqual({ name: 'Student' });
+    expect(controller.resolveQrBorrower(actor, 'token')).toEqual({
+      name: 'Student',
+    });
   });
 });

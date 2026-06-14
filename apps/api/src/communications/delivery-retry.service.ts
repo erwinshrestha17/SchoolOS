@@ -416,7 +416,10 @@ function maskDestination(destination: string | null) {
 function sanitizeFailureReason(reason: string | null | undefined) {
   if (!reason) return 'Notification provider is not ready.';
   return reason
-    .replace(/(secret|token|key|password|authorization|bearer)=[^\s,;]+/gi, '$1=***')
+    .replace(
+      /(secret|token|key|password|authorization|bearer)=[^\s,;]+/gi,
+      '$1=***',
+    )
     .replace(/Bearer\s+[^\s,;]+/gi, 'Bearer ***')
     .slice(0, 240);
 }

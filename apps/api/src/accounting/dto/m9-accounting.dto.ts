@@ -1,5 +1,12 @@
-export const M9_ACCOUNTING_SOURCE_MODULES = ['FEES', 'PAYROLL', 'CANTEEN', 'LIBRARY', 'TRANSPORT'] as const;
-export type M9AccountingSourceModule = (typeof M9_ACCOUNTING_SOURCE_MODULES)[number];
+export const M9_ACCOUNTING_SOURCE_MODULES = [
+  'FEES',
+  'PAYROLL',
+  'CANTEEN',
+  'LIBRARY',
+  'TRANSPORT',
+] as const;
+export type M9AccountingSourceModule =
+  (typeof M9_ACCOUNTING_SOURCE_MODULES)[number];
 
 export class CreateAccountingSourceMappingDto {
   sourceModule!: M9AccountingSourceModule;

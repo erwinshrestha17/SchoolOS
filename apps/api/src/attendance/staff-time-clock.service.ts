@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { AttendanceStatus } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
@@ -121,7 +125,9 @@ export class StaffTimeClockService {
     }
 
     if (timestamp < existing.checkInAt) {
-      throw new ConflictException('Checkout time cannot be before check-in time.');
+      throw new ConflictException(
+        'Checkout time cannot be before check-in time.',
+      );
     }
 
     const record = await this.prisma.staffAttendance.update({
@@ -187,7 +193,10 @@ function earlierDate(a: Date, b: Date) {
   return a.getTime() <= b.getTime() ? a : b;
 }
 
-function mergeClockNote(existing: string | null | undefined, next: string | undefined) {
+function mergeClockNote(
+  existing: string | null | undefined,
+  next: string | undefined,
+) {
   const trimmed = next?.trim();
   if (!trimmed) return existing ?? null;
   return existing ? `${existing}\n${trimmed}` : trimmed;

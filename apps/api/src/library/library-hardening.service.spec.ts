@@ -1,4 +1,9 @@
-import { AuthMethod, LibraryFineStatus, LibraryIssueStatus, Prisma } from '@prisma/client';
+import {
+  AuthMethod,
+  LibraryFineStatus,
+  LibraryIssueStatus,
+  Prisma,
+} from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { LibraryHardeningService } from './library-hardening.service';
 
@@ -40,7 +45,10 @@ describe('LibraryHardeningService M8A workflows', () => {
   });
 
   it('delegates fine posting only when the fine has not been posted before', async () => {
-    const fine = buildFine({ feeInvoiceId: null, status: LibraryFineStatus.PENDING });
+    const fine = buildFine({
+      feeInvoiceId: null,
+      status: LibraryFineStatus.PENDING,
+    });
     const { service, libraryService } = buildService({ fine });
 
     await service.postFineToFeesIdempotent(
@@ -203,7 +211,9 @@ function buildService(
       findMany: jest.fn().mockResolvedValue(options.holidays ?? []),
     },
     $transaction: jest.fn().mockImplementation(async (callback: unknown) => {
-      return (callback as (transactionClient: typeof tx) => Promise<unknown>)(tx);
+      return (callback as (transactionClient: typeof tx) => Promise<unknown>)(
+        tx,
+      );
     }),
   };
 

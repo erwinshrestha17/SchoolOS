@@ -170,8 +170,16 @@ export class LibraryHardeningService {
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: updated.id,
-      before: { title: existing.title, author: existing.author, isbn: existing.isbn },
-      after: { title: updated.title, author: updated.author, isbn: updated.isbn },
+      before: {
+        title: existing.title,
+        author: existing.author,
+        isbn: existing.isbn,
+      },
+      after: {
+        title: updated.title,
+        author: updated.author,
+        isbn: updated.isbn,
+      },
     });
 
     return updated;
@@ -217,7 +225,10 @@ export class LibraryHardeningService {
 
       await tx.libraryReservation.updateMany({
         where: { tenantId: actor.tenantId, bookId: book.id, status: 'ACTIVE' },
-        data: { status: 'CANCELLED', notes: `Cancelled because book was archived: ${reason}` },
+        data: {
+          status: 'CANCELLED',
+          notes: `Cancelled because book was archived: ${reason}`,
+        },
       });
 
       await tx.libraryCopy.updateMany({
@@ -270,7 +281,9 @@ export class LibraryHardeningService {
             ? null
             : new Prisma.Decimal(dto.replacementCost),
         purchasedAt: dto.purchasedAt ? new Date(dto.purchasedAt) : null,
-        lastInventoryAt: dto.lastInventoryAt ? new Date(dto.lastInventoryAt) : null,
+        lastInventoryAt: dto.lastInventoryAt
+          ? new Date(dto.lastInventoryAt)
+          : null,
       },
       include: { book: true },
     });
@@ -281,7 +294,11 @@ export class LibraryHardeningService {
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: copy.id,
-      after: { bookId: copy.bookId, barcode: copy.barcode, qrCode: copy.qrCode },
+      after: {
+        bookId: copy.bookId,
+        barcode: copy.barcode,
+        qrCode: copy.qrCode,
+      },
     });
 
     return copy;
@@ -337,10 +354,16 @@ export class LibraryHardeningService {
             ? { replacementCost: new Prisma.Decimal(dto.replacementCost) }
             : {}),
           ...(dto.purchasedAt !== undefined
-            ? { purchasedAt: dto.purchasedAt ? new Date(dto.purchasedAt) : null }
+            ? {
+                purchasedAt: dto.purchasedAt ? new Date(dto.purchasedAt) : null,
+              }
             : {}),
           ...(dto.lastInventoryAt !== undefined
-            ? { lastInventoryAt: dto.lastInventoryAt ? new Date(dto.lastInventoryAt) : null }
+            ? {
+                lastInventoryAt: dto.lastInventoryAt
+                  ? new Date(dto.lastInventoryAt)
+                  : null,
+              }
             : {}),
         },
         include: { book: true },
@@ -353,7 +376,10 @@ export class LibraryHardeningService {
         statusBefore: existing.status,
         statusAfter: copy.status,
         reason: 'Copy metadata updated',
-        metadata: { beforeBarcode: existing.barcode, afterBarcode: copy.barcode },
+        metadata: {
+          beforeBarcode: existing.barcode,
+          afterBarcode: copy.barcode,
+        },
       });
 
       return copy;
@@ -365,8 +391,16 @@ export class LibraryHardeningService {
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: updated.id,
-      before: { bookId: existing.bookId, barcode: existing.barcode, status: existing.status },
-      after: { bookId: updated.bookId, barcode: updated.barcode, status: updated.status },
+      before: {
+        bookId: existing.bookId,
+        barcode: existing.barcode,
+        status: existing.status,
+      },
+      after: {
+        bookId: updated.bookId,
+        barcode: updated.barcode,
+        status: updated.status,
+      },
     });
 
     return updated;
@@ -374,12 +408,14 @@ export class LibraryHardeningService {
 
   async archiveCopy(copyId: string, reason: string, actor: AuthContext) {
     const archiveReason = reason?.trim();
-    if (!archiveReason) throw new BadRequestException('Archive reason is required');
+    if (!archiveReason)
+      throw new BadRequestException('Archive reason is required');
 
     const copy = await this.prisma.libraryCopy.findFirst({
       where: { id: copyId, tenantId: actor.tenantId },
     });
-    if (!copy) throw new NotFoundException('Library copy not found in this tenant');
+    if (!copy)
+      throw new NotFoundException('Library copy not found in this tenant');
     if (copy.status === LibraryCopyStatus.ISSUED) {
       throw new ConflictException('Cannot archive an issued copy');
     }
@@ -387,7 +423,10 @@ export class LibraryHardeningService {
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.libraryReservation.updateMany({
         where: { tenantId: actor.tenantId, copyId: copy.id, status: 'ACTIVE' },
-        data: { status: 'CANCELLED', notes: `Cancelled because copy was archived: ${archiveReason}` },
+        data: {
+          status: 'CANCELLED',
+          notes: `Cancelled because copy was archived: ${archiveReason}`,
+        },
       });
 
       const archived = await tx.libraryCopy.update({
@@ -432,7 +471,8 @@ export class LibraryHardeningService {
     const copy = await this.prisma.libraryCopy.findFirst({
       where: { id: copyId, tenantId: actor.tenantId },
     });
-    if (!copy) throw new NotFoundException('Library copy not found in this tenant');
+    if (!copy)
+      throw new NotFoundException('Library copy not found in this tenant');
 
     if ([LibraryCopyStatus.LOST, LibraryCopyStatus.DAMAGED].includes(status)) {
       if (!dto.reason?.trim()) {
@@ -526,8 +566,10 @@ export class LibraryHardeningService {
       this.getLibrarySettings(actor),
     ]);
 
-    if (!copy) throw new NotFoundException('Library copy not found in this tenant');
-    if (copy.archivedAt) throw new ConflictException('Cannot issue an archived library copy');
+    if (!copy)
+      throw new NotFoundException('Library copy not found in this tenant');
+    if (copy.archivedAt)
+      throw new ConflictException('Cannot issue an archived library copy');
     if (copy.status !== LibraryCopyStatus.AVAILABLE) {
       throw new ConflictException('Library copy is not available for issue');
     }
@@ -576,10 +618,7 @@ export class LibraryHardeningService {
           tenantId: actor.tenantId,
           status: 'ACTIVE',
           bookId: copy.bookId,
-          OR: [
-            { copyId: null },
-            { copyId: copy.id },
-          ],
+          OR: [{ copyId: null }, { copyId: copy.id }],
           ...(borrower.borrowerStudentId
             ? { borrowerStudentId: borrower.borrowerStudentId }
             : { borrowerStaffId: borrower.borrowerStaffId }),
@@ -617,7 +656,10 @@ export class LibraryHardeningService {
     return issue;
   }
 
-  async issueCopyByScanner(dto: ScannerIssueLibraryCopyDto, actor: AuthContext) {
+  async issueCopyByScanner(
+    dto: ScannerIssueLibraryCopyDto,
+    actor: AuthContext,
+  ) {
     const copy = await this.resolveCopyByScanCode(actor, dto.code);
     return this.issueCopy({ ...dto, copyId: copy.id }, actor);
   }
@@ -631,7 +673,8 @@ export class LibraryHardeningService {
       where: { id: issueId, tenantId: actor.tenantId },
       include: { copy: { include: { book: true } }, borrowerStudent: true },
     });
-    if (!issue) throw new NotFoundException('Library issue not found in this tenant');
+    if (!issue)
+      throw new NotFoundException('Library issue not found in this tenant');
     if (issue.status === LibraryIssueStatus.RETURNED) {
       throw new ConflictException('Library issue is already returned');
     }
@@ -666,7 +709,9 @@ export class LibraryHardeningService {
             tenantId: actor.tenantId,
             issueId: issue.id,
             amount: fineAmount,
-            status: { in: [LibraryFineStatus.PENDING, LibraryFineStatus.POSTED_TO_FEES] },
+            status: {
+              in: [LibraryFineStatus.PENDING, LibraryFineStatus.POSTED_TO_FEES],
+            },
           },
         });
 
@@ -744,7 +789,10 @@ export class LibraryHardeningService {
     return updated;
   }
 
-  async returnCopyByScanner(dto: ScannerReturnLibraryCopyDto, actor: AuthContext) {
+  async returnCopyByScanner(
+    dto: ScannerReturnLibraryCopyDto,
+    actor: AuthContext,
+  ) {
     const copy = await this.resolveCopyByScanCode(actor, dto.code);
     const issue = await this.prisma.libraryIssue.findFirst({
       where: {
@@ -753,7 +801,8 @@ export class LibraryHardeningService {
         status: LibraryIssueStatus.ISSUED,
       },
     });
-    if (!issue) throw new NotFoundException('No active issue found for scanned copy');
+    if (!issue)
+      throw new NotFoundException('No active issue found for scanned copy');
 
     return this.returnCopy(issue.id, dto, actor);
   }
@@ -771,11 +820,15 @@ export class LibraryHardeningService {
       include: { book: true },
     });
 
-    if (!copy) throw new NotFoundException('No library copy found for scanned code');
+    if (!copy)
+      throw new NotFoundException('No library copy found for scanned code');
     return copy;
   }
 
-  async createReservation(dto: CreateLibraryReservationDto, actor: AuthContext) {
+  async createReservation(
+    dto: CreateLibraryReservationDto,
+    actor: AuthContext,
+  ) {
     this.assertOneBorrower(dto);
     const borrower = {
       borrowerStudentId: dto.borrowerStudentId ?? null,
@@ -798,7 +851,8 @@ export class LibraryHardeningService {
           archivedAt: null,
         },
       });
-      if (!copy) throw new NotFoundException('Library copy not found for this book');
+      if (!copy)
+        throw new NotFoundException('Library copy not found for this book');
     }
 
     const existing = await this.prisma.libraryReservation.findFirst({
@@ -873,7 +927,10 @@ export class LibraryHardeningService {
   }
 
   async cancelReservation(reservationId: string, actor: AuthContext) {
-    const reservation = await this.ensureReservationVisible(actor, reservationId);
+    const reservation = await this.ensureReservationVisible(
+      actor,
+      reservationId,
+    );
     if (reservation.status !== 'ACTIVE') return reservation;
 
     const updated = await this.prisma.libraryReservation.update({
@@ -899,13 +956,17 @@ export class LibraryHardeningService {
     dto: { copyId?: string; dueAt?: string; notes?: string },
     actor: AuthContext,
   ) {
-    const reservation = await this.ensureReservationVisible(actor, reservationId);
+    const reservation = await this.ensureReservationVisible(
+      actor,
+      reservationId,
+    );
     if (reservation.status !== 'ACTIVE') {
       throw new ConflictException('Only active reservations can be fulfilled');
     }
 
     const copyId = dto.copyId ?? reservation.copyId;
-    if (!copyId) throw new BadRequestException('Copy is required to fulfill reservation');
+    if (!copyId)
+      throw new BadRequestException('Copy is required to fulfill reservation');
 
     return this.issueCopy(
       {
@@ -940,7 +1001,10 @@ export class LibraryHardeningService {
         tenantId: actor.tenantId,
         status: { in: [LibraryCopyStatus.LOST, LibraryCopyStatus.DAMAGED] },
       },
-      include: { book: true, history: { orderBy: { createdAt: 'desc' }, take: 5 } },
+      include: {
+        book: true,
+        history: { orderBy: { createdAt: 'desc' }, take: 5 },
+      },
       orderBy: [{ updatedAt: 'desc' }],
       take: 500,
     });
@@ -980,9 +1044,13 @@ export class LibraryHardeningService {
         totalFines: rows.length,
         totalFine: totalFine.toString(),
         totalWaived: totalWaived.toString(),
-        pending: rows.filter((row) => row.status === LibraryFineStatus.PENDING).length,
-        postedToFees: rows.filter((row) => row.status === LibraryFineStatus.POSTED_TO_FEES).length,
-        paid: rows.filter((row) => row.status === LibraryFineStatus.PAID).length,
+        pending: rows.filter((row) => row.status === LibraryFineStatus.PENDING)
+          .length,
+        postedToFees: rows.filter(
+          (row) => row.status === LibraryFineStatus.POSTED_TO_FEES,
+        ).length,
+        paid: rows.filter((row) => row.status === LibraryFineStatus.PAID)
+          .length,
       },
     };
   }
@@ -1006,8 +1074,13 @@ export class LibraryHardeningService {
       },
       include: { book: true },
     });
-    const countByCopy = new Map(popularCopies.map((row) => [row.copyId, row._count.id]));
-    const countByBook = new Map<string, { book: unknown; issueCount: number }>();
+    const countByCopy = new Map(
+      popularCopies.map((row) => [row.copyId, row._count.id]),
+    );
+    const countByBook = new Map<
+      string,
+      { book: unknown; issueCount: number }
+    >();
 
     for (const copy of copies) {
       const existing = countByBook.get(copy.bookId);
@@ -1074,7 +1147,11 @@ export class LibraryHardeningService {
         : fine.status;
 
     if (fine.status === nextStatus) {
-      return { ...fine, alreadyReconciled: true, paidAmount: paidAmount.toString() };
+      return {
+        ...fine,
+        alreadyReconciled: true,
+        paidAmount: paidAmount.toString(),
+      };
     }
 
     const updated = await this.prisma.libraryFine.update({
@@ -1090,10 +1167,18 @@ export class LibraryHardeningService {
       userId: actor.userId,
       resourceId: fine.id,
       before: { status: fine.status },
-      after: { status: updated.status, invoiceId, paidAmount: paidAmount.toString() },
+      after: {
+        status: updated.status,
+        invoiceId,
+        paidAmount: paidAmount.toString(),
+      },
     });
 
-    return { ...updated, alreadyReconciled: false, paidAmount: paidAmount.toString() };
+    return {
+      ...updated,
+      alreadyReconciled: false,
+      paidAmount: paidAmount.toString(),
+    };
   }
 
   async postFineToFeesIdempotent(
@@ -1169,7 +1254,10 @@ export class LibraryHardeningService {
     return normalizeSettings(settings);
   }
 
-  async updateLibrarySettings(actor: AuthContext, dto: UpdateLibrarySettingDto) {
+  async updateLibrarySettings(
+    actor: AuthContext,
+    dto: UpdateLibrarySettingDto,
+  ) {
     const settings = await this.prisma.librarySetting.upsert({
       where: { tenantId: actor.tenantId },
       update: {
@@ -1187,7 +1275,11 @@ export class LibraryHardeningService {
           ? { gracePeriodDays: dto.gracePeriodDays }
           : {}),
         ...(dto.lostBookChargeMultiplier !== undefined
-          ? { lostBookChargeMultiplier: new Prisma.Decimal(dto.lostBookChargeMultiplier) }
+          ? {
+              lostBookChargeMultiplier: new Prisma.Decimal(
+                dto.lostBookChargeMultiplier,
+              ),
+            }
           : {}),
         ...(dto.maxBooksPerStudent !== undefined
           ? { maxBooksPerStudent: dto.maxBooksPerStudent }
@@ -1198,7 +1290,9 @@ export class LibraryHardeningService {
         ...(dto.studentLoanDays !== undefined
           ? { studentLoanDays: dto.studentLoanDays }
           : {}),
-        ...(dto.staffLoanDays !== undefined ? { staffLoanDays: dto.staffLoanDays } : {}),
+        ...(dto.staffLoanDays !== undefined
+          ? { staffLoanDays: dto.staffLoanDays }
+          : {}),
         ...(dto.includeHolidaysInFine !== undefined
           ? { includeHolidaysInFine: dto.includeHolidaysInFine }
           : {}),
@@ -1213,7 +1307,9 @@ export class LibraryHardeningService {
           ? new Prisma.Decimal(dto.maxFineAmount)
           : null,
         gracePeriodDays: dto.gracePeriodDays ?? 0,
-        lostBookChargeMultiplier: new Prisma.Decimal(dto.lostBookChargeMultiplier ?? 1),
+        lostBookChargeMultiplier: new Prisma.Decimal(
+          dto.lostBookChargeMultiplier ?? 1,
+        ),
         maxBooksPerStudent: dto.maxBooksPerStudent ?? 3,
         maxBooksPerStaff: dto.maxBooksPerStaff ?? 5,
         studentLoanDays: dto.studentLoanDays ?? 14,
@@ -1250,7 +1346,10 @@ export class LibraryHardeningService {
       return { skipped: true, sourceId, deliveryCount: existing };
     }
 
-    const result = await this.libraryService.sendOverdueReminders(actor, sourceId);
+    const result = await this.libraryService.sendOverdueReminders(
+      actor,
+      sourceId,
+    );
 
     await this.auditService.record({
       action: 'send_overdue_reminders',
@@ -1267,7 +1366,10 @@ export class LibraryHardeningService {
   private async calculateFineAmount(
     issue: {
       dueAt: Date;
-      copy: { replacementCost: Prisma.Decimal | null; book: { purchasePrice: Prisma.Decimal | null } };
+      copy: {
+        replacementCost: Prisma.Decimal | null;
+        book: { purchasePrice: Prisma.Decimal | null };
+      };
     },
     returnedAt: Date,
     settings: LibraryPolicySettings,
@@ -1300,7 +1402,9 @@ export class LibraryHardeningService {
         select: { calendarDate: true },
       });
       holidayCount = new Set(
-        holidayDates.map((holiday) => startOfDay(holiday.calendarDate).toISOString()),
+        holidayDates.map((holiday) =>
+          startOfDay(holiday.calendarDate).toISOString(),
+        ),
       ).size;
     }
 
@@ -1340,13 +1444,17 @@ export class LibraryHardeningService {
     throw new ConflictException('Copy is reserved for another borrower');
   }
 
-  private async ensureReservationVisible(actor: AuthContext, reservationId: string) {
+  private async ensureReservationVisible(
+    actor: AuthContext,
+    reservationId: string,
+  ) {
     const scope = await this.buildBorrowerScope(actor);
     const reservation = await this.prisma.libraryReservation.findFirst({
       where: { id: reservationId, tenantId: actor.tenantId, ...scope },
       include: { book: true, copy: true },
     });
-    if (!reservation) throw new NotFoundException('Library reservation not found');
+    if (!reservation)
+      throw new NotFoundException('Library reservation not found');
     return reservation;
   }
 
@@ -1356,24 +1464,38 @@ export class LibraryHardeningService {
   ): Promise<Prisma.LibraryIssueWhereInput> {
     const where: Prisma.LibraryIssueWhereInput = {
       tenantId: actor.tenantId,
-      ...(options.status ? { status: this.parseIssueStatus(options.status) } : {}),
+      ...(options.status
+        ? { status: this.parseIssueStatus(options.status) }
+        : {}),
     };
 
     const parentStudentIds = await getParentStudentIds(this.prisma, actor);
     if (parentStudentIds !== null) {
-      if (options.staffId) throw new ForbiddenException('Parents cannot read staff library issues');
+      if (options.staffId)
+        throw new ForbiddenException(
+          'Parents cannot read staff library issues',
+        );
       if (options.studentId && !parentStudentIds.includes(options.studentId)) {
-        throw new ForbiddenException('Parent cannot read this student library history');
+        throw new ForbiddenException(
+          'Parent cannot read this student library history',
+        );
       }
-      where.borrowerStudentId = { in: options.studentId ? [options.studentId] : parentStudentIds };
+      where.borrowerStudentId = {
+        in: options.studentId ? [options.studentId] : parentStudentIds,
+      };
       return where;
     }
 
     const studentOwnId = await getStudentOwnId(this.prisma, actor);
     if (studentOwnId !== null) {
-      if (options.staffId) throw new ForbiddenException('Students cannot read staff library issues');
+      if (options.staffId)
+        throw new ForbiddenException(
+          'Students cannot read staff library issues',
+        );
       if (options.studentId && options.studentId !== studentOwnId) {
-        throw new ForbiddenException('Student cannot read another student library history');
+        throw new ForbiddenException(
+          'Student cannot read another student library history',
+        );
       }
       where.borrowerStudentId = studentOwnId;
       return where;
@@ -1414,7 +1536,9 @@ export class LibraryHardeningService {
       ? settings.maxBooksPerStaff
       : settings.maxBooksPerStudent;
     if (activeIssues >= maxAllowed) {
-      throw new ConflictException('Borrower has reached the active library issue limit');
+      throw new ConflictException(
+        'Borrower has reached the active library issue limit',
+      );
     }
   }
 
@@ -1445,11 +1569,16 @@ export class LibraryHardeningService {
       throw new BadRequestException('Student or staff borrower is required');
     }
     if (input.borrowerStudentId && input.borrowerStaffId) {
-      throw new BadRequestException('Choose either a student or staff borrower');
+      throw new BadRequestException(
+        'Choose either a student or staff borrower',
+      );
     }
   }
 
-  private borrowerMatches(record: BorrowerIdentity, borrower: BorrowerIdentity) {
+  private borrowerMatches(
+    record: BorrowerIdentity,
+    borrower: BorrowerIdentity,
+  ) {
     return (
       (borrower.borrowerStudentId &&
         record.borrowerStudentId === borrower.borrowerStudentId) ||
@@ -1462,32 +1591,39 @@ export class LibraryHardeningService {
     const existing = await this.prisma.libraryBook.findUnique({
       where: { tenantId_isbn: { tenantId, isbn } },
     });
-    if (existing) throw new ConflictException('Book ISBN already exists in this tenant');
+    if (existing)
+      throw new ConflictException('Book ISBN already exists in this tenant');
   }
 
   private async ensureUniqueBarcode(tenantId: string, barcode: string) {
     const existing = await this.prisma.libraryCopy.findUnique({
       where: { tenantId_barcode: { tenantId, barcode } },
     });
-    if (existing) throw new ConflictException('Copy barcode already exists in this tenant');
+    if (existing)
+      throw new ConflictException('Copy barcode already exists in this tenant');
   }
 
   private async ensureUniqueQrCode(tenantId: string, qrCode: string) {
     const existing = await this.prisma.libraryCopy.findUnique({
       where: { tenantId_qrCode: { tenantId, qrCode } },
     });
-    if (existing) throw new ConflictException('Copy QR code already exists in this tenant');
+    if (existing)
+      throw new ConflictException('Copy QR code already exists in this tenant');
   }
 
   private parseCopyStatus(status: string) {
-    if (!Object.values(LibraryCopyStatus).includes(status as LibraryCopyStatus)) {
+    if (
+      !Object.values(LibraryCopyStatus).includes(status as LibraryCopyStatus)
+    ) {
       throw new BadRequestException(`Invalid library copy status: ${status}`);
     }
     return status as LibraryCopyStatus;
   }
 
   private parseIssueStatus(status: string) {
-    if (!Object.values(LibraryIssueStatus).includes(status as LibraryIssueStatus)) {
+    if (
+      !Object.values(LibraryIssueStatus).includes(status as LibraryIssueStatus)
+    ) {
       throw new BadRequestException(`Invalid library issue status: ${status}`);
     }
     return status as LibraryIssueStatus;
@@ -1527,7 +1663,9 @@ export class LibraryHardeningService {
   }
 }
 
-function normalizeSettings(settings: Partial<LibraryPolicySettings> | null): LibraryPolicySettings {
+function normalizeSettings(
+  settings: Partial<LibraryPolicySettings> | null,
+): LibraryPolicySettings {
   return {
     finePerDay: new Prisma.Decimal(settings?.finePerDay ?? 0),
     maxFineAmount: settings?.maxFineAmount

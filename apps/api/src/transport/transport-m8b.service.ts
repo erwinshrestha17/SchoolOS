@@ -69,7 +69,11 @@ export class TransportM8bService {
       },
       trips: activeTrips.map((trip) => ({
         tripId: trip.id,
-        route: { id: trip.route.id, name: trip.route.name, code: trip.route.code },
+        route: {
+          id: trip.route.id,
+          name: trip.route.name,
+          code: trip.route.code,
+        },
         vehicle: {
           id: trip.vehicle.id,
           registrationNumber: trip.vehicle.registrationNumber,
@@ -130,25 +134,34 @@ export class TransportM8bService {
 
     const acceptedByTrip = new Map<string, number>();
     for (const ping of accepted) {
-      acceptedByTrip.set(ping.tripId, (acceptedByTrip.get(ping.tripId) ?? 0) + 1);
+      acceptedByTrip.set(
+        ping.tripId,
+        (acceptedByTrip.get(ping.tripId) ?? 0) + 1,
+      );
     }
 
-    const rejectionCounters = await this.readGpsRejectionCounters(actor.tenantId);
+    const rejectionCounters = await this.readGpsRejectionCounters(
+      actor.tenantId,
+    );
 
     return {
       generatedAt: new Date().toISOString(),
       window: { since: since.toISOString(), until: new Date().toISOString() },
       totals: {
         acceptedPersisted: accepted.length,
-        rejectedObserved: rejectionCounters.reduce((sum, item) => sum + item.count, 0),
+        rejectedObserved: rejectionCounters.reduce(
+          (sum, item) => sum + item.count,
+          0,
+        ),
       },
-      acceptedByTrip: Array.from(acceptedByTrip.entries()).map(([tripId, count]) => ({
-        tripId,
-        count,
-      })),
+      acceptedByTrip: Array.from(acceptedByTrip.entries()).map(
+        ([tripId, count]) => ({
+          tripId,
+          count,
+        }),
+      ),
       rejectedByTripAndReason: rejectionCounters,
-      note:
-        'Accepted pings are persisted samples; rejected pings are Redis pressure/validation counters from the automated driver GPS ping endpoint.',
+      note: 'Accepted pings are persisted samples; rejected pings are Redis pressure/validation counters from the automated driver GPS ping endpoint.',
     };
   }
 
@@ -174,7 +187,11 @@ export class TransportM8bService {
         : 'missing';
       items.push({
         tripId: trip.id,
-        route: { id: trip.route.id, name: trip.route.name, code: trip.route.code },
+        route: {
+          id: trip.route.id,
+          name: trip.route.name,
+          code: trip.route.code,
+        },
         vehicle: {
           id: trip.vehicle.id,
           registrationNumber: trip.vehicle.registrationNumber,
@@ -209,11 +226,16 @@ export class TransportM8bService {
         where: { id: dto.routeId, tenantId: actor.tenantId, isActive: true },
       }),
       this.prisma.transportStop.findFirst({
-        where: { id: dto.stopId, tenantId: actor.tenantId, routeId: dto.routeId },
+        where: {
+          id: dto.stopId,
+          tenantId: actor.tenantId,
+          routeId: dto.routeId,
+        },
       }),
     ]);
 
-    if (!student) throw new NotFoundException('Student not found in this tenant');
+    if (!student)
+      throw new NotFoundException('Student not found in this tenant');
     if (!route) throw new NotFoundException('Route not found in this tenant');
     if (!stop) throw new NotFoundException('Stop not found in this route');
 
@@ -303,9 +325,17 @@ export class TransportM8bService {
         registrationNumber: vehicle.registrationNumber,
         status: vehicle.status,
         documents: {
-          fitnessCertificateExp: documentState(vehicle.fitnessCertificateExp, now, until),
+          fitnessCertificateExp: documentState(
+            vehicle.fitnessCertificateExp,
+            now,
+            until,
+          ),
           insuranceExpiry: documentState(vehicle.insuranceExpiry, now, until),
-          registrationExpiry: documentState(vehicle.registrationExpiry, now, until),
+          registrationExpiry: documentState(
+            vehicle.registrationExpiry,
+            now,
+            until,
+          ),
           pollutionExpiry: documentState(vehicle.pollutionExpiry, now, until),
           documentExpiry: documentState(vehicle.documentExpiry, now, until),
         },
@@ -321,7 +351,10 @@ export class TransportM8bService {
       take: 500,
     });
 
-    const byVehicle = new Map<string, { vehicle: any; tripCount: number; latestTripAt: Date }>();
+    const byVehicle = new Map<
+      string,
+      { vehicle: any; tripCount: number; latestTripAt: Date }
+    >();
     for (const trip of trips) {
       const current = byVehicle.get(trip.vehicleId);
       if (!current) {
@@ -332,7 +365,8 @@ export class TransportM8bService {
         });
       } else {
         current.tripCount += 1;
-        if (trip.startedAt > current.latestTripAt) current.latestTripAt = trip.startedAt;
+        if (trip.startedAt > current.latestTripAt)
+          current.latestTripAt = trip.startedAt;
       }
     }
 
@@ -358,7 +392,9 @@ export class TransportM8bService {
           include: { staff: true, vehicle: true },
           orderBy: [{ startsAt: 'desc' }],
         },
-        studentAssignments: { where: { status: TransportEnrollmentStatus.ACTIVE } },
+        studentAssignments: {
+          where: { status: TransportEnrollmentStatus.ACTIVE },
+        },
       },
       orderBy: [{ name: 'asc' }],
       take: 200,
@@ -696,13 +732,21 @@ export class TransportM8bService {
   }
 
   private toGpsLabel(confidence: string): GpsLabel {
-    if (confidence === 'fresh' || confidence === 'delayed' || confidence === 'stale') {
+    if (
+      confidence === 'fresh' ||
+      confidence === 'delayed' ||
+      confidence === 'stale'
+    ) {
       return confidence;
     }
     return 'missing';
   }
 
-  private toStudentSummary(student: { id: string; firstNameEn: string; lastNameEn?: string | null }) {
+  private toStudentSummary(student: {
+    id: string;
+    firstNameEn: string;
+    lastNameEn?: string | null;
+  }) {
     return {
       id: student.id,
       name: `${student.firstNameEn} ${student.lastNameEn ?? ''}`.trim(),
@@ -763,8 +807,7 @@ function documentState(value: Date | null, now: Date, until: Date) {
     (value.getTime() - now.getTime()) / (24 * 60 * 60 * 1000),
   );
   return {
-    status:
-      value < now ? 'EXPIRED' : value <= until ? 'DUE_SOON' : 'VALID',
+    status: value < now ? 'EXPIRED' : value <= until ? 'DUE_SOON' : 'VALID',
     expiresAt: value.toISOString(),
     daysRemaining,
   };

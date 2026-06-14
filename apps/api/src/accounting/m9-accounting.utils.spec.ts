@@ -16,7 +16,11 @@ describe('M9 accounting utilities', () => {
 
   it('provides Nepal school chart template accounts', () => {
     expect(NEPAL_SCHOOL_CHART_TEMPLATE.length).toBeGreaterThan(10);
-    expect(NEPAL_SCHOOL_CHART_TEMPLATE.some((row) => row.code === '4000')).toBe(true);
-    expect(NEPAL_SCHOOL_CHART_TEMPLATE.some((row) => row.code === '2220')).toBe(true);
+    expect(NEPAL_SCHOOL_CHART_TEMPLATE.some((row) => row.code === '4000')).toBe(
+      true,
+    );
+    expect(NEPAL_SCHOOL_CHART_TEMPLATE.some((row) => row.code === '2220')).toBe(
+      true,
+    );
   });
 });

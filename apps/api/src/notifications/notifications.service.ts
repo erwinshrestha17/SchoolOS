@@ -104,7 +104,8 @@ export class NotificationsService {
       return {
         enabled: false,
         failureCode: 'PROVIDER_DISABLED',
-        failureReason: 'Notification dispatch is disabled for this environment.',
+        failureReason:
+          'Notification dispatch is disabled for this environment.',
       };
     }
 

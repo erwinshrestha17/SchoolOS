@@ -32,6 +32,10 @@ export class M9TemplateService {
       ),
     );
 
-    return { template: 'NEPAL_SCHOOL_STANDARD', count: accounts.length, accounts };
+    return {
+      template: 'NEPAL_SCHOOL_STANDARD',
+      count: accounts.length,
+      accounts,
+    };
   }
 }

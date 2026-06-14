@@ -225,9 +225,7 @@ describe('finance production controls', () => {
     const invoice = buildInvoice({
       status: InvoiceStatus.PAID,
       paidAt: new Date('2026-04-10T00:00:00.000Z'),
-      payments: [
-        buildInvoicePayment({ amount: new Prisma.Decimal(1117) }),
-      ],
+      payments: [buildInvoicePayment({ amount: new Prisma.Decimal(1117) })],
     });
     const { service } = buildService({
       invoice,
