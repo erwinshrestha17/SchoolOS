@@ -461,4 +461,99 @@ describe('TimetableSubstitutionService', () => {
       );
     });
   });
+
+  describe('handleStaffLeaveApproved', () => {
+    it('creates draft substitution tasks for leave-affected timetable slots', async () => {
+      const leaveDate = new Date('2026-05-11T00:00:00.000Z');
+      jest.spyOn(prisma.timetableSlot, 'findMany').mockResolvedValue([
+        {
+          ...mockSlot,
+          subject: { name: 'Mathematics' },
+          class: { name: 'Grade 4' },
+          section: null,
+          staff: { firstName: 'Absent', lastName: 'Teacher' },
+        } as any,
+      ]);
+      jest
+        .spyOn(prisma.timetableSubstitution, 'findFirst')
+        .mockResolvedValue(null);
+      jest.spyOn(prisma.timetableSubstitution, 'create').mockResolvedValue({
+        id: 'sub-from-leave',
+        tenantId: 'tenant-1',
+        timetableSlotId: 'slot-1',
+        absentTeacherId: 'teacher-absent',
+        date: leaveDate,
+        status: TimetableSubstitutionStatus.DRAFT,
+      } as any);
+
+      const result = await service.handleStaffLeaveApproved({
+        tenantId: 'tenant-1',
+        leaveRequestId: 'leave-1',
+        staffId: 'teacher-absent',
+        startsOn: leaveDate,
+        endsOn: leaveDate,
+        reviewedById: 'reviewer-1',
+      });
+
+      expect(prisma.timetableSlot.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: 'tenant-1',
+            staffId: 'teacher-absent',
+            dayOfWeek: 1,
+            version: expect.objectContaining({
+              status: {
+                in: [
+                  TimetableVersionStatus.PUBLISHED,
+                  TimetableVersionStatus.LOCKED,
+                ],
+              },
+            }),
+          }),
+        }),
+      );
+      expect(prisma.timetableSubstitution.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tenantId: 'tenant-1',
+            timetableSlotId: 'slot-1',
+            absentTeacherId: 'teacher-absent',
+            substituteTeacherId: null,
+            reason: 'Approved leave request leave-1',
+            status: TimetableSubstitutionStatus.DRAFT,
+            createdById: 'reviewer-1',
+          }),
+        }),
+      );
+      expect(result.createdCount).toBe(1);
+    });
+
+    it('does not create duplicate active substitution tasks for the same leave slot', async () => {
+      const leaveDate = new Date('2026-05-11T00:00:00.000Z');
+      jest.spyOn(prisma.timetableSlot, 'findMany').mockResolvedValue([
+        {
+          ...mockSlot,
+          subject: { name: 'Mathematics' },
+          class: { name: 'Grade 4' },
+          section: null,
+          staff: { firstName: 'Absent', lastName: 'Teacher' },
+        } as any,
+      ]);
+      jest
+        .spyOn(prisma.timetableSubstitution, 'findFirst')
+        .mockResolvedValue({ id: 'existing-sub' } as any);
+
+      const result = await service.handleStaffLeaveApproved({
+        tenantId: 'tenant-1',
+        leaveRequestId: 'leave-1',
+        staffId: 'teacher-absent',
+        startsOn: leaveDate,
+        endsOn: leaveDate,
+        reviewedById: 'reviewer-1',
+      });
+
+      expect(prisma.timetableSubstitution.create).not.toHaveBeenCalled();
+      expect(result.createdCount).toBe(0);
+    });
+  });
 });

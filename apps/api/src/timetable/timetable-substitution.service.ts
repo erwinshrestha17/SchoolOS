@@ -3,8 +3,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import {
   AudienceType,
+  AuthMethod,
   ConsentType,
   NotificationChannel,
   TimetableSubstitutionStatus,
@@ -25,6 +27,15 @@ import {
 } from './dto/timetable-setup.dto';
 import { toTimetableDayOfWeek } from './timetable-calendar';
 
+interface StaffLeaveApprovedEvent {
+  tenantId: string;
+  leaveRequestId: string;
+  staffId: string;
+  startsOn: Date | string;
+  endsOn: Date | string;
+  reviewedById: string;
+}
+
 @Injectable()
 export class TimetableSubstitutionService {
   constructor(
@@ -34,6 +45,100 @@ export class TimetableSubstitutionService {
     private readonly lifecycleService: TimetableLifecycleService,
     private readonly attendanceService: AttendanceService,
   ) {}
+
+  @OnEvent('staff.leave.approved', { async: true })
+  async handleStaffLeaveApproved(event: StaffLeaveApprovedEvent) {
+    const startsOn = stripTime(parseDate(String(event.startsOn), 'startsOn'));
+    const endsOn = stripTime(parseDate(String(event.endsOn), 'endsOn'));
+
+    if (endsOn < startsOn) {
+      throw new ConflictException('Leave end date cannot be before start date');
+    }
+
+    const created: Prisma.TimetableSubstitutionGetPayload<{
+      include: ReturnType<typeof substitutionInclude>;
+    }>[] = [];
+
+    for (const date of eachDateInclusive(startsOn, endsOn)) {
+      const dayOfWeek = toTimetableDayOfWeek(date);
+      const slots = await this.prisma.timetableSlot.findMany({
+        where: {
+          tenantId: event.tenantId,
+          staffId: event.staffId,
+          dayOfWeek,
+          version: {
+            status: {
+              in: [
+                TimetableVersionStatus.PUBLISHED,
+                TimetableVersionStatus.LOCKED,
+              ],
+            },
+            effectiveFrom: { lte: date },
+            OR: [{ effectiveTo: null }, { effectiveTo: { gte: date } }],
+          },
+        },
+        include: timetableSlotInclude(),
+      });
+
+      for (const slot of slots) {
+        const existing = await this.prisma.timetableSubstitution.findFirst({
+          where: {
+            tenantId: event.tenantId,
+            timetableSlotId: slot.id,
+            date,
+            status: {
+              in: [
+                TimetableSubstitutionStatus.DRAFT,
+                TimetableSubstitutionStatus.ASSIGNED,
+              ],
+            },
+          },
+        });
+
+        if (existing) {
+          continue;
+        }
+
+        const substitution = await this.prisma.timetableSubstitution.create({
+          data: {
+            tenantId: event.tenantId,
+            timetableSlotId: slot.id,
+            absentTeacherId: event.staffId,
+            substituteTeacherId: null,
+            date,
+            reason: `Approved leave request ${event.leaveRequestId}`,
+            status: TimetableSubstitutionStatus.DRAFT,
+            createdById: event.reviewedById,
+          },
+          include: substitutionInclude(),
+        });
+
+        await this.audit(
+          'create_from_leave',
+          'timetable_substitution',
+          substitution.id,
+          {
+            tenantId: event.tenantId,
+            userId: event.reviewedById,
+            tenantSlug: '',
+            email: null,
+            authMethod: AuthMethod.PASSWORD,
+            roles: [],
+            permissions: [],
+          },
+          {
+            leaveRequestId: event.leaveRequestId,
+            timetableSlotId: slot.id,
+            date,
+          },
+        );
+
+        created.push(substitution);
+      }
+    }
+
+    return { createdCount: created.length, items: created };
+  }
 
   async listSubstitutions(actor: AuthContext, query: SubstitutionQueryDto) {
     const page = query.page ?? 1;
@@ -577,6 +682,19 @@ function stripTime(date: Date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
   return d;
+}
+
+function eachDateInclusive(startsOn: Date, endsOn: Date) {
+  const dates: Date[] = [];
+  const cursor = stripTime(startsOn);
+  const end = stripTime(endsOn);
+
+  while (cursor <= end) {
+    dates.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return dates;
 }
 
 function parseDate(value: string, fieldName: string) {

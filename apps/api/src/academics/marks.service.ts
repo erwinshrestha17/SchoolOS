@@ -86,18 +86,19 @@ export class MarksService {
       const activeStatesCount =
         (entry.isAbsent ? 1 : 0) +
         (entry.isWithheld ? 1 : 0) +
-        (entry.isRetest ? 1 : 0);
+        (entry.isRetest ? 1 : 0) +
+        (entry.isDraft ? 1 : 0);
 
       if (activeStatesCount > 1) {
         throw new ConflictException(
-          'Entry can only be one of absent, withheld, or retest',
+          'Entry can only be one of draft, absent, withheld, or retest',
         );
       }
 
-      if (!entry.isAbsent && !entry.isWithheld) {
+      if (!entry.isAbsent && !entry.isWithheld && !entry.isDraft) {
         if (entry.marksObtained === undefined || entry.marksObtained === null) {
           throw new ConflictException(
-            'marksObtained is required if not absent or withheld',
+            'marksObtained is required if not draft, absent, or withheld',
           );
         }
         if (entry.marksObtained < 0 || entry.marksObtained > maxMarks) {
@@ -156,7 +157,8 @@ export class MarksService {
     const results = await this.prisma.$transaction(
       dto.entries.map((entry) => {
         let status: MarkEntryStatus = MarkEntryStatus.SUBMITTED;
-        if (entry.isAbsent) status = MarkEntryStatus.ABSENT;
+        if (entry.isDraft) status = MarkEntryStatus.DRAFT;
+        else if (entry.isAbsent) status = MarkEntryStatus.ABSENT;
         else if (entry.isWithheld) status = MarkEntryStatus.WITHHELD;
         else if (entry.isRetest) status = MarkEntryStatus.RETEST;
 
@@ -384,40 +386,50 @@ export class MarksService {
     const isAbsent =
       dto.isAbsent !== undefined
         ? dto.isAbsent
-        : dto.isWithheld || dto.isRetest
+        : dto.isWithheld || dto.isRetest || dto.isDraft
           ? false
           : existingMark.status === MarkEntryStatus.ABSENT;
     const isWithheld =
       dto.isWithheld !== undefined
         ? dto.isWithheld
-        : dto.isAbsent || dto.isRetest
+        : dto.isAbsent || dto.isRetest || dto.isDraft
           ? false
           : existingMark.status === MarkEntryStatus.WITHHELD;
     const isRetest =
       dto.isRetest !== undefined
         ? dto.isRetest
-        : dto.isAbsent || dto.isWithheld
+        : dto.isAbsent || dto.isWithheld || dto.isDraft
           ? false
           : existingMark.status === MarkEntryStatus.RETEST;
+    const isDraft =
+      dto.isDraft !== undefined
+        ? dto.isDraft
+        : dto.isAbsent || dto.isWithheld || dto.isRetest
+          ? false
+          : existingMark.status === MarkEntryStatus.DRAFT;
 
     const activeStatesCount =
-      (isAbsent ? 1 : 0) + (isWithheld ? 1 : 0) + (isRetest ? 1 : 0);
+      (isAbsent ? 1 : 0) +
+      (isWithheld ? 1 : 0) +
+      (isRetest ? 1 : 0) +
+      (isDraft ? 1 : 0);
 
     if (activeStatesCount > 1) {
       throw new ConflictException(
-        'Entry can only be one of absent, withheld, or retest',
+        'Entry can only be one of draft, absent, withheld, or retest',
       );
     }
 
     let status: MarkEntryStatus = existingMark.status;
     let val = Number(existingMark.marksObtained);
 
-    if (isAbsent) status = MarkEntryStatus.ABSENT;
+    if (isDraft) status = MarkEntryStatus.DRAFT;
+    else if (isAbsent) status = MarkEntryStatus.ABSENT;
     else if (isWithheld) status = MarkEntryStatus.WITHHELD;
     else if (isRetest) status = MarkEntryStatus.RETEST;
     else status = MarkEntryStatus.SUBMITTED;
 
-    if (!isAbsent && !isWithheld) {
+    if (!isAbsent && !isWithheld && !isDraft) {
       val =
         dto.marksObtained !== undefined && dto.marksObtained !== null
           ? dto.marksObtained

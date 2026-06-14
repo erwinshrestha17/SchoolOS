@@ -289,6 +289,7 @@ export class GradeCalculatorService {
     const isRetest = component.status === MarkEntryStatus.RETEST;
     const isMissing =
       component.isMissing ||
+      component.status === 'DRAFT' ||
       component.status === MarkEntryStatus.MISSING ||
       ((component.marksObtained === undefined ||
         component.marksObtained === null) &&

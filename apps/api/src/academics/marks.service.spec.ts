@@ -30,7 +30,7 @@ describe('MarksService', () => {
     expect(service).toBeDefined();
   });
 
-  it('persists absent, withheld, and retest mark states through tenant-scoped bulk upsert', async () => {
+  it('persists draft, absent, withheld, and retest mark states through tenant-scoped bulk upsert', async () => {
     const actor: AuthContext = {
       tenantId: 'tenant-1',
       tenantSlug: 'tenant-one',
@@ -67,6 +67,7 @@ describe('MarksService', () => {
           { id: 'student-absent', tenantId: actor.tenantId },
           { id: 'student-withheld', tenantId: actor.tenantId },
           { id: 'student-retest', tenantId: actor.tenantId },
+          { id: 'student-draft', tenantId: actor.tenantId },
         ]),
       },
       reportCardCorrectionRequest: {
@@ -98,6 +99,7 @@ describe('MarksService', () => {
         subjectId: 'subject-1',
         classId: 'class-1',
         entries: [
+          { studentId: 'student-draft', isDraft: true },
           { studentId: 'student-absent', isAbsent: true },
           { studentId: 'student-withheld', isWithheld: true },
           {
@@ -114,13 +116,18 @@ describe('MarksService', () => {
     expect(prisma.student.findMany).toHaveBeenCalledWith({
       where: {
         id: {
-          in: ['student-absent', 'student-withheld', 'student-retest'],
+          in: [
+            'student-draft',
+            'student-absent',
+            'student-withheld',
+            'student-retest',
+          ],
         },
         tenantId: actor.tenantId,
         classId: 'class-1',
       },
     });
-    expect(prisma.markEntry.upsert).toHaveBeenCalledTimes(3);
+    expect(prisma.markEntry.upsert).toHaveBeenCalledTimes(4);
     expect(prisma.markEntry.upsert).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
@@ -128,11 +135,11 @@ describe('MarksService', () => {
           tenantId_assessmentComponentId_studentId: {
             tenantId: actor.tenantId,
             assessmentComponentId: 'component-1',
-            studentId: 'student-absent',
+            studentId: 'student-draft',
           },
         },
         create: expect.objectContaining({
-          status: MarkEntryStatus.ABSENT,
+          status: MarkEntryStatus.DRAFT,
           marksObtained: new Prisma.Decimal(0),
         }),
       }),
@@ -141,7 +148,7 @@ describe('MarksService', () => {
       2,
       expect.objectContaining({
         create: expect.objectContaining({
-          status: MarkEntryStatus.WITHHELD,
+          status: MarkEntryStatus.ABSENT,
           marksObtained: new Prisma.Decimal(0),
         }),
       }),
@@ -150,13 +157,22 @@ describe('MarksService', () => {
       3,
       expect.objectContaining({
         create: expect.objectContaining({
+          status: MarkEntryStatus.WITHHELD,
+          marksObtained: new Prisma.Decimal(0),
+        }),
+      }),
+    );
+    expect(prisma.markEntry.upsert).toHaveBeenNthCalledWith(
+      4,
+      expect.objectContaining({
+        create: expect.objectContaining({
           status: MarkEntryStatus.RETEST,
           marksObtained: new Prisma.Decimal(60),
           remarks: 'Make-up test scheduled',
         }),
       }),
     );
-    expect(result.updated).toBe(3);
+    expect(result.updated).toBe(4);
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'ACADEMICS_MARKS_BULK_UPSERTED',
@@ -164,7 +180,7 @@ describe('MarksService', () => {
         tenantId: actor.tenantId,
         after: expect.objectContaining({
           componentId: 'component-1',
-          count: 3,
+          count: 4,
         }),
       }),
     );

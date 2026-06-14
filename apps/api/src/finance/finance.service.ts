@@ -785,7 +785,10 @@ export class FinanceService {
   }
 
   async createDiscountRule(dto: CreateDiscountRuleDto, actor: AuthContext) {
-    if (!dto.reason?.trim()) {
+    assertFinancePermission(actor, 'fees:discount');
+    const reason = dto.reason?.trim();
+
+    if (!reason) {
       throw new BadRequestException('Discount reason is required');
     }
 
@@ -819,7 +822,7 @@ export class FinanceService {
       after: {
         name: discount.name,
         type: discount.type,
-        reason: dto.reason,
+        reason,
       },
     });
 
@@ -840,6 +843,13 @@ export class FinanceService {
   }
 
   async createWaiver(dto: CreateFeeWaiverDto, actor: AuthContext) {
+    assertFinancePermission(actor, 'fees:discount');
+    const reason = dto.reason?.trim();
+
+    if (!reason) {
+      throw new BadRequestException('Waiver reason is required');
+    }
+
     const student = await this.prisma.student.findFirst({
       where: { id: dto.studentId, tenantId: actor.tenantId },
     });
@@ -865,6 +875,16 @@ export class FinanceService {
       );
     }
 
+    if (invoice?.status === InvoiceStatus.VOID) {
+      throw new ConflictException('Void invoices cannot receive waivers');
+    }
+
+    if (invoice?.status === InvoiceStatus.PAID) {
+      throw new ConflictException(
+        'Paid invoices require a refund or reversal workflow before waiver',
+      );
+    }
+
     if (dto.feeHeadId) {
       const feeHead = await this.prisma.feeHead.findFirst({
         where: { id: dto.feeHeadId, tenantId: actor.tenantId },
@@ -876,7 +896,11 @@ export class FinanceService {
 
       if (
         invoice &&
-        !(await this.invoiceContainsFeeHead(invoice.id, dto.feeHeadId))
+        !(await this.invoiceContainsFeeHead(
+          invoice.id,
+          dto.feeHeadId,
+          actor.tenantId,
+        ))
       ) {
         throw new ConflictException(
           'Fee head is not present on the selected invoice',
@@ -885,6 +909,23 @@ export class FinanceService {
     }
 
     const amount = new Prisma.Decimal(dto.amount);
+    const paidAmount = invoice ? sumNetPaidAmount(invoice.payments) : null;
+    const newSubtotal = invoice ? invoice.subtotal.sub(amount) : null;
+    const newTotal = invoice ? invoice.totalAmount.sub(amount) : null;
+
+    if (invoice && newSubtotal?.lt(0)) {
+      throw new ConflictException('Waiver cannot make invoice totals negative');
+    }
+
+    if (invoice && newTotal?.lt(0)) {
+      throw new ConflictException('Waiver cannot make invoice totals negative');
+    }
+
+    if (invoice && paidAmount && newTotal && paidAmount.gt(newTotal)) {
+      throw new ConflictException(
+        'Waiver would make paid amount exceed invoice total',
+      );
+    }
 
     const waiver = await this.prisma.$transaction(async (tx) => {
       const created = await tx.feeWaiver.create({
@@ -894,27 +935,25 @@ export class FinanceService {
           feeHeadId: dto.feeHeadId ?? null,
           invoiceId: dto.invoiceId ?? null,
           amount,
-          reason: dto.reason,
+          reason,
           approvedById: actor.userId,
           approvedAt: new Date(),
         },
       });
 
-      if (invoice) {
-        const paidAmount = sumNetPaidAmount(invoice.payments);
-        const newTotal = invoice.totalAmount.sub(amount);
-        const safeTotal = newTotal.gt(0) ? newTotal : new Prisma.Decimal(0);
-
+      if (invoice && paidAmount && newSubtotal && newTotal) {
         await tx.invoice.update({
           where: { id: invoice.id },
           data: {
-            subtotal: invoice.subtotal.sub(amount).gt(0)
-              ? invoice.subtotal.sub(amount)
-              : new Prisma.Decimal(0),
-            totalAmount: safeTotal,
-            status: paidAmount.gte(safeTotal)
-              ? InvoiceStatus.PAID
-              : invoice.status,
+            subtotal: newSubtotal,
+            totalAmount: newTotal,
+            status: resolveInvoiceStatusAfterAdjustment(
+              invoice.status,
+              paidAmount,
+              newTotal,
+            ),
+            paidAt:
+              paidAmount.gte(newTotal) && newTotal.gt(0) ? new Date() : null,
           },
         });
       }
@@ -926,7 +965,7 @@ export class FinanceService {
           studentId: dto.studentId,
           invoiceId: dto.invoiceId,
           amount,
-          reason: dto.reason,
+          reason,
         },
         actor,
         tx,
@@ -945,6 +984,7 @@ export class FinanceService {
         studentId: dto.studentId,
         invoiceId: dto.invoiceId ?? null,
         amount: dto.amount,
+        reason,
       },
     });
 
@@ -2207,6 +2247,13 @@ export class FinanceService {
     dto: CreateInvoiceAdjustmentDto,
     actor: AuthContext,
   ) {
+    assertFinancePermission(actor, 'fees:adjust');
+    const reason = dto.reason?.trim();
+
+    if (!reason) {
+      throw new BadRequestException('Adjustment reason is required');
+    }
+
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, tenantId: actor.tenantId },
       include: { payments: { include: { refunds: true } } },
@@ -2267,7 +2314,7 @@ export class FinanceService {
           tenantId: actor.tenantId,
           invoiceId: invoice.id,
           feeHeadId: feeHead.id,
-          description: `Adjustment: ${dto.reason}`,
+          description: `Adjustment: ${reason}`,
           quantity: 1,
           unitAmount: signedSubtotal,
           vatAmount: signedVat,
@@ -2305,7 +2352,7 @@ export class FinanceService {
           feeHeadId: feeHead.id,
           feeHeadCode: feeHead.code,
           amount: signedSubtotal.add(signedVat),
-          reason: dto.reason,
+          reason,
         },
         actor,
         tx,
@@ -2331,7 +2378,7 @@ export class FinanceService {
         direction: dto.direction,
         amount: dto.amount,
         vatAmount: dto.vatAmount ?? 0,
-        reason: dto.reason,
+        reason,
         subtotal: Number(result.invoice.subtotal),
         totalAmount: Number(result.invoice.totalAmount),
         status: result.invoice.status,
@@ -5461,9 +5508,13 @@ export class FinanceService {
     }
   }
 
-  private async invoiceContainsFeeHead(invoiceId: string, feeHeadId: string) {
+  private async invoiceContainsFeeHead(
+    invoiceId: string,
+    feeHeadId: string,
+    tenantId: string,
+  ) {
     const line = await this.prisma.invoiceLine.findFirst({
-      where: { invoiceId, feeHeadId },
+      where: { invoiceId, feeHeadId, tenantId },
       select: { id: true },
     });
 

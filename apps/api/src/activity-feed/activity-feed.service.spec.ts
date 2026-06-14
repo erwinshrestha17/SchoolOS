@@ -4,6 +4,7 @@ import {
   AuthMethod,
   DevelopmentalMilestoneStatus,
   NotificationChannel,
+  StudentLifecycleStatus,
   StorageProvider,
 } from '@prisma/client';
 import { ForbiddenException } from '@nestjs/common';
@@ -206,9 +207,10 @@ describe('ActivityFeedService', () => {
     expect(communicationsService.recordDeliveryRecords).toHaveBeenCalledWith(
       expect.objectContaining({
         actor,
-        audienceType: AudienceType.ALL,
+        audienceType: AudienceType.STUDENT,
         channels: [NotificationChannel.PUSH],
         studentIds: ['student-1'],
+        activeStudentsOnly: true,
       }),
     );
     expect(auditService.record).toHaveBeenCalledWith(
@@ -216,6 +218,96 @@ describe('ActivityFeedService', () => {
         action: 'create',
         resource: 'activity_post',
         tenantId: 'tenant-1',
+      }),
+    );
+  });
+
+  it('previews class, section, and student-specific audience with media consent counts', async () => {
+    prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
+    prisma.section.findFirst.mockResolvedValue({
+      id: 'section-1',
+      classId: 'class-1',
+    });
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        firstNameEn: 'Aarav',
+        lastNameEn: 'Sharma',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        guardianLinks: [
+          {
+            guardianId: 'guardian-1',
+            isPrimary: true,
+            guardian: {
+              id: 'guardian-1',
+              userId: 'guardian-user-1',
+              receivesAlerts: true,
+              consents: [{ granted: true, revokedAt: null }],
+            },
+          },
+        ],
+      },
+      {
+        id: 'student-2',
+        firstNameEn: 'Mina',
+        lastNameEn: 'Rai',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        guardianLinks: [
+          {
+            guardianId: 'guardian-2',
+            isPrimary: true,
+            guardian: {
+              id: 'guardian-2',
+              userId: null,
+              receivesAlerts: true,
+              consents: [{ granted: false, revokedAt: null }],
+            },
+          },
+        ],
+      },
+    ]);
+
+    await expect(
+      service.previewAudience(actor, {
+        classId: 'class-1',
+        sectionId: 'section-1',
+        studentIds: 'student-1,student-2',
+      }),
+    ).resolves.toEqual({
+      audienceType: AudienceType.STUDENT,
+      classId: 'class-1',
+      sectionId: 'section-1',
+      requestedStudentIds: ['student-1', 'student-2'],
+      studentCount: 2,
+      guardianRecipientCount: 2,
+      pushRecipientCount: 1,
+      mediaConsent: {
+        grantedStudentCount: 1,
+        blockedStudentCount: 1,
+      },
+      students: [
+        expect.objectContaining({
+          id: 'student-1',
+          mediaConsentGranted: true,
+        }),
+        expect.objectContaining({
+          id: 'student-2',
+          mediaConsentGranted: false,
+        }),
+      ],
+    });
+
+    expect(prisma.student.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+          id: { in: ['student-1', 'student-2'] },
+        }),
       }),
     );
   });

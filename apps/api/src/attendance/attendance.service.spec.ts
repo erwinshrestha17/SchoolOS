@@ -362,6 +362,103 @@ describe('attendance production hardening', () => {
     );
   });
 
+  it('honors tenant M2 parent notification channels and message templates', async () => {
+    const finalSession = buildAttendanceSession({
+      records: [
+        {
+          studentId: 'student-1',
+          status: AttendanceStatus.ABSENT,
+          remark: null,
+          lateAt: null,
+        },
+      ],
+    });
+    const { service, communicationsService } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
+      students: [buildStudent({ id: 'student-1' })],
+      finalSession,
+      m2Policy: {
+        parentNotificationChannels: [NotificationChannel.EMAIL],
+        absenceMessageTemplate:
+          '{studentName} has one absence mark. Please review with school.',
+      },
+    });
+
+    await service.submitAttendance(
+      {
+        academicYearId: 'ay-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        attendanceDate: '2026-04-28',
+        exceptions: [
+          {
+            studentId: 'student-1',
+            status: AttendanceStatus.ABSENT,
+          },
+        ],
+      },
+      adminActor,
+    );
+
+    expect(communicationsService.recordDeliveryRecords).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: 'attendance_parent_absence_notification',
+        body: 'Your child has one absence mark. Please review with school.',
+        channels: [NotificationChannel.EMAIL],
+      }),
+    );
+  });
+
+  it('keeps attendance events but skips disabled parent absence notifications', async () => {
+    const finalSession = buildAttendanceSession({
+      records: [
+        {
+          studentId: 'student-1',
+          status: AttendanceStatus.ABSENT,
+          remark: null,
+          lateAt: null,
+        },
+      ],
+    });
+    const { service, eventEmitter, communicationsService } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
+      students: [buildStudent({ id: 'student-1' })],
+      finalSession,
+      m2Policy: {
+        notifyParentsForAbsence: false,
+      },
+    });
+
+    await service.submitAttendance(
+      {
+        academicYearId: 'ay-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        attendanceDate: '2026-04-28',
+        exceptions: [
+          {
+            studentId: 'student-1',
+            status: AttendanceStatus.ABSENT,
+          },
+        ],
+      },
+      adminActor,
+    );
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'attendance.student.absent',
+      expect.objectContaining({
+        tenantId: adminActor.tenantId,
+        studentId: 'student-1',
+      }),
+    );
+    expect(communicationsService.recordDeliveryRecords).not.toHaveBeenCalled();
+  });
+
   it('returns a repeated absence and late follow-up queue', async () => {
     const { service } = buildService({});
     jest.spyOn(service, 'getAttendanceAnomalies').mockResolvedValue({
@@ -693,6 +790,28 @@ describe('attendance production hardening', () => {
     );
   });
 
+  it('enforces tenant M2 correction review minimum reason length before lookup', async () => {
+    const { service, prisma } = buildService({
+      m2Policy: {
+        correctionReviewMinReasonLength: 12,
+      },
+    });
+
+    await expect(
+      service.approveCorrectionRequest(
+        'correction-1',
+        {
+          status: 'APPROVED',
+          reviewReason: 'Too short',
+        },
+        adminActor,
+      ),
+    ).rejects.toThrow(
+      'Attendance correction review requires a reason of at least 12 characters.',
+    );
+    expect(prisma.attendanceCorrectionRequest.findFirst).not.toHaveBeenCalled();
+  });
+
   it('records rejected correction reasons without mutating attendance records', async () => {
     const rejectedCorrection = {
       id: 'correction-1',
@@ -759,6 +878,44 @@ describe('attendance production hardening', () => {
     ).rejects.toThrow(ForbiddenException);
     expect(prisma.attendanceRecord.findFirst).not.toHaveBeenCalled();
     expect(prisma.attendanceRecord.findMany).not.toHaveBeenCalled();
+  });
+
+  it('enforces tenant M2 locked-session override minimum reason length before mutating records', async () => {
+    const session = buildAttendanceSession({
+      records: [
+        {
+          studentId: 'student-1',
+          status: AttendanceStatus.ABSENT,
+          remark: null,
+        },
+      ],
+    });
+    const { service, prisma, tx } = buildService({
+      attendanceSession: session,
+      m2Policy: {
+        lockOverrideMinReasonLength: 10,
+      },
+    });
+
+    await expect(
+      service.overrideLockedSession(
+        'session-1',
+        {
+          reason: 'Short',
+          exceptions: [
+            {
+              studentId: 'student-1',
+              status: AttendanceStatus.PRESENT,
+            },
+          ],
+        },
+        adminActor,
+      ),
+    ).rejects.toThrow(
+      'Attendance lock override requires a reason of at least 10 characters.',
+    );
+    expect(prisma.attendanceSession.findFirst).not.toHaveBeenCalled();
+    expect(tx.attendanceRecord.update).not.toHaveBeenCalled();
   });
 
   it('marks rejected resubmissions and updates linked sync records', async () => {
@@ -1127,6 +1284,7 @@ function buildService(options: {
   teacherAssignments?: unknown[];
   classTeacherSections?: unknown[];
   guardianFindFirst?: unknown;
+  m2Policy?: unknown;
 }) {
   const tx = {
     attendanceConflict: {
@@ -1178,6 +1336,15 @@ function buildService(options: {
       findMany: jest
         .fn()
         .mockResolvedValue(options.calendarDay ? [options.calendarDay] : []),
+    },
+    tenantSetting: {
+      findUnique: jest.fn().mockResolvedValue(
+        options.m2Policy === undefined
+          ? null
+          : {
+              value: options.m2Policy,
+            },
+      ),
     },
     attendanceSession: {
       findFirst: jest.fn().mockResolvedValue(options.attendanceSession ?? null),

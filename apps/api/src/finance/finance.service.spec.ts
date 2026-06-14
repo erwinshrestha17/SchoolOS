@@ -26,6 +26,7 @@ const actor = {
   roles: ['accountant'],
   permissions: [
     'fees:adjust',
+    'fees:discount',
     'fees:manage',
     'payments:collect',
     'payments:refund',
@@ -199,6 +200,79 @@ describe('finance production controls', () => {
         actor,
       ),
     ).rejects.toThrow('Invoice does not belong to the selected student');
+  });
+
+  it('blocks waivers without an auditable reason', async () => {
+    const { service } = buildService({
+      invoice: null,
+      feeHead: buildFeeHead(),
+      student: { id: 'student-1', tenantId: actor.tenantId },
+    });
+
+    await expect(
+      service.createWaiver(
+        {
+          studentId: 'student-1',
+          amount: 100,
+          reason: '   ',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('Waiver reason is required');
+  });
+
+  it('blocks waivers on paid invoices until refund or reversal workflow runs', async () => {
+    const invoice = buildInvoice({
+      status: InvoiceStatus.PAID,
+      paidAt: new Date('2026-04-10T00:00:00.000Z'),
+      payments: [
+        buildInvoicePayment({ amount: new Prisma.Decimal(1117) }),
+      ],
+    });
+    const { service } = buildService({
+      invoice,
+      feeHead: buildFeeHead(),
+      student: { id: 'student-1', tenantId: actor.tenantId },
+    });
+
+    await expect(
+      service.createWaiver(
+        {
+          studentId: 'student-1',
+          invoiceId: invoice.id,
+          amount: 100,
+          reason: 'Scholarship correction',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Paid invoices require a refund or reversal workflow before waiver',
+    );
+  });
+
+  it('blocks waivers that would reduce an invoice below net paid amount', async () => {
+    const invoice = buildInvoice({
+      status: InvoiceStatus.PARTIAL,
+      totalAmount: new Prisma.Decimal(1000),
+      payments: [buildInvoicePayment({ amount: new Prisma.Decimal(950) })],
+    });
+    const { service } = buildService({
+      invoice,
+      feeHead: buildFeeHead(),
+      student: { id: 'student-1', tenantId: actor.tenantId },
+    });
+
+    await expect(
+      service.createWaiver(
+        {
+          studentId: 'student-1',
+          invoiceId: invoice.id,
+          amount: 100,
+          reason: 'Scholarship correction',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('Waiver would make paid amount exceed invoice total');
   });
 
   it('blocks duplicate referenced payments for the same invoice', async () => {

@@ -157,8 +157,7 @@ describe('AdmissionsService production hardening', () => {
 
     await expect(
       service.createAdmission(
-        {
-          ...buildAdmissionDto(),
+        Object.assign(buildAdmissionDto(), {
           guardians: [
             {
               fullName: 'Maya Shrestha',
@@ -166,7 +165,7 @@ describe('AdmissionsService production hardening', () => {
               primaryPhone: 'not-a-phone',
             },
           ],
-        },
+        }),
         actor,
       ),
     ).rejects.toThrow(BadRequestException);
@@ -542,7 +541,43 @@ describe('AdmissionsService production hardening', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('enrolls an accepted application through the existing admission flow', async () => {
+  it('blocks direct ENROLLED status updates because conversion must create a linked student', async () => {
+    const prisma = buildPrisma({
+      admissionApplicationFindFirstResult: {
+        ...buildApplication(),
+        status: 'ACCEPTED',
+      },
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.updateApplicationStatus(
+        'application-1',
+        { status: 'ENROLLED' },
+        actor,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.admissionApplication.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('requires accepted status before enrolling an admission application', async () => {
+    const prisma = buildPrisma({
+      admissionApplicationFindFirstResult: {
+        ...buildApplication(),
+        status: 'DOCUMENT_PENDING',
+      },
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.enrollApplication('application-1', buildAdmissionDto(), actor),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('enrolls an accepted application through one tenant-scoped conversion transaction', async () => {
     const prisma = buildPrisma({
       admissionApplicationFindFirstResult: {
         ...buildApplication(),
@@ -559,7 +594,16 @@ describe('AdmissionsService production hardening', () => {
       actor,
     );
 
-    expect(prisma.admissionApplication.update).toHaveBeenCalledWith({
+    expect(tx.admissionApplication.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'application-1',
+        tenantId: actor.tenantId,
+        status: 'ACCEPTED',
+        convertedStudentId: null,
+      },
+      data: { updatedById: actor.userId },
+    });
+    expect(tx.admissionApplication.update).toHaveBeenCalledWith({
       where: { id: 'application-1' },
       data: expect.objectContaining({
         status: 'ENROLLED',
@@ -796,6 +840,7 @@ function buildPrisma(overrides: Partial<PrismaMockOptions> = {}) {
           overrides.admissionApplicationFindFirstResult ?? null,
         ),
       create: jest.fn().mockResolvedValue(buildApplication()),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       update: jest.fn().mockResolvedValue({
         ...buildApplication(),
         status: 'ENROLLED',
@@ -867,6 +912,14 @@ function buildTransaction() {
     admissionImportBatch: {
       update: jest.fn().mockResolvedValue({
         id: 'import-batch-1',
+      }),
+    },
+    admissionApplication: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      update: jest.fn().mockResolvedValue({
+        ...buildApplication(),
+        status: 'ENROLLED',
+        convertedStudentId: 'student-1',
       }),
     },
   };

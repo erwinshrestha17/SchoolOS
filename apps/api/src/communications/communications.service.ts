@@ -14,6 +14,7 @@ import {
   NotificationStatus,
   NoticePriority,
   Prisma,
+  StudentLifecycleStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -851,6 +852,9 @@ export class CommunicationsService {
           ? { sectionId: input.sectionId }
           : {}),
         ...(input.studentIds?.length ? { id: { in: input.studentIds } } : {}),
+        ...(input.activeStudentsOnly
+          ? { lifecycleStatus: StudentLifecycleStatus.ACTIVE }
+          : {}),
         // If audience type is STUDENT but no IDs provided, we return NO ONE (safer)
         ...(input.audienceType === AudienceType.STUDENT &&
         !input.studentIds?.length
@@ -1027,6 +1031,7 @@ interface DeliveryRecordInput {
   channels: NotificationChannel[];
   requiredConsentTypes?: ConsentType[];
   communicationCategory?: 'ESSENTIAL' | 'NON_ESSENTIAL' | 'MARKETING';
+  activeStudentsOnly?: boolean;
 }
 
 interface DeliveryRecipient {

@@ -50,6 +50,31 @@ interface AdmissionReferenceContext {
 
 type AdmissionGuardianInput = CreateAdmissionDto['guardians'][number];
 type AdmissionPersistenceClient = Prisma.TransactionClient | PrismaService;
+interface AdmissionCoreWrite {
+  student: {
+    id: string;
+    studentSystemId: string;
+    firstNameEn: string;
+    lastNameEn: string;
+    admissionDate: Date;
+    classId: string;
+  };
+  enrollment: {
+    id: string;
+    academicYearId: string;
+    classId: string;
+    sectionId: string | null;
+    rollNumber: number | null;
+  };
+  guardians: Array<{
+    relation: string;
+    guardian: {
+      id: string;
+      fullName: string;
+      primaryPhone: string;
+    };
+  }>;
+}
 
 @Injectable()
 export class AdmissionsService {
@@ -196,11 +221,16 @@ export class AdmissionsService {
       if (!studentRole) {
         throw new NotFoundException('Student role not found for this tenant');
       }
+      if (!dto.email || !dto.password) {
+        throw new BadRequestException(
+          'Email and password are required when creating a student login',
+        );
+      }
 
       const managedUser = await this.usersService.createManagedUser({
         tenantId: actor.tenantId,
-        email: dto.email!,
-        password: dto.password!,
+        email: dto.email,
+        password: dto.password,
         phone: dto.phone,
         roleIds: [studentRole.id],
         assignedById: actor.userId,
@@ -209,363 +239,11 @@ export class AdmissionsService {
     }
 
     const core = await this.prisma.$transaction(
-      async (tx) => {
-        const studentSystemId =
-          dto.studentSystemId ??
-          (await this.generateStudentSystemId(
-            actor,
-            context.academicYear.startsOn,
-            tx,
-          ));
-
-        const student = await tx.student.create({
-          data: {
-            tenantId: actor.tenantId,
-            userId: linkedUserId,
-            studentSystemId,
-            firstNameEn: dto.firstNameEn,
-            lastNameEn: dto.lastNameEn,
-            firstNameNp: dto.firstNameNp ?? null,
-            lastNameNp: dto.lastNameNp ?? null,
-            dateOfBirth: new Date(dto.dateOfBirth),
-            gender: dto.gender,
-            admissionDate: new Date(dto.admissionDate),
-            admissionNumber: dto.admissionNumber ?? null,
-            classId: dto.classId,
-            sectionId: dto.sectionId ?? null,
-            section: context.section?.name ?? null,
-            rollNumber: dto.rollNumber ?? null,
-            nationality: dto.nationality ?? 'Nepali',
-            motherTongue: dto.motherTongue ?? null,
-            disabilityFlag: dto.disabilityFlag || 'No known disability',
-            bloodGroup: dto.bloodGroup ?? null,
-            religion: dto.religion ?? null,
-            ethnicity: dto.ethnicity ?? null,
-            citizenshipNo: dto.citizenshipNo ?? null,
-            mediumOfInstruct: dto.mediumOfInstruction ?? 'English',
-            emergencyName: dto.emergencyName ?? null,
-            emergencyPhone: dto.emergencyPhone ?? null,
-            medicalConditions: encryptSensitiveField(
-              dto.medicalConditions,
-              this.configService.medicalEncryptionKey,
-            ),
-            severeAllergies: encryptSensitiveField(
-              dto.severeAllergies,
-              this.configService.medicalEncryptionKey,
-            ),
-            medications: encryptSensitiveField(
-              dto.medications,
-              this.configService.medicalEncryptionKey,
-            ),
-            specialNeeds: encryptSensitiveField(
-              dto.specialNeeds,
-              this.configService.medicalEncryptionKey,
-            ),
-            doctorName: encryptSensitiveField(
-              dto.doctorName,
-              this.configService.medicalEncryptionKey,
-            ),
-            doctorPhone: encryptSensitiveField(
-              dto.doctorPhone,
-              this.configService.medicalEncryptionKey,
-            ),
-            privacyConsentAt: new Date(),
-            dataProcessingConsentedAt: new Date(),
-            medicalConsentAt:
-              dto.medicalConditions ||
-              dto.severeAllergies ||
-              dto.medications ||
-              dto.specialNeeds
-                ? new Date()
-                : null,
-          },
-        });
-
-        await tx.studentLifecycleTransition.create({
-          data: {
-            tenantId: actor.tenantId,
-            studentId: student.id,
-            fromStatus: null,
-            toStatus: StudentLifecycleStatus.ACTIVE,
-            reason: 'Initial enrollment via admission',
-            changedById: actor.userId,
-            feeClearanceWaived: false,
-            metadata: {
-              admissionDate: student.admissionDate.toISOString(),
-              classId: student.classId,
-            },
-          },
-        });
-
-        if (dto.photo && dto.photoFileName) {
-          const stored = await this.storageService.saveBase64Object({
-            tenantId: actor.tenantId,
-            prefix: `students/${student.id}/photo`,
-            fileName: dto.photoFileName,
-            contentType: 'image/jpeg',
-            base64Content: dto.photo,
-          });
-
-          const asset = await this.fileRegistryService.registerFile({
-            tenantId: actor.tenantId,
-            uploadedByUserId: actor.userId,
-            originalFilename: dto.photoFileName,
-            objectKey: stored.objectKey,
-            mimeType: 'image/jpeg',
-            sizeBytes: stored.sizeBytes,
-            provider: stored.provider,
-            bucket: stored.bucket,
-            checksumSha256: stored.checksumSha256,
-            module: 'students',
-            entityId: student.id,
-            metadata: { kind: 'PHOTO', title: 'Student Photo' },
-          });
-
-          await tx.student.update({
-            where: { id: student.id },
-            data: { photoUrl: asset.id },
-          });
-        }
-
-        if (dto.siblingStudentSystemId) {
-          const sibling = await tx.student.findFirst({
-            where: {
-              tenantId: actor.tenantId,
-              studentSystemId: dto.siblingStudentSystemId,
-            },
-            include: {
-              siblingMemberships: { include: { siblingGroup: true } },
-            },
-          });
-
-          if (sibling) {
-            let siblingGroupId: string;
-            if (sibling.siblingMemberships.length > 0) {
-              siblingGroupId = sibling.siblingMemberships[0].siblingGroupId;
-            } else {
-              const newGroup = await tx.siblingGroup.create({
-                data: {
-                  tenantId: actor.tenantId,
-                  name: `Sibling-${sibling.studentSystemId}`,
-                },
-              });
-              siblingGroupId = newGroup.id;
-              await tx.siblingGroupMember.create({
-                data: {
-                  tenantId: actor.tenantId,
-                  studentId: sibling.id,
-                  siblingGroupId,
-                },
-              });
-            }
-
-            await tx.siblingGroupMember.create({
-              data: {
-                tenantId: actor.tenantId,
-                studentId: student.id,
-                siblingGroupId,
-              },
-            });
-          }
-        }
-
-        const guardianLinks: Array<{
-          relation: string;
-          guardian: {
-            id: string;
-            fullName: string;
-            primaryPhone: string;
-          };
-        }> = [];
-
-        for (const guardianInput of dto.guardians) {
-          const guardianPhone = normalizeGuardianPhone(
-            guardianInput.primaryPhone,
-          );
-          const guardian = await tx.guardian.upsert({
-            where: {
-              tenantId_primaryPhone: {
-                tenantId: actor.tenantId,
-                primaryPhone: guardianPhone,
-              },
-            },
-            update: {
-              fullName: guardianInput.fullName.trim(),
-              relation: guardianInput.relation.trim(),
-              secondaryPhone: guardianInput.secondaryPhone ?? null,
-              email: guardianInput.email ?? null,
-              occupation: guardianInput.occupation ?? null,
-              homeAddress: guardianInput.homeAddress ?? null,
-              wardNumber: guardianInput.wardNumber ?? null,
-              receivesAlerts: guardianInput.receivesAlerts ?? false,
-              privacyConsentAt: new Date(),
-            },
-            create: {
-              tenantId: actor.tenantId,
-              fullName: guardianInput.fullName.trim(),
-              relation: guardianInput.relation.trim(),
-              primaryPhone: guardianPhone,
-              secondaryPhone: guardianInput.secondaryPhone ?? null,
-              email: guardianInput.email ?? null,
-              occupation: guardianInput.occupation ?? null,
-              homeAddress: guardianInput.homeAddress ?? null,
-              wardNumber: guardianInput.wardNumber ?? null,
-              receivesAlerts: guardianInput.receivesAlerts ?? false,
-              privacyConsentAt: new Date(),
-            },
-          });
-
-          guardianLinks.push(
-            await tx.studentGuardian.create({
-              data: {
-                tenantId: actor.tenantId,
-                studentId: student.id,
-                guardianId: guardian.id,
-                relation: guardianInput.relation.trim(),
-                isPrimary: guardianInput.isPrimary ?? false,
-              },
-              include: {
-                guardian: true,
-              },
-            }),
-          );
-        }
-
-        const enrollment = await tx.enrollment.create({
-          data: {
-            tenantId: actor.tenantId,
-            studentId: student.id,
-            academicYearId: dto.academicYearId,
-            classId: dto.classId,
-            sectionId: dto.sectionId ?? null,
-            rollNumber: dto.rollNumber ?? null,
-            admissionNumber: dto.admissionNumber ?? null,
-            admissionDate: new Date(dto.admissionDate),
-            mediumOfInstruction: dto.mediumOfInstruction ?? 'English',
-          },
-        });
-
-        await tx.auditLog.create({
-          data: {
-            action: 'create',
-            resource: 'admission',
-            tenantId: actor.tenantId,
-            userId: actor.userId,
-            resourceId: enrollment.id,
-            after: {
-              studentId: student.id,
-              studentSystemId: student.studentSystemId,
-              academicYearId: dto.academicYearId,
-              classId: dto.classId,
-              sectionId: dto.sectionId ?? null,
-              guardianCount: guardianLinks.length,
-            },
-          },
-        });
-
-        return {
-          student,
-          enrollment,
-          guardians: guardianLinks,
-        };
-      },
+      (tx) => this.createAdmissionCore(dto, actor, context, linkedUserId, tx),
       { isolationLevel: 'Serializable' },
     );
 
-    await this.financeService.assignFeePlansForEnrollment({
-      tenantId: actor.tenantId,
-      studentId: core.student.id,
-      academicYearId: dto.academicYearId,
-      classId: dto.classId,
-    });
-
-    const initialInvoice = await this.financeService.createInitialInvoice({
-      actor,
-      studentId: core.student.id,
-      academicYearId: dto.academicYearId,
-      enrollmentId: core.enrollment.id,
-      dueDate: new Date(dto.admissionDate),
-    });
-
-    try {
-      await this.studentsService.generateStudentDocumentPdf(
-        core.student.id,
-        'ID_CARD',
-        actor,
-      );
-    } catch (e) {
-      // Best effort generation during admission to avoid blocking enrollment
-    }
-
-    const documents: Array<
-      Awaited<ReturnType<StudentRecordsService['uploadDocument']>>
-    > = [];
-
-    for (const documentInput of dto.documents ?? []) {
-      documents.push(
-        await this.studentRecordsService.uploadDocument(
-          {
-            ...documentInput,
-            studentId: core.student.id,
-          },
-          actor,
-        ),
-      );
-    }
-
-    await this.auditService.record({
-      action: 'admission_side_effects',
-      resource: 'admission',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: core.enrollment.id,
-      after: {
-        studentId: core.student.id,
-        invoiceId: initialInvoice?.id ?? null,
-        documentCount: documents.length,
-        guardianInviteCount: core.guardians.length,
-      },
-    });
-
-    this.eventEmitter.emit('student.admitted', {
-      tenantId: actor.tenantId,
-      classId: dto.classId,
-      sectionId: dto.sectionId,
-      studentId: core.student.id,
-      studentName: `${core.student.firstNameEn} ${core.student.lastNameEn}`,
-      actor,
-    });
-
-    await this.usageService.incrementUsage(actor.tenantId, 'students.count');
-
-    return {
-      student: {
-        id: core.student.id,
-        studentSystemId: core.student.studentSystemId,
-        fullNameEn:
-          `${core.student.firstNameEn} ${core.student.lastNameEn}`.trim(),
-      },
-      enrollment: {
-        id: core.enrollment.id,
-        academicYearId: core.enrollment.academicYearId,
-        classId: core.enrollment.classId,
-        sectionId: core.enrollment.sectionId,
-        rollNumber: core.enrollment.rollNumber,
-      },
-      guardians: core.guardians.map((link) => ({
-        id: link.guardian.id,
-        fullName: link.guardian.fullName,
-        relation: link.relation,
-      })),
-      documents,
-      invoice: initialInvoice
-        ? {
-            id: initialInvoice.id,
-            invoiceNumber: initialInvoice.invoiceNumber,
-            totalAmount: Number(initialInvoice.totalAmount),
-          }
-        : null,
-    };
+    return this.completeAdmissionSideEffects(core, dto, actor);
   }
 
   async checkDuplicateAdmissions(
@@ -912,8 +590,18 @@ export class AdmissionsService {
       );
     }
 
-    const updated = await this.prisma.admissionApplication.update({
-      where: { id: application.id },
+    if (dto.status === 'ENROLLED') {
+      throw new BadRequestException(
+        'Use the application enrollment endpoint so a tenant-owned student record is created and linked.',
+      );
+    }
+
+    const updatedCount = await this.prisma.admissionApplication.updateMany({
+      where: {
+        id: application.id,
+        tenantId: actor.tenantId,
+        status: application.status,
+      },
       data: {
         status: dto.status,
         rejectedReason:
@@ -921,6 +609,13 @@ export class AdmissionsService {
         updatedById: actor.userId,
       },
     });
+    if (updatedCount.count !== 1) {
+      throw new ConflictException(
+        'Admission application changed while updating status. Refresh and retry.',
+      );
+    }
+
+    const updated = await this.findTenantApplication(application.id, actor);
 
     await this.auditService.record({
       action: 'admission_application_status_update',
@@ -941,32 +636,66 @@ export class AdmissionsService {
     actor: AuthContext,
   ) {
     const application = await this.findTenantApplication(applicationId, actor);
-    if (
-      !['ACCEPTED', 'APPLICATION', 'DOCUMENT_PENDING'].includes(
-        application.status,
-      )
-    ) {
+    if (application.convertedStudentId || application.status === 'ENROLLED') {
+      throw new ConflictException(
+        'Admission application is already linked to an enrolled student',
+      );
+    }
+    if (application.status !== 'ACCEPTED') {
       throw new BadRequestException(
-        'Only accepted or in-progress applications can be enrolled',
+        'Only accepted admission applications can be enrolled',
       );
     }
 
-    const admission = await this.createAdmission(
-      {
-        ...dto,
-        confirmDuplicate: true,
+    const admissionDto: CreateAdmissionDto = Object.assign(
+      new CreateAdmissionDto(),
+      dto,
+      { confirmDuplicate: true },
+    );
+    const context = await this.validateAdmissionForCreate(admissionDto, actor);
+
+    const { core, updated } = await this.prisma.$transaction(
+      async (tx) => {
+        const claimed = await tx.admissionApplication.updateMany({
+          where: {
+            id: application.id,
+            tenantId: actor.tenantId,
+            status: 'ACCEPTED',
+            convertedStudentId: null,
+          },
+          data: { updatedById: actor.userId },
+        });
+        if (claimed.count !== 1) {
+          throw new ConflictException(
+            'Admission application was already enrolled or changed while converting.',
+          );
+        }
+
+        const conversionCore = await this.createAdmissionCore(
+          admissionDto,
+          actor,
+          context,
+          null,
+          tx,
+        );
+        const convertedApplication = await tx.admissionApplication.update({
+          where: { id: application.id },
+          data: {
+            status: 'ENROLLED',
+            convertedStudentId: conversionCore.student.id,
+            updatedById: actor.userId,
+          },
+        });
+
+        return { core: conversionCore, updated: convertedApplication };
       },
+      { isolationLevel: 'Serializable' },
+    );
+    const admission = await this.completeAdmissionSideEffects(
+      core,
+      admissionDto,
       actor,
     );
-
-    const updated = await this.prisma.admissionApplication.update({
-      where: { id: application.id },
-      data: {
-        status: 'ENROLLED',
-        convertedStudentId: admission.student.id,
-        updatedById: actor.userId,
-      },
-    });
 
     await this.auditService.record({
       action: 'admission_application_enroll',
@@ -1112,13 +841,13 @@ export class AdmissionsService {
               studentId: result.studentId ?? null,
               studentSystemId: result.studentSystemId ?? null,
               errors: result.errors
-                ? (result.errors as Prisma.InputJsonValue)
+                ? toInputJsonValue(result.errors)
                 : Prisma.JsonNull,
               duplicates: result.duplicates
-                ? (result.duplicates as Prisma.InputJsonValue)
+                ? toInputJsonValue(result.duplicates)
                 : Prisma.JsonNull,
               rawData: sourceRow?.raw
-                ? (sourceRow.raw as Prisma.InputJsonValue)
+                ? toInputJsonValue(sourceRow.raw)
                 : Prisma.JsonNull,
             };
           }),
@@ -1235,6 +964,362 @@ export class AdmissionsService {
         duplicates: normalizeJsonArray(row.duplicates),
         rawData: row.rawData ?? null,
       })),
+    };
+  }
+
+  private async createAdmissionCore(
+    dto: CreateAdmissionDto,
+    actor: AuthContext,
+    context: AdmissionReferenceContext,
+    linkedUserId: string | null,
+    tx: Prisma.TransactionClient,
+  ): Promise<AdmissionCoreWrite> {
+    const studentSystemId =
+      dto.studentSystemId ??
+      (await this.generateStudentSystemId(
+        actor,
+        context.academicYear.startsOn,
+        tx,
+      ));
+
+    const student = await tx.student.create({
+      data: {
+        tenantId: actor.tenantId,
+        userId: linkedUserId,
+        studentSystemId,
+        firstNameEn: dto.firstNameEn,
+        lastNameEn: dto.lastNameEn,
+        firstNameNp: dto.firstNameNp ?? null,
+        lastNameNp: dto.lastNameNp ?? null,
+        dateOfBirth: new Date(dto.dateOfBirth),
+        gender: dto.gender,
+        admissionDate: new Date(dto.admissionDate),
+        admissionNumber: dto.admissionNumber ?? null,
+        classId: dto.classId,
+        sectionId: dto.sectionId ?? null,
+        section: context.section?.name ?? null,
+        rollNumber: dto.rollNumber ?? null,
+        nationality: dto.nationality ?? 'Nepali',
+        motherTongue: dto.motherTongue ?? null,
+        disabilityFlag: dto.disabilityFlag || 'No known disability',
+        bloodGroup: dto.bloodGroup ?? null,
+        religion: dto.religion ?? null,
+        ethnicity: dto.ethnicity ?? null,
+        citizenshipNo: dto.citizenshipNo ?? null,
+        mediumOfInstruct: dto.mediumOfInstruction ?? 'English',
+        emergencyName: dto.emergencyName ?? null,
+        emergencyPhone: dto.emergencyPhone ?? null,
+        medicalConditions: encryptSensitiveField(
+          dto.medicalConditions,
+          this.configService.medicalEncryptionKey,
+        ),
+        severeAllergies: encryptSensitiveField(
+          dto.severeAllergies,
+          this.configService.medicalEncryptionKey,
+        ),
+        medications: encryptSensitiveField(
+          dto.medications,
+          this.configService.medicalEncryptionKey,
+        ),
+        specialNeeds: encryptSensitiveField(
+          dto.specialNeeds,
+          this.configService.medicalEncryptionKey,
+        ),
+        doctorName: encryptSensitiveField(
+          dto.doctorName,
+          this.configService.medicalEncryptionKey,
+        ),
+        doctorPhone: encryptSensitiveField(
+          dto.doctorPhone,
+          this.configService.medicalEncryptionKey,
+        ),
+        privacyConsentAt: new Date(),
+        dataProcessingConsentedAt: new Date(),
+        medicalConsentAt:
+          dto.medicalConditions ||
+          dto.severeAllergies ||
+          dto.medications ||
+          dto.specialNeeds
+            ? new Date()
+            : null,
+      },
+    });
+
+    await tx.studentLifecycleTransition.create({
+      data: {
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        fromStatus: null,
+        toStatus: StudentLifecycleStatus.ACTIVE,
+        reason: 'Initial enrollment via admission',
+        changedById: actor.userId,
+        feeClearanceWaived: false,
+        metadata: {
+          admissionDate: student.admissionDate.toISOString(),
+          classId: student.classId,
+        },
+      },
+    });
+
+    if (dto.photo && dto.photoFileName) {
+      const stored = await this.storageService.saveBase64Object({
+        tenantId: actor.tenantId,
+        prefix: `students/${student.id}/photo`,
+        fileName: dto.photoFileName,
+        contentType: 'image/jpeg',
+        base64Content: dto.photo,
+      });
+
+      const asset = await this.fileRegistryService.registerFile({
+        tenantId: actor.tenantId,
+        uploadedByUserId: actor.userId,
+        originalFilename: dto.photoFileName,
+        objectKey: stored.objectKey,
+        mimeType: 'image/jpeg',
+        sizeBytes: stored.sizeBytes,
+        provider: stored.provider,
+        bucket: stored.bucket,
+        checksumSha256: stored.checksumSha256,
+        module: 'students',
+        entityId: student.id,
+        metadata: { kind: 'PHOTO', title: 'Student Photo' },
+      });
+
+      await tx.student.update({
+        where: { id: student.id },
+        data: { photoUrl: asset.id },
+      });
+    }
+
+    if (dto.siblingStudentSystemId) {
+      const sibling = await tx.student.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          studentSystemId: dto.siblingStudentSystemId,
+        },
+        include: {
+          siblingMemberships: { include: { siblingGroup: true } },
+        },
+      });
+
+      if (sibling) {
+        let siblingGroupId: string;
+        if (sibling.siblingMemberships.length > 0) {
+          siblingGroupId = sibling.siblingMemberships[0].siblingGroupId;
+        } else {
+          const newGroup = await tx.siblingGroup.create({
+            data: {
+              tenantId: actor.tenantId,
+              name: `Sibling-${sibling.studentSystemId}`,
+            },
+          });
+          siblingGroupId = newGroup.id;
+          await tx.siblingGroupMember.create({
+            data: {
+              tenantId: actor.tenantId,
+              studentId: sibling.id,
+              siblingGroupId,
+            },
+          });
+        }
+
+        await tx.siblingGroupMember.create({
+          data: {
+            tenantId: actor.tenantId,
+            studentId: student.id,
+            siblingGroupId,
+          },
+        });
+      }
+    }
+
+    const guardianLinks: AdmissionCoreWrite['guardians'] = [];
+
+    for (const guardianInput of dto.guardians) {
+      const guardianPhone = normalizeGuardianPhone(guardianInput.primaryPhone);
+      const guardian = await tx.guardian.upsert({
+        where: {
+          tenantId_primaryPhone: {
+            tenantId: actor.tenantId,
+            primaryPhone: guardianPhone,
+          },
+        },
+        update: {
+          fullName: guardianInput.fullName.trim(),
+          relation: guardianInput.relation.trim(),
+          secondaryPhone: guardianInput.secondaryPhone ?? null,
+          email: guardianInput.email ?? null,
+          occupation: guardianInput.occupation ?? null,
+          homeAddress: guardianInput.homeAddress ?? null,
+          wardNumber: guardianInput.wardNumber ?? null,
+          receivesAlerts: guardianInput.receivesAlerts ?? false,
+          privacyConsentAt: new Date(),
+        },
+        create: {
+          tenantId: actor.tenantId,
+          fullName: guardianInput.fullName.trim(),
+          relation: guardianInput.relation.trim(),
+          primaryPhone: guardianPhone,
+          secondaryPhone: guardianInput.secondaryPhone ?? null,
+          email: guardianInput.email ?? null,
+          occupation: guardianInput.occupation ?? null,
+          homeAddress: guardianInput.homeAddress ?? null,
+          wardNumber: guardianInput.wardNumber ?? null,
+          receivesAlerts: guardianInput.receivesAlerts ?? false,
+          privacyConsentAt: new Date(),
+        },
+      });
+
+      guardianLinks.push(
+        await tx.studentGuardian.create({
+          data: {
+            tenantId: actor.tenantId,
+            studentId: student.id,
+            guardianId: guardian.id,
+            relation: guardianInput.relation.trim(),
+            isPrimary: guardianInput.isPrimary ?? false,
+          },
+          include: {
+            guardian: true,
+          },
+        }),
+      );
+    }
+
+    const enrollment = await tx.enrollment.create({
+      data: {
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        academicYearId: dto.academicYearId,
+        classId: dto.classId,
+        sectionId: dto.sectionId ?? null,
+        rollNumber: dto.rollNumber ?? null,
+        admissionNumber: dto.admissionNumber ?? null,
+        admissionDate: new Date(dto.admissionDate),
+        mediumOfInstruction: dto.mediumOfInstruction ?? 'English',
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        action: 'create',
+        resource: 'admission',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: enrollment.id,
+        after: {
+          studentId: student.id,
+          studentSystemId: student.studentSystemId,
+          academicYearId: dto.academicYearId,
+          classId: dto.classId,
+          sectionId: dto.sectionId ?? null,
+          guardianCount: guardianLinks.length,
+        },
+      },
+    });
+
+    return {
+      student,
+      enrollment,
+      guardians: guardianLinks,
+    };
+  }
+
+  private async completeAdmissionSideEffects(
+    core: AdmissionCoreWrite,
+    dto: CreateAdmissionDto,
+    actor: AuthContext,
+  ) {
+    await this.financeService.assignFeePlansForEnrollment({
+      tenantId: actor.tenantId,
+      studentId: core.student.id,
+      academicYearId: dto.academicYearId,
+      classId: dto.classId,
+    });
+
+    const initialInvoice = await this.financeService.createInitialInvoice({
+      actor,
+      studentId: core.student.id,
+      academicYearId: dto.academicYearId,
+      enrollmentId: core.enrollment.id,
+      dueDate: new Date(dto.admissionDate),
+    });
+
+    try {
+      await this.studentsService.generateStudentDocumentPdf(
+        core.student.id,
+        'ID_CARD',
+        actor,
+      );
+    } catch {
+      // Best effort generation during admission to avoid blocking enrollment
+    }
+
+    const documents: Array<
+      Awaited<ReturnType<StudentRecordsService['uploadDocument']>>
+    > = [];
+
+    for (const documentInput of dto.documents ?? []) {
+      documents.push(
+        await this.studentRecordsService.uploadDocument(
+          Object.assign({}, documentInput, { studentId: core.student.id }),
+          actor,
+        ),
+      );
+    }
+
+    await this.auditService.record({
+      action: 'admission_side_effects',
+      resource: 'admission',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: core.enrollment.id,
+      after: {
+        studentId: core.student.id,
+        invoiceId: initialInvoice?.id ?? null,
+        documentCount: documents.length,
+        guardianInviteCount: core.guardians.length,
+      },
+    });
+
+    this.eventEmitter.emit('student.admitted', {
+      tenantId: actor.tenantId,
+      classId: dto.classId,
+      sectionId: dto.sectionId,
+      studentId: core.student.id,
+      studentName: `${core.student.firstNameEn} ${core.student.lastNameEn}`,
+      actor,
+    });
+
+    await this.usageService.incrementUsage(actor.tenantId, 'students.count');
+
+    return {
+      student: {
+        id: core.student.id,
+        studentSystemId: core.student.studentSystemId,
+        fullNameEn:
+          `${core.student.firstNameEn} ${core.student.lastNameEn}`.trim(),
+      },
+      enrollment: {
+        id: core.enrollment.id,
+        academicYearId: core.enrollment.academicYearId,
+        classId: core.enrollment.classId,
+        sectionId: core.enrollment.sectionId,
+        rollNumber: core.enrollment.rollNumber,
+      },
+      guardians: core.guardians.map((link) => ({
+        id: link.guardian.id,
+        fullName: link.guardian.fullName,
+        relation: link.relation,
+      })),
+      documents,
+      invoice: initialInvoice
+        ? {
+            id: initialInvoice.id,
+            invoiceNumber: initialInvoice.invoiceNumber,
+            totalAmount: Number(initialInvoice.totalAmount),
+          }
+        : null,
     };
   }
 
@@ -1591,6 +1676,10 @@ function buildBulkImportErrorCsv(
   return lines.join('\n');
 }
 
+function toInputJsonValue(value: unknown): Prisma.InputJsonValue {
+  return value as Prisma.InputJsonValue;
+}
+
 function formatAdmissionApplication(application: {
   id: string;
   status: string;
@@ -1683,7 +1772,7 @@ function formatImportError(error: unknown) {
   return error instanceof Error ? error.message : 'Unknown import error';
 }
 
-type BulkImportDuplicateWarning = {
+interface BulkImportDuplicateWarning {
   studentId: string;
   studentSystemId: string;
   fullNameEn: string;
@@ -1692,7 +1781,7 @@ type BulkImportDuplicateWarning = {
   sectionName: string | null;
   rollNumber: number | null;
   matchTypes?: string[];
-};
+}
 
 function extractImportDuplicates(error: unknown): BulkImportDuplicateWarning[] {
   if (!(error instanceof HttpException)) {

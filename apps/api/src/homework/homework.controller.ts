@@ -202,6 +202,24 @@ export class HomeworkController {
     return this.homeworkService.sendReminders(id, auth);
   }
 
+  @Get('reminders/batches')
+  @Permissions('homework:notify')
+  listReminderBatches(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: HomeworkReminderQueryDto,
+  ) {
+    return this.homeworkService.listHomeworkReminderBatches(auth, query);
+  }
+
+  @Post('reminders/batches/:batchId/retry')
+  @Permissions('homework:notify')
+  retryReminderBatch(
+    @Param('batchId') batchId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.homeworkService.retryHomeworkReminderBatch(batchId, auth);
+  }
+
   // --- Reports ---
 
   @Get('reports/completion')

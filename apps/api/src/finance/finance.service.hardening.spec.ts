@@ -33,6 +33,7 @@ describe('FinanceService - Hardening', () => {
     userId: 'u1',
     roles: ['admin'],
     permissions: [
+      'fees:adjust',
       'fees:manage',
       'payments:refund',
       'payments:reverse',

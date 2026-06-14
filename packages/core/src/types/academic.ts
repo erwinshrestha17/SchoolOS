@@ -121,12 +121,14 @@ export type MarkEntrySummary = {
   studentId: string;
   marksObtained: number;
   status:
+    | 'DRAFT'
     | 'PRESENT'
     | 'ABSENT'
     | 'EXCUSED'
     | 'MISSING'
     | 'WITHHELD'
-    | 'SUBMITTED';
+    | 'SUBMITTED'
+    | 'RETEST';
   remarks: string | null;
   isLocked: boolean;
   student?: StudentProfile;

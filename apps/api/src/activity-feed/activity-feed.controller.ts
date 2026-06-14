@@ -117,6 +117,21 @@ export class ActivityFeedController {
     return this.activityFeedService.getReactionAnalytics(auth);
   }
 
+  @Get('audience-preview')
+  @Permissions('activity_feed:read')
+  previewAudience(
+    @CurrentAuth() auth: AuthContext,
+    @Query('classId') classId?: string,
+    @Query('sectionId') sectionId?: string,
+    @Query('studentIds') studentIds?: string | string[],
+  ) {
+    return this.activityFeedService.previewAudience(auth, {
+      classId,
+      sectionId,
+      studentIds,
+    });
+  }
+
   @Get('posts/:id')
   @Permissions('activity_feed:read')
   getPostDetail(@Param('id') postId: string, @CurrentAuth() auth: AuthContext) {

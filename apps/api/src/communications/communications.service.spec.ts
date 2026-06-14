@@ -6,6 +6,7 @@ import {
   NotificationChannel,
   NotificationStatus,
   NoticePriority,
+  StudentLifecycleStatus,
 } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from './communications.service';
@@ -239,6 +240,73 @@ describe('CommunicationsService', () => {
     expect(prisma.student.findMany).not.toHaveBeenCalled();
     expect(prisma.notificationDelivery.create).not.toHaveBeenCalled();
     expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
+  });
+
+  it('limits activity notification delivery resolution to active students only', async () => {
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        userId: null,
+        user: null,
+        guardianLinks: [
+          {
+            isPrimary: true,
+            guardian: {
+              id: 'guardian-1',
+              userId: 'guardian-user-1',
+              email: 'guardian@school.test',
+              primaryPhone: '+9779800000000',
+              receivesAlerts: true,
+              user: { email: 'guardian-user@school.test' },
+            },
+          },
+        ],
+      },
+    ]);
+    prisma.guardianConsent.findMany.mockResolvedValue([
+      {
+        id: 'consent-1',
+        guardianId: 'guardian-1',
+        consentType: ConsentType.PHOTO_USAGE,
+        granted: true,
+        revokedAt: null,
+        capturedAt: new Date('2026-04-01T00:00:00.000Z'),
+      },
+    ]);
+
+    await service.recordDeliveryRecords({
+      actor,
+      sourceType: 'activity_post',
+      sourceId: 'post-1',
+      activityPostId: 'post-1',
+      audienceType: AudienceType.SECTION,
+      classId: 'class-1',
+      sectionId: 'section-1',
+      title: 'Class activity',
+      body: 'Today in class.',
+      channels: [NotificationChannel.PUSH],
+      requiredConsentTypes: [ConsentType.PHOTO_USAGE],
+      activeStudentsOnly: true,
+    });
+
+    expect(prisma.student.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          sectionId: 'section-1',
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        }),
+      }),
+    );
+    expect(prisma.notificationDelivery.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        activityPostId: 'post-1',
+        studentId: 'student-1',
+        guardianId: 'guardian-1',
+        status: NotificationStatus.QUEUED,
+      }),
+    });
   });
 
   it('links notice attachments through File Registry and stores protected URLs only', async () => {

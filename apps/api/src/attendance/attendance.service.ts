@@ -56,6 +56,22 @@ import { UpsertAttendanceDraftDto } from './dto/upsert-attendance-draft.dto';
 import { buildRosterPdf } from '../common/pdf/simple-pdf';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 
+const M2_ATTENDANCE_HARDENING_POLICY_KEY = 'attendance.m2.hardeningPolicy';
+const DEFAULT_M2_ATTENDANCE_POLICY = {
+  lockOverrideMinReasonLength: 8,
+  correctionReviewMinReasonLength: 8,
+  parentNotificationChannels: [
+    NotificationChannel.PUSH,
+    NotificationChannel.SMS,
+  ],
+  notifyParentsForLate: true,
+  notifyParentsForAbsence: true,
+  absenceMessageTemplate:
+    'Your child was marked absent today. Please contact the school office if this needs review.',
+  lateMessageTemplate:
+    'Your child was marked late today. Please contact the school office if this needs review.',
+};
+
 @Injectable()
 export class AttendanceService {
   constructor(
@@ -839,6 +855,12 @@ export class AttendanceService {
     actor: AuthContext,
   ) {
     this.ensureAttendanceReviewAuthority(actor);
+    const reasonPolicy = await this.loadM2AttendancePolicy(actor.tenantId);
+    const overrideReason = requireMinimumReason(
+      dto.reason,
+      reasonPolicy.lockOverrideMinReasonLength,
+      'Attendance lock override',
+    );
 
     const session = await this.prisma.attendanceSession.findFirst({
       where: {
@@ -910,7 +932,7 @@ export class AttendanceService {
           })),
           incomingPayload: {
             override: dto.exceptions,
-            reason: dto.reason ?? null,
+            reason: overrideReason,
             source: dto.source ?? AttendanceOverrideSource.MANUAL_OVERRIDE,
             changedRows,
             originalLockAt: session.lockAt.toISOString(),
@@ -918,7 +940,7 @@ export class AttendanceService {
           status: AttendanceConflictStatus.REVIEWED,
           reviewedById: actor.userId,
           reviewedAt: new Date(),
-          resolutionNote: dto.reason ?? 'Admin override',
+          resolutionNote: overrideReason,
         },
       });
 
@@ -964,7 +986,7 @@ export class AttendanceService {
         })),
       },
       after: {
-        reason: dto.reason ?? null,
+        reason: overrideReason,
         source: dto.source ?? AttendanceOverrideSource.MANUAL_OVERRIDE,
         originalLockAt: session.lockAt,
         changedRows,
@@ -1398,6 +1420,12 @@ export class AttendanceService {
   ) {
     this.ensureAttendanceReviewAuthority(actor);
     const reviewReason = getCorrectionReviewReason(dto);
+    const reasonPolicy = await this.loadM2AttendancePolicy(actor.tenantId);
+    requireMinimumReason(
+      reviewReason,
+      reasonPolicy.correctionReviewMinReasonLength,
+      'Attendance correction review',
+    );
     const request = await this.prisma.attendanceCorrectionRequest.findFirst({
       where: { id, tenantId: actor.tenantId },
       select: {
@@ -2406,6 +2434,7 @@ export class AttendanceService {
         staffId: updated.reviewed.staffId,
         startsOn: updated.reviewed.startsOn,
         endsOn: updated.reviewed.endsOn,
+        reviewedById: actor.userId,
       });
     }
 
@@ -3320,11 +3349,16 @@ export class AttendanceService {
     records: Array<{ studentId: string; status: AttendanceStatus }>,
     actor: AuthContext,
   ) {
-    const parentNotificationRecords = records.filter(
-      (record) =>
-        record.status === AttendanceStatus.ABSENT ||
-        record.status === AttendanceStatus.LATE,
-    );
+    const policy = await this.loadM2AttendancePolicy(actor.tenantId);
+    const parentNotificationRecords = records.filter((record) => {
+      if (record.status === AttendanceStatus.ABSENT) {
+        return policy.notifyParentsForAbsence;
+      }
+      if (record.status === AttendanceStatus.LATE) {
+        return policy.notifyParentsForLate;
+      }
+      return false;
+    });
 
     if (parentNotificationRecords.length === 0) {
       return;
@@ -3345,9 +3379,9 @@ export class AttendanceService {
         studentIds: [record.studentId],
         title: isLate ? 'Late attendance update' : 'Absence attendance update',
         body: isLate
-          ? 'Your child was marked late today. Please contact the school office if this needs review.'
-          : 'Your child was marked absent today. Please contact the school office if this needs review.',
-        channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+          ? renderM2AttendanceTemplate(policy.lateMessageTemplate)
+          : renderM2AttendanceTemplate(policy.absenceMessageTemplate),
+        channels: policy.parentNotificationChannels,
         requiredConsentTypes: [ConsentType.MESSAGING],
         communicationCategory: 'ESSENTIAL',
       });
@@ -3610,6 +3644,54 @@ export class AttendanceService {
         'You do not have permission to review attendance conflicts/corrections',
       );
     }
+  }
+
+  private async loadM2AttendancePolicy(tenantId: string) {
+    const setting = await this.prisma.tenantSetting.findUnique({
+      where: {
+        tenantId_key: {
+          tenantId,
+          key: M2_ATTENDANCE_HARDENING_POLICY_KEY,
+        },
+      },
+      select: { value: true },
+    });
+    const value = setting?.value;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return DEFAULT_M2_ATTENDANCE_POLICY;
+    }
+
+    const policy = value as Record<string, unknown>;
+    return {
+      lockOverrideMinReasonLength: readM2ReasonPolicyNumber(
+        policy.lockOverrideMinReasonLength,
+        DEFAULT_M2_ATTENDANCE_POLICY.lockOverrideMinReasonLength,
+      ),
+      correctionReviewMinReasonLength: readM2ReasonPolicyNumber(
+        policy.correctionReviewMinReasonLength,
+        DEFAULT_M2_ATTENDANCE_POLICY.correctionReviewMinReasonLength,
+      ),
+      parentNotificationChannels: readM2NotificationChannels(
+        policy.parentNotificationChannels,
+        DEFAULT_M2_ATTENDANCE_POLICY.parentNotificationChannels,
+      ),
+      notifyParentsForLate: readM2Boolean(
+        policy.notifyParentsForLate,
+        DEFAULT_M2_ATTENDANCE_POLICY.notifyParentsForLate,
+      ),
+      notifyParentsForAbsence: readM2Boolean(
+        policy.notifyParentsForAbsence,
+        DEFAULT_M2_ATTENDANCE_POLICY.notifyParentsForAbsence,
+      ),
+      absenceMessageTemplate: readM2String(
+        policy.absenceMessageTemplate,
+        DEFAULT_M2_ATTENDANCE_POLICY.absenceMessageTemplate,
+      ),
+      lateMessageTemplate: readM2String(
+        policy.lateMessageTemplate,
+        DEFAULT_M2_ATTENDANCE_POLICY.lateMessageTemplate,
+      ),
+    };
   }
 
   private async ensureStudentAttendanceAccess(
@@ -4394,6 +4476,58 @@ function getCorrectionReviewReason(dto: ReviewAttendanceCorrectionDto) {
   }
 
   return reviewReason;
+}
+
+function readM2ReasonPolicyNumber(value: unknown, fallback: number) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 1
+    ? Math.min(Math.trunc(value), 30)
+    : fallback;
+}
+
+function readM2Boolean(value: unknown, fallback: boolean) {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function readM2String(value: unknown, fallback: string) {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+
+function readM2NotificationChannels(
+  value: unknown,
+  fallback: NotificationChannel[],
+) {
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+  const allowed = new Set(Object.values(NotificationChannel));
+  const channels = value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim().toUpperCase())
+    .filter((item): item is NotificationChannel =>
+      allowed.has(item as NotificationChannel),
+    );
+  return channels.length > 0 ? [...new Set(channels)] : fallback;
+}
+
+function requireMinimumReason(
+  reason: string | null | undefined,
+  minLength: number,
+  context: string,
+) {
+  const normalized = (reason ?? '').trim();
+  if (normalized.length < minLength) {
+    throw new ConflictException(
+      `${context} requires a reason of at least ${minLength} characters.`,
+    );
+  }
+  return normalized;
+}
+
+function renderM2AttendanceTemplate(template: string) {
+  return template
+    .replaceAll('{studentName}', 'Your child')
+    .replaceAll('{count}', '1')
+    .replaceAll('{threshold}', '1');
 }
 
 function buildParentAttendanceStatusLabel(

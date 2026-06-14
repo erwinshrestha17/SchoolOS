@@ -274,6 +274,52 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
       'tenant-a-import.csv',
     );
   });
+
+  it('hardens admission application status mutations over HTTP', async () => {
+    const directEnroll = await request(app.getHttpServer())
+      .post('/admissions/applications/application-a/status')
+      .set('x-test-tenant', tenantAId)
+      .set('authorization', 'Bearer test-token')
+      .send({ status: 'ENROLLED' })
+      .expect(400);
+
+    expect(directEnroll.body.message).toBe(
+      'Use the application enrollment endpoint so a tenant-owned student record is created and linked.',
+    );
+    expect(
+      prisma.__state.admissionApplications.find(
+        (application) => application.id === 'application-a',
+      )?.status,
+    ).toBe('ACCEPTED');
+
+    await request(app.getHttpServer())
+      .post('/admissions/applications/application-a/status')
+      .set('x-test-tenant', tenantBId)
+      .set('authorization', 'Bearer test-token')
+      .send({ status: 'REJECTED', reason: 'Cross-tenant attempt' })
+      .expect(404);
+
+    expect(
+      prisma.__state.admissionApplications.find(
+        (application) => application.id === 'application-a',
+      )?.status,
+    ).toBe('ACCEPTED');
+
+    const accepted = await request(app.getHttpServer())
+      .post('/admissions/applications/application-a/status')
+      .set('x-test-tenant', tenantAId)
+      .set('authorization', 'Bearer test-token')
+      .send({ status: 'REJECTED', reason: 'Family withdrew application' })
+      .expect(201);
+
+    expect(accepted.body).toEqual(
+      expect.objectContaining({
+        id: 'application-a',
+        status: 'REJECTED',
+        rejectedReason: 'Family withdrew application',
+      }),
+    );
+  });
 });
 
 function buildActor(tenantId: string, userId: string): AuthContext {
@@ -423,16 +469,47 @@ function seedM1Data(prisma: PrismaMock) {
   });
   prisma.__state.admissionApplications = [
     {
+      id: 'application-a',
+      tenantId: tenantAId,
+      status: 'ACCEPTED',
+      firstNameEn: 'Asha',
+      lastNameEn: 'Tamang',
+      firstNameNp: null,
+      lastNameNp: null,
+      dateOfBirth: new Date('2020-01-02T00:00:00.000Z'),
+      gender: 'FEMALE',
+      guardianFullName: 'Maya Tamang',
+      guardianRelation: 'mother',
+      guardianPhone: '9800000000',
+      guardianEmail: null,
+      academicYearId: null,
+      classId: null,
+      sectionId: null,
+      previousSchool: null,
+      source: 'front-desk',
+      notes: null,
+      duplicateReview: null,
+      convertedStudentId: null,
+      rejectedReason: null,
+      createdById: 'registrar-a',
+      updatedById: 'registrar-a',
+      createdAt: new Date('2026-04-04T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-04T00:00:00.000Z'),
+    },
+    {
       id: 'draft-b',
       tenantId: tenantBId,
       status: 'INQUIRY',
+      gender: null,
       firstNameEn: 'Bina',
       lastNameEn: 'Rai',
       firstNameNp: null,
       lastNameNp: null,
       dateOfBirth: new Date('2020-03-03T00:00:00.000Z'),
       guardianFullName: 'Tenant B Guardian',
+      guardianRelation: null,
       guardianPhone: '9811111111',
+      guardianEmail: null,
       academicYearId: null,
       classId: null,
       sectionId: null,
@@ -440,6 +517,8 @@ function seedM1Data(prisma: PrismaMock) {
       source: 'autosave:tenant-b-draft',
       notes: JSON.stringify({ payload: { tenant: 'B' } }),
       duplicateReview: { matches: [] },
+      convertedStudentId: null,
+      rejectedReason: null,
       createdById: 'registrar-b',
       updatedById: 'registrar-b',
       createdAt: new Date('2026-04-04T00:00:00.000Z'),
@@ -610,6 +689,23 @@ function overrideAdmissionDraftReads(prisma: PrismaMock) {
       prisma.__state.admissionApplications.push(application);
       return Promise.resolve(application);
     }),
+    updateMany: jest.fn(
+      (query: {
+        where?: Record<string, unknown>;
+        data?: Record<string, unknown>;
+      }) => {
+        let count = 0;
+        for (const application of prisma.__state.admissionApplications) {
+          if (matchesRecordWhere(application, query.where)) {
+            Object.assign(application, query.data ?? {}, {
+              updatedAt: new Date('2026-04-06T00:05:00.000Z'),
+            });
+            count += 1;
+          }
+        }
+        return Promise.resolve({ count });
+      },
+    ),
     update: jest.fn(
       (query: {
         where?: Record<string, unknown>;

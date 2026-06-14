@@ -222,4 +222,63 @@ describe('DeliveryRetryService failure dashboard', () => {
       }),
     );
   });
+
+  it('replays pending activity delivery retries without dispatching a duplicate provider request', async () => {
+    const lastRetryAt = new Date('2026-05-17T09:05:00.000Z');
+    const prisma = {
+      notificationDelivery: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'delivery-1',
+          tenantId: 'tenant-1',
+          status: NotificationStatus.RETRY_PENDING,
+          channel: NotificationChannel.PUSH,
+          sourceType: 'activity_post',
+          sourceId: 'activity-post-1',
+          destination: 'guardian-user-1',
+          title: 'Class activity',
+          body: 'Students painted today.',
+          errorMessage: null,
+          lastRetryAt,
+        }),
+        updateMany: jest.fn(),
+      },
+    };
+    const notificationsService = {
+      sendPushNotification: jest.fn(),
+    };
+    const auditService = {
+      record: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new DeliveryRetryService(
+      prisma as never,
+      notificationsService as never,
+      auditService as never,
+    );
+
+    await expect(
+      service.retryDelivery('delivery-1', actor, {
+        reason: 'Teacher retried from activity feed',
+      }),
+    ).resolves.toEqual({
+      deliveryId: 'delivery-1',
+      status: NotificationStatus.RETRY_PENDING,
+      errorMessage: null,
+      retriedAt: lastRetryAt.toISOString(),
+      replayed: true,
+    });
+
+    expect(prisma.notificationDelivery.updateMany).not.toHaveBeenCalled();
+    expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'retry_replayed',
+        resource: 'notification_delivery',
+        tenantId: 'tenant-1',
+        after: expect.objectContaining({
+          sourceType: 'activity_post',
+          sourceId: 'activity-post-1',
+        }),
+      }),
+    );
+  });
 });

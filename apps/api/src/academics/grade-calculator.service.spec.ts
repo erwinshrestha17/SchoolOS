@@ -141,6 +141,26 @@ describe('GradeCalculatorService', () => {
       expect(result.missingComponentCount).toBe(1);
     });
 
+    it('marks draft autosaved components as incomplete until submitted', () => {
+      const result = service.calculateWeightedSubjectGrade({
+        subjectId: 'math',
+        components: [
+          {
+            componentId: 'draft-theory',
+            subjectId: 'math',
+            maxMarks: 100,
+            marksObtained: 82,
+            passMarks: 35,
+            status: 'DRAFT' as MarkEntryStatus,
+            weightPercent: 100,
+          },
+        ],
+      });
+
+      expect(result.status).toBe('INCOMPLETE');
+      expect(result.missingComponentCount).toBe(1);
+    });
+
     it('returns RETEST component result when status is RETEST and utilizes marksObtained', () => {
       const result = service.calculateWeightedSubjectGrade({
         subjectId: 'eng',

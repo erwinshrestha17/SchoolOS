@@ -19,6 +19,8 @@ interface RetryableDelivery {
   destination: string | null;
   title: string;
   body: string;
+  errorMessage?: string | null;
+  lastRetryAt?: Date | null;
 }
 
 export interface DeliveryRetryResult {
@@ -26,6 +28,7 @@ export interface DeliveryRetryResult {
   status: NotificationStatus;
   errorMessage: string | null;
   retriedAt: string;
+  replayed?: boolean;
 }
 
 export interface BulkDeliveryRetryResult {
@@ -88,6 +91,31 @@ export class DeliveryRetryService {
       throw new BadRequestException(
         `Only failed or queued deliveries can be retried. Current status: ${delivery.status}`,
       );
+    }
+
+    if (delivery.status === NotificationStatus.RETRY_PENDING) {
+      await this.auditService.record({
+        action: 'retry_replayed',
+        resource: 'notification_delivery',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: delivery.id,
+        after: {
+          status: delivery.status,
+          sourceType: delivery.sourceType,
+          sourceId: delivery.sourceId,
+          channel: delivery.channel,
+          reason: options.reason ?? null,
+        },
+      });
+
+      return {
+        deliveryId: delivery.id,
+        status: NotificationStatus.RETRY_PENDING,
+        errorMessage: delivery.errorMessage ?? null,
+        retriedAt: (delivery.lastRetryAt ?? new Date()).toISOString(),
+        replayed: true,
+      };
     }
 
     const result = await this.dispatchRetry(delivery, actor, options);

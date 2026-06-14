@@ -14,6 +14,7 @@ import {
   Prisma,
   ActivityAttachment,
   ActivityPostStatus,
+  StudentLifecycleStatus,
   StorageProvider,
 } from '@prisma/client';
 import { Queue } from 'bullmq';
@@ -239,6 +240,135 @@ export class ActivityFeedService {
       };
       return this.serializePostForActor(post, postMediaAccess);
     });
+  }
+
+  async previewAudience(
+    actor: AuthContext,
+    filters: {
+      classId?: string;
+      sectionId?: string;
+      studentIds?: string | string[];
+    },
+  ) {
+    if (!filters.classId?.trim()) {
+      throw new BadRequestException('classId is required for audience preview');
+    }
+
+    const requestedStudentIds = normalizeStudentIds(filters.studentIds);
+
+    await this.ensureClassSectionAndWriteAccess(actor, {
+      classId: filters.classId,
+      sectionId: filters.sectionId,
+      requireWritable: false,
+    });
+
+    const students = await this.prisma.student.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        classId: filters.classId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+        ...(requestedStudentIds.length
+          ? { id: { in: requestedStudentIds } }
+          : {}),
+      },
+      select: {
+        id: true,
+        firstNameEn: true,
+        lastNameEn: true,
+        classId: true,
+        sectionId: true,
+        guardianLinks: {
+          include: {
+            guardian: {
+              include: {
+                consents: {
+                  where: { consentType: ConsentType.PHOTO_USAGE },
+                  orderBy: { capturedAt: 'desc' },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ firstNameEn: 'asc' }, { lastNameEn: 'asc' }],
+      take: requestedStudentIds.length ? requestedStudentIds.length : 250,
+    });
+
+    if (
+      requestedStudentIds.length > 0 &&
+      students.length !== requestedStudentIds.length
+    ) {
+      throw new NotFoundException(
+        'One or more preview students were not found as active members of this class/section',
+      );
+    }
+
+    const guardianIds = new Set<string>();
+    let pushRecipientCount = 0;
+    let mediaConsentGrantedCount = 0;
+    let mediaConsentBlockedCount = 0;
+
+    const previewStudents = students.map((student) => {
+      const recipientLinks = student.guardianLinks.filter(
+        (link) => link.isPrimary || link.guardian.receivesAlerts,
+      );
+      let mediaConsentGranted = false;
+      for (const link of student.guardianLinks) {
+        const latestConsent = link.guardian.consents[0];
+        if (!latestConsent) {
+          continue;
+        }
+        if (latestConsent.granted && !latestConsent.revokedAt) {
+          mediaConsentGranted = true;
+          continue;
+        }
+        mediaConsentGranted = false;
+        break;
+      }
+
+      for (const link of recipientLinks) {
+        guardianIds.add(link.guardianId);
+        if (link.guardian.userId) {
+          pushRecipientCount += 1;
+        }
+      }
+
+      if (mediaConsentGranted) {
+        mediaConsentGrantedCount += 1;
+      } else {
+        mediaConsentBlockedCount += 1;
+      }
+
+      return {
+        id: student.id,
+        fullName: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+        classId: student.classId,
+        sectionId: student.sectionId,
+        guardianRecipientCount: recipientLinks.length,
+        mediaConsentGranted,
+      };
+    });
+
+    return {
+      audienceType: requestedStudentIds.length
+        ? AudienceType.STUDENT
+        : filters.sectionId
+          ? AudienceType.SECTION
+          : AudienceType.CLASS,
+      classId: filters.classId,
+      sectionId: filters.sectionId ?? null,
+      requestedStudentIds,
+      studentCount: students.length,
+      guardianRecipientCount: guardianIds.size,
+      pushRecipientCount,
+      mediaConsent: {
+        grantedStudentCount: mediaConsentGrantedCount,
+        blockedStudentCount: mediaConsentBlockedCount,
+      },
+      students: previewStudents,
+    };
   }
 
   async getPostDetail(postId: string, actor: AuthContext) {
@@ -585,13 +715,12 @@ export class ActivityFeedService {
 
     let post;
     try {
-      const audienceType =
-        dto.audienceType ??
-        (dto.studentIds?.length
-          ? AudienceType.ALL
-          : dto.sectionId
-            ? AudienceType.SECTION
-            : AudienceType.CLASS);
+      const defaultAudienceType = dto.sectionId
+        ? AudienceType.SECTION
+        : AudienceType.CLASS;
+      const audienceType = dto.studentIds?.length
+        ? AudienceType.STUDENT
+        : (dto.audienceType ?? defaultAudienceType);
 
       post = await this.prisma.activityPost.create({
         data: {
@@ -678,6 +807,7 @@ export class ActivityFeedService {
         body: post.caption,
         channels: [NotificationChannel.PUSH],
         requiredConsentTypes: [ConsentType.PHOTO_USAGE],
+        activeStudentsOnly: true,
       });
 
       await this.auditService.record({
@@ -1474,6 +1604,23 @@ function getMonthRange(month: string) {
     start: new Date(Date.UTC(year, monthIndex, 1)),
     end: new Date(Date.UTC(year, monthIndex + 1, 1)),
   };
+}
+
+function normalizeStudentIds(studentIds?: string | string[]) {
+  const rawValues = Array.isArray(studentIds)
+    ? studentIds
+    : studentIds
+      ? studentIds.split(',')
+      : [];
+
+  return Array.from(
+    new Set(
+      rawValues
+        .flatMap((value) => value.split(','))
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  );
 }
 
 function canManageAllActivity(actor: AuthContext) {

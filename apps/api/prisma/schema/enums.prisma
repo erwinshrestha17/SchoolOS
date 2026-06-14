@@ -758,6 +758,7 @@ enum StudentQrStatus {
 }
 
 enum MarkEntryStatus {
+  DRAFT
   PRESENT
   ABSENT
   EXCUSED

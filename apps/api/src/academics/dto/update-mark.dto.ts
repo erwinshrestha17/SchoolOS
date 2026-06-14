@@ -25,6 +25,10 @@ export class UpdateMarkDto {
   isRetest?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  isDraft?: boolean;
+
+  @IsOptional()
   @IsString()
   remarks?: string;
 }
