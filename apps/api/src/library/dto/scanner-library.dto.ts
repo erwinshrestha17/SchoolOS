@@ -25,7 +25,7 @@ export class ScannerIssueLibraryCopyDto {
 
   @IsOptional()
   @IsDateString()
-  dueAt?: string;
+  dueAt!: string;
 
   @IsOptional()
   @IsString()
