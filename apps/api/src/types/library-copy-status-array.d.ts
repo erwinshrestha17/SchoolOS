@@ -10,4 +10,8 @@ declare global {
   interface Array<T> {
     includes(searchElement: T | LibraryCopyStatus, fromIndex?: number): boolean;
   }
+
+  interface DateConstructor {
+    new (value: string | number | Date | undefined): Date;
+  }
 }
