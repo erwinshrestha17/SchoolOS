@@ -1,3 +1,15 @@
 model ProviderConfig {
-  id String @id @default(uuid())
+  id               String              @id @default(uuid())
+  type             ProviderType
+  name             String
+  enabled          Boolean             @default(false)
+  environment      ProviderEnvironment @default(TEST)
+  lastValidatedAt  DateTime?
+  validationStatus String?
+  updatedBy        String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@unique([type, name, environment])
+  @@index([type, enabled])
 }
