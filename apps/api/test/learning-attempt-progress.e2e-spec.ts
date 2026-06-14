@@ -49,4 +49,20 @@ describe('Learning attempt progress (E2E)', () => {
     expect(prisma.__state.learningProgress).toHaveLength(1);
     expect(prisma.__state.learningProgress[0].completedCount).toBe(1);
   });
+
+  it('does not record progress from autosave alone', async () => {
+    const { prisma, attempts } = createLearningHarness();
+    seedLearningBase(prisma);
+    seedLearningActivity(prisma);
+    seedLearningSession(prisma);
+
+    const started = await attempts.startAttempt('session-a', studentActor());
+    await attempts.autosaveAttempt(
+      started.id,
+      { answers: [{ questionId: 'question-a', answer: 'A' }] },
+      studentActor(),
+    );
+
+    expect(prisma.__state.learningProgress).toHaveLength(0);
+  });
 });
