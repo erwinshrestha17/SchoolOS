@@ -5,6 +5,7 @@ model ProviderConfig {
   enabled          Boolean             @default(false)
   environment      ProviderEnvironment @default(TEST)
   configEncrypted  Json
+  secretKeys       String[]            @default([])
   lastValidatedAt  DateTime?
   validationStatus String?
   updatedBy        String?
