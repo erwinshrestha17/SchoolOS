@@ -115,27 +115,32 @@ M1 / M5 / M10
 - 2026-06-13: M1 student directory now uses the tenant-scoped `/students/iemis/validation` endpoint for class/section iEMIS readiness review, with issue counts and profile links for corrections.
 - 2026-06-13: M1 backend now persists admissions bulk-import batch/row history, exposes tenant-scoped import history APIs, adds configurable student-document expiry reminder templates, and exposes Student QR operational analytics from the audit trail.
 - 2026-06-13: M1 admission applications now support tenant-scoped pipeline states from inquiry through application/document-pending/interview/accepted/enrolled/rejected, audited status transitions, duplicate review metadata, and conversion through the existing enrollment flow.
+- 2026-06-14: M1 hardening coverage now validates tenant-scoped ownership audit lookups, QR analytics token-hash suppression, admission draft autosave/recovery scoping, enhanced duplicate signals, guardian-removal file-access review, generated ID-card metadata lookup, import-review queue scoping, iEMIS readiness, and alumni graduation transitions; guardian-link removal now mutates with tenant/student/guardian predicates. Route-level M1 hardening controller contracts now pin module entitlement, high-risk route permissions, and authenticated actor delegation for ownership, drafts, duplicate/relationship review, guardian removal, generated documents, import review, iEMIS readiness, workflow labels, and alumni transitions. HTTP E2E now covers same-tenant and cross-tenant M1 ownership audit, guardian-removal file-access review, admission draft autosave/recovery, and import-review queue paths, including QR token-hash non-disclosure and no cross-tenant mutation or draft/import leakage.
 - RequiredModule('activity') on media-access (M5).
 - EntitlementGuard on all communications/messaging satellite controllers (M10).
 
 M2 Attendance
 - 2026-06-13: Monthly register CSV/PDF exports now use the shared authenticated web API helper with parsed backend errors and in-app success/failure states instead of raw URL `window.open` export links.
 - 2026-06-13: Submitted absent/late records now create child-scoped parent notification deliveries with audit, and `/attendance/follow-ups` exposes a repeated absence/late follow-up queue from anomaly data.
+- 2026-06-14: M2 hardening regression coverage now validates tenant-scoped anomaly detection across session windows, active-roster counts, explicit calendar policy, non-working/exam-day attendance, generic holiday status on exam days, not-marked sessions, missing roster records, high absence rates, anomaly audit metadata, and cutoff automation creating locked not-marked sessions for missing active-roster scopes.
 - Repo-truth correction: lock-window enforcement, working-day calendar policy, duplicate/concurrent session conflict handling, and operational anomaly detection/dashboard are already implemented; remaining M2 work is regression depth, smoke, and UX triage polish.
 
 M3 Fees & Receipts
 - 2026-06-13: Online payment webhooks now fail closed for non-success gateway events, reject missing references and zero-amount success events, and keep duplicate/already-paid protections covered by focused finance hardening tests.
 - 2026-06-13: Defaulter APIs now support aging-bucket and min/max overdue segmentation, return segment totals, and send child-scoped overdue reminders with segment-aware audit metadata.
 - 2026-06-13: Online payment webhook status normalization now accepts common dotted provider callback events such as `payment.success`, `payment.failed`, and `payment.pending` while continuing to fail closed for unknown statuses.
+- 2026-06-14: Payment collection now treats tenant-scoped idempotency-key unique races as idempotent responses by returning the existing receipt/payment, and cashier-close regression coverage maps database unique-window races to bounded conflict responses. Cashier-close overlap checks now respect payment-method-specific closes so cash/bank/manual mode day-close workflows can close separately while all-method closes still guard the whole window.
 
 M4 Academics
 - 2026-06-13: Report-card PDF opening now uses the shared authenticated web helper with response validation and parsed error handling across the dedicated report-card workspace and the academics tab.
 - 2026-06-13: Assessment template backend presets now expose terminal and theory/practical templates and can apply them as audited tenant-scoped exam terms plus assessment components for class subjects.
+- 2026-06-14: Marks service regression coverage now pins absent, withheld, and retest/make-up mark states through the tenant-scoped bulk upsert path with audit metadata.
 - Repo-truth correction: mark lock/unlock approval, dues-aware result withholding, and queued large-batch report-card generation already exist; remaining M4 work is focused regression/staging smoke plus retest/make-up exam workflow depth.
 
 M5 Activity Feed
 - 2026-06-13: Activity media preview/download now uses shared web blob helpers for authenticated response validation, empty-file checks, object URL cleanup, and app-controlled downloads.
 - 2026-06-13: Milestone template presets now expose Montessori/ECD and primary-stage milestone suggestions with stage/domain filtering for future teacher picker UI and mobile reuse.
+- 2026-06-14: Activity feed parent visibility regression coverage now fails closed after guardian-student links are removed, preventing removed guardians from receiving activity posts or media visibility.
 
 M6 Homework / Timetable
 - 2026-06-13: Homework detail, review, and student attachment opening now use homework-specific signed access helpers instead of generic file view calls, preserving assignment/submission ownership checks.

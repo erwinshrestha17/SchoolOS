@@ -553,4 +553,31 @@ describe('ActivityFeedService', () => {
       'PHOTO_USAGE_CONSENT_REQUIRED',
     );
   });
+
+  it('fails closed for parent feed visibility after guardian links are removed', async () => {
+    const parentActor: AuthContext = {
+      ...actor,
+      userId: 'guardian-user-removed',
+      roles: ['parent'],
+      permissions: ['activity_feed:read'],
+    };
+
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-removed',
+      studentLinks: [],
+    });
+    prisma.activityPost.findMany.mockResolvedValue([]);
+
+    const results = await service.listPosts(parentActor);
+
+    expect(results).toEqual([]);
+    expect(prisma.activityPost.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: actor.tenantId,
+          id: '__no_visible_activity_posts__',
+        }),
+      }),
+    );
+  });
 });

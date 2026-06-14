@@ -35,7 +35,6 @@ import {
 } from '../accounting/dto/reconciliation-query.dto';
 import { UsageService } from '../usage/usage.service';
 import {
-  buildSimplePdf,
   buildReceiptPdf,
   buildCashierClosePdf,
 } from '../common/pdf/simple-pdf';
@@ -73,6 +72,18 @@ import { resolveCashAccountCode } from './finance.defaults';
 import { ReprintReceiptDto } from './dto/reprint-receipt.dto';
 import { DuesQueryDto } from './dto/dues-query.dto';
 import { FeeAgingBucket, ListDefaultersDto } from './dto/list-defaulters.dto';
+
+interface CollectedPaymentWithReceipt {
+  id: string;
+  invoiceId: string;
+  amount: Prisma.Decimal;
+  method: PaymentMethod;
+  paidAt: Date;
+  receipt: {
+    receiptNumber: string;
+    pdfUrl: string | null;
+  } | null;
+}
 
 export interface FeeCollectionReportRow {
   receiptNumber: string;
@@ -2916,121 +2927,149 @@ export class FinanceService {
       where: { id: actor.tenantId },
     });
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const receiptNumber = await this.generateReceiptNumber(
-        actor.tenantId,
-        fiscalYear,
-        tx,
-      );
+    let result: CollectedPaymentWithReceipt;
 
-      const receiptVat = invoice.totalAmount.gt(0)
-        ? invoice.vatAmount.mul(paymentAmount).div(invoice.totalAmount)
-        : new Prisma.Decimal(0);
-      const payment = await tx.payment.create({
-        data: {
-          tenantId: actor.tenantId,
-          studentId: invoice.studentId,
-          invoiceId: invoice.id,
-          collectedById: actor.userId,
-          method: dto.method,
-          status: PaymentStatus.SUCCESS,
-          referenceNumber: dto.referenceNumber ?? null,
-          amount: paymentAmount,
-          isAdvance: dto.isAdvance ?? false,
-          recognizedAt: dto.recognizedAt ? new Date(dto.recognizedAt) : null,
-          metadata: {
-            remainingBeforePayment: Number(remaining),
-          },
-          paidAt: new Date(),
-          narration: dto.narration ?? null,
-          idempotencyKey: dto.idempotencyKey ?? null,
-          receipt: {
-            create: {
-              tenantId: actor.tenantId,
-              receiptNumber,
-              fiscalYear,
-              schoolPan: tenant.panNumber,
-              vatAmount: receiptVat,
-              metadata: {
-                nonReusable: true,
-                invoiceFiscalYear: invoice.fiscalYear,
-                billNumber: invoice.billNumber ?? invoice.invoiceNumber,
-              },
-              pdfUrl: `/api/v1/receipts/${receiptNumber}.pdf`,
+    try {
+      result = await this.prisma.$transaction(async (tx) => {
+        const receiptNumber = await this.generateReceiptNumber(
+          actor.tenantId,
+          fiscalYear,
+          tx,
+        );
+
+        const receiptVat = invoice.totalAmount.gt(0)
+          ? invoice.vatAmount.mul(paymentAmount).div(invoice.totalAmount)
+          : new Prisma.Decimal(0);
+        const payment = await tx.payment.create({
+          data: {
+            tenantId: actor.tenantId,
+            studentId: invoice.studentId,
+            invoiceId: invoice.id,
+            collectedById: actor.userId,
+            method: dto.method,
+            status: PaymentStatus.SUCCESS,
+            referenceNumber: dto.referenceNumber ?? null,
+            amount: paymentAmount,
+            isAdvance: dto.isAdvance ?? false,
+            recognizedAt: dto.recognizedAt ? new Date(dto.recognizedAt) : null,
+            metadata: {
+              remainingBeforePayment: Number(remaining),
             },
-          },
-        },
-        include: {
-          receipt: true,
-        },
-      });
-
-      await this.usageService.incrementUsage(
-        actor.tenantId,
-        'receipts.generated',
-        1,
-      );
-
-      const totalPaid = paidSoFar.add(paymentAmount);
-
-      await tx.invoice.update({
-        where: { id: invoice.id },
-        data: {
-          status: totalPaid.gte(invoice.totalAmount)
-            ? InvoiceStatus.PAID
-            : InvoiceStatus.PARTIAL,
-          paidAt: totalPaid.gte(invoice.totalAmount) ? new Date() : null,
-        },
-      });
-
-      const allocatedLines = allocatePaymentAcrossLines(
-        invoice.lines.map((line) => ({
-          id: line.id,
-          totalAmount: line.totalAmount,
-          feeHeadCode: line.feeHead.code,
-          description: line.description,
-        })),
-        paymentAmount,
-        invoice.totalAmount,
-      );
-
-      const creditLines = await Promise.all(
-        allocatedLines.map(async (line) => {
-          const account = await tx.chartAccount.findUniqueOrThrow({
-            where: {
-              tenantId_code: {
+            paidAt: new Date(),
+            narration: dto.narration ?? null,
+            idempotencyKey: dto.idempotencyKey ?? null,
+            receipt: {
+              create: {
                 tenantId: actor.tenantId,
-                code: resolveIncomeAccountCode(line.feeHeadCode),
+                receiptNumber,
+                fiscalYear,
+                schoolPan: tenant.panNumber,
+                vatAmount: receiptVat,
+                metadata: {
+                  nonReusable: true,
+                  invoiceFiscalYear: invoice.fiscalYear,
+                  billNumber: invoice.billNumber ?? invoice.invoiceNumber,
+                },
+                pdfUrl: `/api/v1/receipts/${receiptNumber}.pdf`,
               },
             },
-          });
+          },
+          include: {
+            receipt: true,
+          },
+        });
 
-          return {
-            chartAccountId: account.id,
-            amount: line.totalAmount,
+        await this.usageService.incrementUsage(
+          actor.tenantId,
+          'receipts.generated',
+          1,
+        );
+
+        const totalPaid = paidSoFar.add(paymentAmount);
+
+        await tx.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            status: totalPaid.gte(invoice.totalAmount)
+              ? InvoiceStatus.PAID
+              : InvoiceStatus.PARTIAL,
+            paidAt: totalPaid.gte(invoice.totalAmount) ? new Date() : null,
+          },
+        });
+
+        const allocatedLines = allocatePaymentAcrossLines(
+          invoice.lines.map((line) => ({
+            id: line.id,
+            totalAmount: line.totalAmount,
+            feeHeadCode: line.feeHead.code,
             description: line.description,
-          };
-        }),
-      );
-
-      await this.accountingPostingService.postFeePayment(
-        {
-          tenantId: actor.tenantId,
-          paymentId: payment.id,
-          invoiceNumber: invoice.invoiceNumber,
-          receiptNumber,
+          })),
           paymentAmount,
-          paymentMethod: dto.method,
-          paymentAccountCode: resolveCashAccountCode(dto.method),
-          narration: dto.narration,
-          lines: [], // Lines no longer needed for payment in accrual model
-        },
-        actor,
-        tx,
-      );
+          invoice.totalAmount,
+        );
 
-      return payment;
-    });
+        await Promise.all(
+          allocatedLines.map(async (line) => {
+            const account = await tx.chartAccount.findUniqueOrThrow({
+              where: {
+                tenantId_code: {
+                  tenantId: actor.tenantId,
+                  code: resolveIncomeAccountCode(line.feeHeadCode),
+                },
+              },
+            });
+
+            return {
+              chartAccountId: account.id,
+              amount: line.totalAmount,
+              description: line.description,
+            };
+          }),
+        );
+
+        await this.accountingPostingService.postFeePayment(
+          {
+            tenantId: actor.tenantId,
+            paymentId: payment.id,
+            invoiceNumber: invoice.invoiceNumber,
+            receiptNumber,
+            paymentAmount,
+            paymentMethod: dto.method,
+            paymentAccountCode: resolveCashAccountCode(dto.method),
+            narration: dto.narration,
+            lines: [], // Lines no longer needed for payment in accrual model
+          },
+          actor,
+          tx,
+        );
+
+        return payment;
+      });
+    } catch (error) {
+      if (dto.idempotencyKey && isPrismaUniqueConstraintError(error)) {
+        const existingPayment = await this.prisma.payment.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            idempotencyKey: dto.idempotencyKey,
+          },
+          include: { receipt: true },
+        });
+
+        if (existingPayment) {
+          return {
+            paymentId: existingPayment.id,
+            invoiceId: existingPayment.invoiceId,
+            amount: Number(existingPayment.amount),
+            method: existingPayment.method,
+            paidAt: existingPayment.paidAt,
+            receiptNumber: existingPayment.receipt?.receiptNumber ?? null,
+            receiptPdfUrl: existingPayment.receipt?.pdfUrl ?? null,
+          };
+        }
+      }
+
+      throw error;
+    }
 
     await this.auditService.record({
       action: 'collect',
@@ -3782,6 +3821,18 @@ export class FinanceService {
         collectorUserId: dto.collectorUserId ?? null,
         openedAt: { lt: window.closedAt },
         closedAt: { gt: window.openedAt },
+        ...(dto.paymentMethod
+          ? {
+              AND: [
+                {
+                  OR: [
+                    { paymentMethod: null },
+                    { paymentMethod: dto.paymentMethod },
+                  ],
+                },
+              ],
+            }
+          : {}),
       },
     });
 

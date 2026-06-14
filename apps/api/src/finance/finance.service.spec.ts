@@ -335,6 +335,78 @@ describe('finance production controls', () => {
     );
   });
 
+  it('returns the existing tenant payment when idempotent collection wins a database race', async () => {
+    const invoice = buildInvoice({
+      payments: [],
+      lines: [
+        {
+          id: 'line-1',
+          totalAmount: new Prisma.Decimal(1117),
+          feeHead: { code: 'TUITION' },
+          description: 'Tuition',
+        },
+      ],
+      student: { id: 'student-1' },
+    });
+    const existingPayment = {
+      id: 'payment-existing',
+      invoiceId: invoice.id,
+      amount: new Prisma.Decimal(100),
+      method: PaymentMethod.CASH,
+      paidAt: new Date('2026-04-27T10:00:00.000Z'),
+      receipt: {
+        receiptNumber: 'REC-2026-00001',
+        pdfUrl: '/api/v1/receipts/REC-2026-00001.pdf',
+      },
+    };
+    const { service, prisma, auditService, eventEmitter } = buildService({
+      invoice,
+      feeHead: buildFeeHead(),
+      duplicatePayment: null,
+      tenant: { id: actor.tenantId, panNumber: 'PAN-123' },
+      receiptCount: 0,
+      journalCount: 0,
+      cashAccount: { id: 'cash' },
+      incomeAccount: { id: 'income' },
+      createdPayment: null,
+    });
+    prisma.payment.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(existingPayment);
+    prisma.payment.create.mockRejectedValueOnce({
+      code: 'P2002',
+      meta: { target: ['tenantId', 'idempotencyKey'] },
+    });
+
+    const result = await service.collectPayment(
+      {
+        invoiceId: invoice.id,
+        amount: 100,
+        method: PaymentMethod.CASH,
+        idempotencyKey: 'counter-submit-1',
+      },
+      actor,
+    );
+
+    expect(result).toEqual({
+      paymentId: existingPayment.id,
+      invoiceId: invoice.id,
+      amount: 100,
+      method: PaymentMethod.CASH,
+      paidAt: existingPayment.paidAt,
+      receiptNumber: 'REC-2026-00001',
+      receiptPdfUrl: '/api/v1/receipts/REC-2026-00001.pdf',
+    });
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'collect', resource: 'payment' }),
+    );
+    expect(eventEmitter.emit).not.toHaveBeenCalledWith(
+      'fees.payment.confirmed',
+      expect.anything(),
+    );
+  });
+
   it('returns tenant-scoped invoice detail with backend-owned totals', async () => {
     const detailedInvoice = buildInvoice({
       invoiceNumber: 'INV-2026-00001',
@@ -1345,6 +1417,94 @@ describe('finance production controls', () => {
     ).rejects.toThrow('This cashier window is already closed for today.');
   });
 
+  it('checks cashier-close overlaps by payment method so cash and bank can close separately', async () => {
+    const createdClose = {
+      id: 'close-bank',
+      closeNumber: 'CLS-2026-00002',
+      openedAt: new Date('2026-04-27T09:00:00.000Z'),
+      closedAt: new Date('2026-04-27T17:00:00.000Z'),
+      collectorUserId: null,
+      paymentMethod: PaymentMethod.BANK,
+      grossCollected: new Prisma.Decimal(300),
+      totalRefunded: new Prisma.Decimal(0),
+      netCollected: new Prisma.Decimal(300),
+      expectedCashAmount: new Prisma.Decimal(0),
+      actualCashAmount: null,
+      varianceAmount: null,
+      varianceReason: null,
+      denominationBreakdown: null,
+      methodBreakdown: [
+        {
+          method: PaymentMethod.BANK,
+          grossCollected: 300,
+          totalRefunded: 0,
+          netCollected: 300,
+          paymentCount: 1,
+          refundCount: 0,
+        },
+      ],
+      paymentCount: 1,
+      refundCount: 0,
+      firstReceiptNumber: 'REC-2026-00002',
+      lastReceiptNumber: 'REC-2026-00002',
+      notes: null,
+      closedById: actor.userId,
+      collectorUser: null,
+      closedBy: { id: actor.userId, email: actor.email },
+      createdAt: new Date('2026-04-27T17:00:00.000Z'),
+    };
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: null,
+      cashierPayments: [
+        buildCashierPayment({
+          id: 'payment-bank',
+          method: PaymentMethod.BANK,
+          amount: new Prisma.Decimal(300),
+          receipt: { receiptNumber: 'REC-2026-00002' },
+        }),
+      ],
+      cashierRefunds: [],
+      cashierCloseCount: 1,
+      createdCashierClose: createdClose,
+    });
+    prisma.cashierClose.findFirst.mockResolvedValue(null);
+
+    const result = await service.finalizeCashierClose(
+      {
+        openedAt: '2026-04-27T09:00:00.000Z',
+        closedAt: '2026-04-27T17:00:00.000Z',
+        paymentMethod: PaymentMethod.BANK,
+      },
+      actor,
+    );
+
+    expect(prisma.cashierClose.findFirst).toHaveBeenNthCalledWith(2, {
+      where: expect.objectContaining({
+        tenantId: actor.tenantId,
+        collectorUserId: null,
+        AND: [
+          {
+            OR: [
+              { paymentMethod: null },
+              { paymentMethod: PaymentMethod.BANK },
+            ],
+          },
+        ],
+      }),
+    });
+    expect(prisma.cashierClose.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentMethod: PaymentMethod.BANK,
+          grossCollected: new Prisma.Decimal(300),
+          netCollected: new Prisma.Decimal(300),
+        }),
+      }),
+    );
+    expect(result.paymentMethod).toBe(PaymentMethod.BANK);
+  });
+
   it('blocks cashier close races when a duplicate appears inside the transaction', async () => {
     const { service, prisma } = buildService({
       invoice: null,
@@ -1370,6 +1530,31 @@ describe('finance production controls', () => {
 
     expect(prisma.$transaction).toHaveBeenCalled();
     expect(prisma.cashierClose.create).not.toHaveBeenCalled();
+  });
+
+  it('maps cashier close unique-window races to a conflict response', async () => {
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: null,
+      cashierPayments: [],
+      cashierRefunds: [],
+      cashierCloseCount: 0,
+    });
+    prisma.cashierClose.findFirst.mockResolvedValue(null);
+    prisma.cashierClose.create.mockRejectedValueOnce({
+      code: 'P2002',
+      meta: { target: ['tenantId', 'closeWindowKey'] },
+    });
+
+    await expect(
+      service.finalizeCashierClose(
+        {
+          openedAt: '2026-04-27T09:00:00.000Z',
+          closedAt: '2026-04-27T17:00:00.000Z',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(ConflictException);
   });
 
   it('builds reconciliation rows and csv export from the same payments', async () => {
@@ -2028,7 +2213,7 @@ function buildService(options: {
         verifyLimit: jest.fn().mockResolvedValue(undefined),
         checkLimit: jest.fn().mockResolvedValue(undefined),
         incrementUsage: jest.fn().mockResolvedValue(undefined),
-      } as any,
+      } as unknown as UsageService,
       { jwtSecret: 'finance-test-secret' } as never,
       options.fileRegistryService as never,
     ),

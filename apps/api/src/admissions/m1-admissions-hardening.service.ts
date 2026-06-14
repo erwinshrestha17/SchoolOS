@@ -25,11 +25,21 @@ import {
 } from './dto/m1-admissions-hardening.dto';
 import { normalizeAdmissionName } from './admissions.utils';
 
-type DuplicateSignal = {
+interface DuplicateSignal {
   code: string;
   label: string;
   weight: number;
-};
+}
+
+type GuardianWithStudentLinks = Prisma.GuardianGetPayload<{
+  include: {
+    studentLinks: {
+      include: {
+        student: true;
+      };
+    };
+  };
+}>;
 
 @Injectable()
 export class M1AdmissionsHardeningService {
@@ -41,63 +51,68 @@ export class M1AdmissionsHardeningService {
 
   async getOwnershipAudit(studentId: string, actor: AuthContext) {
     const student = await this.findTenantStudent(studentId, actor);
-    const [documents, generatedDocuments, registryFiles, qrCredentials, guardians] =
-      await Promise.all([
-        this.prisma.studentDocument.findMany({
-          where: { tenantId: actor.tenantId, studentId: student.id },
-          select: {
-            id: true,
-            fileId: true,
-            kind: true,
-            status: true,
-            objectKey: true,
-            uploadedById: true,
-          },
-        }),
-        this.prisma.generatedStudentDocument.findMany({
-          where: { tenantId: actor.tenantId, studentId: student.id },
-          select: {
-            id: true,
-            kind: true,
-            title: true,
-            storageObjectKey: true,
-            revokedAt: true,
-            generatedAt: true,
-          },
-        }),
-        this.prisma.fileAsset.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            module: 'students',
-            entityId: student.id,
-            deletedAt: null,
-          },
-          select: {
-            id: true,
-            originalFilename: true,
-            objectKey: true,
-            ownerType: true,
-            ownerId: true,
-            visibility: true,
-            status: true,
-          },
-        }),
-        this.prisma.studentQrCredential.findMany({
-          where: { tenantId: actor.tenantId, studentId: student.id },
-          select: {
-            id: true,
-            status: true,
-            expiresAt: true,
-            lastScannedAt: true,
-            revokedAt: true,
-            rotatedAt: true,
-          },
-        }),
-        this.prisma.studentGuardian.findMany({
-          where: { tenantId: actor.tenantId, studentId: student.id },
-          include: { guardian: true },
-        }),
-      ]);
+    const [
+      documents,
+      generatedDocuments,
+      registryFiles,
+      qrCredentials,
+      guardians,
+    ] = await Promise.all([
+      this.prisma.studentDocument.findMany({
+        where: { tenantId: actor.tenantId, studentId: student.id },
+        select: {
+          id: true,
+          fileId: true,
+          kind: true,
+          status: true,
+          objectKey: true,
+          uploadedById: true,
+        },
+      }),
+      this.prisma.generatedStudentDocument.findMany({
+        where: { tenantId: actor.tenantId, studentId: student.id },
+        select: {
+          id: true,
+          kind: true,
+          title: true,
+          storageObjectKey: true,
+          revokedAt: true,
+          generatedAt: true,
+        },
+      }),
+      this.prisma.fileAsset.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          module: 'students',
+          entityId: student.id,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          originalFilename: true,
+          objectKey: true,
+          ownerType: true,
+          ownerId: true,
+          visibility: true,
+          status: true,
+        },
+      }),
+      this.prisma.studentQrCredential.findMany({
+        where: { tenantId: actor.tenantId, studentId: student.id },
+        select: {
+          id: true,
+          status: true,
+          expiresAt: true,
+          lastScannedAt: true,
+          revokedAt: true,
+          rotatedAt: true,
+        },
+      }),
+      this.prisma.studentGuardian.findMany({
+        where: { tenantId: actor.tenantId, studentId: student.id },
+        include: { guardian: true },
+      }),
+    ]);
 
     await this.auditService.record({
       action: 'm1_access_scope_review',
@@ -153,14 +168,21 @@ export class M1AdmissionsHardeningService {
     };
   }
 
-  async autosaveAdmissionDraft(dto: AutosaveAdmissionDraftDto, actor: AuthContext) {
+  async autosaveAdmissionDraft(
+    dto: AutosaveAdmissionDraftDto,
+    actor: AuthContext,
+  ) {
     const source = draftSource(dto.draftKey);
     await this.assertOptionalTenantReferences(dto, actor);
 
     const duplicateReview = await this.enhancedDuplicateReview(
       {
-        firstNameEn: dto.firstNameEn ?? readString(dto.payload, 'firstNameEn') ?? 'Draft',
-        lastNameEn: dto.lastNameEn ?? readString(dto.payload, 'lastNameEn') ?? 'Applicant',
+        firstNameEn:
+          dto.firstNameEn ?? readString(dto.payload, 'firstNameEn') ?? 'Draft',
+        lastNameEn:
+          dto.lastNameEn ??
+          readString(dto.payload, 'lastNameEn') ??
+          'Applicant',
         firstNameNp: dto.firstNameNp ?? readString(dto.payload, 'firstNameNp'),
         lastNameNp: dto.lastNameNp ?? readString(dto.payload, 'lastNameNp'),
         dateOfBirth: dto.dateOfBirth ?? readString(dto.payload, 'dateOfBirth'),
@@ -194,7 +216,7 @@ export class M1AdmissionsHardeningService {
       previousSchool: normalizeNullableString(dto.previousSchool),
       source,
       notes,
-      duplicateReview: duplicateReview as Prisma.InputJsonValue,
+      duplicateReview: duplicateReview as unknown as Prisma.InputJsonValue,
       updatedById: actor.userId,
     } satisfies Prisma.AdmissionApplicationUncheckedUpdateInput;
 
@@ -208,11 +230,13 @@ export class M1AdmissionsHardeningService {
             ...data,
             tenantId: actor.tenantId,
             createdById: actor.userId,
-          } as Prisma.AdmissionApplicationUncheckedCreateInput,
+          },
         });
 
     await this.auditService.record({
-      action: existing ? 'admission_draft_autosave_update' : 'admission_draft_autosave_create',
+      action: existing
+        ? 'admission_draft_autosave_update'
+        : 'admission_draft_autosave_create',
       resource: 'admission_application',
       tenantId: actor.tenantId,
       userId: actor.userId,
@@ -226,11 +250,16 @@ export class M1AdmissionsHardeningService {
     return formatDraft(draft);
   }
 
-  async recoverAdmissionDrafts(query: RecoverAdmissionDraftsDto, actor: AuthContext) {
+  async recoverAdmissionDrafts(
+    query: RecoverAdmissionDraftsDto,
+    actor: AuthContext,
+  ) {
     const where: Prisma.AdmissionApplicationWhereInput = {
       tenantId: actor.tenantId,
       status: { in: ['INQUIRY', 'APPLICATION', 'DOCUMENT_PENDING'] },
-      source: query.draftKey ? draftSource(query.draftKey) : { startsWith: 'autosave:' },
+      source: query.draftKey
+        ? draftSource(query.draftKey)
+        : { startsWith: 'autosave:' },
       ...(query.guardianPhone
         ? { guardianPhone: normalizeGuardianPhone(query.guardianPhone) }
         : {}),
@@ -245,7 +274,8 @@ export class M1AdmissionsHardeningService {
     return {
       items: drafts.map(formatDraft),
       total: drafts.length,
-      recoveryPolicy: 'Only tenant-owned in-progress autosave drafts are returned.',
+      recoveryPolicy:
+        'Only tenant-owned in-progress autosave drafts are returned.',
     };
   }
 
@@ -280,7 +310,9 @@ export class M1AdmissionsHardeningService {
           .map(normalizeGuardianPhone)
       : [];
     const siblingGroupIds = sibling
-      ? sibling.siblingMemberships.map((membership) => membership.siblingGroupId)
+      ? sibling.siblingMemberships.map(
+          (membership) => membership.siblingGroupId,
+        )
       : [];
     const allPhones = [...new Set([...guardianPhones, ...siblingPhones])];
 
@@ -301,7 +333,9 @@ export class M1AdmissionsHardeningService {
     });
 
     const matches = candidates
-      .map((candidate) => scoreDuplicateCandidate(candidate, dto, allPhones, siblingGroupIds))
+      .map((candidate) =>
+        scoreDuplicateCandidate(candidate, dto, allPhones, siblingGroupIds),
+      )
       .filter((match) => match.score > 0)
       .sort((a, b) => b.score - a.score);
 
@@ -333,11 +367,14 @@ export class M1AdmissionsHardeningService {
     };
   }
 
-  async resolveRelationships(dto: ResolveAdmissionRelationshipsDto, actor: AuthContext) {
+  async resolveRelationships(
+    dto: ResolveAdmissionRelationshipsDto,
+    actor: AuthContext,
+  ) {
     const guardianPhones = (dto.guardianPhones ?? [])
       .filter(Boolean)
       .map(normalizeGuardianPhone);
-    const [guardians, sibling] = await Promise.all([
+    const guardiansPromise: Promise<GuardianWithStudentLinks[]> =
       guardianPhones.length > 0
         ? this.prisma.guardian.findMany({
             where: {
@@ -353,7 +390,9 @@ export class M1AdmissionsHardeningService {
               },
             },
           })
-        : Promise.resolve([]),
+        : Promise.resolve([]);
+    const [guardians, sibling] = await Promise.all([
+      guardiansPromise,
       dto.siblingStudentSystemId
         ? this.prisma.student.findFirst({
             where: {
@@ -377,7 +416,8 @@ export class M1AdmissionsHardeningService {
         linkedStudents: guardian.studentLinks.map((link) => ({
           id: link.student.id,
           studentSystemId: link.student.studentSystemId,
-          fullNameEn: `${link.student.firstNameEn} ${link.student.lastNameEn}`.trim(),
+          fullNameEn:
+            `${link.student.firstNameEn} ${link.student.lastNameEn}`.trim(),
           relation: link.relation,
         })),
         recommendedAction: 'reuse_existing_guardian',
@@ -445,7 +485,19 @@ export class M1AdmissionsHardeningService {
     ]);
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.studentGuardian.delete({ where: { id: link.id } });
+      const removed = await tx.studentGuardian.deleteMany({
+        where: {
+          id: link.id,
+          tenantId: actor.tenantId,
+          studentId,
+          guardianId,
+        },
+      });
+      if (removed.count !== 1) {
+        throw new NotFoundException(
+          'Guardian link was already removed or no longer belongs to this tenant',
+        );
+      }
       if (documents.length > 0) {
         await tx.studentDocumentHistory.createMany({
           data: documents.map((document) => ({
@@ -462,7 +514,7 @@ export class M1AdmissionsHardeningService {
               guardianId,
               studentId,
               relationshipRemoved: true,
-            } as Prisma.InputJsonValue,
+            },
           })),
         });
       }
@@ -507,7 +559,11 @@ export class M1AdmissionsHardeningService {
 
   async generateIdCard(studentId: string, actor: AuthContext) {
     const student = await this.findTenantStudent(studentId, actor);
-    await this.studentsService.generateStudentDocumentPdf(student.id, 'ID_CARD', actor);
+    await this.studentsService.generateStudentDocumentPdf(
+      student.id,
+      'ID_CARD',
+      actor,
+    );
     return this.latestGeneratedDocument(student.id, 'ID_CARD', actor, {
       workflowLabel: 'Student ID card generated',
       wording: 'Student Identity Card',
@@ -538,16 +594,27 @@ export class M1AdmissionsHardeningService {
       'TRANSFER_CERTIFICATE',
       actor,
     );
-    return this.latestGeneratedDocument(student.id, 'TRANSFER_CERTIFICATE', actor, {
-      workflowLabel: 'Transfer certificate generated',
-      wording:
-        'This certifies that the student was enrolled at the school and has been transferred according to school records.',
-    });
+    return this.latestGeneratedDocument(
+      student.id,
+      'TRANSFER_CERTIFICATE',
+      actor,
+      {
+        workflowLabel: 'Transfer certificate generated',
+        wording:
+          'This certifies that the student was enrolled at the school and has been transferred according to school records.',
+      },
+    );
   }
 
-  async graduateStudent(studentId: string, dto: GraduateStudentDto, actor: AuthContext) {
+  async graduateStudent(
+    studentId: string,
+    dto: GraduateStudentDto,
+    actor: AuthContext,
+  ) {
     const student = await this.findTenantStudent(studentId, actor);
-    const graduatedAt = dto.graduatedAt ? new Date(dto.graduatedAt) : new Date();
+    const graduatedAt = dto.graduatedAt
+      ? new Date(dto.graduatedAt)
+      : new Date();
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.enrollment.updateMany({
         where: {
@@ -585,7 +652,10 @@ export class M1AdmissionsHardeningService {
       userId: actor.userId,
       resourceId: student.id,
       before: { lifecycleStatus: student.lifecycleStatus },
-      after: { lifecycleStatus: updated.lifecycleStatus, exitedAt: updated.exitedAt },
+      after: {
+        lifecycleStatus: updated.lifecycleStatus,
+        exitedAt: updated.exitedAt,
+      },
     });
 
     return {
@@ -630,18 +700,25 @@ export class M1AdmissionsHardeningService {
         createdAt: row.createdAt.toISOString(),
       })),
       total: rows.length,
-      policy: 'Import-review queue is tenant-scoped and only returns rows needing review or matching the requested status.',
+      policy:
+        'Import-review queue is tenant-scoped and only returns rows needing review or matching the requested status.',
     };
   }
 
-  async getIemisReadinessSummary(query: IemisReadinessSummaryDto, actor: AuthContext) {
+  async getIemisReadinessSummary(
+    query: IemisReadinessSummaryDto,
+    actor: AuthContext,
+  ) {
     const students = await this.prisma.student.findMany({
       where: {
         tenantId: actor.tenantId,
         ...(query.classId ? { classId: query.classId } : {}),
         ...(query.sectionId ? { sectionId: query.sectionId } : {}),
         lifecycleStatus: {
-          notIn: [StudentLifecycleStatus.DELETED, StudentLifecycleStatus.MERGED],
+          notIn: [
+            StudentLifecycleStatus.DELETED,
+            StudentLifecycleStatus.MERGED,
+          ],
         },
       },
       include: {
@@ -657,10 +734,8 @@ export class M1AdmissionsHardeningService {
     const items = students.map((student) => {
       const blockers: string[] = [];
       const warnings: string[] = [];
-      if (!student.firstNameEn || !student.lastNameEn) blockers.push('english_name_missing');
-      if (!student.dateOfBirth) blockers.push('date_of_birth_missing');
-      if (!student.gender) blockers.push('gender_missing');
-      if (!student.classId) blockers.push('class_missing');
+      if (!student.firstNameEn || !student.lastNameEn)
+        blockers.push('english_name_missing');
       if (student.guardianLinks.length === 0) blockers.push('guardian_missing');
       if (
         student.guardianLinks.length > 0 &&
@@ -668,10 +743,14 @@ export class M1AdmissionsHardeningService {
       ) {
         blockers.push('guardian_phone_missing');
       }
-      if (!student.disabilityFlag) blockers.push('iemis_disability_flag_missing');
-      if (student.enrollments.length === 0) blockers.push('active_enrollment_missing');
-      if (!student.firstNameNp || !student.lastNameNp) warnings.push('nepali_name_missing');
-      if (!student.nationalStudentId) warnings.push('national_student_id_missing');
+      if (!student.disabilityFlag)
+        blockers.push('iemis_disability_flag_missing');
+      if (student.enrollments.length === 0)
+        blockers.push('active_enrollment_missing');
+      if (!student.firstNameNp || !student.lastNameNp)
+        warnings.push('nepali_name_missing');
+      if (!student.nationalStudentId)
+        warnings.push('national_student_id_missing');
       if (!student.previousSchool) warnings.push('previous_school_missing');
 
       return {
@@ -690,11 +769,21 @@ export class M1AdmissionsHardeningService {
       total: items.length,
       ready: items.filter((item) => item.ready).length,
       hasIssues: items.filter((item) => !item.ready).length,
-      warningsOnly: items.filter((item) => item.ready && item.warnings.length > 0).length,
+      warningsOnly: items.filter(
+        (item) => item.ready && item.warnings.length > 0,
+      ).length,
       items,
       refinements: {
-        exportBlockedBy: ['missing guardian phone', 'missing disability flag', 'missing active enrollment'],
-        exportWarnings: ['missing Nepali name', 'missing national student ID', 'missing previous school'],
+        exportBlockedBy: [
+          'missing guardian phone',
+          'missing disability flag',
+          'missing active enrollment',
+        ],
+        exportWarnings: [
+          'missing Nepali name',
+          'missing national student ID',
+          'missing previous school',
+        ],
       },
     };
   }
@@ -734,7 +823,9 @@ export class M1AdmissionsHardeningService {
       orderBy: [{ generatedAt: 'desc' }],
     });
     if (!document) {
-      throw new NotFoundException('Generated document metadata was not persisted');
+      throw new NotFoundException(
+        'Generated document metadata was not persisted',
+      );
     }
     return {
       id: document.id,
@@ -764,7 +855,10 @@ export class M1AdmissionsHardeningService {
   }
 
   private async assertOptionalTenantReferences(
-    dto: Pick<AutosaveAdmissionDraftDto, 'academicYearId' | 'classId' | 'sectionId'>,
+    dto: Pick<
+      AutosaveAdmissionDraftDto,
+      'academicYearId' | 'classId' | 'sectionId'
+    >,
     actor: AuthContext,
   ) {
     const [academicYear, classroom, section] = await Promise.all([
@@ -787,11 +881,16 @@ export class M1AdmissionsHardeningService {
           })
         : Promise.resolve(null),
     ]);
-    if (dto.academicYearId && !academicYear) throw new NotFoundException('Academic year not found in this tenant');
-    if (dto.classId && !classroom) throw new NotFoundException('Class not found in this tenant');
-    if (dto.sectionId && !section) throw new NotFoundException('Section not found in this tenant');
+    if (dto.academicYearId && !academicYear)
+      throw new NotFoundException('Academic year not found in this tenant');
+    if (dto.classId && !classroom)
+      throw new NotFoundException('Class not found in this tenant');
+    if (dto.sectionId && !section)
+      throw new NotFoundException('Section not found in this tenant');
     if (section && dto.classId && section.classId !== dto.classId) {
-      throw new BadRequestException('Section must belong to the selected class in this tenant');
+      throw new BadRequestException(
+        'Section must belong to the selected class in this tenant',
+      );
     }
   }
 }
@@ -802,21 +901,43 @@ function buildDuplicateSearchConditions(
   siblingGroupIds: string[],
 ): Prisma.StudentWhereInput[] {
   const conditions: Prisma.StudentWhereInput[] = [
-    { firstNameEn: { equals: dto.firstNameEn, mode: 'insensitive' }, lastNameEn: { equals: dto.lastNameEn, mode: 'insensitive' } },
+    {
+      firstNameEn: { equals: dto.firstNameEn, mode: 'insensitive' },
+      lastNameEn: { equals: dto.lastNameEn, mode: 'insensitive' },
+    },
     { lastNameEn: { equals: dto.lastNameEn, mode: 'insensitive' } },
   ];
-  if (dto.dateOfBirth) conditions.push({ dateOfBirth: new Date(dto.dateOfBirth) });
+  if (dto.dateOfBirth)
+    conditions.push({ dateOfBirth: new Date(dto.dateOfBirth) });
   if (dto.firstNameNp && dto.lastNameNp) {
-    conditions.push({ firstNameNp: { equals: dto.firstNameNp, mode: 'insensitive' }, lastNameNp: { equals: dto.lastNameNp, mode: 'insensitive' } });
+    conditions.push({
+      firstNameNp: { equals: dto.firstNameNp, mode: 'insensitive' },
+      lastNameNp: { equals: dto.lastNameNp, mode: 'insensitive' },
+    });
   }
   if (phones.length > 0) {
-    conditions.push({ guardianLinks: { some: { guardian: { OR: [{ primaryPhone: { in: phones } }, { secondaryPhone: { in: phones } }] } } } });
+    conditions.push({
+      guardianLinks: {
+        some: {
+          guardian: {
+            OR: [
+              { primaryPhone: { in: phones } },
+              { secondaryPhone: { in: phones } },
+            ],
+          },
+        },
+      },
+    });
   }
   if (dto.previousSchool) {
-    conditions.push({ previousSchool: { contains: dto.previousSchool, mode: 'insensitive' } });
+    conditions.push({
+      previousSchool: { contains: dto.previousSchool, mode: 'insensitive' },
+    });
   }
   if (siblingGroupIds.length > 0) {
-    conditions.push({ siblingMemberships: { some: { siblingGroupId: { in: siblingGroupIds } } } });
+    conditions.push({
+      siblingMemberships: { some: { siblingGroupId: { in: siblingGroupIds } } },
+    });
   }
   return conditions;
 }
@@ -836,41 +957,93 @@ function scoreDuplicateCandidate(
 ) {
   const signals: DuplicateSignal[] = [];
   const candidatePhones = candidate.guardianLinks
-    .flatMap((link) => [link.guardian.primaryPhone, link.guardian.secondaryPhone])
+    .flatMap((link) => [
+      link.guardian.primaryPhone,
+      link.guardian.secondaryPhone,
+    ])
     .filter((phone): phone is string => Boolean(phone))
     .map(normalizeGuardianPhone);
   const phoneReuse = phones.some((phone) => candidatePhones.includes(phone));
   const englishName =
-    normalizeAdmissionName(candidate.firstNameEn) === normalizeAdmissionName(dto.firstNameEn) &&
-    normalizeAdmissionName(candidate.lastNameEn) === normalizeAdmissionName(dto.lastNameEn);
+    normalizeAdmissionName(candidate.firstNameEn) ===
+      normalizeAdmissionName(dto.firstNameEn) &&
+    normalizeAdmissionName(candidate.lastNameEn) ===
+      normalizeAdmissionName(dto.lastNameEn);
   const nepaliName =
-    Boolean(dto.firstNameNp && dto.lastNameNp && candidate.firstNameNp && candidate.lastNameNp) &&
-    normalizeAdmissionName(candidate.firstNameNp ?? '') === normalizeAdmissionName(dto.firstNameNp ?? '') &&
-    normalizeAdmissionName(candidate.lastNameNp ?? '') === normalizeAdmissionName(dto.lastNameNp ?? '');
+    Boolean(
+      dto.firstNameNp &&
+      dto.lastNameNp &&
+      candidate.firstNameNp &&
+      candidate.lastNameNp,
+    ) &&
+    normalizeAdmissionName(candidate.firstNameNp ?? '') ===
+      normalizeAdmissionName(dto.firstNameNp ?? '') &&
+    normalizeAdmissionName(candidate.lastNameNp ?? '') ===
+      normalizeAdmissionName(dto.lastNameNp ?? '');
   const dob = dto.dateOfBirth
-    ? candidate.dateOfBirth.toISOString().slice(0, 10) === dto.dateOfBirth.slice(0, 10)
+    ? candidate.dateOfBirth.toISOString().slice(0, 10) ===
+      dto.dateOfBirth.slice(0, 10)
     : false;
   const samePreviousSchool =
     Boolean(dto.previousSchool && candidate.previousSchool) &&
-    normalizeAdmissionName(candidate.previousSchool ?? '') === normalizeAdmissionName(dto.previousSchool ?? '');
+    normalizeAdmissionName(candidate.previousSchool ?? '') ===
+      normalizeAdmissionName(dto.previousSchool ?? '');
   const siblingGroup = siblingGroupIds.some((id) =>
-    candidate.siblingMemberships.some((membership) => membership.siblingGroupId === id),
+    candidate.siblingMemberships.some(
+      (membership) => membership.siblingGroupId === id,
+    ),
   );
-  if (englishName && dob) signals.push({ code: 'english_name_dob', label: 'English name and DOB match', weight: 45 });
-  if (nepaliName && dob) signals.push({ code: 'nepali_name_dob', label: 'Nepali name and DOB match', weight: 45 });
-  if (phoneReuse) signals.push({ code: 'guardian_phone_reuse', label: 'Guardian phone is already used', weight: 25 });
-  if (samePreviousSchool) signals.push({ code: 'previous_school_match', label: 'Previous school matches', weight: 15 });
-  if (siblingGroup) signals.push({ code: 'sibling_group_clue', label: 'Sibling group clue matches', weight: 20 });
-  if (!englishName && normalizeAdmissionName(candidate.lastNameEn) === normalizeAdmissionName(dto.lastNameEn)) {
-    signals.push({ code: 'same_english_last_name', label: 'English last name matches', weight: 8 });
+  if (englishName && dob)
+    signals.push({
+      code: 'english_name_dob',
+      label: 'English name and DOB match',
+      weight: 45,
+    });
+  if (nepaliName && dob)
+    signals.push({
+      code: 'nepali_name_dob',
+      label: 'Nepali name and DOB match',
+      weight: 45,
+    });
+  if (phoneReuse)
+    signals.push({
+      code: 'guardian_phone_reuse',
+      label: 'Guardian phone is already used',
+      weight: 25,
+    });
+  if (samePreviousSchool)
+    signals.push({
+      code: 'previous_school_match',
+      label: 'Previous school matches',
+      weight: 15,
+    });
+  if (siblingGroup)
+    signals.push({
+      code: 'sibling_group_clue',
+      label: 'Sibling group clue matches',
+      weight: 20,
+    });
+  if (
+    !englishName &&
+    normalizeAdmissionName(candidate.lastNameEn) ===
+      normalizeAdmissionName(dto.lastNameEn)
+  ) {
+    signals.push({
+      code: 'same_english_last_name',
+      label: 'English last name matches',
+      weight: 8,
+    });
   }
-  if (dob && !englishName && !nepaliName) signals.push({ code: 'same_dob', label: 'DOB matches', weight: 8 });
+  if (dob && !englishName && !nepaliName)
+    signals.push({ code: 'same_dob', label: 'DOB matches', weight: 8 });
   const score = signals.reduce((sum, signal) => sum + signal.weight, 0);
   return {
     studentId: candidate.id,
     studentSystemId: candidate.studentSystemId,
     fullNameEn: `${candidate.firstNameEn} ${candidate.lastNameEn}`.trim(),
-    fullNameNp: [candidate.firstNameNp, candidate.lastNameNp].filter(Boolean).join(' ') || null,
+    fullNameNp:
+      [candidate.firstNameNp, candidate.lastNameNp].filter(Boolean).join(' ') ||
+      null,
     dateOfBirth: candidate.dateOfBirth.toISOString(),
     className: candidate.class.name,
     sectionName: candidate.sectionRef?.name ?? candidate.section ?? null,
@@ -881,7 +1054,13 @@ function scoreDuplicateCandidate(
   };
 }
 
-function formatStudentSummary(student: { id: string; studentSystemId: string; firstNameEn: string; lastNameEn: string; lifecycleStatus?: StudentLifecycleStatus }) {
+function formatStudentSummary(student: {
+  id: string;
+  studentSystemId: string;
+  firstNameEn: string;
+  lastNameEn: string;
+  lifecycleStatus?: StudentLifecycleStatus;
+}) {
   return {
     id: student.id,
     studentSystemId: student.studentSystemId,
@@ -890,10 +1069,23 @@ function formatStudentSummary(student: { id: string; studentSystemId: string; fi
   };
 }
 
-function formatDraft(application: { id: string; source: string | null; status: string; firstNameEn: string; lastNameEn: string; guardianPhone: string | null; notes: string | null; duplicateReview: Prisma.JsonValue | null; updatedAt: Date; createdAt: Date }) {
+function formatDraft(application: {
+  id: string;
+  source: string | null;
+  status: string;
+  firstNameEn: string;
+  lastNameEn: string;
+  guardianPhone: string | null;
+  notes: string | null;
+  duplicateReview: Prisma.JsonValue | null;
+  updatedAt: Date;
+  createdAt: Date;
+}) {
   return {
     id: application.id,
-    draftKey: application.source?.startsWith('autosave:') ? application.source.slice('autosave:'.length) : null,
+    draftKey: application.source?.startsWith('autosave:')
+      ? application.source.slice('autosave:'.length)
+      : null,
     status: application.status,
     fullNameEn: `${application.firstNameEn} ${application.lastNameEn}`.trim(),
     guardianPhone: application.guardianPhone,
@@ -904,7 +1096,10 @@ function formatDraft(application: { id: string; source: string | null; status: s
   };
 }
 
-function buildDraftNotes(dto: AutosaveAdmissionDraftDto, duplicateReview: unknown) {
+function buildDraftNotes(
+  dto: AutosaveAdmissionDraftDto,
+  duplicateReview: unknown,
+) {
   return JSON.stringify({
     m1AdmissionDraft: true,
     draftKey: dto.draftKey,

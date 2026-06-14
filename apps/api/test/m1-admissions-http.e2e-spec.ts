@@ -1,0 +1,704 @@
+import { INestApplication } from '@nestjs/common';
+import { getQueueToken } from '@nestjs/bullmq';
+import { Test, TestingModule } from '@nestjs/testing';
+import { AuthMethod } from '@prisma/client';
+import request from 'supertest';
+import { AppModule } from '../src/app.module';
+import type { AuthContext } from '../src/auth/auth.types';
+import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
+import { NotificationsProcessor } from '../src/notifications/notifications.processor';
+import { ActivityMediaProcessor } from '../src/activity-feed/processors/activity-media.processor';
+import { FinanceProcessor } from '../src/finance/finance.processor';
+import { PayrollProcessor } from '../src/payroll/payroll.processor';
+import { PrismaService } from '../src/prisma/prisma.service';
+import { RedisService } from '../src/redis/redis.service';
+import {
+  createPrismaMock,
+  createQueueMock,
+  ensureTenantDefaultsWithState,
+  type PrismaMock,
+} from './test-helpers';
+
+const tenantAId = 'tenant-m1-http-a';
+const tenantBId = 'tenant-m1-http-b';
+
+const actorA = buildActor(tenantAId, 'registrar-a');
+const actorB = buildActor(tenantBId, 'registrar-b');
+
+describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
+  let app: INestApplication;
+  let prisma: PrismaMock;
+
+  beforeEach(async () => {
+    prisma = createPrismaMock();
+    seedTenant(prisma, tenantAId);
+    seedTenant(prisma, tenantBId);
+    seedM1Data(prisma);
+    overrideGeneratedDocumentReads(prisma);
+    overrideStudentGuardianReads(prisma);
+    overrideAdmissionDraftReads(prisma);
+    overrideImportReviewReads(prisma);
+    overrideFileAssetCount(prisma);
+
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(PrismaService)
+      .useValue(prisma)
+      .overrideProvider(RedisService)
+      .useValue({
+        ping: jest.fn(() => Promise.resolve('PONG')),
+        onModuleDestroy: jest.fn(() => Promise.resolve(undefined)),
+      })
+      .overrideProvider(getQueueToken('finance'))
+      .useValue(createQueueMock())
+      .overrideProvider(getQueueToken('notifications'))
+      .useValue(createQueueMock())
+      .overrideProvider(getQueueToken('payroll'))
+      .useValue(createQueueMock())
+      .overrideProvider(getQueueToken('activity-media'))
+      .useValue(createQueueMock())
+      .overrideProvider(FinanceProcessor)
+      .useValue({ process: jest.fn() })
+      .overrideProvider(NotificationsProcessor)
+      .useValue({ process: jest.fn() })
+      .overrideProvider(ActivityMediaProcessor)
+      .useValue({ process: jest.fn() })
+      .overrideProvider(PayrollProcessor)
+      .useValue({ process: jest.fn() })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({
+        canActivate: (context: {
+          switchToHttp: () => {
+            getRequest: () => {
+              headers: Record<string, string>;
+              auth?: AuthContext;
+            };
+          };
+        }) => {
+          const req = context.switchToHttp().getRequest();
+          req.auth =
+            req.headers['x-test-tenant'] === tenantBId ? actorB : actorA;
+          return true;
+        },
+      })
+      .compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app?.close();
+  });
+
+  it('returns tenant-owned ownership audit data over HTTP without leaking QR token hashes', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/admissions/m1/students/student-a/ownership-audit')
+      .set('x-test-tenant', tenantAId)
+      .expect(200);
+
+    expect(response.body.student.id).toBe('student-a');
+    expect(response.body.documents).toHaveLength(1);
+    expect(response.body.generatedDocuments).toHaveLength(1);
+    expect(response.body.registryFiles).toHaveLength(1);
+    expect(response.body.qrAnalytics).toHaveLength(1);
+    expect(JSON.stringify(response.body)).not.toContain('secret-token-hash');
+    expect(response.body.policy).toEqual(
+      expect.objectContaining({
+        tenantScoped: true,
+        generatedDocumentsRequireTenantAndStudentMatch: true,
+        qrAnalyticsNeverReturnsTokenHash: true,
+      }),
+    );
+  });
+
+  it('denies cross-tenant ownership audit over HTTP', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/admissions/m1/students/student-a/ownership-audit')
+      .set('x-test-tenant', tenantBId)
+      .expect(404);
+
+    expect(response.body.message).toBe('Student not found in this tenant');
+    expect(JSON.stringify(response.body)).not.toContain('tenant-m1-http-a');
+    expect(JSON.stringify(response.body)).not.toContain('secret-token-hash');
+  });
+
+  it('removes guardian access for same-tenant links and writes document review history over HTTP', async () => {
+    const response = await request(app.getHttpServer())
+      .delete('/admissions/m1/students/student-a/guardians/guardian-a')
+      .set('x-test-tenant', tenantAId)
+      .set('authorization', 'Bearer test-token')
+      .send({
+        confirmFileAccessReview: true,
+        reason: 'Guardian changed after admission review',
+      })
+      .expect(200);
+
+    expect(response.body.removed).toBe(true);
+    expect(response.body.accessReview).toEqual(
+      expect.objectContaining({
+        canAccessStudentFiles: false,
+        documentsReviewed: 1,
+        generatedDocumentsReviewed: 1,
+        registryFilesReviewed: 1,
+      }),
+    );
+    expect(
+      prisma.__state.studentGuardians.some((link) => link.id === 'link-a'),
+    ).toBe(false);
+    expect(prisma.__state.studentDocumentHistory).toContainEqual(
+      expect.objectContaining({
+        tenantId: tenantAId,
+        documentId: 'doc-a',
+        action: 'GUARDIAN_ACCESS_REVIEW',
+      }),
+    );
+  });
+
+  it('denies cross-tenant guardian removal over HTTP without mutating tenant-owned links', async () => {
+    await request(app.getHttpServer())
+      .delete('/admissions/m1/students/student-a/guardians/guardian-a')
+      .set('x-test-tenant', tenantBId)
+      .set('authorization', 'Bearer test-token')
+      .send({
+        confirmFileAccessReview: true,
+        reason: 'Cross-tenant attempt',
+      })
+      .expect(404);
+
+    expect(prisma.__state.studentGuardians).toContainEqual(
+      expect.objectContaining({
+        id: 'link-a',
+        tenantId: tenantAId,
+        studentId: 'student-a',
+        guardianId: 'guardian-a',
+      }),
+    );
+    expect(prisma.__state.studentDocumentHistory).toHaveLength(0);
+  });
+
+  it('autosaves and recovers admission drafts only inside the actor tenant over HTTP', async () => {
+    const autosaveResponse = await request(app.getHttpServer())
+      .post('/admissions/m1/drafts/autosave')
+      .set('x-test-tenant', tenantAId)
+      .set('authorization', 'Bearer test-token')
+      .send({
+        draftKey: 'front-desk-1',
+        firstNameEn: 'Asha',
+        lastNameEn: 'Tamang',
+        firstNameNp: 'आशा',
+        lastNameNp: 'तामाङ',
+        dateOfBirth: '2020-01-02',
+        guardianFullName: 'Maya Tamang',
+        guardianPhone: '9800000000',
+        classId: 'class-a',
+        sectionId: 'section-a',
+        previousSchool: 'Little Flower',
+        payload: { intendedSection: 'A' },
+      })
+      .expect(201);
+
+    expect(autosaveResponse.body).toEqual(
+      expect.objectContaining({
+        draftKey: 'front-desk-1',
+        fullNameEn: 'Asha Tamang',
+        guardianPhone: '9800000000',
+      }),
+    );
+    expect(prisma.__state.admissionApplications).toContainEqual(
+      expect.objectContaining({
+        id: autosaveResponse.body.id,
+        tenantId: tenantAId,
+        source: 'autosave:front-desk-1',
+      }),
+    );
+
+    const recoveryResponse = await request(app.getHttpServer())
+      .get('/admissions/m1/drafts/recover')
+      .set('x-test-tenant', tenantAId)
+      .query({ draftKey: 'front-desk-1' })
+      .expect(200);
+
+    expect(recoveryResponse.body.total).toBe(1);
+    expect(recoveryResponse.body.items[0]).toEqual(
+      expect.objectContaining({
+        id: autosaveResponse.body.id,
+        draftKey: 'front-desk-1',
+      }),
+    );
+
+    const crossTenantRecovery = await request(app.getHttpServer())
+      .get('/admissions/m1/drafts/recover')
+      .set('x-test-tenant', tenantBId)
+      .query({ draftKey: 'front-desk-1' })
+      .expect(200);
+
+    expect(crossTenantRecovery.body.items).toEqual([]);
+    expect(JSON.stringify(crossTenantRecovery.body)).not.toContain(tenantAId);
+  });
+
+  it('returns import-review rows only for the actor tenant over HTTP', async () => {
+    const tenantAResponse = await request(app.getHttpServer())
+      .get('/admissions/m1/import-review/queue')
+      .set('x-test-tenant', tenantAId)
+      .query({ limit: 10 })
+      .expect(200);
+
+    expect(tenantAResponse.body.total).toBe(1);
+    expect(tenantAResponse.body.items[0]).toEqual(
+      expect.objectContaining({
+        id: 'import-row-a',
+        batchId: 'import-batch-a',
+        sourceFileName: 'tenant-a-import.csv',
+        workflowLabel: 'Needs review',
+      }),
+    );
+    expect(JSON.stringify(tenantAResponse.body)).not.toContain(
+      'tenant-b-import.csv',
+    );
+
+    const tenantBResponse = await request(app.getHttpServer())
+      .get('/admissions/m1/import-review/queue')
+      .set('x-test-tenant', tenantBId)
+      .query({ limit: 10 })
+      .expect(200);
+
+    expect(tenantBResponse.body.items).toEqual([
+      expect.objectContaining({
+        id: 'import-row-b',
+        sourceFileName: 'tenant-b-import.csv',
+      }),
+    ]);
+    expect(JSON.stringify(tenantBResponse.body)).not.toContain(
+      'tenant-a-import.csv',
+    );
+  });
+});
+
+function buildActor(tenantId: string, userId: string): AuthContext {
+  return {
+    tenantId,
+    tenantSlug: tenantId,
+    userId,
+    email: `${userId}@schoolos.test`,
+    authMethod: AuthMethod.PASSWORD,
+    roles: ['admin'],
+    permissions: [
+      'students:read',
+      'students:create',
+      'student_documents:manage',
+      'enrollments:create',
+      'enrollments:read',
+      'guardians:create',
+      'guardians:read',
+      'guardians:update',
+    ],
+  };
+}
+
+function seedTenant(prisma: PrismaMock, tenantId: string) {
+  ensureTenantDefaultsWithState(prisma.__state, tenantId);
+  const planId = `plan-${tenantId}`;
+  prisma.__state.platformPlans.push({
+    id: planId,
+    key: 'standard',
+    name: 'Standard',
+  });
+  prisma.__state.platformPlanFeatures.push({
+    id: `feature-students-${tenantId}`,
+    planId,
+    featureKey: 'module.students',
+    enabled: true,
+  });
+  prisma.__state.tenantSubscriptions.push({
+    id: `sub-${tenantId}`,
+    tenantId,
+    planId,
+    status: 'ACTIVE',
+    createdAt: new Date('2026-04-01T00:00:00.000Z'),
+  });
+}
+
+function seedM1Data(prisma: PrismaMock) {
+  prisma.__state.classes.push({
+    id: 'class-a',
+    tenantId: tenantAId,
+    name: 'Class 1',
+    level: 1,
+  });
+  prisma.__state.sections.push({
+    id: 'section-a',
+    tenantId: tenantAId,
+    classId: 'class-a',
+    name: 'A',
+  });
+  prisma.__state.students = [
+    {
+      id: 'student-a',
+      tenantId: tenantAId,
+      studentSystemId: 'ST-A',
+      firstNameEn: 'Asha',
+      lastNameEn: 'Tamang',
+      firstNameNp: 'आशा',
+      lastNameNp: 'तामाङ',
+      dateOfBirth: new Date('2020-01-02T00:00:00.000Z'),
+      gender: 'FEMALE',
+      admissionDate: new Date('2026-04-01T00:00:00.000Z'),
+      classId: 'class-a',
+      sectionId: 'section-a',
+      lifecycleStatus: 'ACTIVE',
+      class: { id: 'class-a', name: 'Class 1' },
+      sectionRef: { id: 'section-a', name: 'A' },
+    },
+  ];
+  prisma.__state.guardians.push({
+    id: 'guardian-a',
+    tenantId: tenantAId,
+    fullName: 'Maya Tamang',
+    relation: 'mother',
+    primaryPhone: '9800000000',
+  });
+  prisma.__state.studentGuardians.push({
+    id: 'link-a',
+    tenantId: tenantAId,
+    studentId: 'student-a',
+    guardianId: 'guardian-a',
+    relation: 'mother',
+    isPrimary: true,
+  });
+  prisma.__state.studentDocuments.push({
+    id: 'doc-a',
+    tenantId: tenantAId,
+    studentId: 'student-a',
+    fileId: 'file-a',
+    kind: 'BIRTH_CERTIFICATE',
+    status: 'ACTIVE',
+    title: 'Birth certificate',
+    fileName: 'birth.pdf',
+    contentType: 'application/pdf',
+    sizeBytes: 1024,
+    objectKey: 'tenant-a/students/student-a/birth.pdf',
+    uploadedById: 'registrar-a',
+  });
+  prisma.__state.fileAssets.push({
+    id: 'file-a',
+    tenantId: tenantAId,
+    module: 'students',
+    entityId: 'student-a',
+    originalFilename: 'birth.pdf',
+    objectKey: 'tenant-a/students/student-a/birth.pdf',
+    ownerType: 'student',
+    ownerId: 'student-a',
+    visibility: 'PRIVATE',
+    status: 'UPLOADED',
+    deletedAt: null,
+    softDeletedAt: null,
+    sizeBytes: 1024,
+  });
+  prisma.__state.generatedStudentDocuments.push({
+    id: 'generated-a',
+    tenantId: tenantAId,
+    studentId: 'student-a',
+    kind: 'ID_CARD',
+    title: 'Student Identity Card',
+    fileName: 'id-card.pdf',
+    contentType: 'application/pdf',
+    sizeBytes: 2048,
+    pdfUrl: '/files/generated-a',
+    storageObjectKey: 'tenant-a/students/student-a/id-card.pdf',
+    generatedAt: new Date('2026-04-02T00:00:00.000Z'),
+    revokedAt: null,
+  });
+  prisma.__state.studentQrCredentials.push({
+    id: 'qr-a',
+    tenantId: tenantAId,
+    studentId: 'student-a',
+    tokenHash: 'secret-token-hash',
+    status: 'ACTIVE',
+    lastScannedAt: new Date('2026-04-03T00:00:00.000Z'),
+    expiresAt: new Date('2026-05-01T00:00:00.000Z'),
+    revokedAt: null,
+    rotatedAt: null,
+  });
+  prisma.__state.admissionApplications = [
+    {
+      id: 'draft-b',
+      tenantId: tenantBId,
+      status: 'INQUIRY',
+      firstNameEn: 'Bina',
+      lastNameEn: 'Rai',
+      firstNameNp: null,
+      lastNameNp: null,
+      dateOfBirth: new Date('2020-03-03T00:00:00.000Z'),
+      guardianFullName: 'Tenant B Guardian',
+      guardianPhone: '9811111111',
+      academicYearId: null,
+      classId: null,
+      sectionId: null,
+      previousSchool: null,
+      source: 'autosave:tenant-b-draft',
+      notes: JSON.stringify({ payload: { tenant: 'B' } }),
+      duplicateReview: { matches: [] },
+      createdById: 'registrar-b',
+      updatedById: 'registrar-b',
+      createdAt: new Date('2026-04-04T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-04T00:00:00.000Z'),
+    },
+  ];
+  prisma.__state.admissionImportBatches = [
+    {
+      id: 'import-batch-a',
+      tenantId: tenantAId,
+      sourceFileName: 'tenant-a-import.csv',
+    },
+    {
+      id: 'import-batch-b',
+      tenantId: tenantBId,
+      sourceFileName: 'tenant-b-import.csv',
+    },
+  ];
+  prisma.__state.admissionImportRows = [
+    {
+      id: 'import-row-a',
+      tenantId: tenantAId,
+      batchId: 'import-batch-a',
+      rowNumber: 2,
+      status: 'DUPLICATE_REVIEW',
+      errors: [],
+      duplicates: [{ studentId: 'student-a', score: 94 }],
+      rawData: { firstNameEn: 'Asha' },
+      createdAt: new Date('2026-04-05T00:00:00.000Z'),
+    },
+    {
+      id: 'import-row-b',
+      tenantId: tenantBId,
+      batchId: 'import-batch-b',
+      rowNumber: 3,
+      status: 'FAILED',
+      errors: ['Missing guardian phone'],
+      duplicates: [],
+      rawData: { firstNameEn: 'Bina' },
+      createdAt: new Date('2026-04-05T00:00:00.000Z'),
+    },
+  ];
+}
+
+function overrideGeneratedDocumentReads(prisma: PrismaMock) {
+  prisma.generatedStudentDocument.findMany.mockImplementation(
+    (query: { where?: Record<string, unknown> }) =>
+      Promise.resolve(
+        prisma.__state.generatedStudentDocuments.filter(
+          (document) =>
+            (!query.where?.tenantId ||
+              document.tenantId === query.where.tenantId) &&
+            (!query.where?.studentId ||
+              document.studentId === query.where.studentId),
+        ),
+      ),
+  );
+  prisma.generatedStudentDocument.count = jest.fn();
+  prisma.generatedStudentDocument.count.mockImplementation(
+    (query: { where?: Record<string, unknown> }) =>
+      Promise.resolve(
+        prisma.__state.generatedStudentDocuments.filter(
+          (document) =>
+            (!query.where?.tenantId ||
+              document.tenantId === query.where.tenantId) &&
+            (!query.where?.studentId ||
+              document.studentId === query.where.studentId),
+        ).length,
+      ),
+  );
+}
+
+function overrideStudentGuardianReads(prisma: PrismaMock) {
+  prisma.studentGuardian.findMany.mockImplementation(
+    (query: { where?: Record<string, unknown> }) =>
+      Promise.resolve(
+        prisma.__state.studentGuardians
+          .filter(
+            (link) =>
+              (!query.where?.tenantId ||
+                link.tenantId === query.where.tenantId) &&
+              (!query.where?.studentId ||
+                link.studentId === query.where.studentId) &&
+              (!query.where?.guardianId ||
+                link.guardianId === query.where.guardianId),
+          )
+          .map((link) => ({
+            ...link,
+            guardian: prisma.__state.guardians.find(
+              (guardian) => guardian.id === link.guardianId,
+            ),
+          })),
+      ),
+  );
+  prisma.studentGuardian.findFirst.mockImplementation(
+    (query: { where?: Record<string, unknown> }) =>
+      Promise.resolve(
+        prisma.__state.studentGuardians
+          .filter(
+            (link) =>
+              (!query.where?.tenantId ||
+                link.tenantId === query.where.tenantId) &&
+              (!query.where?.studentId ||
+                link.studentId === query.where.studentId) &&
+              (!query.where?.guardianId ||
+                link.guardianId === query.where.guardianId),
+          )
+          .map((link) => ({
+            ...link,
+            guardian: prisma.__state.guardians.find(
+              (guardian) => guardian.id === link.guardianId,
+            ),
+            student: prisma.__state.students.find(
+              (student) => student.id === link.studentId,
+            ),
+          }))[0] ?? null,
+      ),
+  );
+  prisma.studentGuardian.deleteMany.mockImplementation(
+    (query: { where?: Record<string, unknown> }) => {
+      const before = prisma.__state.studentGuardians.length;
+      prisma.__state.studentGuardians = prisma.__state.studentGuardians.filter(
+        (link) =>
+          !(
+            (!query.where?.id || link.id === query.where.id) &&
+            (!query.where?.tenantId ||
+              link.tenantId === query.where.tenantId) &&
+            (!query.where?.studentId ||
+              link.studentId === query.where.studentId) &&
+            (!query.where?.guardianId ||
+              link.guardianId === query.where.guardianId)
+          ),
+      );
+      return Promise.resolve({
+        count: before - prisma.__state.studentGuardians.length,
+      });
+    },
+  );
+}
+
+function overrideAdmissionDraftReads(prisma: PrismaMock) {
+  prisma.admissionApplication = {
+    findFirst: jest.fn((query: { where?: Record<string, unknown> }) =>
+      Promise.resolve(
+        prisma.__state.admissionApplications.find((application) =>
+          matchesRecordWhere(application, query.where),
+        ) ?? null,
+      ),
+    ),
+    findMany: jest.fn(
+      (query: { where?: Record<string, unknown>; take?: number }) =>
+        Promise.resolve(
+          prisma.__state.admissionApplications
+            .filter((application) =>
+              matchesRecordWhere(application, query.where),
+            )
+            .slice(0, query.take ?? 10),
+        ),
+    ),
+    create: jest.fn((query: { data?: Record<string, unknown> }) => {
+      const now = new Date('2026-04-06T00:00:00.000Z');
+      const application = {
+        id: `draft-${String(prisma.__state.admissionApplications.length + 1)}`,
+        ...(query.data ?? {}),
+        createdAt: now,
+        updatedAt: now,
+      };
+      prisma.__state.admissionApplications.push(application);
+      return Promise.resolve(application);
+    }),
+    update: jest.fn(
+      (query: {
+        where?: Record<string, unknown>;
+        data?: Record<string, unknown>;
+      }) => {
+        const application = prisma.__state.admissionApplications.find(
+          (candidate) => matchesRecordWhere(candidate, query.where),
+        );
+        if (!application) {
+          return Promise.resolve(null);
+        }
+        Object.assign(application, query.data ?? {}, {
+          updatedAt: new Date('2026-04-06T00:05:00.000Z'),
+        });
+        return Promise.resolve(application);
+      },
+    ),
+  };
+}
+
+function overrideImportReviewReads(prisma: PrismaMock) {
+  prisma.admissionImportRow = {
+    findMany: jest.fn(
+      (query: { where?: Record<string, unknown>; take?: number }) =>
+        Promise.resolve(
+          prisma.__state.admissionImportRows
+            .filter((row) => matchesRecordWhere(row, query.where))
+            .slice(0, query.take ?? 50)
+            .map((row) => ({
+              ...row,
+              batch: prisma.__state.admissionImportBatches.find(
+                (batch) => batch.id === row.batchId,
+              ),
+            })),
+        ),
+    ),
+  };
+}
+
+function overrideFileAssetCount(prisma: PrismaMock) {
+  prisma.fileAsset.count = jest.fn(
+    (query: { where?: Record<string, unknown> }) =>
+      Promise.resolve(
+        prisma.__state.fileAssets.filter(
+          (asset) =>
+            (!query.where?.tenantId ||
+              asset.tenantId === query.where.tenantId) &&
+            (!query.where?.module || asset.module === query.where.module) &&
+            (!query.where?.entityId ||
+              asset.entityId === query.where.entityId) &&
+            (!query.where?.deletedAt ||
+              asset.deletedAt === query.where.deletedAt),
+        ).length,
+      ),
+  );
+}
+
+function matchesRecordWhere(
+  record: Record<string, unknown>,
+  where?: Record<string, unknown>,
+): boolean {
+  if (!where) {
+    return true;
+  }
+
+  return Object.entries(where).every(([key, value]) => {
+    if (key === 'OR' && Array.isArray(value)) {
+      return value.some((clause) =>
+        matchesRecordWhere(record, clause as Record<string, unknown>),
+      );
+    }
+    if (value && typeof value === 'object' && 'in' in value) {
+      return (value as { in: unknown[] }).in.includes(record[key]);
+    }
+    if (value && typeof value === 'object' && 'startsWith' in value) {
+      return stringifyScalar(record[key]).startsWith(
+        String((value as { startsWith: unknown }).startsWith),
+      );
+    }
+    if (value && typeof value === 'object' && 'not' in value) {
+      return record[key] !== (value as { not: unknown }).not;
+    }
+
+    return record[key] === value;
+  });
+}
+
+function stringifyScalar(value: unknown): string {
+  return ['string', 'number', 'boolean'].includes(typeof value)
+    ? String(value)
+    : '';
+}
