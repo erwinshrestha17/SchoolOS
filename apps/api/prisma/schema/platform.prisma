@@ -241,6 +241,25 @@ model PlatformApiKey {
   @@index([expiresAt])
 }
 
+model SupportOverride {
+  id             String   @id @default(uuid())
+  tenantId       String
+  platformUserId String
+  reason         String
+  startsAt       DateTime @default(now())
+  expiresAt      DateTime
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant       Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  platformUser User   @relation("UserSupportOverrides", fields: [platformUserId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isActive])
+  @@index([platformUserId, isActive])
+  @@index([expiresAt])
+}
+
 model DemoRequest {
   id                String   @id @default(uuid())
   schoolName        String
@@ -288,4 +307,19 @@ model ReportExport {
   @@index([tenantId, reportKey, createdAt])
   @@index([tenantId, requestedBy, createdAt])
   @@index([tenantId, fileAssetId])
+}
+
+model TenantOnboardingChecklistOverride {
+  id        String   @id @default(uuid())
+  tenantId  String
+  itemKey   String
+  completed Boolean
+  reason    String
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, itemKey])
 }
