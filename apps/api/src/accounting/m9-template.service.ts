@@ -8,10 +8,9 @@ export class M9TemplateService {
   constructor(private readonly prisma: PrismaService) {}
 
   async importNepalChartTemplate(actor: AuthContext) {
-    const accounts = [];
-    for (const account of NEPAL_SCHOOL_CHART_TEMPLATE) {
-      accounts.push(
-        await this.prisma.chartAccount.upsert({
+    const accounts = await Promise.all(
+      NEPAL_SCHOOL_CHART_TEMPLATE.map((account) =>
+        this.prisma.chartAccount.upsert({
           where: {
             tenantId_code: { tenantId: actor.tenantId, code: account.code },
           },
@@ -30,8 +29,9 @@ export class M9TemplateService {
             isSystem: true,
           },
         }),
-      );
-    }
+      ),
+    );
+
     return { template: 'NEPAL_SCHOOL_STANDARD', count: accounts.length, accounts };
   }
 }
