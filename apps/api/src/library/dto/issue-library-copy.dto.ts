@@ -14,7 +14,7 @@ export class IssueLibraryCopyDto {
 
   @IsOptional()
   @IsDateString()
-  dueAt?: string;
+  dueAt!: string;
 
   @IsOptional()
   @IsString()
