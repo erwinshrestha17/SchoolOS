@@ -35,6 +35,9 @@ describe('PlatformQueuesService', () => {
     const canteenAlertsQueue = makeQueue(
       queueOverrides['canteen-alerts'] as any,
     );
+    const accountingReportsQueue = makeQueue(
+      queueOverrides['accounting-reports'] as any,
+    );
 
     const service = new PlatformQueuesService(
       auditService as any,
@@ -46,6 +49,7 @@ describe('PlatformQueuesService', () => {
       homeworkQueue as any,
       reportsQueue as any,
       canteenAlertsQueue as any,
+      accountingReportsQueue as any,
     );
 
     return {
@@ -58,6 +62,7 @@ describe('PlatformQueuesService', () => {
         homeworkQueue,
         reportsQueue,
         canteenAlertsQueue,
+        accountingReportsQueue,
       },
     };
   };
@@ -145,7 +150,7 @@ describe('PlatformQueuesService', () => {
     );
   });
 
-  it('monitors reports and canteen alert queues alongside core queues', async () => {
+  it('monitors reports, accounting reports, and canteen alert queues alongside core queues', async () => {
     const { service } = buildService({
       reports: {
         getJobCounts: jest.fn().mockResolvedValue({
@@ -154,6 +159,15 @@ describe('PlatformQueuesService', () => {
           completed: 8,
           failed: 1,
           delayed: 3,
+        }),
+      },
+      'accounting-reports': {
+        getJobCounts: jest.fn().mockResolvedValue({
+          waiting: 1,
+          active: 1,
+          completed: 5,
+          failed: 2,
+          delayed: 0,
         }),
       },
       'canteen-alerts': {
@@ -174,6 +188,12 @@ describe('PlatformQueuesService', () => {
           waiting: 2,
           failed: 1,
           delayed: 3,
+        }),
+        expect.objectContaining({
+          name: 'accounting-reports',
+          waiting: 1,
+          active: 1,
+          failed: 2,
         }),
         expect.objectContaining({
           name: 'canteen-alerts',
@@ -229,6 +249,23 @@ describe('PlatformQueuesService', () => {
           },
         ]),
       },
+      'accounting-reports': {
+        getFailed: jest.fn().mockResolvedValue([
+          {
+            id: 'job-4',
+            name: 'generate-accounting-report',
+            failedReason: 'File Registry object storage timeout',
+            attemptsMade: 3,
+            timestamp: 250,
+            data: {
+              tenantId: 'tenant-4',
+              reportKey: 'accounting.general-ledger',
+              format: 'pdf',
+              secretKey: 'raw-secret',
+            },
+          },
+        ]),
+      },
     });
 
     await expect(service.listFailedJobGroups()).resolves.toEqual([
@@ -244,6 +281,16 @@ describe('PlatformQueuesService', () => {
         affectedTenantIds: ['tenant-1', 'tenant-2'],
         diagnostic: expect.objectContaining({
           category: 'provider',
+          retryable: true,
+        }),
+      }),
+      expect.objectContaining({
+        queueName: 'accounting-reports',
+        name: 'generate-accounting-report',
+        count: 1,
+        affectedTenantIds: ['tenant-4'],
+        diagnostic: expect.objectContaining({
+          category: 'storage',
           retryable: true,
         }),
       }),

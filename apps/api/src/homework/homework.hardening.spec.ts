@@ -190,6 +190,7 @@ describe('Homework Hardening', () => {
           {
             academicYearId: 'year-1',
             classId: 'class-1',
+            sectionId: 'section-1',
             subjectId: 'sub-1',
             title: 'Not my subject',
             instructions: 'Test',
@@ -198,6 +199,17 @@ describe('Homework Hardening', () => {
           teacherActor,
         ),
       ).rejects.toThrow(); // Should throw ForbiddenException
+
+      expect(p.subjectTeacherAssignment.findFirst).toHaveBeenCalledWith({
+        where: {
+          tenantId: 'tenant-a',
+          academicYearId: 'year-1',
+          subjectId: 'sub-1',
+          staffId: 'teacher-1',
+          classId: 'class-1',
+          OR: [{ sectionId: 'section-1' }, { sectionId: null }],
+        },
+      });
     });
   });
 
@@ -241,6 +253,7 @@ describe('Homework Hardening', () => {
           tenantId: 'tenant-a',
           guardian: { userId: 'parent-user-1' },
           studentId: 'other-student',
+          student: { lifecycleStatus: 'ACTIVE' },
         },
         select: { studentId: true },
       });
@@ -306,7 +319,10 @@ describe('Homework Hardening', () => {
         roles: ['student'],
         permissions: ['homework:read'],
       };
-      p.student.findFirst.mockResolvedValue({ id: 'student-1' });
+      p.student.findFirst.mockResolvedValue({
+        id: 'student-1',
+        lifecycleStatus: 'ACTIVE',
+      });
       p.homeworkSubmission.findFirst.mockResolvedValue(null);
 
       await expect(
@@ -322,6 +338,33 @@ describe('Homework Hardening', () => {
           }),
         }),
       );
+    });
+
+    it('blocks direct student homework detail reads outside the active class scope', async () => {
+      const p = prisma as any;
+      const studentActor: AuthContext = {
+        ...actor,
+        userId: 'student-user-1',
+        roles: ['student'],
+        permissions: ['homework:read'],
+      };
+      p.homeworkAssignment.findFirst.mockResolvedValue({
+        id: 'hw-other-class',
+        tenantId: 'tenant-a',
+        classId: 'class-2',
+        sectionId: 'section-1',
+        attachments: [],
+      });
+      p.student.findFirst.mockResolvedValue({
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        lifecycleStatus: 'ACTIVE',
+      });
+
+      await expect(
+        homeworkService.getAssignment(studentActor, 'hw-other-class'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

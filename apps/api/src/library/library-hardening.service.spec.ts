@@ -1,5 +1,6 @@
 import {
   AuthMethod,
+  LibraryCopyStatus,
   LibraryFineStatus,
   LibraryIssueStatus,
   Prisma,
@@ -151,6 +152,51 @@ describe('LibraryHardeningService M8A workflows', () => {
       }),
     );
   });
+
+  it('archives instead of deleting a copy with issue/history records', async () => {
+    const { service, prisma, tx } = buildService({
+      copy: buildCopy({ issueCount: 1, historyCount: 1 }),
+    });
+
+    const result = await service.deleteCopy(
+      'copy-1',
+      'Damaged beyond repair',
+      actor,
+    );
+
+    expect(prisma.libraryCopy.delete).not.toHaveBeenCalled();
+    expect(tx.libraryCopy.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'copy-1' },
+        data: expect.objectContaining({
+          status: LibraryCopyStatus.ARCHIVED,
+          archiveReason: 'Damaged beyond repair',
+        }),
+      }),
+    );
+    expect(result).toEqual(expect.objectContaining({ id: 'copy-1' }));
+  });
+
+  it('registers issued-book CSV exports through File Registry', async () => {
+    const fileRegistryService = {
+      registerGeneratedFile: jest.fn().mockResolvedValue({ id: 'file-1' }),
+    };
+    const { service } = buildService({ fileRegistryService });
+
+    const result = await service.exportIssuedBooksCsvFile(actor);
+
+    expect(fileRegistryService.registerGeneratedFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: actor.tenantId,
+        generatedByUserId: actor.userId,
+        mimeType: 'text/csv',
+        module: 'library',
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({ fileAssetId: 'file-1' }),
+    );
+  });
 });
 
 function buildService(
@@ -160,10 +206,13 @@ function buildService(
     issue?: ReturnType<typeof buildIssue>;
     settings?: Record<string, unknown>;
     holidays?: Array<{ calendarDate: Date }>;
+    copy?: ReturnType<typeof buildCopy>;
+    fileRegistryService?: { registerGeneratedFile: jest.Mock };
   } = {},
 ) {
   const issue = options.issue ?? buildIssue();
   const fine = options.fine ?? buildFine({ status: LibraryFineStatus.PENDING });
+  const copy = options.copy ?? buildCopy();
 
   const tx = {
     libraryFine: {
@@ -180,7 +229,15 @@ function buildService(
       }),
     },
     libraryCopy: {
-      update: jest.fn().mockResolvedValue({ id: 'copy-1' }),
+      update: jest.fn().mockResolvedValue({
+        ...copy,
+        status: LibraryCopyStatus.ARCHIVED,
+        archivedAt: new Date(),
+        archiveReason: 'Damaged beyond repair',
+      }),
+    },
+    libraryReservation: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     libraryCopyHistory: {
       create: jest.fn().mockResolvedValue({ id: 'history-1' }),
@@ -203,6 +260,21 @@ function buildService(
     },
     libraryIssue: {
       findFirst: jest.fn().mockResolvedValue(issue),
+      findMany: jest.fn().mockResolvedValue([
+        {
+          ...issue,
+          copy: {
+            ...issue.copy,
+            barcode: 'BC-1',
+          },
+          borrowerStaff: null,
+        },
+      ]),
+      count: jest.fn().mockResolvedValue(1),
+    },
+    libraryCopy: {
+      findFirst: jest.fn().mockResolvedValue(copy),
+      delete: jest.fn().mockResolvedValue(copy),
     },
     librarySetting: {
       findUnique: jest.fn().mockResolvedValue(options.settings ?? null),
@@ -211,6 +283,9 @@ function buildService(
       findMany: jest.fn().mockResolvedValue(options.holidays ?? []),
     },
     $transaction: jest.fn().mockImplementation(async (callback: unknown) => {
+      if (Array.isArray(callback)) {
+        return Promise.all(callback);
+      }
       return (callback as (transactionClient: typeof tx) => Promise<unknown>)(
         tx,
       );
@@ -232,11 +307,27 @@ function buildService(
       prisma as never,
       auditService as never,
       libraryService as never,
+      options.fileRegistryService as never,
     ),
     prisma,
     tx,
     auditService,
     libraryService,
+  };
+}
+
+function buildCopy(
+  overrides: Partial<{ issueCount: number; historyCount: number }> = {},
+) {
+  return {
+    id: 'copy-1',
+    tenantId: actor.tenantId,
+    barcode: 'BC-1',
+    status: LibraryCopyStatus.AVAILABLE,
+    _count: {
+      issues: overrides.issueCount ?? 0,
+      history: overrides.historyCount ?? 0,
+    },
   };
 }
 
@@ -274,6 +365,7 @@ function buildIssue(overrides: Partial<{ dueAt: Date }> = {}) {
     copyId: 'copy-1',
     borrowerStudentId: 'student-1',
     borrowerStaffId: null,
+    issuedAt: new Date('2026-06-01T00:00:00.000Z'),
     dueAt: overrides.dueAt ?? new Date('2026-06-10T00:00:00.000Z'),
     status: LibraryIssueStatus.ISSUED,
     notes: null,

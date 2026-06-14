@@ -222,6 +222,69 @@ describe('M10HardeningService operations depth', () => {
     );
   });
 
+  it.each([
+    ['EMAIL', 'SCHOOL_EMAIL'],
+    ['FCM', 'SCHOOL_FCM'],
+  ] as const)(
+    'verifies signed %s provider callbacks before updating delivery status',
+    async (providerType, providerName) => {
+      const { service, prisma } = createService();
+      prisma.providerConfig.findFirst.mockResolvedValue({
+        id: `provider-${providerType}`,
+        type: providerType,
+        name: providerName,
+        enabled: true,
+        configEncrypted: { callbackSecret: 'callback-secret' },
+        secretKeys: ['callbackSecret'],
+      });
+      prisma.notificationDelivery.findFirst.mockResolvedValue({
+        id: 'delivery-1',
+        status: NotificationStatus.SENT,
+        providerMessageId: 'provider-1',
+        sentAt: new Date('2026-06-01T00:00:00.000Z'),
+      });
+      prisma.notificationDelivery.update.mockResolvedValue({
+        id: 'delivery-1',
+        status: NotificationStatus.DELIVERED,
+        providerMessageId: 'provider-1',
+      });
+      const payload = {
+        deliveryId: null,
+        failureCode: null,
+        failureReason: null,
+        providerMessageId: 'provider-1',
+        providerName,
+        providerType,
+        status: 'DELIVERED',
+      };
+
+      await service.recordProviderDeliveryStatus(
+        {
+          providerType,
+          providerName,
+          providerMessageId: 'provider-1',
+          status: 'DELIVERED',
+          signature: signProviderStatusPayload(payload),
+        },
+        actor,
+      );
+
+      expect(prisma.providerConfig.findFirst).toHaveBeenCalledWith({
+        where: { type: providerType, enabled: true, name: providerName },
+        orderBy: [{ updatedAt: 'desc' }],
+      });
+      expect(prisma.notificationDelivery.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'delivery-1' },
+          data: expect.objectContaining({
+            status: NotificationStatus.DELIVERED,
+            providerMessageId: 'provider-1',
+          }),
+        }),
+      );
+    },
+  );
+
   it('rejects provider callbacks with missing signatures before delivery lookup', async () => {
     const { service, prisma } = createService();
 

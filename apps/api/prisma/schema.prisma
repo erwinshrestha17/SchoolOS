@@ -2108,6 +2108,7 @@ model CanteenSpendingControl {
   tenantId            String
   studentId           String
   dailySpendingLimit  Decimal? @db.Decimal(12, 2)
+  monthlySpendingLimit Decimal? @db.Decimal(12, 2)
   blockedCategories   String[] @default([])
   blockedMenuItemIds  String[] @default([])
   lowBalanceThreshold Decimal? @db.Decimal(12, 2)

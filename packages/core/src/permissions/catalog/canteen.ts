@@ -119,4 +119,9 @@ export const canteenPermissions = [
     action: "read",
     description: "Read canteen reports",
   },
+  {
+    resource: "canteen:parent",
+    action: "read",
+    description: "Read own child canteen wallet, menu, and meal plan status",
+  },
 ] as const;

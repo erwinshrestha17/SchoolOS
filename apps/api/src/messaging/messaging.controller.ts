@@ -38,9 +38,9 @@ export class MessagingController {
           payload.tenantId === auth.tenantId,
       ),
       map(
-        (payload) =>
+        () =>
           ({
-            data: payload,
+            data: { type: 'message.sent' },
           }) as MessageEvent,
       ),
     );

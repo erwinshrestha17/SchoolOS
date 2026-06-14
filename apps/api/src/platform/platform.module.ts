@@ -31,6 +31,7 @@ import { PlatformBillingLifecycleService } from './platform-billing-lifecycle.se
       { name: 'activity-media' },
       { name: 'homework' },
       { name: 'reports' },
+      { name: 'accounting-reports' },
       { name: 'canteen-alerts' },
     ),
   ],

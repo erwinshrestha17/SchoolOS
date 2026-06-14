@@ -84,6 +84,36 @@ describe('NoticeDetailService', () => {
     expect(detail.attachmentUrl).toBe('https://legacy.example/notice.pdf');
   });
 
+  it('does not expose raw legacy object keys when no linked File Registry asset exists', async () => {
+    const { service, prisma, fileRegistry } = buildService();
+    prisma.notice.findFirst.mockResolvedValue(
+      noticeRecord({
+        attachmentUrl: 'tenant-1/notices/raw-object-key.pdf',
+      }),
+    );
+    fileRegistry.listFilesByEntity.mockResolvedValue([]);
+
+    const detail = await service.getNoticeDetail('notice-1', actor);
+
+    expect(fileRegistry.getSignedUrl).not.toHaveBeenCalled();
+    expect(detail.attachmentUrl).toBeNull();
+  });
+
+  it('allows protected API paths for legacy notice attachments', async () => {
+    const { service, prisma, fileRegistry } = buildService();
+    prisma.notice.findFirst.mockResolvedValue(
+      noticeRecord({
+        attachmentUrl: '/api/v1/files/file-1/preview',
+      }),
+    );
+    fileRegistry.listFilesByEntity.mockResolvedValue([]);
+
+    const detail = await service.getNoticeDetail('notice-1', actor);
+
+    expect(fileRegistry.getSignedUrl).not.toHaveBeenCalled();
+    expect(detail.attachmentUrl).toBe('/api/v1/files/file-1/preview');
+  });
+
   it('fails closed for missing or cross-tenant notice details', async () => {
     const { service, prisma, fileRegistry } = buildService();
     prisma.notice.findFirst.mockResolvedValue(null);

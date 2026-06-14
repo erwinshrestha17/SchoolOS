@@ -1,6 +1,12 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   AuthMethod,
+  ChatAvailabilityAppliesToRole,
+  ChatEscalationStatus,
   MessageStatus,
   ParentTeacherMessagePriority,
   ParentTeacherSenderRole,
@@ -331,6 +337,120 @@ describe('ParentTeacherChatService', () => {
     );
   });
 
+  it('uses teacher-specific availability rules for teacher status checks', async () => {
+    const currentNepalDay = new Date(Date.now() + 345 * 60_000).getUTCDay();
+    prisma.chatAvailabilityRule.findMany.mockResolvedValue([
+      {
+        id: 'parent-rule',
+        tenantId: 'tenant-1',
+        dayOfWeek: currentNepalDay,
+        enabled: false,
+        startTime: '00:00',
+        endTime: '00:00',
+        appliesToRole: ChatAvailabilityAppliesToRole.PARENT,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 'teacher-rule',
+        tenantId: 'tenant-1',
+        dayOfWeek: currentNepalDay,
+        enabled: true,
+        startTime: '00:00',
+        endTime: '23:59',
+        appliesToRole: ChatAvailabilityAppliesToRole.TEACHER,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+
+    await expect(service.getAvailabilityStatus(teacherActor)).resolves.toEqual(
+      expect.objectContaining({
+        appliesToRole: ChatAvailabilityAppliesToRole.TEACHER,
+        isAvailable: true,
+      }),
+    );
+    await expect(service.getAvailabilityStatus(parentActor)).resolves.toEqual(
+      expect.objectContaining({
+        appliesToRole: ChatAvailabilityAppliesToRole.PARENT,
+        isAvailable: false,
+      }),
+    );
+  });
+
+  it('does not queue teacher replies as outside-hours when teacher chat window is open', async () => {
+    const currentNepalDay = new Date(Date.now() + 345 * 60_000).getUTCDay();
+    prisma.parentTeacherThread.findFirst.mockResolvedValue(thread);
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    prisma.chatAvailabilityRule.findMany.mockResolvedValue([
+      {
+        id: 'parent-rule',
+        tenantId: 'tenant-1',
+        dayOfWeek: currentNepalDay,
+        enabled: false,
+        startTime: '00:00',
+        endTime: '00:00',
+        appliesToRole: ChatAvailabilityAppliesToRole.PARENT,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 'teacher-rule',
+        tenantId: 'tenant-1',
+        dayOfWeek: currentNepalDay,
+        enabled: true,
+        startTime: '00:00',
+        endTime: '23:59',
+        appliesToRole: ChatAvailabilityAppliesToRole.TEACHER,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    prisma.parentTeacherMessage.create.mockResolvedValue({
+      id: 'message-1',
+      threadId: 'thread-1',
+      senderUserId: 'teacher-user-1',
+      senderRole: ParentTeacherSenderRole.TEACHER,
+      message: 'Please check the homework diary.',
+      priority: ParentTeacherMessagePriority.NORMAL,
+      status: MessageStatus.SENT,
+    });
+    prisma.parentTeacherThread.update.mockResolvedValue(thread);
+    communicationsService.recordDeliveryRecords.mockResolvedValue({
+      created: 1,
+    });
+
+    const result = await service.sendMessage(
+      'thread-1',
+      { message: 'Please check the homework diary.' },
+      teacherActor,
+    );
+
+    expect(result.queuedNotice).toBeNull();
+    expect(result.availability).toEqual(
+      expect.objectContaining({
+        appliesToRole: ChatAvailabilityAppliesToRole.TEACHER,
+        isAvailable: true,
+      }),
+    );
+    expect(communicationsService.recordDeliveryRecords).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: 'parent_teacher_message',
+        sourceId: 'message-1',
+        studentIds: ['student-1'],
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'send',
+        resource: 'parent_teacher_message',
+        after: expect.objectContaining({
+          outsideHours: false,
+        }),
+      }),
+    );
+  });
+
   it('updates read receipts on visible unread messages', async () => {
     prisma.parentTeacherThread.findFirst.mockResolvedValue(thread);
     prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
@@ -400,6 +520,74 @@ describe('ParentTeacherChatService', () => {
     await expect(
       service.sendMessage('thread-1', { message: 'Hello' }, parentActor),
     ).rejects.toThrow('Closed parent-teacher threads reject new messages');
+  });
+
+  it('locks escalated threads for normal participants until moderation resolves them', async () => {
+    prisma.parentTeacherThread.findFirst.mockResolvedValue({
+      ...thread,
+      status: ParentTeacherThreadStatus.ESCALATED,
+    });
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+
+    await expect(
+      service.sendMessage('thread-1', { message: 'Following up' }, teacherActor),
+    ).rejects.toThrow(ConflictException);
+
+    expect(prisma.parentTeacherMessage.create).not.toHaveBeenCalled();
+    expect(communicationsService.recordDeliveryRecords).not.toHaveBeenCalled();
+  });
+
+  it('reopens an escalated thread when a moderator resolves the escalation', async () => {
+    prisma.chatEscalation.findFirst.mockResolvedValue({
+      id: 'escalation-1',
+      tenantId: 'tenant-1',
+      threadId: 'thread-1',
+      status: ChatEscalationStatus.OPEN,
+    });
+    prisma.chatEscalation.update.mockResolvedValue({
+      id: 'escalation-1',
+      tenantId: 'tenant-1',
+      threadId: 'thread-1',
+      status: ChatEscalationStatus.RESOLVED,
+    });
+    prisma.parentTeacherThread.update.mockResolvedValue({
+      ...thread,
+      status: ParentTeacherThreadStatus.OPEN,
+    });
+
+    await expect(
+      service.resolveEscalation(
+        'escalation-1',
+        { resolutionNote: 'Handled by discipline coordinator' },
+        adminActor,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({ status: ChatEscalationStatus.RESOLVED }),
+    );
+
+    expect(prisma.chatEscalation.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'escalation-1' },
+        data: expect.objectContaining({
+          status: ChatEscalationStatus.RESOLVED,
+          resolvedByUserId: 'admin-1',
+        }),
+      }),
+    );
+    expect(prisma.parentTeacherThread.update).toHaveBeenCalledWith({
+      where: { id: 'thread-1' },
+      data: { status: ParentTeacherThreadStatus.OPEN },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'resolve',
+        resource: 'chat_escalation',
+        resourceId: 'escalation-1',
+        after: expect.objectContaining({
+          resolutionNote: 'Handled by discipline coordinator',
+        }),
+      }),
+    );
   });
 
   it('validates empty and oversized message DTOs', async () => {

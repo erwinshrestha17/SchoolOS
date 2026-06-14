@@ -603,4 +603,10 @@ export class TransportController {
   exportTripHistoryCsv(@CurrentAuth() auth: AuthContext) {
     return this.transportHardeningService.exportTripHistoryCsv(auth);
   }
+
+  @Post('reports/trips/export')
+  @Permissions('transport:reports:read')
+  exportTripHistoryCsvFile(@CurrentAuth() auth: AuthContext) {
+    return this.transportHardeningService.exportTripHistoryCsvFile(auth);
+  }
 }

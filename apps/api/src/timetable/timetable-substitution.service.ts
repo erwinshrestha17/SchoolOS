@@ -377,6 +377,7 @@ export class TimetableSubstitutionService {
         dto.substituteTeacherId,
         substitution.date,
         actor,
+        substitution.id,
       );
     }
 
@@ -425,6 +426,7 @@ export class TimetableSubstitutionService {
       dto.substituteTeacherId,
       substitution.date,
       actor,
+      substitution.id,
     );
 
     const updated = await this.prisma.timetableSubstitution.update({
@@ -498,6 +500,7 @@ export class TimetableSubstitutionService {
     substituteTeacherId: string,
     date: Date,
     actor: AuthContext,
+    currentSubstitutionId?: string,
   ) {
     const targetDate = stripTime(date);
     await this.ensureStaff(actor, substituteTeacherId);
@@ -545,6 +548,9 @@ export class TimetableSubstitutionService {
       await this.prisma.timetableSubstitution.findFirst({
         where: {
           tenantId: actor.tenantId,
+          ...(currentSubstitutionId
+            ? { id: { not: currentSubstitutionId } }
+            : {}),
           substituteTeacherId,
           date: targetDate,
           status: TimetableSubstitutionStatus.ASSIGNED,

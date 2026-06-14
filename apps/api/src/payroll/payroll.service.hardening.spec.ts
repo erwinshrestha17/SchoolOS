@@ -57,6 +57,7 @@ describe('PayrollService hardening boundaries', () => {
     });
     const { service, prisma } = buildService({
       salaryStructureFindFirstQueue: [structure, overlapping],
+      salaryStructures: [overlapping],
     });
 
     await expect(
@@ -66,8 +67,7 @@ describe('PayrollService hardening boundaries', () => {
     expect(prisma.salaryStructure.findFirst).toHaveBeenNthCalledWith(1, {
       where: { id: 'salary-1', tenantId: actor.tenantId },
     });
-    expect(prisma.salaryStructure.findFirst).toHaveBeenNthCalledWith(
-      2,
+    expect(prisma.salaryStructure.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           tenantId: actor.tenantId,
@@ -78,6 +78,43 @@ describe('PayrollService hardening boundaries', () => {
       }),
     );
     expect(prisma.salaryStructure.update).not.toHaveBeenCalled();
+  });
+
+  it('closes the previous open-ended salary version when activating a later version', async () => {
+    const structure = buildSalaryStructure({
+      id: 'salary-new',
+      staffId: 'staff-1',
+      effectiveFrom: new Date('2026-06-01T00:00:00.000Z'),
+      effectiveTo: null,
+      status: SalaryStructureStatus.DRAFT,
+    });
+    const previous = buildSalaryStructure({
+      id: 'salary-old',
+      staffId: 'staff-1',
+      effectiveFrom: new Date('2026-05-01T00:00:00.000Z'),
+      effectiveTo: null,
+      status: SalaryStructureStatus.ACTIVE,
+    });
+    const { service, tx } = buildService({
+      salaryStructureFindFirstQueue: [structure],
+      salaryStructures: [previous],
+    });
+
+    await service.activateSalaryStructure('salary-new', actor as never);
+
+    expect(tx.salaryStructure.update).toHaveBeenCalledWith({
+      where: { id: 'salary-old' },
+      data: { effectiveTo: new Date('2026-05-31T00:00:00.000Z') },
+    });
+    expect(tx.salaryStructure.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'salary-new' },
+        data: expect.objectContaining({
+          status: SalaryStructureStatus.ACTIVE,
+          activatedAt: expect.any(Date),
+        }),
+      }),
+    );
   });
 
   it('prevents mutating salary structures already used by payroll', async () => {
@@ -181,6 +218,22 @@ describe('PayrollService hardening boundaries', () => {
     expect(result).toEqual(
       expect.objectContaining({ journalEntryId: 'journal-1' }),
     );
+  });
+
+  it('rejects double posting instead of returning a silently posted run', async () => {
+    const run = buildPayrollRun({
+      status: PayrollRunStatus.POSTED,
+      journalEntryId: 'journal-1',
+    });
+    const { service, accountingPostingService } = buildService({
+      payrollRun: run,
+    });
+
+    await expect(
+      service.postPayrollRun('run-1', actor as never),
+    ).rejects.toThrow('Payroll run is already posted');
+
+    expect(accountingPostingService.postPayrollAccrual).not.toHaveBeenCalled();
   });
 
   it('scopes payroll run register reports by tenant and selected payroll run', async () => {
@@ -343,6 +396,9 @@ function buildService(options: {
   const tx = {
     payrollLine: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    salaryStructure: {
+      update: jest.fn().mockResolvedValue(buildSalaryStructure()),
     },
     payrollRun: {
       update: jest

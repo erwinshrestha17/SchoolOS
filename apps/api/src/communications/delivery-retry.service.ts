@@ -158,7 +158,41 @@ export class DeliveryRetryService {
     const results: DeliveryRetryResult[] = [];
 
     for (const delivery of deliveries) {
-      results.push(await this.dispatchRetry(delivery, actor, options));
+      try {
+        results.push(await this.dispatchRetry(delivery, actor, options));
+      } catch (error) {
+        if (!(error instanceof BadRequestException)) {
+          throw error;
+        }
+
+        const retriedAt = new Date();
+        const errorMessage = sanitizeFailureReason(
+          error.message || 'Delivery is no longer retryable',
+        );
+
+        await this.auditService.record({
+          action: 'retry_skipped',
+          resource: 'notification_delivery',
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          resourceId: delivery.id,
+          after: {
+            status: delivery.status,
+            sourceType: delivery.sourceType,
+            sourceId: delivery.sourceId,
+            channel: delivery.channel,
+            reason: options.reason ?? null,
+            diagnostic: errorMessage,
+          },
+        });
+
+        results.push({
+          deliveryId: delivery.id,
+          status: delivery.status,
+          errorMessage,
+          retriedAt: retriedAt.toISOString(),
+        });
+      }
     }
 
     await this.auditService.record({

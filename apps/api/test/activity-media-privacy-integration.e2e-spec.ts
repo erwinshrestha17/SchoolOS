@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import {
   ActivityCategory,
+  ActivityPostStatus,
   AudienceType,
   ConsentType,
   NotificationChannel,
@@ -34,6 +35,7 @@ interface ActivityPostRecord {
   audienceType: AudienceType;
   publishedAt: Date;
   createdAt: Date;
+  status: ActivityPostStatus;
   moderationStatus: string;
   softDeletedAt: Date | null;
   attachments: ActivityAttachmentRecord[];
@@ -61,6 +63,7 @@ interface ActivityPostLifecycleRow {
   id: string;
   tenantId: string;
   createdById: string;
+  status: ActivityPostStatus;
   moderationStatus: string;
   softDeletedAt: Date | null;
 }
@@ -564,6 +567,7 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
         : AudienceType.SECTION,
       publishedAt: new Date(),
       createdAt: new Date(),
+      status: ActivityPostStatus.APPROVED,
       moderationStatus: 'APPROVED',
       softDeletedAt: null,
       attachments: [attachment],
@@ -762,6 +766,7 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
             audienceType: data.audienceType as AudienceType,
             publishedAt: data.publishedAt as Date,
             createdAt: new Date(),
+            status: ActivityPostStatus.APPROVED,
             moderationStatus: 'APPROVED',
             softDeletedAt: null,
             attachments,
@@ -818,6 +823,9 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
           );
           if (!post) return null;
           Object.assign(post, q.data);
+          if (q.data.status) {
+            post.moderationStatus = q.data.status as string;
+          }
           return post;
         },
       ),
@@ -897,6 +905,7 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
     if (isSoftDeleteQuery(sqlText)) {
       post.softDeletedAt = new Date();
       post.moderationStatus = 'REJECTED';
+      post.status = ActivityPostStatus.REJECTED;
       return [toLifecycleRow(post)];
     }
 
@@ -904,6 +913,9 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
       post.moderationStatus = sqlText.includes('REJECTED')
         ? 'REJECTED'
         : 'APPROVED';
+      post.status = sqlText.includes('REJECTED')
+        ? ActivityPostStatus.REJECTED
+        : ActivityPostStatus.APPROVED;
       return [toLifecycleRow(post)];
     }
 
@@ -949,6 +961,7 @@ function toLifecycleRow(post: ActivityPostRecord): ActivityPostLifecycleRow {
     id: post.id,
     tenantId: post.tenantId,
     createdById: post.createdById,
+    status: post.status,
     moderationStatus: post.moderationStatus,
     softDeletedAt: post.softDeletedAt,
   };

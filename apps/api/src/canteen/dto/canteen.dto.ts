@@ -119,6 +119,7 @@ export class CompleteCanteenPosSaleDto {
 export class UpsertCanteenSpendingControlDto {
   @IsString() studentId!: string;
   @IsOptional() @IsNumber() @Min(0) dailySpendingLimit?: number;
+  @IsOptional() @IsNumber() @Min(0) monthlySpendingLimit?: number;
   @IsOptional()
   @IsArray()
   @ArrayUnique()

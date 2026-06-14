@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   LibraryCopyStatus,
@@ -19,6 +20,7 @@ import {
   getStudentOwnId,
 } from '../common/security/parent-scope';
 import { PrismaService } from '../prisma/prisma.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { ArchiveLibraryBookDto } from './dto/archive-library-book.dto';
 import { CreateLibraryBookDto } from './dto/create-library-book.dto';
 import { CreateLibraryCopyDto } from './dto/create-library-copy.dto';
@@ -70,6 +72,8 @@ export class LibraryHardeningService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly libraryService: LibraryService,
+    @Optional()
+    private readonly fileRegistryService?: FileRegistryService,
   ) {}
 
   async createBook(dto: CreateLibraryBookDto, actor: AuthContext) {
@@ -460,6 +464,30 @@ export class LibraryHardeningService {
     });
 
     return updated;
+  }
+
+  async deleteCopy(copyId: string, reason: string, actor: AuthContext) {
+    const copy = await this.prisma.libraryCopy.findFirst({
+      where: { id: copyId, tenantId: actor.tenantId },
+      include: { _count: { select: { issues: true, history: true } } },
+    });
+    if (!copy)
+      throw new NotFoundException('Library copy not found in this tenant');
+
+    if (copy._count.issues > 0 || copy._count.history > 0) {
+      return this.archiveCopy(copyId, reason, actor);
+    }
+
+    await this.prisma.libraryCopy.delete({ where: { id: copy.id } });
+    await this.auditService.record({
+      action: 'delete',
+      resource: 'library_copy',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: copy.id,
+      before: { barcode: copy.barcode, reason },
+    });
+    return { deleted: true, id: copy.id };
   }
 
   async markCopyStatus(
@@ -1244,6 +1272,29 @@ export class LibraryHardeningService {
     });
 
     return rows.map((row) => row.map(csvEscape).join(',')).join('\n');
+  }
+
+  async exportIssuedBooksCsvFile(actor: AuthContext) {
+    if (!this.fileRegistryService) {
+      throw new ConflictException('File Registry is not available for export');
+    }
+
+    const csv = await this.exportIssuedBooksCsv(actor);
+    const fileName = `library-issued-books-${new Date().toISOString().slice(0, 10)}.csv`;
+    const asset = await this.fileRegistryService.registerGeneratedFile({
+      tenantId: actor.tenantId,
+      generatedByUserId: actor.userId,
+      originalFilename: fileName,
+      content: Buffer.from(csv, 'utf8'),
+      mimeType: 'text/csv',
+      module: 'library',
+      metadata: {
+        kind: 'library_issued_books_report',
+        generatedAt: new Date().toISOString(),
+      },
+    });
+
+    return { fileAssetId: asset.id, fileName, mimeType: 'text/csv' };
   }
 
   async getLibrarySettings(actor: AuthContext): Promise<LibraryPolicySettings> {

@@ -263,6 +263,36 @@ describe('Transport Security Boundaries', () => {
       expect(result.ageSeconds).toBeGreaterThanOrEqual(600);
     });
 
+    it('falls back to persisted latest-location when Redis read fails', async () => {
+      const recordedAt = new Date(Date.now() - 60 * 1000);
+
+      prisma.transportTrip.findFirst.mockResolvedValue({
+        id: 'trip-1',
+        status: TransportTripStatus.ACTIVE,
+        driverAssignmentId: 'assignment-1',
+        vehicleId: 'v-1',
+      });
+      redisClient.get.mockRejectedValueOnce(new Error('redis unavailable'));
+      prisma.transportLocationPing.findFirst.mockResolvedValue({
+        tenantId,
+        tripId: 'trip-1',
+        vehicleId: 'v-1',
+        driverAssignmentId: 'assignment-1',
+        latitude: { toNumber: () => 27.7172 },
+        longitude: { toNumber: () => 85.324 },
+        speedKph: null,
+        heading: null,
+        recordedAt,
+      });
+
+      const result = await service.getLatestTripLocation('trip-1', adminActor);
+
+      expect(result).toMatchObject({
+        source: 'history',
+        confidence: 'fresh',
+      });
+    });
+
     it('rejects location ingestion pressure before cache or database writes', async () => {
       prisma.transportTrip.findFirst.mockResolvedValue({
         id: 'trip-1',

@@ -324,6 +324,11 @@ export class FileRegistryService {
       return;
     }
 
+    if (asset.module === 'payroll') {
+      await this.assertPayrollFileAccess(asset, auth);
+      return;
+    }
+
     const requiredPermissions = FILE_READ_PERMISSIONS[asset.module ?? ''];
     if (requiredPermissions) {
       if (
@@ -583,6 +588,46 @@ export class FileRegistryService {
     );
   }
 
+  private async assertPayrollFileAccess(
+    asset: Awaited<ReturnType<FileRegistryService['getFileMetadata']>>,
+    auth: AuthContext,
+  ) {
+    if (
+      auth.permissions.includes('payroll:read') ||
+      auth.permissions.includes('payroll:manage')
+    ) {
+      return;
+    }
+
+    const metadata = asset.metadata as Prisma.JsonObject | null;
+    const payslipId =
+      asset.entityId ??
+      (typeof metadata?.payslipId === 'string' ? metadata.payslipId : null);
+
+    if (!payslipId) {
+      throw new ForbiddenException('Payroll file is not linked to a payslip');
+    }
+
+    const payslip = await this.prisma.payslip.findFirst({
+      where: { id: payslipId, tenantId: auth.tenantId },
+      select: {
+        staff: {
+          select: {
+            userId: true,
+          },
+        },
+      },
+    });
+
+    if (payslip?.staff.userId === auth.userId) {
+      return;
+    }
+
+    throw new ForbiddenException(
+      'You do not have permission to view this payroll file',
+    );
+  }
+
   private currentStorageProvider(): StorageProvider {
     const provider = this.configService.storageProvider;
 
@@ -651,6 +696,7 @@ const FILE_READ_PERMISSIONS: Record<string, string[]> = {
   reports: ['reports:read', 'reports:export'],
   academics: ['academics:read', 'reports:read'],
   accounting: ['accounting:read', 'accounting:reports:read'],
+  payroll: ['payroll:read', 'payroll:manage'],
   finance: ['fees:manage', 'receipts:read', 'receipts:manage'],
   fees: ['fees:manage', 'receipts:read', 'receipts:manage'],
   admissions: ['admissions:read'],

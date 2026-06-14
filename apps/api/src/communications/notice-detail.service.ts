@@ -135,9 +135,28 @@ export class NoticeDetailService {
     );
 
     if (!linkedFile) {
-      return notice.attachmentUrl;
+      return this.isSafeLegacyAttachmentUrl(notice.attachmentUrl)
+        ? notice.attachmentUrl
+        : null;
     }
 
     return this.fileRegistryService.getSignedUrl(actor.tenantId, linkedFile.id);
+  }
+
+  private isSafeLegacyAttachmentUrl(url: string | null) {
+    if (!url) {
+      return false;
+    }
+
+    if (url.startsWith('/api/') || url.startsWith('/files/')) {
+      return true;
+    }
+
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
   }
 }

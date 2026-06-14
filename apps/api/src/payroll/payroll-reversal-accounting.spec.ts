@@ -110,6 +110,48 @@ describe('PayrollService reversal accounting reconciliation', () => {
     expect(prisma.payrollRun.update).not.toHaveBeenCalled();
   });
 
+  it('does not cancel payroll when the accrual journal is missing', async () => {
+    const postedRun = buildPayrollRun({
+      status: PayrollRunStatus.POSTED,
+      journalEntryId: 'missing-journal',
+    });
+    const { service, tx, accountingPostingService } = buildService({
+      payrollRun: postedRun,
+      journalEntries: {},
+    });
+
+    await expect(
+      service.reversePayrollRun(
+        postedRun.id,
+        { reason: 'Accounting correction' },
+        actor as never,
+      ),
+    ).rejects.toThrow('Payroll accrual journal entry was not found');
+
+    expect(accountingPostingService.postReversal).not.toHaveBeenCalled();
+    expect(tx.payrollRun.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects marking an already paid payroll run as paid again', async () => {
+    const paidRun = buildPayrollRun({
+      status: PayrollRunStatus.PAID,
+      disbursementJournalEntryId: 'journal-disbursement-1',
+    });
+    const { service, accountingPostingService } = buildService({
+      payrollRun: paidRun,
+    });
+
+    await expect(
+      service.markPayrollRunPaid(
+        paidRun.id,
+        { reason: 'Duplicate click' },
+        actor as never,
+      ),
+    ).rejects.toThrow('Payroll run is already marked as paid');
+
+    expect(accountingPostingService.postPayrollDisbursement).not.toHaveBeenCalled();
+  });
+
   it('prevents regenerating locked posted payroll lines', async () => {
     const postedRun = buildPayrollRun({ status: PayrollRunStatus.POSTED });
     const { service, tx } = buildService({ payrollRun: postedRun });

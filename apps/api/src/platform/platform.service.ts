@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -249,6 +250,9 @@ export class PlatformService {
     @InjectQueue('homework') private readonly homeworkQueue: Queue,
     @InjectQueue('reports') private readonly reportsQueue: Queue,
     @InjectQueue('canteen-alerts') private readonly canteenAlertsQueue: Queue,
+    @Optional()
+    @InjectQueue('accounting-reports')
+    private readonly accountingReportsQueue?: Queue,
   ) {
     this.queues = new Map([
       ['notifications', notificationsQueue],
@@ -258,6 +262,11 @@ export class PlatformService {
       ['homework', homeworkQueue],
       ['reports', reportsQueue],
       ['canteen-alerts', canteenAlertsQueue],
+      ...(accountingReportsQueue
+        ? ([['accounting-reports', accountingReportsQueue]] as Array<
+            [string, Queue]
+          >)
+        : []),
     ]);
   }
 

@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
@@ -94,6 +95,9 @@ export class PlatformQueuesService {
     @InjectQueue('homework') private readonly homeworkQueue: Queue,
     @InjectQueue('reports') private readonly reportsQueue: Queue,
     @InjectQueue('canteen-alerts') private readonly canteenAlertsQueue: Queue,
+    @Optional()
+    @InjectQueue('accounting-reports')
+    private readonly accountingReportsQueue?: Queue,
   ) {
     this.queues = new Map([
       ['notifications', notificationsQueue],
@@ -102,6 +106,11 @@ export class PlatformQueuesService {
       ['activity-media', activityMediaQueue],
       ['homework', homeworkQueue],
       ['reports', reportsQueue],
+      ...(accountingReportsQueue
+        ? ([['accounting-reports', accountingReportsQueue]] as Array<
+            [string, Queue]
+          >)
+        : []),
       ['canteen-alerts', canteenAlertsQueue],
     ]);
   }

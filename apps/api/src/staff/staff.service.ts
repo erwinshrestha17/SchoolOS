@@ -1,9 +1,16 @@
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, StaffStatus, StaffLifecycleEventType } from '@prisma/client';
+import {
+  AttendanceStatus,
+  Prisma,
+  StaffStatus,
+  StaffLifecycleEventType,
+} from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,7 +20,12 @@ import { StaffLifecycleDto } from './dto/staff-lifecycle.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { StaffLifecycleService } from './staff-lifecycle.service';
 import { UsageService } from '../usage/usage.service';
-import type { ContractExpiryReminderQueryDto } from './dto/staff-actions.dto';
+import type {
+  ContractExpiryReminderQueryDto,
+  CreateStaffLeaveRequestDto,
+  RecordStaffAttendanceDto,
+  ReviewStaffLeaveRequestDto,
+} from './dto/staff-actions.dto';
 
 @Injectable()
 export class StaffService {
@@ -187,7 +199,7 @@ export class StaffService {
       throw new NotFoundException('Staff profile not found');
     }
 
-    return staff;
+    return mapStaffDetail(staff, actor);
   }
 
   async getStaffDetail(staffId: string, actor: AuthContext) {
@@ -557,6 +569,501 @@ export class StaffService {
     };
   }
 
+  async getMyStaffTimeline(actor: AuthContext) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+      select: { id: true },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff profile not found');
+    }
+
+    return this.getStaffTimeline(staff.id, actor);
+  }
+
+  async getStaffTimeline(staffId: string, actor: AuthContext) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { id: staffId, tenantId: actor.tenantId },
+      select: { id: true, joiningDate: true },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff member not found in this tenant');
+    }
+
+    const [events, contracts, leaveRequests, payrollLines, documents] =
+      await Promise.all([
+        this.prisma.staffLifecycleEvent.findMany({
+          where: { tenantId: actor.tenantId, staffId },
+          orderBy: { eventDate: 'desc' },
+          take: 100,
+        }),
+        this.prisma.staffContract.findMany({
+          where: { tenantId: actor.tenantId, staffId },
+          orderBy: { startDate: 'desc' },
+          take: 50,
+        }),
+        this.prisma.staffLeaveRequest.findMany({
+          where: { tenantId: actor.tenantId, staffId },
+          orderBy: { startsOn: 'desc' },
+          take: 50,
+        }),
+        this.prisma.payrollLine.findMany({
+          where: { tenantId: actor.tenantId, staffId },
+          include: { payrollRun: true, payslip: true },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        }),
+        this.prisma.staffDocument.findMany({
+          where: { tenantId: actor.tenantId, staffId },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        }),
+      ]);
+
+    const items = [
+      ...events.map((event) => ({
+        id: event.id,
+        type: `LIFECYCLE_${event.eventType}`,
+        occurredAt: event.eventDate,
+        title: event.eventType,
+        reason: event.reason,
+        notes: event.notes,
+        metadata: event.metadata,
+      })),
+      ...contracts.map((contract) => ({
+        id: contract.id,
+        type: 'CONTRACT',
+        occurredAt: contract.startDate,
+        title: `Contract ${contract.contractNumber}`,
+        reason: contract.status,
+        metadata: {
+          position: contract.position,
+          endDate: contract.endDate,
+        },
+      })),
+      ...leaveRequests.map((leave) => ({
+        id: leave.id,
+        type: 'LEAVE',
+        occurredAt: leave.startsOn,
+        title: `${leave.leaveType} leave`,
+        reason: leave.status,
+        notes: leave.reviewNote ?? leave.reason,
+        metadata: {
+          startsOn: leave.startsOn,
+          endsOn: leave.endsOn,
+          days: Number(leave.days),
+          isPaid: leave.isPaid,
+        },
+      })),
+      ...payrollLines.map((line) => ({
+        id: line.id,
+        type: 'PAYROLL',
+        occurredAt: line.createdAt,
+        title: `Payroll ${line.payrollRun.periodMonth}/${line.payrollRun.periodYear}`,
+        reason: line.payrollRun.status,
+        metadata: {
+          payrollRunId: line.payrollRunId,
+          payslipNumber: line.payslip?.payslipNumber ?? null,
+          netSalary: canSeeSensitiveStaffData(actor)
+            ? Number(line.netSalary)
+            : null,
+        },
+      })),
+      ...documents.map((document) => ({
+        id: document.id,
+        type: 'DOCUMENT',
+        occurredAt: document.createdAt,
+        title: document.name,
+        reason: document.status,
+        metadata: {
+          kind: document.kind,
+          verifiedAt: document.verifiedAt,
+        },
+      })),
+    ].sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime());
+
+    return { staffId, total: items.length, items };
+  }
+
+  async createMyLeaveRequest(
+    dto: CreateStaffLeaveRequestDto,
+    actor: AuthContext,
+  ) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+      select: { id: true },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff profile not found');
+    }
+
+    return this.createLeaveRequest(staff.id, dto, actor);
+  }
+
+  async createLeaveRequest(
+    staffId: string,
+    dto: CreateStaffLeaveRequestDto,
+    actor: AuthContext,
+  ) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { id: staffId, tenantId: actor.tenantId },
+      select: { id: true, userId: true, status: true },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff member not found in this tenant');
+    }
+
+    if (staff.userId !== actor.userId && !canManageHr(actor)) {
+      throw new ForbiddenException(
+        'You cannot create leave requests for another staff member',
+      );
+    }
+
+    if (staff.status === StaffStatus.TERMINATED || staff.status === StaffStatus.RESIGNED) {
+      throw new ConflictException('Inactive staff cannot request leave');
+    }
+
+    const startsOn = startOfDay(new Date(dto.startsOn));
+    const endsOn = startOfDay(new Date(dto.endsOn));
+    assertDateRange(startsOn, endsOn, 'Leave end date cannot be before start date');
+    const days = getInclusiveDays(startsOn, endsOn);
+    const leaveType = normalizeLeaveType(dto.leaveType);
+    const isPaid = dto.isPaid ?? leaveType !== 'UNPAID';
+
+    if (isPaid) {
+      await this.assertLeaveBalanceAvailable(
+        staffId,
+        leaveType,
+        startsOn.getUTCFullYear(),
+        days,
+        actor,
+      );
+    }
+
+    const request = await this.prisma.staffLeaveRequest.create({
+      data: {
+        tenantId: actor.tenantId,
+        staffId,
+        leaveType,
+        isPaid,
+        startsOn,
+        endsOn,
+        days: new Prisma.Decimal(days),
+        reason: dto.reason.trim(),
+        status: 'PENDING',
+      },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'staff_leave_request',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: request.id,
+      after: { staffId, leaveType, startsOn, endsOn, days, isPaid },
+    });
+
+    return request;
+  }
+
+  async reviewLeaveRequest(
+    leaveRequestId: string,
+    dto: ReviewStaffLeaveRequestDto,
+    actor: AuthContext,
+  ) {
+    if (
+      dto.status !== 'APPROVED' &&
+      dto.status !== 'REJECTED'
+    ) {
+      throw new BadRequestException('Leave review must approve or reject');
+    }
+
+    const request = await this.prisma.staffLeaveRequest.findFirst({
+      where: { id: leaveRequestId, tenantId: actor.tenantId },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Leave request not found in this tenant');
+    }
+
+    if (request.status !== 'PENDING') {
+      throw new ConflictException(
+        `Leave request in ${request.status} status cannot be reviewed`,
+      );
+    }
+
+    if (dto.status === 'APPROVED') {
+      await this.assertLeaveApprovalDoesNotRequirePayrollAdjustment(
+        request.startsOn,
+        request.endsOn,
+        actor,
+      );
+
+      if (request.isPaid) {
+        await this.assertLeaveBalanceAvailable(
+          request.staffId,
+          normalizeLeaveType(request.leaveType),
+          request.startsOn.getUTCFullYear(),
+          Number(request.days),
+          actor,
+        );
+      }
+    }
+
+    const reviewed = await this.prisma.$transaction(async (tx) => {
+      if (dto.status === 'APPROVED' && request.isPaid) {
+        await this.incrementLeaveUsed(
+          tx,
+          request.staffId,
+          normalizeLeaveType(request.leaveType),
+          request.startsOn.getUTCFullYear(),
+          request.days,
+          actor,
+        );
+      }
+
+      return tx.staffLeaveRequest.update({
+        where: { id: request.id },
+        data: {
+          status: dto.status,
+          reviewedById: actor.userId,
+          reviewedAt: new Date(),
+          reviewNote: dto.reviewNote ?? null,
+        },
+      });
+    });
+
+    await this.auditService.record({
+      action: dto.status === 'APPROVED' ? 'approve' : 'reject',
+      resource: 'staff_leave_request',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: reviewed.id,
+      before: { status: request.status },
+      after: {
+        status: reviewed.status,
+        reviewNote: dto.reviewNote ?? null,
+      },
+    });
+
+    if (reviewed.status === 'APPROVED') {
+      await this.lifecycleService.recordEvent(
+        reviewed.staffId,
+        StaffLifecycleEventType.ON_LEAVE,
+        actor,
+        {
+          eventDate: reviewed.startsOn,
+          reason: reviewed.reason,
+          metadata: {
+            leaveRequestId: reviewed.id,
+            leaveType: reviewed.leaveType,
+            startsOn: reviewed.startsOn,
+            endsOn: reviewed.endsOn,
+            days: Number(reviewed.days),
+            isPaid: reviewed.isPaid,
+          },
+        },
+      );
+    }
+
+    return reviewed;
+  }
+
+  async recordMyAttendance(dto: RecordStaffAttendanceDto, actor: AuthContext) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+      select: { id: true },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff profile not found');
+    }
+
+    return this.recordStaffAttendance(staff.id, dto, actor);
+  }
+
+  async recordStaffAttendance(
+    staffId: string,
+    dto: RecordStaffAttendanceDto,
+    actor: AuthContext,
+  ) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { id: staffId, tenantId: actor.tenantId },
+      select: { id: true, userId: true },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff member not found in this tenant');
+    }
+
+    if (staff.userId !== actor.userId && !canManageHr(actor)) {
+      throw new ForbiddenException(
+        'You cannot record attendance for another staff member',
+      );
+    }
+
+    const attendanceDate = startOfDay(
+      dto.attendanceDate ? new Date(dto.attendanceDate) : new Date(),
+    );
+    const checkInAt = dto.checkInAt ? new Date(dto.checkInAt) : undefined;
+    const checkOutAt = dto.checkOutAt ? new Date(dto.checkOutAt) : undefined;
+
+    if (checkInAt && checkOutAt && checkOutAt < checkInAt) {
+      throw new BadRequestException('Check-out cannot be before check-in');
+    }
+    const status = (dto.status ?? AttendanceStatus.PRESENT) as AttendanceStatus;
+
+    const attendance = await this.prisma.staffAttendance.upsert({
+      where: {
+        tenantId_staffId_attendanceDate: {
+          tenantId: actor.tenantId,
+          staffId,
+          attendanceDate,
+        },
+      },
+      update: {
+        status,
+        checkInAt,
+        checkOutAt,
+        note: dto.note,
+        approvedById: canManageHr(actor) ? actor.userId : undefined,
+      },
+      create: {
+        tenantId: actor.tenantId,
+        staffId,
+        attendanceDate,
+        status,
+        checkInAt: checkInAt ?? new Date(),
+        checkOutAt,
+        note: dto.note,
+        approvedById: canManageHr(actor) ? actor.userId : null,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'record_attendance',
+      resource: 'staff_attendance',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: attendance.id,
+      after: {
+        staffId,
+        attendanceDate,
+        status: attendance.status,
+        hasCheckIn: Boolean(attendance.checkInAt),
+        hasCheckOut: Boolean(attendance.checkOutAt),
+      },
+    });
+
+    return attendance;
+  }
+
+  private async assertLeaveBalanceAvailable(
+    staffId: string,
+    leaveType: string,
+    year: number,
+    days: number,
+    actor: AuthContext,
+  ) {
+    const balances = await this.prisma.staffLeaveBalance.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        staffId,
+        year,
+        leaveType: { in: leaveTypeAliases(leaveType) },
+      },
+    });
+
+    const available = balances.reduce((total, balance) => {
+      return total
+        .add(balance.opening)
+        .add(balance.accrued)
+        .add(balance.allocated)
+        .add(balance.carried)
+        .add(balance.adjusted)
+        .sub(balance.used);
+    }, new Prisma.Decimal(0));
+
+    if (available.lt(days)) {
+      throw new ConflictException(
+        `Insufficient ${leaveType} leave balance for requested ${days} day(s)`,
+      );
+    }
+  }
+
+  private async assertLeaveApprovalDoesNotRequirePayrollAdjustment(
+    startsOn: Date,
+    endsOn: Date,
+    actor: AuthContext,
+  ) {
+    const periodPairs = getMonthYearPairs(startsOn, endsOn);
+    const existingRuns = await this.prisma.payrollRun.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        status: {
+          in: [
+            'GENERATED',
+            'UNDER_REVIEW',
+            'REVIEWED',
+            'APPROVED',
+            'POSTED',
+            'PAID',
+          ],
+        },
+        OR: periodPairs.map(({ month, year }) => ({
+          periodMonth: month,
+          periodYear: year,
+        })),
+      },
+      select: {
+        id: true,
+        periodMonth: true,
+        periodYear: true,
+        status: true,
+      },
+      take: 1,
+    });
+
+    if (existingRuns.length > 0) {
+      const run = existingRuns[0];
+      throw new ConflictException(
+        `Leave overlaps payroll run ${run.periodMonth}/${run.periodYear} in ${run.status} status. Reverse/regenerate payroll or post an approved adjustment instead of silently changing payroll.`,
+      );
+    }
+  }
+
+  private async incrementLeaveUsed(
+    tx: Prisma.TransactionClient,
+    staffId: string,
+    leaveType: string,
+    year: number,
+    days: Prisma.Decimal,
+    actor: AuthContext,
+  ) {
+    const balance = await tx.staffLeaveBalance.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        staffId,
+        year,
+        leaveType: { in: leaveTypeAliases(leaveType) },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    if (!balance) {
+      throw new ConflictException(`Missing ${leaveType} leave balance`);
+    }
+
+    await tx.staffLeaveBalance.update({
+      where: { id: balance.id },
+      data: { used: { increment: days } },
+    });
+  }
+
   private async generateEmployeeId(actor: AuthContext) {
     const count = await this.prisma.staff.count({
       where: { tenantId: actor.tenantId },
@@ -653,6 +1160,83 @@ function clampReminderWindow(days: number | undefined) {
   return Math.min(Math.max(Math.trunc(days), 1), 180);
 }
 
+function assertDateRange(startsOn: Date, endsOn: Date, message: string) {
+  if (Number.isNaN(startsOn.getTime()) || Number.isNaN(endsOn.getTime())) {
+    throw new BadRequestException('Invalid date');
+  }
+
+  if (endsOn < startsOn) {
+    throw new BadRequestException(message);
+  }
+}
+
+function getInclusiveDays(startsOn: Date, endsOn: Date) {
+  const start = Date.UTC(
+    startsOn.getUTCFullYear(),
+    startsOn.getUTCMonth(),
+    startsOn.getUTCDate(),
+  );
+  const end = Date.UTC(
+    endsOn.getUTCFullYear(),
+    endsOn.getUTCMonth(),
+    endsOn.getUTCDate(),
+  );
+
+  return Math.round((end - start) / 86_400_000) + 1;
+}
+
+function normalizeLeaveType(leaveType: string) {
+  return leaveType.trim().toUpperCase().replace(/\s+/g, '_');
+}
+
+function titleCaseLeaveType(leaveType: string) {
+  return leaveType
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function leaveTypeAliases(leaveType: string) {
+  const normalized = normalizeLeaveType(leaveType);
+  return Array.from(new Set([normalized, titleCaseLeaveType(normalized)]));
+}
+
+function getMonthYearPairs(startsOn: Date, endsOn: Date) {
+  const pairs: Array<{ month: number; year: number }> = [];
+  const cursor = new Date(
+    Date.UTC(startsOn.getUTCFullYear(), startsOn.getUTCMonth(), 1),
+  );
+  const last = new Date(
+    Date.UTC(endsOn.getUTCFullYear(), endsOn.getUTCMonth(), 1),
+  );
+
+  while (cursor <= last) {
+    pairs.push({
+      month: cursor.getUTCMonth() + 1,
+      year: cursor.getUTCFullYear(),
+    });
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+
+  return pairs;
+}
+
+function canManageHr(actor?: AuthContext) {
+  return Boolean(
+    actor?.permissions?.includes('hr:manage') ||
+      actor?.permissions?.includes('hr:staff:update'),
+  );
+}
+
+function canSeeSensitiveStaffData(actor?: AuthContext) {
+  return Boolean(
+    actor?.permissions?.includes('hr:manage') ||
+      actor?.permissions?.includes('payroll:manage') ||
+      actor?.permissions?.includes('payroll:salary:read'),
+  );
+}
+
 function buildStaffUpdateData(dto: UpdateStaffDto): Prisma.StaffUpdateInput {
   return {
     employeeId: dto.employeeId,
@@ -730,10 +1314,7 @@ function mapStaffDetail(
   },
   actor?: AuthContext,
 ) {
-  const canSeeSensitive =
-    actor?.permissions?.includes('hr:manage') ||
-    actor?.permissions?.includes('payroll:manage') ||
-    (staff.userId && actor?.userId === staff.userId);
+  const canSeeSensitive = canSeeSensitiveStaffData(actor);
 
   const mask = (val: string | null | undefined) => {
     if (!val) return val;
@@ -747,6 +1328,12 @@ function mapStaffDetail(
     citizenshipNo: mask(staff.citizenshipNo),
     panNumber: mask(staff.panNumber),
     bankAccount: mask(staff.bankAccount),
+    salaryStructures: canSeeSensitive
+      ? staff.salaryStructures
+      : maskSalaryStructures(staff.salaryStructures),
+    payrollLines: canSeeSensitive
+      ? staff.payrollLines
+      : maskPayrollLines(staff.payrollLines),
     email: staff.user?.email ?? null,
     roles: staff.user?.userRoles?.map(({ role }) => role.name) ?? [],
     personal: {
@@ -768,6 +1355,38 @@ function mapStaffDetail(
       teacherRegistryId: staff.teacherRegistryId,
     },
   };
+}
+
+function maskSalaryStructures(items?: unknown[]) {
+  return (items ?? []).map((item) => {
+    if (!item || typeof item !== 'object') return item;
+    return {
+      ...(item as Record<string, unknown>),
+      basicSalary: null,
+      allowances: null,
+      deductions: null,
+      bankAccount: null,
+      bankName: null,
+      components: [],
+      masked: true,
+    };
+  });
+}
+
+function maskPayrollLines(items?: unknown[]) {
+  return (items ?? []).map((item) => {
+    if (!item || typeof item !== 'object') return item;
+    return {
+      ...(item as Record<string, unknown>),
+      basicSalary: null,
+      earnings: null,
+      grossSalary: null,
+      allowances: null,
+      deductions: null,
+      netSalary: null,
+      masked: true,
+    };
+  });
 }
 
 function isInactiveStaffStatus(

@@ -1159,9 +1159,14 @@ export class TransportService {
   }
 
   private async readLatestTripLocation(tenantId: string, tripId: string) {
-    const cached = await this.redisService
-      .getClient()
-      .get(this.latestLocationKey(tenantId, tripId));
+    let cached: string | null = null;
+    try {
+      cached = await this.redisService
+        .getClient()
+        .get(this.latestLocationKey(tenantId, tripId));
+    } catch {
+      cached = null;
+    }
 
     if (cached) {
       try {
@@ -1172,9 +1177,13 @@ export class TransportService {
       } catch {
         // Corrupt cache is ignored below and replaced by persisted history.
       }
-      await this.redisService
-        .getClient()
-        .del(this.latestLocationKey(tenantId, tripId));
+      try {
+        await this.redisService
+          .getClient()
+          .del(this.latestLocationKey(tenantId, tripId));
+      } catch {
+        // Redis cleanup failure must not block persisted-history fallback.
+      }
     }
 
     const latest = await this.prisma.transportLocationPing.findFirst({

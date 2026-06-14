@@ -19,6 +19,10 @@ import { CreateStaffDto } from './dto/create-staff.dto';
 import { StaffLifecycleDto } from './dto/staff-lifecycle.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { StaffService } from './staff.service';
+import {
+  CreateStaffLeaveRequestDto,
+  RecordStaffAttendanceDto,
+} from './dto/staff-actions.dto';
 
 @Controller('staff')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -36,6 +40,30 @@ export class StaffController {
   @Permissions('staff:read')
   getMe(@CurrentAuth() auth: AuthContext) {
     return this.staffService.getStaffProfile(auth);
+  }
+
+  @Get('me/timeline')
+  @Permissions('staff:read')
+  getMyTimeline(@CurrentAuth() auth: AuthContext) {
+    return this.staffService.getMyStaffTimeline(auth);
+  }
+
+  @Post('me/leave-requests')
+  @Permissions('hr:leave:request')
+  createMyLeaveRequest(
+    @Body() dto: CreateStaffLeaveRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.staffService.createMyLeaveRequest(dto, auth);
+  }
+
+  @Post('me/attendance')
+  @Permissions('hr:attendance:write')
+  recordMyAttendance(
+    @Body() dto: RecordStaffAttendanceDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.staffService.recordMyAttendance(dto, auth);
   }
 
   @Get(':id')

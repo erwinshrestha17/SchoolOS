@@ -15,6 +15,7 @@ import {
   CanteenWalletTransactionSource,
   CanteenWalletTransactionType,
   Prisma,
+  StudentLifecycleStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
@@ -22,6 +23,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { buildSimplePdf } from '../common/pdf/simple-pdf';
 import { PrismaService } from '../prisma/prisma.service';
 import { FinanceService } from '../finance/finance.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import {
   CompleteCanteenPosSaleDto,
   CreateCanteenMealPlanDto,
@@ -108,6 +110,7 @@ export class CanteenService {
     private readonly auditService: AuditService,
     private readonly accountingPostingService: AccountingPostingService,
     private readonly financeService: FinanceService,
+    private readonly fileRegistryService?: FileRegistryService,
   ) {}
 
   async createMenuItem(dto: CreateCanteenMenuItemDto, actor: AuthContext) {
@@ -1172,6 +1175,66 @@ export class CanteenService {
     return pdf;
   }
 
+  async getPosReceiptPdfFile(id: string, actor: AuthContext) {
+    if (!this.fileRegistryService) {
+      throw new ConflictException('File Registry is not available for receipt');
+    }
+
+    const existing = await this.findReceiptFile(id, actor, 'pos_receipt_pdf');
+    if (existing) {
+      return { fileAssetId: existing.id, alreadyGenerated: true };
+    }
+
+    const pdf = await this.getPosReceiptPdf(id, actor);
+    const receipt = await this.getPosReceipt(id, actor);
+    const asset = await this.fileRegistryService.registerGeneratedFile({
+      tenantId: actor.tenantId,
+      generatedByUserId: actor.userId,
+      originalFilename: `canteen-pos-receipt-${receipt.receiptNumber ?? id}.pdf`,
+      content: pdf,
+      mimeType: 'application/pdf',
+      module: 'canteen',
+      entityId: id,
+      metadata: {
+        kind: 'pos_receipt_pdf',
+        saleId: id,
+        receiptNumber: receipt.receiptNumber,
+      },
+    });
+
+    return { fileAssetId: asset.id, alreadyGenerated: false };
+  }
+
+  async getPosReceiptJsonFile(id: string, actor: AuthContext) {
+    if (!this.fileRegistryService) {
+      throw new ConflictException('File Registry is not available for receipt');
+    }
+
+    const existing = await this.findReceiptFile(id, actor, 'pos_receipt_json');
+    if (existing) {
+      return { fileAssetId: existing.id, alreadyGenerated: true };
+    }
+
+    const receipt = await this.getPosReceipt(id, actor);
+    const content = Buffer.from(JSON.stringify(receipt, null, 2), 'utf8');
+    const asset = await this.fileRegistryService.registerGeneratedFile({
+      tenantId: actor.tenantId,
+      generatedByUserId: actor.userId,
+      originalFilename: `canteen-pos-receipt-${receipt.receiptNumber ?? id}.json`,
+      content,
+      mimeType: 'application/json',
+      module: 'canteen',
+      entityId: id,
+      metadata: {
+        kind: 'pos_receipt_json',
+        saleId: id,
+        receiptNumber: receipt.receiptNumber,
+      },
+    });
+
+    return { fileAssetId: asset.id, alreadyGenerated: false };
+  }
+
   async listPosSales(actor: AuthContext, options: ListPosSalesQuery = {}) {
     const { skip, take, page } = this.pagination(options);
     const range = this.dateRange(options);
@@ -1215,6 +1278,10 @@ export class CanteenService {
           dto.dailySpendingLimit === undefined
             ? null
             : new Prisma.Decimal(dto.dailySpendingLimit),
+        monthlySpendingLimit:
+          dto.monthlySpendingLimit === undefined
+            ? null
+            : new Prisma.Decimal(dto.monthlySpendingLimit),
         blockedCategories: dto.blockedCategories ?? [],
         blockedMenuItemIds: dto.blockedMenuItemIds ?? [],
         lowBalanceThreshold:
@@ -1228,6 +1295,10 @@ export class CanteenService {
           dto.dailySpendingLimit === undefined
             ? null
             : new Prisma.Decimal(dto.dailySpendingLimit),
+        monthlySpendingLimit:
+          dto.monthlySpendingLimit === undefined
+            ? null
+            : new Prisma.Decimal(dto.monthlySpendingLimit),
         blockedCategories: dto.blockedCategories ?? [],
         blockedMenuItemIds: dto.blockedMenuItemIds ?? [],
         lowBalanceThreshold:
@@ -1253,6 +1324,104 @@ export class CanteenService {
     return this.prisma.canteenSpendingControl.findFirst({
       where: { tenantId: actor.tenantId, studentId },
     });
+  }
+
+  async getParentStudentCanteenStatus(studentId: string, actor: AuthContext) {
+    const guardianLink = await this.prisma.studentGuardian.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        studentId,
+        guardian: { userId: actor.userId },
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            studentSystemId: true,
+            firstNameEn: true,
+            lastNameEn: true,
+          },
+        },
+      },
+    });
+
+    if (!guardianLink) {
+      throw new ForbiddenException('Student is outside guardian scope');
+    }
+
+    const today = this.dateOnly(this.todayIso());
+    const [wallet, enrollment, todayServings, menuItems] = await Promise.all([
+      this.prisma.canteenWallet.findFirst({
+        where: { tenantId: actor.tenantId, studentId },
+      }),
+      this.prisma.canteenStudentEnrollment.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          studentId,
+          status: CanteenEnrollmentStatus.ACTIVE,
+          startsOn: { lte: today },
+          OR: [{ endsOn: null }, { endsOn: { gte: today } }],
+        },
+        include: { mealPlan: true },
+        orderBy: [{ createdAt: 'desc' }],
+      }),
+      this.prisma.canteenMealServing.findMany({
+        where: { tenantId: actor.tenantId, studentId, mealDate: today },
+        orderBy: [{ servedAt: 'desc' }],
+        take: 20,
+      }),
+      this.prisma.canteenMenuItem.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          status: CanteenMenuItemStatus.ACTIVE,
+          archivedAt: null,
+        },
+        select: {
+          id: true,
+          name: true,
+          category: true,
+          unitPrice: true,
+          isMealItem: true,
+          allergenTags: true,
+        },
+        orderBy: [{ category: 'asc' }, { name: 'asc' }],
+        take: 100,
+      }),
+    ]);
+
+    return {
+      student: {
+        id: guardianLink.student.id,
+        studentSystemId: guardianLink.student.studentSystemId,
+        name:
+          `${guardianLink.student.firstNameEn} ${guardianLink.student.lastNameEn}`.trim(),
+      },
+      wallet: wallet
+        ? {
+            balance: wallet.balance,
+            lowBalanceThreshold: wallet.lowBalanceThreshold,
+            isLowBalance: wallet.balance.lte(wallet.lowBalanceThreshold),
+          }
+        : null,
+      mealPlan: enrollment
+        ? {
+            enrollmentId: enrollment.id,
+            mealPlanId: enrollment.mealPlanId,
+            name: enrollment.mealPlan.name,
+            mealType: enrollment.mealPlan.mealType,
+            status: enrollment.status,
+            startsOn: enrollment.startsOn,
+            endsOn: enrollment.endsOn,
+          }
+        : null,
+      todayServings: todayServings.map((serving) => ({
+        id: serving.id,
+        mealType: serving.mealType,
+        status: serving.status,
+        servedAt: serving.servedAt,
+      })),
+      menuItems,
+    };
   }
 
   async dailyMealCountReport(actor: AuthContext, date = this.todayIso()) {
@@ -1423,6 +1592,36 @@ export class CanteenService {
         throw new ConflictException('Daily spending limit exceeded');
       }
     }
+    if (control.monthlySpendingLimit) {
+      const now = new Date();
+      const from = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+      );
+      const to = new Date(
+        Date.UTC(
+          now.getUTCFullYear(),
+          now.getUTCMonth() + 1,
+          0,
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
+      const spent = await tx.canteenPosSale.aggregate({
+        where: {
+          tenantId,
+          studentId,
+          status: CanteenPosSaleStatus.COMPLETED,
+          saleDate: { gte: from, lte: to },
+        },
+        _sum: { totalAmount: true },
+      });
+      const current = spent._sum.totalAmount ?? new Prisma.Decimal(0);
+      if (current.add(total).gt(control.monthlySpendingLimit)) {
+        throw new ConflictException('Monthly spending limit exceeded');
+      }
+    }
   }
 
   private resolveServingEnrollment(
@@ -1534,11 +1733,58 @@ export class CanteenService {
   private async ensureStudent(tenantId: string, studentId: string) {
     const student = await this.prisma.student.findFirst({
       where: { tenantId, id: studentId },
-      select: { id: true },
+      select: { id: true, lifecycleStatus: true },
     });
     if (!student) {
       throw new NotFoundException('Student not found in this tenant');
     }
+    if (student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE) {
+      throw new ConflictException('Only active students can use canteen flows');
+    }
+  }
+
+  private async ensureStockDateOpen(
+    tx: Tx,
+    tenantId: string,
+    value: string | Date,
+    action: string,
+  ) {
+    const dateKey = this.startOfDay(new Date(value)).toISOString().slice(0, 10);
+    const closed = await tx.auditLog.findFirst({
+      where: {
+        tenantId,
+        resource: 'canteen_stock_close',
+        action: 'close',
+        resourceId: dateKey,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+
+    if (closed) {
+      throw new ConflictException(
+        `Cannot record ${action} for closed stock date ${dateKey}`,
+      );
+    }
+  }
+
+  private async findReceiptFile(
+    saleId: string,
+    actor: AuthContext,
+    kind: 'pos_receipt_pdf' | 'pos_receipt_json',
+  ) {
+    if (!this.fileRegistryService) return null;
+    const files = await this.fileRegistryService.listFilesByEntity(
+      actor.tenantId,
+      'canteen',
+      saleId,
+    );
+    return (
+      files.find((file) => {
+        const metadata = file.metadata as Prisma.JsonObject | null;
+        return metadata?.kind === kind;
+      }) ?? null
+    );
   }
 
   private async requireMenuItem(tenantId: string, id: string) {
@@ -1775,6 +2021,12 @@ export class CanteenService {
     actor: AuthContext,
   ) {
     const bill = await this.prisma.$transaction(async (tx) => {
+      await this.ensureStockDateOpen(
+        tx,
+        actor.tenantId,
+        dto.billDate,
+        'purchase bill',
+      );
       const supplier = await tx.canteenSupplier.findFirst({
         where: {
           id: dto.supplierId,
@@ -1902,6 +2154,12 @@ export class CanteenService {
 
   async recordWastage(dto: CreateCanteenWastageDto, actor: AuthContext) {
     const wastage = await this.prisma.$transaction(async (tx) => {
+      await this.ensureStockDateOpen(
+        tx,
+        actor.tenantId,
+        dto.wastageDate,
+        'wastage',
+      );
       const item = await tx.canteenInventoryItem.findFirstOrThrow({
         where: { id: dto.inventoryItemId, tenantId: actor.tenantId },
       });
@@ -1978,6 +2236,12 @@ export class CanteenService {
     actor: AuthContext,
   ) {
     const adjustment = await this.prisma.$transaction(async (tx) => {
+      await this.ensureStockDateOpen(
+        tx,
+        actor.tenantId,
+        new Date(),
+        'stock adjustment',
+      );
       const item = await tx.canteenInventoryItem.findFirstOrThrow({
         where: { id: dto.inventoryItemId, tenantId: actor.tenantId },
       });

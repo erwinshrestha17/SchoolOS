@@ -1,5 +1,6 @@
 import {
   ActivityCategory,
+  ActivityPostStatus,
   AudienceType,
   AuthMethod,
   DevelopmentalMilestoneStatus,
@@ -723,4 +724,46 @@ describe('ActivityFeedService', () => {
       }),
     );
   });
+
+  it.each([
+    {
+      label: 'archived',
+      status: ActivityPostStatus.ARCHIVED,
+      softDeletedAt: null,
+    },
+    {
+      label: 'rejected',
+      status: ActivityPostStatus.REJECTED,
+      softDeletedAt: null,
+    },
+    {
+      label: 'soft-deleted',
+      status: ActivityPostStatus.REJECTED,
+      softDeletedAt: new Date('2026-05-06T10:00:00.000Z'),
+    },
+  ])(
+    'blocks direct signed media previews for $label activity posts',
+    async ({ status, softDeletedAt }) => {
+      prisma.activityAttachment = {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'attachment-1',
+          tenantId: 'tenant-1',
+          activityPostId: 'post-1',
+          fileAssetId: 'file-asset-1',
+          activityPost: {
+            id: 'post-1',
+            status,
+            softDeletedAt,
+          },
+        }),
+      };
+
+      await expect(
+        service.getAttachmentPreview(actor, 'attachment-1'),
+      ).rejects.toThrow('Activity post is no longer available');
+
+      expect(fileRegistry.auditAccess).not.toHaveBeenCalled();
+      expect(fileRegistry.getSignedUrl).not.toHaveBeenCalled();
+    },
+  );
 });

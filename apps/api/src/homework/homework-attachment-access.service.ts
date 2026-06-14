@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
-import { Prisma } from '@prisma/client';
+import { Prisma, StudentLifecycleStatus } from '@prisma/client';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -100,6 +100,17 @@ export class HomeworkAttachmentAccessService {
       );
     }
 
+    if (
+      attachment.fileAsset.entityId &&
+      attachment.assignmentId &&
+      !attachment.submissionId &&
+      attachment.fileAsset.entityId !== attachment.assignmentId
+    ) {
+      throw new ForbiddenException(
+        'Homework attachment file is not linked to this assignment',
+      );
+    }
+
     await this.fileRegistryService.auditAccess(
       actor.tenantId,
       attachment.fileAssetId,
@@ -137,8 +148,14 @@ export class HomeworkAttachmentAccessService {
         where: {
           tenantId: actor.tenantId,
           userId: actor.userId,
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
         },
-        select: { id: true, classId: true, sectionId: true },
+        select: {
+          id: true,
+          classId: true,
+          sectionId: true,
+          lifecycleStatus: true,
+        },
       });
 
       if (!student) {
@@ -176,10 +193,18 @@ export class HomeworkAttachmentAccessService {
         ...(attachment.submission?.studentId
           ? { studentId: attachment.submission.studentId }
           : {}),
+        student: {
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
       },
       include: {
         student: {
-          select: { id: true, classId: true, sectionId: true },
+          select: {
+            id: true,
+            classId: true,
+            sectionId: true,
+            lifecycleStatus: true,
+          },
         },
       },
     });

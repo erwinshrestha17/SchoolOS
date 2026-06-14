@@ -37,9 +37,12 @@ function createController() {
     cancelPosSale: jest.fn(),
     getPosReceipt: jest.fn(),
     getPosReceiptPdf: jest.fn(),
+    getPosReceiptPdfFile: jest.fn(),
+    getPosReceiptJsonFile: jest.fn(),
     listPosSales: jest.fn(),
     upsertSpendingControl: jest.fn(),
     getSpendingControl: jest.fn(),
+    getParentStudentCanteenStatus: jest.fn(),
     dailyMealCountReport: jest.fn(),
     itemWiseSalesReport: jest.fn(),
     lowBalanceWalletList: jest.fn(),
@@ -53,7 +56,9 @@ function createController() {
     markServingNotTaken: jest.fn(),
     sendLowBalanceAlerts: jest.fn(),
     exportDailyMealCountCsv: jest.fn(),
+    exportDailyMealCountCsvFile: jest.fn(),
     exportItemWiseSalesCsv: jest.fn(),
+    exportItemWiseSalesCsvFile: jest.fn(),
   };
   const studentQrService = {
     resolveQr: jest.fn(),
@@ -355,9 +360,19 @@ describe('CanteenController M8C contracts', () => {
     canteenService.getPosReceipt.mockReturnValue({
       receiptNumber: 'POS-2026-000001',
     });
+    canteenService.getPosReceiptPdfFile.mockReturnValue({
+      fileAssetId: 'file-pdf-1',
+    });
+    canteenService.getPosReceiptJsonFile.mockReturnValue({
+      fileAssetId: 'file-json-1',
+    });
     canteenService.listPosSales.mockReturnValue({ items: [] });
     canteenService.upsertSpendingControl.mockReturnValue({ id: 'control-1' });
     canteenService.getSpendingControl.mockReturnValue({ id: 'control-1' });
+    canteenService.getParentStudentCanteenStatus.mockReturnValue({
+      student: { id: 'student-1' },
+      wallet: { balance: 1000 },
+    });
 
     expect(controller.createPosSale(saleDto as never, actor)).toEqual({
       id: 'sale-1',
@@ -370,6 +385,12 @@ describe('CanteenController M8C contracts', () => {
     });
     expect(controller.getPosReceipt('sale-1', actor)).toEqual({
       receiptNumber: 'POS-2026-000001',
+    });
+    expect(controller.getPosReceiptPdfFile('sale-1', actor)).toEqual({
+      fileAssetId: 'file-pdf-1',
+    });
+    expect(controller.getPosReceiptJsonFile('sale-1', actor)).toEqual({
+      fileAssetId: 'file-json-1',
     });
     expect(
       controller.listPosSales(
@@ -388,6 +409,12 @@ describe('CanteenController M8C contracts', () => {
     expect(controller.getSpendingControl('student-1', actor)).toEqual({
       id: 'control-1',
     });
+    expect(controller.getParentStudentCanteenStatus('student-1', actor)).toEqual(
+      {
+        student: { id: 'student-1' },
+        wallet: { balance: 1000 },
+      },
+    );
     expect(canteenService.createPosSale).toHaveBeenCalledWith(saleDto, actor);
     expect(canteenService.completePosSale).toHaveBeenCalledWith(
       'sale-1',
@@ -403,6 +430,18 @@ describe('CanteenController M8C contracts', () => {
       limit: '20',
     });
     expect(canteenService.getPosReceipt).toHaveBeenCalledWith('sale-1', actor);
+    expect(canteenService.getPosReceiptPdfFile).toHaveBeenCalledWith(
+      'sale-1',
+      actor,
+    );
+    expect(canteenService.getPosReceiptJsonFile).toHaveBeenCalledWith(
+      'sale-1',
+      actor,
+    );
+    expect(canteenService.getParentStudentCanteenStatus).toHaveBeenCalledWith(
+      'student-1',
+      actor,
+    );
   });
 
   it('streams POS receipt PDFs from the service boundary', async () => {
@@ -429,12 +468,18 @@ describe('CanteenController M8C contracts', () => {
     canteenHardeningService.exportDailyMealCountCsv.mockReturnValue(
       'Meal Type,Status,Count\nLUNCH,SERVED,10',
     );
+    canteenHardeningService.exportDailyMealCountCsvFile.mockReturnValue({
+      fileAssetId: 'file-daily-1',
+    });
     canteenService.itemWiseSalesReport.mockReturnValue([
       { itemName: 'Veg Momo' },
     ]);
     canteenHardeningService.exportItemWiseSalesCsv.mockReturnValue(
       'Item Name,Sales Amount\nVeg Momo,800',
     );
+    canteenHardeningService.exportItemWiseSalesCsvFile.mockReturnValue({
+      fileAssetId: 'file-sales-1',
+    });
     canteenService.lowBalanceWalletList.mockReturnValue([
       { studentId: 'student-1' },
     ]);
@@ -448,12 +493,24 @@ describe('CanteenController M8C contracts', () => {
     expect(controller.exportDailyMealCountCsv(actor, '2026-05-09')).toBe(
       'Meal Type,Status,Count\nLUNCH,SERVED,10',
     );
+    expect(controller.exportDailyMealCountCsvFile(actor, '2026-05-09')).toEqual(
+      {
+        fileAssetId: 'file-daily-1',
+      },
+    );
     expect(
       controller.itemWiseSalesReport(actor, '2026-05-01', '2026-05-09'),
     ).toEqual([{ itemName: 'Veg Momo' }]);
     expect(
       controller.exportItemWiseSalesCsv(actor, '2026-05-01', '2026-05-09'),
     ).toBe('Item Name,Sales Amount\nVeg Momo,800');
+    expect(
+      controller.exportItemWiseSalesCsvFile(
+        actor,
+        '2026-05-01',
+        '2026-05-09',
+      ),
+    ).toEqual({ fileAssetId: 'file-sales-1' });
     expect(controller.lowBalanceWalletList(actor)).toEqual([
       { studentId: 'student-1' },
     ]);
@@ -468,6 +525,9 @@ describe('CanteenController M8C contracts', () => {
     expect(
       canteenHardeningService.exportDailyMealCountCsv,
     ).toHaveBeenCalledWith(actor, '2026-05-09');
+    expect(
+      canteenHardeningService.exportDailyMealCountCsvFile,
+    ).toHaveBeenCalledWith(actor, '2026-05-09');
     expect(canteenHardeningService.exportItemWiseSalesCsv).toHaveBeenCalledWith(
       actor,
       {
@@ -475,5 +535,11 @@ describe('CanteenController M8C contracts', () => {
         to: '2026-05-09',
       },
     );
+    expect(
+      canteenHardeningService.exportItemWiseSalesCsvFile,
+    ).toHaveBeenCalledWith(actor, {
+      from: '2026-05-01',
+      to: '2026-05-09',
+    });
   });
 });

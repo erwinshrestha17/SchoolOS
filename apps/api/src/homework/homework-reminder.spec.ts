@@ -143,6 +143,29 @@ describe('Homework Reminders', () => {
       ).not.toHaveBeenCalled();
     });
 
+    it('re-checks homework status before retrying reminders', async () => {
+      prisma.homeworkAssignment.findFirst.mockResolvedValue({
+        ...mockHomework,
+        status: HomeworkAssignmentStatus.CANCELLED,
+      });
+
+      await expect(
+        service.sendHomeworkReminder(
+          'hw-1',
+          {
+            reminderType: HomeworkReminderType.HOMEWORK_DUE_SOON,
+            force: true,
+          },
+          mockActor,
+        ),
+      ).rejects.toThrow(ConflictException);
+
+      expect(
+        communicationsService.recordDeliveryRecords,
+      ).not.toHaveBeenCalled();
+      expect(prisma.homeworkReminderBatch.upsert).not.toHaveBeenCalled();
+    });
+
     it('should allow force resend', async () => {
       prisma.homeworkAssignment.findFirst.mockResolvedValue(mockHomework);
       prisma.homeworkReminderBatch.findFirst.mockResolvedValue({

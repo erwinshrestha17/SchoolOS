@@ -188,6 +188,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "messaging:create",
     "messaging:read",
     "transport:tracking:parent",
+    "canteen:parent:read",
     "settings:read_public",
   ],
   accountant: [

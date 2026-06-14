@@ -109,6 +109,37 @@ describe('TimetableConflictService', () => {
     );
   });
 
+  it('treats class-wide slots as conflicts with section-specific slots', () => {
+    const result = service.validateCandidate({
+      candidate: {
+        ...baseSlot,
+        sectionId: 'section-a',
+      },
+      existingSlots: [
+        {
+          ...baseSlot,
+          id: 'slot-class-wide',
+          sectionId: null,
+          subjectId: 'subject-english',
+          staffId: 'teacher-2',
+          roomId: 'room-2',
+        },
+      ],
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'CLASS_SECTION_OVERLAP',
+          severity: 'BLOCKING',
+          classId: 'class-1',
+          sectionId: 'section-a',
+        }),
+      ]),
+    );
+  });
+
   it('detects teacher unavailable periods as blocking conflicts', () => {
     const result = service.validateCandidate({
       candidate: baseSlot,

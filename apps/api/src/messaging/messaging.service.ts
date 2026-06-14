@@ -1,5 +1,7 @@
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,10 +10,12 @@ import {
   ConsentType,
   NotificationChannel,
   NotificationStatus,
+  Prisma,
 } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import { isParentOnly } from '../common/security/parent-scope';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
@@ -30,27 +34,12 @@ export class MessagingService {
   ) {}
 
   async listConversations(actor: AuthContext) {
-    // Restrict parents/guardians to their own conversations
-    const isParentOnly =
-      actor.roles.includes('parent') &&
-      !actor.roles.includes('platform_super_admin') &&
-      !actor.roles.includes('admin') &&
-      !actor.roles.includes('teacher') &&
-      !actor.roles.includes('principal');
+    const conversationScope = await this.buildConversationScopeWhere(actor);
 
-    let participantFilter = {};
-    if (isParentOnly) {
-      participantFilter = {
-        participants: {
-          some: { userId: actor.userId },
-        },
-      };
-    }
-
-    return this.prisma.conversation.findMany({
+    const conversations = await this.prisma.conversation.findMany({
       where: {
         tenantId: actor.tenantId,
-        ...participantFilter,
+        ...conversationScope,
       },
       include: {
         class: true,
@@ -69,6 +58,13 @@ export class MessagingService {
       orderBy: [{ updatedAt: 'desc' }],
       take: 100,
     });
+
+    return conversations.map((conversation) => ({
+      ...conversation,
+      messages: conversation.messages.map((message) =>
+        this.sanitizeMessageAttachment(message),
+      ),
+    }));
   }
 
   async createConversation(dto: CreateConversationDto, actor: AuthContext) {
@@ -142,8 +138,9 @@ export class MessagingService {
   }
 
   async listMessages(actor: AuthContext) {
-    return this.prisma.message.findMany({
-      where: { tenantId: actor.tenantId },
+    const conversationScope = await this.buildConversationScopeWhere(actor);
+    const messages = await this.prisma.message.findMany({
+      where: { tenantId: actor.tenantId, conversation: conversationScope },
       include: {
         conversation: true,
         senderStaff: true,
@@ -153,11 +150,19 @@ export class MessagingService {
       orderBy: [{ createdAt: 'desc' }],
       take: 100,
     });
+
+    return messages.map((message) => this.sanitizeMessageAttachment(message));
   }
 
   async createMessage(dto: CreateMessageDto, actor: AuthContext) {
+    this.assertSafeAttachmentUrl(dto.attachmentUrl);
+    const conversationScope = await this.buildConversationScopeWhere(actor);
     const conversation = await this.prisma.conversation.findFirst({
-      where: { id: dto.conversationId, tenantId: actor.tenantId },
+      where: {
+        id: dto.conversationId,
+        tenantId: actor.tenantId,
+        ...conversationScope,
+      },
       include: {
         guardian: true,
       },
@@ -174,9 +179,11 @@ export class MessagingService {
     const staff = await this.prisma.staff.findFirst({
       where: { tenantId: actor.tenantId, userId: actor.userId },
     });
+    const senderGuardian = isParentOnly(actor)
+      ? await this.getGuardianForActor(actor)
+      : null;
 
     // Check usage limit (monthly messages)
-    const now = new Date();
     await this.usageService.checkLimit(actor.tenantId, 'messages.sent', 1);
 
     const message = await this.prisma.message.create({
@@ -185,6 +192,7 @@ export class MessagingService {
         conversationId: conversation.id,
         senderUserId: actor.userId,
         senderStaffId: staff?.id ?? null,
+        senderGuardianId: senderGuardian?.id ?? null,
         body: dto.body,
         attachmentUrl: dto.attachmentUrl ?? null,
       },
@@ -205,21 +213,24 @@ export class MessagingService {
 
     this.eventEmitter.emit('message.sent', {
       tenantId: actor.tenantId,
-      conversationId: conversation.id,
-      messageId: message.id,
-      body: message.body,
-      senderUserId: actor.userId,
     });
 
     return message;
   }
 
   async getUnreadCount(actor: AuthContext) {
-    // Find all conversations where the user is a participant
+    const conversationScope = await this.buildConversationScopeWhere(actor);
+    const guardian = isParentOnly(actor)
+      ? await this.getGuardianForActor(actor)
+      : null;
     const participations = await this.prisma.conversationParticipant.findMany({
       where: {
         tenantId: actor.tenantId,
-        userId: actor.userId,
+        OR: [
+          { userId: actor.userId },
+          ...(guardian ? [{ guardianId: guardian.id }] : []),
+        ],
+        conversation: conversationScope,
       },
     });
 
@@ -230,6 +241,7 @@ export class MessagingService {
         where: {
           tenantId: actor.tenantId,
           conversationId: participation.conversationId,
+          conversation: conversationScope,
           createdAt: {
             gt: participation.lastReadAt ?? new Date(0),
           },
@@ -243,8 +255,12 @@ export class MessagingService {
   }
 
   async listReadReceipts(actor: AuthContext) {
+    const conversationScope = await this.buildConversationScopeWhere(actor);
     return this.prisma.messageReadReceipt.findMany({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        message: { conversation: conversationScope },
+      },
       include: {
         message: true,
         guardian: true,
@@ -255,20 +271,28 @@ export class MessagingService {
   }
 
   async markRead(dto: ReadMessageDto, actor: AuthContext) {
+    const conversationScope = await this.buildConversationScopeWhere(actor);
     const message = await this.prisma.message.findFirst({
-      where: { id: dto.messageId, tenantId: actor.tenantId },
+      where: {
+        id: dto.messageId,
+        tenantId: actor.tenantId,
+        conversation: conversationScope,
+      },
     });
 
     if (!message) {
       throw new NotFoundException('Message not found in this tenant');
     }
+    const readerGuardian = isParentOnly(actor)
+      ? await this.getGuardianForActor(actor)
+      : null;
 
     const receipt = await this.prisma.messageReadReceipt.create({
       data: {
         tenantId: actor.tenantId,
         messageId: dto.messageId,
         readerUserId: actor.userId,
-        guardianId: dto.guardianId ?? null,
+        guardianId: readerGuardian?.id ?? dto.guardianId ?? null,
       },
       include: {
         message: true,
@@ -285,7 +309,10 @@ export class MessagingService {
       where: {
         tenantId: actor.tenantId,
         conversationId: message.conversationId,
-        OR: [{ userId: actor.userId }, { guardianId: dto.guardianId }],
+        OR: [
+          { userId: actor.userId },
+          { guardianId: readerGuardian?.id ?? dto.guardianId },
+        ],
       },
       data: { lastReadAt: receipt.readAt },
     });
@@ -354,6 +381,108 @@ export class MessagingService {
 
     if (latestConsent && !latestConsent.granted) {
       throw new ConflictException('Guardian has revoked messaging consent');
+    }
+  }
+
+  private async buildConversationScopeWhere(
+    actor: AuthContext,
+  ): Promise<Prisma.ConversationWhereInput> {
+    if (!isParentOnly(actor)) {
+      return {};
+    }
+
+    const guardian = await this.getGuardianForActor(actor);
+    const linkedStudentIds = await this.getLinkedStudentIds(
+      actor,
+      guardian.id,
+    );
+    const studentScopedConversation: Prisma.ConversationWhereInput[] =
+      linkedStudentIds.length > 0
+        ? [
+            { studentId: { in: linkedStudentIds } },
+            {
+              guardianId: guardian.id,
+              studentId: { in: linkedStudentIds },
+            },
+            {
+              participants: { some: { guardianId: guardian.id } },
+              studentId: { in: linkedStudentIds },
+            },
+          ]
+        : [];
+
+    return {
+      OR: [
+        {
+          guardianId: guardian.id,
+          studentId: null,
+        },
+        {
+          participants: { some: { guardianId: guardian.id } },
+          studentId: null,
+        },
+        ...studentScopedConversation,
+      ],
+    };
+  }
+
+  private async getGuardianForActor(actor: AuthContext) {
+    const guardian = await this.prisma.guardian.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+    });
+
+    if (!guardian) {
+      throw new ForbiddenException(
+        'No guardian profile is linked to this account',
+      );
+    }
+
+    return guardian;
+  }
+
+  private async getLinkedStudentIds(actor: AuthContext, guardianId: string) {
+    const links = await this.prisma.studentGuardian.findMany({
+      where: { tenantId: actor.tenantId, guardianId },
+      select: { studentId: true },
+    });
+
+    return links.map((link) => link.studentId);
+  }
+
+  private sanitizeMessageAttachment<T extends { attachmentUrl: string | null }>(
+    message: T,
+  ): T {
+    if (this.isSafeAttachmentUrl(message.attachmentUrl)) {
+      return message;
+    }
+
+    return { ...message, attachmentUrl: null };
+  }
+
+  private assertSafeAttachmentUrl(url?: string | null) {
+    if (!url || this.isSafeAttachmentUrl(url)) {
+      return;
+    }
+
+    throw new BadRequestException(
+      'Message attachments must use a protected API URL or a signed HTTP(S) URL',
+    );
+  }
+
+  private isSafeAttachmentUrl(url?: string | null) {
+    if (!url) {
+      return false;
+    }
+
+    if (url.startsWith('/api/') || url.startsWith('/files/')) {
+      return true;
+    }
+
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
     }
   }
 

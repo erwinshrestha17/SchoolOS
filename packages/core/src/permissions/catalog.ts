@@ -525,6 +525,11 @@ export const permissionCatalog = [
     action: "read",
     description: "Read canteen reports",
   },
+  {
+    resource: "canteen:parent",
+    action: "read",
+    description: "Read own child canteen wallet, menu, and meal plan status",
+  },
 
   // ─── Compiled from catalog/communications.ts ───
   {

@@ -55,6 +55,7 @@ describe('M0 Queue & Provider safety contracts', () => {
       expect(service).toContain("'activity-media'");
       expect(service).toContain("'homework'");
       expect(service).toContain("'reports'");
+      expect(service).toContain("'accounting-reports'");
       expect(service).toContain("'canteen-alerts'");
     });
 

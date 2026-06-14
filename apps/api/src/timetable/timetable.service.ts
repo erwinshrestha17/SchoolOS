@@ -630,6 +630,7 @@ export class TimetableService {
   async archiveVersion(id: string, actor: AuthContext) {
     const version = await this.findVersionOrThrow(id, actor);
     if (version.status === TimetableVersionStatus.ARCHIVED) return version;
+    this.lifecycleService.assertCanArchive(version.status);
     const updated = await this.prisma.timetableVersion.update({
       where: { id },
       data: {
@@ -1233,7 +1234,9 @@ export class TimetableService {
         id: { not: version.id },
         academicYearId: version.academicYearId,
         classId: version.classId,
-        sectionId: version.sectionId,
+        ...(version.sectionId
+          ? { OR: [{ sectionId: version.sectionId }, { sectionId: null }] }
+          : {}),
         status: {
           in: [TimetableVersionStatus.PUBLISHED, TimetableVersionStatus.LOCKED],
         },

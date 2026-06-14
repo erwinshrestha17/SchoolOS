@@ -483,6 +483,24 @@ export class CanteenController {
     });
   }
 
+  @Post('pos-sales/:id/receipt.pdf/file')
+  @Permissions('canteen:pos:read')
+  getPosReceiptPdfFile(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenService.getPosReceiptPdfFile(id, auth);
+  }
+
+  @Post('pos-sales/:id/receipt.json/file')
+  @Permissions('canteen:pos:read')
+  getPosReceiptJsonFile(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenService.getPosReceiptJsonFile(id, auth);
+  }
+
   @Get('pos-sales')
   @Permissions('canteen:pos:read')
   listPosSales(
@@ -522,6 +540,15 @@ export class CanteenController {
     return this.canteenService.getSpendingControl(studentId, auth);
   }
 
+  @Get('parent/students/:studentId/status')
+  @Permissions('canteen:parent:read')
+  getParentStudentCanteenStatus(
+    @Param('studentId') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenService.getParentStudentCanteenStatus(studentId, auth);
+  }
+
   @Get('reports/daily-meal-count')
   @Permissions('canteen:reports:read')
   dailyMealCountReport(
@@ -543,6 +570,15 @@ export class CanteenController {
     @Query('date') date?: string,
   ) {
     return this.canteenHardeningService.exportDailyMealCountCsv(auth, date);
+  }
+
+  @Post('reports/daily-meal-count/export')
+  @Permissions('canteen:reports:read')
+  exportDailyMealCountCsvFile(
+    @CurrentAuth() auth: AuthContext,
+    @Query('date') date?: string,
+  ) {
+    return this.canteenHardeningService.exportDailyMealCountCsvFile(auth, date);
   }
 
   @Get('reports/item-wise-sales')
@@ -568,6 +604,19 @@ export class CanteenController {
     @Query('to') to?: string,
   ) {
     return this.canteenHardeningService.exportItemWiseSalesCsv(auth, {
+      from,
+      to,
+    });
+  }
+
+  @Post('reports/item-wise-sales/export')
+  @Permissions('canteen:reports:read')
+  exportItemWiseSalesCsvFile(
+    @CurrentAuth() auth: AuthContext,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.canteenHardeningService.exportItemWiseSalesCsvFile(auth, {
       from,
       to,
     });

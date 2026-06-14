@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import {
@@ -10,6 +15,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CanteenReasonDto,
@@ -23,6 +29,8 @@ export class CanteenHardeningService {
     private readonly auditService: AuditService,
     private readonly communicationsService: CommunicationsService,
     @InjectQueue('canteen-alerts') private readonly alertsQueue: Queue,
+    @Optional()
+    private readonly fileRegistryService?: FileRegistryService,
   ) {}
 
   async pauseEnrollment(id: string, dto: CanteenReasonDto, actor: AuthContext) {
@@ -170,6 +178,30 @@ export class CanteenHardeningService {
       .join('\n');
   }
 
+  async exportDailyMealCountCsvFile(actor: AuthContext, date?: string) {
+    if (!this.fileRegistryService) {
+      throw new ConflictException('File Registry is not available for export');
+    }
+
+    const csv = await this.exportDailyMealCountCsv(actor, date);
+    const fileName = `canteen-daily-meal-count-${date ?? new Date().toISOString().slice(0, 10)}.csv`;
+    const asset = await this.fileRegistryService.registerGeneratedFile({
+      tenantId: actor.tenantId,
+      generatedByUserId: actor.userId,
+      originalFilename: fileName,
+      content: Buffer.from(csv, 'utf8'),
+      mimeType: 'text/csv',
+      module: 'canteen',
+      metadata: {
+        kind: 'canteen_daily_meal_count_report',
+        date: date ?? null,
+        generatedAt: new Date().toISOString(),
+      },
+    });
+
+    return { fileAssetId: asset.id, fileName, mimeType: 'text/csv' };
+  }
+
   async exportItemWiseSalesCsv(
     actor: AuthContext,
     input: { from?: string; to?: string },
@@ -213,6 +245,34 @@ export class CanteenHardeningService {
     ]
       .map((row) => row.map(csvEscape).join(','))
       .join('\n');
+  }
+
+  async exportItemWiseSalesCsvFile(
+    actor: AuthContext,
+    input: { from?: string; to?: string },
+  ) {
+    if (!this.fileRegistryService) {
+      throw new ConflictException('File Registry is not available for export');
+    }
+
+    const csv = await this.exportItemWiseSalesCsv(actor, input);
+    const fileName = `canteen-item-wise-sales-${new Date().toISOString().slice(0, 10)}.csv`;
+    const asset = await this.fileRegistryService.registerGeneratedFile({
+      tenantId: actor.tenantId,
+      generatedByUserId: actor.userId,
+      originalFilename: fileName,
+      content: Buffer.from(csv, 'utf8'),
+      mimeType: 'text/csv',
+      module: 'canteen',
+      metadata: {
+        kind: 'canteen_item_wise_sales_report',
+        from: input.from ?? null,
+        to: input.to ?? null,
+        generatedAt: new Date().toISOString(),
+      },
+    });
+
+    return { fileAssetId: asset.id, fileName, mimeType: 'text/csv' };
   }
 
   private async transitionEnrollment(

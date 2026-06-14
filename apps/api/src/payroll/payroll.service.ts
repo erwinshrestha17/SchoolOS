@@ -311,7 +311,7 @@ export class PayrollService {
       structure.effectiveTo,
     );
 
-    const overlapping = await this.prisma.salaryStructure.findFirst({
+    const overlappingStructures = await this.prisma.salaryStructure.findMany({
       where: {
         tenantId: actor.tenantId,
         staffId: structure.staffId,
@@ -325,34 +325,29 @@ export class PayrollService {
           { effectiveTo: { gte: structure.effectiveFrom } },
         ],
       },
+      orderBy: { effectiveFrom: 'asc' },
     });
 
-    if (overlapping) {
+    const unsafeOverlap = overlappingStructures.find(
+      (activeStructure) =>
+        !canClosePreviousSalaryVersion(activeStructure, structure),
+    );
+
+    if (unsafeOverlap) {
       throw new ConflictException(
         'Only one ACTIVE salary structure is allowed for an effective date range',
       );
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      await tx.salaryStructure.updateMany({
-        where: {
-          tenantId: actor.tenantId,
-          staffId: structure.staffId,
-          status: SalaryStructureStatus.ACTIVE,
-          id: { not: structure.id },
-          effectiveFrom: {
-            lte: structure.effectiveTo ?? structure.effectiveFrom,
+      for (const previousVersion of overlappingStructures) {
+        await tx.salaryStructure.update({
+          where: { id: previousVersion.id },
+          data: {
+            effectiveTo: previousDayUtc(structure.effectiveFrom),
           },
-          OR: [
-            { effectiveTo: null },
-            { effectiveTo: { gte: structure.effectiveFrom } },
-          ],
-        },
-        data: {
-          status: SalaryStructureStatus.ARCHIVED,
-          effectiveTo: new Date(),
-        },
-      });
+        });
+      }
 
       return tx.salaryStructure.update({
         where: { id: structure.id },
@@ -596,6 +591,7 @@ export class PayrollService {
     const staffMembers = await this.prisma.staff.findMany({
       where: {
         tenantId: actor.tenantId,
+        status: { in: ['ACTIVE', 'ON_LEAVE'] },
       },
     });
 
@@ -605,6 +601,9 @@ export class PayrollService {
         status: 'ACTIVE',
         startDate: { lte: period.endsOn },
         OR: [{ endDate: null }, { endDate: { gte: period.startsOn } }],
+        staff: {
+          status: { in: ['ACTIVE', 'ON_LEAVE'] },
+        },
       },
     });
     const salaryStructures = await this.prisma.salaryStructure.findMany({
@@ -613,6 +612,9 @@ export class PayrollService {
         status: SalaryStructureStatus.ACTIVE,
         effectiveFrom: { lte: period.endsOn },
         OR: [{ effectiveTo: null }, { effectiveTo: { gte: period.startsOn } }],
+        staff: {
+          status: { in: ['ACTIVE', 'ON_LEAVE'] },
+        },
       },
       include: { components: true },
       orderBy: { effectiveFrom: 'desc' },
@@ -878,12 +880,15 @@ export class PayrollService {
     const run = await this.getPayrollRunOrThrow(id, actor);
     const actions = getPayrollRunActions(run.status);
 
-    if (run.status === PayrollRunStatus.POSTED) {
-      return run;
+    if (run.journalEntryId) {
+      throw new ConflictException('Payroll run is already posted');
     }
 
-    if (run.journalEntryId) {
-      return run;
+    if (
+      run.status === PayrollRunStatus.POSTED ||
+      run.status === PayrollRunStatus.PAID
+    ) {
+      throw new ConflictException('Payroll run is already posted');
     }
 
     if (!actions.canPost) {
@@ -906,6 +911,10 @@ export class PayrollService {
             pfEmployeeAmount: run.pfEmployeeAmount,
             pfEmployerAmount: run.pfEmployerAmount,
             tdsAmount: run.tdsAmount,
+            entryDate: run.periodEnd ?? getPayrollPeriod(
+              run.periodYear,
+              run.periodMonth,
+            ).endsOn,
           },
           actor,
           tx,
@@ -1075,12 +1084,16 @@ export class PayrollService {
   ) {
     const run = await this.getPayrollRunOrThrow(id, actor);
 
+    if (run.status === PayrollRunStatus.PAID) {
+      throw new ConflictException('Payroll run is already marked as paid');
+    }
+
     if (run.status !== PayrollRunStatus.POSTED) {
       throw new ConflictException('Payroll run must be posted before payment');
     }
 
     if (run.disbursementJournalEntryId) {
-      return run;
+      throw new ConflictException('Payroll run is already marked as paid');
     }
 
     const paid = await this.prisma.$transaction(async (tx) => {
@@ -1093,6 +1106,10 @@ export class PayrollService {
             periodYear: run.periodYear,
             netAmount: run.netAmount,
             paymentAccountCode: dto.paymentAccountCode,
+            entryDate: run.periodEnd ?? getPayrollPeriod(
+              run.periodYear,
+              run.periodMonth,
+            ).endsOn,
           },
           actor,
           tx,
@@ -1162,28 +1179,31 @@ export class PayrollService {
           where: { id: run.disbursementJournalEntryId },
           include: { lines: true },
         });
-        if (originalEntry) {
-          await this.accountingPostingService.postReversal(
-            {
-              tenantId: actor.tenantId,
-              originalEntryId: originalEntry.id,
-              reversalDate: new Date(),
-              narration: `Reversal of Payroll Disbursement for ${run.periodMonth}/${run.periodYear}`,
-              reason: dto.reason!,
-              lines: originalEntry.lines.map((l) => ({
-                chartAccountId: l.chartAccountId,
-                side:
-                  l.side === JournalLineSide.DEBIT
-                    ? JournalLineSide.CREDIT
-                    : JournalLineSide.DEBIT,
-                amount: l.amount,
-                description: `Reversal of ${l.description}`,
-              })),
-            },
-            actor,
-            tx,
+        if (!originalEntry) {
+          throw new ConflictException(
+            'Payroll disbursement journal entry was not found',
           );
         }
+        await this.accountingPostingService.postReversal(
+          {
+            tenantId: actor.tenantId,
+            originalEntryId: originalEntry.id,
+            reversalDate: new Date(),
+            narration: `Reversal of Payroll Disbursement for ${run.periodMonth}/${run.periodYear}`,
+            reason: dto.reason!,
+            lines: originalEntry.lines.map((l) => ({
+              chartAccountId: l.chartAccountId,
+              side:
+                l.side === JournalLineSide.DEBIT
+                  ? JournalLineSide.CREDIT
+                  : JournalLineSide.DEBIT,
+              amount: l.amount,
+              description: `Reversal of ${l.description}`,
+            })),
+          },
+          actor,
+          tx,
+        );
       }
 
       // 2. Reverse Accrual
@@ -1192,28 +1212,31 @@ export class PayrollService {
           where: { id: run.journalEntryId },
           include: { lines: true },
         });
-        if (originalEntry) {
-          await this.accountingPostingService.postReversal(
-            {
-              tenantId: actor.tenantId,
-              originalEntryId: originalEntry.id,
-              reversalDate: new Date(),
-              narration: `Reversal of Payroll Accrual for ${run.periodMonth}/${run.periodYear}`,
-              reason: dto.reason!,
-              lines: originalEntry.lines.map((l) => ({
-                chartAccountId: l.chartAccountId,
-                side:
-                  l.side === JournalLineSide.DEBIT
-                    ? JournalLineSide.CREDIT
-                    : JournalLineSide.DEBIT,
-                amount: l.amount,
-                description: `Reversal of ${l.description}`,
-              })),
-            },
-            actor,
-            tx,
+        if (!originalEntry) {
+          throw new ConflictException(
+            'Payroll accrual journal entry was not found',
           );
         }
+        await this.accountingPostingService.postReversal(
+          {
+            tenantId: actor.tenantId,
+            originalEntryId: originalEntry.id,
+            reversalDate: new Date(),
+            narration: `Reversal of Payroll Accrual for ${run.periodMonth}/${run.periodYear}`,
+            reason: dto.reason!,
+            lines: originalEntry.lines.map((l) => ({
+              chartAccountId: l.chartAccountId,
+              side:
+                l.side === JournalLineSide.DEBIT
+                  ? JournalLineSide.CREDIT
+                  : JournalLineSide.DEBIT,
+              amount: l.amount,
+              description: `Reversal of ${l.description}`,
+            })),
+          },
+          actor,
+          tx,
+        );
       }
 
       // 3. Update Payroll Run Status
@@ -2200,6 +2223,25 @@ function assertSalaryStructureDateRange(
   if (effectiveTo && effectiveTo < effectiveFrom) {
     throw new ConflictException('effectiveTo cannot be before effectiveFrom');
   }
+}
+
+function canClosePreviousSalaryVersion(
+  activeStructure: { effectiveFrom: Date; effectiveTo: Date | null },
+  nextStructure: { effectiveFrom: Date },
+) {
+  return (
+    activeStructure.effectiveFrom < nextStructure.effectiveFrom &&
+    (!activeStructure.effectiveTo ||
+      activeStructure.effectiveTo >= nextStructure.effectiveFrom)
+  );
+}
+
+function previousDayUtc(date: Date) {
+  const previous = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
+  previous.setUTCDate(previous.getUTCDate() - 1);
+  return previous;
 }
 
 function getPayrollPeriod(periodYear: number, periodMonth: number) {

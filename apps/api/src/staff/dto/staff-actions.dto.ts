@@ -1,7 +1,10 @@
 import { StaffDocumentKind } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
+  IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -50,4 +53,65 @@ export class ContractExpiryReminderQueryDto {
   @Min(1)
   @Max(180)
   days?: number;
+}
+
+export class CreateStaffLeaveRequestDto {
+  @IsIn(['SICK', 'CASUAL', 'EARNED', 'MATERNITY', 'PATERNITY', 'UNPAID', 'OTHER'])
+  leaveType!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isPaid?: boolean;
+
+  @IsDateString()
+  startsOn!: string;
+
+  @IsDateString()
+  endsOn!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
+}
+
+export class ReviewStaffLeaveRequestDto {
+  @IsIn(['APPROVED', 'REJECTED'])
+  status!: 'APPROVED' | 'REJECTED';
+
+  @IsOptional()
+  @IsString()
+  reviewNote?: string;
+}
+
+export class RecordStaffAttendanceDto {
+  @IsOptional()
+  @IsDateString()
+  attendanceDate?: string;
+
+  @IsOptional()
+  @IsIn([
+    'PRESENT',
+    'ABSENT',
+    'LATE',
+    'HALF_DAY',
+    'LEAVE',
+    'ON_LEAVE',
+    'HOLIDAY',
+    'SICK_LEAVE',
+    'EXCUSED_LEAVE',
+    'UNEXCUSED_LEAVE',
+  ])
+  status?: string;
+
+  @IsOptional()
+  @IsDateString()
+  checkInAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  checkOutAt?: string;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
 }

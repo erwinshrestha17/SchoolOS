@@ -223,6 +223,176 @@ describe('DeliveryRetryService failure dashboard', () => {
     );
   });
 
+  it('fails closed for bulk retry when a channel provider is disabled', async () => {
+    const prisma = {
+      notificationDelivery: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'delivery-1',
+            tenantId: 'tenant-1',
+            status: NotificationStatus.FAILED,
+            channel: NotificationChannel.SMS,
+            sourceType: 'notice',
+            sourceId: 'notice-1',
+            destination: '+9779800000000',
+            title: 'Emergency notice',
+            body: 'School is closed today.',
+          },
+        ]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+    const notificationsService = {
+      getProviderReadiness: jest.fn().mockResolvedValue({
+        enabled: false,
+        failureCode: 'PROVIDER_DISABLED',
+        failureReason: 'SMS dispatch is disabled. bearer=secret-token',
+      }),
+      sendSms: jest.fn(),
+    };
+    const auditService = {
+      record: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new DeliveryRetryService(
+      prisma as never,
+      notificationsService as never,
+      auditService as never,
+    );
+
+    await expect(
+      service.retryFailedDeliveries(actor, {
+        reason: 'Retry queued after outage',
+      }),
+    ).resolves.toEqual({
+      requested: 1,
+      retried: 1,
+      results: [
+        expect.objectContaining({
+          deliveryId: 'delivery-1',
+          status: NotificationStatus.FAILED,
+          errorMessage: 'SMS dispatch is disabled. bearer=***',
+        }),
+      ],
+    });
+
+    expect(notificationsService.sendSms).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
+      where: { id: 'delivery-1' },
+      data: expect.objectContaining({
+        status: NotificationStatus.FAILED,
+        failureCode: 'PROVIDER_DISABLED',
+        failureReason: 'SMS dispatch is disabled. bearer=***',
+      }),
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'retry_blocked',
+        resource: 'notification_delivery',
+        resourceId: 'delivery-1',
+        after: expect.objectContaining({
+          failureCode: 'PROVIDER_DISABLED',
+          reason: 'Retry queued after outage',
+        }),
+      }),
+    );
+  });
+
+  it('keeps bulk retry replay-safe when a delivery claim loses the retry race', async () => {
+    const prisma = {
+      notificationDelivery: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'delivery-1',
+            tenantId: 'tenant-1',
+            status: NotificationStatus.FAILED,
+            channel: NotificationChannel.EMAIL,
+            sourceType: 'notice',
+            sourceId: 'notice-1',
+            destination: 'guardian@example.edu',
+            title: 'Fee reminder',
+            body: 'Please review the latest invoice.',
+          },
+          {
+            id: 'delivery-2',
+            tenantId: 'tenant-1',
+            status: NotificationStatus.FAILED,
+            channel: NotificationChannel.EMAIL,
+            sourceType: 'notice',
+            sourceId: 'notice-2',
+            destination: 'second@example.edu',
+            title: 'Exam reminder',
+            body: 'Exam starts tomorrow.',
+          },
+        ]),
+        updateMany: jest
+          .fn()
+          .mockResolvedValueOnce({ count: 0 })
+          .mockResolvedValueOnce({ count: 1 }),
+        update: jest.fn(),
+      },
+    };
+    const notificationsService = {
+      getProviderReadiness: jest.fn().mockResolvedValue({
+        enabled: true,
+        failureCode: null,
+        failureReason: null,
+      }),
+      sendEmail: jest.fn().mockResolvedValue(undefined),
+    };
+    const auditService = {
+      record: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new DeliveryRetryService(
+      prisma as never,
+      notificationsService as never,
+      auditService as never,
+    );
+
+    const result = await service.retryFailedDeliveries(actor, {
+      reason: 'Bulk operator retry',
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        requested: 2,
+        retried: 2,
+        results: [
+          expect.objectContaining({
+            deliveryId: 'delivery-1',
+            status: NotificationStatus.FAILED,
+            errorMessage: 'Delivery is no longer retryable',
+          }),
+          expect.objectContaining({
+            deliveryId: 'delivery-2',
+            status: NotificationStatus.RETRY_PENDING,
+            errorMessage: null,
+          }),
+        ],
+      }),
+    );
+    expect(notificationsService.sendEmail).toHaveBeenCalledTimes(1);
+    expect(notificationsService.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'second@example.edu',
+        metadata: expect.objectContaining({
+          notificationDeliveryId: 'delivery-2',
+          retry: 'true',
+        }),
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'retry_skipped',
+        resourceId: 'delivery-1',
+        after: expect.objectContaining({
+          diagnostic: 'Delivery is no longer retryable',
+          reason: 'Bulk operator retry',
+        }),
+      }),
+    );
+  });
+
   it('replays pending activity delivery retries without dispatching a duplicate provider request', async () => {
     const lastRetryAt = new Date('2026-05-17T09:05:00.000Z');
     const prisma = {

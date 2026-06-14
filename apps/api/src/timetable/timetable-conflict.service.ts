@@ -162,14 +162,19 @@ export class TimetableConflictService {
     tenantId: string,
     candidate: ConflictSlotInput,
   ): Promise<TimetableConflictValidationResult> {
+    const classSectionScope =
+      candidate.sectionId === null || candidate.sectionId === undefined
+        ? { classId: candidate.classId }
+        : {
+            classId: candidate.classId,
+            OR: [{ sectionId: candidate.sectionId }, { sectionId: null }],
+          };
+
     const candidateScopes = [
       candidate.versionId ? { versionId: candidate.versionId } : null,
       { staffId: candidate.staffId },
       candidate.roomId ? { roomId: candidate.roomId } : null,
-      {
-        classId: candidate.classId,
-        sectionId: candidate.sectionId ?? null,
-      },
+      classSectionScope,
     ].filter(Boolean) as Prisma.TimetableSlotWhereInput[];
 
     const [
@@ -466,8 +471,7 @@ export class TimetableConflictService {
       .filter(
         (slot) =>
           slot.classId === candidate.classId &&
-          normalizeNullable(slot.sectionId) ===
-            normalizeNullable(candidate.sectionId) &&
+          sectionsOverlap(slot.sectionId, candidate.sectionId) &&
           slot.dayOfWeek === candidate.dayOfWeek &&
           rangesOverlap(
             candidate.startsAt,
@@ -757,6 +761,13 @@ function toMinutes(value: string): number {
 
 function normalizeNullable(value?: string | null): string {
   return value ?? '';
+}
+
+function sectionsOverlap(
+  first?: string | null,
+  second?: string | null,
+): boolean {
+  return first === second || first == null || second == null;
 }
 
 function dedupeIssues(

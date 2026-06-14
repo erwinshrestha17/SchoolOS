@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Param,
@@ -155,6 +156,16 @@ export class LibraryController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.libraryHardeningService.archiveCopy(copyId, dto.reason, auth);
+  }
+
+  @Delete('copies/:id')
+  @Permissions('library:copies:update')
+  deleteCopy(
+    @Param('id') copyId: string,
+    @Body() dto: ArchiveLibraryBookDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.libraryHardeningService.deleteCopy(copyId, dto.reason, auth);
   }
 
   @Get('issues')
@@ -350,6 +361,12 @@ export class LibraryController {
   @Permissions('library:reports:read')
   exportIssuedBooksCsv(@CurrentAuth() auth: AuthContext) {
     return this.libraryHardeningService.exportIssuedBooksCsv(auth);
+  }
+
+  @Post('reports/issued/export')
+  @Permissions('library:reports:read')
+  exportIssuedBooksCsvFile(@CurrentAuth() auth: AuthContext) {
+    return this.libraryHardeningService.exportIssuedBooksCsvFile(auth);
   }
 
   @Get('borrowed-students')

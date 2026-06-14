@@ -330,6 +330,15 @@ export class ParentTeacherChatService {
     }
 
     const senderRole = await this.resolveSenderRole(thread, actor);
+    if (
+      thread.status === ParentTeacherThreadStatus.ESCALATED &&
+      !this.isModerator(actor)
+    ) {
+      throw new ConflictException(
+        'Escalated parent-teacher threads are locked until moderation resolves them',
+      );
+    }
+
     const priority = dto.priority ?? ParentTeacherMessagePriority.NORMAL;
 
     if (
@@ -510,11 +519,12 @@ export class ParentTeacherChatService {
   async getAvailabilityStatus(actor: AuthContext) {
     const rules = await this.listAvailability(actor);
     const now = getNepalWallClock(new Date());
+    const appliesToRole = this.resolveAvailabilityRole(actor);
     const applicable = rules.find(
       (rule) =>
         rule.dayOfWeek === now.dayOfWeek &&
         (rule.appliesToRole === ChatAvailabilityAppliesToRole.BOTH ||
-          rule.appliesToRole === ChatAvailabilityAppliesToRole.PARENT),
+          rule.appliesToRole === appliesToRole),
     );
 
     const isAvailable = Boolean(
@@ -528,6 +538,7 @@ export class ParentTeacherChatService {
       timezone: 'Asia/Kathmandu',
       currentDayOfWeek: now.dayOfWeek,
       currentTime: now.time,
+      appliesToRole,
       notice: isAvailable
         ? 'School chat hours are open now.'
         : OUTSIDE_HOURS_NOTICE,
@@ -643,13 +654,22 @@ export class ParentTeacherChatService {
       throw new NotFoundException('Escalation not found');
     }
 
-    const updated = await this.prisma.chatEscalation.update({
-      where: { id: escalation.id },
-      data: {
-        status: ChatEscalationStatus.RESOLVED,
-        resolvedAt: new Date(),
-        resolvedByUserId: actor.userId,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const resolved = await tx.chatEscalation.update({
+        where: { id: escalation.id },
+        data: {
+          status: ChatEscalationStatus.RESOLVED,
+          resolvedAt: new Date(),
+          resolvedByUserId: actor.userId,
+        },
+      });
+
+      await tx.parentTeacherThread.update({
+        where: { id: escalation.threadId },
+        data: { status: ParentTeacherThreadStatus.OPEN },
+      });
+
+      return resolved;
     });
 
     await this.auditService.record({
@@ -965,6 +985,18 @@ export class ParentTeacherChatService {
         ['teacher', 'subject_teacher'].includes(role),
       ) && !this.isModerator(actor)
     );
+  }
+
+  private resolveAvailabilityRole(actor: AuthContext) {
+    if (this.isTeacherOnly(actor)) {
+      return ChatAvailabilityAppliesToRole.TEACHER;
+    }
+
+    if (isParentOnly(actor)) {
+      return ChatAvailabilityAppliesToRole.PARENT;
+    }
+
+    return ChatAvailabilityAppliesToRole.BOTH;
   }
 
   private async enrichThreads(threads: ThreadRecord[]) {

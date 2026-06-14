@@ -287,7 +287,12 @@ describe('Homework Workflow', () => {
         dueDate: new Date('2020-01-01'),
       };
       prisma.homeworkAssignment.findFirst.mockResolvedValue(pastAssignment);
-      prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+      prisma.student.findFirst.mockResolvedValue({
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        lifecycleStatus: 'ACTIVE',
+      });
       prisma.homeworkSubmission.upsert.mockResolvedValue({
         id: 'sub-1',
         status: HomeworkSubmissionStatus.LATE,
@@ -309,6 +314,27 @@ describe('Homework Workflow', () => {
       );
 
       expect(result.status).toBe(HomeworkSubmissionStatus.LATE);
+    });
+
+    it('blocks submission when the student is no longer active in the homework class scope', async () => {
+      prisma.homeworkAssignment.findFirst.mockResolvedValue({
+        ...mockAssignment,
+        status: HomeworkAssignmentStatus.ASSIGNED,
+      });
+      prisma.student.findFirst
+        .mockResolvedValueOnce({ id: 'student-1' })
+        .mockResolvedValueOnce(null);
+
+      await expect(
+        service.createSubmission(
+          'hw-1',
+          {
+            studentId: 'student-1',
+            submissionText: 'No longer active',
+          },
+          mockActor,
+        ),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should review submission and allow status change', async () => {

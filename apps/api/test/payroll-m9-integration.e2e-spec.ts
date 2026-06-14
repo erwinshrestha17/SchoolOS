@@ -223,9 +223,10 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
       journalEntryId: 'journal-existing',
     });
 
-    const result = await payrollService.postPayrollRun('run-1', actor);
+    await expect(payrollService.postPayrollRun('run-1', actor)).rejects.toThrow(
+      ConflictException,
+    );
 
-    expect(result.journalEntryId).toBe('journal-existing');
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.journalEntry.create).not.toHaveBeenCalled();
   });
@@ -310,15 +311,14 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
       disbursementJournalEntryId: 'journal-disbursement-existing',
     });
 
-    const result = await payrollService.markPayrollRunPaid(
-      'run-1',
-      { reason: 'Already paid' },
-      actor,
-    );
+    await expect(
+      payrollService.markPayrollRunPaid(
+        'run-1',
+        { reason: 'Already paid' },
+        actor,
+      ),
+    ).rejects.toThrow(ConflictException);
 
-    expect(result.disbursementJournalEntryId).toBe(
-      'journal-disbursement-existing',
-    );
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.journalEntry.create).not.toHaveBeenCalled();
   });

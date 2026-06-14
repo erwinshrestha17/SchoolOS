@@ -1049,6 +1049,10 @@ export class ActivityFeedService {
       throw new BadRequestException('Attachment has no linked file asset');
     }
 
+    this.ensureAttachmentPostAllowsSignedPreview(actor, {
+      status: attachment.activityPost.status,
+      softDeletedAt: attachment.activityPost.softDeletedAt,
+    });
     await this.ensurePostVisibleToActor(actor, attachment.activityPostId);
     const mediaAccess = await this.resolveActorMediaAccess(actor);
     if (mediaAccess.blocked) {
@@ -1082,6 +1086,32 @@ export class ActivityFeedService {
     );
 
     return this.fileRegistryService.getSignedUrl(actor.tenantId, fileAssetId);
+  }
+
+  private ensureAttachmentPostAllowsSignedPreview(
+    actor: AuthContext,
+    post: {
+      status: ActivityPostStatus;
+      softDeletedAt: Date | null;
+    },
+  ) {
+    if (post.softDeletedAt) {
+      throw new ForbiddenException('Activity post is no longer available');
+    }
+
+    if (
+      post.status === ActivityPostStatus.ARCHIVED ||
+      post.status === ActivityPostStatus.REJECTED
+    ) {
+      throw new ForbiddenException('Activity post is no longer available');
+    }
+
+    if (
+      (isParentOnly(actor) || isStudentOnly(actor)) &&
+      post.status !== ActivityPostStatus.APPROVED
+    ) {
+      throw new ForbiddenException('Activity post is no longer available');
+    }
   }
 
   private async ensureTaggedStudentsAllowMediaForParent(

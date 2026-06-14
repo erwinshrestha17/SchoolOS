@@ -6,6 +6,7 @@ import {
   NotificationChannel,
   Prisma,
   HomeworkAssignment,
+  StudentLifecycleStatus,
 } from '@prisma/client';
 import {
   ConflictException,
@@ -176,7 +177,9 @@ export class HomeworkService {
   }
 
   async getAssignment(actor: AuthContext, id: string) {
-    return this.findAssignmentOrThrow(actor, id);
+    const assignment = await this.findAssignmentOrThrow(actor, id);
+    await this.ensureAssignmentVisibleToActor(actor, assignment);
+    return assignment;
   }
 
   async listTemplates(
@@ -239,8 +242,17 @@ export class HomeworkService {
       ? new Date(dto.assignedDate)
       : new Date();
     const dueDate = new Date(dto.dueDate);
+    const dueAt = dto.dueAt ? new Date(dto.dueAt) : dueDate;
 
-    if (dueDate < assignedDate) {
+    if (
+      Number.isNaN(assignedDate.getTime()) ||
+      Number.isNaN(dueDate.getTime()) ||
+      Number.isNaN(dueAt.getTime())
+    ) {
+      throw new ConflictException('Homework dates must be valid');
+    }
+
+    if (dueDate < assignedDate || dueAt < assignedDate) {
       throw new ConflictException('Due date cannot be before assigned date');
     }
 
@@ -281,6 +293,10 @@ export class HomeworkService {
           academicYearId: dto.academicYearId,
           subjectId: dto.subjectId,
           staffId,
+          classId: dto.classId,
+          OR: dto.sectionId
+            ? [{ sectionId: dto.sectionId }, { sectionId: null }]
+            : [{ sectionId: null }],
         },
       });
       if (!isAssigned) {
@@ -291,7 +307,7 @@ export class HomeworkService {
     const occurrences = buildHomeworkOccurrences({
       assignedDate,
       dueDate,
-      dueAt: dto.dueAt ? new Date(dto.dueAt) : dueDate,
+      dueAt,
       recurrence: dto.recurrence,
     });
     const recurrenceSeriesId =
@@ -608,6 +624,7 @@ export class HomeworkService {
     }
 
     const assignment = await this.findAssignmentOrThrow(actor, assignmentId);
+    await this.ensureStudentInAssignmentScope(actor, assignment, studentId);
     if (assignment.status !== HomeworkAssignmentStatus.ASSIGNED) {
       throw new ConflictException('Homework is not open for submission');
     }
@@ -747,9 +764,9 @@ export class HomeworkService {
     actor: AuthContext,
   ) {
     const submission = await this.findSubmissionOrThrow(actor, submissionId);
-    this.ensureSubjectTeacherScope(
+    await this.ensureSubjectTeacherScope(
       actor,
-      submission.homework.subjectId,
+      submission.homework,
       await this.resolveActorStaffId(actor),
     );
 
@@ -839,9 +856,9 @@ export class HomeworkService {
     actor: AuthContext,
   ) {
     const submission = await this.findSubmissionOrThrow(actor, submissionId);
-    this.ensureSubjectTeacherScope(
+    await this.ensureSubjectTeacherScope(
       actor,
-      submission.homework.subjectId,
+      submission.homework,
       await this.resolveActorStaffId(actor),
     );
 
@@ -910,7 +927,7 @@ export class HomeworkService {
         tenantId: actor.tenantId,
         classId: assignment.classId,
         ...(assignment.sectionId ? { sectionId: assignment.sectionId } : {}),
-        lifecycleStatus: 'ACTIVE',
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
       },
       select: { id: true },
     });
@@ -935,9 +952,14 @@ export class HomeworkService {
     }
   }
 
-  private ensureSubjectTeacherScope(
+  private async ensureSubjectTeacherScope(
     actor: AuthContext,
-    subjectId: string,
+    homework: {
+      academicYearId?: string;
+      classId: string;
+      sectionId: string | null;
+      subjectId: string;
+    },
     staffId: string | null,
   ) {
     if (actor.roles.includes('admin') || actor.roles.includes('principal')) {
@@ -948,8 +970,26 @@ export class HomeworkService {
       throw new ForbiddenException('Only staff can access this resource');
     }
 
-    // Basic check: teacher must belong to the tenant
-    // More advanced check would involve Timetable/SubjectTeacher mapping
+    const assignment = await this.prisma.subjectTeacherAssignment.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        ...(homework.academicYearId
+          ? { academicYearId: homework.academicYearId }
+          : {}),
+        subjectId: homework.subjectId,
+        classId: homework.classId,
+        staffId,
+        OR: homework.sectionId
+          ? [{ sectionId: homework.sectionId }, { sectionId: null }]
+          : [{ sectionId: null }],
+      },
+    });
+
+    if (!assignment) {
+      throw new ForbiddenException(
+        'You are not assigned to review homework for this class and subject',
+      );
+    }
   }
 
   private async auditSubmission(
@@ -978,12 +1018,19 @@ export class HomeworkService {
     const prisma = tx || this.prisma;
 
     // 1. Validate files belong to tenant
+    const uniqueFileAssetIds = Array.from(new Set(fileAssetIds));
+    if (uniqueFileAssetIds.length !== fileAssetIds.length) {
+      throw new ConflictException(
+        'Duplicate homework attachment files are not allowed',
+      );
+    }
+
     const fileAssets = await prisma.fileAsset.findMany({
-      where: { id: { in: fileAssetIds }, tenantId: actor.tenantId },
+      where: { id: { in: uniqueFileAssetIds }, tenantId: actor.tenantId },
       select: { id: true },
     });
 
-    if (fileAssets.length !== fileAssetIds.length) {
+    if (fileAssets.length !== uniqueFileAssetIds.length) {
       throw new ConflictException(
         'Some attachment files were not found or do not belong to this tenant',
       );
@@ -991,7 +1038,7 @@ export class HomeworkService {
 
     // 2. Create join records
     await prisma.homeworkAttachment.createMany({
-      data: fileAssetIds.map((fileAssetId) => ({
+      data: uniqueFileAssetIds.map((fileAssetId) => ({
         tenantId: actor.tenantId,
         assignmentId,
         submissionId,
@@ -1001,7 +1048,7 @@ export class HomeworkService {
     });
 
     // 3. Update FileAsset entity reference via Registry for consistency/auditing
-    for (const assetId of fileAssetIds) {
+    for (const assetId of uniqueFileAssetIds) {
       await this.fileRegistry.linkToEntity(
         actor.tenantId,
         assetId,
@@ -1018,6 +1065,14 @@ export class HomeworkService {
     actor: AuthContext,
   ) {
     const homework = await this.findAssignmentOrThrow(actor, homeworkId);
+    if (
+      homework.status !== HomeworkAssignmentStatus.ASSIGNED &&
+      dto.reminderType !== HomeworkReminderType.HOMEWORK_RETURNED_FOR_CORRECTION
+    ) {
+      throw new ConflictException(
+        'Homework reminders can only be sent for assigned homework',
+      );
+    }
 
     const idempotencyKey = this.buildHomeworkReminderIdempotencyKey(
       actor.tenantId,
@@ -1265,7 +1320,7 @@ export class HomeworkService {
         tenantId: actor.tenantId,
         classId: homework.classId,
         ...(homework.sectionId ? { sectionId: homework.sectionId } : {}),
-        lifecycleStatus: 'ACTIVE', // Only active students
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
       },
       select: { id: true },
     });
@@ -1461,9 +1516,11 @@ export class HomeworkService {
     if (actor.roles.includes('student')) {
       const student = await this.prisma.student.findFirst({
         where: { tenantId: actor.tenantId, userId: actor.userId },
-        select: { id: true },
+        select: { id: true, lifecycleStatus: true },
       });
-      return student?.id ?? null;
+      return student?.lifecycleStatus === StudentLifecycleStatus.ACTIVE
+        ? student.id
+        : null;
     }
 
     if (actor.roles.includes('parent')) {
@@ -1472,6 +1529,7 @@ export class HomeworkService {
           tenantId: actor.tenantId,
           guardian: { userId: actor.userId },
           ...(requestedStudentId ? { studentId: requestedStudentId } : {}),
+          student: { lifecycleStatus: StudentLifecycleStatus.ACTIVE },
         },
         select: { studentId: true },
       });
@@ -1485,7 +1543,11 @@ export class HomeworkService {
     ) {
       if (!requestedStudentId) return null;
       const student = await this.prisma.student.findFirst({
-        where: { id: requestedStudentId, tenantId: actor.tenantId },
+        where: {
+          id: requestedStudentId,
+          tenantId: actor.tenantId,
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
         select: { id: true },
       });
       return student?.id ?? null;
@@ -1498,9 +1560,11 @@ export class HomeworkService {
     if (actor.roles.includes('student')) {
       const student = await this.prisma.student.findFirst({
         where: { tenantId: actor.tenantId, userId: actor.userId },
-        select: { id: true },
+        select: { id: true, lifecycleStatus: true },
       });
-      return student ? [student.id] : [];
+      return student?.lifecycleStatus === StudentLifecycleStatus.ACTIVE
+        ? [student.id]
+        : [];
     }
 
     if (actor.roles.includes('parent')) {
@@ -1508,6 +1572,7 @@ export class HomeworkService {
         where: {
           tenantId: actor.tenantId,
           guardian: { userId: actor.userId },
+          student: { lifecycleStatus: StudentLifecycleStatus.ACTIVE },
         },
         select: { studentId: true },
       });
@@ -1516,6 +1581,72 @@ export class HomeworkService {
     }
 
     return null;
+  }
+
+  private async ensureAssignmentVisibleToActor(
+    actor: AuthContext,
+    assignment: {
+      classId: string;
+      sectionId: string | null;
+    },
+  ) {
+    if (actor.roles.includes('student')) {
+      const student = await this.prisma.student.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
+        select: { classId: true, sectionId: true },
+      });
+      if (!student || !studentMatchesAssignment(student, assignment)) {
+        throw new NotFoundException('Homework assignment not found');
+      }
+      return;
+    }
+
+    if (actor.roles.includes('parent')) {
+      const link = await this.prisma.studentGuardian.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          guardian: { userId: actor.userId },
+          student: {
+            lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+            classId: assignment.classId,
+            ...(assignment.sectionId
+              ? { sectionId: assignment.sectionId }
+              : {}),
+          },
+        },
+        select: { id: true },
+      });
+      if (!link) {
+        throw new NotFoundException('Homework assignment not found');
+      }
+    }
+  }
+
+  private async ensureStudentInAssignmentScope(
+    actor: AuthContext,
+    assignment: {
+      classId: string;
+      sectionId: string | null;
+    },
+    studentId: string,
+  ) {
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: studentId,
+        tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
+      select: { id: true, classId: true, sectionId: true },
+    });
+    if (!student || !studentMatchesAssignment(student, assignment)) {
+      throw new ForbiddenException(
+        'Student is not active in this homework class scope',
+      );
+    }
   }
 
   async getHomeworkCompletionReport(
@@ -1615,6 +1746,16 @@ function parseDate(value: string | undefined, fieldName: string) {
     throw new ConflictException(`${fieldName} must be a valid date`);
   }
   return parsed;
+}
+
+function studentMatchesAssignment(
+  student: { classId: string; sectionId: string | null },
+  assignment: { classId: string; sectionId: string | null },
+) {
+  return (
+    student.classId === assignment.classId &&
+    (!assignment.sectionId || student.sectionId === assignment.sectionId)
+  );
 }
 
 interface HomeworkOccurrence {

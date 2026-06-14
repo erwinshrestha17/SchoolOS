@@ -26,6 +26,9 @@ import { StaffLeaveAccrualService } from '../hr/staff-leave-accrual.service';
 import {
   AddStaffDocumentDto,
   ContractExpiryReminderQueryDto,
+  CreateStaffLeaveRequestDto,
+  RecordStaffAttendanceDto,
+  ReviewStaffLeaveRequestDto,
   TerminateStaffDto,
   VerifyStaffDocumentDto,
 } from './dto/staff-actions.dto';
@@ -83,6 +86,45 @@ export class HrStaffController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.staffService.getStaffDetail(staffId, auth);
+  }
+
+  @Get(':staffId/timeline')
+  @Permissions('hr:staff:read')
+  getStaffTimeline(
+    @Param('staffId') staffId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.staffService.getStaffTimeline(staffId, auth);
+  }
+
+  @Post(':staffId/leave-requests')
+  @Permissions('hr:leave:request')
+  createLeaveRequest(
+    @Param('staffId') staffId: string,
+    @Body() dto: CreateStaffLeaveRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.staffService.createLeaveRequest(staffId, dto, auth);
+  }
+
+  @Post('leave-requests/:leaveRequestId/review')
+  @Permissions('hr:leave:approve')
+  reviewLeaveRequest(
+    @Param('leaveRequestId') leaveRequestId: string,
+    @Body() dto: ReviewStaffLeaveRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.staffService.reviewLeaveRequest(leaveRequestId, dto, auth);
+  }
+
+  @Post(':staffId/attendance')
+  @Permissions('hr:attendance:write')
+  recordAttendance(
+    @Param('staffId') staffId: string,
+    @Body() dto: RecordStaffAttendanceDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.staffService.recordStaffAttendance(staffId, dto, auth);
   }
 
   @Patch(':staffId')

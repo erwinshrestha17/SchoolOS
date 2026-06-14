@@ -62,6 +62,9 @@ describe('FileRegistryService tenant scoping', () => {
       staff: {
         findFirst: jest.fn(),
       },
+      payslip: {
+        findFirst: jest.fn(),
+      },
     };
     auditService = { record: jest.fn().mockResolvedValue({}) };
     storageService = {
@@ -340,6 +343,47 @@ describe('FileRegistryService tenant scoping', () => {
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'file_download' }),
     );
+  });
+
+  it('allows only payroll permission or the owning staff user to preview payslip files', async () => {
+    const payrollAsset = {
+      ...asset,
+      module: 'payroll',
+      entityId: 'payslip-1',
+      metadata: {
+        reportKey: 'payroll.payslip',
+        payslipId: 'payslip-1',
+        staffId: 'staff-1',
+      },
+    };
+    prisma.fileAsset.findUnique.mockResolvedValue(payrollAsset);
+    prisma.payslip.findFirst.mockResolvedValue({
+      staff: { userId: 'staff-user-1' },
+    });
+
+    await expect(
+      service.createSignedPreviewUrl(
+        {
+          tenantId: 'tenant-1',
+          userId: 'staff-user-1',
+          roles: ['teacher'],
+          permissions: ['staff:read'],
+        } as any,
+        'file-1',
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'file-1' }));
+
+    await expect(
+      service.createSignedPreviewUrl(
+        {
+          tenantId: 'tenant-1',
+          userId: 'staff-user-2',
+          roles: ['teacher'],
+          permissions: ['staff:read'],
+        } as any,
+        'file-1',
+      ),
+    ).rejects.toThrow(ForbiddenException);
   });
 
   it('creates pending signed upload intents without leaking storage keys', async () => {

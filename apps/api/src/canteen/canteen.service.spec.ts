@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   AuthMethod,
   CanteenMealPlanStatus,
@@ -7,6 +11,7 @@ import {
   CanteenPaymentMethod,
   CanteenPosSaleStatus,
   Prisma,
+  StudentLifecycleStatus,
 } from '@prisma/client';
 import { CanteenService } from './canteen.service';
 
@@ -502,8 +507,150 @@ describe('CanteenService Phase 3C hardening', () => {
 
     expect(prisma.student.findFirst).toHaveBeenCalledWith({
       where: { tenantId: actor.tenantId, id: 'student-cross-tenant' },
-      select: { id: true },
+      select: { id: true, lifecycleStatus: true },
     });
+  });
+
+  it('prevents inactive or withdrawn students from being served', async () => {
+    const { service } = buildService({
+      student: {
+        id: 'student-1',
+        tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.EXITED,
+      },
+    });
+
+    await expect(
+      service.serveMeal(
+        { studentId: 'student-1', mealType: 'LUNCH', mealDate: '2026-05-06' },
+        actor,
+      ),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('enforces monthly spending limits before creating POS sales', async () => {
+    const { service } = buildService({
+      spendingControl: {
+        id: 'control-1',
+        tenantId: actor.tenantId,
+        studentId: 'student-1',
+        isActive: true,
+        blockedCategories: [],
+        blockedMenuItemIds: [],
+        dailySpendingLimit: null,
+        monthlySpendingLimit: new Prisma.Decimal(40),
+      },
+      saleAggregateTotal: new Prisma.Decimal(0),
+    });
+
+    await expect(
+      service.createPosSale(
+        {
+          studentId: 'student-1',
+          paymentMethod: CanteenPaymentMethod.WALLET,
+          items: [{ menuItemId: 'item-1', quantity: 1 }],
+        },
+        actor,
+      ),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('blocks stock mutations after stock close', async () => {
+    const { service, tx } = buildService({
+      stockClose: { id: 'stock-close-1' },
+    });
+
+    await expect(
+      service.recordWastage(
+        {
+          inventoryItemId: 'stock-1',
+          quantity: 1,
+          reason: 'Expired',
+          wastageDate: '2026-05-12',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    expect(tx.canteenWastage.create).not.toHaveBeenCalled();
+  });
+
+  it('reuses existing POS receipt files from File Registry', async () => {
+    const fileRegistryService = {
+      listFilesByEntity: jest.fn().mockResolvedValue([
+        {
+          id: 'file-1',
+          metadata: { kind: 'pos_receipt_pdf' },
+        },
+      ]),
+      registerGeneratedFile: jest.fn(),
+    };
+    const { service } = buildService({
+      receiptSale: buildReceiptSale(),
+      fileRegistryService,
+    });
+
+    const result = await service.getPosReceiptPdfFile('sale-1', actor);
+
+    expect(fileRegistryService.listFilesByEntity).toHaveBeenCalledWith(
+      actor.tenantId,
+      'canteen',
+      'sale-1',
+    );
+    expect(fileRegistryService.registerGeneratedFile).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      fileAssetId: 'file-1',
+      alreadyGenerated: true,
+    });
+  });
+
+  it('returns purpose-limited parent canteen status for linked children', async () => {
+    const { service, prisma } = buildService();
+
+    const result = await service.getParentStudentCanteenStatus(
+      'student-1',
+      actor,
+    );
+
+    expect(prisma.studentGuardian.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: 'student-1',
+        guardian: { userId: actor.userId },
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            studentSystemId: true,
+            firstNameEn: true,
+            lastNameEn: true,
+          },
+        },
+      },
+    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        student: expect.objectContaining({
+          id: 'student-1',
+          name: 'Asha Student',
+        }),
+        wallet: expect.objectContaining({
+          balance: new Prisma.Decimal(1000),
+          isLowBalance: false,
+        }),
+      }),
+    );
+    expect(result.todayServings).toHaveLength(1);
+    expect(result.menuItems).toHaveLength(1);
+  });
+
+  it('denies parent canteen status for unlinked or cross-tenant children', async () => {
+    const { service } = buildService({ guardianLink: null });
+
+    await expect(
+      service.getParentStudentCanteenStatus('student-cross-tenant', actor),
+    ).rejects.toThrow(ForbiddenException);
   });
 });
 
@@ -524,11 +671,22 @@ function buildService(
     supplier?: unknown;
     inventoryItem?: unknown;
     inventoryUpdateManyCount?: number;
+    saleAggregateTotal?: Prisma.Decimal;
+    stockClose?: unknown;
+    guardianLink?: unknown;
+    fileRegistryService?: {
+      listFilesByEntity: jest.Mock;
+      registerGeneratedFile: jest.Mock;
+    };
   } = {},
 ) {
   const student =
     options.student === undefined
-      ? { id: 'student-1', tenantId: actor.tenantId }
+      ? {
+          id: 'student-1',
+          tenantId: actor.tenantId,
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        }
       : options.student;
   const menuItem = options.menuItem ?? {
     id: 'item-1',
@@ -589,6 +747,21 @@ function buildService(
     notes: 'restock',
     items: [],
   };
+  const guardianLink =
+    options.guardianLink === undefined
+      ? {
+          id: 'guardian-link-1',
+          tenantId: actor.tenantId,
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          student: {
+            id: 'student-1',
+            studentSystemId: 'STU-001',
+            firstNameEn: 'Asha',
+            lastNameEn: 'Student',
+          },
+        }
+      : options.guardianLink;
 
   const tx = {
     canteenMenuItem: {
@@ -677,7 +850,11 @@ function buildService(
       }),
       aggregate: jest
         .fn()
-        .mockResolvedValue({ _sum: { totalAmount: new Prisma.Decimal(0) } }),
+        .mockResolvedValue({
+          _sum: {
+            totalAmount: options.saleAggregateTotal ?? new Prisma.Decimal(0),
+          },
+        }),
     },
     student: {
       findFirst: jest.fn().mockResolvedValue({
@@ -709,11 +886,17 @@ function buildService(
     canteenStockMovement: {
       create: jest.fn().mockResolvedValue({ id: 'movement-1' }),
     },
+    auditLog: {
+      findFirst: jest.fn().mockResolvedValue(options.stockClose ?? null),
+    },
   };
 
   const prisma = {
     student: {
       findFirst: jest.fn().mockResolvedValue(student),
+    },
+    studentGuardian: {
+      findFirst: jest.fn().mockResolvedValue(guardianLink),
     },
     canteenMenuItem: {
       create: jest.fn().mockResolvedValue({
@@ -721,15 +904,46 @@ function buildService(
         tenantId: actor.tenantId,
         name: 'Lunch Set',
       }),
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: 'item-1',
+          name: 'Lunch Set',
+          category: 'Lunch',
+          unitPrice: new Prisma.Decimal(80),
+          isMealItem: true,
+          allergenTags: [],
+        },
+      ]),
     },
     canteenMealPlan: {
       findFirst: jest.fn().mockResolvedValue(mealPlan),
     },
     canteenStudentEnrollment: {
       create: jest.fn().mockResolvedValue({ id: 'enrollment-1' }),
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'enrollment-1',
+        mealPlanId: 'plan-1',
+        status: CanteenMealPlanStatus.ACTIVE,
+        startsOn: new Date('2026-05-06T00:00:00.000Z'),
+        endsOn: null,
+        mealPlan,
+      }),
     },
     canteenPosSale: {
       findFirst: jest.fn().mockResolvedValue(options.receiptSale ?? sale),
+    },
+    canteenWallet: {
+      findFirst: jest.fn().mockResolvedValue(wallet),
+    },
+    canteenMealServing: {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: 'serving-1',
+          mealType: 'LUNCH',
+          status: CanteenMealServingStatus.SERVED,
+          servedAt: new Date('2026-05-17T07:00:00.000Z'),
+        },
+      ]),
     },
     $transaction: jest.fn().mockImplementation(async (input: unknown) => {
       if (Array.isArray(input)) {
@@ -764,6 +978,7 @@ function buildService(
       auditService as never,
       accountingPostingService as never,
       financeService as never,
+      options.fileRegistryService as never,
     ),
     prisma,
     tx,

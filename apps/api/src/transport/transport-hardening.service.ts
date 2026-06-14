@@ -2,10 +2,12 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { TransportEnrollmentStatus, TransportTripStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { CancelTransportTripDto } from './dto/cancel-transport-trip.dto';
@@ -18,6 +20,8 @@ export class TransportHardeningService {
     private readonly auditService: AuditService,
     private readonly redisService: RedisService,
     private readonly transportService: TransportService,
+    @Optional()
+    private readonly fileRegistryService?: FileRegistryService,
   ) {}
 
   async cancelTrip(
@@ -274,6 +278,29 @@ export class TransportHardeningService {
     });
 
     return rows.map((row) => row.map(csvEscape).join(',')).join('\n');
+  }
+
+  async exportTripHistoryCsvFile(actor: AuthContext) {
+    if (!this.fileRegistryService) {
+      throw new ForbiddenException('File Registry is not available for export');
+    }
+
+    const csv = await this.exportTripHistoryCsv(actor);
+    const fileName = `transport-trip-history-${new Date().toISOString().slice(0, 10)}.csv`;
+    const asset = await this.fileRegistryService.registerGeneratedFile({
+      tenantId: actor.tenantId,
+      generatedByUserId: actor.userId,
+      originalFilename: fileName,
+      content: Buffer.from(csv, 'utf8'),
+      mimeType: 'text/csv',
+      module: 'transport',
+      metadata: {
+        kind: 'transport_trip_history_report',
+        generatedAt: new Date().toISOString(),
+      },
+    });
+
+    return { fileAssetId: asset.id, fileName, mimeType: 'text/csv' };
   }
 
   /**

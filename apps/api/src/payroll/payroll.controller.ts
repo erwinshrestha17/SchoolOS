@@ -180,7 +180,7 @@ export class PayrollController {
   }
 
   @Get('payslips')
-  @Permissions('payroll:payslip:read')
+  @Permissions('payroll:read')
   listPayslips(@CurrentAuth() auth: AuthContext) {
     return this.payrollService.listPayslips(auth);
   }
@@ -193,7 +193,7 @@ export class PayrollController {
 
   @Get('payslips/:payslipNumber/pdf')
   @Header('Content-Type', 'application/pdf')
-  @Permissions('payroll:read', 'staff:read')
+  @Permissions('payroll:payslip:read')
   getPayslipPdfAlias(
     @Param('payslipNumber') payslipNumber: string,
     @CurrentAuth() auth: AuthContext,
@@ -203,7 +203,7 @@ export class PayrollController {
 
   @Get('payslips/:payslipNumber.pdf')
   @Header('Content-Type', 'application/pdf')
-  @Permissions('payroll:read', 'staff:read')
+  @Permissions('payroll:payslip:read')
   getPayslipPdf(
     @Param('payslipNumber') payslipNumber: string,
     @CurrentAuth() auth: AuthContext,
@@ -213,7 +213,7 @@ export class PayrollController {
 
   @Get('runs/:runId/staff/:staffId/payslip.pdf')
   @Header('Content-Type', 'application/pdf')
-  @Permissions('payroll:payslip:read')
+  @Permissions('payroll:read')
   getStaffPayslipPdf(
     @Param('runId') runId: string,
     @Param('staffId') staffId: string,
