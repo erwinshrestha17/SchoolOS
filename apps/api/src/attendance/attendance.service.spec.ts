@@ -411,6 +411,62 @@ describe('attendance production hardening', () => {
     );
   });
 
+  it('suppresses duplicate parent absence notifications on retry by stable source id', async () => {
+    const finalSession = buildAttendanceSession({
+      records: [
+        {
+          studentId: 'student-1',
+          status: AttendanceStatus.ABSENT,
+          remark: null,
+          lateAt: null,
+        },
+      ],
+    });
+    const { service, prisma, communicationsService, auditService } =
+      buildService({
+        academicYear: { id: 'ay-1' },
+        classroom: { id: 'class-1', name: 'Grade 1' },
+        section: { id: 'section-1', name: 'A', classId: 'class-1' },
+        students: [buildStudent({ id: 'student-1' })],
+        finalSession,
+        notificationDeliveryFindFirstQueue: [{ id: 'delivery-existing' }],
+      });
+
+    await service.submitAttendance(
+      {
+        academicYearId: 'ay-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        attendanceDate: '2026-04-28',
+        exceptions: [
+          {
+            studentId: 'student-1',
+            status: AttendanceStatus.ABSENT,
+          },
+        ],
+      },
+      adminActor,
+    );
+
+    expect(prisma.notificationDelivery.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: adminActor.tenantId,
+        sourceType: 'attendance_parent_absence_notification',
+        sourceId: 'session-1:student-1:ABSENT',
+      },
+    });
+    expect(communicationsService.recordDeliveryRecords).not.toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'parent_status_notifications',
+        after: expect.objectContaining({
+          notifiedRecords: 1,
+          deliveryCount: 0,
+        }),
+      }),
+    );
+  });
+
   it('keeps attendance events but skips disabled parent absence notifications', async () => {
     const finalSession = buildAttendanceSession({
       records: [

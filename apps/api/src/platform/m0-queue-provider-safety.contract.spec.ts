@@ -75,6 +75,20 @@ describe('M0 Queue & Provider safety contracts', () => {
       expect(service).toContain("failed: this.count(counts, 'failed')");
     });
 
+    it('failed-job grouping exposes bounded diagnostics without job payloads', () => {
+      const controller = read('src/platform/platform.controller.ts');
+      const service = read('src/platform/platform-queues.service.ts');
+
+      expect(controller).toContain("@Get('queues/failed-job-groups')");
+      expect(controller).toContain(
+        'platformQueuesService.listFailedJobGroups()',
+      );
+      expect(service).toContain('listFailedJobGroups');
+      expect(service).toContain('buildFailureDiagnostic');
+      expect(service).toContain('affectedTenantIds');
+      expect(service).toContain('sampleJobIds');
+    });
+
     it('destructive failed-job discard records an operator reason', () => {
       const service = read('src/platform/platform-queues.service.ts');
       const controller = read('src/platform/platform.controller.ts');

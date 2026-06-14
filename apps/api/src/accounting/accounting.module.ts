@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { FinanceModule } from '../finance/finance.module';
@@ -9,6 +10,7 @@ import { AccountingPostingModule } from './accounting-posting.module';
 import { AccountingReportsController } from './accounting-reports.controller';
 import { AccountingReportsService } from './accounting-reports.service';
 import { AccountingReportExportsService } from './accounting-report-exports.service';
+import { AccountingReportsProcessor } from './accounting-reports.processor';
 import { AccountingM9Controller } from './accounting-m9.controller';
 import { AccountingM9Service } from './accounting-m9.service';
 import { M9SourceService } from './m9-source.service';
@@ -21,6 +23,9 @@ import { M9TemplateService } from './m9-template.service';
     FinanceModule,
     AccountingPostingModule,
     FileRegistryModule,
+    BullModule.registerQueue({
+      name: 'accounting-reports',
+    }),
   ],
   controllers: [
     AccountingController,
@@ -31,6 +36,7 @@ import { M9TemplateService } from './m9-template.service';
     AccountingService,
     AccountingReportsService,
     AccountingReportExportsService,
+    AccountingReportsProcessor,
     AccountingM9Service,
     M9SourceService,
     M9TemplateService,

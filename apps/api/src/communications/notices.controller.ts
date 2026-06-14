@@ -27,6 +27,15 @@ export class NoticesController {
     return this.communicationsService.createNotice(dto, auth);
   }
 
+  @Post('recipient-preview')
+  @Permissions('notices:create')
+  previewNoticeRecipients(
+    @Body() dto: CreateNoticeDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.communicationsService.previewNoticeRecipients(dto, auth);
+  }
+
   @Post('scheduled/process')
   @Permissions('notices:create')
   processScheduled(@CurrentAuth() auth: AuthContext) {

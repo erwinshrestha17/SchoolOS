@@ -3371,6 +3371,17 @@ export class AttendanceService {
         ? 'attendance_parent_late_notification'
         : 'attendance_parent_absence_notification';
       const sourceId = `${session.id}:${record.studentId}:${record.status}`;
+      const alreadySent = await this.prisma.notificationDelivery.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          sourceType,
+          sourceId,
+        },
+      });
+      if (alreadySent) {
+        continue;
+      }
+
       const delivery = await this.communicationsService.recordDeliveryRecords({
         actor,
         sourceType,

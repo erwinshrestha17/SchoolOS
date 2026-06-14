@@ -64,6 +64,7 @@ M0 SaaS billing records must not post directly into school tenant fee ledgers.
 ### Current M0 Platform Core Status
 M0 Platform Core Foundation is completed. Current focus is staging verification, browser coverage, entitlement enforcement, provider readiness, queue/File Registry hardening, and pilot reliability.
 M0 remains inside the existing NestJS modular monolith. It is not a separate microservice and should not be split unless scale or compliance requires it.
+For current pilot backend closure, tenant onboarding is modeled as a computed readiness checklist with audited platform overrides. A separate onboarding state machine is deferred unless product requirements add approval, rollback, or multi-status transition needs.
 
 Implemented M0 foundation areas:
 - Platform tenant list/detail/dashboard/status flows
@@ -77,6 +78,7 @@ Implemented M0 foundation areas:
 - Provider readiness detail API with dry-run validation
 - Queue health plus audited retry/discard operator workflows
 - Failed-job detail inspection with sanitized payloads and retry audit history
+- Failed-job grouping diagnostics by queue, job name, bounded failure reason, tenant hints, and retry-safety category
 - File upload validation and dangerous extension blocking
 - Private/protected file URL response shape
 - Report export history and audited export persistence

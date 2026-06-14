@@ -178,6 +178,7 @@ describe('ActivityFeedService', () => {
         tenantId: 'tenant-1',
         classId: 'class-1',
         sectionId: 'section-1',
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
         id: { in: ['student-1'] },
       },
     });
@@ -342,6 +343,56 @@ describe('ActivityFeedService', () => {
         actor,
       ),
     ).rejects.toThrow('Teacher is not assigned to this class/section');
+  });
+
+  it('rejects inactive tagged students before storing activity media', async () => {
+    prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
+    prisma.section.findFirst.mockResolvedValue({
+      id: 'section-1',
+      classId: 'class-1',
+    });
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    prisma.student.findMany.mockResolvedValue([]);
+
+    await expect(
+      service.createPost(
+        {
+          classId: 'class-1',
+          sectionId: 'section-1',
+          title: 'Science day',
+          caption: 'Archived students should not receive new activity media.',
+          category: ActivityCategory.LEARNING,
+          studentIds: ['student-archived'],
+          attachments: [
+            {
+              fileName: 'photo.jpg',
+              contentType: 'image/jpeg',
+              base64Content: Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString(
+                'base64',
+              ),
+            },
+          ],
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'One or more tagged students were not active in this class/section',
+    );
+
+    expect(prisma.student.findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        id: { in: ['student-archived'] },
+      },
+    });
+    expect(storageService.saveBase64Object).not.toHaveBeenCalled();
+    expect(fileRegistry.registerFile).not.toHaveBeenCalled();
+    expect(prisma.activityPost.create).not.toHaveBeenCalled();
+    expect(mediaQueue.add).not.toHaveBeenCalled();
+    expect(communicationsService.recordDeliveryRecords).not.toHaveBeenCalled();
   });
 
   it('rejects non-image activity attachments before storage', async () => {

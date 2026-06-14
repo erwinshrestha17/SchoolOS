@@ -1247,7 +1247,7 @@ function IssuesPanel(props: {
               </select>
             </label>
             
-            <TextInput label="Due date" type="date" value={props.form.dueAt} required onChange={(dueAt) => props.setForm({ ...props.form, dueAt })} />
+            <TextInput label="Due date" type="date" value={props.form.dueAt ?? ''} required onChange={(dueAt) => props.setForm({ ...props.form, dueAt })} />
             <TextInput label="Internal Notes" value={props.form.notes ?? ''} onChange={(notes) => props.setForm({ ...props.form, notes })} />
             
             <button

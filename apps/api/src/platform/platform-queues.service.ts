@@ -49,6 +49,30 @@ export interface PlatformFailedJobSummary {
   }>;
 }
 
+export interface PlatformFailedJobGroup {
+  queueName: string;
+  name: string;
+  failedReason: string;
+  count: number;
+  firstFailedAt?: number;
+  latestFailedAt?: number;
+  maxAttemptsMade: number;
+  sampleJobIds: string[];
+  affectedTenantIds: string[];
+  diagnostic: {
+    category:
+      | 'provider'
+      | 'storage'
+      | 'tenant_state'
+      | 'entitlement'
+      | 'data_validation'
+      | 'transient'
+      | 'unknown';
+    retryable: boolean;
+    recommendedAction: string;
+  };
+}
+
 const SECRET_KEY_PATTERN =
   /(api[-_]?key|token|secret|password|credential|authorization|private[-_]?key|cookie|phone|email)/i;
 const MAX_STRING_LENGTH = 500;
@@ -162,6 +186,82 @@ export class PlatformQueuesService {
     }
 
     return failedJobs.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
+  }
+
+  async listFailedJobGroups(): Promise<PlatformFailedJobGroup[]> {
+    const groups = new Map<
+      string,
+      PlatformFailedJobGroup & { tenantIds: Set<string> }
+    >();
+
+    for (const [queueName, queue] of this.queues.entries()) {
+      const jobs = await queue.getFailed(0, 100);
+
+      for (const job of jobs) {
+        const failedReason = normalizeFailureReason(job.failedReason);
+        const groupKey = [queueName, job.name, failedReason].join('\u0000');
+        const timestamp = Number(job.timestamp ?? 0) || undefined;
+        const existing = groups.get(groupKey);
+
+        if (!existing) {
+          const diagnostic = buildFailureDiagnostic(
+            queueName,
+            job.name,
+            failedReason,
+            job.data,
+          );
+          const tenantIds = new Set<string>();
+          const tenantId = extractTenantId(job.data);
+          if (tenantId) tenantIds.add(tenantId);
+
+          groups.set(groupKey, {
+            queueName,
+            name: job.name,
+            failedReason,
+            count: 1,
+            firstFailedAt: timestamp,
+            latestFailedAt: timestamp,
+            maxAttemptsMade: Number(job.attemptsMade ?? 0),
+            sampleJobIds: [String(job.id)],
+            affectedTenantIds: [],
+            diagnostic,
+            tenantIds,
+          });
+          continue;
+        }
+
+        existing.count += 1;
+        existing.maxAttemptsMade = Math.max(
+          existing.maxAttemptsMade,
+          Number(job.attemptsMade ?? 0),
+        );
+        if (timestamp) {
+          existing.firstFailedAt =
+            existing.firstFailedAt === undefined
+              ? timestamp
+              : Math.min(existing.firstFailedAt, timestamp);
+          existing.latestFailedAt =
+            existing.latestFailedAt === undefined
+              ? timestamp
+              : Math.max(existing.latestFailedAt, timestamp);
+        }
+        if (existing.sampleJobIds.length < 5) {
+          existing.sampleJobIds.push(String(job.id));
+        }
+        const tenantId = extractTenantId(job.data);
+        if (tenantId) existing.tenantIds.add(tenantId);
+      }
+    }
+
+    return Array.from(groups.values())
+      .map(({ tenantIds, ...group }) => ({
+        ...group,
+        affectedTenantIds: Array.from(tenantIds).sort().slice(0, 20),
+      }))
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return (b.latestFailedAt ?? 0) - (a.latestFailedAt ?? 0);
+      });
   }
 
   async getJobDetail(
@@ -328,6 +428,115 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object'
     ? (value as Record<string, unknown>)
     : {};
+}
+
+function normalizeFailureReason(reason: unknown) {
+  if (typeof reason !== 'string' || reason.trim().length === 0) {
+    return 'Unknown failure';
+  }
+
+  return reason.trim().replace(/\s+/g, ' ').slice(0, 180);
+}
+
+function extractTenantId(data: unknown): string | null {
+  const record = asRecord(data);
+  const direct = record.tenantId;
+  if (typeof direct === 'string' && direct.trim().length > 0) {
+    return direct.trim();
+  }
+
+  const nestedKeys = ['payload', 'data', 'context', 'meta'];
+  for (const key of nestedKeys) {
+    const nested = asRecord(record[key]);
+    const nestedTenantId = nested.tenantId;
+    if (
+      typeof nestedTenantId === 'string' &&
+      nestedTenantId.trim().length > 0
+    ) {
+      return nestedTenantId.trim();
+    }
+  }
+
+  return null;
+}
+
+function buildFailureDiagnostic(
+  queueName: string,
+  jobName: string,
+  failedReason: string,
+  data: unknown,
+): PlatformFailedJobGroup['diagnostic'] {
+  const haystack = [
+    queueName,
+    jobName,
+    failedReason,
+    JSON.stringify(sanitizeJobData(data)),
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  if (/suspend|inactive|archived tenant|tenant.*not.*active/.test(haystack)) {
+    return {
+      category: 'tenant_state',
+      retryable: false,
+      recommendedAction:
+        'Confirm tenant status before retrying; inactive or suspended tenant jobs should stay blocked.',
+    };
+  }
+
+  if (/feature|entitlement|module.*locked|plan.*locked/.test(haystack)) {
+    return {
+      category: 'entitlement',
+      retryable: false,
+      recommendedAction:
+        'Confirm feature entitlement before retrying; disabled feature jobs must fail closed.',
+    };
+  }
+
+  if (/storage|file|s3|r2|minio|object/.test(haystack)) {
+    return {
+      category: 'storage',
+      retryable: true,
+      recommendedAction:
+        'Check storage readiness and object key availability before retrying this group.',
+    };
+  }
+
+  if (/provider|webhook|sms|email|fcm|push|payment|gateway/.test(haystack)) {
+    return {
+      category: 'provider',
+      retryable: true,
+      recommendedAction:
+        'Check provider readiness, mode, and recent outage status before retrying this group.',
+    };
+  }
+
+  if (/validation|bad request|invalid|required|missing/.test(haystack)) {
+    return {
+      category: 'data_validation',
+      retryable: false,
+      recommendedAction:
+        'Fix the invalid payload or source record before retrying this group.',
+    };
+  }
+
+  if (
+    /timeout|temporar|rate limit|econn|connection|redis|network/.test(haystack)
+  ) {
+    return {
+      category: 'transient',
+      retryable: true,
+      recommendedAction:
+        'Confirm dependency recovery and retry in small batches to avoid duplicate work.',
+    };
+  }
+
+  return {
+    category: 'unknown',
+    retryable: false,
+    recommendedAction:
+      'Inspect a sample job detail and retry only after tenant, feature, and provider state are verified.',
+  };
 }
 
 function sanitizeJobData(value: unknown, depth = 0, strict = false): unknown {

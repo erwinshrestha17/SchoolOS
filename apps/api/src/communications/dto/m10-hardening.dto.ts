@@ -1,5 +1,6 @@
 import {
   IsDateString,
+  IsEnum,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -77,6 +78,20 @@ export class RetryDeliveryDto {
 }
 
 export class ProviderDeliveryStatusDto {
+  @IsOptional()
+  @IsEnum(['SMS', 'EMAIL', 'FCM'])
+  providerType?: 'SMS' | 'EMAIL' | 'FCM';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  providerName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  signature?: string;
+
   @IsOptional()
   @IsString()
   deliveryId?: string;

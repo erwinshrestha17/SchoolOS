@@ -296,7 +296,7 @@ describe('M1AdmissionsHardeningService', () => {
       where: {
         tenantId: actor.tenantId,
         studentId: 'student-1',
-        kind: 'ID_CARD',
+        kind: 'id-card',
       },
       orderBy: [{ generatedAt: 'desc' }],
     });

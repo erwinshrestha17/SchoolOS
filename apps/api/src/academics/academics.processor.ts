@@ -63,6 +63,8 @@ export class AcademicsProcessor extends WorkerHost {
       `Starting batch report-card generation for tenant ${input.tenantId}: studentsCount=${input.studentIds.length}...`,
     );
 
+    const failures: Array<{ studentId: string; message: string }> = [];
+
     for (const studentId of input.studentIds) {
       try {
         await this.reportCardsService.generateReportCard(
@@ -76,6 +78,17 @@ export class AcademicsProcessor extends WorkerHost {
           input.actor,
         );
       } catch (err) {
+        if (isAlreadyGeneratedLockedReportCardError(err)) {
+          this.logger.warn(
+            `Skipping already generated locked report card for student ${studentId} during batch retry.`,
+          );
+          continue;
+        }
+
+        failures.push({
+          studentId,
+          message: err instanceof Error ? err.message : 'Unknown error',
+        });
         this.logger.error(
           `Failed to generate report card for student ${studentId} in background job:`,
           err,
@@ -83,8 +96,25 @@ export class AcademicsProcessor extends WorkerHost {
       }
     }
 
+    if (failures.length > 0) {
+      throw new Error(
+        `Report-card batch generation failed for ${failures.length} of ${input.studentIds.length} students: ${failures
+          .map((failure) => `${failure.studentId} (${failure.message})`)
+          .join(', ')}`,
+      );
+    }
+
     this.logger.log(
       `Completed batch report-card generation background job for tenant ${input.tenantId}.`,
     );
   }
+}
+
+function isAlreadyGeneratedLockedReportCardError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes(
+      'Locked report cards cannot be regenerated without a correction workflow',
+    )
+  );
 }

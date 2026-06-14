@@ -632,11 +632,24 @@ export class M2AttendanceHardeningService {
           .replace('{studentName}', item.fullNameEn)
           .replace('{count}', String(item.absences))
           .replace('{threshold}', String(item.threshold));
+        const sourceType = 'attendance_repeated_absence_follow_up';
+        const sourceId = `${dateKey(new Date())}:${item.studentId}:${item.absences}:${item.consecutiveAbsences}`;
+        const alreadySent = await this.prisma.notificationDelivery.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            sourceType,
+            sourceId,
+          },
+        });
+        if (alreadySent) {
+          continue;
+        }
+
         const delivery = await this.communicationsService.recordDeliveryRecords(
           {
             actor,
-            sourceType: 'attendance_repeated_absence_follow_up',
-            sourceId: `${dateKey(new Date())}:${item.studentId}:${item.absences}:${item.consecutiveAbsences}`,
+            sourceType,
+            sourceId,
             audienceType: AudienceType.ALL,
             studentIds: [item.studentId],
             title: 'Attendance follow-up needed',

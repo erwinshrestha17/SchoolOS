@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Param,
+  Post,
   Put,
   Body,
   Query,
@@ -23,7 +25,10 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { AccountingReportsService } from './accounting-reports.service';
-import { AccountingReportExportsService } from './accounting-report-exports.service';
+import {
+  AccountingQueuedReportFormat,
+  AccountingReportExportsService,
+} from './accounting-report-exports.service';
 import { AuditService } from '../audit/audit.service';
 import { TrialBalanceQueryDto } from './dto/trial-balance-query.dto';
 import { GeneralLedgerQueryDto } from './dto/general-ledger-query.dto';
@@ -194,6 +199,22 @@ export class AccountingReportsController {
     this.sendPdfResponse(res, pdf, 'general-ledger');
   }
 
+  @Post('general-ledger/export/queue')
+  @ApiOperation({ summary: 'Queue a large general ledger export' })
+  @Permissions('accounting:exports:create', 'accounting:reports:general-ledger')
+  async queueGeneralLedgerExport(
+    @CurrentAuth() auth: AuthContext,
+    @Body() query: GeneralLedgerQueryDto,
+    @Query('format') format = 'csv',
+  ) {
+    return this.exportsService.queueLargeReportExport({
+      reportKey: 'accounting.general-ledger',
+      format: this.parseQueuedExportFormat(format),
+      filters: query as unknown as Record<string, unknown>,
+      actor: auth,
+    });
+  }
+
   @Get('cash-book/export')
   @ApiOperation({ summary: 'Export cash book to CSV' })
   @Permissions('accounting:exports:create', 'accounting:reports:cash-book')
@@ -224,6 +245,22 @@ export class AccountingReportsController {
       auth,
     );
     this.sendPdfResponse(res, pdf, 'cash-book');
+  }
+
+  @Post('cash-book/export/queue')
+  @ApiOperation({ summary: 'Queue a large cash book export' })
+  @Permissions('accounting:exports:create', 'accounting:reports:cash-book')
+  async queueCashBookExport(
+    @CurrentAuth() auth: AuthContext,
+    @Body() query: CashBookQueryDto,
+    @Query('format') format = 'csv',
+  ) {
+    return this.exportsService.queueLargeReportExport({
+      reportKey: 'accounting.cash-book',
+      format: this.parseQueuedExportFormat(format),
+      filters: query as unknown as Record<string, unknown>,
+      actor: auth,
+    });
   }
 
   @Get('income-statement/export')
@@ -366,6 +403,13 @@ export class AccountingReportsController {
       `attachment; filename="${fileNamePrefix}-${date}.pdf"`,
     );
     res.send(pdf);
+  }
+
+  private parseQueuedExportFormat(format: string): AccountingQueuedReportFormat {
+    if (format === 'csv' || format === 'pdf') {
+      return format;
+    }
+    throw new BadRequestException('Queued accounting exports support csv or pdf');
   }
 
   @Get('bank-reconciliation/:accountId/export')

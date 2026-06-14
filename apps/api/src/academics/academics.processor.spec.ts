@@ -96,7 +96,7 @@ describe('AcademicsProcessor', () => {
     expect(reportCardsService.generateReportCard).not.toHaveBeenCalled();
   });
 
-  it('logs error but continues loop if one student generation fails', async () => {
+  it('continues loop but fails the job if any student generation fails', async () => {
     reportCardsService.generateReportCard
       .mockRejectedValueOnce(new Error('Generation failed'))
       .mockResolvedValue({ id: 'rc-2' });
@@ -109,6 +109,40 @@ describe('AcademicsProcessor', () => {
       actor,
     };
 
+    await expect(
+      processor.process({
+        name: 'batchGenerateReportCards',
+        data: jobData,
+      } as any),
+    ).rejects.toThrow(
+      'Report-card batch generation failed for 1 of 2 students',
+    );
+
+    expect(reportCardsService.generateReportCard).toHaveBeenCalledTimes(2);
+    expect(reportCardsService.generateReportCard).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ studentId: 'student-success' }),
+      actor,
+    );
+  });
+
+  it('skips already generated locked report cards during batch retry without duplicating files', async () => {
+    reportCardsService.generateReportCard
+      .mockRejectedValueOnce(
+        new Error(
+          'Locked report cards cannot be regenerated without a correction workflow',
+        ),
+      )
+      .mockResolvedValue({ id: 'rc-2' });
+
+    const jobData = {
+      tenantId: 'tenant-1',
+      academicYearId: 'year-1',
+      examTermId: 'term-1',
+      studentIds: ['student-already-generated', 'student-new'],
+      actor,
+    };
+
     await processor.process({
       name: 'batchGenerateReportCards',
       data: jobData,
@@ -117,7 +151,7 @@ describe('AcademicsProcessor', () => {
     expect(reportCardsService.generateReportCard).toHaveBeenCalledTimes(2);
     expect(reportCardsService.generateReportCard).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ studentId: 'student-success' }),
+      expect.objectContaining({ studentId: 'student-new' }),
       actor,
     );
   });

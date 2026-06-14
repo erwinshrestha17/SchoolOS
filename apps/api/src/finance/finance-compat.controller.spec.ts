@@ -24,6 +24,7 @@ function createController() {
     finalizeCashierClose: jest.fn(),
     collectPayment: jest.fn(),
     refundPayment: jest.fn(),
+    reversePayment: jest.fn(),
     reprintReceipt: jest.fn(),
   };
   const financeCompatService = {
@@ -81,19 +82,20 @@ describe('FinanceCompatController', () => {
     expect(result).toEqual({ id: 'payment-1' });
   });
 
-  it('maps payment reverse endpoint to refund/reversal workflow', () => {
+  it('maps payment reverse endpoint to reversal workflow', () => {
     const { controller, financeService } = createController();
-    const dto = { amount: 1000, reason: 'Duplicate payment' };
-    financeService.refundPayment.mockReturnValue({ id: 'refund-1' });
+    const dto = { reason: 'Duplicate payment' };
+    financeService.reversePayment.mockReturnValue({ id: 'reversal-1' });
 
     const result = controller.reversePayment('payment-1', dto as never, actor);
 
-    expect(financeService.refundPayment).toHaveBeenCalledWith(
+    expect(financeService.reversePayment).toHaveBeenCalledWith(
       'payment-1',
       dto,
       actor,
     );
-    expect(result).toEqual({ id: 'refund-1' });
+    expect(financeService.refundPayment).not.toHaveBeenCalled();
+    expect(result).toEqual({ id: 'reversal-1' });
   });
 
   it('maps payment correct endpoint to controlled correction workflow', () => {

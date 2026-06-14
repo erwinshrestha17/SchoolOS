@@ -242,6 +242,106 @@ describe('CommunicationsService', () => {
     expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
   });
 
+  it('previews emergency notice recipients without exposing raw destinations and audits high-impact preview', async () => {
+    prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        userId: null,
+        user: null,
+        guardianLinks: [
+          {
+            isPrimary: true,
+            guardian: {
+              id: 'guardian-1',
+              userId: 'guardian-user-1',
+              email: 'guardian@school.test',
+              primaryPhone: '+9779800000000',
+              receivesAlerts: true,
+              user: { email: 'guardian-user@school.test' },
+            },
+          },
+        ],
+      },
+      {
+        id: 'student-2',
+        userId: null,
+        user: null,
+        guardianLinks: [
+          {
+            isPrimary: true,
+            guardian: {
+              id: 'guardian-2',
+              userId: 'guardian-user-2',
+              email: 'second@school.test',
+              primaryPhone: '+9779800000001',
+              receivesAlerts: true,
+              user: { email: 'second-user@school.test' },
+            },
+          },
+        ],
+      },
+    ]);
+    prisma.guardianConsent.findMany.mockResolvedValue([
+      {
+        id: 'consent-1',
+        guardianId: 'guardian-1',
+        consentType: ConsentType.MESSAGING,
+        granted: true,
+        revokedAt: null,
+        capturedAt: new Date('2026-04-01T00:00:00.000Z'),
+      },
+      {
+        id: 'consent-2',
+        guardianId: 'guardian-2',
+        consentType: ConsentType.MESSAGING,
+        granted: false,
+        revokedAt: null,
+        capturedAt: new Date('2026-04-01T00:00:00.000Z'),
+      },
+    ]);
+
+    const preview = await service.previewNoticeRecipients(
+      {
+        title: 'Emergency closure',
+        body: 'School is closed today.',
+        priority: NoticePriority.EMERGENCY,
+        audienceType: AudienceType.CLASS,
+        classId: 'class-1',
+      },
+      actor,
+    );
+
+    expect(preview).toEqual(
+      expect.objectContaining({
+        priority: NoticePriority.EMERGENCY,
+        channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+        recipientCount: 2,
+        allowedRecipientCount: 1,
+        skippedRecipientCount: 1,
+        estimatedDeliveryRows: 2,
+        sampleRecipients: [
+          {
+            studentId: 'student-1',
+            guardianId: 'guardian-1',
+            recipientUserId: 'guardian-user-1',
+          },
+        ],
+      }),
+    );
+    expect(JSON.stringify(preview)).not.toContain('guardian@school.test');
+    expect(JSON.stringify(preview)).not.toContain('+9779800000000');
+    expect(prisma.notificationDelivery.create).not.toHaveBeenCalled();
+    expect(notificationsService.sendSms).not.toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'preview_recipients',
+        resource: 'notice',
+        tenantId: 'tenant-1',
+      }),
+    );
+  });
+
   it('limits activity notification delivery resolution to active students only', async () => {
     prisma.notificationDelivery.findMany.mockResolvedValue([]);
     prisma.student.findMany.mockResolvedValue([

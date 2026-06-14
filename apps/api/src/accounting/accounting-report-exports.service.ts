@@ -1,4 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { createHash } from 'crypto';
 import { AccountingReportsService } from './accounting-reports.service';
 import { convertToCsv, formatCsvDecimal } from '../common/csv-utils';
 import { buildTableReportPdf } from '../common/pdf/simple-pdf';
@@ -14,6 +17,20 @@ import { IncomeStatementQueryDto } from './dto/income-statement-query.dto';
 import { BalanceSheetQueryDto } from './dto/balance-sheet-query.dto';
 import { TaxSummaryQueryDto } from './dto/tax-summary-query.dto';
 
+export type AccountingQueuedReportKey =
+  | 'accounting.general-ledger'
+  | 'accounting.cash-book';
+
+export type AccountingQueuedReportFormat = 'csv' | 'pdf';
+
+export interface AccountingQueuedReportJob {
+  exportId: string;
+  reportKey: AccountingQueuedReportKey;
+  format: AccountingQueuedReportFormat;
+  filters: Record<string, unknown>;
+  actor: AuthContext;
+}
+
 @Injectable()
 export class AccountingReportExportsService {
   constructor(
@@ -21,6 +38,8 @@ export class AccountingReportExportsService {
     private readonly prisma: PrismaService,
     private readonly fileRegistryService: FileRegistryService,
     private readonly auditService: AuditService,
+    @InjectQueue('accounting-reports')
+    private readonly accountingReportsQueue: Queue,
   ) {}
 
   async exportTrialBalanceCsv(
@@ -115,6 +134,7 @@ export class AccountingReportExportsService {
   async exportGeneralLedgerCsv(
     tenantId: string,
     query: GeneralLedgerQueryDto,
+    options: { mode?: 'sync' | 'background' } = {},
   ): Promise<string> {
     const data = await this.reportsService.getGeneralLedger(tenantId, {
       fiscalYearId: query.fiscalYearId,
@@ -123,9 +143,18 @@ export class AccountingReportExportsService {
       toDate: query.toDate,
       accountId: query.accountId,
       accountCode: query.accountCode,
-      page: query.page,
-      limit: 10000,
+      sourceModule: query.sourceModule,
+      sourceType: query.sourceType,
+      sourceId: query.sourceId,
+      page: options.mode === 'background' ? 1 : query.page,
+      sort: query.sort,
+      limit: this.rowLimitForMode(options.mode),
     });
+    this.ensureWithinExportLimit(
+      'General Ledger',
+      data.pagination.total,
+      options.mode,
+    );
 
     const rows: Array<Record<string, unknown>> = data.rows.map((row) => ({
       Date: row.entryDate,
@@ -163,6 +192,7 @@ export class AccountingReportExportsService {
     tenantId: string,
     query: GeneralLedgerQueryDto,
     actor: AuthContext,
+    options: { mode?: 'sync' | 'background' } = {},
   ) {
     const data = await this.reportsService.getGeneralLedger(tenantId, {
       fiscalYearId: query.fiscalYearId,
@@ -174,10 +204,15 @@ export class AccountingReportExportsService {
       sourceModule: query.sourceModule,
       sourceType: query.sourceType,
       sourceId: query.sourceId,
-      page: query.page,
+      page: options.mode === 'background' ? 1 : query.page,
       sort: query.sort,
-      limit: 10000,
+      limit: this.rowLimitForMode(options.mode),
     });
+    this.ensureWithinExportLimit(
+      'General Ledger',
+      data.pagination.total,
+      options.mode,
+    );
     const rows: Array<Record<string, unknown>> = [
       {
         Date: 'OPENING',
@@ -219,6 +254,7 @@ export class AccountingReportExportsService {
   async exportCashBookCsv(
     tenantId: string,
     query: CashBookQueryDto,
+    options: { mode?: 'sync' | 'background' } = {},
   ): Promise<string> {
     const data = await this.reportsService.getCashBook(tenantId, {
       fiscalYearId: query.fiscalYearId,
@@ -226,9 +262,16 @@ export class AccountingReportExportsService {
       fromDate: query.fromDate,
       toDate: query.toDate,
       accountId: query.accountId,
-      page: query.page,
-      limit: 10000,
+      accountCode: query.accountCode,
+      accountKind: query.accountKind,
+      page: options.mode === 'background' ? 1 : query.page,
+      limit: this.rowLimitForMode(options.mode),
     });
+    this.ensureWithinExportLimit(
+      'Cash Book',
+      data.pagination.total,
+      options.mode,
+    );
 
     const rows: Array<Record<string, unknown>> = data.rows.map((row) => ({
       Date: row.entryDate,
@@ -264,6 +307,7 @@ export class AccountingReportExportsService {
     tenantId: string,
     query: CashBookQueryDto,
     actor: AuthContext,
+    options: { mode?: 'sync' | 'background' } = {},
   ) {
     const data = await this.reportsService.getCashBook(tenantId, {
       fiscalYearId: query.fiscalYearId,
@@ -273,9 +317,14 @@ export class AccountingReportExportsService {
       accountId: query.accountId,
       accountCode: query.accountCode,
       accountKind: query.accountKind,
-      page: query.page,
-      limit: 10000,
+      page: options.mode === 'background' ? 1 : query.page,
+      limit: this.rowLimitForMode(options.mode),
     });
+    this.ensureWithinExportLimit(
+      'Cash Book',
+      data.pagination.total,
+      options.mode,
+    );
     const rows: Array<Record<string, unknown>> = data.rows.map((row) => ({
       Date: row.entryDate,
       Journal: row.entryNumber ?? '',
@@ -744,6 +793,255 @@ export class AccountingReportExportsService {
     });
   }
 
+  async queueLargeReportExport(input: {
+    reportKey: AccountingQueuedReportKey;
+    format: AccountingQueuedReportFormat;
+    filters: Record<string, unknown>;
+    actor: AuthContext;
+  }) {
+    const totalRows = await this.getQueuedReportRowCount(input);
+    if (totalRows <= ACCOUNTING_SYNC_EXPORT_ROW_LIMIT) {
+      throw new BadRequestException(
+        `${this.reportDisplayName(input.reportKey)} export has ${totalRows} rows and can be generated synchronously.`,
+      );
+    }
+    if (totalRows > ACCOUNTING_BACKGROUND_EXPORT_ROW_LIMIT) {
+      throw new BadRequestException(
+        `${this.reportDisplayName(input.reportKey)} export has ${totalRows} rows, which exceeds the background export limit of ${ACCOUNTING_BACKGROUND_EXPORT_ROW_LIMIT}. Narrow the filters before exporting.`,
+      );
+    }
+
+    const filters = input.filters as Prisma.InputJsonValue;
+    const existingExport = await this.prisma.reportExport.findFirst({
+      where: {
+        tenantId: input.actor.tenantId,
+        reportKey: input.reportKey,
+        format: input.format,
+        requestedBy: input.actor.userId,
+        filters: { equals: filters },
+        status: {
+          in: [
+            'QUEUED',
+            'RUNNING',
+            'COMPLETED',
+          ],
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        fileAssetId: true,
+      },
+    });
+
+    if (
+      existingExport &&
+      (existingExport.status !== 'COMPLETED' ||
+        existingExport.fileAssetId)
+    ) {
+      await this.auditService.record({
+        action: 'reuse_accounting_report_export_request',
+        resource: 'accounting_report',
+        resourceId: input.reportKey,
+        tenantId: input.actor.tenantId,
+        userId: input.actor.userId,
+        after: {
+          format: input.format,
+          filters: input.filters,
+          reportExportId: existingExport.id,
+          status: existingExport.status,
+          fileAssetId: existingExport.fileAssetId ?? null,
+          totalRows,
+        },
+      });
+
+      return {
+        exportId: existingExport.id,
+        status: existingExport.status,
+        fileAssetId: existingExport.fileAssetId ?? null,
+        totalRows,
+        syncThreshold: ACCOUNTING_SYNC_EXPORT_ROW_LIMIT,
+        backgroundThreshold: ACCOUNTING_BACKGROUND_EXPORT_ROW_LIMIT,
+        reused: true,
+      };
+    }
+
+    const exportRecord = await this.prisma.reportExport.create({
+      data: {
+        tenantId: input.actor.tenantId,
+        reportKey: input.reportKey,
+        format: input.format,
+        filters,
+        status: 'QUEUED',
+        requestedBy: input.actor.userId,
+      },
+    });
+    const jobId = this.queuedReportJobId(input);
+    const job = await this.accountingReportsQueue.add(
+      'generateAccountingReport',
+      {
+        exportId: exportRecord.id,
+        reportKey: input.reportKey,
+        format: input.format,
+        filters: input.filters,
+        actor: input.actor,
+      } satisfies AccountingQueuedReportJob,
+      { jobId },
+    );
+
+    await this.auditService.record({
+      action: 'queue_accounting_report_export',
+      resource: 'accounting_report',
+      resourceId: input.reportKey,
+      tenantId: input.actor.tenantId,
+      userId: input.actor.userId,
+      after: {
+        format: input.format,
+        filters: input.filters,
+        reportExportId: exportRecord.id,
+        jobId: job.id,
+        totalRows,
+        syncThreshold: ACCOUNTING_SYNC_EXPORT_ROW_LIMIT,
+        backgroundThreshold: ACCOUNTING_BACKGROUND_EXPORT_ROW_LIMIT,
+      },
+    });
+
+    return {
+      exportId: exportRecord.id,
+      jobId: job.id,
+      status: 'QUEUED',
+      totalRows,
+      syncThreshold: ACCOUNTING_SYNC_EXPORT_ROW_LIMIT,
+      backgroundThreshold: ACCOUNTING_BACKGROUND_EXPORT_ROW_LIMIT,
+      reused: false,
+    };
+  }
+
+  async completeQueuedReportExport(input: AccountingQueuedReportJob) {
+    const exportRecord = await this.prisma.reportExport.findFirst({
+      where: {
+        id: input.exportId,
+        tenantId: input.actor.tenantId,
+        reportKey: input.reportKey,
+      },
+      select: {
+        id: true,
+        status: true,
+        fileAssetId: true,
+      },
+    });
+
+    if (!exportRecord) {
+      throw new BadRequestException('Accounting report export not found');
+    }
+
+    if (
+      exportRecord.status === 'COMPLETED' &&
+      exportRecord.fileAssetId
+    ) {
+      await this.auditService.record({
+        action: 'reuse_accounting_report_export',
+        resource: 'accounting_report',
+        resourceId: input.reportKey,
+        tenantId: input.actor.tenantId,
+        userId: input.actor.userId,
+        after: {
+          format: input.format,
+          filters: input.filters,
+          reportExportId: input.exportId,
+          fileAssetId: exportRecord.fileAssetId,
+          async: true,
+        },
+      });
+      return;
+    }
+
+    const filters = input.filters as Prisma.InputJsonValue;
+    const existingCompleted = await this.prisma.reportExport.findFirst({
+      where: {
+        tenantId: input.actor.tenantId,
+        reportKey: input.reportKey,
+        format: input.format,
+        requestedBy: input.actor.userId,
+        filters: { equals: filters },
+        status: 'COMPLETED',
+        fileAssetId: { not: null },
+        id: { not: input.exportId },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, fileAssetId: true },
+    });
+
+    if (existingCompleted?.fileAssetId) {
+      await this.prisma.reportExport.update({
+        where: { id: input.exportId },
+        data: {
+          status: 'COMPLETED',
+          completedAt: new Date(),
+          errorSummary: null,
+          fileAssetId: existingCompleted.fileAssetId,
+        },
+      });
+      await this.auditService.record({
+        action: 'reuse_accounting_report_export',
+        resource: 'accounting_report',
+        resourceId: input.reportKey,
+        tenantId: input.actor.tenantId,
+        userId: input.actor.userId,
+        after: {
+          format: input.format,
+          filters: input.filters,
+          reportExportId: input.exportId,
+          reusedReportExportId: existingCompleted.id,
+          fileAssetId: existingCompleted.fileAssetId,
+          async: true,
+        },
+      });
+      return;
+    }
+
+    const artifact = await this.buildQueuedReportArtifact(input);
+    const asset = await this.fileRegistryService.registerGeneratedFile({
+      tenantId: input.actor.tenantId,
+      generatedByUserId: input.actor.userId,
+      originalFilename: artifact.fileName,
+      content: artifact.content,
+      mimeType: artifact.contentType,
+      module: 'accounting',
+      metadata: {
+        reportKey: input.reportKey,
+        format: input.format,
+        filters,
+        async: true,
+      },
+    });
+
+    await this.prisma.reportExport.update({
+      where: { id: input.exportId },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        errorSummary: null,
+        fileAssetId: asset.id,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'export_accounting_report',
+      resource: 'accounting_report',
+      resourceId: input.reportKey,
+      tenantId: input.actor.tenantId,
+      userId: input.actor.userId,
+      after: {
+        format: input.format,
+        filters: input.filters,
+        fileAssetId: asset.id,
+        async: true,
+      },
+    });
+  }
+
   private async buildAndSnapshotPdf(input: {
     tenantId: string;
     actor: AuthContext;
@@ -768,6 +1066,37 @@ export class AccountingReportExportsService {
       rows: input.rows,
       summaryCards: input.summaryCards,
     });
+    const existingExport = await this.prisma.reportExport.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        reportKey: input.reportKey,
+        format: 'pdf',
+        status: 'COMPLETED',
+        requestedBy: input.actor.userId,
+        filters: { equals: input.filters },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, fileAssetId: true },
+    });
+
+    if (existingExport?.fileAssetId) {
+      await this.auditService.record({
+        action: 'reuse_accounting_report_export',
+        resource: 'accounting_report',
+        resourceId: input.reportKey,
+        tenantId: input.tenantId,
+        userId: input.actor.userId,
+        after: {
+          format: 'pdf',
+          filters: input.filters,
+          reportExportId: existingExport.id,
+          fileAssetId: existingExport.fileAssetId,
+        },
+      });
+
+      return content;
+    }
+
     const fileName = `${input.reportKey.replace(/\./g, '-')}-${new Date()
       .toISOString()
       .slice(0, 10)}.pdf`;
@@ -830,4 +1159,279 @@ export class AccountingReportExportsService {
       .filter(Boolean)
       .join(' | ');
   }
+
+  private async buildQueuedReportArtifact(input: AccountingQueuedReportJob) {
+    if (input.reportKey === 'accounting.general-ledger') {
+      const query = input.filters as unknown as GeneralLedgerQueryDto;
+      if (input.format === 'csv') {
+        return {
+          content: Buffer.from(
+            await this.exportGeneralLedgerCsv(input.actor.tenantId, query, {
+              mode: 'background',
+            }),
+            'utf8',
+          ),
+          contentType: 'text/csv',
+          fileName: this.queuedFileName(input.reportKey, 'csv'),
+        };
+      }
+      return {
+        content: await this.buildGeneralLedgerPdfContent(
+          input.actor.tenantId,
+          query,
+          input.actor,
+          'background',
+        ),
+        contentType: 'application/pdf',
+        fileName: this.queuedFileName(input.reportKey, 'pdf'),
+      };
+    }
+
+    const query = input.filters as unknown as CashBookQueryDto;
+    if (input.format === 'csv') {
+      return {
+        content: Buffer.from(
+          await this.exportCashBookCsv(input.actor.tenantId, query, {
+            mode: 'background',
+          }),
+          'utf8',
+        ),
+        contentType: 'text/csv',
+        fileName: this.queuedFileName(input.reportKey, 'csv'),
+      };
+    }
+    return {
+      content: await this.buildCashBookPdfContent(
+        input.actor.tenantId,
+        query,
+        input.actor,
+        'background',
+      ),
+      contentType: 'application/pdf',
+      fileName: this.queuedFileName(input.reportKey, 'pdf'),
+    };
+  }
+
+  private async buildGeneralLedgerPdfContent(
+    tenantId: string,
+    query: GeneralLedgerQueryDto,
+    actor: AuthContext,
+    mode: 'sync' | 'background',
+  ) {
+    const data = await this.reportsService.getGeneralLedger(tenantId, {
+      fiscalYearId: query.fiscalYearId,
+      fiscalPeriodId: query.fiscalPeriodId,
+      fromDate: query.fromDate,
+      toDate: query.toDate,
+      accountId: query.accountId,
+      accountCode: query.accountCode,
+      sourceModule: query.sourceModule,
+      sourceType: query.sourceType,
+      sourceId: query.sourceId,
+      page: mode === 'background' ? 1 : query.page,
+      sort: query.sort,
+      limit: this.rowLimitForMode(mode),
+    });
+    this.ensureWithinExportLimit('General Ledger', data.pagination.total, mode);
+    const rows: Array<Record<string, unknown>> = [
+      {
+        Date: 'OPENING',
+        Journal: '',
+        Description: `${formatCsvDecimal(data.openingBalance)} ${data.openingBalanceSide}`,
+        Debit: '',
+        Credit: '',
+        Balance: '',
+      },
+      ...data.rows.map((row) => ({
+        Date: row.entryDate,
+        Journal: row.entryNumber ?? '',
+        Description: row.description ?? '',
+        Debit: formatCsvDecimal(row.debit),
+        Credit: formatCsvDecimal(row.credit),
+        Balance: `${formatCsvDecimal(row.runningBalance)} ${row.runningBalanceSide}`,
+      })),
+      {
+        Date: 'CLOSING',
+        Journal: '',
+        Description: data.accountCode ?? data.accountId ?? '',
+        Debit: formatCsvDecimal(data.totals.debit),
+        Credit: formatCsvDecimal(data.totals.credit),
+        Balance: `${formatCsvDecimal(data.closingBalance)} ${data.closingBalanceSide}`,
+      },
+    ];
+
+    return this.buildPdfContent({
+      tenantId,
+      actor,
+      title: 'General Ledger',
+      subtitle: this.periodSubtitle(query),
+      rows,
+    });
+  }
+
+  private async buildCashBookPdfContent(
+    tenantId: string,
+    query: CashBookQueryDto,
+    actor: AuthContext,
+    mode: 'sync' | 'background',
+  ) {
+    const data = await this.reportsService.getCashBook(tenantId, {
+      fiscalYearId: query.fiscalYearId,
+      fiscalPeriodId: query.fiscalPeriodId,
+      fromDate: query.fromDate,
+      toDate: query.toDate,
+      accountId: query.accountId,
+      accountCode: query.accountCode,
+      accountKind: query.accountKind,
+      page: mode === 'background' ? 1 : query.page,
+      limit: this.rowLimitForMode(mode),
+    });
+    this.ensureWithinExportLimit('Cash Book', data.pagination.total, mode);
+    const rows: Array<Record<string, unknown>> = data.rows.map((row) => ({
+      Date: row.entryDate,
+      Journal: row.entryNumber ?? '',
+      Description: row.narration ?? '',
+      Receipt: formatCsvDecimal(row.receiptAmount),
+      Payment: formatCsvDecimal(row.paymentAmount),
+      Balance: `${formatCsvDecimal(row.runningBalance)} ${row.runningBalanceSide}`,
+    }));
+    rows.push({
+      Date: 'TOTAL',
+      Journal: '',
+      Description: data.account
+        ? `${data.account.code} - ${data.account.name}`
+        : '',
+      Receipt: formatCsvDecimal(data.totalReceipts),
+      Payment: formatCsvDecimal(data.totalPayments),
+      Balance: `${formatCsvDecimal(data.closingBalance)} ${data.closingBalanceSide}`,
+    });
+
+    return this.buildPdfContent({
+      tenantId,
+      actor,
+      title: 'Cash Book',
+      subtitle: this.periodSubtitle(query),
+      rows,
+    });
+  }
+
+  private async buildPdfContent(input: {
+    tenantId: string;
+    actor: AuthContext;
+    title: string;
+    subtitle: string;
+    rows: Array<Record<string, unknown>>;
+    summaryCards?: Array<{
+      label: string;
+      value: string | number;
+      note?: string | null;
+    }>;
+  }) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: input.tenantId },
+    });
+    return buildTableReportPdf({
+      schoolName: tenant?.name ?? input.actor.tenantSlug,
+      title: input.title,
+      subtitle: input.subtitle,
+      rows: input.rows,
+      summaryCards: input.summaryCards,
+    });
+  }
+
+  private async getQueuedReportRowCount(input: {
+    reportKey: AccountingQueuedReportKey;
+    filters: Record<string, unknown>;
+    actor: AuthContext;
+  }) {
+    if (input.reportKey === 'accounting.general-ledger') {
+      const data = await this.reportsService.getGeneralLedger(
+        input.actor.tenantId,
+        {
+          ...(input.filters as unknown as GeneralLedgerQueryDto),
+          page: 1,
+          limit: 1,
+        },
+      );
+      return data.pagination.total;
+    }
+
+    const data = await this.reportsService.getCashBook(input.actor.tenantId, {
+      ...(input.filters as unknown as CashBookQueryDto),
+      page: 1,
+      limit: 1,
+    });
+    return data.pagination.total;
+  }
+
+  private rowLimitForMode(mode: 'sync' | 'background' = 'sync') {
+    return mode === 'background'
+      ? ACCOUNTING_BACKGROUND_EXPORT_ROW_LIMIT
+      : ACCOUNTING_SYNC_EXPORT_ROW_LIMIT;
+  }
+
+  private ensureWithinExportLimit(
+    reportName: string,
+    totalRows: number,
+    mode: 'sync' | 'background' = 'sync',
+  ) {
+    const limit = this.rowLimitForMode(mode);
+    if (totalRows <= limit) {
+      return;
+    }
+
+    throw new BadRequestException(
+      `${reportName} export has ${totalRows} rows, which exceeds the ${mode === 'sync' ? 'synchronous' : mode} export limit of ${limit}. Narrow the filters before exporting.`,
+    );
+  }
+
+  private queuedReportJobId(input: {
+    reportKey: AccountingQueuedReportKey;
+    format: AccountingQueuedReportFormat;
+    filters: Record<string, unknown>;
+    actor: AuthContext;
+  }) {
+    return createHash('sha256')
+      .update(
+        [
+          input.actor.tenantId,
+          input.actor.userId,
+          input.reportKey,
+          input.format,
+          stableStringify(input.filters),
+        ].join(':'),
+      )
+      .digest('hex');
+  }
+
+  private reportDisplayName(reportKey: AccountingQueuedReportKey) {
+    return reportKey === 'accounting.general-ledger'
+      ? 'General Ledger'
+      : 'Cash Book';
+  }
+
+  private queuedFileName(
+    reportKey: AccountingQueuedReportKey,
+    format: AccountingQueuedReportFormat,
+  ) {
+    return `${reportKey.replace(/\./g, '-')}-${new Date()
+      .toISOString()
+      .slice(0, 10)}.${format}`;
+  }
+}
+
+const ACCOUNTING_SYNC_EXPORT_ROW_LIMIT = 1000;
+const ACCOUNTING_BACKGROUND_EXPORT_ROW_LIMIT = 50000;
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
 }

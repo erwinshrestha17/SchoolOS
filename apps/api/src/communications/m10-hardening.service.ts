@@ -1,11 +1,15 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { NotificationStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import { decryptSensitiveField } from '../common/security/field-encryption';
+import { ConfigService } from '../config/config.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CommunicationsService } from './communications.service';
 import { DeliveryRetryService } from './delivery-retry.service';
@@ -60,6 +64,7 @@ export class M10HardeningService {
     private readonly communicationsService: CommunicationsService,
     private readonly deliveryRetryService: DeliveryRetryService,
     private readonly auditService: AuditService,
+    private readonly configService: ConfigService,
   ) {}
 
   async listNoticesWithReadStatus(actor: AuthContext) {
@@ -377,6 +382,8 @@ export class M10HardeningService {
     dto: ProviderDeliveryStatusDto,
     actor: AuthContext,
   ) {
+    await this.verifyProviderCallbackSignature(dto, actor);
+
     if (!dto.deliveryId && !dto.providerMessageId) {
       throw new BadRequestException(
         'deliveryId or providerMessageId is required',
@@ -450,11 +457,13 @@ export class M10HardeningService {
             : null,
         failureReason:
           incomingStatus === NotificationStatus.FAILED
-            ? (dto.failureReason ?? null)
+            ? sanitizeProviderFailureReason(dto.failureReason ?? null)
             : null,
         errorMessage:
           incomingStatus === NotificationStatus.FAILED
-            ? (dto.failureReason ?? dto.failureCode ?? 'Provider failed')
+            ? sanitizeProviderFailureReason(
+                dto.failureReason ?? dto.failureCode ?? 'Provider failed',
+              )
             : null,
         sentAt:
           (incomingStatus === NotificationStatus.SENT ||
@@ -495,6 +504,89 @@ export class M10HardeningService {
       providerMessageId: updated.providerMessageId,
       updatedAt: new Date().toISOString(),
     };
+  }
+
+  private async verifyProviderCallbackSignature(
+    dto: ProviderDeliveryStatusDto,
+    actor: AuthContext,
+  ) {
+    const hasProviderCallbackMetadata =
+      Boolean(dto.providerType) ||
+      Boolean(dto.providerName) ||
+      Boolean(dto.signature);
+
+    if (!hasProviderCallbackMetadata) {
+      return;
+    }
+
+    if (!dto.providerType) {
+      throw new BadRequestException(
+        'providerType is required for signed provider callbacks',
+      );
+    }
+    if (!dto.signature) {
+      throw new BadRequestException(
+        'signature is required for provider callbacks',
+      );
+    }
+
+    const provider = await this.prisma.providerConfig.findFirst({
+      where: {
+        type: dto.providerType,
+        enabled: true,
+        ...(dto.providerName ? { name: dto.providerName } : {}),
+      },
+      orderBy: [{ updatedAt: 'desc' }],
+    });
+
+    if (!provider) {
+      throw new BadRequestException(
+        `Provider ${dto.providerType} is disabled or not configured.`,
+      );
+    }
+
+    const config = this.decryptProviderConfig(
+      provider.configEncrypted as Record<string, unknown>,
+      provider.secretKeys,
+    );
+    const signingSecret = getProviderCallbackSecret(config);
+
+    if (!signingSecret) {
+      throw new BadRequestException(
+        'Provider callback signing secret is not configured.',
+      );
+    }
+
+    if (!verifyProviderCallbackSignature(dto, signingSecret)) {
+      await this.auditService.record({
+        action: 'provider_status_rejected',
+        resource: 'notification_delivery',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        after: {
+          providerType: dto.providerType,
+          providerName: dto.providerName ?? provider.name,
+          deliveryId: dto.deliveryId ?? null,
+          providerMessageId: dto.providerMessageId ?? null,
+          reason: 'invalid_signature',
+        },
+      });
+      throw new ForbiddenException('Invalid provider callback signature.');
+    }
+  }
+
+  private decryptProviderConfig(
+    config: Record<string, unknown>,
+    secretKeys: string[],
+  ) {
+    const output: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(config ?? {})) {
+      output[key] =
+        secretKeys.includes(key) && typeof value === 'string'
+          ? decryptSensitiveField(value, this.configService.jwtSecret)
+          : value;
+    }
+    return output;
   }
 
   async resendNoticeFailed(
@@ -792,4 +884,72 @@ function resolveDeliveryStatusTransition(
   }
 
   return { apply: true, reason: null };
+}
+
+function sanitizeProviderFailureReason(reason: string | null | undefined) {
+  if (!reason) return null;
+  return reason
+    .replace(
+      /(secret|token|key|password|authorization|bearer)=[^\s,;]+/gi,
+      '$1=***',
+    )
+    .replace(/Bearer\s+[^\s,;]+/gi, 'Bearer ***')
+    .slice(0, 500);
+}
+
+function getProviderCallbackSecret(config: Record<string, unknown>) {
+  for (const key of [
+    'callbackSecret',
+    'webhookSecret',
+    'signingSecret',
+    'providerWebhookSecret',
+  ]) {
+    const value = config[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function verifyProviderCallbackSignature(
+  dto: ProviderDeliveryStatusDto,
+  signingSecret: string,
+) {
+  const expected = createHmac('sha256', signingSecret)
+    .update(stableStringify(providerCallbackSigningPayload(dto)))
+    .digest('hex');
+  const normalized = dto.signature?.trim().replace(/^sha256=/i, '') ?? '';
+  const expectedBuffer = Buffer.from(expected, 'hex');
+  const actualBuffer = Buffer.from(normalized, 'hex');
+
+  return (
+    actualBuffer.length === expectedBuffer.length &&
+    timingSafeEqual(actualBuffer, expectedBuffer)
+  );
+}
+
+function providerCallbackSigningPayload(dto: ProviderDeliveryStatusDto) {
+  return {
+    deliveryId: dto.deliveryId ?? null,
+    failureCode: dto.failureCode ?? null,
+    failureReason: dto.failureReason ?? null,
+    providerMessageId: dto.providerMessageId ?? null,
+    providerName: dto.providerName ?? null,
+    providerType: dto.providerType ?? null,
+    status: dto.status,
+  };
+}
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
 }

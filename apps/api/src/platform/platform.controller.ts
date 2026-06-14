@@ -456,6 +456,12 @@ export class PlatformController {
     return this.platformQueuesService.listFailedJobs();
   }
 
+  @Get('queues/failed-job-groups')
+  @Permissions('platform:queues:read')
+  async listFailedJobGroups() {
+    return this.platformQueuesService.listFailedJobGroups();
+  }
+
   @Get('queues/:queueName/jobs/:jobId')
   @Permissions('platform:queues:read')
   async getJobDetail(

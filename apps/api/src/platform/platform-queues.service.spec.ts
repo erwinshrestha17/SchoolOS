@@ -185,6 +185,87 @@ describe('PlatformQueuesService', () => {
     );
   });
 
+  it('groups failed jobs by queue, job name, and bounded failure reason with safe diagnostics', async () => {
+    const { service } = buildService({
+      notifications: {
+        getFailed: jest.fn().mockResolvedValue([
+          {
+            id: 'job-1',
+            name: 'send-sms',
+            failedReason: 'SMS provider timeout',
+            attemptsMade: 2,
+            timestamp: 100,
+            data: {
+              tenantId: 'tenant-1',
+              phone: '9800000000',
+              apiKey: 'raw-api-key',
+            },
+          },
+          {
+            id: 'job-2',
+            name: 'send-sms',
+            failedReason: 'SMS   provider   timeout',
+            attemptsMade: 4,
+            timestamp: 200,
+            data: {
+              tenantId: 'tenant-2',
+              token: 'raw-token',
+            },
+          },
+        ]),
+      },
+      reports: {
+        getFailed: jest.fn().mockResolvedValue([
+          {
+            id: 'job-3',
+            name: 'generate-report',
+            failedReason: 'Tenant is suspended',
+            attemptsMade: 1,
+            timestamp: 150,
+            data: {
+              tenantId: 'tenant-3',
+              secret: 'raw-secret',
+            },
+          },
+        ]),
+      },
+    });
+
+    await expect(service.listFailedJobGroups()).resolves.toEqual([
+      expect.objectContaining({
+        queueName: 'notifications',
+        name: 'send-sms',
+        failedReason: 'SMS provider timeout',
+        count: 2,
+        firstFailedAt: 100,
+        latestFailedAt: 200,
+        maxAttemptsMade: 4,
+        sampleJobIds: ['job-1', 'job-2'],
+        affectedTenantIds: ['tenant-1', 'tenant-2'],
+        diagnostic: expect.objectContaining({
+          category: 'provider',
+          retryable: true,
+        }),
+      }),
+      expect.objectContaining({
+        queueName: 'reports',
+        name: 'generate-report',
+        count: 1,
+        affectedTenantIds: ['tenant-3'],
+        diagnostic: expect.objectContaining({
+          category: 'tenant_state',
+          retryable: false,
+        }),
+      }),
+    ]);
+
+    const serialized = JSON.stringify(await service.listFailedJobGroups());
+    expect(serialized).not.toContain('raw-api-key');
+    expect(serialized).not.toContain('raw-token');
+    expect(serialized).not.toContain('raw-secret');
+    expect(serialized).not.toContain('9800000000');
+  });
+
   it('audits failed-job discard with the required reason', async () => {
     const remove = jest.fn().mockResolvedValue(undefined);
     const job = {

@@ -95,6 +95,7 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
       communicationsService,
       deliveryRetryService,
       auditService as unknown as AuditService,
+      { jwtSecret: 'school-os-access-secret' } as any,
     );
   });
 

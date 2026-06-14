@@ -19,7 +19,9 @@ describe('Attendance teacher scope integration', () => {
     const eventEmitter = { emit: jest.fn() };
     const service = new AttendanceService(
       prisma as unknown as PrismaService,
-      { recordDeliveryRecords: jest.fn() } as unknown as CommunicationsService,
+      {
+        recordDeliveryRecords: jest.fn().mockResolvedValue({ count: 0 }),
+      } as unknown as CommunicationsService,
       auditService as unknown as AuditService,
       eventEmitter as unknown as EventEmitter2,
       {
@@ -99,6 +101,9 @@ function makePrisma() {
   const prisma: any = {
     state,
     $transaction: jest.fn((callback) => callback(prisma)),
+    tenantSetting: {
+      findUnique: jest.fn(async () => null),
+    },
     academicYear: {
       findFirst: jest.fn(async ({ where }) =>
         where.id === 'year-2081' && where.tenantId === tenantId
@@ -185,6 +190,9 @@ function makePrisma() {
     },
     attendanceConflict: {
       create: jest.fn(async () => ({ id: 'conflict-1' })),
+    },
+    notificationDelivery: {
+      findFirst: jest.fn(async () => null),
     },
   };
   return prisma;

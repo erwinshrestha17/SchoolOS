@@ -191,6 +191,9 @@ function makeOverridePrisma() {
   };
   const prisma: any = {
     $transaction: jest.fn((callback) => callback(prisma)),
+    tenantSetting: {
+      findUnique: jest.fn(async () => null),
+    },
     attendanceSession: {
       findFirst: jest.fn(async () => session),
       update: jest.fn(async ({ data }) => {

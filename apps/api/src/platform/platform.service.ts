@@ -2101,15 +2101,18 @@ export class PlatformService {
     try {
       await this.storageService.checkReadiness();
       const storageConfig = this.configService.storageConfig;
+      const storageProfile = getStorageReadinessProfile(storageConfig.provider);
       return {
         providerKey: 'object_storage',
         displayName,
         status: 'READY' as const,
-        message:
-          'Object storage configuration is valid for the selected provider. No external bucket call was made.',
+        message: `Object storage configuration is valid for ${storageConfig.provider} using the ${storageProfile.adapterProfile} adapter profile. No external bucket call was made.`,
         checkedAt: checkedAt.toISOString(),
         requiredConfigMissing: [],
         provider: storageConfig.provider,
+        adapterProfile: storageProfile.adapterProfile,
+        compatibility: storageProfile.compatibility,
+        externalBucketCall: false,
         bucket: 'bucket' in storageConfig ? storageConfig.bucket : 'local',
         endpoint: 'endpoint' in storageConfig ? storageConfig.endpoint : null,
         forcePathStyle:
@@ -3424,6 +3427,41 @@ function safeErrorMessage(error: unknown) {
       '$1$2=********',
     )
     .slice(0, 240);
+}
+
+function getStorageReadinessProfile(provider: string) {
+  if (provider === 'local') {
+    return {
+      adapterProfile: 'local',
+      compatibility: 'local-filesystem',
+    };
+  }
+
+  if (provider === 's3') {
+    return {
+      adapterProfile: 's3-compatible',
+      compatibility: 'aws-s3',
+    };
+  }
+
+  if (provider === 'r2') {
+    return {
+      adapterProfile: 's3-compatible',
+      compatibility: 'cloudflare-r2',
+    };
+  }
+
+  if (provider === 'minio') {
+    return {
+      adapterProfile: 's3-compatible',
+      compatibility: 'minio',
+    };
+  }
+
+  return {
+    adapterProfile: 'gcp',
+    compatibility: 'google-cloud-storage',
+  };
 }
 
 function normalizeSecurityAuditCategory(

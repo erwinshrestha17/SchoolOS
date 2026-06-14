@@ -564,7 +564,8 @@ export class M1AdmissionsHardeningService {
       'ID_CARD',
       actor,
     );
-    return this.latestGeneratedDocument(student.id, 'ID_CARD', actor, {
+    return this.latestGeneratedDocument(student.id, 'id-card', actor, {
+      kind: 'ID_CARD',
       workflowLabel: 'Student ID card generated',
       wording: 'Student Identity Card',
     });
@@ -596,9 +597,10 @@ export class M1AdmissionsHardeningService {
     );
     return this.latestGeneratedDocument(
       student.id,
-      'TRANSFER_CERTIFICATE',
+      'transfer-certificate',
       actor,
       {
+        kind: 'TRANSFER_CERTIFICATE',
         workflowLabel: 'Transfer certificate generated',
         wording:
           'This certifies that the student was enrolled at the school and has been transferred according to school records.',

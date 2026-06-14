@@ -21,6 +21,44 @@ import { TransportService } from './transport.service';
 
 type GpsLabel = 'fresh' | 'delayed' | 'stale' | 'missing';
 
+type RedisCommandClient = {
+  set(
+    key: string,
+    value: string,
+    mode: 'EX',
+    seconds: number,
+  ): Promise<unknown>;
+  lpush(key: string, value: string): Promise<unknown>;
+  expire(key: string, seconds: number): Promise<unknown>;
+  lrange(key: string, start: number, stop: number): Promise<string[]>;
+  incr?: (key: string) => Promise<unknown>;
+  keys?: (pattern: string) => Promise<string[]>;
+  get?: (key: string) => Promise<string | null>;
+};
+
+type OneDayRouteChangeRecord = {
+  id: string;
+  tenantId: string;
+  studentId: string;
+  studentName: string;
+  routeId: string;
+  routeName: string;
+  routeCode: string;
+  stopId: string;
+  stopName: string;
+  stopSequence: number;
+  serviceDate: string;
+  reason: string | null;
+  createdById: string;
+  createdAt: string;
+  status: 'ACTIVE_ONE_DAY_CHANGE';
+};
+
+type MaintenanceReminderVehicle = {
+  id: string;
+  registrationNumber: string;
+};
+
 @Injectable()
 export class TransportM8bService {
   constructor(
@@ -239,7 +277,7 @@ export class TransportM8bService {
     if (!route) throw new NotFoundException('Route not found in this tenant');
     if (!stop) throw new NotFoundException('Stop not found in this route');
 
-    const record = {
+    const record: OneDayRouteChangeRecord = {
       id: `${serviceDate}:${dto.studentId}`,
       tenantId: actor.tenantId,
       studentId: student.id,
@@ -257,7 +295,7 @@ export class TransportM8bService {
       status: 'ACTIVE_ONE_DAY_CHANGE',
     };
 
-    const redis = this.redisService.getClient() as any;
+    const redis = this.redisService.getClient() as RedisCommandClient;
     await redis.set(
       this.oneDayRouteChangeKey(actor.tenantId, serviceDate, student.id),
       JSON.stringify(record),
@@ -287,18 +325,18 @@ export class TransportM8bService {
 
   async listOneDayRouteChanges(actor: AuthContext, serviceDate?: string) {
     const date = dateOnly(serviceDate ?? new Date().toISOString());
-    const redis = this.redisService.getClient() as any;
-    const rows = (await redis.lrange(
+    const redis = this.redisService.getClient() as RedisCommandClient;
+    const rows = await redis.lrange(
       this.oneDayRouteChangesListKey(actor.tenantId, date),
       0,
       200,
-    )) as string[];
+    );
 
     const seen = new Set<string>();
     const items = rows
       .map((row) => safeJson(row))
-      .filter(Boolean)
-      .filter((row: any) => {
+      .filter(isOneDayRouteChangeRecord)
+      .filter((row) => {
         if (seen.has(row.id)) return false;
         seen.add(row.id);
         return true;
@@ -353,7 +391,11 @@ export class TransportM8bService {
 
     const byVehicle = new Map<
       string,
-      { vehicle: any; tripCount: number; latestTripAt: Date }
+      {
+        vehicle: MaintenanceReminderVehicle;
+        tripCount: number;
+        latestTripAt: Date;
+      }
     >();
     for (const trip of trips) {
       const current = byVehicle.get(trip.vehicleId);
@@ -670,7 +712,7 @@ export class TransportM8bService {
     outcome: 'accepted' | 'rejected',
     reason = 'accepted',
   ) {
-    const redis = this.redisService.getClient() as any;
+    const redis = this.redisService.getClient() as RedisCommandClient;
     const key = this.gpsCounterKey(tenantId, tripId, outcome, reason);
     if (typeof redis.incr === 'function') {
       await redis.incr(key);
@@ -681,7 +723,7 @@ export class TransportM8bService {
   }
 
   private async readGpsRejectionCounters(tenantId: string) {
-    const redis = this.redisService.getClient() as any;
+    const redis = this.redisService.getClient() as RedisCommandClient;
     if (typeof redis.keys !== 'function' || typeof redis.get !== 'function') {
       return [] as Array<{ tripId: string; reason: string; count: number }>;
     }
@@ -702,7 +744,7 @@ export class TransportM8bService {
     serviceDate: string,
     studentId: string,
   ) {
-    const redis = this.redisService.getClient() as any;
+    const redis = this.redisService.getClient() as RedisCommandClient;
     if (typeof redis.get !== 'function') return null;
     const value = await redis.get(
       this.oneDayRouteChangeKey(tenantId, serviceDate, studentId),
@@ -773,12 +815,20 @@ function classifyGpsRejection(error: unknown) {
   return 'VALIDATION_OR_SCOPE_REJECTED';
 }
 
-function safeJson(value: string) {
+function safeJson(value: string): unknown {
   try {
     return JSON.parse(value);
   } catch {
     return null;
   }
+}
+
+function isOneDayRouteChangeRecord(
+  value: unknown,
+): value is OneDayRouteChangeRecord {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as { id?: unknown };
+  return typeof candidate.id === 'string';
 }
 
 function dateOnly(value: string) {

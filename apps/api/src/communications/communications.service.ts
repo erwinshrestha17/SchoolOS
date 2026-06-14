@@ -119,6 +119,62 @@ export class CommunicationsService {
     return notice;
   }
 
+  async previewNoticeRecipients(dto: CreateNoticeDto, actor: AuthContext) {
+    await this.ensureAudienceRefs(actor, dto.classId, dto.sectionId);
+
+    const priority = dto.priority ?? NoticePriority.NORMAL;
+    const channels =
+      priority === NoticePriority.EMERGENCY
+        ? [NotificationChannel.PUSH, NotificationChannel.SMS]
+        : [NotificationChannel.PUSH];
+    const input: DeliveryRecordInput = {
+      actor,
+      sourceType: 'notice_preview',
+      sourceId: `notice-preview:${actor.userId}`,
+      audienceType: dto.audienceType ?? AudienceType.ALL,
+      classId: dto.classId ?? null,
+      sectionId: dto.sectionId ?? null,
+      title: dto.title,
+      body: dto.body,
+      channels,
+      requiredConsentTypes: [ConsentType.MESSAGING],
+      communicationCategory:
+        priority === NoticePriority.EMERGENCY ? 'ESSENTIAL' : 'NON_ESSENTIAL',
+    };
+    const recipients = await this.resolveAudienceRecipients(input);
+    const { allowedRecipients, skippedRecipients } =
+      await this.partitionRecipientsByCommunicationPolicy(input, recipients);
+
+    const result = {
+      audienceType: input.audienceType,
+      classId: input.classId,
+      sectionId: input.sectionId,
+      priority,
+      channels,
+      recipientCount: recipients.length,
+      allowedRecipientCount: allowedRecipients.length,
+      skippedRecipientCount: skippedRecipients.length,
+      estimatedDeliveryRows: allowedRecipients.length * channels.length,
+      sampleRecipients: allowedRecipients.slice(0, 10).map((recipient) => ({
+        studentId: recipient.studentId || null,
+        guardianId: recipient.guardianId,
+        recipientUserId: recipient.userId,
+      })),
+    };
+
+    if (priority === NoticePriority.EMERGENCY) {
+      await this.auditService.record({
+        action: 'preview_recipients',
+        resource: 'notice',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        after: result,
+      });
+    }
+
+    return result;
+  }
+
   async listEvents(actor: AuthContext) {
     return this.prisma.event.findMany({
       where: { tenantId: actor.tenantId },

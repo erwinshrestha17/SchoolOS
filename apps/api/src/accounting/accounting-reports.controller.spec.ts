@@ -37,6 +37,7 @@ describe('AccountingReportsController', () => {
       exportIncomeStatementCsv: jest.fn(),
       exportBalanceSheetCsv: jest.fn(),
       exportTaxSummaryCsv: jest.fn(),
+      queueLargeReportExport: jest.fn(),
     };
     const mockAuditService = {
       record: jest.fn(),
@@ -147,6 +148,63 @@ describe('AccountingReportsController', () => {
       }),
     );
     expect(mockRes.send).toHaveBeenCalledWith('csv-data');
+  });
+
+  it('queues large General Ledger exports through the accounting export service', async () => {
+    exportsService.queueLargeReportExport.mockResolvedValue({
+      exportId: 'export-1',
+      jobId: 'job-1',
+      status: 'QUEUED',
+    } as any);
+    const query = { fiscalYearId: 'fy-1', accountCode: '1001' };
+
+    await expect(
+      controller.queueGeneralLedgerExport(
+        mockAuth as any,
+        query as any,
+        'pdf',
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        exportId: 'export-1',
+        status: 'QUEUED',
+      }),
+    );
+    expect(exportsService.queueLargeReportExport).toHaveBeenCalledWith({
+      reportKey: 'accounting.general-ledger',
+      format: 'pdf',
+      filters: query,
+      actor: mockAuth,
+    });
+  });
+
+  it('queues large Cash Book exports through the accounting export service', async () => {
+    exportsService.queueLargeReportExport.mockResolvedValue({
+      exportId: 'export-cash',
+      jobId: 'job-cash',
+      status: 'QUEUED',
+    } as any);
+    const query = { fiscalYearId: 'fy-1', accountKind: 'BANK' };
+
+    await controller.queueCashBookExport(mockAuth as any, query as any, 'csv');
+
+    expect(exportsService.queueLargeReportExport).toHaveBeenCalledWith({
+      reportKey: 'accounting.cash-book',
+      format: 'csv',
+      filters: query,
+      actor: mockAuth,
+    });
+  });
+
+  it('rejects unsupported queued accounting export formats', async () => {
+    await expect(
+      controller.queueCashBookExport(
+        mockAuth as any,
+        { fiscalYearId: 'fy-1' } as any,
+        'xlsx',
+      ),
+    ).rejects.toThrow('Queued accounting exports support csv or pdf');
+    expect(exportsService.queueLargeReportExport).not.toHaveBeenCalled();
   });
 
   it('exports Income Statement and records audit', async () => {

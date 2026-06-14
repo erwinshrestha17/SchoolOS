@@ -354,9 +354,63 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
     await expect(
       activityFeedService.getAttachmentPreview(
         { ...parentActor, tenantId: otherTenantId },
+      post.attachments[0].id,
+    ),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('blocks direct class-wide media previews when the linked child is inactive', async () => {
+    const student = prisma.__state.students.find(
+      (item) => item.id === 'student-1',
+    );
+    if (student) {
+      student.lifecycleStatus = 'ARCHIVED';
+    }
+    const post = seedPost({
+      id: 'post-class-wide-inactive-child',
+      studentIds: [],
+      title: 'Class wide inactive child',
+    });
+
+    await expect(
+      activityFeedService.getAttachmentPreview(
+        parentActor,
         post.attachments[0].id,
       ),
-    ).rejects.toThrow(NotFoundException);
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(fileRegistryService.auditAccess).not.toHaveBeenCalled();
+    expect(fileRegistryService.getSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it('blocks direct tagged media previews when any tagged student lacks active consent', async () => {
+    const post = seedPost({
+      id: 'post-mixed-consent',
+      studentIds: ['student-1', 'student-2'],
+      title: 'Mixed consent',
+    });
+
+    await expect(
+      activityFeedService.getAttachmentPreview(
+        parentActor,
+        post.attachments[0].id,
+      ),
+    ).rejects.toThrow(
+      'Some media is hidden because of student photo consent settings.',
+    );
+
+    expect(fileRegistryService.auditAccess).not.toHaveBeenCalled();
+    expect(fileRegistryService.getSignedUrl).not.toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'activity_attachment_denied_consent',
+        resourceId: post.attachments[0].id,
+        after: expect.objectContaining({
+          blockedStudentId: 'student-2',
+          reason: 'PHOTO_USAGE_CONSENT_REQUIRED',
+        }),
+      }),
+    );
   });
 
   it('rejects non-image media before storage and delivery dispatch', async () => {
@@ -634,6 +688,8 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
             student.tenantId === where.tenantId &&
             (!where.classId || student.classId === where.classId) &&
             (!where.sectionId || student.sectionId === where.sectionId) &&
+            (!where.lifecycleStatus ||
+              student.lifecycleStatus === where.lifecycleStatus) &&
             (!idIn || idIn.includes(student.id as string)),
         );
       }),

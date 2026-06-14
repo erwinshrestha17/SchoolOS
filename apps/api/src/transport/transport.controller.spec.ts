@@ -51,14 +51,17 @@ function createController() {
     getBoardingReport: jest.fn(),
     exportTripHistoryCsv: jest.fn(),
   };
+  const transportM8bService = {};
 
   return {
     controller: new TransportController(
       transportService as never,
       transportHardeningService as never,
+      transportM8bService as never,
     ),
     transportService,
     transportHardeningService,
+    transportM8bService,
   };
 }
 

@@ -2163,6 +2163,30 @@ export type PlatformFailedJobSummary = {
   }>;
 };
 
+export type PlatformFailedJobGroup = {
+  queueName: string;
+  name: string;
+  failedReason: string;
+  count: number;
+  firstFailedAt?: number;
+  latestFailedAt?: number;
+  maxAttemptsMade: number;
+  sampleJobIds: string[];
+  affectedTenantIds: string[];
+  diagnostic: {
+    category:
+      | 'provider'
+      | 'storage'
+      | 'tenant_state'
+      | 'entitlement'
+      | 'data_validation'
+      | 'transient'
+      | 'unknown';
+    retryable: boolean;
+    recommendedAction: string;
+  };
+};
+
 export type PlatformHealthSummary = {
   status: 'ready' | 'degraded';
   checks: Record<string, { status: 'ok' | 'error'; message?: string }>;

@@ -20,6 +20,7 @@ import { CashierCloseWindowDto } from './dto/cashier-close-window.dto';
 import { CollectPaymentDto } from './dto/collect-payment.dto';
 import { CreateCashierCloseDto } from './dto/create-cashier-close.dto';
 import { CreatePaymentRefundDto } from './dto/create-payment-refund.dto';
+import { ReversePaymentDto } from './dto/reverse-payment.dto';
 import { DuesQueryDto } from './dto/dues-query.dto';
 import { ListDefaultersDto } from './dto/list-defaulters.dto';
 import { ListCashierClosesDto } from './dto/list-cashier-closes.dto';
@@ -113,13 +114,13 @@ export class FinanceCompatController {
   }
 
   @Post('payments/:id/reverse')
-  @Permissions('payments:refund')
+  @Permissions('payments:reverse')
   reversePayment(
     @Param('id') paymentId: string,
-    @Body() dto: CreatePaymentRefundDto,
+    @Body() dto: ReversePaymentDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.financeService.refundPayment(paymentId, dto, auth);
+    return this.financeService.reversePayment(paymentId, dto, auth);
   }
 
   @Post('payments/:id/correct')

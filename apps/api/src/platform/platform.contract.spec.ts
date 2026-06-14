@@ -97,6 +97,7 @@ describe('M0 Platform Control Plane contracts', () => {
       "@Get('tenants/:tenantId/api-keys')",
       "@Post('providers')",
       "@Get('queues')",
+      "@Get('queues/failed-job-groups')",
       "@Post('queues/retry')",
       "@Get('health')",
       "@Get('report-exports')",

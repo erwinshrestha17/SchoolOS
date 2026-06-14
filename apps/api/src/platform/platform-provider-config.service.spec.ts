@@ -7,10 +7,16 @@ describe('PlatformService provider config hardening', () => {
   let auditService: { record: jest.Mock };
   let configService: {
     storageConfig: {
-      provider: 'local';
-      localRoot: string;
-      publicBaseUrl: string;
-      signingSecret: string;
+      provider: 'local' | 's3' | 'r2' | 'minio';
+      localRoot?: string;
+      publicBaseUrl: string | null;
+      signingSecret?: string;
+      bucket?: string;
+      region?: string;
+      endpoint?: string;
+      accessKeyId?: string;
+      secretAccessKey?: string;
+      forcePathStyle?: boolean;
       signedReadUrlTtlSeconds: number;
       signedUploadUrlTtlSeconds: number;
     };
@@ -517,6 +523,9 @@ describe('PlatformService provider config hardening', () => {
         providerKey: 'object_storage',
         status: 'READY',
         provider: 'local',
+        adapterProfile: 'local',
+        compatibility: 'local-filesystem',
+        externalBucketCall: false,
         bucket: 'local',
         signedReadUrlTtlSeconds: 300,
       }),
@@ -524,6 +533,56 @@ describe('PlatformService provider config hardening', () => {
     expect(storageService.checkReadiness).toHaveBeenCalled();
     expect(storageService.testConnection).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['s3', 'aws-s3', false],
+    ['r2', 'cloudflare-r2', true],
+    ['minio', 'minio', true],
+  ] as const)(
+    'surfaces %s object storage readiness through the S3-compatible adapter profile',
+    async (provider, compatibility, forcePathStyle) => {
+      prisma.providerConfig.findFirst.mockResolvedValue(null);
+      configService.storageConfig = {
+        provider,
+        bucket: 'schoolos-private',
+        region: provider === 'r2' ? 'auto' : 'ap-south-1',
+        endpoint:
+          provider === 's3'
+            ? 'https://s3.ap-south-1.amazonaws.com'
+            : provider === 'r2'
+              ? 'https://account.r2.cloudflarestorage.com'
+              : 'http://localhost:9000',
+        accessKeyId: 'configured-access-key',
+        secretAccessKey: 'configured-secret-key',
+        publicBaseUrl: null,
+        forcePathStyle,
+        signedReadUrlTtlSeconds: 300,
+        signedUploadUrlTtlSeconds: 300,
+      };
+
+      const readiness = await service.getProvidersReadiness();
+      const storage = readiness.find(
+        (item) => item.providerKey === 'object_storage',
+      );
+
+      expect(storage).toEqual(
+        expect.objectContaining({
+          providerKey: 'object_storage',
+          status: 'READY',
+          provider,
+          adapterProfile: 's3-compatible',
+          compatibility,
+          externalBucketCall: false,
+          bucket: 'schoolos-private',
+          forcePathStyle,
+          signedReadUrlTtlSeconds: 300,
+        }),
+      );
+      expect(JSON.stringify(storage)).not.toContain('configured-secret-key');
+      expect(storageService.checkReadiness).toHaveBeenCalled();
+      expect(storageService.testConnection).not.toHaveBeenCalled();
+    },
+  );
 
   it('includes payment gateway in aggregate provider readiness', async () => {
     prisma.providerConfig.findFirst.mockResolvedValue(null);

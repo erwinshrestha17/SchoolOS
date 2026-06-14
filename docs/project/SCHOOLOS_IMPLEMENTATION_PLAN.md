@@ -17,14 +17,14 @@
 * **M2 Smart Attendance:** Pilot-ready plus lock-window enforcement, working-day calendar policy, concurrent-session conflict handling, correction/offline-draft, rejected replay regressions, correction-review UI, operational anomaly dashboard, focused anomaly/cutoff automation hardening regression coverage, app-controlled monthly register exports, parent absence/late notifications and follow-up queue, mobile teacher scope, real-data teacher dashboard, and mobile parent attendance summary query validation.
 * **M3 Fees & Receipts:** Pilot-ready plus receipt reprint history UI, printed receipt QR verification, reversal/refund approval foundation, cashier close, method-specific cashier close, reconciliation, Analysis CSV exports, protected day-end PDF snapshots, transaction-race/idempotency coverage, segmented overdue reminder backend, and HMAC-secured online payment webhook verification with duplicate/already-paid/failed-event guards plus dotted provider event fixtures.
 * **M4 Academics / Exams / CAS / Report Cards:** Completed / Pilot-Ready with PDF/report/correction/snapshot polish, protected/app-controlled report-card PDF opening, retest/absent/withheld mark-state regression coverage, and backend assessment template presets that create audited exam-term/component structures.
-* **M5 Activity Feed & Milestones:** Strong foundation with media privacy, consent-aware blocking, removed-guardian visibility regression coverage, optimized previews, app-controlled private media preview/download helpers, moderation controls, teacher media gallery, media-access gating, backend class/section/student audience preview, active-student-only activity notification delivery, retry-pending delivery replay idempotency, and backend milestone template presets.
+* **M5 Activity Feed & Milestones:** Strong foundation with media privacy, consent-aware blocking, removed-guardian visibility regression coverage, optimized previews, app-controlled private media preview/download helpers with active-child and tagged-student consent enforcement, moderation controls, teacher media gallery, media-access gating, backend class/section/student audience preview, active-student-only activity tagging and notification delivery, retry-pending delivery replay idempotency, and backend milestone template presets.
 * **M6 Homework / Timetable:** Completed / Pilot-Ready with File Registry attachments, homework-specific attachment access helpers, filtered homework template APIs, reminder hardening, absence/substitution conflict coverage, mobile homework/timetable views, and improved substitution slot selection / absence recording UI.
 * **M7 HR / Payroll:** Completed / Pilot-Ready with posting locks, accounting integration, reversals, PII/self-service bank masking, payroll reports, mobile staff self-service, and statutory deduction retrieval from active salary structures.
 * **M8A Library:** Admin/backend foundation plus QR lookup, fines, staff borrowers, fine-to-fees/accounting tests, scanner-first UI, copy archive workflow, and reports/export polish.
 * **M8B Transport:** Admin/trip/location/report foundation plus Redis GPS/cache/pressure/retention hardening, driver mobile surfaces, parent latest-GPS view, and trip-history exports.
 * **M8C Canteen:** Admin/wallet/POS/inventory/vendor/report foundation plus receipt JSON/PDF, stock hardening, wallet guards, linked invoice handoff, parent mobile views, serving allergy acknowledgement, and canteen workspace polish.
-* **M9 Accounting:** Production-candidate / Pilot-Ready with PDFs, snapshots, audit trail, reconciliation suggestions, File Registry export support, and hardened bank statement import/reconciliation DTO validation.
-* **M10 Notices / Communication / Chat:** Strong foundation with provider modes, attachments, failure dashboard, moderation/escalation, unread-recipient follow-up, mobile notification/chat surfaces, and full communications/messaging sub-controller entitlement gating.
+* **M9 Accounting:** Production-candidate / Pilot-Ready with Nepal school chart template preview/import, source-mapping health checks, PDFs, retry-safe report snapshot reuse, synchronous export row thresholds, queued large General Ledger/Cash Book exports through File Registry, audit trail, reconciliation suggestions, File Registry export support, and hardened bank statement import/reconciliation DTO validation.
+* **M10 Notices / Communication / Chat:** Strong foundation with provider modes, HMAC-signed provider callback verification, sanitized provider callback failures, duplicate/out-of-order provider status guards, high-impact notice recipient preview, attachments, failure dashboard, moderation/escalation, unread-recipient follow-up, mobile notification/chat surfaces, and full communications/messaging sub-controller entitlement gating.
 * **M12 Learning Layer:** Production foundation implemented and verified under `apps/api/src/learning`, `apps/web` Learning routes, and `apps/schoolos_mobile/lib/features/learning`: activity builder, school-only sessions, session monitoring/heartbeat/participants, resource library, QR/code join, lab attempts, autosave/submit, MCQ/true-false/short-answer/matching/ordering evaluation, progress recording, parent child-scoped summary, student self-scoped mobile summary, tenant isolation, RBAC, entitlement, audit logging, Prisma migrations, and focused E2E/contract/mobile coverage.
 * **Public Demo Requests:** Public POST intake plus platform operator list/detail/status-follow-up APIs and `/platform/demo-requests` review workspace with RBAC, audit logging, pagination/filtering, internal notes, public rate limiting, and tests.
 * **Settings / Audit Visibility:** Settings audit-log access, support-override banner visibility, and live tenant role/permission inspection added with access-control tests.
@@ -141,15 +141,15 @@ Before adding or expanding visible features:
   - Continue permission-denied, session-expiry, and suspended-tenant UX polish across direct route access and long-running sessions.
 
 ### M0 Platform Core (87-91%)
-* **Current Status:** Tenants, plans, usage tracking, SaaS billing foundation, platform audit logs, API keys, provider readiness queues, payment gateway aggregate readiness with validated-sandbox enforcement, File Registry, report exports, onboarding, structured platform operation DTOs, and bounded queue retry/discard race handling with per-job audited retry UX.
+* **Current Status:** Tenants, plans, usage tracking, SaaS billing foundation, platform audit logs, API keys, provider readiness queues, payment gateway aggregate readiness with validated-sandbox enforcement, File Registry, report exports, computed onboarding checklist plus audited manual override workflow, structured platform operation DTOs, queue failure grouping/detail diagnostics, and bounded queue retry/discard race handling with per-job audited retry UX.
 * **Staging / Verification Remaining:**
   - Provider-specific readiness staging (SMS/email/FCM/storage/gateway).
 * **Backend Backlog:**
   - Continue provider-specific staging verification for SMS, email, FCM, object storage, and payment gateways using real provider/env setup.
-  - Add queue failure grouping and richer queue diagnostics; retry/discard reasons and race/idempotency checks are implemented for single-job operations.
-  - Add platform SaaS billing lifecycle without mixing it with school fee collection.
-  - Add storage readiness verification for local, S3, R2, MinIO, and future adapters.
-  - Add tenant onboarding state machine with audit trail.
+  - Continue deployed queue-topology smoke for the implemented queue health, failure grouping, detail diagnostics, and retry/discard workflows.
+  - Continue platform SaaS billing lifecycle staging verification; implemented lifecycle paths must remain separate from school fee collection and M9 accounting posting.
+  - Continue real-environment storage smoke for the implemented local, S3, R2, and MinIO-compatible readiness surfaces.
+  - Formal tenant onboarding state transitions are not required for current backend closure; the accepted pilot model is computed checklist state plus audited platform overrides. Reopen only if product requires additional onboarding statuses, approvals, or rollback transitions.
 * **Web Frontend Backlog:**
   - Guided tenant onboarding checklist: school profile, logo, academic year, classes, sections, fee heads, users, modules.
   - Visual plan comparison and entitlement warnings.
@@ -176,11 +176,11 @@ Before adding or expanding visible features:
   - Teacher quick student profile scoped to assigned classes only.
 
 ### M2 Smart Attendance (96-98%)
-* **Current Status:** Roster, lock-window enforcement, correction/offline drafts, rejected replay, concurrent submission conflict handling, working-day calendar policy, correction review UI, monthly register reports/exports, operational anomaly dashboard, focused regression coverage for anomaly detection across active roster counts, non-working/exam-day calendar policy, not-marked sessions, missing roster records, high absence rates, anomaly audit metadata, and cutoff automation for locked not-marked sessions, child-scoped parent absence/late notifications, repeated absence/late follow-up queue, mobile teacher scope, parent attendance, and real-data teacher dashboard.
+* **Current Status:** Roster, lock-window enforcement, correction/offline drafts, rejected replay, concurrent submission conflict handling, working-day calendar policy, correction review UI, monthly register reports/exports, operational anomaly dashboard, focused regression coverage for anomaly detection across active roster counts, non-working/exam-day calendar policy, not-marked sessions, missing roster records, high absence rates, anomaly audit metadata, and cutoff automation for locked not-marked sessions, child-scoped parent absence/late notifications, retry-safe duplicate suppression for parent absence/late notifications and repeated follow-up dispatch, repeated absence/late follow-up queue, mobile teacher scope, parent attendance, and real-data teacher dashboard.
 * **Staging / Verification Remaining:**
   - Continue browser/mobile smoke and UX depth for correction/offline states.
 * **Backend Backlog:**
-  - Continue regression coverage for lock-window override, correction audit, duplicate-session conflicts, follow-up automation, offline sync conflict rules, and broader calendar policy edge cases before claiming production readiness.
+  - Continue regression coverage for lock-window override, correction audit, duplicate-session conflicts, offline sync conflict rules, and broader calendar policy edge cases before claiming production readiness.
   - Exam-day policy refinements after pilot timetable/exam fixture feedback.
   - Pilot feedback tuning for parent notification wording, channels, and follow-up queue thresholds.
 * **Web Frontend Backlog:**
@@ -192,7 +192,7 @@ Before adding or expanding visible features:
   - Parent/student monthly attendance calendar with reason display.
 
 ### M3 Fees & Receipts (96-98%)
-* **Current Status:** Fee setup, invoices, student ledger, payments, receipts, printed receipt QR verification, receipt reprint with audit history UI, reversal/refund approval foundation, cashier close, method-specific cashier close overlap rules, reconciliation, CSV exports, protected day-end PDFs, payment idempotency race handling, cashier-close unique-window race coverage plus HTTP method-specific isolation coverage, aging-bucket/min-max overdue defaulter segmentation with child-scoped reminder delivery/audit, service-hardened scholarship/waiver and invoice-adjustment workflows after invoice creation with HTTP tenant/paid-invoice denial coverage, and HMAC online payment webhook verification with duplicate, already-paid, missing-reference, zero-amount, dotted success/failure/pending provider events, and failed/pending event guards.
+* **Current Status:** Fee setup, invoices, student ledger, payments, receipts, printed receipt QR verification, receipt reprint with audit history UI, reversal/refund approval foundation, legacy payment-reversal compatibility route mapped to the reversal workflow and permission, cashier close, method-specific cashier close overlap rules, reconciliation, CSV exports, protected day-end PDFs, payment idempotency race handling, cashier-close unique-window race coverage plus HTTP method-specific isolation coverage, aging-bucket/min-max overdue defaulter segmentation with child-scoped reminder delivery/audit, service-hardened scholarship/waiver and invoice-adjustment workflows after invoice creation with HTTP tenant/paid-invoice denial coverage, and HMAC online payment webhook verification with duplicate, already-paid, missing-reference, zero-amount, dotted success/failure/pending provider events, and failed/pending event guards.
 * **Staging / Verification Remaining:**
   - Broader reversal/refund/cashier-close HTTP isolation tests and gateway sandbox verification.
 * **Backend Backlog:**
@@ -210,12 +210,12 @@ Before adding or expanding visible features:
   - Payment initiation remains disabled until gateway verification is staging-proven.
 
 ### M4 Academics / Exams / CAS / Report Cards (98-100%)
-* **Current Status:** Subjects, exams, marks, CAS, mark lock/unlock workflow, teacher marks autosave/draft backend support, absent/withheld/retest mark-state coverage, tenant grading scale/rounding policy, dues-aware result withholding, queued large-batch report-card generation, protected report-card PDFs, backend assessment template presets for terminal and theory/practical exam structures, and report/correction/history/snapshot/grading-policy workspace polish.
+* **Current Status:** Subjects, exams, marks, CAS, mark lock/unlock workflow, teacher marks autosave/draft backend support, absent/withheld/retest mark-state coverage, tenant grading scale/rounding policy, dues-aware result withholding, queued large-batch report-card generation with partial-failure job surfacing and retry-safe already-generated locked-card skipping, protected report-card PDFs, backend assessment template presets for terminal and theory/practical exam structures, and report/correction/history/snapshot/grading-policy workspace polish.
 * **Staging / Verification Remaining:**
-  - Report generation failure and correction tests.
+  - Correction/regeneration staging smoke.
   - Smoke `/dashboard/academics/report-cards`.
 * **Backend Backlog:**
-  - Regression coverage for mark lock/correction/result-publish/report-card queue edge cases before claiming production readiness.
+  - Regression coverage for mark lock/correction/result-publish edge cases before claiming production readiness.
   - Broader retest/make-up exam workflow depth beyond mark-state persistence.
   - Pilot tuning for large batch thresholds and queue observability after staging fixtures.
 * **Web Frontend Backlog:**
@@ -229,12 +229,12 @@ Before adding or expanding visible features:
   - Show only published results and permission-safe data.
 
 ### M5 Activity Feed & Milestones (92-96%)
-* **Current Status:** Private media, consent-aware media blocking, removed-guardian parent feed visibility denial, optimized previews, app-controlled media preview/download helpers, moderation controls, teacher media gallery, media-access gating, deterministic Montessori/ECD/primary milestone template presets, backend class/section/student audience preview, active-student-only activity notification delivery, retry-pending delivery replay idempotency, post-create media/database cleanup on downstream failures, and cross-surface feed/gallery/parent/dashboard invalidation after post mutations.
+* **Current Status:** Private media, consent-aware media blocking, removed-guardian parent feed visibility denial, optimized previews, app-controlled media preview/download helpers with direct signed-preview checks for active linked children and all tagged-student consent, moderation controls, teacher media gallery, media-access gating, deterministic Montessori/ECD/primary milestone template presets, backend class/section/student audience preview, active-student-only tagged-post validation and activity notification delivery, retry-pending delivery replay idempotency, post-create media/database cleanup on downstream failures, and cross-surface feed/gallery/parent/dashboard invalidation after post mutations.
 * **Staging / Verification Remaining:**
   - Consent/media cross-tenant tests.
   - Protected media browser smoke.
 * **Backend Backlog:**
-  - Stronger consent-aware media tests across removed students and additional cross-tenant media paths.
+  - Additional cross-tenant media paths beyond current tenant/file asset denial coverage.
 * **Web Frontend Backlog:**
   - Improved teacher post composer consuming the backend class/section/student audience preview.
   - Image compression, upload retry, and low-bandwidth preview behavior after the protected media helper path.
@@ -343,16 +343,14 @@ Before adding or expanding visible features:
   - Canteen scanner and serve meal flow after device QA.
 
 ### M9 Accounting & Finance (98-100%)
-* **Current Status:** Accounts, journals, source-record drilldown, reports, reconciliation, PDFs, snapshots, audit, bank statement DTO/import validation, and reconciliation DTOs.
+* **Current Status:** Accounts, Nepal school-friendly chart template preview/import, journals, source-record drilldown, source-mapping health checks for fees/payroll/canteen/library/transport, reports, reconciliation, PDFs, retry-safe File Registry report snapshot reuse, synchronous export row thresholds plus queued background General Ledger/Cash Book exports through File Registry, audit, bank statement DTO/import validation, and reconciliation DTOs.
 * **Staging / Verification Remaining:**
   - Fiscal lock/reversal/export failure and bank reconciliation browser tests.
   - Report/export/import/reconciliation smoke.
 * **Backend Backlog:**
-  - Nepal school-friendly default chart of accounts templates.
   - Fiscal close/reopen safety and period-lock regression coverage.
   - Reversal/correction-only enforcement for posted records.
-  - Source mapping checks for fees, payroll, canteen, library, and transport.
-  - Large-report background export thresholds.
+  - Platform queue diagnostics visibility for the accounting-reports queue after operator UI demand is confirmed.
 * **Web Frontend Backlog:**
   - Accountant dashboard for fiscal status, unreconciled items, pending postings, export history.
   - Bank reconciliation review with manual confirmation polish.
@@ -361,18 +359,17 @@ Before adding or expanding visible features:
   - Principal read-only finance snapshot only; no full COA/journal editing on mobile.
 
 ### M10 Notices / Communication / Chat (94-97%)
-* **Current Status:** Notices, deliveries, events, consents, notice-detail, notification-center, parent-teacher chat, messaging-hardening, and audited delivery retry reasons. Delivery retry now preserves existing tenant-scoped/idempotent backend claims, records operator reasons for single and bulk retry attempts, and the web retry panel requires those reasons while showing backend `RETRY_PENDING` state.
+* **Current Status:** Notices, deliveries, events, consents, high-impact recipient preview, notice-detail, notification-center, parent-teacher chat, messaging-hardening, HMAC-signed provider callback verification, sanitized provider callback failures, duplicate/out-of-order provider status guards, and audited delivery retry reasons. Delivery retry now preserves existing tenant-scoped/idempotent backend claims, records operator reasons for single and bulk retry attempts, and the web retry panel requires those reasons while showing backend `RETRY_PENDING` state.
 * **Staging / Verification Remaining:**
   - Provider failure, retry, moderation, attachment tests.
   - Provider-mode browser smoke.
 * **Backend Backlog:**
-  - Real provider callback verification (duplicate, forged, failed, delayed, out-of-order).
+  - Provider-specific signed callback staging smoke against real SMS/email/FCM fixtures.
   - Provider-disabled fail-closed behavior for retry dispatch.
   - Quiet-hours and moderation policy enforcement for chat.
-  - Attachment access tests after guardian removal or role change.
+  - Attachment access tests after guardian removal or role change for any future chat attachment workflow.
 * **Web Frontend Backlog:**
   - Notice templates (holiday, fee reminder, emergency, exam, transport delay, event).
-  - Recipient preview before high-impact notices.
   - Unread follow-up UI polish.
   - Communication audit for emergency and high-impact messages.
 * **Mobile Frontend Backlog:**

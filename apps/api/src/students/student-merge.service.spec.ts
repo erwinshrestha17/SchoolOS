@@ -5,6 +5,7 @@ import { AuditService } from '../audit/audit.service';
 import { StorageService } from '../storage/storage.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { CommunicationsService } from '../communications/communications.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { UsageService } from '../usage/usage.service';
 import { UsersService } from '../users/users.service';
 import { StudentLifecycleStatus, EnrollmentStatus } from '@prisma/client';
@@ -95,6 +96,10 @@ describe('StudentsService (Duplicate Merge)', () => {
         { provide: AuditService, useValue: { record: jest.fn() } },
         { provide: UsersService, useValue: {} },
         { provide: CommunicationsService, useValue: {} },
+        {
+          provide: NotificationsService,
+          useValue: { sendEmail: jest.fn(), sendSms: jest.fn() },
+        },
         {
           provide: UsageService,
           useValue: { verifyLimit: jest.fn(), checkLimit: jest.fn() },

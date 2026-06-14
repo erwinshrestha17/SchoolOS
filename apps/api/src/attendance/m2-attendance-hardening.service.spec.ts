@@ -202,6 +202,66 @@ describe('M2AttendanceHardeningService', () => {
       }),
     );
   });
+
+  it('suppresses duplicate repeated absence follow-up notifications on retry', async () => {
+    const prisma = buildPrisma();
+    prisma.notificationDelivery.findFirst.mockResolvedValue({
+      id: 'delivery-existing',
+    });
+    const { service, communicationsService, auditService } =
+      buildService(prisma);
+    jest.spyOn(service, 'getFollowUpQueue').mockResolvedValue({
+      fromDate: new Date('2026-04-01T00:00:00.000Z'),
+      toDate: new Date('2026-04-30T00:00:00.000Z'),
+      threshold: 3,
+      total: 1,
+      items: [
+        {
+          studentId: 'student-1',
+          studentSystemId: 'SCH-2026-0001',
+          fullNameEn: 'Asha Tamang',
+          className: 'Class 1',
+          sectionName: 'A',
+          guardianCount: 1,
+          absences: 4,
+          lates: 0,
+          consecutiveAbsences: 4,
+          threshold: 3,
+          needsFollowUp: true,
+          recommendedChannels: [],
+        },
+      ],
+    });
+
+    const result = await service.runFollowUpAutomation(
+      {
+        fromDate: '2026-04-01',
+        toDate: '2026-04-30',
+        dryRun: false,
+      },
+      actor,
+    );
+
+    expect(prisma.notificationDelivery.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        sourceType: 'attendance_repeated_absence_follow_up',
+        sourceId: expect.stringMatching(/^\d{4}-\d{2}-\d{2}:student-1:4:4$/),
+      },
+    });
+    expect(communicationsService.recordDeliveryRecords).not.toHaveBeenCalled();
+    expect(result.deliveryCount).toBe(0);
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'm2_follow_up_dispatch',
+        after: expect.objectContaining({
+          queueCount: 1,
+          deliveryCount: 0,
+          dryRun: false,
+        }),
+      }),
+    );
+  });
 });
 
 function buildService(prisma = buildPrisma()) {
@@ -278,6 +338,9 @@ function buildPrisma() {
           label: 'Terminal exam',
         },
       ]),
+    },
+    notificationDelivery: {
+      findFirst: jest.fn().mockResolvedValue(null),
     },
   };
 }

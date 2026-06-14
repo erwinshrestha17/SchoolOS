@@ -129,12 +129,14 @@ describe('M0 Platform Core hardening contracts', () => {
 
     expect(controller).toContain("@Get('queues')");
     expect(controller).toContain("@Get('queues/failed-jobs')");
+    expect(controller).toContain("@Get('queues/failed-job-groups')");
     expect(controller).toContain("@Get('queues/:queueName/jobs/:jobId')");
     expect(controller).toContain("@Post('queues/retry')");
     expect(controller).toContain("@Permissions('platform:queues:read')");
     expect(controller).toContain("@Permissions('platform:queues:retry')");
     expect(controller).toContain('platformQueuesService.getQueueHealth()');
     expect(controller).toContain('platformQueuesService.listFailedJobs()');
+    expect(controller).toContain('platformQueuesService.listFailedJobGroups()');
     expect(controller).toContain('platformQueuesService.retryFailedJob');
 
     expect(module).toContain('PlatformQueuesService');
@@ -142,6 +144,8 @@ describe('M0 Platform Core hardening contracts', () => {
 
     expect(queuesService).toContain('getJobCounts');
     expect(queuesService).toContain('getFailed(0, 50)');
+    expect(queuesService).toContain('listFailedJobGroups');
+    expect(queuesService).toContain('buildFailureDiagnostic');
     expect(queuesService).toContain('queue.getJob(dto.jobId)');
     expect(queuesService).toContain('listRetryHistory');
     expect(queuesService).toContain('job.isFailed()');

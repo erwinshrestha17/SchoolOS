@@ -650,13 +650,14 @@ export class ActivityFeedService {
           tenantId: actor.tenantId,
           classId: dto.classId,
           ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
           id: { in: dto.studentIds },
         },
       });
 
       if (students.length !== dto.studentIds.length) {
         throw new NotFoundException(
-          'One or more tagged students were not found in this class/section',
+          'One or more tagged students were not active in this class/section',
         );
       }
     }
@@ -1066,6 +1067,12 @@ export class ActivityFeedService {
         'Some media is hidden because of student photo consent settings.',
       );
     }
+    await this.ensureTaggedStudentsAllowMediaForParent(
+      actor,
+      attachment.activityPostId,
+      attachment.id,
+      fileAssetId,
+    );
 
     await this.fileRegistryService.auditAccess(
       actor.tenantId,
@@ -1075,6 +1082,99 @@ export class ActivityFeedService {
     );
 
     return this.fileRegistryService.getSignedUrl(actor.tenantId, fileAssetId);
+  }
+
+  private async ensureTaggedStudentsAllowMediaForParent(
+    actor: AuthContext,
+    postId: string,
+    attachmentId: string,
+    fileAssetId: string,
+  ) {
+    if (!isParentOnly(actor)) {
+      return;
+    }
+
+    const post = await this.prisma.activityPost.findFirst({
+      where: {
+        id: postId,
+        tenantId: actor.tenantId,
+      },
+      include: {
+        studentTags: {
+          select: { studentId: true },
+        },
+      },
+    });
+
+    const studentIds = post?.studentTags.map((tag) => tag.studentId) ?? [];
+    if (studentIds.length === 0) {
+      return;
+    }
+
+    const students = await this.prisma.student.findMany({
+      where: { id: { in: studentIds }, tenantId: actor.tenantId },
+      include: {
+        guardianLinks: {
+          include: {
+            guardian: {
+              include: {
+                consents: {
+                  where: { consentType: ConsentType.PHOTO_USAGE },
+                  orderBy: { capturedAt: 'desc' },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const blockedStudent = students.find((student) => {
+      if (student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE) {
+        return true;
+      }
+
+      const guardians = student.guardianLinks.map((link) => link.guardian);
+      if (guardians.length === 0) {
+        return true;
+      }
+
+      let studentHasConsent = false;
+      for (const guardian of guardians) {
+        const latestConsent = guardian.consents[0];
+        if (latestConsent) {
+          if (latestConsent.granted && !latestConsent.revokedAt) {
+            studentHasConsent = true;
+          } else {
+            return true;
+          }
+        }
+      }
+
+      return !studentHasConsent;
+    });
+
+    if (!blockedStudent) {
+      return;
+    }
+
+    await this.auditService.record({
+      action: 'activity_attachment_denied_consent',
+      resource: 'activity_attachment',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: attachmentId,
+      after: {
+        activityPostId: postId,
+        fileAssetId,
+        reason: ACTIVITY_MEDIA_CONSENT_BLOCK_REASON,
+        blockedStudentId: blockedStudent.id,
+      },
+    });
+    throw new ForbiddenException(
+      'Some media is hidden because of student photo consent settings.',
+    );
   }
 
   async listMoodLogs(actor: AuthContext) {
@@ -1394,6 +1494,7 @@ export class ActivityFeedService {
       where: {
         tenantId: actor.tenantId,
         id: { in: studentIds },
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
       },
       select: {
         id: true,
@@ -1401,10 +1502,15 @@ export class ActivityFeedService {
         sectionId: true,
       },
     });
+    const activeStudentIds = students.map((student) => student.id);
+
+    if (activeStudentIds.length === 0) {
+      return { id: '__no_visible_activity_posts__' };
+    }
 
     return {
       OR: [
-        { studentTags: { some: { studentId: { in: studentIds } } } },
+        { studentTags: { some: { studentId: { in: activeStudentIds } } } },
         ...students.flatMap((student) => {
           const classWidePost = {
             studentTags: { none: {} },

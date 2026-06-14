@@ -3435,6 +3435,7 @@ export class StudentsService {
         { reminderStatus: 'asc' },
         { createdAt: 'asc' },
       ],
+      take: 100,
     });
 
     return templates.map((template) => ({
