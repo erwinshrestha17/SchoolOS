@@ -1,0 +1,3 @@
+model ProviderConfig {
+  id String @id @default(uuid())
+}
