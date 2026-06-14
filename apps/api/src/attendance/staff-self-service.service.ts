@@ -22,6 +22,7 @@ export class StaffSelfServiceService {
     const balances = await this.prisma.staffLeaveBalance.findMany({
       where: { tenantId: actor.tenantId, staffId: staff.id },
       orderBy: [{ year: 'desc' }, { leaveType: 'asc' }],
+      take: 100,
     });
 
     return balances.map((balance) => ({
