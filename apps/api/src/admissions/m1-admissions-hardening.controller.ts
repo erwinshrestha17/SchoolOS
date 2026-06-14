@@ -35,7 +35,7 @@ export class M1AdmissionsHardeningController {
 
   @Post('duplicates/review')
   @Permissions('students:read')
-  enhancedDuplicateReview(@Body() dto: EnhancedDuplicateReviewDto, @CurrentAuth() auth: AuthContext) {
+  enhancedDuplicateReview(@Body() dto: EnhancedDuplicateReviewDto, @CurrentAuth() auth: AuthContext): Promise<unknown> {
     return this.service.enhancedDuplicateReview(dto, auth);
   }
 
