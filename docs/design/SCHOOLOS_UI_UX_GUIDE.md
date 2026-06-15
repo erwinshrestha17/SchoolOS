@@ -1,7 +1,7 @@
 # SchoolOS UI/UX Guide
 
 **Status:** Single source of truth for SchoolOS UI/UX, web dashboard overhaul, platform UI, component strategy, colors, typography, accessibility, and performance rules.  
-**Last updated:** 2026-06-04
+**Last updated:** 2026-06-15
 
 This is the active UI/UX source of truth for:
 
@@ -854,512 +854,958 @@ Technical rules:
 - Use route-level `loading.tsx` and component skeletons.
 - Use paginated APIs and paginated tables for large lists.
 - Avoid client-side calculation of official totals; official totals must come from backend APIs.
-- Use TanStack Query for cache, mutation invalidation, prefetching, and background refetch on interactive client screens.
-- Avoid N+1 frontend request waterfalls; combine dashboard summary endpoints where appropriate.
-- Use `next/image` for images where applicable and fixed dimensions to avoid layout shift.
-- Virtualize or paginate large tables instead of rendering hundreds of rows.
-- Track Core Web Vitals before/after the overhaul.
-
-Performance acceptance targets:
-
-```text
-LCP: <= 2.5s on normal broadband staging
-INP: <= 200ms for common interactions
-CLS: <= 0.1
-Dashboard route transition: feels instant after shell load
-Module table filter/search: responsive without blocking typing
-```
+- Use TanStack Query for cache, mutation invalidation, pagination, and background refetch.
+- Do not fetch every module's data on the main dashboard.
+- Avoid large icon packs, chart bundles, and animation libraries unless needed.
+- Keep mobile network performance in mind for Nepal users.
 
 ---
 
 ## 17. Dashboard First: Target Screen
 
-The first overhaul target is `/dashboard`.
+The school dashboard should be the first overhaul target.
 
-Main job:
-
-```text
-Give school leadership and admins a calm, accurate overview of what needs attention today.
-```
-
-Recommended sections:
+Target purpose:
 
 ```text
-1. School day header
-2. Today summary cards
-3. Attention required panel
-4. Attendance snapshot
-5. Fee collection snapshot
-6. Admissions / student movement snapshot
-7. Notices and communication health
-8. Recent activity and audit-safe timeline
-9. Quick links to dedicated module screens
+Show what the school needs to know and act on today.
 ```
 
-Dashboard must not become a full report page. Each card links to its dedicated module screen.
+Recommended dashboard sections:
 
-Dashboard API/data rules:
+1. Welcome / school context / academic year.
+2. Today summary cards:
+   - Students present / absent.
+   - Fees collected today.
+   - Pending dues.
+   - Staff present / absent.
+   - Pending approvals.
+3. Priority tasks:
+   - Attendance not submitted.
+   - Payment reversals waiting approval.
+   - Report cards pending generation.
+   - Notices scheduled today.
+   - Payroll or accounting posting pending.
+4. Module health grid:
+   - Students.
+   - Attendance.
+   - Fees.
+   - Academics.
+   - Communication.
+   - HR.
+5. Recent activity / audit-safe activity stream.
+6. Optional right insight panel:
+   - Upcoming events.
+   - Quick reports.
+   - System/module warnings.
 
-- Use backend summary APIs only.
-- No fake KPI numbers.
-- No frontend-only official totals.
-- Show loading skeletons, stale-data indicators, and error recovery.
-- Respect role permissions; users see only modules they can access.
+Rules:
+
+- Dashboard should not become a shortcut wall.
+- Every card should link to a real module screen.
+- Metrics must come from backend APIs.
+- If a metric is unavailable, show unavailable state, not fake value.
+- Use role-aware dashboard variants later.
 
 ---
 
 ## 18. Dedicated School Module Screens
 
-Every module must own a dedicated route/workspace and sub-screens. Avoid hiding core operations inside generic dashboard cards.
+Each module needs its own workspace.
 
-### M1 Admissions / Students / Student Profiles
+### Students
 
-Target screens:
+Route:
 
 ```text
 /dashboard/students
 /dashboard/students/[id]
-/dashboard/admissions
-/dashboard/admissions/new
-/dashboard/admissions/review
 ```
 
-UX direction:
+Main job:
 
-- Student directory with search, class/section/status filters, sortable columns, and action menu.
-- Student profile tabs: Overview, Guardians, Attendance, Fees, Academics, Documents, Activity, History.
-- Admissions pipeline with drafts, duplicate warnings, document checklist, and review step.
-- Clear lifecycle actions: transfer, withdraw, graduate, archive, rejoin.
+```text
+Find, review, and manage student records safely.
+```
 
-### M2 Attendance
+Screen requirements:
 
-Target screens:
+- Student directory table.
+- Search by name/admission number/guardian phone.
+- Filters: class, section, status, admission year.
+- Student profile detail screen.
+- Tabs for profile, guardians, attendance, fees, documents, academics, activity, audit.
+- Clear status badges.
+- No fake documents or fake attendance summaries.
+
+### Admissions
+
+Route:
+
+```text
+/dashboard/admissions
+```
+
+Main job:
+
+```text
+Move applicants from inquiry/application to enrolled student.
+```
+
+Screen requirements:
+
+- Admission pipeline table or board.
+- Application status filters.
+- Duplicate warning panel.
+- Document checklist.
+- Enrollment action with confirmation.
+
+### Attendance
+
+Route:
 
 ```text
 /dashboard/attendance
-/dashboard/attendance/register
-/dashboard/attendance/corrections
-/dashboard/attendance/reports
 ```
 
-UX direction:
-
-- Class/section/date context bar.
-- Attendance register with clear present/absent/late/leave states.
-- Bulk present and exception marking may exist, but do not frame the workflow as a tap-count concept.
-- Draft, submit, lock, correction, conflict, and audit states visible.
-- Reports are separate from register entry.
-
-### M3 Fees / Receipts
-
-Target screens:
+Main job:
 
 ```text
-/dashboard/finance
-/dashboard/finance/collections
-/dashboard/finance/invoices
-/dashboard/finance/receipts
-/dashboard/finance/cashier-close
-/dashboard/finance/reversals-refunds
-/dashboard/finance/reports
+Mark, review, correct, and report attendance.
 ```
 
-UX direction:
+Screen requirements:
 
-- Separate cashier collection from accountant/ledger controls.
-- Student search and dues panel optimized for front-desk use.
-- Receipt success screen with print/download/share actions.
-- Reversal/refund/cashier close require confirmation and audit reason.
-- Gateway/payment mode must clearly show mock/disabled/sandbox/ready state.
+- Class/section/date filters.
+- Attendance marking screen.
+- Monthly register.
+- Corrections queue.
+- Lock/permission states.
+- Export attendance reports.
 
-### M4 Academics
+### Fees
 
-Target screens:
+Route:
+
+```text
+/dashboard/fees
+```
+
+Main job:
+
+```text
+Bill, collect, receipt, refund/reverse, and report student fees.
+```
+
+Screen requirements:
+
+- Fee dashboard summary.
+- Invoice list.
+- Payment collection panel.
+- Receipt viewer/reprint.
+- Defaulter list.
+- Refund/reversal approval queue.
+- Clear money display with NPR and tabular numbers.
+
+### Academics
+
+Route:
 
 ```text
 /dashboard/academics
-/dashboard/academics/exams
-/dashboard/academics/marks
-/dashboard/academics/cas
-/dashboard/academics/report-cards
-/dashboard/academics/promotion
 ```
 
-UX direction:
-
-- Exams workflow: Setup → Enter Marks → Validate → Lock → Publish → Generate Reports.
-- Keyboard-friendly marks/CAS grids.
-- Report-card history and regeneration context.
-- Result publish/withhold states explicit.
-
-### M5 Activity Feed
-
-Target screens:
+Main job:
 
 ```text
-/dashboard/activity
-/dashboard/activity/new
-/dashboard/activity/moderation
-/dashboard/activity/gallery
-/dashboard/activity/milestones
+Manage exams, marks, CAS, report cards, results, and promotions.
 ```
 
-UX direction:
+Screen requirements:
 
-- Activity Feed is for classroom updates and milestones.
-- Audience and media consent must be visible before publishing.
-- Moderated/archived states must be obvious.
-- Media upload must show compression/progress/retry states.
+- Exam term setup.
+- Marks entry grid.
+- CAS records.
+- Report card generation.
+- Result publishing readiness.
+- Promotions workflow.
 
-### M6 Homework / Timetable
+### Activity Feed
 
-Target screens:
+Route:
+
+```text
+/dashboard/activity-feed
+```
+
+Main job:
+
+```text
+Share classroom updates and milestones safely with families.
+```
+
+Screen requirements:
+
+- Post composer.
+- Audience preview.
+- Media gallery.
+- Moderation queue.
+- Parent-visible preview.
+- Consent-aware media states.
+
+### Homework & Timetable
+
+Route:
 
 ```text
 /dashboard/homework
-/dashboard/homework/new
-/dashboard/homework/review
 /dashboard/timetable
-/dashboard/timetable/builder
-/dashboard/timetable/substitutions
-/dashboard/timetable/conflicts
 ```
 
-UX direction:
+Main job:
 
-- Homework grouped by Due Today, Upcoming, Overdue, Checked, Closed.
-- Timetable builder separated from published timetable view.
-- Conflicts, rooms, teacher workload, and substitutions have dedicated screens/panels.
-- Substitution workflow shows available slots and absence context clearly.
+```text
+Assign learning work and manage school schedules.
+```
 
-### M7 HR / Payroll
+Screen requirements:
 
-Target screens:
+- Homework list/detail/submissions.
+- Missing/late reports.
+- Reminder workflow.
+- Timetable builder.
+- Teacher/room/period conflict indicators.
+- Substitution workflow.
+
+### HR & Payroll
+
+Route:
 
 ```text
 /dashboard/hr
-/dashboard/hr/staff
-/dashboard/hr/attendance
-/dashboard/hr/leave
 /dashboard/payroll
-/dashboard/payroll/runs
-/dashboard/payroll/payslips
-/dashboard/payroll/reports
 ```
 
-UX direction:
+Main job:
 
-- Staff lifecycle timeline.
-- Sensitive salary/bank fields masked by default unless permission allows.
-- Payroll workflow: Draft → Approved → Posted → Paid.
-- Statutory deductions and salary structures shown clearly.
+```text
+Manage staff records, leave, payroll runs, payslips, and payroll reports.
+```
 
-### M8A Library
+Screen requirements:
 
-Target screens:
+- Staff directory.
+- Staff profile/timeline.
+- Leave request queue.
+- Payroll run stepper.
+- Payslip PDF actions.
+- Statutory deduction reports.
+
+### Library
+
+Route:
 
 ```text
 /dashboard/library
-/dashboard/library/catalog
-/dashboard/library/issue-return
-/dashboard/library/borrowers
-/dashboard/library/fines
-/dashboard/library/reports
 ```
 
-UX direction:
+Main job:
 
-- Scanner-first issue/return screen.
-- Book/copy status visible.
-- Borrower profile shows current loans, overdue items, fines, history.
-- Fine posting/payment status must be clear.
+```text
+Manage books, copies, issue/return, reservations, overdue, and fines.
+```
 
-### M8B Transport
+Screen requirements:
 
-Target screens:
+- Book catalog.
+- Copy management.
+- Issue/return panel.
+- Overdue list.
+- Fines and reports.
+
+### Transport
+
+Route:
 
 ```text
 /dashboard/transport
-/dashboard/transport/routes
-/dashboard/transport/vehicles
-/dashboard/transport/trips
-/dashboard/transport/live-status
-/dashboard/transport/students
-/dashboard/transport/reports
 ```
 
-UX direction:
+Main job:
 
-- Show route/trip status before raw coordinates.
-- Latest GPS freshness visible: fresh, delayed, stale, no ping.
-- Parent tracking and live map remain gated until runtime/device/load checks pass.
-- Driver/vehicle overlap warnings visible.
+```text
+Manage routes, vehicles, student assignments, trips, and safety updates.
+```
 
-### M8C Canteen
+Screen requirements:
 
-Target screens:
+- Route and stop management.
+- Vehicle list.
+- Driver assignment.
+- Active trip tracking.
+- Delay broadcast.
+- Transport reports.
+
+### Canteen
+
+Route:
 
 ```text
 /dashboard/canteen
-/dashboard/canteen/pos
-/dashboard/canteen/menu
-/dashboard/canteen/wallets
-/dashboard/canteen/meal-plans
-/dashboard/canteen/inventory
-/dashboard/canteen/vendors
-/dashboard/canteen/reports
 ```
 
-UX direction:
+Main job:
 
-- Fast POS with student QR/search, wallet balance, allergy warning, and receipt.
-- Menu and inventory separated.
-- Low-stock, wallet guard, spending limit, allergy, and disabled-item warnings prominent.
+```text
+Manage menu, meal plans, servings, wallet, POS, suppliers, and inventory.
+```
 
-### M9 Accounting
+Screen requirements:
 
-Target screens:
+- Menu and meal plan setup.
+- Serving scanner/workspace.
+- Wallet summary and top-up history.
+- POS sales.
+- Inventory and supplier records.
+
+### Accounting
+
+Route:
 
 ```text
 /dashboard/accounting
-/dashboard/accounting/chart-of-accounts
-/dashboard/accounting/journals
-/dashboard/accounting/fiscal-periods
-/dashboard/accounting/reconciliation
-/dashboard/accounting/reports
-/dashboard/accounting/audit
 ```
 
-UX direction:
-
-- Accountant dashboard shows fiscal period, pending postings, unreconciled items, and export history.
-- Posted entries immutable; corrections use reversal/correction workflows.
-- Bank import/reconciliation has review, validation errors, matching suggestions, and confirmation.
-
-### M10 Notices / Chat
-
-Target screens:
+Main job:
 
 ```text
-/dashboard/notices
-/dashboard/notices/new
-/dashboard/notices/deliveries
-/dashboard/messages
-/dashboard/messages/threads
-/dashboard/messages/moderation
+Control chart of accounts, journals, periods, reports, and reconciliation.
 ```
 
-UX direction:
+Screen requirements:
 
-- Notices are official announcements; chat is conversation.
-- Notice audience preview before high-impact sending.
-- Delivery failures, unread recipients, provider mode, and retry state visible.
-- Chat moderation/report/block/escalation states explicit.
+- Accounting dashboard.
+- Chart of accounts.
+- Journal workflow.
+- Period/fiscal year controls.
+- Financial reports.
+- Bank reconciliation.
+
+### Notices & Chat
+
+Route:
+
+```text
+/dashboard/communications
+```
+
+Main job:
+
+```text
+Send notices and manage school-safe communication.
+```
+
+Screen requirements:
+
+- Notice composer.
+- Recipient preview.
+- Scheduled notices.
+- Parent-teacher chat inbox.
+- Escalation/abuse review.
+- School-hour and policy states.
+
+### Reports
+
+Route:
+
+```text
+/dashboard/reports
+```
+
+Main job:
+
+```text
+Find, generate, export, and review reports safely.
+```
+
+Screen requirements:
+
+- Report catalog.
+- Filter form.
+- Export history.
+- Retry failed exports.
+- CSV/PDF download with authenticated helper.
 
 ### Settings
 
-Target screens:
+Route:
 
 ```text
 /dashboard/settings
-/dashboard/settings/school-profile
-/dashboard/settings/academic-structure
-/dashboard/settings/classes-sections
-/dashboard/settings/roles-permissions
-/dashboard/settings/modules
-/dashboard/settings/fees
-/dashboard/settings/notifications
-/dashboard/settings/security-audit
 ```
 
-UX direction:
+Main job:
 
-- Settings grouped by school operational domains.
-- No developer/platform-only settings shown to normal school admins.
-- Audit-log visibility included for permitted users.
-- Dangerous changes require confirmation and reason.
+```text
+Configure the school, academic setup, users, roles, branding, and integrations.
+```
+
+Screen requirements:
+
+- School profile.
+- Academic years/classes/sections where applicable.
+- Users and roles.
+- Branding/logo.
+- Integrations/provider status where tenant-owned.
+- Audit logs.
 
 ---
 
 ## 19. Platform Control Plane Screens
 
-Target screens:
+Platform screens must live outside `/dashboard`.
+
+Route group:
+
+```text
+/platform/*
+```
+
+Required workspaces:
 
 ```text
 /platform/dashboard
 /platform/schools
 /platform/schools/[tenantId]
-/platform/schools/[tenantId]/billing
-/platform/settings
-/platform/settings/plans
-/platform/settings/providers
-/platform/operations/health
-/platform/operations/queues
-/platform/operations/audit
-/platform/operations/reports
+/platform/billing
+/platform/plans
+/platform/providers
+/platform/queues
+/platform/audit
+/platform/report-exports
 ```
 
-UX direction:
+Rules:
 
-- Platform is for SchoolOS operators, not school staff.
-- Use operational language: tenant health, provider readiness, queue failures, billing state, support access.
-- Dangerous platform actions require confirmation, reason, permission, and audit trail.
-- Provider screens must clearly show disabled/mock/sandbox/ready states.
+- Platform uses enterprise/indigo accent.
+- Platform dashboard shows SaaS/operator concerns, not tenant school operations.
+- Support override mode must be highly visible.
+- Tenant status actions need confirmation and reason.
+- Queue retry/discard must be audited.
+- SaaS billing must not mix with school fee collection.
 
 ---
 
 ## 20. API Integration Rules
 
-Every screen must have an explicit backend API integration plan:
-
-```text
-Read APIs
-Mutation APIs
-Permission requirements
-Tenant ownership rules
-Loading state
-Empty state
-Error state
-Success state
-Audit behavior
-Cache invalidation behavior
-Pagination/filter behavior
-```
+All dashboard and module screens must use real backend APIs.
 
 Rules:
 
-- Frontend must not invent missing official totals.
-- Frontend must not persist production workflow state only in memory.
-- Frontend must parse backend error messages into school-friendly copy.
-- Mutations must invalidate or update relevant TanStack Query keys.
-- Growing lists must use server pagination/filtering.
-- Backend permission denial must show `PermissionState`, not a broken screen.
+```text
+1. No fake production data.
+2. No placeholder metrics in live module screens.
+3. No local-only production workflow state.
+4. Use existing API clients under apps/web/lib/api or create module API clients there.
+5. Preserve cookie-first auth.
+6. Do not store raw tokens in browser storage.
+7. Use TanStack Query for interactive server state.
+8. Use loading, empty, error, success, permission, and locked states.
+9. Use backend pagination for large records.
+10. Use authenticated blob/download helpers for PDFs and CSVs.
+11. Parent/student/mobile APIs must remain purpose-limited.
+12. Do not use admin endpoints to power parent/student views when scoped routes exist.
+```
+
+Every module implementation should document:
+
+```text
+Backend route -> school workflow -> UI screen -> component -> API client -> state handling -> verification
+```
 
 ---
 
 ## 21. Implementation Sequence
 
-Start with design system, then Dashboard, then shell/components, then modules.
+Recommended order:
 
-```text
-0. Remove old shortcut/tap-based language from docs and user-facing copy.
-1. Apply design-system decisions: component strategy, palette, typography, font loading, size scale.
-2. Convert font loading from CSS @import to next/font/google Inter.
-3. Add/standardize cn/class utility if missing.
-4. Standardize Button, Card, Badge, Input, Select, Tabs, Dialog, AlertDialog, Sheet, DropdownMenu, Table, Skeleton, EmptyState, ErrorState, PermissionState.
-5. Add module color token map.
-6. Audit current dashboard and platform shell.
-7. Overhaul `/dashboard` first.
-8. Overhaul school operations shell/sidebar/topbar.
-9. Overhaul Platform Control Plane shell/screens.
-10. Module pass 1: M1 Students/Admissions, M2 Attendance, M3 Fees.
-11. Module pass 2: M4 Academics, M6 Homework/Timetable, M10 Notices/Chat.
-12. Module pass 3: M7 HR/Payroll, M9 Accounting.
-13. Module pass 4: M8A Library, M8B Transport, M8C Canteen.
-14. Settings polish and audit/security visibility.
-15. Performance, accessibility, route smoke, and visual regression pass.
-```
+1. Stabilize design tokens, typography, AppShell, Topbar, Sidebar, PageHeader, SectionCard, DataTable, state components.
+2. Rebuild Dashboard first.
+3. Rebuild Settings and RBAC surfaces.
+4. Rebuild Students/Admissions.
+5. Rebuild Attendance.
+6. Rebuild Fees.
+7. Rebuild Academics.
+8. Rebuild Homework/Timetable.
+9. Rebuild HR/Payroll.
+10. Rebuild Library/Transport/Canteen.
+11. Rebuild Accounting.
+12. Rebuild Notices/Chat.
+13. Rebuild Platform control plane.
+14. Add role-aware mobile/web polish.
+15. Add browser E2E coverage for critical workflows.
 
-Do not overhaul all pages in one uncontrolled diff. Work module-by-module with tests and screenshots where possible.
+Do not start with decorative redesign. Start with shell, state system, real APIs, and dashboard.
 
 ---
 
 ## 22. Current UI Progress Snapshot
 
-Current status:
+Known direction:
+
+- Backend modules are broad and mature.
+- Web already has module pages and workspaces in many areas.
+- Current frontend needs consistent UX, stronger role-aware navigation, real state handling, and final SchoolOS design polish.
+- Platform UI needs clear separation from school operations.
+- Dashboard should be rebuilt as the command center.
+
+Current risk:
 
 ```text
-Admin web global polish is implemented for the current modular-monolith scope.
-Dashboard shell polish, accounting audit context, transport location freshness, scanner-first Library/Canteen QR flows, report-card correction review, and app-controlled toasts/confirmation dialogs are present.
-A full web dashboard UI/UX overhaul direction, component strategy, color palette, typography, font scale, and module-screen plan are now merged into this guide.
-Next UI work should start with frontend implementation for the verified backend foundations: design-system primitives and `/dashboard`, then shared shell/components, then platform, module, and Advanced Operations workspaces.
+The system may have many working pages but inconsistent user experience.
 ```
 
-Implemented highlights:
-
-- Dashboard shell includes skip link, sharper card radius, readable section/stat typography, and clearer fee-alert routing.
-- Accounting audit workspace surfaces summary cards, richer log detail, and loading/empty states.
-- Transport latest-location workflow shows Fresh, Delayed, Stale, and No ping context.
-- Library issue and Canteen serving/POS workflows use scanner-first copy/student QR context and warnings.
-- Academics, Homework, Admissions, Staff, Students, and Platform operations use app-controlled feedback instead of browser-native `alert()`/`confirm()`.
-- Web contract rejects future `alert()`/`confirm()` usage in `apps/web/app` and `apps/web/components`.
-- Flutter parent, teacher, notification, staff, driver, and canteen surfaces now use purpose-limited APIs where available.
-
-Verification snapshot:
+Main frontend goal:
 
 ```text
-- Web contract tests passed for app-controlled feedback coverage in prior targeted polish runs.
-- Web typecheck has passed in prior targeted polish runs.
-- Local smoke suites now pass with API, web, Postgres, and Redis running (`pnpm smoke:pilot`, `pnpm smoke:learning`, `pnpm smoke:full`).
-- Seeded browser E2E, visual regression, and staging smoke still need execution before claiming UI or pilot production readiness.
+Turn working module screens into a coherent, professional SchoolOS product experience.
 ```
 
 ---
 
 ## 23. Accessibility and Smoke Coverage
 
-Required:
+Minimum accessibility rules:
 
-- Keyboard navigation and visible focus rings.
-- `aria-label` for icon-only buttons.
-- Dialog focus trap.
-- Escape-to-close behavior where appropriate.
-- Skeleton/loading frames instead of confusing blank areas.
-- Empty, error, and permission-denied states for all important routes.
-- No layout shift on dashboard cards/tables/fonts.
-- No console errors.
-- No fake data.
-- API calls are permission-safe and tenant-safe.
-- Core Web Vitals should be checked before claiming UI overhaul completion.
+- Keyboard reachable dialogs, menus, selects, tabs, and sheets.
+- Visible focus states.
+- Proper labels for inputs.
+- Do not rely only on color for status.
+- Sufficient text contrast.
+- Error messages associated with fields.
+- Tables should have clear headers.
+- Buttons must have meaningful labels.
+
+Smoke coverage should include:
+
+- Dashboard loads.
+- Navigation opens module pages.
+- Login/session restore works.
+- Main API-backed list page loads per module.
+- Loading/empty/error states render.
+- Permission hidden nav works.
+- Module locked state works.
+- Critical PDF/CSV actions use authenticated helpers.
 
 ---
 
 ## 24. Verification Checklist
 
-For every UI overhaul slice:
+Before marking UI/UX overhaul work complete, run:
 
 ```bash
-pnpm --filter @schoolos/web lint
 pnpm --filter @schoolos/web typecheck
-pnpm --filter @schoolos/web test
-pnpm --filter @schoolos/web build
+pnpm typecheck
+pnpm build
+pnpm smoke:pilot
+pnpm smoke:learning
+pnpm smoke:full
 ```
 
-When services are available:
+Also manually verify:
 
-```bash
-pnpm --filter @schoolos/web test:e2e
-pnpm smoke:pilot          # Legacy alias: pnpm smoke:phase1
+```text
+1. Dashboard has no fake production data.
+2. Sidebar has no phase labels.
+3. Platform and school operations are separate.
+4. Every module page has loading/empty/error states.
+5. Role-hidden navigation behaves correctly.
+6. Money values use tabular numbers and NPR labels.
+7. Dangerous actions require confirmation/reason.
+8. PDFs/CSVs use authenticated download helpers.
+9. Mobile layouts do not become dense desktop tables.
+10. Public website does not expose tenant operations.
 ```
-
-Manual checks:
-
-- Keyboard navigation.
-- Focus rings.
-- Screen-reader labels for icon buttons.
-- Loading skeletons.
-- Empty states.
-- Error states.
-- Permission denied states.
-- Slow network behavior.
-- No layout shift on dashboard cards/tables.
-- No console errors.
-- No fake data.
-- API calls are permission-safe and tenant-safe.
 
 ---
 
 ## 25. Definition of Done for the Web UI/UX Overhaul
 
+The overhaul is done when:
+
 ```text
-1. Dashboard is redesigned and backend-backed.
-2. School and platform shells are consistent, fast, responsive, and permission-aware.
-3. Each module has dedicated screens for its real workflow.
-4. Every module uses shared UI primitives and design tokens.
-5. No old shortcut/tap-based UX language remains in docs or user-facing copy.
-6. All module pages connect to real backend APIs.
-7. Large lists use server pagination/filtering.
-8. Mutations show pending/success/error states and invalidate correct queries.
-9. Financial, posting, publishing, lock, retry, and destructive actions use confirmation/audit reason where needed.
-10. Core Web Vitals and route smoke are checked before claiming UI completion.
+1. SchoolOS feels like one coherent product.
+2. Dashboard gives useful real school information.
+3. Every major module has a dedicated workspace.
+4. Platform control plane is separate and safe.
+5. Shared components are reused instead of one-off page styling.
+6. Real backend APIs power production data.
+7. Loading, empty, error, permission, and module-locked states are consistent.
+8. Role-aware navigation is clear.
+9. Critical workflows are covered by smoke/browser tests.
+10. Non-technical school staff can understand what to do next on every page.
+```
+
+---
+
+## 26. Component Governance: Custom vs Dependency Rules
+
+This section strengthens Sections 5, 6, 12, 15, and 20. If there is doubt, follow this rule:
+
+```text
+SchoolOS owns the design system. Dependencies may power behavior, but they must not define the product experience.
+```
+
+### 26.1 Final component decision
+
+SchoolOS should use a **hybrid professional component strategy**:
+
+```text
+Custom SchoolOS components for product experience + approved dependencies for complex accessible behavior.
+```
+
+Do **not** use a full component provider or admin dashboard kit as the primary UI layer. SchoolOS must not look like a generic SaaS template. It must feel like a trustworthy, Nepal-ready School Management System.
+
+### 26.2 What must be SchoolOS-owned
+
+These components must be SchoolOS-owned and live under `apps/web/components/ui`, `apps/web/components/layout`, `apps/web/components/dashboard`, or `apps/web/components/<module>`:
+
+| Component area | Decision | Reason |
+|---|---|---|
+| App shell, topbar, sidebar, platform shell | Custom SchoolOS components | Navigation, tenant context, role visibility, and platform separation are product-specific. |
+| Page headers, module headers, context bars | Custom SchoolOS components | Every module needs school-friendly title, description, primary action, filters, and next-step guidance. |
+| Cards, stat cards, insight cards | Custom SchoolOS components | Must use SchoolOS tokens, module accents, tabular numbers, and Nepal school language. |
+| Data table wrapper | Custom SchoolOS `DataTable` wrapper | Tables need consistent loading, empty, error, permission, pagination, exports, bulk actions, and audit behavior. |
+| Filter bar, search input, saved filter patterns | Custom SchoolOS components | Filters must match school workflows: academic year, class, section, month, student, staff, route, account period. |
+| Pagination | Custom SchoolOS pagination wrapper | Pagination copy, disabled states, mobile behavior, and backend query handling must stay consistent. |
+| Breadcrumbs | Custom SchoolOS breadcrumbs | Breadcrumbs need module-aware labels and should never expose technical route names. |
+| Empty, loading, error, permission, module-locked states | Custom SchoolOS state components | Every workflow must explain the next action using school language. |
+| Confirm dialog and audit reason dialog | Custom SchoolOS wrappers | Dangerous actions need confirmation, reason, audit hint, permission check, and pending/error states. |
+| Money, date, student, staff, module, and status displays | Custom SchoolOS domain components | NPR, academic years, class/section labels, statuses, and identity display need consistent handling. |
+| Module workspaces | Custom SchoolOS domain components | Student, fees, attendance, academics, transport, canteen, payroll, accounting, and communication workflows are domain-specific. |
+
+### 26.3 What may use approved dependencies under the hood
+
+Approved dependencies may be used only when they improve accessibility, reliability, performance, or developer velocity without taking over the design system.
+
+| Need | Approved direction | Rule |
+|---|---|---|
+| Dialogs, alert dialogs, dropdowns, popovers, tooltips, tabs, sheets, command menu | shadcn-style/Radix-based primitives adapted into SchoolOS components | Vendor/adapt code into SchoolOS components and style with SchoolOS tokens. |
+| Complex tables with sorting, column visibility, row selection, grouping, pinning | TanStack Table under a SchoolOS `DataTable` wrapper | Do not expose TanStack APIs directly across module pages. |
+| Server state, caching, pagination, mutation invalidation | TanStack Query | Required for interactive authenticated server state. |
+| Forms and validation | React Hook Form + Zod | Required for forms with inline errors, disabled states, and safe submit behavior. |
+| Icons | Lucide icons | Use consistent icon stroke/size rules. Do not mix many icon packs. |
+| Charts | A small approved chart dependency only behind `SchoolOSChart` wrappers | Use backend official totals. Do not build official finance/attendance totals in the browser. |
+| Date picking/calendar behavior | shadcn-style/Radix-compatible date picker pattern | Must support Nepali school calendar needs later without rewriting all screens. |
+
+### 26.4 Dependency approval checklist
+
+Before adding any UI dependency, it must pass all checks:
+
+```text
+1. It solves a real repeated product problem.
+2. It is accessible or helps us build accessible behavior.
+3. It is compatible with Next.js App Router, React, Tailwind CSS, and SSR/client boundaries.
+4. It is themeable with SchoolOS tokens.
+5. It does not force a separate visual language.
+6. It is tree-shakeable or small enough for dashboard performance.
+7. It has acceptable maintenance, license, and security posture.
+8. It does not duplicate an existing SchoolOS component.
+9. It can be wrapped behind a SchoolOS-owned component API.
+10. It does not move business rules out of backend/API contracts.
+```
+
+### 26.5 Component implementation rules by common pattern
+
+| Pattern | Professional SchoolOS rule |
+|---|---|
+| Tables | Use `DataTable` for all dense admin lists. Support loading, empty, error, permission denied, module locked, pagination, row actions, bulk actions where allowed, and CSV/PDF export actions where backed by API. |
+| Filters | Use `FilterBar` with explicit filters. Common filters: academic year, class, section, date/month, status, student, staff, route, account period, payment mode. Preserve filters on refetch/navigation where useful. |
+| Search | Use `SearchInput` for local screen search and `CommandSearch` for global search. Global search should support student name, admission number, guardian phone, invoice number, receipt number, staff, book barcode, vehicle number, and notice title. |
+| Pagination | Prefer backend pagination for large lists. Never load thousands of records just to paginate in the browser. |
+| Breadcrumbs | Use human labels: `Students > Aarav Shrestha > Fee Ledger`, not technical route segments. |
+| Cards | Use cards for summaries, insights, and mobile views. Do not replace dense finance/accounting/attendance tables with card-only layouts on desktop. |
+| Dropdowns and action menus | Use for secondary actions. Primary screen action stays visible in the page header. Dangerous actions must open `AuditReasonDialog`. |
+| Drawers/sheets | Use for quick detail, preview, or edit where the user should not lose table context. Use full pages for complex workflows. |
+| Forms | Use React Hook Form + Zod. Show field errors, helper text, disabled states, unsaved changes handling where needed, and clear success/error feedback. |
+| Toasts | Use for lightweight confirmation only. Do not use toast as the only place for important errors. |
+| File/PDF/CSV actions | Use authenticated blob/download helpers. Do not use raw unauthenticated URLs for private school data. |
+
+---
+
+## 27. Professional Module Design and Color Strategy
+
+### 27.1 Final color decision
+
+For Nepal schools and SchoolOS, the best professional design is:
+
+```text
+One shared SchoolOS base palette + small module accent colors.
+```
+
+Do **not** give every module a completely different full color palette. That makes the product feel fragmented, childish, and harder for school staff to learn. A school management system should feel calm, official, safe, and trustworthy.
+
+### 27.2 Why this is best for Nepal school operations
+
+Nepal school users include owners, principals, office admins, accountants, teachers, parents, drivers, and canteen/library staff. Many users are non-technical and will use the system under daily operational pressure. Therefore:
+
+```text
+Consistency is more important than decoration.
+```
+
+Use the same base layout, spacing, typography, card style, table style, form style, and state components across modules. Use module accent colors only to help users quickly identify where they are.
+
+### 27.3 Module accent usage rules
+
+| Use module accent for | Do not use module accent for |
+|---|---|
+| Sidebar active marker | Error states |
+| Module icon background | Success states |
+| Section left border | Warning or danger states |
+| Soft badge background | Financial risk states |
+| Tab active state | Approval/rejection states |
+| Small decorative module identity | Emergency notices |
+| Empty-state illustration/accent | Accounting debit/credit meaning |
+
+Semantic status colors always win:
+
+```text
+Success = success green
+Warning = warning amber
+Danger/error = danger red
+Info = info blue
+Neutral = slate/gray
+```
+
+Examples:
+
+```text
+M3 Fees uses amber as module identity, but failed payment uses danger red.
+M10 Notices uses rose as module identity, but emergency notice uses danger red.
+M8B Transport uses orange as module identity, but delayed trip uses warning amber.
+M9 Accounting uses teal as module identity, but unbalanced journal uses danger red.
+```
+
+### 27.4 Visual maturity rules
+
+SchoolOS module screens should look professional and trustworthy:
+
+```text
+1. Calm app background.
+2. White cards and tables.
+3. Strong readable text.
+4. Consistent module accents.
+5. Few gradients.
+6. No colorful dashboard-kit look.
+7. No cartoon-heavy admin screens.
+8. No tiny low-contrast operational data.
+9. Clear hierarchy: title, filters, summary, workspace, actions.
+10. Tables for dense school-office data; cards for summaries and mobile views.
+```
+
+### 27.5 Platform color separation
+
+Platform Control must look related to SchoolOS but clearly separate from school operations.
+
+```text
+School operations: SchoolOS blue base + module accents.
+Platform control: indigo/enterprise accent + operational risk states.
+```
+
+Never mix:
+
+```text
+M0 SaaS billing with M3 student fees.
+M0 support override with school staff settings.
+M0 platform audit with tenant accounting audit.
+```
+
+---
+
+## 28. Role-Based Screen, Device, and Data Access Rules
+
+### 28.1 Final access design principle
+
+SchoolOS access must be:
+
+```text
+Role-aware, permission-backed, tenant-scoped, child-safe, and minimum-necessary.
+```
+
+The frontend must hide navigation and actions that a role cannot use, but backend permissions remain the source of truth. A hidden button is not security.
+
+### 28.2 Device access strategy
+
+| Actor family | Web access | Mobile access | Best experience |
+|---|---|---|---|
+| Platform operator | Yes | Usually no | Web-only platform control plane. |
+| School owner/director | Yes | Optional executive mobile | Web for deep review, mobile for high-level alerts/approvals. |
+| Principal/head teacher | Yes | Yes | Web for operations, mobile for alerts/approvals. |
+| Vice principal/academic coordinator | Yes | Optional | Web-first for academics/timetable/exams. |
+| School admin/office admin | Yes | Optional | Web-first for student/admin workflows. |
+| Admission officer | Yes | Optional | Web-first for application and document workflows. |
+| Accountant | Yes | Optional approval/summary only | Web-first for finance/accounting. |
+| Cashier/fee collector | Yes | Optional receipt lookup only | Web-first counter workflow. |
+| HR/payroll officer | Yes | Optional approval/summary only | Web-first staff/payroll workflow. |
+| Teacher/class teacher | Yes | Yes | Web for detailed work, mobile for attendance/homework/activity updates. |
+| Subject teacher | Yes | Yes | Web for marks/homework, mobile for quick tasks. |
+| Librarian | Yes | Optional scanner mobile later | Web-first issue/return/catalog. |
+| Transport manager | Yes | Yes | Web for routes/vehicles/reports, mobile for live operations. |
+| Driver/conductor | No admin web | Yes | Mobile-only assigned trips, manifest, boarding/dropping, emergency contact. |
+| Canteen manager/POS staff | Yes | Optional tablet/mobile POS | Web/tablet POS and inventory. |
+| Parent/guardian | Optional parent web portal | Yes | Mobile-first child updates, fees, homework, notices, chat. |
+| Student | Optional student web portal | Yes | Mobile/card-first age-appropriate self-service. |
+
+### 28.3 Role dashboard rule
+
+After login, users should not all see the same dashboard. They should land on the most useful view for their role.
+
+```text
+Owner/director -> Executive Overview
+Principal -> School Operations Overview
+Teacher -> My Classes Today
+Accountant -> Finance Today
+Cashier -> Fee Collection Counter
+HR/payroll -> Staff and Payroll Today
+Librarian -> Library Desk
+Transport manager -> Transport Operations Today
+Driver -> My Assigned Trip
+Canteen staff -> Canteen POS Today
+Parent -> My Child Overview
+Student -> My Learning Today
+Platform operator -> Platform Attention Dashboard
+```
+
+If one user has multiple roles, show a role-aware combined dashboard with a clear role/context switcher where needed. Do not create duplicate accounts for the same person.
+
+### 28.4 Owner and principal overlap rule
+
+In many Nepal schools, the school owner and principal may be the same person. SchoolOS should support this without confusion.
+
+Rules:
+
+```text
+1. One person can have both Owner/Director and Principal roles.
+2. Permissions are the union of assigned roles, limited by tenant and module entitlement.
+3. The dashboard may show both Executive Overview and School Operations Overview sections.
+4. High-risk actions still require confirmation, reason, and audit trail.
+5. Audit logs must show the actual user and the role/context used for the action where available.
+6. If owner and principal are separate people, financial ownership views and academic operation views should remain distinct.
+```
+
+Owner/director focus:
+
+```text
+Business health, revenue, dues, enrollment, expenses, staff cost, risks, approvals, school growth, platform subscription, high-level audit.
+```
+
+Principal focus:
+
+```text
+Daily school operations, attendance, academics, teacher workload, exams, discipline, communication, parent issues, timetable, result readiness.
+```
+
+---
+
+## 29. Role-to-Information Access Matrix
+
+This matrix defines what each role should see by default. Exact permissions still come from backend RBAC and module entitlements.
+
+| Role | Default landing view | Should see | Can manage | Should not see by default |
+|---|---|---|---|---|
+| Platform operator | Platform Attention Dashboard | Tenants, plans, SaaS billing, provider readiness, queues, platform audit, support overrides | School onboarding, subscriptions, provider tests, failed jobs, platform reports | Tenant-private student/finance details unless using audited support access. |
+| School owner/director | Executive Overview | Enrollment, revenue, dues, expenses, cash/bank summary, staff cost, attendance risk, academic outcomes, module health, audit highlights | High-level approvals, plan/subscription review, school settings if granted | Private chats, child-sensitive notes, teacher private details unless policy grants. |
+| Principal/head teacher | School Operations Overview | Today attendance, absent teachers, substitutions, academic calendar, exam readiness, discipline/communication issues, pending approvals | Academic workflows, notices, attendance review, result publish, teacher coordination | Detailed accounting ledgers/payroll salaries unless explicitly granted. |
+| Vice principal/academic coordinator | Academic Operations | Classes, sections, teacher workload, timetable, exams, marks, report cards, syllabus, substitutions | Exam terms, assessment setup, timetable publish, marks review, report card readiness | Full finance, payroll, platform billing. |
+| School admin/office admin | Office Dashboard | Student records, admissions, guardians, documents, settings tasks, notices, reports | Student profile updates, guardian invitations, document generation, basic settings | Salary details, ledger postings, private communications unless assigned. |
+| Admission officer | Admissions Pipeline | Applications, document status, duplicate candidates, enrollment readiness, guardian details needed for admission | Application status, bulk import, duplicate review, enrollment handoff | Existing student finance ledger beyond admission fee context, payroll/accounting. |
+| Class teacher | My Class Today | Own class roster, attendance, homework, activity posts, parent communication, student academic/attendance summary | Mark attendance, create homework/activity posts, communicate with parents during allowed hours | Other classes, school-wide finance, payroll, accounting, unrelated student records. |
+| Subject teacher | My Teaching Today | Assigned subjects/classes, syllabus, homework, marks entry, own timetable, relevant student academic info | Enter marks, manage subject homework, syllabus progress, class activity where allowed | Fees, payroll, accounting, unrelated guardian/private data. |
+| Accountant | Finance Today | Fee setup, invoices, dues, payments, receipts, cashier close, reports, accounting journals, reconciliation | Fee plans, billing runs, payment review, refunds/reversals if permitted, journals, reports | Academic marks, private student notes, parent chat content, staff HR details beyond payroll needs. |
+| Cashier/fee collector | Collection Counter | Student billing identity, dues, invoices, payment modes, receipt history, cashier close preview | Collect payment, issue receipt, reprint with reason, close cashier day | Fee setup, accounting configuration, payroll, academic records. |
+| HR/payroll officer | Staff and Payroll Today | Staff directory, contracts/status, leave, attendance, salary structures, payroll runs, payslips, payroll reports | Staff lifecycle, leave review, payroll preparation, salary structures, payslip generation | Student fees, academic marks, parent chat, tenant platform billing. |
+| Librarian | Library Desk | Books, copies, issue/return, borrower identity, overdue, reservations, fines, library reports | Catalog, issue/return, reservations, fine posting if permitted | Student full profile, finance ledger, payroll, private guardian information. |
+| Transport manager | Transport Operations Today | Routes, stops, vehicles, drivers, assignments, trips, GPS status, delays, transport reports | Route/vehicle/trip setup, student assignments, delay broadcasts, maintenance records | Academic marks, payroll salary details, accounting ledgers. |
+| Driver/conductor | My Assigned Trip | Assigned vehicle/route, student manifest, pickup/drop status, emergency contact, trip instructions | Start/complete trip, mark boarded/dropped/absent, send location/delay/emergency updates | Fees, academics, full student profiles, other routes, parent private details. |
+| Canteen manager/POS staff | Canteen POS Today | Menu, meal plans, enrolled students, serving eligibility, wallet balance/status, POS sales, stock | Serve meal, POS sale, stock movement, menu/inventory if manager | Academic marks, payroll, full guardian records, accounting beyond canteen reports. |
+| Parent/guardian | My Child Overview | Own child attendance, homework, fees/receipts, notices, activity feed, report cards after publish, transport, canteen, library, teacher chat | Pay/track fees where enabled, message allowed teachers, view/download own child docs/receipts | Other children, teacher/staff private data, internal school reports, unpublished results. |
+| Student | My Learning Today | Own timetable, homework, submitted work, published results, library borrowing, notices, activity where age-appropriate | Submit homework, view own progress, update limited profile fields if allowed | Fees management, parent/staff data, other students, unpublished marks/results. |
+| Canteen POS-only staff | POS Counter | Active menu, scan/resolve student, wallet eligibility, serving/payment result | Serve item, complete POS sale, print/view POS receipt | Inventory purchase cost, finance reports, student full profile. |
+| Support user under override | Support Session Banner | Only support-relevant diagnostics granted by platform override | Troubleshoot within time-limited audited session | Unrelated tenant data, hidden child/private data unless specifically required and audited. |
+
+### 29.1 Data minimization rules
+
+```text
+1. Show each role the minimum data needed to finish their job.
+2. Prefer scoped endpoints for parents, students, staff self-service, drivers, and mobile users.
+3. Do not use admin endpoints to power parent/student/driver screens when purpose-limited APIs exist.
+4. Hide irrelevant navigation before the user reaches a page.
+5. Hide unavailable actions on the page.
+6. Still show permission-denied and module-locked states when a user reaches a blocked route directly.
+7. Do not expose raw tokens, private file URLs, internal IDs, or unnecessary audit internals.
+8. Sensitive child data should be visible only to roles with a real school reason.
+9. Finance and payroll visibility must be stricter than general admin visibility.
+10. Owner-level visibility does not automatically mean every private conversation or child-sensitive note is visible.
+```
+
+### 29.2 Role-based navigation rules
+
+```text
+1. Navigation should be generated from assigned role permissions and module entitlements.
+2. A user with multiple roles should see a clean merged navigation, not duplicate modules.
+3. Platform navigation must never appear inside the normal school sidebar.
+4. Parent/student/driver mobile navigation must be purpose-built and minimal.
+5. Reports should show only report categories the user can legally access.
+6. Settings should be split by responsibility: school profile, academic setup, finance setup, users/roles, integrations, and audit.
+```
+
+### 29.3 Role-based screen design rules
+
+| Role type | Screen design priority |
+|---|---|
+| Owner/director | Executive summaries, trends, risks, approvals, cash/dues, growth, audit highlights. Avoid operational clutter. |
+| Principal | Today’s school operation, academic readiness, teacher/class issues, pending approvals, communication risks. |
+| Office/admin | Search, forms, document readiness, student lifecycle, guardian management, clean task queues. |
+| Teacher | My classes, fast attendance, homework, marks, student context, parent communication. Avoid finance/admin clutter. |
+| Accountant/cashier | High-contrast money data, receipts, dues, approvals, audit trail, cashier close. No decorative UI. |
+| HR/payroll | Staff lifecycle, leave/payroll status, approval steps, PDF/CSV exports, confidential salary handling. |
+| Transport/driver | Trip status, route clarity, student safety, delay/emergency actions, mobile-friendly scanning/status updates. |
+| Canteen/POS | Fast scan/serve/sell flow, wallet eligibility, clear success/failure states, stock visibility for managers only. |
+| Parent/student | Card-based, simple language, own-child/own-data only, no dense tables, clear next action. |
+| Platform operator | Operational control, tenant status, provider/queue health, auditability, support override safety. |
+
+---
+
+## 30. Role-Based First-Login Information Requirements
+
+Each role dashboard should answer: `What should I know right now, and what should I do next?`
+
+| Role | First-login information required |
+|---|---|
+| School owner/director | Total students, new admissions, active/inactive students, monthly fee collection, outstanding dues, expenses/payroll summary, cash/bank health if enabled, attendance risk, academic result trend, staff count, pending approvals, audit/security alerts, module subscription/lock status. |
+| Principal/head teacher | Today’s student attendance, absent teachers, class coverage/substitutions, timetable issues, pending attendance corrections, homework completion risk, exam/result readiness, notices needing approval, parent escalations, discipline/communication alerts. |
+| Vice principal/academic coordinator | Current exam term, mark entry completion, CAS/report card readiness, timetable validation issues, teacher workload, syllabus progress, substitution needs, promotions/result publish readiness. |
+| School admin/office admin | Admission applications, incomplete student profiles, document expiry/readiness, duplicate candidates, guardian verification queue, pending notices, settings/onboarding tasks. |
+| Admission officer | New applications, status pipeline, documents missing, duplicate warnings, accepted applications ready to enroll, bulk import batches needing review. |
+| Class teacher | Own class attendance today, students absent repeatedly, homework due/missing, upcoming timetable, activity/milestone tasks, parent messages during allowed hours, student birthdays/events if enabled. |
+| Subject teacher | Today’s teaching periods, assigned homework, mark entry tasks, syllabus topics, students needing attention, upcoming exams for assigned subjects. |
+| Accountant | Today’s collection, pending invoices, overdue dues, failed/online payments, refund/reversal requests, cashier close status, accounting posting exceptions, report export shortcuts. |
+| Cashier | Search student by name/admission/phone, collect payment, recent receipts, pending reprints, cashier close preview, payment mode readiness. |
+| HR/payroll officer | Staff attendance today, leave requests, contract/lifecycle alerts, payroll run status, salary structure gaps, payslip/report tasks. |
+| Librarian | Books due today, overdue list, issue/return scanner/search, reservations, damaged/lost copies, fine queue. |
+| Transport manager | Active trips, route delays, missing GPS/stale vehicles, driver assignments, absent/not boarded students, vehicle maintenance/document alerts. |
+| Driver/conductor | Assigned trip, route/stops, student manifest, pickup/drop buttons, emergency contact, delay/report issue action. |
+| Canteen manager/POS staff | Today’s menu, meal plan serving count, scan/serve action, wallet low-balance/blocked status, POS sales, stock alerts. |
+| Parent/guardian | Child attendance today, homework due, notices, fee dues/receipts, transport status, canteen balance/meal status, activity updates, published report cards. |
+| Student | Today’s timetable, homework due, submitted homework status, published marks/report cards, library due items, notices. |
+| Platform operator | Schools needing attention, provider readiness, failed jobs, overdue SaaS invoices, support overrides active, onboarding blockers, platform audit/security alerts. |
+
+### 30.1 Approval and confidential data rules
+
+```text
+1. Approval cards should show who requested, what changes, amount/risk if applicable, and deadline/status.
+2. Confidential salary/payroll data must not appear on owner/principal dashboards unless the role has payroll permission.
+3. Parent/student dashboards must never show unpublished marks, other students, or internal comments.
+4. Finance numbers must always use tabular numbers and clear NPR formatting.
+5. Medical, child-safety, support override, and private communication data must be deliberately scoped and auditable.
 ```
