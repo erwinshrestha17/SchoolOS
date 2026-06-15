@@ -4,6 +4,8 @@ Browser smoke coverage verifies public routes, authenticated school-admin naviga
 
 The Playwright config is available at `apps/web/playwright.config.ts`.
 
+The active persona matrix lives in `docs/testing/SCHOOLOS_WEB_MOBILE_PERSONA_SMOKE_PLAN.md`.
+
 ## Local authenticated smoke
 
 Authenticated smoke tests use the real cookie-first login form and seeded local/dev accounts. Start Docker Postgres/Redis, run migrations/seed, and start the API before running the full authenticated checks.
@@ -59,8 +61,8 @@ Transport Manager
 Driver / Conductor
 Canteen Manager / POS Staff
 Parent / Guardian
-Student
+Student Lab-Only User
 Staff Self-Service User
 ```
 
-Module smoke must stay real-API backed. Do not use fake data, browser-only role assumptions, or admin-shaped payloads for parent/student/driver/mobile-scoped checks.
+Module smoke must stay real-API backed. Do not use fake data, browser-only role assumptions, or admin-shaped payloads for parent, driver, staff, or lab/student-scoped checks.

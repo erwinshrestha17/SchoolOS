@@ -1,6 +1,6 @@
 # SchoolOS UI/UX Guide
 
-**Status:** Single source of truth for SchoolOS UI/UX, web dashboard overhaul, platform UI, component strategy, colors, typography, accessibility, and performance rules.  
+**Status:** Single source of truth for SchoolOS UI/UX, web dashboard overhaul, platform UI, component strategy, colors, typography, accessibility, and performance rules.
 **Last updated:** 2026-06-15
 
 This is the active UI/UX source of truth for:
@@ -1653,8 +1653,8 @@ The frontend must hide navigation and actions that a role cannot use, but backen
 | Transport manager | Yes | Yes | Web for routes/vehicles/reports, mobile for live operations. |
 | Driver/conductor | No admin web | Yes | Mobile-only assigned trips, manifest, boarding/dropping, emergency contact. |
 | Canteen manager/POS staff | Yes | Optional tablet/mobile POS | Web/tablet POS and inventory. |
-| Parent/guardian | Optional parent web portal | Yes | Mobile-first child updates, fees, homework, notices, chat. |
-| Student | Optional student web portal | Yes | Mobile/card-first age-appropriate self-service. |
+| Parent/guardian | Optional parent web portal | Yes | Mobile-first own-child updates, fees, homework, notices, chat. |
+| Student | Controlled lab/session route only | No broad MVP mobile | Computer-lab or controlled school-device learning sessions only. |
 
 ### 28.3 Role dashboard rule
 
@@ -1672,7 +1672,7 @@ Transport manager -> Transport Operations Today
 Driver -> My Assigned Trip
 Canteen staff -> Canteen POS Today
 Parent -> My Child Overview
-Student -> My Learning Today
+Student -> Controlled Learning Session
 Platform operator -> Platform Attention Dashboard
 ```
 
@@ -1729,7 +1729,7 @@ This matrix defines what each role should see by default. Exact permissions stil
 | Driver/conductor | My Assigned Trip | Assigned vehicle/route, student manifest, pickup/drop status, emergency contact, trip instructions | Start/complete trip, mark boarded/dropped/absent, send location/delay/emergency updates | Fees, academics, full student profiles, other routes, parent private details. |
 | Canteen manager/POS staff | Canteen POS Today | Menu, meal plans, enrolled students, serving eligibility, wallet balance/status, POS sales, stock | Serve meal, POS sale, stock movement, menu/inventory if manager | Academic marks, payroll, full guardian records, accounting beyond canteen reports. |
 | Parent/guardian | My Child Overview | Own child attendance, homework, fees/receipts, notices, activity feed, report cards after publish, transport, canteen, library, teacher chat | Pay/track fees where enabled, message allowed teachers, view/download own child docs/receipts | Other children, teacher/staff private data, internal school reports, unpublished results. |
-| Student | My Learning Today | Own timetable, homework, submitted work, published results, library borrowing, notices, activity where age-appropriate | Submit homework, view own progress, update limited profile fields if allowed | Fees management, parent/staff data, other students, unpublished marks/results. |
+| Student | Controlled Learning Session | Current teacher-controlled learning session, assigned activity, own attempt/progress for that session | Join session, autosave, submit assigned learning attempt | Broad mobile app, fees, parent/staff data, other students, unpublished marks/results, public leaderboard, open chat. |
 | Canteen POS-only staff | POS Counter | Active menu, scan/resolve student, wallet eligibility, serving/payment result | Serve item, complete POS sale, print/view POS receipt | Inventory purchase cost, finance reports, student full profile. |
 | Support user under override | Support Session Banner | Only support-relevant diagnostics granted by platform override | Troubleshoot within time-limited audited session | Unrelated tenant data, hidden child/private data unless specifically required and audited. |
 
@@ -1754,7 +1754,7 @@ This matrix defines what each role should see by default. Exact permissions stil
 1. Navigation should be generated from assigned role permissions and module entitlements.
 2. A user with multiple roles should see a clean merged navigation, not duplicate modules.
 3. Platform navigation must never appear inside the normal school sidebar.
-4. Parent/student/driver mobile navigation must be purpose-built and minimal.
+4. Parent/driver/staff mobile navigation must be purpose-built and minimal; student MVP access is lab/session only.
 5. Reports should show only report categories the user can legally access.
 6. Settings should be split by responsibility: school profile, academic setup, finance setup, users/roles, integrations, and audit.
 ```
@@ -1797,7 +1797,7 @@ Each role dashboard should answer: `What should I know right now, and what shoul
 | Driver/conductor | Assigned trip, route/stops, student manifest, pickup/drop buttons, emergency contact, delay/report issue action. |
 | Canteen manager/POS staff | Today’s menu, meal plan serving count, scan/serve action, wallet low-balance/blocked status, POS sales, stock alerts. |
 | Parent/guardian | Child attendance today, homework due, notices, fee dues/receipts, transport status, canteen balance/meal status, activity updates, published report cards. |
-| Student | Today’s timetable, homework due, submitted homework status, published marks/report cards, library due items, notices. |
+| Student | Controlled lab/session state, assigned learning activity, own attempt autosave/submit state, and teacher-supervised progress for that session only. |
 | Platform operator | Schools needing attention, provider readiness, failed jobs, overdue SaaS invoices, support overrides active, onboarding blockers, platform audit/security alerts. |
 
 ### 30.1 Approval and confidential data rules

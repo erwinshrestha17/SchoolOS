@@ -1,6 +1,6 @@
 # SchoolOS Documentation Archive
 
-**Status:** Archive index  
+**Status:** Archive index
 **Last updated:** 2026-06-15
 
 This folder is for old, superseded, duplicated, or one-off planning documents.
@@ -48,12 +48,9 @@ Use these instead of archived docs:
 
 ```text
 docs/README.md
-docs/SCHOOLOS_PLANNING_INDEX.md
 docs/design/SCHOOLOS_UI_UX_GUIDE.md
-docs/design/SCHOOLOS_DESIGN_TOKENS_REFERENCE.md
-docs/frontend/SCHOOLOS_PERMISSION_CATALOG.md
-docs/frontend/SCHOOLOS_SCREEN_CONTRACT_MATRIX.md
-docs/frontend/SCHOOLOS_FRONTEND_BACKEND_CONTRACT_SYNC_PLAN.md
-docs/frontend/SCHOOLOS_COMPONENT_IMPLEMENTATION_ROADMAP.md
-docs/testing/SCHOOLOS_PERSONA_SMOKE_TEST_PLAN.md
+docs/design/SCHOOLOS_WEB_MOBILE_MASTER_DESIGN_PLAN.md
+docs/frontend/SCHOOLOS_FRONTEND_BACKEND_API_CONTRACT_MAP.md
+docs/mobile/SCHOOLOS_FLUTTER_APP_PLAN.md
+docs/testing/SCHOOLOS_WEB_MOBILE_PERSONA_SMOKE_PLAN.md
 ```

@@ -1,7 +1,7 @@
-# SchoolOS Frontend API Consumption Map
+# SchoolOS Frontend and Backend API Contract Map
 
-**Updated:** 2026-06-15  
-**Scope:** Planning and inventory only. Do not implement module UI from this document in the same task.  
+**Updated:** 2026-06-15
+**Scope:** Planning and inventory only. Do not implement module UI from this document in the same task.
 **Backend rule:** Backend is frozen except blockers. Do not change backend business logic, add backend features, rename `tenantId`, or introduce fake data.
 
 ---
@@ -16,7 +16,8 @@ Runtime API rules:
 - Swagger/OpenAPI UI: `/api/v1/docs`.
 - Frontend must use cookie-first auth. Never store raw access/refresh tokens in browser storage.
 - Every module API call must use the existing shared web API helper and credentials-enabled requests.
-- Parent, student, staff self-service, driver, and mobile APIs are purpose-limited. Do not use admin endpoints for these actors when scoped endpoints exist.
+- Parent, staff self-service, driver, lab/session student, and mobile APIs are purpose-limited. Do not use admin endpoints for these actors when scoped endpoints exist.
+- Students do not get a broad MVP mobile app. Student-facing MVP routes are controlled computer-lab or school-device learning sessions only.
 - Every workflow must render loading, empty, error, success, permission-denied, and module-locked states.
 - Use school-friendly language. One main job per screen.
 
@@ -51,36 +52,31 @@ OpenAPI parity note:
 
 ## 3. Recommended API Client Files
 
-Create or align clients under `apps/web/lib/api` without duplicating the shared HTTP helper:
+Create or align clients under `apps/web/lib/api` without duplicating the shared HTTP helper. The current repo already has `client.ts`, `auth.ts`, `platform.ts`, `students.ts`, `attendance.ts`, `finance.ts`, `academics.ts`, `activity.ts`, `communications.ts`, `messaging.ts`, `learning.ts`, `library.ts`, `transport.ts`, `canteen.ts`, `accounting.ts`, `payroll.ts`, `users.ts`, `marketing.ts`, and `index.ts`.
 
 ```text
-apps/web/lib/api/http.ts                    # existing shared cookie-first fetch, error normalization, blob helpers
+apps/web/lib/api/client.ts                  # shared cookie-first fetch, error normalization, query, blob/download helpers
 apps/web/lib/api/auth.ts                    # auth, me, MFA, password/OTP recovery
-apps/web/lib/api/rbac.ts                    # users, roles, permissions
+apps/web/lib/api/users.ts                   # users, roles, permissions
 apps/web/lib/api/platform.ts                # M0 platform, tenants, plans, provider readiness, queues, SaaS billing
-apps/web/lib/api/settings.ts                # tenant settings, onboarding, audit, logo access
-apps/web/lib/api/files.ts                   # File Registry upload/signed-preview/signed-download
-apps/web/lib/api/reports.ts                 # shared reports and export history
 apps/web/lib/api/students.ts                # M1 student profile, documents, QR, lifecycle, iEMIS
-apps/web/lib/api/admissions.ts              # M1 admissions applications/imports/duplicates/enrollment
 apps/web/lib/api/attendance.ts              # M2 attendance, drafts, corrections, calendar, staff attendance links
-apps/web/lib/api/fees.ts                    # M3 fees, invoices, payments, receipts, cashier close
+apps/web/lib/api/finance.ts                 # M3 fees, invoices, payments, receipts, cashier close
 apps/web/lib/api/academics.ts               # M4 exams, marks, CAS, report cards, results, promotions
 apps/web/lib/api/activity.ts                # M5 feed, gallery, media, mood logs, milestones
-apps/web/lib/api/homework.ts                # M6 homework, submissions, reminders, attachments, reports
-apps/web/lib/api/timetable.ts               # M6 timetable setup, versions, slots, workload, substitutions
-apps/web/lib/api/staff.ts                   # M7 staff profile/lifecycle/self-service
 apps/web/lib/api/payroll.ts                 # M7 payroll preview/runs/payslips/salary/reports
 apps/web/lib/api/library.ts                 # M8A library books/copies/issues/reservations/fines/reports
 apps/web/lib/api/transport.ts               # M8B routes/stops/vehicles/trips/driver/parent/reports
 apps/web/lib/api/canteen.ts                 # M8C menu/plans/enrollments/serving/wallet/POS/inventory/reports
 apps/web/lib/api/accounting.ts              # M9 chart, periods, journals, reports, vouchers, reconciliation
 apps/web/lib/api/communications.ts          # M10 notices, messaging, parent-teacher chat, notifications
+apps/web/lib/api/messaging.ts               # M10 parent-teacher chat and thread/message helpers
 apps/web/lib/api/learning.ts                # M12 activities, sessions, attempts, progress, resources
-apps/web/lib/api/advanced-operations.ts     # approvals, automation, analytics, document templates, export center
-apps/web/lib/api/mobile.ts                  # web-only test/admin inspection of mobile-scoped endpoints if needed
+apps/web/lib/api/marketing.ts               # public demo/request flows
 apps/web/lib/api/index.ts                   # re-export only; no second client implementation
 ```
+
+Planned split rule: new domain files can be added only when they reduce real duplication. Admissions, homework, timetable, settings, files, reports, and advanced operations may be split out later, but until then they must continue to use `client.ts` as the only base HTTP/blob/error layer.
 
 ---
 
@@ -171,7 +167,7 @@ apps/web/lib/api/index.ts                   # re-export only; no second client i
 | Backend routes | School workflow / business logic / actor | Frontend route + component | Data, mutation, and state handling | Priority |
 |---|---|---|---|---|
 | `GET/POST/PATCH/DELETE /api/v1/homework`, `GET /api/v1/homework/templates`, `GET /api/v1/homework/:id`, `PATCH /api/v1/homework/:id/publish`, `PATCH /api/v1/homework/:id/close`, `PATCH /api/v1/homework/:id/cancel` | Homework assignment lifecycle. Actor: teacher/coordinator. | `/dashboard/homework`, `/dashboard/homework/[id]` → `HomeworkWorkspace`, `HomeworkDetailWorkspace` | Draft/published/closed/cancelled states control actions. Empty state prompts teacher to create homework. | P0 |
-| `GET/POST /api/v1/homework/:id/submissions`, `GET/PATCH /api/v1/homework/submissions/:submissionId`, `PATCH /api/v1/homework/submissions/:submissionId/review`, `PATCH /api/v1/homework/submissions/:submissionId/mark-reviewed`, `POST /api/v1/homework/submissions/:submissionId/request-correction`, `POST /api/v1/homework/submit` | Submission, review, correction. Actors: student/parent/teacher. | `/dashboard/homework/[id]/submissions` → `HomeworkSubmissionsWorkspace` | Student submit route purpose-limited. Review success updates status and counts. | P0 |
+| `GET/POST /api/v1/homework/:id/submissions`, `GET/PATCH /api/v1/homework/submissions/:submissionId`, `PATCH /api/v1/homework/submissions/:submissionId/review`, `PATCH /api/v1/homework/submissions/:submissionId/mark-reviewed`, `POST /api/v1/homework/submissions/:submissionId/request-correction`, `POST /api/v1/homework/submit` | Submission, review, correction. Actors: teacher/parent; broad student homework UI is deferred for MVP. | `/dashboard/homework/[id]/submissions` → `HomeworkSubmissionsWorkspace` | Any student-facing submission use must be purpose-limited and is not part of broad mobile MVP. Review success updates status and counts. | P0 |
 | `GET /api/v1/homework/:id/reminders/preview`, `POST /api/v1/homework/:id/reminders/send`, `GET /api/v1/homework/reminders/batches`, `POST /api/v1/homework/reminders/batches/:batchId/retry` | Missing homework reminders and retry history. Actor: teacher/coordinator. | `/dashboard/homework/reminders` → `HomeworkRemindersWorkspace` | Preview recipients before send. Retry failed batch only with visible status. | P1 |
 | `GET /api/v1/homework/reports/completion`, `GET /api/v1/homework/reports/missing-late`, `GET /api/v1/homework/attachments/:attachmentId/preview-url`, `GET /api/v1/homework/attachments/:attachmentId/download-url` | Homework reports and File Registry-backed attachments. Actor: teacher/admin/parent scoped. | `/dashboard/homework/reports` → `HomeworkReportsWorkspace` | Attachment links via signed helper; report filters required. | P1 |
 | `GET /api/v1/timetable`, `GET/POST/PATCH/DELETE /api/v1/timetable/periods`, `GET/POST/PATCH/DELETE /api/v1/timetable/rooms`, `GET/POST/PATCH /api/v1/timetable/versions`, `POST /api/v1/timetable/versions/:id/restore`, `GET /api/v1/timetable/versions/:id/compare/:targetId`, `POST /api/v1/timetable/versions/:id/validate`, `PATCH /api/v1/timetable/versions/:id/publish`, `PATCH /api/v1/timetable/versions/:id/lock`, `PATCH /api/v1/timetable/versions/:id/archive`, `PATCH /api/v1/timetable/versions/:id/reopen-draft`, `POST /api/v1/timetable/versions/:id/slots`, `PATCH/DELETE /api/v1/timetable/slots/:id` | Timetable builder with versioning, validation, publish/lock/archive. Actor: academic coordinator/admin. | `/dashboard/timetable/builder` → `TimetableBuilderWorkspace` | One main job: build/publish a timetable version. Validation errors show per slot. | P0 |
@@ -245,9 +241,9 @@ apps/web/lib/api/index.ts                   # re-export only; no second client i
 | Backend routes | School workflow / business logic / actor | Frontend route + component | Data, mutation, and state handling | Priority |
 |---|---|---|---|---|
 | `GET/POST/PATCH/DELETE /api/v1/learning/activities`, `GET /api/v1/learning/activities/:id`, `GET/POST /api/v1/learning/activities/:id/resources` | Learning activity builder and resources. Actors: teacher/admin. | `/dashboard/learning/activities`, `/dashboard/learning/activities/[id]` → `LearningActivitiesWorkspace`, `LearningActivityBuilder` | Builder saves real payload only. Archive activity instead of hard-delete wording. | P0 |
-| `POST /api/v1/learning/activities/:id/sessions`, `GET /api/v1/learning/sessions`, `GET /api/v1/learning/sessions/:id`, `POST /api/v1/learning/sessions/:id/pause`, `POST /api/v1/learning/sessions/:id/resume`, `POST /api/v1/learning/sessions/:id/end`, `POST /api/v1/learning/sessions/:id/heartbeat`, `GET /api/v1/learning/sessions/:id/participants`, `POST /api/v1/learning/sessions/join` | School-only live learning sessions, monitoring, heartbeat, participants. Actors: teacher/student. | `/dashboard/learning/sessions`, student learning surface → `LearningSessionsWorkspace`, `LearningSessionRoom` | Heartbeat failure shows reconnect, not fake live status. Join is student-scoped. | P0 |
-| `POST /api/v1/learning/sessions/:id/attempts`, `PATCH /api/v1/learning/attempts/:id/autosave`, `POST /api/v1/learning/attempts/:id/submit` | Attempt start/autosave/submit. Actor: student. | Student learning surface → `LearningAttemptWorkspace` | Autosave indicator required. Submit locked after success. | P0 |
-| `GET /api/v1/learning/progress/class/:classId`, `GET /api/v1/learning/progress/student/:studentId`, `GET /api/v1/parent/learning/summary` | Class/student/parent learning progress. Actors: teacher/parent/student scoped. | `/dashboard/learning/progress`, parent portal → `LearningProgressWorkspace`, `ParentLearningSummaryCard` | Parent summary must use parent-scoped endpoint only. Empty: no attempts yet. | P1 |
+| `POST /api/v1/learning/activities/:id/sessions`, `GET /api/v1/learning/sessions`, `GET /api/v1/learning/sessions/:id`, `POST /api/v1/learning/sessions/:id/pause`, `POST /api/v1/learning/sessions/:id/resume`, `POST /api/v1/learning/sessions/:id/end`, `POST /api/v1/learning/sessions/:id/heartbeat`, `GET /api/v1/learning/sessions/:id/participants`, `POST /api/v1/learning/sessions/join` | School-only live learning sessions, monitoring, heartbeat, participants. Actors: teacher and lab/session student. | `/dashboard/learning/sessions`, `/student/learning/*` lab/session route → `LearningSessionsWorkspace`, `LearningSessionRoom` | Heartbeat failure shows reconnect, not fake live status. Join is lab/session scoped. | P0 |
+| `POST /api/v1/learning/sessions/:id/attempts`, `PATCH /api/v1/learning/attempts/:id/autosave`, `POST /api/v1/learning/attempts/:id/submit` | Attempt start/autosave/submit. Actor: lab/session student. | `/student/learning/session/[sessionId]` → `LearningAttemptWorkspace` | Autosave indicator required. Submit locked after success. No broad student mobile/home app. | P0 |
+| `GET /api/v1/learning/progress/class/:classId`, `GET /api/v1/learning/progress/student/:studentId`, `GET /api/v1/parent/learning/summary` | Class/student/parent learning progress. Actors: teacher, parent, lab/session student scoped. | `/dashboard/learning/progress`, parent portal → `LearningProgressWorkspace`, `ParentLearningSummaryCard` | Parent summary must use parent-scoped endpoint only. Empty: no attempts yet. | P1 |
 | `GET/POST/PATCH/DELETE /api/v1/learning/resources`, `GET /api/v1/learning/resources/:id` | Reusable learning resource library. Actor: teacher/admin. | `/dashboard/learning/resources` → `LearningResourcesWorkspace` | Resource archive; no fake resource placeholders. | P1 |
 
 ### 4.16 Advanced Operations

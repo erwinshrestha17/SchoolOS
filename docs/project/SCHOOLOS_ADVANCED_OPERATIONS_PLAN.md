@@ -1,8 +1,8 @@
 # SchoolOS Advanced Operations Plan
 
-**Status:** Active pre-AI implementation blueprint with backend foundation and additive migration added  
-**Scope:** Nepal-first advanced school operations before M11 School Intelligence / AI  
-**Last updated:** 2026-06-15  
+**Status:** Active pre-AI implementation blueprint with backend foundation and additive migration added
+**Scope:** Nepal-first advanced school operations before M11 School Intelligence / AI
+**Last updated:** 2026-06-15
 **Relationship to existing docs:** This document expands the module-wise backlog in `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md` without replacing the PRD, FRS, architecture/security guide, production runbook, or M12 Learning Layer plan.
 
 ---
@@ -87,7 +87,7 @@ These rules apply to every feature in this plan:
 3. Student lifecycle and IEMIS-ready fields.
 4. Advanced fee workflows.
 5. Attendance automation and offline sync polish.
-6. Parent/student mobile self-service.
+6. Parent mobile self-service and controlled student lab/session access.
 7. Communication read receipts and follow-ups.
 8. Exam/report-card/certificate generation.
 9. Browser E2E and staging smoke for the implemented advanced foundations.

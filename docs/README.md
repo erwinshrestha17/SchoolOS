@@ -1,6 +1,6 @@
 # SchoolOS Documentation
 
-**Status:** Active documentation map  
+**Status:** Active documentation map
 **Last updated:** 2026-06-15
 
 This folder contains the active detailed SchoolOS documentation. Use this page as the folder-level map only; the root `README.md` remains the repository entry point and source-of-truth summary.
@@ -39,6 +39,10 @@ project/SCHOOLOS_COST_PERFORMANCE_IMPLEMENTATION_PLAN.md
 architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
 architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
 design/SCHOOLOS_UI_UX_GUIDE.md
+design/SCHOOLOS_WEB_MOBILE_MASTER_DESIGN_PLAN.md
+frontend/SCHOOLOS_FRONTEND_BACKEND_API_CONTRACT_MAP.md
+mobile/SCHOOLOS_FLUTTER_APP_PLAN.md
+testing/SCHOOLOS_WEB_MOBILE_PERSONA_SMOKE_PLAN.md
 production/SCHOOLOS_PRODUCTION_RUNBOOK.md
 ```
 
@@ -56,4 +60,5 @@ apps/web/e2e/README.md
 1. Do not add a new `.md` file if the content belongs inside an active source-of-truth doc.
 2. Do not recreate planning-only docs that conflict with current implementation status.
 3. Keep old duplicated planning content in git history rather than active repo docs.
+4. For web/mobile implementation, use the master design plan, API contract map, Flutter plan, and persona smoke plan as the active planning set.
 4. Add a split-out doc only when it has a clear owner, current status, and no overlap with an existing active doc.

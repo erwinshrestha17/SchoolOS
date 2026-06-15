@@ -1,17 +1,16 @@
-# SchoolOS Persona Smoke Test Plan
+# SchoolOS Web and Mobile Persona Smoke Plan
 
-**Status:** Planning baseline  
-**Last updated:** 2026-06-15  
-**Phase:** Planning only — test execution starts during implementation phase  
+**Status:** Planning baseline
+**Last updated:** 2026-06-15
+**Phase:** Planning only — test execution starts during implementation phase
 **Purpose:** Define role/persona-based smoke tests so SchoolOS web and mobile experiences are validated by real school responsibilities, not only by page existence.
 
 Related docs:
 
 ```text
-docs/frontend/SCHOOLOS_PERMISSION_CATALOG.md
-docs/frontend/SCHOOLOS_SCREEN_CONTRACT_MATRIX.md
-docs/frontend/SCHOOLOS_FRONTEND_BACKEND_CONTRACT_SYNC_PLAN.md
-docs/design/SCHOOLOS_WEB_MOBILE_MODULE_SCREEN_ROLE_PLAN.md
+docs/design/SCHOOLOS_WEB_MOBILE_MASTER_DESIGN_PLAN.md
+docs/frontend/SCHOOLOS_FRONTEND_BACKEND_API_CONTRACT_MAP.md
+docs/mobile/SCHOOLOS_FLUTTER_APP_PLAN.md
 ```
 
 ---
@@ -74,7 +73,7 @@ Driver / Conductor
 Canteen Manager
 Canteen POS Staff
 Parent / Guardian
-Student
+Student Lab-Only User
 Staff Self-Service User
 ```
 
@@ -399,23 +398,24 @@ parent chat respects school-hours policy
 
 ---
 
-## 20. Student Smoke
+## 20. Student Lab-Only Smoke
 
 | Area | Expected result |
 |---|---|
-| Platform | Mobile-first, age-appropriate. |
-| Dashboard | My Learning Today. |
-| Sees | Own timetable, homework, submissions, published results, library due items, notices, learning resources. |
-| Actions | Submit homework, view progress, join learning activity if enabled. |
-| Does not see | Fees management, parent/staff data, other students, unpublished marks. |
+| Platform | Controlled computer-lab or school-device route only. |
+| Dashboard | No broad mobile/dashboard home in MVP. |
+| Sees | Current teacher-controlled learning session, assigned activity, own attempt/progress for that session. |
+| Actions | Join session, autosave answers, submit attempt, exit session safely. |
+| Does not see | Broad mobile app, fees, parent/staff data, other students, unpublished marks, public leaderboard, open chat. |
 
 Priority tests:
 
 ```text
-student sees own homework only
-student cannot view another student's results
-student cannot see unpublished results
-student can submit assigned homework only
+student can join only valid active assigned learning session
+student cannot view another student's attempt or progress
+student cannot access broad mobile home routes
+student cannot see fees, parent/staff data, unpublished results, leaderboard, or chat
+student autosave/submit retry is idempotent
 ```
 
 ---
@@ -445,7 +445,7 @@ These tests should be automated where possible.
 
 ```text
 Parent cannot access another parent's child.
-Student cannot access another student's profile/homework/results.
+Student lab user cannot access another student's session attempt/progress.
 Teacher cannot access another class unless assigned or explicitly permitted.
 Subject teacher cannot enter marks for unassigned subject.
 Driver cannot access unassigned trip.
@@ -462,8 +462,9 @@ Module locked route shows ModuleLockedState and backend blocks action.
 ## 23. Mobile-Specific Smoke Tests
 
 ```text
-Mobile login works for parent, teacher, student, driver.
-Mobile bottom nav matches persona.
+Mobile login works for parent, teacher, driver, and staff self-service.
+Student MVP access is tested through lab/session routes, not broad mobile bottom nav.
+Mobile bottom nav matches persona where mobile nav exists.
 Mobile screens use own/scoped data only.
 Offline banner appears when offline where supported.
 Pending sync banner appears after offline write where supported.
@@ -487,7 +488,7 @@ Subject Teacher
 Accountant
 Cashier
 Parent
-Student
+Student Lab-Only User
 Platform Operator
 ```
 
