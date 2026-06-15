@@ -64,15 +64,13 @@ These are useful but should not be the daily implementation entry point.
 
 | Document | Purpose |
 |---|---|
-| `docs/design/SCHOOLOS_DETAILED_UI_UX_ROLE_COMPONENT_BLUEPRINT.md` | Deep component, role, device, data access, and module-design reasoning. |
-| `docs/design/SCHOOLOS_WEB_MOBILE_MODULE_SCREEN_ROLE_PLAN.md` | Detailed web/mobile screen plan by module and role. |
-| `docs/design/SCHOOLOS_UI_UX_CONSOLIDATION_NOTES.md` | Explains how uploaded UI/UX plans were consolidated into SchoolOS docs. |
+| `docs/design/references/SCHOOLOS_ROLE_SCREEN_DESIGN_REFERENCE.md` | Consolidated reference for role-based UI, device strategy, screen modes, and module screen behavior. |
 | `docs/frontend/SCHOOLOS_FRONTEND_API_CONSUMPTION_MAP.md` | Earlier API consumption planning map; useful for route/client audit. |
 
 Future cleanup target:
 
 ```text
-Move long reference docs under docs/design/references/ or docs/frontend/references/ once paths are fully updated.
+Move docs/frontend/SCHOOLOS_FRONTEND_API_CONSUMPTION_MAP.md under docs/frontend/references/ after all links are updated.
 ```
 
 ---
@@ -159,7 +157,7 @@ Recommended next steps:
 4. Decide final MVP screen order.
 5. Decide final web/mobile release order.
 6. Decide if dark mode, Nepali labels, and Bikram Sambat support are v1 or later.
-7. Move long reference docs into references/ folders after path references are updated.
+7. Move docs/frontend/SCHOOLOS_FRONTEND_API_CONSUMPTION_MAP.md into frontend references after path references are updated.
 8. Create Codex implementation prompts only after planning is accepted.
 ```
 
