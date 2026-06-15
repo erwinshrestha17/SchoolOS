@@ -49,6 +49,7 @@ describe('M12 Learning frontend contracts', () => {
   it('adds a real Learning API client for the backend MVP endpoints', () => {
     const client = read('lib/api/learning.ts');
     const barrel = read('lib/api/index.ts');
+    const legacyAggregate = read('lib/api.ts');
 
     for (const helper of [
       'listActivities',
@@ -104,6 +105,9 @@ describe('M12 Learning frontend contracts', () => {
     assert.match(client, /LearningResourceStatus[\s\S]*'ARCHIVED'/);
     assert.doesNotMatch(client, /PUBLISHED/);
     assert.match(barrel, /export \* from '\.\/learning'/);
+    assert.match(legacyAggregate, /export \* from '\.\/api\/learning'/);
+    assert.match(legacyAggregate, /import \{ learningApi \} from '\.\/api\/learning'/);
+    assert.match(legacyAggregate, /\.\.\.learningApi/);
   });
 
   it('uses real Learning APIs and production states in the workspaces', () => {

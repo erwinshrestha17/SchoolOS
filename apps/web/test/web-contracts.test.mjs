@@ -61,14 +61,17 @@ describe("SchoolOS web production contracts", () => {
       "confirm-dialog",
       "data-table",
       "empty-state",
+      "error-state",
       "export-button",
       "filter-bar",
       "loading-state",
       "locked-record-banner",
       "money-display",
+      "module-locked-state",
       "notification-badge",
       "page-header",
       "permission-state",
+      "protected-file",
       "report-toolbar",
       "search-input",
       "section-card",
@@ -123,9 +126,12 @@ describe("SchoolOS web production contracts", () => {
       "components/ui/dialog.tsx",
       "components/ui/file-uploader.tsx",
       "components/ui/filter-bar.tsx",
+      "components/ui/error-state.tsx",
       "components/ui/input.tsx",
       "components/ui/loading-state.tsx",
+      "components/ui/module-locked-state.tsx",
       "components/ui/page-state.tsx",
+      "components/ui/protected-file.tsx",
       "components/ui/qr-resolver.tsx",
       "components/ui/search-input.tsx",
       "components/ui/select.tsx",
@@ -135,6 +141,12 @@ describe("SchoolOS web production contracts", () => {
     ]);
 
     assert.match(sharedPrimitives, /Loader2/);
+    assert.match(sharedPrimitives, /ProtectedFileButton/);
+    assert.match(sharedPrimitives, /ProtectedFileLink/);
+    assert.match(sharedPrimitives, /openProtectedFile/);
+    assert.match(sharedPrimitives, /downloadProtectedFile/);
+    assert.match(read("lib/api/client.ts"), /\/files\/\$\{encodeURIComponent\(fileAssetId\)\}\/preview/);
+    assert.match(read("lib/api/client.ts"), /\/files\/\$\{encodeURIComponent\(fileAssetId\)\}\/download/);
     assert.match(sharedPrimitives, /bg-\[var\(--primary\)\]/);
     assert.match(sharedPrimitives, /bg-\[var\(--primary-soft\)\]/);
     assert.match(sharedPrimitives, /text-\[var\(--primary-dark\)\]/);

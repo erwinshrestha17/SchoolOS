@@ -463,6 +463,39 @@ export async function downloadBlob(response: Response, fileName: string) {
   document.body.removeChild(a);
 }
 
+export async function openProtectedFile(
+  fileAssetId: string,
+  options?: { fileName?: string | null },
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/files/${encodeURIComponent(fileAssetId)}/preview`,
+    { credentials: 'include' },
+  );
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+
+  if (contentType.includes('application/pdf')) {
+    return openPdfBlob(response);
+  }
+
+  if (contentType.startsWith('image/')) {
+    return openImageBlob(response);
+  }
+
+  return downloadBlob(response, options?.fileName?.trim() || 'schoolos-file');
+}
+
+export async function downloadProtectedFile(
+  fileAssetId: string,
+  fileName: string,
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/files/${encodeURIComponent(fileAssetId)}/download`,
+    { credentials: 'include' },
+  );
+
+  return downloadBlob(response, fileName.trim() || 'schoolos-file');
+}
+
 export async function downloadCsv(path: string, fileName: string) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     credentials: 'include',

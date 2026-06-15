@@ -16,6 +16,7 @@ export * from './api/users';
 export * from './api/canteen';
 export * from './api/library';
 export * from './api/transport';
+export * from './api/learning';
 
 import { authApi } from './api/auth';
 import { academicsApi } from './api/academics';
@@ -33,6 +34,7 @@ import { usersApi } from './api/users';
 import { canteenApi } from './api/canteen';
 import { libraryApi } from './api/library';
 import { transportApi } from './api/transport';
+import { learningApi } from './api/learning';
 import { filesApi } from './api/client';
 
 export const api = {
@@ -52,5 +54,6 @@ export const api = {
   ...canteenApi,
   ...libraryApi,
   ...transportApi,
+  ...learningApi,
   ...filesApi,
 };

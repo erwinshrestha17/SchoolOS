@@ -5,15 +5,14 @@ import { api } from '@/lib/api';
 import { SectionCard } from '@/components/ui/section-card';
 import { Badge } from '@/components/ui/badge';
 import { LoadingState } from '@/components/ui/loading-state';
-import { Wallet, Printer, CheckCircle2, AlertCircle, Banknote, CreditCard, History, Loader2, ChevronRight } from 'lucide-react';
+import { ProtectedFileLink } from '@/components/ui/protected-file';
+import { Wallet, CheckCircle2, AlertCircle, Banknote, CreditCard, History, Loader2, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
-import type { CashierCloseSummary } from '@schoolos/core';
 
 export function CashierCloseSection() {
   const queryClient = useQueryClient();
   const [remarks, setRemarks] = useState('');
-  const [openingClosePdfId, setOpeningClosePdfId] = useState<string | null>(null);
   const [closePdfError, setClosePdfError] = useState<string | null>(null);
   
   const openedAt = new Date();
@@ -49,29 +48,6 @@ export function CashierCloseSection() {
     closeMutation.data?.closePdfFile
       ? closeMutation.data
       : closesQuery.data?.find((close) => close.closePdfFile);
-
-  async function openClosePdf(close: CashierCloseSummary) {
-    setClosePdfError(null);
-
-    if (!close.closePdfFile) {
-      setClosePdfError('The protected close PDF is not available yet.');
-      return;
-    }
-
-    try {
-      setOpeningClosePdfId(close.id);
-      const view = await api.getFileView(close.closePdfFile.fileAssetId);
-      window.open(view.url, '_blank', 'noopener,noreferrer');
-    } catch (err: unknown) {
-      setClosePdfError(
-        err instanceof Error
-          ? err.message
-          : 'Failed to open the day-end close PDF.',
-      );
-    } finally {
-      setOpeningClosePdfId(null);
-    }
-  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NP', {
@@ -211,16 +187,17 @@ export function CashierCloseSection() {
              ) : null}
 
              {latestCloseWithPdf ? (
-               <button
-                type="button"
+               <ProtectedFileLink
+                fileAssetId={latestCloseWithPdf.closePdfFile?.fileAssetId}
+                fileName={latestCloseWithPdf.closePdfFile?.fileName}
+                action="preview"
+                label="Open Close Report PDF"
                 data-testid="finance-day-end-close-pdf-open"
-                disabled={openingClosePdfId === latestCloseWithPdf.id}
-                onClick={() => void openClosePdf(latestCloseWithPdf)}
-                className="w-full flex items-center justify-center gap-2 py-3 text-[0.65rem] font-black text-slate-500 uppercase tracking-widest hover:text-slate-900 transition-colors disabled:cursor-wait disabled:opacity-60"
-               >
-                  {openingClosePdfId === latestCloseWithPdf.id ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
-                  {openingClosePdfId === latestCloseWithPdf.id ? 'Opening Close PDF' : 'Open Close Report PDF'}
-               </button>
+                className="w-full justify-center py-3 text-[0.65rem] font-black uppercase tracking-widest text-slate-500 no-underline hover:text-slate-900"
+                statusClassName="text-center"
+                onSuccess={() => setClosePdfError(null)}
+                onError={(message) => setClosePdfError(message)}
+               />
              ) : null}
           </div>
         </SectionCard>

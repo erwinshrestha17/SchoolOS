@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '../ui/button';
 import { FormField, TextArea } from '../ui/form-field';
 import { Badge } from '../ui/badge';
+import { ProtectedFileButton } from '../ui/protected-file';
 import { useSession } from '../session-provider';
 import { cn } from '../../lib/utils';
 
@@ -22,7 +23,6 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
   const [verifyNotes, setVerifyNotes] = useState('');
   const [verifyError, setVerifyError] = useState<string | null>(null);
 
-  const [fileViewPendingId, setFileViewPendingId] = useState<string | null>(null);
   const [fileViewError, setFileViewError] = useState<string | null>(null);
 
   const documentsQuery = useQuery({
@@ -41,22 +41,6 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
     },
     onError: (error: any) => {
       setVerifyError(error.message || 'Failed to verify document.');
-    },
-  });
-
-  const fileViewMutation = useMutation({
-    mutationFn: (fileId: string) => api.getFileView(fileId),
-    onMutate: (fileId) => setFileViewPendingId(fileId),
-    onSuccess: (data) => {
-      setFileViewPendingId(null);
-      setFileViewError(null);
-      if (data && data.url) {
-        window.open(data.url, '_blank', 'noopener,noreferrer');
-      }
-    },
-    onError: (err: any) => {
-      setFileViewPendingId(null);
-      setFileViewError(err.message || 'Failed to retrieve download link.');
     },
   });
 
@@ -156,18 +140,21 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
                           Verify
                         </button>
                       )}
-                      <button
-                        onClick={() => fileViewMutation.mutate(doc.fileId)}
-                        disabled={fileViewPendingId === doc.fileId}
-                        className="p-1.5 rounded-lg border border-slate-200 hover:border-slate-300 text-slate-400 hover:text-slate-700 transition-all"
+                      <ProtectedFileButton
+                        fileAssetId={doc.fileId}
+                        fileName={doc.name}
+                        action="preview"
+                        size="icon"
+                        variant="outline"
+                        showStatus={false}
                         title="Download / View"
+                        ariaLabel={`Open ${doc.name || 'staff document'}`}
+                        className="h-8 w-8 rounded-lg border-slate-200 p-0 text-slate-400 hover:border-slate-300 hover:text-slate-700"
+                        onSuccess={() => setFileViewError(null)}
+                        onError={(message) => setFileViewError(message)}
                       >
-                        {fileViewPendingId === doc.fileId ? (
-                          <div className="h-4 w-4 border-2 border-slate-200 border-t-slate-500 rounded-full animate-spin" />
-                        ) : (
-                          <Download size={14} />
-                        )}
-                      </button>
+                        <Download size={14} />
+                      </ProtectedFileButton>
                     </div>
                   </td>
                 </tr>
