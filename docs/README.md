@@ -46,9 +46,7 @@ docs/testing/SCHOOLOS_PERSONA_SMOKE_TEST_PLAN.md
 These docs contain deeper explanations and should be used when the source-of-truth docs need more context:
 
 ```text
-docs/design/SCHOOLOS_DETAILED_UI_UX_ROLE_COMPONENT_BLUEPRINT.md
-docs/design/SCHOOLOS_WEB_MOBILE_MODULE_SCREEN_ROLE_PLAN.md
-docs/design/SCHOOLOS_UI_UX_CONSOLIDATION_NOTES.md
+docs/design/references/SCHOOLOS_ROLE_SCREEN_DESIGN_REFERENCE.md
 docs/frontend/SCHOOLOS_FRONTEND_API_CONSUMPTION_MAP.md
 ```
 
