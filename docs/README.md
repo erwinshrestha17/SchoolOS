@@ -1,110 +1,59 @@
 # SchoolOS Documentation
 
-**Status:** Documentation entry point  
+**Status:** Active documentation map  
 **Last updated:** 2026-06-15
 
-This folder contains SchoolOS product, design, frontend, backend-contract, and testing planning documents.
+This folder contains the active detailed SchoolOS documentation. Use this page as the folder-level map only; the root `README.md` remains the repository entry point and source-of-truth summary.
 
-SchoolOS is currently in **planning phase** for the frontend and mobile app work. Frontend/mobile implementation should start only after the planning acceptance checklist in `docs/SCHOOLOS_PLANNING_INDEX.md` is accepted.
+SchoolOS is not in a planning-only documentation phase. Current work is controlled pilot hardening, staging verification, frontend/mobile polish where real APIs exist, and staged KG-12/M12 Learning expansion.
 
 ---
 
-## Read These First
+## Read Order
 
 | Order | Document | Purpose |
 |---:|---|---|
-| 1 | `docs/SCHOOLOS_PLANNING_INDEX.md` | Master planning index and planning-phase rules. |
-| 2 | `docs/design/SCHOOLOS_UI_UX_GUIDE.md` | Main UI/UX source-of-truth. |
-| 3 | `docs/design/SCHOOLOS_DESIGN_TOKENS_REFERENCE.md` | Visual tokens for web/mobile design. |
-| 4 | `docs/frontend/SCHOOLOS_PERMISSION_CATALOG.md` | Permission naming and scope planning. |
-| 5 | `docs/frontend/SCHOOLOS_SCREEN_CONTRACT_MATRIX.md` | Screen-to-role-to-permission-to-API matrix. |
-| 6 | `docs/frontend/SCHOOLOS_FRONTEND_BACKEND_CONTRACT_SYNC_PLAN.md` | Rule for implementing backend contract gaps alongside frontend screens. |
-| 7 | `docs/frontend/SCHOOLOS_COMPONENT_IMPLEMENTATION_ROADMAP.md` | Component build order for web and mobile. |
-| 8 | `docs/testing/SCHOOLOS_PERSONA_SMOKE_TEST_PLAN.md` | Persona-based smoke testing plan. |
+| 1 | `../README.md` | Project summary, current stage, readiness boundaries, and active source-of-truth set. |
+| 2 | `../AGENTS.md` | Agent/developer operating rules, security rules, architecture rules, and verification commands. |
+| 3 | `product/SCHOOLOS_PRODUCT_REQUIREMENTS.md` | Product vision, Nepal-first requirements, modules, actors, and product boundaries. |
+| 4 | `product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` | Feature-level behavior, validation rules, edge cases, and acceptance criteria. |
+| 5 | `project/SCHOOLOS_PROJECT_STATUS.md` | Current implementation status and remaining work snapshot. |
+| 6 | `project/SCHOOLOS_IMPLEMENTATION_PLAN.md` | Active implementation order, module backlogs, and phase gates. |
+| 7 | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Storage, File Registry, tenant isolation, scaling, performance, and security architecture. |
+| 8 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, and provider/queue operations. |
+| 9 | `design/SCHOOLOS_UI_UX_GUIDE.md` | Single UI/UX, design-token, component, accessibility, and web/mobile direction. |
+| 10 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, and go/no-go checks. |
 
 ---
 
-## Documentation Tiers
-
-### Source of Truth
-
-These docs are the active planning source for frontend/mobile work:
+## Active Docs
 
 ```text
-docs/SCHOOLOS_PLANNING_INDEX.md
-docs/design/SCHOOLOS_UI_UX_GUIDE.md
-docs/design/SCHOOLOS_DESIGN_TOKENS_REFERENCE.md
-docs/frontend/SCHOOLOS_PERMISSION_CATALOG.md
-docs/frontend/SCHOOLOS_SCREEN_CONTRACT_MATRIX.md
-docs/frontend/SCHOOLOS_FRONTEND_BACKEND_CONTRACT_SYNC_PLAN.md
-docs/frontend/SCHOOLOS_COMPONENT_IMPLEMENTATION_ROADMAP.md
-docs/testing/SCHOOLOS_PERSONA_SMOKE_TEST_PLAN.md
+product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
+product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
+project/SCHOOLOS_PROJECT_STATUS.md
+project/SCHOOLOS_IMPLEMENTATION_PLAN.md
+project/SCHOOLOS_ADVANCED_OPERATIONS_PLAN.md
+project/SCHOOLOS_LEARNING_LAYER_PLAN.md
+project/SCHOOLOS_COST_PERFORMANCE_IMPLEMENTATION_PLAN.md
+architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
+architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
+design/SCHOOLOS_UI_UX_GUIDE.md
+production/SCHOOLOS_PRODUCTION_RUNBOOK.md
 ```
 
-### Reference
-
-These docs contain deeper explanations and should be used when the source-of-truth docs need more context:
+App-specific active docs outside this folder:
 
 ```text
-docs/design/references/SCHOOLOS_ROLE_SCREEN_DESIGN_REFERENCE.md
-docs/frontend/SCHOOLOS_FRONTEND_API_CONSUMPTION_MAP.md
-```
-
-### Archive / Superseded
-
-Older drafts, duplicated plans, and one-off planning docs should be moved under:
-
-```text
-docs/archive/
-```
-
-Do not delete useful old docs immediately. Archive first, then remove later only when the active docs fully replace them.
-
----
-
-## Rules For Adding New Docs
-
-Before adding a new `.md` file, choose one:
-
-```text
-Source of Truth
-Reference
-Draft
-Archive
-```
-
-Do not create a new planning file if the content belongs inside an existing source-of-truth doc.
-
-Use this naming style:
-
-```text
-SCHOOLOS_<AREA>_<PURPOSE>.md
-```
-
-Examples:
-
-```text
-SCHOOLOS_SCREEN_CONTRACT_MATRIX.md
-SCHOOLOS_PERMISSION_CATALOG.md
-SCHOOLOS_PERSONA_SMOKE_TEST_PLAN.md
+apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md
+apps/web/e2e/README.md
 ```
 
 ---
 
-## Planning Exit Rule
+## Cleanup Rules
 
-Frontend/mobile implementation should start only when:
-
-```text
-1. Planning index is accepted.
-2. UI/UX guide is accepted.
-3. Design tokens are accepted.
-4. Permission catalog is accepted.
-5. Screen contract matrix P0 rows are finalized.
-6. Frontend/backend contract sync plan is accepted.
-7. Component roadmap is accepted.
-8. Persona smoke test plan is accepted.
-9. Open planning questions are answered or explicitly deferred.
-```
-
-Until then, docs may be refined, consolidated, archived, or reorganized, but implementation should not start.
+1. Do not add a new `.md` file if the content belongs inside an active source-of-truth doc.
+2. Do not recreate planning-only docs that conflict with current implementation status.
+3. Keep old duplicated planning content in git history rather than active repo docs.
+4. Add a split-out doc only when it has a clear owner, current status, and no overlap with an existing active doc.
