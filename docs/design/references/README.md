@@ -22,6 +22,24 @@ docs/design/SCHOOLOS_DESIGN_TOKENS_REFERENCE.md
 
 ---
 
+## Active Design Reference
+
+```text
+docs/design/references/SCHOOLOS_ROLE_SCREEN_DESIGN_REFERENCE.md
+```
+
+This consolidated reference replaces these older long-form docs from the active tree:
+
+```text
+docs/design/SCHOOLOS_DETAILED_UI_UX_ROLE_COMPONENT_BLUEPRINT.md
+docs/design/SCHOOLOS_WEB_MOBILE_MODULE_SCREEN_ROLE_PLAN.md
+docs/design/SCHOOLOS_UI_UX_CONSOLIDATION_NOTES.md
+```
+
+The old files remain available in Git history.
+
+---
+
 ## What Belongs Here
 
 ```text
@@ -47,17 +65,3 @@ Old/superseded drafts
 
 Implementation-facing frontend docs belong under `docs/frontend/`.
 Old or superseded docs belong under `docs/archive/`.
-
----
-
-## Future Cleanup Target
-
-The following current docs may later be moved here after all links are updated:
-
-```text
-docs/design/SCHOOLOS_DETAILED_UI_UX_ROLE_COMPONENT_BLUEPRINT.md
-docs/design/SCHOOLOS_WEB_MOBILE_MODULE_SCREEN_ROLE_PLAN.md
-docs/design/SCHOOLOS_UI_UX_CONSOLIDATION_NOTES.md
-```
-
-For now, they remain in their current paths to avoid breaking references during planning.
