@@ -81,6 +81,18 @@ const permissionAliases: Record<string, string[]> = {
   'transport:location:update': ['transport:operate', 'transport:manage'],
   'transport:tracking:parent': ['transport:read'],
   'transport:reports:read': ['transport:read'],
+  'advanced:approvals:read': ['settings:read'],
+  'advanced:approvals:manage': ['settings:manage'],
+  'advanced:approvals:decide': ['settings:manage'],
+  'advanced:automation:read': ['settings:read'],
+  'advanced:automation:manage': ['settings:manage'],
+  'advanced:automation:execute': ['settings:manage'],
+  'advanced:analytics:read': ['reports:read'],
+  'advanced:analytics:refresh': ['reports:export', 'settings:manage'],
+  'advanced:documents:read': ['reports:read'],
+  'advanced:documents:manage': ['reports:export', 'settings:manage'],
+  'advanced:exports:read': ['reports:read'],
+  'advanced:exports:create': ['reports:export'],
 };
 
 function hasRequiredPermission(

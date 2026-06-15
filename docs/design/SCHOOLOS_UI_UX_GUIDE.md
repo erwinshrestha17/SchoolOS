@@ -1272,7 +1272,7 @@ Current status:
 Admin web global polish is implemented for the current modular-monolith scope.
 Dashboard shell polish, accounting audit context, transport location freshness, scanner-first Library/Canteen QR flows, report-card correction review, and app-controlled toasts/confirmation dialogs are present.
 A full web dashboard UI/UX overhaul direction, component strategy, color palette, typography, font scale, and module-screen plan are now merged into this guide.
-Next UI work should start with design-system primitives and `/dashboard`, then shared shell/components, then platform and module workspaces.
+Next UI work should start with frontend implementation for the verified backend foundations: design-system primitives and `/dashboard`, then shared shell/components, then platform, module, and Advanced Operations workspaces.
 ```
 
 Implemented highlights:
@@ -1290,7 +1290,8 @@ Verification snapshot:
 ```text
 - Web contract tests passed for app-controlled feedback coverage in prior targeted polish runs.
 - Web typecheck has passed in prior targeted polish runs.
-- Browser/staging smoke still needs execution in an environment that can bind local ports and has Postgres, Redis, API, and web running.
+- Local smoke suites now pass with API, web, Postgres, and Redis running (`pnpm smoke:pilot`, `pnpm smoke:learning`, `pnpm smoke:full`).
+- Seeded browser E2E, visual regression, and staging smoke still need execution before claiming UI or pilot production readiness.
 ```
 
 ---

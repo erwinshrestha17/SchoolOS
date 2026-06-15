@@ -1,7 +1,7 @@
 # SchoolOS Implementation Plan
 
-**Last updated:** 2026-06-14
-**Status:** Consolidated active implementation plan and module backlogs  
+**Last updated:** 2026-06-15
+**Status:** Consolidated active implementation plan and module backlogs; backend/root/local smoke gates green after migration stabilization  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard, Flutter companion app
 
 ---
@@ -25,6 +25,7 @@
 * **M8C Canteen:** Admin/wallet/POS/inventory/vendor/report foundation plus receipt JSON/PDF, stock hardening, wallet guards, linked invoice handoff, parent mobile views, serving allergy acknowledgement, and canteen workspace polish.
 * **M9 Accounting:** Production-candidate / Pilot-Ready with Nepal school chart template preview/import, source-mapping health checks, PDFs, retry-safe report snapshot reuse, synchronous export row thresholds, queued large General Ledger/Cash Book exports through File Registry, platform-visible accounting report queue diagnostics, audit trail, reconciliation suggestions, File Registry export support, and hardened bank statement import/reconciliation DTO validation.
 * **M10 Notices / Communication / Chat:** Strong foundation with provider modes, HMAC-signed SMS/email/FCM provider callback verification, sanitized provider callback failures, duplicate/out-of-order provider status guards, provider-disabled retry fail-closed behavior, role-aware chat quiet-hours, escalation write locks, high-impact notice recipient preview, File Registry-backed notice attachments with raw object-key suppression, legacy messaging parent/guardian live-link scoping with unsafe attachment suppression and sanitized change streams, failure dashboard, moderation/escalation, unread-recipient follow-up, mobile notification/chat surfaces, and full communications/messaging sub-controller entitlement gating.
+* **Pre-AI Advanced Operations:** Backend foundation and additive Prisma migration are present for approval workflows, deterministic automation, descriptive analytics summaries, document templates/generated documents, verification/access logs, and data export jobs. Frontend workspaces, mobile/offline depth, seeded browser E2E, staging migration apply, provider/staging checks, and pilot workflow tuning remain.
 * **M12 Learning Layer:** Production foundation implemented and verified under `apps/api/src/learning`, `apps/web` Learning routes, and `apps/schoolos_mobile/lib/features/learning`: activity builder, school-only sessions, session monitoring/heartbeat/participants, resource library, QR/code join, lab attempts, autosave/submit, MCQ/true-false/short-answer/matching/ordering evaluation, progress recording, parent child-scoped summary, student self-scoped mobile summary, tenant isolation, RBAC, entitlement, audit logging, Prisma migrations, and focused E2E/contract/mobile coverage.
 * **Public Demo Requests:** Public POST intake plus platform operator list/detail/status-follow-up APIs and `/platform/demo-requests` review workspace with RBAC, audit logging, pagination/filtering, internal notes, public rate limiting, and tests.
 * **Settings / Audit Visibility:** Settings audit-log access, support-override banner visibility, and live tenant role/permission inspection added with access-control tests.
@@ -34,11 +35,13 @@
 ### Overall Product Readiness
 * **Demo-ready:** Yes
 * **Internal QA-ready:** Yes
-* **Controlled pilot-ready:** Yes, after staging checks and smoke verification
+* **Controlled pilot-ready:** Yes, after staging checks, browser E2E, and pilot smoke verification
 * **Multi-school production-ready:** Not yet
 * **Full SchoolOS product complete:** No
 
-**Remaining M1–M10 work:** Core modules are pilot-ready; enhancement depth, staging smoke, and mobile polish remain.
+**Verification snapshot:** Backend package gates pass, root `pnpm typecheck` and `pnpm build` pass, and local smoke suites pass (`pnpm smoke:pilot`, `pnpm smoke:learning`, `pnpm smoke:full`). These are local gates; staging/pilot deployment is still pending.
+
+**Remaining work categories:** Frontend implementation is next. Remaining work is grouped as frontend workspace completion, mobile polish/device QA, provider/staging verification, browser E2E, pilot feedback, and future AI. M11 remains roadmap/deferred.
 
 ---
 
@@ -46,21 +49,22 @@
 
 This order is mandatory. Do not start a later phase until the previous phase's exit criteria are fully met.
 
-### Phase Gate 0 — Stabilize Main Before New Scope
+### Phase Gate 0 — Stabilize Main Before Frontend Scope
 * **Allowed work:** verification fixes, migration fixes, seed fixes, tenant isolation fixes, permission fixes, doc alignment, small code-file modularization in touched areas.
 * **Blocked work:** AI, Angular migration, microservices, broad new modules, deep mobile expansion without purpose-limited APIs/ownership tests, live transport map/WebSocket/SSE UI, biometric workflows.
+* **Current local status:** Backend gates, root typecheck/build, and local smoke suites are green. The advanced-operations additive migration exists as `20260615090000_advanced_operations_foundation`.
 * **Exit criteria:**
   1. Prisma generate and validate pass.
   2. OpenAPI gate passes.
   3. Lint, typecheck, unit tests, API E2E, web E2E, build, verify:production pass.
-  4. Local/staging smoke:pilot runs with API, web, Postgres, and Redis (or legacy alias `smoke:phase1`).
-  5. Pending migrations are applied or intentionally parked with written reason.
+  4. Local smoke suites run with API, web, Postgres, and Redis: `pnpm smoke:pilot`, `pnpm smoke:learning`, and `pnpm smoke:full`.
+  5. Pending migrations are applied in the target environment or intentionally parked with written reason.
   6. Seed data supports every dashboard module route used in browser smoke.
   7. No stale docs claim a module is next when it is already implemented.
 
-### Phase 1 — Pilot Reliability for Existing Core
-* **Scope:** Auth/Security, M0, M1, M2, M3, M5, M10, settings, reports, File Registry, notifications, public demo intake.
-* **Focus:** staging secrets/session review, storage readiness, request/correlation logging, notification provider failure visibility, export/report history, tenant isolation tests, platform denial tests, entitlement enforcement tests, permission-denied/slow-session recovery web states, public demo request abuse controls.
+### Phase 1 — Frontend Implementation for Existing Core
+* **Scope:** Auth/Security, M0, M1, M2, M3, M5, M10, settings, reports, File Registry, notifications, public demo intake, and the pre-AI Advanced Operations frontend shell.
+* **Focus:** Real API-backed web workspaces, loading/empty/error/success/permission-denied/module-locked states, server-side pagination/filtering, app-controlled confirmations, seeded browser E2E, and staging secrets/session/provider review.
 * **Exit criteria:** One real school can run daily admissions, attendance, fees, notices, activity, settings, and platform operations without engineering handholding, and public demo intake can persist leads safely.
 
 ### Phase 2 — High-Value Academic and Finance Polish
@@ -119,9 +123,10 @@ Before adding or expanding visible features:
 * **Current Status:** Basic foundations complete.
 * **Staging / Verification Remaining:**
   - Broader cross-tenant denial tests on tenant-owned read/write paths.
-  - Staging verification: `pnpm smoke:pilot` with Postgres, Redis, API, and web (or legacy alias `pnpm smoke:phase1`).
-  - OpenAPI gate and full E2E/browser smoke rerun in a port-bindable environment.
+  - Staging verification: `pnpm smoke:pilot`, `pnpm smoke:learning`, and `pnpm smoke:full` with Postgres, Redis, API, and web.
+  - Seeded browser E2E and browser smoke rerun in a port-bindable staging environment.
 * **Web Frontend Backlog:**
+  - Frontend implementation is the next active phase after backend/migration stabilization.
   - Permission-denied screens for direct route access.
   - Session-expiry and slow-network recovery states.
   - Module-locked empty states where plan lacks entitlement.
@@ -328,10 +333,8 @@ Before adding or expanding visible features:
   - POS reversal/wallet guard smoke.
   - POS/report smoke.
 * **Backend Backlog:**
-  - POS double-submit and receipt reprint idempotency tests.
-  - Backend policy/regression coverage for allergy and medical warning enforcement after pilot serving rules are finalized.
-  - Daily/monthly spending controls and low-balance events.
-  - Stock close, wastage reports, and vendor bill edit locks.
+  - No current-code M8C backend closure blocker remains after monthly spending controls, low-balance events, stock close, wastage reports, supplier purchase reports, vendor bill edit locks, serving warning acknowledgement, POS/wallet guards, and local backend/root/smoke gates.
+  - Continue regression depth for POS double-submit, receipt reprint idempotency, and allergy/medical warning enforcement after pilot serving rules are finalized.
 * **Web Frontend Backlog:**
   - POS speed polish with QR/student search, wallet balance, allergy warning, and receipt after device/browser QA.
   - Daily/weekly menu planner.

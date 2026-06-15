@@ -1,8 +1,8 @@
 # SchoolOS Advanced Operations Plan
 
-**Status:** Active pre-AI implementation blueprint  
+**Status:** Active pre-AI implementation blueprint with backend foundation and additive migration added  
 **Scope:** Nepal-first advanced school operations before M11 School Intelligence / AI  
-**Last updated:** 2026-06-13  
+**Last updated:** 2026-06-15  
 **Relationship to existing docs:** This document expands the module-wise backlog in `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md` without replacing the PRD, FRS, architecture/security guide, production runbook, or M12 Learning Layer plan.
 
 ---
@@ -27,6 +27,16 @@ The goal is to deepen real school workflows around:
 ```
 
 This is intentionally **pre-AI**. It must use deterministic workflows, explicit business rules, human approvals, audit trails, and tenant-scoped data access.
+
+Current implementation status:
+
+```text
+Backend foundation: Implemented for approval workflows, deterministic automation, descriptive analytics summaries, document templates/generated documents, verification/access logs, and data export jobs.
+Migration: apps/api/prisma/migrations/20260615090000_advanced_operations_foundation adds the advanced-operations enums, tenant-scoped tables, indexes, and foreign keys.
+Local verification: backend package gates, root typecheck/build, and local smoke suites pass.
+Still pending: staging migration apply/deploy, seeded browser E2E, frontend workspaces, mobile/offline workflow depth, provider/staging checks, and pilot feedback.
+M11 AI: Deferred/roadmap only.
+```
 
 ---
 
@@ -72,16 +82,16 @@ These rules apply to every feature in this plan:
 
 ### Phase A — Pre-AI Pilot Depth
 
-1. Tenant onboarding wizard.
-2. Student lifecycle and IEMIS-ready fields.
-3. Advanced fee workflows.
-4. Attendance automation and offline sync polish.
-5. Parent/student mobile self-service.
-6. Communication read receipts and follow-ups.
-7. Exam/report-card/certificate generation.
-8. Approval workflow engine.
-9. Rules-based automation engine.
-10. Descriptive analytics dashboards.
+1. Frontend workspaces for implemented approval, automation, analytics, document-template, and data-export backend foundations.
+2. Tenant onboarding wizard.
+3. Student lifecycle and IEMIS-ready fields.
+4. Advanced fee workflows.
+5. Attendance automation and offline sync polish.
+6. Parent/student mobile self-service.
+7. Communication read receipts and follow-ups.
+8. Exam/report-card/certificate generation.
+9. Browser E2E and staging smoke for the implemented advanced foundations.
+10. Pilot feedback refinements.
 
 ### Phase B — Premium Private-School Operations
 
@@ -128,6 +138,8 @@ ApprovalComment
 ApprovalAttachment
 ```
 
+Status: backend foundation and migration are present; frontend workspace integration, module-specific final-action wiring, browser E2E, staging migration apply, and pilot feedback remain.
+
 Required workflows:
 
 | Workflow | Typical approver | Required controls |
@@ -170,6 +182,8 @@ AutomationExecutionLog
 AutomationFailure
 ```
 
+Status: backend foundation and migration are present for deterministic rules, triggers, conditions, actions, execution logs, and failures; frontend rule management, module-specific rule catalog depth, browser E2E, staging validation, and pilot tuning remain.
+
 Initial rules:
 
 | Trigger | Condition | Action |
@@ -195,6 +209,8 @@ Acceptance criteria:
 ### 5.3 Analytics Dashboards Without AI
 
 Use descriptive metrics only. No prediction, no model scores, and no automated punitive action.
+
+Status: backend summary/refresh-job foundation and migration are present; dashboard frontend implementation, summary refresh coverage, seeded browser E2E, staging validation, and pilot metrics tuning remain.
 
 Dashboards:
 
@@ -239,6 +255,8 @@ DocumentVerificationToken
 DocumentPrintHistory
 DocumentAccessLog
 ```
+
+Status: backend template/generated-document/verification/access-log foundation and migration are present; frontend template builder/generation screens, PDF/template polish, browser E2E, staging validation, and pilot wording/localization feedback remain.
 
 Acceptance criteria:
 

@@ -48,6 +48,7 @@ import { UsageModule } from './usage/usage.module';
 import { PlansModule } from './plans/plans.module';
 import { DemoRequestsModule } from './demo-requests/demo-requests.module';
 import { LearningModule } from './learning/learning.module';
+import { AdvancedOperationsModule } from './advanced-operations/advanced-operations.module';
 import { UsageInterceptor } from './usage/usage.interceptor';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 import { CsrfGuard } from './auth/guards/csrf.guard';
@@ -122,6 +123,7 @@ import { AppThrottlerGuard } from './auth/guards/app-throttler.guard';
     PlansModule,
     DemoRequestsModule,
     LearningModule,
+    AdvancedOperationsModule,
     TenantsModule,
     RedisModule,
     NotificationsModule,

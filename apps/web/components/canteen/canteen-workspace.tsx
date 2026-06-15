@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-PLACEHOLDER
-=======
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -2061,4 +2058,3 @@ function cleanStockAdjustmentPayload(form: CanteenStockAdjustmentPayload): Cante
     reason: form.reason.trim(),
   };
 }
->>>>>>> ece53334 (fix: update text encoding for student allergy warning in canteen workspace)

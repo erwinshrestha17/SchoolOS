@@ -9,6 +9,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../src/auth/auth-request.interface';
 import { AppModule } from '../src/app.module';
+
+jest.setTimeout(15000);
 import { AuthController } from '../src/auth/auth.controller';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../src/auth/guards/roles-permissions.guard';

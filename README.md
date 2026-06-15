@@ -78,10 +78,24 @@ M7 HR/Payroll: Completed / Pilot-Ready
 M8A Library, M8B Transport, M8C Canteen: Admin/backend foundations implemented with hardening depth
 M9 Accounting: Completed / Pilot-Ready
 M10 Notices/Communication/Chat: Foundation plus provider/attachment/retry depth implemented
-Pre-AI Advanced Operations: Module-wise implementation blueprint added for tenant onboarding, approvals, automation, analytics, mobile/offline, documents, and Nepal-school workflow depth
+Pre-AI Advanced Operations: Backend foundation and additive Prisma migration added for approvals, automation, descriptive analytics summaries, mobile/offline reliability foundations, documents, and Nepal-school workflow depth; frontend/mobile workflow depth remains next-phase work
 M11 Intelligence/AI: Roadmap only
 M12 Learning Layer: Backend MVP foundation implemented and verified; frontend teacher/student/parent screens remain staged
 KG-12 Expansion: Product direction added; Grade 11-12 and advanced learning features are staged future scope
+```
+
+Latest local verification snapshot:
+
+```text
+2026-06-15: Backend package gates pass, root typecheck/build pass, and local smoke suites pass:
+- pnpm smoke:pilot
+- pnpm smoke:learning
+- pnpm smoke:full
+
+Advanced-operations migration status:
+- apps/api/prisma/migrations/20260615090000_advanced_operations_foundation exists.
+- Migration SQL was reviewed as additive-only for the advanced-operations tables/enums/indexes/foreign keys.
+- Staging/pilot migration deployment remains pending; do not claim production-ready until staging migration and pilot checks pass.
 ```
 
 Current product readiness:
@@ -89,7 +103,7 @@ Current product readiness:
 ```text
 Demo-ready: Yes
 Internal QA-ready: Yes
-Controlled pilot-ready: Yes, after staging checks
+Controlled pilot-ready: Yes, after staging/pilot checks
 Multi-school production-ready: Not yet
 Full KG-12 SchoolOS product complete: No
 ```

@@ -1859,7 +1859,7 @@ function ReportsPanel({
   const issuedTotal = issuedBooksReport?.meta.total ?? issuedBooks.length;
   const overdueTotal = overdueBooksReport?.meta.total ?? overdueBooks.length;
   const fineTotal = fineSummary?.summary.totalFine ?? 0;
-  const fineIssueTotal = fineSummary?.summary.totalIssuesWithFine ?? 0;
+  const fineIssueTotal = fineSummary?.summary.totalFines ?? 0;
 
   return (
     <div className="space-y-6">

@@ -162,6 +162,28 @@ model Tenant {
   staffLifecycleEvents          StaffLifecycleEvent[]
   supportOverrides              SupportOverride[]
   financeApprovalRequests       FinanceApprovalRequest[]
+  approvalPolicies              ApprovalPolicy[]
+  approvalRequests              ApprovalRequest[]
+  approvalSteps                 ApprovalStep[]
+  approvalDecisions             ApprovalDecision[]
+  approvalComments              ApprovalComment[]
+  approvalAttachments           ApprovalAttachment[]
+  automationRules               AutomationRule[]
+  automationTriggers            AutomationTrigger[]
+  automationConditions          AutomationCondition[]
+  automationActions             AutomationAction[]
+  automationExecutionLogs       AutomationExecutionLog[]
+  automationFailures            AutomationFailure[]
+  analyticsSummaries            AnalyticsSummary[]
+  analyticsRefreshJobs          AnalyticsRefreshJob[]
+  documentTemplates             DocumentTemplate[]
+  documentTemplateVersions      DocumentTemplateVersion[]
+  generatedDocuments            GeneratedDocument[]
+  documentVerificationTokens    DocumentVerificationToken[]
+  documentPrintHistory          DocumentPrintHistory[]
+  documentAccessLogs            DocumentAccessLog[]
+  dataExportJobs                DataExportJob[]
+  dataExportFailures            DataExportFailure[]
   learningActivities            LearningActivity[]
   learningQuestions             LearningQuestion[]
   learningSessions              LearningSession[]
@@ -217,6 +239,9 @@ model FileAsset {
   reportCards         ReportCard[]         @relation("ReportCardFile")
   reportCardHistories ReportCardHistory[]  @relation("ReportCardHistoryFile")
   learningResources   LearningResource[]
+  approvalAttachments ApprovalAttachment[]
+  generatedDocuments  GeneratedDocument[]
+  dataExportJobs      DataExportJob[]
 
   @@index([tenantId, module, entityId])
   @@index([tenantId, ownerType, ownerId])

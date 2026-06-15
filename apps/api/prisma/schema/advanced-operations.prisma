@@ -1,0 +1,443 @@
+model ApprovalPolicy {
+  id              String               @id @default(uuid())
+  tenantId        String
+  workflowType    ApprovalWorkflowType
+  name            String
+  description     String?
+  isActive        Boolean              @default(true)
+  minApprovals    Int                  @default(1)
+  approverRoles   Json                 @default("[]")
+  approverPermissions Json             @default("[]")
+  finalActionKey  String?
+  createdById     String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User?             @relation("CreatedApprovalPolicies", fields: [createdById], references: [id], onDelete: SetNull)
+  requests  ApprovalRequest[]
+
+  @@unique([tenantId, workflowType, name])
+  @@index([tenantId, workflowType, isActive])
+}
+
+model ApprovalRequest {
+  id                    String                    @id @default(uuid())
+  tenantId              String
+  policyId              String?
+  workflowType          ApprovalWorkflowType
+  status                ApprovalRequestStatus     @default(PENDING)
+  title                 String
+  reason                String
+  targetModule          String
+  targetType            String
+  targetId              String
+  requestedById         String
+  beforeContext         Json?
+  afterContext          Json?
+  safeContext           Json?
+  finalActionKey        String?
+  finalActionPayload    Json?
+  finalActionStatus     ApprovalFinalActionStatus @default(NOT_READY)
+  finalActionAppliedAt  DateTime?
+  finalActionError      String?
+  idempotencyKey        String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  policy      ApprovalPolicy?      @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  requestedBy User                 @relation("RequestedApprovalRequests", fields: [requestedById], references: [id], onDelete: Restrict)
+  steps       ApprovalStep[]
+  decisions   ApprovalDecision[]
+  comments    ApprovalComment[]
+  attachments ApprovalAttachment[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, workflowType, status])
+  @@index([tenantId, targetModule, targetType, targetId])
+}
+
+model ApprovalStep {
+  id                 String             @id @default(uuid())
+  tenantId           String
+  requestId          String
+  sequence           Int
+  name               String
+  status             ApprovalStepStatus @default(PENDING)
+  approverRole       String?
+  approverPermission String?
+  decidedById        String?
+  decidedAt          DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  request   ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  decidedBy User?           @relation("ApprovalStepDeciders", fields: [decidedById], references: [id], onDelete: SetNull)
+  decisions ApprovalDecision[]
+
+  @@unique([requestId, sequence])
+  @@index([tenantId, status])
+}
+
+model ApprovalDecision {
+  id        String               @id @default(uuid())
+  tenantId  String
+  requestId String
+  stepId    String?
+  decision  ApprovalDecisionType
+  reason    String?
+  decidedById String
+  context   Json?
+  createdAt DateTime             @default(now())
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  request   ApprovalRequest  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  step      ApprovalStep?    @relation(fields: [stepId], references: [id], onDelete: SetNull)
+  decidedBy User             @relation("ApprovalDecisionActors", fields: [decidedById], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, requestId, createdAt])
+  @@index([tenantId, decidedById, createdAt])
+}
+
+model ApprovalComment {
+  id        String   @id @default(uuid())
+  tenantId  String
+  requestId String
+  body      String
+  createdById String
+  createdAt DateTime @default(now())
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  request   ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  createdBy User            @relation("ApprovalCommentAuthors", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, requestId, createdAt])
+}
+
+model ApprovalAttachment {
+  id          String   @id @default(uuid())
+  tenantId    String
+  requestId   String
+  fileAssetId String
+  label       String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  request   ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fileAsset FileAsset       @relation(fields: [fileAssetId], references: [id], onDelete: Restrict)
+  createdBy User            @relation("ApprovalAttachmentAuthors", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, requestId])
+  @@index([tenantId, fileAssetId])
+}
+
+model AutomationRule {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  isEnabled   Boolean  @default(true)
+  priority    Int      @default(100)
+  featureKey  String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant     Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy  User?                   @relation("CreatedAutomationRules", fields: [createdById], references: [id], onDelete: SetNull)
+  triggers   AutomationTrigger[]
+  conditions AutomationCondition[]
+  actions    AutomationAction[]
+  logs       AutomationExecutionLog[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isEnabled, priority])
+}
+
+model AutomationTrigger {
+  id          String                @id @default(uuid())
+  tenantId    String
+  ruleId      String
+  type        AutomationTriggerType
+  sourceModule String?
+  config      Json                  @default("{}")
+  createdAt   DateTime              @default(now())
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rule   AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, type])
+}
+
+model AutomationCondition {
+  id        String                      @id @default(uuid())
+  tenantId  String
+  ruleId    String
+  fieldPath String
+  operator  AutomationConditionOperator
+  value     Json?
+  createdAt DateTime                    @default(now())
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rule   AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, ruleId])
+}
+
+model AutomationAction {
+  id        String               @id @default(uuid())
+  tenantId  String
+  ruleId    String
+  type      AutomationActionType
+  config    Json                 @default("{}")
+  sortOrder Int                  @default(0)
+  createdAt DateTime             @default(now())
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rule   AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, ruleId, sortOrder])
+}
+
+model AutomationExecutionLog {
+  id             String                    @id @default(uuid())
+  tenantId       String
+  ruleId         String
+  triggerType    AutomationTriggerType
+  targetType     String?
+  targetId       String?
+  status         AutomationExecutionStatus
+  idempotencyKey String?
+  input          Json?
+  result         Json?
+  createdAt      DateTime                  @default(now())
+
+  tenant   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rule     AutomationRule         @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  failures AutomationFailure[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, triggerType, createdAt])
+  @@index([tenantId, ruleId, createdAt])
+}
+
+model AutomationFailure {
+  id             String   @id @default(uuid())
+  tenantId       String
+  executionLogId String
+  actionType     AutomationActionType?
+  errorCode      String
+  errorMessage   String
+  retryCount     Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  executionLog AutomationExecutionLog @relation(fields: [executionLogId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+}
+
+model AnalyticsSummary {
+  id          String                 @id @default(uuid())
+  tenantId    String
+  domain      AnalyticsSummaryDomain
+  summaryDate DateTime
+  scopeType   String                 @default("tenant")
+  scopeId     String?
+  metrics     Json
+  sourceHash  String?
+  generatedAt DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, domain, summaryDate, scopeType, scopeId])
+  @@index([tenantId, domain, summaryDate])
+}
+
+model AnalyticsRefreshJob {
+  id          String                 @id @default(uuid())
+  tenantId    String
+  domain      AnalyticsSummaryDomain
+  summaryDate DateTime
+  status      AnalyticsRefreshStatus @default(QUEUED)
+  errorSummary String?
+  requestedById String?
+  idempotencyKey String?
+  createdAt   DateTime               @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedBy User?  @relation("AnalyticsRefreshRequesters", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, domain, status])
+}
+
+model DocumentTemplate {
+  id            String                 @id @default(uuid())
+  tenantId      String
+  kind          DocumentTemplateKind
+  key           String
+  name          String
+  status        DocumentTemplateStatus @default(DRAFT)
+  locale        String                 @default("en")
+  createdById   String?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  tenant    Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User?                     @relation("CreatedDocumentTemplates", fields: [createdById], references: [id], onDelete: SetNull)
+  versions  DocumentTemplateVersion[]
+  documents GeneratedDocument[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId, kind, status])
+}
+
+model DocumentTemplateVersion {
+  id              String   @id @default(uuid())
+  tenantId        String
+  templateId      String
+  version         Int
+  body            String
+  mergeFields     Json     @default("[]")
+  headerConfig    Json?
+  footerConfig    Json?
+  activatedAt     DateTime?
+  createdById     String?
+  createdAt       DateTime @default(now())
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  template  DocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  createdBy User?            @relation("CreatedDocumentTemplateVersions", fields: [createdById], references: [id], onDelete: SetNull)
+  documents GeneratedDocument[]
+
+  @@unique([templateId, version])
+  @@index([tenantId, templateId, createdAt])
+}
+
+model GeneratedDocument {
+  id                String                  @id @default(uuid())
+  tenantId          String
+  templateId        String
+  templateVersionId String
+  status            GeneratedDocumentStatus @default(QUEUED)
+  subjectType       String
+  subjectId         String
+  fileAssetId       String?
+  mergeData         Json
+  verificationCode  String?
+  generatedById     String?
+  errorSummary      String?
+  generatedAt       DateTime?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  tenant          Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  template        DocumentTemplate        @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  templateVersion DocumentTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  fileAsset       FileAsset?              @relation(fields: [fileAssetId], references: [id], onDelete: SetNull)
+  generatedBy     User?                   @relation("GeneratedDocumentActors", fields: [generatedById], references: [id], onDelete: SetNull)
+  verificationTokens DocumentVerificationToken[]
+  printHistory    DocumentPrintHistory[]
+  accessLogs      DocumentAccessLog[]
+
+  @@index([tenantId, subjectType, subjectId])
+  @@index([tenantId, status, createdAt])
+  @@unique([tenantId, verificationCode])
+}
+
+model DocumentVerificationToken {
+  id          String   @id @default(uuid())
+  tenantId    String
+  documentId  String
+  tokenHash   String
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  document GeneratedDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, tokenHash])
+  @@index([tenantId, documentId])
+}
+
+model DocumentPrintHistory {
+  id          String   @id @default(uuid())
+  tenantId    String
+  documentId  String
+  printedById String?
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  document  GeneratedDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  printedBy User?             @relation("DocumentPrintActors", fields: [printedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, documentId, createdAt])
+}
+
+model DocumentAccessLog {
+  id          String   @id @default(uuid())
+  tenantId    String
+  documentId  String
+  accessedById String?
+  action      String
+  createdAt   DateTime @default(now())
+
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  document   GeneratedDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  accessedBy User?             @relation("DocumentAccessActors", fields: [accessedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, documentId, createdAt])
+}
+
+model DataExportJob {
+  id             String              @id @default(uuid())
+  tenantId       String
+  exportKey      String
+  format         String
+  filters        Json                @default("{}")
+  status         DataExportJobStatus @default(QUEUED)
+  fileAssetId    String?
+  requestedById  String?
+  retryOfId      String?
+  idempotencyKey String?
+  expiresAt      DateTime?
+  errorSummary   String?
+  createdAt      DateTime            @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  updatedAt      DateTime            @updatedAt
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fileAsset   FileAsset?      @relation(fields: [fileAssetId], references: [id], onDelete: SetNull)
+  requestedBy User?           @relation("DataExportRequesters", fields: [requestedById], references: [id], onDelete: SetNull)
+  retryOf     DataExportJob?  @relation("DataExportRetries", fields: [retryOfId], references: [id], onDelete: SetNull)
+  retries     DataExportJob[] @relation("DataExportRetries")
+  failures    DataExportFailure[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, exportKey, createdAt])
+  @@index([tenantId, status, createdAt])
+}
+
+model DataExportFailure {
+  id          String   @id @default(uuid())
+  tenantId    String
+  exportJobId String
+  errorCode   String
+  errorMessage String
+  createdAt   DateTime @default(now())
+
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  exportJob DataExportJob @relation(fields: [exportJobId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, exportJobId, createdAt])
+}
