@@ -1,10 +1,10 @@
 # SchoolOS Planning Index
 
-**Status:** Planning index  
+**Status:** Source of Truth  
 **Last updated:** 2026-06-15  
 **Phase:** Planning only — frontend/mobile development starts only after planning docs are accepted.
 
-This file lists the current SchoolOS planning documents and explains how they should be used.
+This file is the master planning index. For a shorter entry point, start with `docs/README.md`.
 
 ---
 
@@ -22,39 +22,80 @@ When planning is accepted, implement module-by-module using the screen contract 
 
 ---
 
-## 2. Core UI/UX Planning Docs
+## 2. Documentation Tiers
 
-| Document | Purpose |
-|---|---|
-| `docs/design/SCHOOLOS_UI_UX_GUIDE.md` | Main SchoolOS UI/UX guide and source of broad design/product rules. |
-| `docs/design/SCHOOLOS_DETAILED_UI_UX_ROLE_COMPONENT_BLUEPRINT.md` | Deep component, role, device, data access, and module-design blueprint. |
-| `docs/design/SCHOOLOS_WEB_MOBILE_MODULE_SCREEN_ROLE_PLAN.md` | Web/mobile screen plan by module and role. |
-| `docs/design/SCHOOLOS_UI_UX_CONSOLIDATION_NOTES.md` | Consolidates uploaded UI/UX plans with existing SchoolOS docs. |
-| `docs/design/SCHOOLOS_DESIGN_TOKENS_REFERENCE.md` | Consolidated color, typography, spacing, radius, elevation, icon, role, and module token planning. |
+SchoolOS planning docs are now divided into three tiers.
 
----
+| Tier | Meaning | How to use |
+|---|---|---|
+| Source of Truth | Active docs that drive implementation decisions. | Read these first and keep them updated. |
+| Reference | Detailed background docs that explain the reasoning. | Use when source-of-truth docs need deeper context. |
+| Archive / Superseded | Older drafts, duplicate plans, and one-off docs. | Keep for history only; do not use for implementation decisions. |
 
-## 3. Frontend Planning Docs
+Rule:
 
-| Document | Purpose |
-|---|---|
-| `docs/frontend/SCHOOLOS_FRONTEND_API_CONSUMPTION_MAP.md` | Maps frontend modules to real backend API usage direction. |
-| `docs/frontend/SCHOOLOS_FRONTEND_BACKEND_CONTRACT_SYNC_PLAN.md` | Requires backend contract verification/implementation alongside each frontend screen. |
-| `docs/frontend/SCHOOLOS_SCREEN_CONTRACT_MATRIX.md` | Implementation matrix for every planned screen: role, permission, API, backend gap, component, state, test. |
-| `docs/frontend/SCHOOLOS_PERMISSION_CATALOG.md` | Permission naming catalog and planning baseline for role bundles/scopes. |
-| `docs/frontend/SCHOOLOS_COMPONENT_IMPLEMENTATION_ROADMAP.md` | Build order for shared components, domain components, mobile widgets, and previews. |
+```text
+Do not create new planning docs unless the content cannot fit cleanly into an existing source-of-truth or reference doc.
+```
 
 ---
 
-## 4. Testing Planning Docs
+## 3. Source-of-Truth Docs
 
-| Document | Purpose |
-|---|---|
-| `docs/testing/SCHOOLOS_PERSONA_SMOKE_TEST_PLAN.md` | Persona-based smoke testing for owner, principal, teacher, parent, student, cashier, driver, etc. |
+These are the active docs to use before and during implementation.
+
+| Area | Document | Purpose |
+|---|---|---|
+| Entry point | `docs/README.md` | Short documentation guide and read order. |
+| Planning index | `docs/SCHOOLOS_PLANNING_INDEX.md` | Master planning index and planning-phase rules. |
+| UI/UX | `docs/design/SCHOOLOS_UI_UX_GUIDE.md` | Main UI/UX guide and product design rules. |
+| Tokens | `docs/design/SCHOOLOS_DESIGN_TOKENS_REFERENCE.md` | Consolidated color, typography, spacing, radius, elevation, icon, role, and module token planning. |
+| Permissions | `docs/frontend/SCHOOLOS_PERMISSION_CATALOG.md` | Permission naming catalog and planning baseline for role bundles/scopes. |
+| Screen contracts | `docs/frontend/SCHOOLOS_SCREEN_CONTRACT_MATRIX.md` | Implementation matrix for screens: role, permission, API, backend gap, component, state, test. |
+| Frontend/backend sync | `docs/frontend/SCHOOLOS_FRONTEND_BACKEND_CONTRACT_SYNC_PLAN.md` | Requires backend contract verification/implementation alongside each frontend screen. |
+| Components | `docs/frontend/SCHOOLOS_COMPONENT_IMPLEMENTATION_ROADMAP.md` | Build order for shared components, domain components, mobile widgets, and previews. |
+| Testing | `docs/testing/SCHOOLOS_PERSONA_SMOKE_TEST_PLAN.md` | Persona-based smoke testing for owner, principal, teacher, parent, student, cashier, driver, etc. |
 
 ---
 
-## 5. Uploaded Reference Docs
+## 4. Reference Docs
+
+These are useful but should not be the daily implementation entry point.
+
+| Document | Purpose |
+|---|---|
+| `docs/design/SCHOOLOS_DETAILED_UI_UX_ROLE_COMPONENT_BLUEPRINT.md` | Deep component, role, device, data access, and module-design reasoning. |
+| `docs/design/SCHOOLOS_WEB_MOBILE_MODULE_SCREEN_ROLE_PLAN.md` | Detailed web/mobile screen plan by module and role. |
+| `docs/design/SCHOOLOS_UI_UX_CONSOLIDATION_NOTES.md` | Explains how uploaded UI/UX plans were consolidated into SchoolOS docs. |
+| `docs/frontend/SCHOOLOS_FRONTEND_API_CONSUMPTION_MAP.md` | Earlier API consumption planning map; useful for route/client audit. |
+
+Future cleanup target:
+
+```text
+Move long reference docs under docs/design/references/ or docs/frontend/references/ once paths are fully updated.
+```
+
+---
+
+## 5. Archive / Superseded Docs
+
+Older drafts, duplicated plans, and one-off planning files should move under:
+
+```text
+docs/archive/
+```
+
+Archive rules:
+
+```text
+Archive before deleting.
+Do not use archived docs as source of truth.
+Add a short note when a doc is archived explaining what replaced it.
+```
+
+---
+
+## 6. Uploaded Reference Docs
 
 Uploaded reference files used in consolidation:
 
@@ -88,7 +129,7 @@ Implementation order
 
 ---
 
-## 6. Planning Acceptance Checklist
+## 7. Planning Acceptance Checklist
 
 Planning can move toward implementation only when these are reviewed and accepted:
 
@@ -107,7 +148,7 @@ Planning can move toward implementation only when these are reviewed and accepte
 
 ---
 
-## 7. Suggested Next Planning Steps
+## 8. Suggested Next Planning Steps
 
 Recommended next steps:
 
@@ -118,12 +159,13 @@ Recommended next steps:
 4. Decide final MVP screen order.
 5. Decide final web/mobile release order.
 6. Decide if dark mode, Nepali labels, and Bikram Sambat support are v1 or later.
-7. Create Codex implementation prompts only after planning is accepted.
+7. Move long reference docs into references/ folders after path references are updated.
+8. Create Codex implementation prompts only after planning is accepted.
 ```
 
 ---
 
-## 8. Current Recommended MVP Planning Order
+## 9. Current Recommended MVP Planning Order
 
 ```text
 P0 Foundation:
@@ -160,7 +202,7 @@ P1/P2 Mobile workflows:
 
 ---
 
-## 9. Final Planning Rule
+## 10. Final Planning Rule
 
 ```text
 Every planned screen must map to:
