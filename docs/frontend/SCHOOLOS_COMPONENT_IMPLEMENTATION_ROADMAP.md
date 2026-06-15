@@ -1,6 +1,6 @@
 # SchoolOS Component Implementation Roadmap
 
-**Status:** Planning baseline  
+**Status:** Source of Truth  
 **Last updated:** 2026-06-15  
 **Phase:** Planning only — no component implementation until planning is accepted  
 **Purpose:** Define the SchoolOS component system build order so web and mobile screens can be implemented consistently after the planning phase.
@@ -9,9 +9,8 @@ Related docs:
 
 ```text
 docs/design/SCHOOLOS_UI_UX_GUIDE.md
-docs/design/SCHOOLOS_DETAILED_UI_UX_ROLE_COMPONENT_BLUEPRINT.md
-docs/design/SCHOOLOS_WEB_MOBILE_MODULE_SCREEN_ROLE_PLAN.md
-docs/design/SCHOOLOS_UI_UX_CONSOLIDATION_NOTES.md
+docs/design/SCHOOLOS_DESIGN_TOKENS_REFERENCE.md
+docs/design/references/SCHOOLOS_ROLE_SCREEN_DESIGN_REFERENCE.md
 docs/frontend/SCHOOLOS_SCREEN_CONTRACT_MATRIX.md
 ```
 
@@ -45,16 +44,16 @@ Flutter Material 3 with SchoolOS theme wrappers
 
 ## 2. Component Layers
 
-| Layer | Purpose | Example components | Implementation priority |
+| Layer | Purpose | Example components | Priority |
 |---|---|---|---|
 | Tokens | Visual foundation | colors, typography, spacing, radius, shadows | P0 |
-| Primitives | Basic UI building blocks | Button, Input, Select, Dialog, Tabs, Badge | P0 |
-| Layout | Product shell and page scaffolding | AppShell, PlatformShell, MobileShell, PageHeader | P0 |
-| State | Consistent API/UI state handling | LoadingState, EmptyState, ErrorState, PermissionState, ModuleLockedState | P0 |
-| Data | Dense school office workflows | DataTable, FilterBar, Pagination, SearchInput | P0 |
+| Primitives | Basic UI blocks | Button, Input, Select, Dialog, Tabs, Badge | P0 |
+| Layout | Product shell/scaffolding | AppShell, PlatformShell, MobileShell, PageHeader | P0 |
+| State | Consistent UI states | LoadingState, EmptyState, ErrorState, PermissionState, ModuleLockedState | P0 |
+| Data | Dense school workflows | DataTable, FilterBar, Pagination, SearchInput | P0 |
 | Feedback/action | Safe interactions | ConfirmDialog, AuditReasonDialog, Toast, InlineAlert | P0 |
 | Domain shared | Cross-module business UI | MoneyDisplay, DateDisplay, StatusBadge, FilePreviewAction | P0/P1 |
-| Module domain | Module-specific workflow UI | AttendanceRegister, FeeCollectionPanel, MarksGrid | P1+ |
+| Module domain | Module workflow UI | AttendanceRegister, FeeCollectionPanel, MarksGrid | P1+ |
 | Mobile widgets | Flutter role-focused patterns | MobileStatusCard, TodayCard, BottomNav, OfflineBanner | P1 |
 
 ---
@@ -151,8 +150,6 @@ Parent, teacher, student, and driver mobile screens can share the same shell, st
 
 ## 5. Shared Display Components
 
-These should be used across all modules to avoid inconsistent rendering.
-
 | Component | Purpose | Notes |
 |---|---|---|
 | `MoneyDisplay` | NPR and monetary values | Right-aligned in tables, tabular numbers. |
@@ -168,182 +165,23 @@ These should be used across all modules to avoid inconsistent rendering.
 
 ---
 
-## 6. Module Domain Components
+## 6. Module Domain Component Families
 
-### M1 Students / Admissions
-
-```text
-StudentProfileHeader
-StudentIdentityCard
-GuardianCard
-StudentDocumentList
-StudentPhotoUploader
-StudentQrLifecyclePanel
-StudentLifecycleTimeline
-DuplicateCandidateComparison
-AdmissionPipelineBoard
-EnrollmentConfirmationPanel
-IemisReadinessTable
-```
-
-### M2 Attendance
-
-```text
-AttendanceRegister
-AttendanceStatusToggle
-AttendanceSummaryStrip
-AttendanceMonthlyGrid
-AttendanceCorrectionQueue
-AttendanceConflictCard
-WorkingDayCalendar
-MobileAttendanceRoster
-```
-
-### M3 Fees
-
-```text
-FinanceKpiStrip
-StudentFeeLedger
-PaymentCollectionPanel
-ReceiptViewer
-CashierClosePreview
-RefundReversalQueue
-DefaulterTable
-FeeReminderPreview
-```
-
-### M4 Academics
-
-```text
-ExamTermStatusPanel
-AssessmentComponentTable
-MarksEntryGrid
-CasEntryGrid
-ReportCardReadinessPanel
-ReportCardBatchTable
-ResultPublishConfirm
-PromotionReviewTable
-SyllabusProgressPanel
-```
-
-### M5 Activity Feed
-
-```text
-ActivityComposer
-AudiencePreviewPanel
-ActivityPostCard
-MediaConsentBadge
-ActivityMediaGallery
-ModerationQueue
-MilestoneTemplateCard
-MoodLogPanel
-```
-
-### M6 Homework / Timetable
-
-```text
-HomeworkWorkspaceTable
-HomeworkDetailPanel
-SubmissionReviewTable
-HomeworkReminderPreview
-TimetableBuilderGrid
-TimetableConflictPanel
-TeacherAvailabilityGrid
-SubstitutionAssignmentPanel
-MobileTimetableCard
-```
-
-### M7 HR / Payroll
-
-```text
-StaffProfileHeader
-LeaveApprovalQueue
-StaffSelfServiceCard
-PayrollRunStepper
-PayrollPreviewTable
-PayslipDownloadCard
-SalaryStructurePanel
-PayrollPostingPanel
-```
-
-### M8A Library
-
-```text
-LibraryDeskPanel
-BookCatalogTable
-CopyStatusBadge
-IssueReturnPanel
-ReservationQueue
-OverdueTable
-LibraryFinePanel
-```
-
-### M8B Transport
-
-```text
-TransportStatusDashboard
-RouteStopManager
-VehicleDocumentAlert
-DriverAssignmentTable
-StudentTransportAssignmentTable
-ActiveTripBoard
-TripManifestTable
-DelayBroadcastPreview
-MobileDriverTripPanel
-ParentTransportStatusCard
-```
-
-### M8C Canteen
-
-```text
-CanteenPosPanel
-CanteenScanResultCard
-MenuItemTable
-MealPlanPanel
-WalletBalanceCard
-WalletTransactionTimeline
-InventoryStockTable
-ParentCanteenStatusCard
-```
-
-### M9 Accounting
-
-```text
-AccountingControlDashboard
-ChartOfAccountsTree
-JournalTable
-JournalDebitCreditTable
-FiscalPeriodStatusPanel
-VoucherForm
-BankReconciliationWorkspace
-FinancialReportFilterPanel
-SourceLedgerTable
-```
-
-### M10 Notices / Communication
-
-```text
-NoticeComposer
-NoticeAudiencePreview
-NoticeDeliveryStatusTable
-MessagingInboxLayout
-MessageThread
-SchoolHoursBanner
-EscalationReviewQueue
-MobileNoticeCard
-MobileChatThread
-```
-
-### M12 Learning
-
-```text
-LearningActivityCard
-LearningSessionPanel
-AttemptReviewTable
-ClassProgressPanel
-LearningResourceList
-StudentLearningCard
-```
+| Module | Component family examples |
+|---|---|
+| M1 Students/Admissions | StudentProfileHeader, GuardianCard, StudentDocumentList, StudentPhotoUploader, StudentQrLifecyclePanel, DuplicateCandidateComparison, AdmissionPipelineBoard, IemisReadinessTable. |
+| M2 Attendance | AttendanceRegister, AttendanceStatusToggle, AttendanceSummaryStrip, AttendanceMonthlyGrid, AttendanceCorrectionQueue, MobileAttendanceRoster. |
+| M3 Fees | FinanceKpiStrip, StudentFeeLedger, PaymentCollectionPanel, ReceiptViewer, CashierClosePreview, RefundReversalQueue, DefaulterTable. |
+| M4 Academics | MarksEntryGrid, CasEntryGrid, ReportCardReadinessPanel, ReportCardBatchTable, ResultPublishConfirm, PromotionReviewTable. |
+| M5 Activity | ActivityComposer, AudiencePreviewPanel, ActivityPostCard, MediaConsentBadge, ActivityMediaGallery, ModerationQueue. |
+| M6 Homework/Timetable | HomeworkWorkspaceTable, SubmissionReviewTable, TimetableBuilderGrid, TimetableConflictPanel, SubstitutionAssignmentPanel, MobileTimetableCard. |
+| M7 HR/Payroll | StaffProfileHeader, LeaveApprovalQueue, StaffSelfServiceCard, PayrollRunStepper, PayrollPreviewTable, PayslipDownloadCard. |
+| M8A Library | LibraryDeskPanel, BookCatalogTable, CopyStatusBadge, IssueReturnPanel, ReservationQueue, OverdueTable. |
+| M8B Transport | TransportStatusDashboard, RouteStopManager, VehicleDocumentAlert, ActiveTripBoard, MobileDriverTripPanel, ParentTransportStatusCard. |
+| M8C Canteen | CanteenPosPanel, CanteenScanResultCard, MenuItemTable, WalletBalanceCard, InventoryStockTable, ParentCanteenStatusCard. |
+| M9 Accounting | AccountingControlDashboard, ChartOfAccountsTree, JournalTable, JournalDebitCreditTable, FiscalPeriodStatusPanel, FinancialReportFilterPanel. |
+| M10 Notices/Chat | NoticeComposer, NoticeAudiencePreview, NoticeDeliveryStatusTable, MessagingInboxLayout, MessageThread, SchoolHoursBanner. |
+| M12 Learning | LearningActivityCard, LearningSessionPanel, AttemptReviewTable, ClassProgressPanel, LearningResourceList. |
 
 ---
 
@@ -352,10 +190,12 @@ StudentLearningCard
 ### Phase 0 — Planning completion
 
 ```text
-Finalize consolidation notes
+Finalize planning index
+Finalize UI/UX guide
+Finalize design tokens
 Finalize permission catalog
-Finalize screen contract matrix
-Finalize component roadmap
+Finalize screen contract matrix P0 rows
+Finalize frontend/backend sync plan
 Finalize persona smoke tests
 ```
 
@@ -380,8 +220,8 @@ Owner dashboard
 Principal dashboard
 Teacher dashboard
 Finance dashboard
-Parent mobile dashboard contract planning
 Platform dashboard
+Parent/mobile dashboard contract planning
 ```
 
 ### Phase 3 — Core web modules
@@ -391,7 +231,7 @@ M1 Students and Admissions
 M2 Attendance
 M3 Fees
 M4 Academics / Report Cards
-M10 Notices basic
+M10 Notices basics
 ```
 
 ### Phase 4 — Extended web modules
@@ -431,11 +271,11 @@ Parent Fees / Notices / Chat
 
 ---
 
-## 8. Storybook / Preview Plan
+## 8. Preview / Storybook Plan
 
 Before module implementation, create a preview environment for web components.
 
-Priority preview stories:
+Priority previews:
 
 ```text
 Button states
@@ -451,13 +291,12 @@ AuditReasonDialog
 PaymentCollectionPanel mock state
 AttendanceRegister mock state
 MarksEntryGrid mock state
-Mobile card visual references if web preview is useful
 ```
 
 Rules:
 
 ```text
-Storybook/preview uses mock display data only.
+Preview/stories may use mock display data.
 Production module screens use real APIs only.
 No fake data in production routes.
 ```
@@ -485,8 +324,6 @@ Has tests or stories where appropriate
 ---
 
 ## 10. Design Drift Prevention
-
-To avoid inconsistent UI:
 
 ```text
 Do not create new button/card/table/dialog variants inside module folders unless approved.
