@@ -47,6 +47,19 @@ apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md
 apps/web/e2e/README.md
 ```
 
+## Design Planning Docs
+
+The combined web/mobile product direction remains:
+
+- `design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md`
+
+Execution and companion wireframe/component plans:
+
+- `design/SCHOOLOS_WEB_FRONTEND_IMPLEMENTATION_MASTER_PLAN.md`
+- `design/SCHOOLOS_MOBILE_APP_IMPLEMENTATION_MASTER_PLAN.md`
+- `design/SCHOOLOS_SETTINGS_WIREFRAMES.md`
+- `design/SCHOOLOS_PLATFORM_CORE_WIREFRAMES_AND_COMPONENT_PLAN.md`
+
 ---
 
 ## Cleanup Rules
@@ -55,4 +68,5 @@ apps/web/e2e/README.md
 2. Do not recreate planning-only docs that conflict with current implementation status.
 3. Keep old duplicated planning content in git history rather than active repo docs.
 4. For web/mobile implementation, use `design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md` as the consolidated active planning set.
-5. Add a split-out doc only when it has a clear owner, current status, and no overlap with an existing active doc.
+5. Use the split web/mobile implementation master plans for execution sequencing while keeping the combined design doc as product-direction source of truth.
+6. Add a split-out doc only when it has a clear owner, current status, and no overlap with an existing active doc.

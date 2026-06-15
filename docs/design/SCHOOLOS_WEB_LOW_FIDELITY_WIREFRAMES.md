@@ -8,7 +8,7 @@
 - `docs/design/SCHOOLOS_WEB_DESIGN_EXPANSION.md`
 - `docs/design/SCHOOLOS_WEB_MODULE_WORKSPACE_LAYOUT.md`
 - `docs/design/SCHOOLOS_WEB_MAIN_DASHBOARD_LAYOUT.md`
-- `docs/product/SCHOOLOS_MODULE_FEATURE_BREAKDOWN.md`
+- `docs/design/SCHOOLOS_MODULE_FEATURE_BREAKDOWN.md`
 
 Use this as the low-fidelity structure reference for implementing SchoolOS web screens module by module.
 

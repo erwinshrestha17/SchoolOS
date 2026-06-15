@@ -6,6 +6,13 @@
 
 This document consolidates the previous UI/UX guide, web/mobile master design plan, frontend-backend API contract map, Flutter app plan, and web/mobile persona smoke plan. Do not recreate those separate planning docs unless the project grows enough to justify a deliberate split.
 
+## Split Implementation Plans
+
+This combined document remains the source of truth for web/mobile product direction. Execution planning is now split into:
+
+- Web execution: `docs/design/SCHOOLOS_WEB_FRONTEND_IMPLEMENTATION_MASTER_PLAN.md`
+- Mobile execution: `docs/design/SCHOOLOS_MOBILE_APP_IMPLEMENTATION_MASTER_PLAN.md`
+
 ---
 
 ## 1. Status and Scope
