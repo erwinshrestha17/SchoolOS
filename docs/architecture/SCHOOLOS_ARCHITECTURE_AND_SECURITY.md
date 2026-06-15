@@ -291,14 +291,20 @@ Do not buy more server capacity to hide inefficient architecture. SchoolOS must 
 
 Cost-aware performance order:
 ```text
-Database efficiency
--> file/image optimization
--> API payload control
--> async/background work
--> selective caching
--> selective real-time
--> infrastructure scaling
+1. Tenant-scoped database efficiency
+2. Pagination and payload control
+3. File/image compression and object storage
+4. Background jobs for heavy work
+5. Summary tables for dashboards
+6. Selective cache for read-heavy low-risk data
+7. Notification channel control
+8. Controlled logs and retention
+9. Selective real-time only where needed
+10. Async/human-reviewed AI only after real data exists
+11. Infrastructure scaling only after measured need
 ```
+
+Do not add infrastructure before checking for missing indexes, unpaginated queries, over-fetched payloads, original images served to dashboards/mobile, synchronous PDF/report generation, repeated dashboard calculations from raw tables, excessive SMS usage, noisy logs, or unnecessary real-time subscriptions.
 
 ### Low-Resource Baseline Architecture
 The default low-resource architecture remains:
@@ -399,6 +405,8 @@ Required behavior:
 - Serve re-downloads from stored files.
 - Regenerate only when source data changes, the user explicitly requests regeneration, or the report policy requires a fresh snapshot.
 - Never block a normal API request while generating large reports.
+- Temporary exports must expire by policy.
+- Orphaned file cleanup jobs must never delete legal, financial, payroll, attendance, or audit records casually.
 
 ### Notification Cost Rules
 Use the cheapest reliable channel that satisfies the business risk.
@@ -419,6 +427,17 @@ SMS should be reserved for:
 - Critical account or payment events.
 
 Avoid SMS for low-priority notices, general homework updates, routine marketing, and repeated reminders that can be batched.
+
+Provider modes must be explicit:
+
+```text
+disabled
+log/dev
+mock
+configured
+```
+
+The system must not pretend to send real messages in disabled, log/dev, or mock mode. Provider failures should produce safe diagnostics and must not block core school workflows.
 
 ### Real-Time Cost Rules
 Use real-time only where immediate updates materially improve the workflow.
@@ -450,17 +469,49 @@ Default policy:
 ### Cost-Control Gate for New Features
 Before implementing a feature, answer:
 1. Can the first version run inside the existing modular monolith?
-2. Is the data tenant-scoped and indexed for its main query path?
-3. Is every growing list paginated and filtered server-side?
-4. Can heavy work run through BullMQ instead of blocking the request?
-5. Are files stored in object storage with optimized variants?
-6. Can dashboard data use summaries instead of raw scans?
-7. Is real-time necessary, or is polling/refresh enough?
-8. Is SMS necessary, or can in-app/push/email handle it?
-9. Is AI necessary now, or can rules/analytics handle the first version?
-10. What metric proves the feature is fast enough without over-provisioning?
+2. Are all queries tenant-scoped?
+3. Is every growing list paginated?
+4. Which index supports the main query?
+5. Is the response payload purpose-limited?
+6. Does heavy work run in BullMQ?
+7. Are jobs idempotent and tenant-scoped?
+8. Are files stored through File Registry and StorageService?
+9. Are image variants generated where applicable?
+10. Are reports generated once and reused?
+11. Can in-app/push/email replace SMS?
+12. Is real-time truly required?
+13. Is AI truly required now?
+14. Is logging useful without leaking or overproducing data?
+15. What metric proves the feature is fast enough?
+16. What quota or usage counter controls platform cost?
 
 A feature is not cost/performance-ready until these are answered.
+
+### Recommended Cost-Readiness Implementation Sequence
+
+1. Audit list endpoints for pagination and tenant indexes.
+2. Add image variant generation and ensure UI uses variants.
+3. Enforce object storage metadata and no-base64 database rule.
+4. Convert report/export generation to queue-backed workflows.
+5. Add dashboard summary tables/jobs for admin, student, attendance, and fees.
+6. Add notification category/channel policy and tenant usage counters.
+7. Add platform usage dashboard for storage, SMS, reports, queues, and provider health.
+8. Add cache only for settings, entitlements, lookup data, and short-lived summaries.
+9. Review real-time features and avoid unnecessary subscriptions.
+10. Keep AI deferred until production data and cost controls exist.
+
+### Cost and Performance Non-Negotiables
+
+- No unpaginated growing list endpoints.
+- No original image serving in normal UI.
+- No base64 files in PostgreSQL.
+- No heavy report/export/PDF generation inside request-response flows.
+- No dashboard raw-table scans on every page load.
+- No SMS for low-priority notifications.
+- No real-time subscriptions without workflow justification.
+- No AI inference on every page load.
+- No new infrastructure to hide inefficient code.
+- No cross-tenant data or file access under any cost optimization.
 
 ---
 

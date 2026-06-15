@@ -21,7 +21,7 @@ SchoolOS is not in a planning-only documentation phase. Current work is controll
 | 6 | `project/SCHOOLOS_IMPLEMENTATION_PLAN.md` | Active implementation order, module backlogs, and phase gates. |
 | 7 | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Storage, File Registry, tenant isolation, scaling, performance, and security architecture. |
 | 8 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, and provider/queue operations. |
-| 9 | `design/SCHOOLOS_UI_UX_GUIDE.md` | Single UI/UX, design-token, component, accessibility, and web/mobile direction. |
+| 9 | `design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md` | Single web/mobile product design, UI/UX, API contract, Flutter, and persona smoke plan. |
 | 10 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, and go/no-go checks. |
 
 ---
@@ -29,20 +29,14 @@ SchoolOS is not in a planning-only documentation phase. Current work is controll
 ## Active Docs
 
 ```text
+README.md
 product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
 product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
 project/SCHOOLOS_PROJECT_STATUS.md
 project/SCHOOLOS_IMPLEMENTATION_PLAN.md
-project/SCHOOLOS_ADVANCED_OPERATIONS_PLAN.md
-project/SCHOOLOS_LEARNING_LAYER_PLAN.md
-project/SCHOOLOS_COST_PERFORMANCE_IMPLEMENTATION_PLAN.md
 architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
 architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
-design/SCHOOLOS_UI_UX_GUIDE.md
-design/SCHOOLOS_WEB_MOBILE_MASTER_DESIGN_PLAN.md
-frontend/SCHOOLOS_FRONTEND_BACKEND_API_CONTRACT_MAP.md
-mobile/SCHOOLOS_FLUTTER_APP_PLAN.md
-testing/SCHOOLOS_WEB_MOBILE_PERSONA_SMOKE_PLAN.md
+design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md
 production/SCHOOLOS_PRODUCTION_RUNBOOK.md
 ```
 
@@ -60,5 +54,5 @@ apps/web/e2e/README.md
 1. Do not add a new `.md` file if the content belongs inside an active source-of-truth doc.
 2. Do not recreate planning-only docs that conflict with current implementation status.
 3. Keep old duplicated planning content in git history rather than active repo docs.
-4. For web/mobile implementation, use the master design plan, API contract map, Flutter plan, and persona smoke plan as the active planning set.
-4. Add a split-out doc only when it has a clear owner, current status, and no overlap with an existing active doc.
+4. For web/mobile implementation, use `design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md` as the consolidated active planning set.
+5. Add a split-out doc only when it has a clear owner, current status, and no overlap with an existing active doc.

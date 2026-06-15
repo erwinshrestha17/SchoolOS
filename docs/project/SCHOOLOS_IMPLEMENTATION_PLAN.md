@@ -112,7 +112,7 @@ Before adding or expanding visible features:
 8. Keep money flows idempotent and auditable.
 9. Keep private files behind FileRegistryService and StorageService.
 10. Keep AI/ML roadmap-only until reliable production data exists and M11 is approved.
-11. Follow the web dashboard overhaul plan before broad visual redesign work.
+11. Follow `docs/design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md` before broad web/mobile visual redesign work.
 12. Each school module should have dedicated web screens/workspaces for its real workflow.
 
 ---
@@ -423,7 +423,167 @@ Before adding or expanding visible features:
 
 ---
 
-## 5. Verification Commands
+## 5. Advanced Operations Consolidated Plan
+
+**Status:** Active pre-AI implementation blueprint merged from the former advanced operations plan.
+**Scope:** Nepal-first advanced school operations before M11 School Intelligence / AI.
+
+Advanced Operations deepens production workflows without introducing AI/ML/LLM runtime. It uses deterministic workflows, explicit business rules, human approvals, audit trails, tenant-scoped access, queued work, and File Registry-backed documents/exports.
+
+Current implementation status:
+
+```text
+Backend foundation: Implemented for approval workflows, deterministic automation, descriptive analytics summaries, document templates/generated documents, verification/access logs, and data export jobs.
+Migration: apps/api/prisma/migrations/20260615090000_advanced_operations_foundation adds advanced-operations enums, tenant-scoped tables, indexes, and foreign keys.
+Local verification: backend package gates, root typecheck/build, and local smoke suites pass.
+Still pending: staging migration apply/deploy, seeded browser E2E, frontend workspaces, mobile/offline workflow depth, provider/staging checks, and pilot feedback.
+M11 AI: Deferred/roadmap only.
+```
+
+### Advanced Operations Purpose
+
+The goal is to deepen real Nepali school workflows around:
+
+1. Tenant onboarding and SaaS operations.
+2. Admissions and student lifecycle.
+3. Attendance and parent notifications.
+4. Fees, receipts, cashier close, and reconciliation.
+5. Academics, exams, report cards, and promotion.
+6. Homework, timetable, and substitutions.
+7. HR, leave, payroll, and staff self-service.
+8. Library, transport, canteen, and accounting.
+9. Parent/staff/driver mobile self-service and controlled student lab/session access.
+10. Approval workflows, rules-based automation, descriptive analytics, exports, verification/access logs, and document templates.
+
+Nepal-school operating context to preserve:
+
+| Reality | Product implication |
+|---|---|
+| Cash, bank deposit, cheque, QR/wallet, and online references may coexist | Fee collection supports multiple modes, references, cashier close, and reconciliation. |
+| Parent app usage may be inconsistent | Notices, fee reminders, attendance alerts, and transport messages need channel fallback behavior. |
+| Schools use mixed Nepali and English | Notices, receipts, certificates, reports, and templates must be localization-ready. |
+| Internet can be unstable | Attendance, homework viewing, parent summaries, and driver workflows need offline/cache/retry states where practical. |
+| Student records may start in paper/Excel | CSV import, preview, validation errors, duplicate review, and legacy import batches are required. |
+| IEMIS-style reporting pressure exists | Maintain reporting-ready fields and validation/export readiness without claiming unsupported government integration. |
+| SEE and Grade 11-12 workflows matter | Support exam terms, report cards, practicals, projects, streams, subject combinations, and board-prep fields. |
+| Smart boards/shared labs may arrive before 1:1 devices | Learning prioritizes teacher-led board mode, lab mode, and printable fallback before adaptive/AI learning. |
+| Transport and student safety are selling points | Routes, stops, vehicles, drivers, GPS status, boarding/deboarding, emergency contacts, and stale-location warnings matter. |
+
+### Advanced Operations Guardrails
+
+1. Keep the NestJS modular monolith.
+2. Scope all tenant-owned reads, writes, jobs, exports, file access, and analytics by authenticated `tenantId`.
+3. Keep parent, student, driver, and mobile APIs purpose-limited; do not expose admin-shaped responses.
+4. Keep money flows idempotent and auditable.
+5. Use reversal/correction workflows for confirmed financial records.
+6. Keep private files behind File Registry and StorageService boundaries.
+7. Require reason, actor, timestamp, and audit trail for sensitive actions.
+8. Avoid fake/mock production data.
+9. Keep provider-disabled/mock modes explicit in the UI.
+10. Do not implement AI/ML/LLM runtime under this plan.
+11. Add browser/mobile smoke coverage for user-facing workflows before readiness claims.
+12. Add ownership and cross-tenant denial tests for every new parent/student/mobile/driver endpoint.
+
+### Build Order
+
+| Phase | Scope |
+|---|---|
+| Phase A - Pre-AI Pilot Depth | Frontend workspaces for implemented approval, automation, analytics, document-template, and export foundations; tenant onboarding wizard; student lifecycle/IEMIS readiness; fee workflows; attendance automation/offline polish; parent mobile self-service; controlled student lab/session access; communication read receipts/follow-ups; exam/report-card/certificate generation; seeded browser E2E and staging smoke. |
+| Phase B - Premium Private-School Operations | Timetable conflict/substitution engine; transport GPS/driver/parent hardening; canteen POS/wallet controls; scanner-first library; HR leave/payroll self-service; accounting reconciliation polish; Grade 11-12 streams/practicals/projects; export center and document template system. |
+| Phase C - SaaS Maturity Before AI | Usage-based plan limits; add-on entitlements; provider health center; queue operations center; advanced audit/security dashboard; multi-branch support if needed; backup/export/recovery; reporting-safe aggregation for future M11. |
+
+### Cross-Cutting Advanced Features
+
+| Feature | Model / API ownership | Required workflows | Remaining work |
+|---|---|---|---|
+| Approval Workflow Engine | `ApprovalRequest`, `ApprovalStep`, `ApprovalDecision`, `ApprovalPolicy`, `ApprovalComment`, `ApprovalAttachment`; advanced approvals routes under `/api/v1/advanced/approvals/*` | Fee reversal/refund, scholarship/discount, marks correction, attendance correction, leave request, payroll posting/reversal, transfer/withdrawal, document deletion/archive, high-impact notice, platform support override | Frontend workspace, module-specific final-action wiring, browser E2E, staging migration apply, pilot feedback |
+| Rules-Based Automation Engine | `AutomationRule`, `AutomationTrigger`, `AutomationCondition`, `AutomationAction`, `AutomationExecutionLog`, `AutomationFailure`; `/api/v1/advanced/automation/*` | Absent notification, attendance cutoff reminder, fee due reminder, unread notice follow-up, staff-leave substitution, library overdue, canteen low wallet, bus started notification, result published notification, tenant suspended blocking | Rule management UI, module-specific catalog depth, browser E2E, staging validation, pilot tuning |
+| Descriptive Analytics Dashboards | `/api/v1/advanced/analytics/summaries`, `/refresh` | Principal, attendance, fee, academic, homework, communication, transport, canteen, library, HR, platform dashboards | Dashboard frontend, summary refresh coverage, seeded browser E2E, staging validation, pilot metric tuning |
+| Document and Template System | `DocumentTemplate`, `GeneratedDocument`, `DocumentVerificationToken`, `DocumentPrintHistory`, `DocumentAccessLog`; `/api/v1/advanced/document-templates/*` | Fee receipt, report card, transfer/character/bonafide/attendance certificates, student/staff ID, exam admit-card-style document, payment due letter, notice PDF | Template builder/generation screens, PDF/template polish, browser E2E, staging validation, pilot wording/localization |
+| Export Jobs | `/api/v1/advanced/exports`, `/retry` | Large data exports, report history, retry failed export, File Registry download | Export center UI, queue status, retry UX, staging smoke |
+| Mobile and Offline Reliability | Flutter feature-specific queues and cache | Offline draft, retry queue, sync status, conflict state, expired session, forbidden state, module locked state, stale data indicator | Teacher attendance drafts, parent child summary, receipts/notices, driver GPS/trip queue, staff leave/payslip, scanner flows after device QA |
+
+Approval acceptance criteria:
+
+- Requests are tenant-scoped.
+- Rejecting requires a reason.
+- Applying final action is idempotent.
+- Related module screens show approval state.
+- Sensitive approvals expose safe before/after context.
+
+Automation acceptance criteria:
+
+- Rules can be enabled/disabled per tenant/feature.
+- Executions log trigger, action, target, and result.
+- Failed actions are retry-safe and auditable.
+- Provider-disabled modes do not pretend messages were delivered.
+
+Document/template acceptance criteria:
+
+- Templates support school logo/header/footer.
+- Templates are localization-ready for English/Nepali labels.
+- Generated PDFs include timestamp, generated-by, and optional QR verification.
+- Reprints are logged.
+- Protected documents use File Registry access controls.
+
+### Module-Wise Advanced Blueprint
+
+| Module | Advanced features to preserve | Backend ownership | Web/mobile routes | Acceptance criteria |
+|---|---|---|---|---|
+| M0 Platform Core | Onboarding wizard, school level configuration, Grade 11-12 enablement, plans/entitlements, usage counters, provider dashboard, queue center, storage readiness, support override, audit, export center, suspension preview | `apps/api/src/platform/onboarding`, `tenants`, `providers`, `entitlements`, `queues`, `audit` | `/dashboard/platform/tenants`, `/dashboard/platform/providers`, `/dashboard/platform/queues`, `/dashboard/platform/audit`, `/dashboard/platform/exports` | Setup changes audited, modules fail closed, secrets masked, queue retries require reason, support banner visible |
+| M1 Admissions and Students | Pipeline, draft autosave, document checklist/expiry, duplicate review, lifecycle timeline, QR ID, ID card, transfer certificate, alumni, sibling/guardian resolution, IEMIS readiness, legacy import review | `students`, `admissions`, `student-documents`, `student-qr`, `imports` | `/dashboard/admissions/*`, `/dashboard/students/[id]/*`, `/dashboard/students/imports`, `/dashboard/students/iemis-readiness` | Guardian removal revokes access, QR actions audited, duplicate merge never automatic, inactive students filtered from active rosters |
+| M2 Attendance | Teacher workspace, expanded attendance states, offline draft queue, lock window, correction approval, duplicate session prevention, calendar policy, parent notifications, exports, follow-up queue | `attendance`, `attendance-corrections`, `attendance-reports` | `/dashboard/attendance`, `/dashboard/attendance/corrections`, `/dashboard/attendance/reports`, teacher/parent mobile attendance | Offline sync cannot silently overwrite newer data, corrections include before/after reason, parent notifications child-scoped |
+| M3 Fees and Receipts | Fee builder, assignment rules, cashier collection, cash/bank/cheque/QR/gateway/adjustment modes, QR verification, reversal/refund, discount adjustment, cashier close, gateway sandbox, reminders, parent dashboard | `fees`, `receipts`, `cashier-close`, `payment-gateways`, `reconciliation` | `/dashboard/fees/collect`, `/dashboard/fees/reversals`, `/dashboard/fees/cashier-close`, `/dashboard/fees/reconciliation`, parent mobile fees | Double-submit cannot duplicate receipts, gateway webhooks handle duplicate/forged/delayed/out-of-order cases, confirmed receipts use reversal |
+| M4 Academics | Exam templates, marks autosave grid, absent/withheld/retest/practical/project states, lock/unlock approval, result publish, report-card template/QR, batch PDF queue, promotion dashboard, Grade 11-12 streams/practicals/projects | `academics`, `exams`, `report-cards`, `promotions` | `/dashboard/academics/exams`, `/marks-entry`, `/report-cards`, `/promotion`, `/streams`, parent/student published results | Parents see published results only, locked marks require correction workflow, report failures safe, stream changes audited |
+| M5 Activity Feed | Audience preview, Montessori/ECD milestones, class/section/student posts, consent-aware media, compression/retry/previews, moderation queue, parent child feed, gallery, retry idempotency | `activity-feed`, `media-access`, `consents` | `/dashboard/activity/*`, parent activity, teacher composer | Parent sees linked child-safe media only, removed guardians lose access, failed upload cleanup, moderation audited |
+| M6 Homework and Timetable | Templates, recurring homework, reminders, submission states, review/comments/marks, offline viewing, builder, conflict scoring, workload, room/lab allocation, leave-substitution linkage, substitution alerts | `homework`, `timetable`, `substitutions` | `/dashboard/homework/*`, `/dashboard/timetable/*`, teacher/parent mobile | Attachments protected, students/parents see assigned/published homework, conflicts blocked/acknowledged, substitutions notify where enabled |
+| M7 HR and Payroll | Staff lifecycle, documents, contract reminders, attendance/check-in/out, leave balances/approvals, LWP payroll impact, salary versioning, payroll review/approve/post/reverse, payslip polish, staff self-service | `hr`, `payroll`, `staff-attendance`, `leave` | `/dashboard/hr/*`, `/dashboard/payroll/*`, staff mobile | Salary/bank masked unless allowed, posted payroll uses reversal, accounting linked where enabled, staff self-service own-data only |
+| M8A Library | Metadata/barcode/shelf, copy QR/barcode, scanner issue/return, borrower policies, holiday-aware fines, lost/damaged lifecycle, fine-to-fees/accounting, reservations, reports, parent/student due views | `library`, `library-fines` | `/dashboard/library/*`, optional parent/student library views | Copies with history archived, fine posting idempotent, scoped views, scanner device QA before production claims |
+| M8B Transport | Vehicles/doc expiry, driver/conductor assignment, routes/stops, student assignments, driver trip operations, boarding/deboarding/absent, GPS stale warnings, parent bus status, trip history/GPS quality, emergency, maintenance, fee mapping | `transport`, `transport-gps`, `transport-trips` | `/dashboard/transport/*`, driver mobile, parent transport | Parent sees assigned child route only, stale GPS labeled, overlapping trips blocked unless allowed, live maps deferred until policy/load test |
+| M8C Canteen | Fast POS, wallets/top-up/adjustment, spending controls, low balance, allergy warnings, menu planner, inventory, stock close/wastage, vendors/bill locks, receipt idempotency, parent wallet/menu/spending, student meal QR | `canteen`, `canteen-pos`, `canteen-wallets`, `canteen-inventory`, `canteen-vendors` | `/dashboard/canteen/*`, parent canteen, POS tablet/mobile | POS double-submit safe, wallet debit atomic, allergy warning before serving, parent child-scoped |
+| M9 Accounting and Finance | Chart templates, journal/voucher approval, source mappings from fees/payroll/canteen/library/transport, bank import/reconciliation, fiscal lock/close/reopen, reversal-only posted records, reports, large export progress, principal read-only snapshot | `accounting`, `accounting-reconciliation`, `accounting-reports` | `/dashboard/accounting/*`, principal read-only summary later | Posted records not silently edited, source drilldown works, fiscal lock blocks unsafe backdated changes, mobile finance read-only unless approved |
+| M10 Notices / Communication / Chat | Notice templates, recipient preview, targeting, scheduling, read receipts/follow-up, provider callback verification, provider-disabled behavior, quiet hours, report/block/escalation, high-impact audit, attachment preview, notification center | `communications`, `notices`, `messaging`, `notification-providers` | `/dashboard/notices/*`, `/dashboard/messages/*`, parent/teacher mobile | Attachments remain protected after guardian/role changes, high-impact messages audited, diagnostics safe, teacher communication scoped |
+| M12 Learning Layer | Curriculum topic map, manual question bank, template worksheet generator, smart-board/lab polish, session replay/summary, resource library folders, protected file picker, printable fallback, parent/student summaries, browser E2E | `learning`, `learning-resources`, `learning-progress` | `/dashboard/learning/*`, `/classroom/board/*`, `/student/learning/*`, `/parent/learning/*` | Learning does not duplicate core systems, parent summaries child-scoped/non-comparative, public leaderboards out of scope, AI/adaptive/simulations/open chat deferred |
+
+### M11 AI Deferred Rule
+
+M11 remains roadmap-only until:
+
+1. Reliable production data exists across attendance, fees, academics, communication, and learning.
+2. Tenant-safe analytics/aggregation exists.
+3. Parent/student/mobile APIs are purpose-limited and tested.
+4. Sensitive actions have approval and audit trails.
+5. Data quality issues are visible.
+6. Human review exists for future recommendations.
+7. Product owner explicitly approves AI scope.
+
+Do not implement:
+
+```text
+LLM calls
+Open student AI chat
+Automated punishment/risk action
+Raw prediction scores for parents/students
+Cross-tenant model data leakage
+Unreviewed recommendations
+```
+
+### Definition of Done for Advanced Operations
+
+1. Backend API is tenant-scoped and permission-gated.
+2. Parent/student/mobile endpoints are purpose-limited where applicable.
+3. Sensitive writes are audited.
+4. Money writes are idempotent.
+5. File access uses File Registry/StorageService boundaries.
+6. Web UI has loading, empty, forbidden, module-locked, and error states.
+7. Mobile UI has session-expired/forbidden/network states where applicable.
+8. Background jobs re-check tenant, feature, entity, and provider state.
+9. E2E or focused regression coverage exists for the critical path.
+10. Staging smoke is run before readiness claims are updated.
+
+---
+
+## 6. Verification Commands
 
 Run relevant checks after meaningful changes:
 
@@ -452,7 +612,7 @@ flutter test
 
 ---
 
-## 6. Non-Negotiable Rules
+## 7. Non-Negotiable Rules
 
 1. Tenant isolation is mandatory.
 2. Parent/student/mobile APIs must be purpose-limited and fail closed.

@@ -300,6 +300,7 @@ Implementation note: the production foundation for this section is implemented u
 - Parent/Guardian.
 - Principal.
 - Platform Operator for feature entitlement.
+- School support/platform operator only for entitlement/support diagnostics, never silent learning-data browsing.
 
 ### 8.3 Core functions
 
@@ -323,6 +324,9 @@ Implementation note: the production foundation for this section is implemented u
 18. Attach teacher-approved resources through File Registry.
 19. Support Easy / Medium / Hard difficulty internally.
 20. Show supportive student-facing labels: Practice, Challenge, Mastery, or Needs practice / Improving / Ready / Strong.
+21. Keep student access lab-only or controlled school-device only for MVP.
+22. Keep parent summary child-scoped and non-comparative.
+23. Keep teacher assignment validation tied to active staff, tenant, class/section, subject, curriculum, module entitlement, and permission.
 
 ### 8.4 Key states
 
@@ -344,6 +348,11 @@ Implementation note: the production foundation for this section is implemented u
 8. Autosave and submit must be idempotent.
 9. School-only access must be default.
 10. AI functionality must remain disabled until later approved phases.
+11. Public leaderboards and class rank comparisons are not allowed.
+12. Harmful labels such as weak, failed, poor, or low-rank are not allowed.
+13. Open-ended AI chat is not allowed for students.
+14. Learning must not block access based on fee status by default.
+15. Student lab/session routes must not expose fees, parent/staff data, other students, unpublished marks, or admin configuration.
 
 ### 8.6 Acceptance criteria
 
@@ -357,6 +366,8 @@ Implementation note: the production foundation for this section is implemented u
 8. Backend M12 E2E coverage passes for teacher assignment denial, inactive/expired/wrong-class session denial, session monitoring, resource handling, matching/order evaluation, cross-tenant denial, parent child-scope denial, autosave/submit idempotency, and progress-after-submit behavior.
 9. Web contract coverage passes for Learning API helpers, routes, runtime safety, and no fake data.
 10. Flutter tests pass for parent/student Learning summary parsing and supportive labels.
+11. Direct URL checks deny another child, another class/session, expired/inactive sessions, and cross-tenant activity/session/attempt/progress access.
+12. Learning outputs remain teacher-controlled, supportive, explainable, and non-comparative.
 
 ---
 
@@ -388,6 +399,10 @@ Use the existing communication system to send learning-related summaries and not
 2. Do not block learning access based on fee status by default.
 3. Do not publish public leaderboards for children.
 4. Do not show harsh labels like weak, failed, poor, or low-rank.
+5. Do not build broad student mobile/home learning for MVP.
+6. Do not introduce AI tutor, adaptive recommendations, advanced simulations, or open chat until a later approved phase.
+7. Parent learning access is own-child only.
+8. Student learning access is school lab/session only unless a future school-controlled device policy is explicitly approved.
 5. Do not implement open-ended student AI in MVP.
 6. Do not expose admin-shaped APIs to student, parent, board, or lab routes.
 7. Do not claim KG-12 completion until the matching code, tests, data models, and workflows exist.

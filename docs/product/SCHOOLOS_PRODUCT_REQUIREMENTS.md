@@ -295,6 +295,63 @@ Audit logs and RBAC
 
 M12 must not duplicate core student, teacher, class, subject, parent, file, notification, or audit systems.
 
+### 8.1 Product Positioning
+
+SchoolOS is positioned as a KG-12 school operating platform with three connected layers:
+
+```text
+1. School Management Layer
+2. Learning Layer
+3. Intelligence & Insight Layer later
+```
+
+The School Management Layer runs daily school operations: records, fees, attendance, academics, staff, communication, transport, canteen, library, accounting, reports, and platform controls.
+
+The Learning Layer improves classroom teaching and school-controlled student practice. It supports teacher-led interactive learning, smart-board sessions, lab practice, progress tracking, and parent-safe summaries.
+
+The future Intelligence Layer is deferred until reliable production data, tenant-safe aggregation, explainability, human review, and explicit product approval exist. It must not become open-ended student AI chat or automatic punishment/risk scoring.
+
+### 8.2 KG-12 Learning Stages
+
+| Stage | Primary mode | Product expectations | Avoid / defer |
+|---|---|---|---|
+| Stage A - Kindergarten / ECD / Montessori | Smart-board teacher-led only | Picture matching, letter/Nepali character sounds, number counting, colors/shapes, rhymes, story sequencing, movement activities, milestones, parent daily summary | Independent long screen sessions, ranking, open-ended AI, heavy quizzes |
+| Stage B - Grade 1-3 | Teacher-led smart board plus short guided practice | Phonics, Nepali reading, basic math, picture vocabulary, story comprehension, science sorting, short quizzes, supportive progress labels | Competitive ranking and unsupervised screen-heavy learning |
+| Stage C - Grade 4-5 | Smart-board explanation plus group/lab practice | Fractions, science diagrams, Nepal map basics, grammar, revision quizzes, library-linked reading, parent weekly summary | Public comparisons and broad home learning app |
+| Stage D - Grade 6-8 | Smart-board concepts plus computer-lab practice | Algebra, geometry visualizer, science simulations, maps/timelines, paragraph writing, coding basics, digital safety, projects | AI tutor/open chat and heavy simulations until later |
+| Stage E - Grade 9-10 | Concept mastery plus SEE-style preparation | Topic mastery, mock tests, mistake notebook, math/science/social studies revision, teacher weak-topic dashboard | Raw prediction scores to parents/students |
+| Stage F - Grade 11-12 | Stream-based advanced learning, practicals, projects, board prep | Science, Management, Humanities, Education, Computer Science, accountancy/economics/coding labs, project/practical tracking, career/counselling notes | Full adaptive recommendations and AI tutor until approved |
+
+### 8.3 Nepal-First Learning Rules
+
+The Learning Layer must support smart-board classrooms, projector-based teaching, shared computer labs, low-bandwidth environments, mixed manual/digital workflows, English/Nepali/mixed explanations, local examples, curriculum alignment, teacher-controlled session flow, and parent-safe summaries.
+
+Local content examples should use familiar Nepal contexts such as momo, roti, rice, rupees, local markets, monsoon, Terai, Hills, Himalayas, Bagmati, Lumbini, school bus, crops, festivals, and community life.
+
+Allowed usage modes:
+
+```text
+SMART_BOARD  = one screen, whole class
+GROUP        = students participate in groups
+COMPUTER_LAB = individual attempts in school lab
+WORKSHEET    = printable fallback
+HYBRID       = smart-board explanation + lab practice
+```
+
+### 8.4 Deferred Boundaries
+
+Explicitly deferred until later approval:
+
+```text
+Full adaptive learning and recommendations
+AI tutor or open chat
+Heavy simulations and advanced subject labs
+Public leaderboards or comparative ranking
+Full Flutter smart-board/lab runtime
+Broad student mobile/home app
+School-only network/location hardening beyond authenticated membership and expiring code/QR token
+```
+
 ---
 
 ## 9. Target Users and Daily Workflows

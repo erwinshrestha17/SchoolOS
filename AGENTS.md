@@ -209,6 +209,7 @@ utils/<module>-constants.ts
 
 ### Cost and Performance Rules
 - Keep the modular monolith until measured scale pressure proves otherwise.
+- Optimize in this order: tenant-scoped database efficiency, pagination/payload control, file/image compression and object storage, BullMQ background jobs, dashboard summaries, selective cache, notification channel control, bounded logs/retention, selective real-time, and deferred async/human-reviewed AI.
 - Do not add Kubernetes, microservices, separate search clusters, GPU workers, or new databases for first-version module work without explicit approval.
 - Optimize query shape, indexes, pagination, and payload size before increasing CPU/RAM.
 - Do not calculate heavy dashboard summaries from raw tables on every page load; use summaries, cached aggregates, or queued recalculation where practical.
@@ -220,6 +221,7 @@ utils/<module>-constants.ts
 - Do not run AI/ML/LLM inference on every page load; scheduled or event-triggered background scoring is the default.
 - Keep logs useful but bounded. Do not log large request/response bodies or sensitive school data.
 - Review `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` before adding any cost-sensitive storage, report, notification, real-time, or AI work.
+- Before claiming cost-readiness, confirm growing lists are paginated, indexes support the main query, files use File Registry/object storage with variants, heavy work is queued and idempotent, SMS/real-time/AI are justified, and platform usage/cost can be counted.
 
 ### Frontend Rules
 - UI must consume real APIs.

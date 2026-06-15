@@ -2,17 +2,15 @@
 
 **Status:** App-local pointer and guardrail
 **Updated:** 2026-06-15
-**Authoritative mobile plan:** `docs/mobile/SCHOOLOS_FLUTTER_APP_PLAN.md`
+**Authoritative mobile plan:** `docs/design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md`
 
-This file stays in the Flutter app so mobile contributors can find the active plan quickly. Detailed persona, API, offline, state, and feature structure decisions now live in the consolidated docs.
+This file stays in the Flutter app so mobile contributors can find the active plan quickly. Detailed persona, API, offline, state, and feature structure decisions now live in the consolidated web/mobile product design and implementation plan.
 
 ## Required Read Order
 
-1. `docs/design/SCHOOLOS_WEB_MOBILE_MASTER_DESIGN_PLAN.md`
-2. `docs/mobile/SCHOOLOS_FLUTTER_APP_PLAN.md`
-3. `docs/frontend/SCHOOLOS_FRONTEND_BACKEND_API_CONTRACT_MAP.md`
-4. `docs/testing/SCHOOLOS_WEB_MOBILE_PERSONA_SMOKE_PLAN.md`
-5. `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`
+1. `docs/design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md`
+2. `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`
+3. `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`
 
 ## Mobile Product Rules
 

@@ -1,7 +1,7 @@
 # SchoolOS Project Status
 
 **Status:** 2026-06-15 stabilization update: backend package gates pass, root typecheck/build pass, and local smoke suites pass (`pnpm smoke:pilot`, `pnpm smoke:learning`, `pnpm smoke:full`). The advanced-operations backend foundation is present and the additive Prisma migration `20260615090000_advanced_operations_foundation` has been added for approvals, deterministic automation, descriptive analytics summaries, document templates/generated documents, verification/access logs, and data export jobs. Staging/pilot migration deployment and browser E2E remain pending, so do not claim production-ready. 2026-06-14 M6 update: homework reminder batch history/retry routes are exposed, and approved staff leave now creates tenant-scoped draft substitution tasks for affected published/locked timetable slots without duplicating active substitutions. 2026-06-13 implementation updates recorded: Auth/Security settings now include live tenant role/permission inspection and the dashboard shell mounts the support-override warning banner; M0 queue operations reject retry/discard races and keep retry audit single-job scoped; M1 admission application pipeline, uploaded-document expiry reminders, configurable expiry-reminder templates, structured admissions bulk-import duplicate review with persistent batch/row history, and Student QR operational analytics are implemented; M2 monthly register exports are app-controlled and parent absence/late notifications plus repeated absence/late follow-up queue are implemented; M3 payment webhooks fail closed for non-success events, dotted provider callback events are normalized, and overdue reminder segmentation is implemented; M4 report-card PDF opening is protected through the shared web helper and backend assessment template presets are implemented; M5 activity media preview/download uses shared app-controlled blob helpers and milestone template presets are implemented; M6 homework attachment opening uses homework-specific access helpers and homework template filtering is implemented; M7 staff self-service masks bank account display; M8A library copy archive is wired through an audited reason UI; M8C canteen serving requires staff acknowledgement before submitting when allergy/medical warnings are present. 2026-06-12 updates: M12 Learning Layer production foundation implemented and verified across backend, web runtime, and Flutter summaries, including activity/session/attempt/progress/parent-summary/resource APIs, session monitoring/heartbeat/participants, matching/order questions, Prisma migrations, learning permissions/entitlements, audit logging, web routes, mobile summaries, and E2E/contract/mobile coverage. Prior 2026-06-06 updates: suspended-tenant file/export denial, M0 mobile/queue entitlement hardening, M1/M5/M10 satellite-controller entitlement gating, platform `/platform/demo-requests` operator workspace, and Section 11 remaining-work inventory for M1–M10.
-**Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
+**Product:** Production-grade multi-tenant SaaS School Management System for Nepal, with staged Kindergarten / Montessori to Grade 12 product direction
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard, Flutter companion app
 
 This is the consolidated source of truth for SchoolOS project status. It records the current product/technical state and points to the active focused documents.
@@ -19,13 +19,11 @@ docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
 
 docs/project/SCHOOLOS_PROJECT_STATUS.md
 docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
-docs/project/SCHOOLOS_ADVANCED_OPERATIONS_PLAN.md
-docs/project/SCHOOLOS_LEARNING_LAYER_PLAN.md
 
 docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
 docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
 
-docs/design/SCHOOLOS_UI_UX_GUIDE.md
+docs/design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md
 
 docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md
 
@@ -84,7 +82,7 @@ Full SchoolOS product complete: No
 
 ```text
 Pre-AI Advanced Operations
-- docs/project/SCHOOLOS_ADVANCED_OPERATIONS_PLAN.md remains the module-wise implementation blueprint for advanced non-AI SchoolOS features.
+- Advanced Operations now lives inside `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md` as the module-wise implementation blueprint for advanced non-AI SchoolOS features.
 - Backend foundation exists for reusable approval workflows, rules-based automation, descriptive analytics summaries, document/certificate templates, and data export jobs.
 - apps/api/prisma/migrations/20260615090000_advanced_operations_foundation adds the advanced-operations enums, tenant-scoped tables, indexes, and foreign keys.
 - Migration SQL was reviewed as additive-only; staging/pilot migration deployment remains pending before production-readiness claims.
