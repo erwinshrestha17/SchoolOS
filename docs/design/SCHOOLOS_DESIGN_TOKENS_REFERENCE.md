@@ -1,6 +1,6 @@
 # SchoolOS Design Tokens Reference
 
-**Status:** Planning baseline  
+**Status:** Source of Truth  
 **Last updated:** 2026-06-15  
 **Phase:** Planning only — implementation token files will be created during frontend/mobile development phase  
 **Purpose:** Capture the consolidated visual token direction for SchoolOS web and mobile based on the uploaded UI/UX plan and existing SchoolOS UI/UX docs.
@@ -8,9 +8,8 @@
 Related docs:
 
 ```text
-docs/design/SCHOOLOS_UI_UX_CONSOLIDATION_NOTES.md
 docs/design/SCHOOLOS_UI_UX_GUIDE.md
-docs/design/SCHOOLOS_DETAILED_UI_UX_ROLE_COMPONENT_BLUEPRINT.md
+docs/design/references/SCHOOLOS_ROLE_SCREEN_DESIGN_REFERENCE.md
 docs/frontend/SCHOOLOS_COMPONENT_IMPLEMENTATION_ROADMAP.md
 ```
 
