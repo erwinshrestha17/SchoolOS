@@ -487,6 +487,542 @@ Personas:
 | Staff Self-Service | Own profile, attendance/check-in/out, leave, payslips, notices, settings | `/staff/me`, `/staff/me/timeline`, `/hr/me/attendance`, `/hr/me/leave-requests`, `/hr/me/leave-balances`, `/hr/me/time-clock`, `/payroll/me/payslips` | Other staff, salary structures, payroll runs, student records, finance/accounting | Cache own profile, leave balances, payslip metadata, last attendance status; check-in/out requires network unless explicitly approved |
 | Student Lab / Controlled Device | Session join, learning activity, autosave, submit, session result/progress summary | `/learning/sessions/:id/join`, `/learning/sessions/:id/attempts`, `/learning/attempts/:id/autosave`, `/learning/attempts/:id/submit`, `/learning/progress` | Broad mobile home, fees, parent/staff data, other students, unpublished marks, leaderboard, open chat | Prefer online school network; idempotent autosave retries visible; keep local unsent answers only for current session |
 
+### Parent App Scope
+
+Parent mobile should be deep enough for daily family workflows, but every screen and API must stay own-child scoped, payment-safe, and purpose-limited. Do not power parent screens from admin-shaped APIs.
+
+Parent MVP:
+
+1. Login / session restore.
+2. Child switcher.
+3. Parent home dashboard.
+4. Attendance.
+5. Homework.
+6. Notices.
+7. Profile / settings.
+
+Parent Phase 2 — Fees, Payments, and Report Cards:
+
+8. Fees dashboard.
+9. Invoice list/detail.
+10. Bank transfer proof upload.
+11. eSewa fee payment.
+12. Khalti fee payment.
+13. Gateway payment status tracking.
+14. Receipt PDF download/share.
+15. Report cards list/detail/PDF.
+
+Parent Phase 3 — Canteen Wallet and Daily Operations:
+
+16. Canteen wallet balance.
+17. Wallet top-up via bank/eSewa/Khalti.
+18. Wallet transaction history.
+19. Canteen menu and serving history.
+20. Transport status.
+21. Library borrowed books.
+22. Activity feed.
+
+Parent Phase 4 — Communication and Learning:
+
+23. Parent-teacher chat.
+24. Quiet-hours banner.
+25. Report/escalation flow.
+26. Learning summary.
+27. Push notification deep links.
+28. Offline/cached read polish.
+
+Parent fees and payment requirements:
+
+- Parent can view only invoices for currently linked children.
+- Parent can pay school fees through bank transfer, eSewa, Khalti, and future enabled gateways.
+- Payment methods are tenant-configured and provider-readiness gated; disabled, unconfigured, or unverified providers must fail closed and show an honest unavailable state.
+- Bank transfer proof upload collects amount, reference, transfer date, and attachment through File Registry upload helpers.
+- Bank proof creates `PENDING_VERIFICATION` only; it must not mark an invoice paid automatically.
+- eSewa, Khalti, and future gateway payments create backend payment intents before provider handoff.
+- Payment can become successful only after verified gateway callback or explicit provider verification.
+- Duplicate, delayed, or out-of-order gateway callbacks must not create duplicate payments or receipts.
+- Receipt PDF download/share appears only after confirmed payment.
+- Parent can retry failed or expired payment intents safely through idempotent retry behavior.
+- Parent cannot edit invoice amount, reverse payment, approve bank proof, configure gateway settings, or see accounting internals.
+
+Parent canteen wallet top-up requirements:
+
+- Parent can view own child canteen wallet balance.
+- Parent can top up the wallet through bank transfer, eSewa, Khalti, and future enabled gateways.
+- Wallet top-up uses a separate top-up intent from school fee payment.
+- Bank wallet top-up proof creates `PENDING_VERIFICATION` only.
+- Wallet is credited only after gateway-confirmed success or bank proof approval.
+- Parent can view wallet transaction history, spending history, serving history, and low-balance alerts.
+- Parent may set low-balance alert preference and daily/weekly spending limit only if the backend exposes supported child-scoped settings.
+- Fee payment must not credit the canteen wallet.
+- Wallet top-up must not clear a school fee invoice.
+- Wallet balance and top-up amounts use Decimal/numeric money handling, never floating point.
+- Offline wallet top-up and other offline financial writes are not allowed.
+
+Parent financial security and privacy requirements:
+
+- Parent sees only linked children.
+- Use purpose-limited parent/mobile APIs only; do not use admin-shaped APIs.
+- Every endpoint enforces authenticated `tenantId`, parent-child ownership, module entitlement, permission where applicable, and safe response DTOs.
+- Receipts, report cards, payment proofs, and other files use File Registry plus authenticated upload/download/share helpers. Do not expose raw storage URLs or object keys.
+- No fake data, local-only production financial state, or client-side financial truth.
+- Every financial mutation is audited.
+- Every retryable financial action is idempotent.
+- Gateway callbacks are HMAC/signature verified where the provider supports it.
+- Gateway/provider failures fail closed and never mark payment or wallet top-up successful.
+
+Suggested parent mobile API groups:
+
+```text
+/mobile/me/children
+/mobile/dashboard/parent
+/mobile/students/:studentId/fees-summary
+/mobile/students/:studentId/invoices
+/mobile/students/:studentId/invoices/:invoiceId
+/mobile/students/:studentId/payments/intents
+/mobile/students/:studentId/payments/bank-proof
+/mobile/students/:studentId/receipts
+/mobile/students/:studentId/receipts/:receiptId/download
+/mobile/students/:studentId/canteen/wallet
+/mobile/students/:studentId/canteen/wallet/top-up-intents
+/mobile/students/:studentId/canteen/wallet/bank-proof
+/mobile/students/:studentId/canteen/wallet/transactions
+/mobile/students/:studentId/canteen/menu
+/mobile/students/:studentId/canteen/servings
+/mobile/students/:studentId/report-cards
+/mobile/students/:studentId/transport
+/mobile/students/:studentId/library
+/mobile/students/:studentId/activity-feed
+/mobile/students/:studentId/chat
+/mobile/students/:studentId/learning-summary
+```
+
+Parent acceptance tests and planning notes:
+
+- Parent can see only linked child invoice.
+- Parent cannot pay another child invoice.
+- Parent cannot top up another child wallet.
+- eSewa/Khalti success creates verified payment/top-up only once.
+- Duplicate callback does not double-credit or double-receipt.
+- Failed callback does not mark invoice paid or wallet credited.
+- Bank proof upload creates pending verification only.
+- Rejected bank proof does not clear invoice or credit wallet.
+- Receipt/download appears only after confirmed payment.
+- Wallet top-up and school fee payment remain separate.
+- Offline state blocks payment initiation/top-up.
+- Logout clears previous child financial data.
+
+### Principal Mobile Scope
+
+Principal mobile is an attention-first, approval-first, risk/snapshot-first companion app for quick school decisions. It should help principals see what needs action today without turning the phone into the full web dashboard.
+
+Principal mobile purpose:
+
+- Daily attention dashboard.
+- Attendance risk.
+- Staff absence.
+- Pending approvals.
+- Fee collection snapshot.
+- Result publish readiness.
+- Notice delivery status.
+- Chat/escalation review.
+- Transport, canteen, and library operational alerts.
+- Read-only finance/report snapshots.
+- Emergency control.
+- Parent concern/complaint tracking.
+- School day checklist.
+- Staff coverage and substitution visibility.
+- Classroom walkthrough / observation notes.
+- Task assignment / follow-up system.
+- Voice notes where File Registry rules allow.
+- Nepali/English labels.
+- Weak internet mode.
+
+Principal mobile must stay safe for fast decisions. It must not become a full admin dashboard, full accounting system, full payroll system, or full school setup/configuration tool.
+
+Principal navigation:
+
+```text
+Today | Attendance | Approvals | Notices | More
+```
+
+More contains:
+
+```text
+Students
+Academics
+Fees Snapshot
+Transport
+Canteen
+Library
+HR
+Activity
+Chat / Escalations
+Reports Snapshot
+Tasks
+Classroom Walkthroughs
+Profile
+```
+
+Principal can:
+
+- View school-wide safe summaries and attention alerts.
+- View attendance risks, staff absences, staff coverage, and substitution needs.
+- View fee collection snapshot, pending bank/payment verification summary, and cashier close status.
+- View result publish readiness and report-card generation status.
+- View notice delivery status and approve/send emergency or high-impact notices where configured.
+- View transport delay, stale GPS, emergency, canteen allergy/serving/low-balance, and library overdue/lost/damaged alerts.
+- View parent concerns, complaints, and escalated chat issues.
+- View read-only finance/report snapshots.
+- Search students by name, admission number, guardian phone, class, or section.
+- Download protected PDFs where permission allows.
+- Approve/reject leave, fee reversal/refund, or result publishing where permission and tenant policy allow.
+- Resolve or escalate parent-teacher chat issues.
+- Assign follow-up tasks to staff and add internal notes to tasks, complaints, and observations.
+- Record classroom walkthrough / observation notes.
+- Use voice notes only where File Registry size/type rules allow.
+
+Principal cannot:
+
+- Run payroll, edit salary structures, or view salary/bank details without payroll permission.
+- Create fee plans, edit invoice setup, or collect fees as cashier.
+- Create/post accounting journals, edit the chart of accounts, reconcile bank statements, or close/reopen fiscal periods.
+- Bulk import students, merge duplicates, build full timetable, edit full transport routes, edit full canteen inventory, or issue/return library books.
+- Manage platform billing.
+- Read all private chats without escalation/permission.
+- Bypass audit reason requirements.
+- Use admin-shaped APIs.
+
+Principal priority order:
+
+```text
+P0: Attention Center, Approval Inbox, Attendance Risk, Staff Absence / Substitution, Emergency Notice Control.
+P1: Parent Complaint Desk, Student Quick Search, Fee Watchlist, Transport Alerts, Report Snapshot.
+P2: Classroom Walkthrough / Observation Notes, School Day Checklist, Task Assignment / Follow-Up System, Voice Notes, Learning Summary, Canteen / Library Operational Alerts, Nepali/English labels, Weak internet mode.
+```
+
+Suggested principal mobile API groups:
+
+```text
+/mobile/principal/dashboard
+/mobile/principal/attention
+/mobile/principal/attendance-summary
+/mobile/principal/approvals
+/mobile/principal/fees-summary
+/mobile/principal/academics-readiness
+/mobile/principal/transport-alerts
+/mobile/principal/staff-absence
+/mobile/principal/escalations
+/mobile/principal/reports-snapshot
+/mobile/principal/tasks
+/mobile/principal/classroom-observations
+/mobile/principal/complaints
+/mobile/principal/emergency
+/mobile/principal/student-search
+/mobile/principal/school-day-checklist
+```
+
+Principal acceptance tests and planning notes:
+
+- Principal can see dashboard summary but cannot edit accounting/payroll setup.
+- Principal sees attention alerts but cannot edit accounting setup.
+- Principal can approve leave only with permission.
+- Principal cannot view salary details without payroll permission.
+- Principal can send emergency notice only with confirmation.
+- Principal cannot read all private chats without escalation/permission.
+- Principal can view finance snapshot but cannot post journals.
+- Principal can view transport alerts but cannot edit routes.
+- Principal can view staff absence but cannot run payroll.
+- Principal classroom observation requires tenant scope and audit trail.
+
+### Teacher Mobile Scope
+
+Teacher mobile is for daily classroom operations. It must stay assigned-class/subject scoped and must not become a finance, payroll, admin, or platform tool.
+
+Teacher mobile purpose:
+
+- Daily teaching operations.
+- Assigned class/subject only.
+- Attendance.
+- Homework.
+- Timetable.
+- Parent messages.
+- Activity posts.
+- Marks/academic readiness.
+- Learning sessions.
+- Own staff profile/leave.
+- Lesson plan / teaching diary.
+- Student notes with safe language.
+- Substitution mode.
+- Teacher resource library.
+- Weak internet classroom workflows.
+
+Teacher scope split:
+
+Class Teacher:
+
+- Own roster.
+- Attendance.
+- Homework.
+- Activity posts.
+- Parent messages.
+- Student quick profile.
+- Class activity coverage.
+- Class notices.
+- Student behavior/achievement notes.
+- Parent follow-up reminders.
+
+Subject Teacher:
+
+- Assigned subjects/classes.
+- Marks.
+- Homework.
+- Timetable.
+- Learning sessions.
+- Subject messages/notices.
+- Lesson diary.
+- Subject resources.
+- Marks readiness.
+
+Teacher navigation:
+
+```text
+Today | Attendance | Homework | Messages | Profile
+```
+
+More contains:
+
+```text
+Timetable
+Marks
+Students
+Activity
+Notices
+Substitutions
+Leave
+Resources
+Learning
+Lesson Diary
+```
+
+Teacher can:
+
+- View Today dashboard, current period, next class, assigned classes/subjects, and assigned class roster.
+- View safe student quick profile for assigned students only.
+- Mark assigned attendance, use bulk present, and mark absent/late/leave with reason.
+- Save offline attendance drafts with sync status and retry failed attendance sync.
+- Create homework for assigned classes, use templates, attach files/photos through File Registry rules, review submissions, return work for correction, and mark homework checked.
+- View timetable and substitutions, and accept/view substitution duty if configured.
+- Enter marks for assigned exams/subjects if enabled, save marks draft, submit marks if allowed, and add teacher remarks.
+- Create activity posts with consent-aware media, tag assigned-scope students, and preview parent visibility.
+- Message parents of assigned students during allowed hours and use parent communication templates.
+- Launch/monitor learning sessions for assigned classes, show session code/QR, pause/resume/end sessions if allowed, and view assigned class learning progress.
+- Create lesson plan / teaching diary entries with topic taught, objective, completion status, and next follow-up.
+- Add student behavior/achievement notes using safe language.
+- Request own leave, view own leave balance/profile, view own payslips if staff self-service is enabled and permitted, and view school/staff notices.
+
+Teacher cannot:
+
+- View unrelated classes or unrelated students.
+- Access fees, accounting, payroll admin, salary structures, or other staff salary.
+- Enter marks for unassigned class/subject or publish results unless explicitly permitted.
+- Change grading policy, edit report-card templates, or build full timetable.
+- Bypass chat quiet hours, message unrelated parents, or bypass media consent.
+- View private student documents unless permission allows.
+- Use admin-shaped APIs.
+- Use harmful labels such as weak, failed, poor, or low-rank.
+- Create public leaderboards.
+- Access full admin student editing or platform/M0 controls.
+
+Teacher priority order:
+
+```text
+P0: Teacher Today Board, Assigned Classes, Attendance Register, Offline Attendance Drafts, Homework Create / Review, Messages.
+P1: Timetable / Substitution, Class Roster Smart Actions, Activity Capture, Quick Marks Entry, Parent Message Templates.
+P2: Lesson Plan / Teaching Diary, Student Behavior / Achievement Notes, Learning Session Controller, Teacher Resource Library, Teacher Self-Service, Voice Notes where file rules allow, Nepali/English labels, Weak internet mode.
+```
+
+Suggested teacher mobile API groups:
+
+```text
+/mobile/teacher/dashboard
+/mobile/teacher/today
+/mobile/teacher/classes
+/mobile/teacher/classes/:classId/roster
+/mobile/teacher/classes/:classId/students/:studentId/quick-profile
+/mobile/teacher/attendance/classes
+/mobile/teacher/attendance/roster
+/mobile/teacher/attendance/drafts
+/mobile/teacher/attendance/submit
+/mobile/teacher/homework
+/mobile/teacher/homework/templates
+/mobile/teacher/homework/:id/submissions
+/mobile/teacher/timetable
+/mobile/teacher/substitutions
+/mobile/teacher/marks
+/mobile/teacher/messages
+/mobile/teacher/message-templates
+/mobile/teacher/activity
+/mobile/teacher/activity/audience-preview
+/mobile/teacher/learning
+/mobile/teacher/learning/sessions
+/mobile/teacher/lesson-diary
+/mobile/teacher/student-notes
+/mobile/teacher/resources
+/mobile/teacher/profile
+/mobile/teacher/self-service
+```
+
+Teacher acceptance tests and planning notes:
+
+- Teacher sees only assigned classes.
+- Teacher cannot mark attendance for unassigned class.
+- Teacher cannot enter marks for unassigned subject.
+- Teacher chat is limited to assigned students/parents and policy hours.
+- Teacher parent messages respect quiet hours.
+- Teacher offline attendance sync does not duplicate records.
+- Offline attendance draft sync is idempotent.
+- Teacher activity media respects consent.
+- Teacher self-service shows own profile only.
+- Teacher cannot access fees/accounting/payroll.
+- Teacher cannot view private student documents unless permission allows.
+- Teacher lesson diary is scoped to assigned class/subject.
+- Teacher student notes do not allow harmful labels.
+
+### Shared Principal and Teacher Mobile Additions
+
+Shared capabilities:
+
+- Smart Notification Inbox.
+- Task / Follow-Up System.
+- Voice Notes.
+- Nepali + English Language Mode.
+- Weak Internet Mode.
+- Role-scoped Global Search.
+- Protected file preview/download.
+- Offline banner and last-updated timestamp.
+- Pending sync indicators.
+- Low-data image/file behavior.
+
+Smart Notification Inbox categories:
+
+```text
+Attendance
+Homework
+Fees
+Transport
+Notices
+Approvals
+Chat
+Activity
+Learning
+System
+```
+
+Principal search scope:
+
+```text
+Student
+Guardian phone
+Staff
+Class
+Receipt number
+Vehicle
+Book barcode
+```
+
+Teacher search scope:
+
+```text
+Assigned student
+Guardian contact
+Homework
+Notice
+Learning activity
+```
+
+Search must always be role-scoped and tenant-scoped.
+
+Shared mobile rules:
+
+- Use purpose-limited mobile APIs.
+- Do not use admin-shaped APIs.
+- Every endpoint enforces `tenantId`, role, permission, assigned class/subject scope where applicable, module entitlement, and safe DTOs.
+- Principal mobile is attention/approval/snapshot-first, not full admin.
+- Teacher mobile is daily classroom work, not finance/admin/payroll.
+- Backend authorization remains the source of truth; frontend hidden actions are not security.
+- Every school-data mutation is audited.
+- Offline writes are allowed only where idempotency and visible sync status exist.
+- Attendance offline sync must be idempotent.
+- Files use File Registry/authenticated helpers.
+- Voice notes/files follow File Registry, size, type, tenant, actor, and retention rules.
+- No raw storage URLs.
+- No fake data.
+- No Angular migration.
+- No microservices.
+- No AI runtime.
+- No broad student mobile.
+- No unsafe public leaderboard.
+- No harmful labels like weak, failed, poor, or low-rank.
+- No `tenantId` rename.
+- No unrelated refactors.
+- Do not change public API contracts without documenting migration/versioning impact.
+
+Suggested Flutter feature roots:
+
+```text
+lib/features/principal/
+lib/features/principal_attention/
+lib/features/principal_approvals/
+lib/features/principal_tasks/
+lib/features/classroom_observations/
+lib/features/teacher/
+lib/features/teacher_today/
+lib/features/teacher_attendance/
+lib/features/teacher_homework/
+lib/features/teacher_lesson_diary/
+lib/features/teacher_activity_capture/
+lib/features/teacher_learning/
+lib/features/teacher_resources/
+```
+
+Suggested shared widgets:
+
+```text
+RoleHomeScaffold
+TodayCard
+AttentionCard
+ApprovalCard
+TaskCard
+ClassPeriodCard
+StudentMiniProfileCard
+AttendanceRegister
+HomeworkCard
+HomeworkComposer
+TimetableCard
+MessageThreadCard
+MessageTemplatePicker
+LearningSessionControlPanel
+SyncStatusBanner
+OfflineBanner
+OfflineQueueCard
+PermissionState
+ModuleLockedState
+ProtectedFileButton
+ObservationNoteCard
+```
+
+Every mobile screen must handle loading, empty, error, permission denied, module locked, offline, pending sync, and success states.
+
+Shared acceptance tests and planning notes:
+
+- Logout clears previous role data.
+- Logout clears cached principal/teacher data.
+- Direct mobile route access fails safely without permission.
+- Module-locked routes show safe module locked state.
+- Protected files require authenticated access.
+- Offline state shows last updated timestamp and safe retry behavior.
+
 Implementation readiness chain:
 
 ```text
