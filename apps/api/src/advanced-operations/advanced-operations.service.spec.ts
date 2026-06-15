@@ -187,9 +187,9 @@ describe('advanced operations services', () => {
         update: jest.fn().mockResolvedValue({}),
       },
       attendanceRecord: {
-        groupBy: jest.fn().mockResolvedValue([
-          { status: 'ABSENT', _count: { _all: 2 } },
-        ]),
+        groupBy: jest
+          .fn()
+          .mockResolvedValue([{ status: 'ABSENT', _count: { _all: 2 } }]),
       },
       attendanceSession: { count: jest.fn().mockResolvedValue(3) },
       attendanceCorrectionRequest: { count: jest.fn().mockResolvedValue(1) },
@@ -305,19 +305,16 @@ describe('advanced operations services', () => {
     const queue = { add: jest.fn().mockResolvedValue({}) };
     const prisma = {
       dataExportJob: {
-        findFirst: jest
-          .fn()
-          .mockResolvedValueOnce(null)
-          .mockResolvedValueOnce({
-            id: 'job-1',
-            tenantId: actor.tenantId,
-            exportKey: 'advanced.export_jobs',
-            format: 'csv',
-            filters: {},
-            requestedById: actor.userId,
-            status: DataExportJobStatus.COMPLETED,
-            fileAssetId: 'file-1',
-          }),
+        findFirst: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({
+          id: 'job-1',
+          tenantId: actor.tenantId,
+          exportKey: 'advanced.export_jobs',
+          format: 'csv',
+          filters: {},
+          requestedById: actor.userId,
+          status: DataExportJobStatus.COMPLETED,
+          fileAssetId: 'file-1',
+        }),
         create: jest.fn().mockResolvedValue({
           id: 'job-1',
           tenantId: actor.tenantId,

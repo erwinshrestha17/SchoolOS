@@ -43,7 +43,10 @@ describe('advanced operations backend integration contracts', () => {
 
     expect(controllers.length).toBeGreaterThanOrEqual(5);
     for (const controller of controllers) {
-      const source = fs.readFileSync(path.join(controllerDir, controller), 'utf8');
+      const source = fs.readFileSync(
+        path.join(controllerDir, controller),
+        'utf8',
+      );
       expect(source).toContain('RolesPermissionsGuard');
       expect(source).toContain('@Permissions(');
       expect(source).toContain('TenantActiveGuard');

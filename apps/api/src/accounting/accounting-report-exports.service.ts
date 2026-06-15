@@ -820,11 +820,7 @@ export class AccountingReportExportsService {
         requestedBy: input.actor.userId,
         filters: { equals: filters },
         status: {
-          in: [
-            'QUEUED',
-            'RUNNING',
-            'COMPLETED',
-          ],
+          in: ['QUEUED', 'RUNNING', 'COMPLETED'],
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -837,8 +833,7 @@ export class AccountingReportExportsService {
 
     if (
       existingExport &&
-      (existingExport.status !== 'COMPLETED' ||
-        existingExport.fileAssetId)
+      (existingExport.status !== 'COMPLETED' || existingExport.fileAssetId)
     ) {
       await this.auditService.record({
         action: 'reuse_accounting_report_export_request',
@@ -936,10 +931,7 @@ export class AccountingReportExportsService {
       throw new BadRequestException('Accounting report export not found');
     }
 
-    if (
-      exportRecord.status === 'COMPLETED' &&
-      exportRecord.fileAssetId
-    ) {
+    if (exportRecord.status === 'COMPLETED' && exportRecord.fileAssetId) {
       await this.auditService.record({
         action: 'reuse_accounting_report_export',
         resource: 'accounting_report',

@@ -405,11 +405,15 @@ export class AccountingReportsController {
     res.send(pdf);
   }
 
-  private parseQueuedExportFormat(format: string): AccountingQueuedReportFormat {
+  private parseQueuedExportFormat(
+    format: string,
+  ): AccountingQueuedReportFormat {
     if (format === 'csv' || format === 'pdf') {
       return format;
     }
-    throw new BadRequestException('Queued accounting exports support csv or pdf');
+    throw new BadRequestException(
+      'Queued accounting exports support csv or pdf',
+    );
   }
 
   @Get('bank-reconciliation/:accountId/export')

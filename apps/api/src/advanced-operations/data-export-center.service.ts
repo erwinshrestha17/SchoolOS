@@ -6,10 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import {
-  DataExportJobStatus,
-  Prisma,
-} from '@prisma/client';
+import { DataExportJobStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
@@ -258,7 +255,11 @@ export class DataExportCenterService {
     await this.queue.add(
       'runDataExport',
       { tenantId: actor.tenantId, jobId: retry.id },
-      { jobId: retry.id, attempts: 3, backoff: { type: 'exponential', delay: 1000 } },
+      {
+        jobId: retry.id,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
+      },
     );
     await this.auditService.record({
       action: 'data_export_job_retried',

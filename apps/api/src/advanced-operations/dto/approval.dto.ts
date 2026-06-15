@@ -9,10 +9,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import {
-  ApprovalDecisionType,
-  ApprovalWorkflowType,
-} from '@prisma/client';
+import { ApprovalDecisionType, ApprovalWorkflowType } from '@prisma/client';
 
 export class CreateApprovalPolicyDto {
   @IsEnum(ApprovalWorkflowType)

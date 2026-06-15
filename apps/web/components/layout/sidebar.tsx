@@ -295,7 +295,7 @@ export const platformNavItems: NavItem[] = [
   },
 ];
 
-type SidebarProps = {
+export type SidebarProps = {
   collapsed: boolean;
   onToggle: () => void;
   mobileOpen: boolean;

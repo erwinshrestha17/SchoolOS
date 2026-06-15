@@ -31,7 +31,9 @@ export class AccountingReportsProcessor extends WorkerHost {
     }
   }
 
-  private async handleGenerateAccountingReport(input: AccountingQueuedReportJob) {
+  private async handleGenerateAccountingReport(
+    input: AccountingQueuedReportJob,
+  ) {
     if (
       await skipSuspendedTenantJob(
         this.plansService,

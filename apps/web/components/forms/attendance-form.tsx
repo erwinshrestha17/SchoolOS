@@ -12,10 +12,13 @@ import {
 } from '@/lib/session';
 import { useSession } from '@/components/session-provider';
 import { SectionCard } from '@/components/ui/section-card';
+import { ActionMenu } from '@/components/ui/action-menu';
 import { AttendanceHeader } from '@/components/attendance/attendance-header';
 import { AttendanceRosterItem } from '@/components/attendance/attendance-roster-item';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { FilterBar } from '@/components/ui/filter-bar';
 import { LoadingState } from '@/components/ui/loading-state';
 import {
   CheckCircle2,
@@ -27,6 +30,7 @@ import {
   Loader2,
   Info,
   WifiOff,
+  MoreHorizontal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -64,6 +68,9 @@ export function AttendanceForm() {
   const [classId, setClassId] = useState('');
   const [sectionId, setSectionId] = useState('');
   const [attendanceDate, setAttendanceDate] = useState(today);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | AttendanceStatus>(
+    'ALL',
+  );
   const [exceptions, setExceptions] = useState<
     Record<string, AttendanceStatus>
   >({});
@@ -136,6 +143,12 @@ export function AttendanceForm() {
     () => rosterQuery.data?.students ?? [],
     [rosterQuery.data?.students],
   );
+  const visibleRoster = useMemo(() => {
+    if (statusFilter === 'ALL') return roster;
+    return roster.filter(
+      (student) => (exceptions[student.id] ?? 'PRESENT') === statusFilter,
+    );
+  }, [exceptions, roster, statusFilter]);
 
   useEffect(() => {
     const currentAcademicYear = academicYearsQuery.data?.find(
@@ -438,8 +451,11 @@ export function AttendanceForm() {
         exceptions={totals.absent + totals.late + totals.leave}
       />
 
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <FilterBar
+        label="Attendance Filters"
+        description="Choose the school date and assigned class context before marking attendance."
+      >
+        <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
           <div className="space-y-2">
             <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
               Academic Year
@@ -514,8 +530,30 @@ export function AttendanceForm() {
               aria-label="Date"
             />
           </div>
+
+          <div className="space-y-2">
+            <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+              Status
+            </label>
+            <select
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as 'ALL' | AttendanceStatus)
+              }
+              className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
+              aria-label="Status"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="PRESENT">Present</option>
+              <option value="ABSENT">Absent</option>
+              <option value="LATE">Late</option>
+              <option value="SICK_LEAVE">Sick Leave</option>
+              <option value="EXCUSED_LEAVE">Excused Leave</option>
+              <option value="UNEXCUSED_LEAVE">Unexcused Leave</option>
+            </select>
+          </div>
         </div>
-      </section>
+      </FilterBar>
 
       <SectionCard
         title="Attendance Roster"
@@ -529,30 +567,42 @@ export function AttendanceForm() {
               <StatusBadge status={submissionStatus} className="h-6" />
             </div>
             {roster.length > 0 && (
-              <>
-                <button
-                  type="button"
-                  onClick={markAllPresent}
-                  className="flex items-center gap-2 rounded-xl border border-success-100 bg-success-50 px-4 py-2 text-xs font-bold text-success-700 transition-colors hover:bg-success-100"
-                >
-                  <CheckSquare size={14} />
-                  Mark All Present
-                </button>
-                <button
-                  type="button"
-                  onClick={clearAll}
-                  className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors"
-                >
-                  <Eraser size={14} />
-                  Clear Exceptions
-                </button>
-              </>
+              <ActionMenu
+                label="Open attendance roster actions"
+                items={[
+                  {
+                    label: 'Mark all present',
+                    icon: <CheckSquare size={16} />,
+                    onClick: markAllPresent,
+                  },
+                  {
+                    label: 'Clear exceptions',
+                    icon: <Eraser size={16} />,
+                    onClick: clearAll,
+                  },
+                ]}
+                trigger={
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
+                  >
+                    <MoreHorizontal size={14} />
+                    More Actions
+                  </button>
+                }
+              />
             )}
           </div>
         }
       >
         {rosterQuery.isLoading ? (
           <LoadingState label="Loading roster..." />
+        ) : rosterQuery.isError ? (
+          <ErrorState
+            title="Attendance roster could not load"
+            message="Please check the selected class, section, and date, then try again."
+            onRetry={() => void rosterQuery.refetch()}
+          />
         ) : futureDateBlocked ? (
           <EmptyState
             title="Date Not Allowed"
@@ -574,6 +624,12 @@ export function AttendanceForm() {
                 </Link>
               )
             }
+          />
+        ) : visibleRoster.length === 0 ? (
+          <EmptyState
+            title="No students match this status"
+            description="Adjust the status filter to continue marking this roster."
+            icon={<AlertCircle size={32} />}
           />
         ) : (
           <div className="space-y-6">
@@ -610,7 +666,7 @@ export function AttendanceForm() {
             </div>
 
             <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-              {roster.map((student) => (
+              {visibleRoster.map((student) => (
                 <AttendanceRosterItem
                   key={student.id}
                   student={student}
@@ -700,7 +756,8 @@ export function AttendanceForm() {
             <span className="text-[0.65rem] uppercase tracking-widest text-danger-600 mb-1">
               Submission Error
             </span>
-            {mutation.error.message}
+            Attendance could not be submitted. Check the selected class, date,
+            and attendance status, then try again.
           </div>
         </div>
       )}

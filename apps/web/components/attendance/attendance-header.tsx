@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { StatCard } from '@/components/ui/stat-card';
-import { Users } from 'lucide-react';
+import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
+import { AlertTriangle, Percent, Users } from 'lucide-react';
 
 interface AttendanceHeaderProps {
   total: number;
@@ -12,28 +12,28 @@ interface AttendanceHeaderProps {
 
 export function AttendanceHeader({ total, presentPercent, exceptions }: AttendanceHeaderProps) {
   return (
-    <div className="grid gap-6 md:grid-cols-3">
-      <StatCard
-        title="Total Students"
+    <KpiGrid className="md:grid-cols-3 xl:grid-cols-3">
+      <KpiCard
+        title="Roster Students"
         value={String(total)}
         icon={<Users size={18} />}
         tone="neutral"
+        description="Students loaded from the selected roster."
       />
-      <StatCard
-        title="Attendance Rate"
+      <KpiCard
+        title="Roster Attendance Rate"
         value={`${presentPercent}%`}
+        icon={<Percent size={18} />}
         tone="success"
-        trend={{
-          value: presentPercent,
-          label: 'Current rate',
-          isUp: presentPercent >= 90
-        }}
+        description="Calculated for this open roster before submission."
       />
-      <StatCard
+      <KpiCard
         title="Exceptions"
         value={String(exceptions)}
+        icon={<AlertTriangle size={18} />}
         tone={exceptions > 0 ? 'warning' : 'neutral'}
+        description="Absent, late, and leave rows currently marked."
       />
-    </div>
+    </KpiGrid>
   );
 }

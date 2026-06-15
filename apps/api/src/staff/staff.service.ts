@@ -723,13 +723,20 @@ export class StaffService {
       );
     }
 
-    if (staff.status === StaffStatus.TERMINATED || staff.status === StaffStatus.RESIGNED) {
+    if (
+      staff.status === StaffStatus.TERMINATED ||
+      staff.status === StaffStatus.RESIGNED
+    ) {
       throw new ConflictException('Inactive staff cannot request leave');
     }
 
     const startsOn = startOfDay(new Date(dto.startsOn));
     const endsOn = startOfDay(new Date(dto.endsOn));
-    assertDateRange(startsOn, endsOn, 'Leave end date cannot be before start date');
+    assertDateRange(
+      startsOn,
+      endsOn,
+      'Leave end date cannot be before start date',
+    );
     const days = getInclusiveDays(startsOn, endsOn);
     const leaveType = normalizeLeaveType(dto.leaveType);
     const isPaid = dto.isPaid ?? leaveType !== 'UNPAID';
@@ -775,10 +782,7 @@ export class StaffService {
     dto: ReviewStaffLeaveRequestDto,
     actor: AuthContext,
   ) {
-    if (
-      dto.status !== 'APPROVED' &&
-      dto.status !== 'REJECTED'
-    ) {
+    if (dto.status !== 'APPROVED' && dto.status !== 'REJECTED') {
       throw new BadRequestException('Leave review must approve or reject');
     }
 
@@ -1225,15 +1229,15 @@ function getMonthYearPairs(startsOn: Date, endsOn: Date) {
 function canManageHr(actor?: AuthContext) {
   return Boolean(
     actor?.permissions?.includes('hr:manage') ||
-      actor?.permissions?.includes('hr:staff:update'),
+    actor?.permissions?.includes('hr:staff:update'),
   );
 }
 
 function canSeeSensitiveStaffData(actor?: AuthContext) {
   return Boolean(
     actor?.permissions?.includes('hr:manage') ||
-      actor?.permissions?.includes('payroll:manage') ||
-      actor?.permissions?.includes('payroll:salary:read'),
+    actor?.permissions?.includes('payroll:manage') ||
+    actor?.permissions?.includes('payroll:salary:read'),
   );
 }
 

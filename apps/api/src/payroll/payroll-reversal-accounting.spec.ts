@@ -149,7 +149,9 @@ describe('PayrollService reversal accounting reconciliation', () => {
       ),
     ).rejects.toThrow('Payroll run is already marked as paid');
 
-    expect(accountingPostingService.postPayrollDisbursement).not.toHaveBeenCalled();
+    expect(
+      accountingPostingService.postPayrollDisbursement,
+    ).not.toHaveBeenCalled();
   });
 
   it('prevents regenerating locked posted payroll lines', async () => {

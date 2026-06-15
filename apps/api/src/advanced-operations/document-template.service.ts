@@ -200,12 +200,18 @@ export class DocumentTemplateService {
     }
   }
 
-  async recordPrint(documentId: string, reason: string | undefined, actor: AuthContext) {
+  async recordPrint(
+    documentId: string,
+    reason: string | undefined,
+    actor: AuthContext,
+  ) {
     const document = await this.prisma.generatedDocument.findFirst({
       where: { id: documentId, tenantId: actor.tenantId },
     });
     if (!document) {
-      throw new NotFoundException('Generated document not found in this tenant');
+      throw new NotFoundException(
+        'Generated document not found in this tenant',
+      );
     }
     const print = await this.prisma.documentPrintHistory.create({
       data: {
@@ -229,7 +235,14 @@ export class DocumentTemplateService {
 
 function normalizeMergeFields(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return [...new Set(value.map(String).map((field) => field.trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      value
+        .map(String)
+        .map((field) => field.trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 function assertTemplateUsesOnlyDeclaredFields(body: string, fields: string[]) {
@@ -242,8 +255,13 @@ function assertTemplateUsesOnlyDeclaredFields(body: string, fields: string[]) {
   }
 }
 
-function assertMergeDataAllowed(data: Record<string, unknown>, fields: string[]) {
-  const unknownFields = Object.keys(data).filter((key) => !fields.includes(key));
+function assertMergeDataAllowed(
+  data: Record<string, unknown>,
+  fields: string[],
+) {
+  const unknownFields = Object.keys(data).filter(
+    (key) => !fields.includes(key),
+  );
   if (unknownFields.length) {
     throw new BadRequestException(
       `Merge data contains unsafe fields: ${unknownFields.join(', ')}`,

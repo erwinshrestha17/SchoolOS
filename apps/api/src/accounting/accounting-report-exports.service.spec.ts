@@ -12,7 +12,11 @@ describe('AccountingReportExportsService', () => {
   let reportsService: jest.Mocked<AccountingReportsService>;
   let prisma: {
     tenant: { findUnique: jest.Mock };
-    reportExport: { findFirst: jest.Mock; create: jest.Mock; update: jest.Mock };
+    reportExport: {
+      findFirst: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+    };
   };
   let fileRegistryService: { registerGeneratedFile: jest.Mock };
   let auditService: { record: jest.Mock };

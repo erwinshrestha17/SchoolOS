@@ -911,10 +911,9 @@ export class PayrollService {
             pfEmployeeAmount: run.pfEmployeeAmount,
             pfEmployerAmount: run.pfEmployerAmount,
             tdsAmount: run.tdsAmount,
-            entryDate: run.periodEnd ?? getPayrollPeriod(
-              run.periodYear,
-              run.periodMonth,
-            ).endsOn,
+            entryDate:
+              run.periodEnd ??
+              getPayrollPeriod(run.periodYear, run.periodMonth).endsOn,
           },
           actor,
           tx,
@@ -1106,10 +1105,9 @@ export class PayrollService {
             periodYear: run.periodYear,
             netAmount: run.netAmount,
             paymentAccountCode: dto.paymentAccountCode,
-            entryDate: run.periodEnd ?? getPayrollPeriod(
-              run.periodYear,
-              run.periodMonth,
-            ).endsOn,
+            entryDate:
+              run.periodEnd ??
+              getPayrollPeriod(run.periodYear, run.periodMonth).endsOn,
           },
           actor,
           tx,

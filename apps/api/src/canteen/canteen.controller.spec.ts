@@ -409,12 +409,12 @@ describe('CanteenController M8C contracts', () => {
     expect(controller.getSpendingControl('student-1', actor)).toEqual({
       id: 'control-1',
     });
-    expect(controller.getParentStudentCanteenStatus('student-1', actor)).toEqual(
-      {
-        student: { id: 'student-1' },
-        wallet: { balance: 1000 },
-      },
-    );
+    expect(
+      controller.getParentStudentCanteenStatus('student-1', actor),
+    ).toEqual({
+      student: { id: 'student-1' },
+      wallet: { balance: 1000 },
+    });
     expect(canteenService.createPosSale).toHaveBeenCalledWith(saleDto, actor);
     expect(canteenService.completePosSale).toHaveBeenCalledWith(
       'sale-1',
@@ -505,11 +505,7 @@ describe('CanteenController M8C contracts', () => {
       controller.exportItemWiseSalesCsv(actor, '2026-05-01', '2026-05-09'),
     ).toBe('Item Name,Sales Amount\nVeg Momo,800');
     expect(
-      controller.exportItemWiseSalesCsvFile(
-        actor,
-        '2026-05-01',
-        '2026-05-09',
-      ),
+      controller.exportItemWiseSalesCsvFile(actor, '2026-05-01', '2026-05-09'),
     ).toEqual({ fileAssetId: 'file-sales-1' });
     expect(controller.lowBalanceWalletList(actor)).toEqual([
       { studentId: 'student-1' },

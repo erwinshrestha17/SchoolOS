@@ -392,10 +392,7 @@ export class MessagingService {
     }
 
     const guardian = await this.getGuardianForActor(actor);
-    const linkedStudentIds = await this.getLinkedStudentIds(
-      actor,
-      guardian.id,
-    );
+    const linkedStudentIds = await this.getLinkedStudentIds(actor, guardian.id);
     const studentScopedConversation: Prisma.ConversationWhereInput[] =
       linkedStudentIds.length > 0
         ? [

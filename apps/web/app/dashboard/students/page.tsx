@@ -3,11 +3,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
 import { StudentDirectory } from '../../../components/forms/student-directory';
-import { UserPlus } from 'lucide-react';
+import { ClipboardList, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
 import { useSession } from '../../../components/session-provider';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
-import { PageHeader } from '../../../components/ui/page-header';
+import { ModuleHeader } from '../../../components/ui/module-header';
+import { ModuleTabs } from '../../../components/ui/module-tabs';
 import Link from 'next/link';
 
 export default function StudentsPage() {
@@ -117,23 +118,42 @@ export default function StudentsPage() {
 
   return (
     <DashboardPageShell>
-      <PageHeader
+      <ModuleHeader
+        eyebrow="M1 Admissions & Student Profiles"
         title="Student Directory"
-        description="Search student records, manage placement, and open profile details."
-        actions={
+        description="Search student records, manage placement, review iEMIS readiness, and open safe profile context."
+        primaryAction={
           <Link
             href="/dashboard/admissions"
             className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
           >
             <UserPlus size={18} />
-            Enroll Student
+            New Admission
           </Link>
         }
-      />
+      >
+        <ModuleTabs
+          items={[
+            {
+              href: '/dashboard/students',
+              label: 'Students',
+              icon: Users,
+            },
+            {
+              href: '/dashboard/admissions',
+              label: 'Admissions',
+              icon: ClipboardList,
+            },
+          ]}
+          accentColor="blue"
+          variant="light"
+        />
+      </ModuleHeader>
 
       <StudentDirectory
         academicYears={academicYearsQuery.data ?? []}
         admissions={admissionsQuery.data?.items ?? []}
+        admissionsTotal={admissionsQuery.data?.total}
         classes={classesQuery.data ?? []}
         isError={
           academicYearsQuery.isError ||
@@ -150,6 +170,15 @@ export default function StudentsPage() {
           admissionsQuery.isLoading
         }
         pdfError={pdfError}
+        onRetry={() => {
+          void academicYearsQuery.refetch();
+          void classesQuery.refetch();
+          void sectionsQuery.refetch();
+          void studentsQuery.refetch();
+          void admissionsQuery.refetch();
+          void duplicateCandidatesQuery.refetch();
+          void iemisReadinessQuery.refetch();
+        }}
         sections={sectionsQuery.data ?? []}
         studentsResponse={studentsQuery.data}
         onOpenPdf={(studentId, kind) => void openStudentPdf(studentId, kind)}

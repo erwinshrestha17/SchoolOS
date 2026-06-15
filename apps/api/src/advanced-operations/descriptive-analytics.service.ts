@@ -74,7 +74,11 @@ export class DescriptiveAnalyticsService {
     });
 
     try {
-      const metrics = await this.buildMetrics(actor.tenantId, dto.domain, summaryDate);
+      const metrics = await this.buildMetrics(
+        actor.tenantId,
+        dto.domain,
+        summaryDate,
+      );
       const summary = await this.prisma.analyticsSummary.upsert({
         where: {
           tenantId_domain_summaryDate_scopeType_scopeId: {
@@ -152,7 +156,10 @@ export class DescriptiveAnalyticsService {
             _count: { _all: true },
           }),
           this.prisma.attendanceSession.count({
-            where: { tenantId, attendanceDate: { gte: day.start, lt: day.end } },
+            where: {
+              tenantId,
+              attendanceDate: { gte: day.start, lt: day.end },
+            },
           }),
           this.prisma.attendanceCorrectionRequest.count({
             where: { tenantId, status: 'PENDING' },
@@ -267,7 +274,9 @@ export class DescriptiveAnalyticsService {
 }
 
 function startOfDay(date: Date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
 }
 
 function dateRange(date: Date) {

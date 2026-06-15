@@ -1115,8 +1115,7 @@ function overrideImportReviewReads(prisma: PrismaMock) {
         rows: prisma.__state.admissionImportRows
           .filter((row) => row.batchId === batch.id)
           .sort(
-            (left, right) =>
-              Number(left.rowNumber) - Number(right.rowNumber),
+            (left, right) => Number(left.rowNumber) - Number(right.rowNumber),
           ),
       });
     }),

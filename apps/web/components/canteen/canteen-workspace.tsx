@@ -57,6 +57,8 @@ const tabs: Array<{ key: CanteenTab; label: string; href: string }> = [
 ];
 
 const today = new Date().toISOString().slice(0, 10);
+const servingAllergyAcknowledgementLabel =
+  "I reviewed this student's allergy and medical warnings before";
 
 const emptyMenuForm: CanteenMenuItemPayload = {
   name: '',
@@ -750,8 +752,7 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
                     className="mt-0.5 rounded border-red-300 text-red-600 focus:ring-red-200"
                   />
                   <span>
-                    I reviewed this student&apos;s allergy and medical warnings before
-                    serving the meal.
+                    {servingAllergyAcknowledgementLabel} serving the meal.
                   </span>
                 </label>
               ) : null}

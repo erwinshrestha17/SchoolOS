@@ -848,13 +848,11 @@ function buildService(
         status: CanteenPosSaleStatus.COMPLETED,
         items: [],
       }),
-      aggregate: jest
-        .fn()
-        .mockResolvedValue({
-          _sum: {
-            totalAmount: options.saleAggregateTotal ?? new Prisma.Decimal(0),
-          },
-        }),
+      aggregate: jest.fn().mockResolvedValue({
+        _sum: {
+          totalAmount: options.saleAggregateTotal ?? new Prisma.Decimal(0),
+        },
+      }),
     },
     student: {
       findFirst: jest.fn().mockResolvedValue({

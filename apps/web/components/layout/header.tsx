@@ -20,7 +20,7 @@ import { Avatar } from '../ui/avatar';
 import { cn } from '../../lib/utils';
 import { Badge } from '../ui/badge';
 
-type HeaderProps = {
+export type HeaderProps = {
   onMobileMenuToggle: () => void;
 };
 

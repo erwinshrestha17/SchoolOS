@@ -357,8 +357,8 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
     await expect(
       activityFeedService.getAttachmentPreview(
         { ...parentActor, tenantId: otherTenantId },
-      post.attachments[0].id,
-    ),
+        post.attachments[0].id,
+      ),
     ).rejects.toThrow(NotFoundException);
   });
 

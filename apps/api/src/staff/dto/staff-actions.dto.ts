@@ -56,7 +56,15 @@ export class ContractExpiryReminderQueryDto {
 }
 
 export class CreateStaffLeaveRequestDto {
-  @IsIn(['SICK', 'CASUAL', 'EARNED', 'MATERNITY', 'PATERNITY', 'UNPAID', 'OTHER'])
+  @IsIn([
+    'SICK',
+    'CASUAL',
+    'EARNED',
+    'MATERNITY',
+    'PATERNITY',
+    'UNPAID',
+    'OTHER',
+  ])
   leaveType!: string;
 
   @IsOptional()

@@ -78,7 +78,7 @@ export function AttendanceAnalytics({
                   {item.absenceCount}
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-900">Student {item.studentId}</p>
+                  <p className="text-sm font-bold text-slate-900">Student record</p>
                   <p className="text-[0.7rem] text-slate-500 uppercase tracking-wider font-bold">Total Absences</p>
                 </div>
               </div>
@@ -167,7 +167,7 @@ export function AttendanceAnalytics({
               rows={anomalies?.anomalies.lateSubmissions.slice(0, 5).map((item) => ({
                 key: item.sessionId,
                 title: classSectionLabel(item.className, item.sectionName),
-                detail: `${formatDate(item.attendanceDate)} - submitted by ${item.submittedBy}`,
+                detail: `${formatDate(item.attendanceDate)} - submitted after the expected window`,
                 badge: `${item.delayHours}h late`,
               })) ?? []}
             />

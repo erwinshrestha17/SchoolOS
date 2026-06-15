@@ -159,11 +159,7 @@ describe('AccountingReportsController', () => {
     const query = { fiscalYearId: 'fy-1', accountCode: '1001' };
 
     await expect(
-      controller.queueGeneralLedgerExport(
-        mockAuth as any,
-        query as any,
-        'pdf',
-      ),
+      controller.queueGeneralLedgerExport(mockAuth as any, query as any, 'pdf'),
     ).resolves.toEqual(
       expect.objectContaining({
         exportId: 'export-1',

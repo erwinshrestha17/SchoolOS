@@ -126,11 +126,7 @@ describe('StaffService M7 HR hardening', () => {
     });
 
     await expect(
-      service.reviewLeaveRequest(
-        'leave-1',
-        { status: 'APPROVED' },
-        hrActor,
-      ),
+      service.reviewLeaveRequest('leave-1', { status: 'APPROVED' }, hrActor),
     ).rejects.toThrow(/Reverse\/regenerate payroll/);
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -156,12 +152,14 @@ describe('StaffService M7 HR hardening', () => {
   });
 });
 
-function buildService(options: {
-  staff?: Record<string, unknown> | null;
-  leaveBalances?: Array<Record<string, unknown>>;
-  leaveRequest?: Record<string, unknown> | null;
-  payrollRuns?: Array<Record<string, unknown>>;
-} = {}) {
+function buildService(
+  options: {
+    staff?: Record<string, unknown> | null;
+    leaveBalances?: Array<Record<string, unknown>>;
+    leaveRequest?: Record<string, unknown> | null;
+    payrollRuns?: Array<Record<string, unknown>>;
+  } = {},
+) {
   const prisma = {
     staff: {
       findFirst: jest.fn().mockResolvedValue(options.staff ?? buildStaff()),

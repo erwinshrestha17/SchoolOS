@@ -1393,8 +1393,7 @@ export class CanteenService {
       student: {
         id: guardianLink.student.id,
         studentSystemId: guardianLink.student.studentSystemId,
-        name:
-          `${guardianLink.student.firstNameEn} ${guardianLink.student.lastNameEn}`.trim(),
+        name: `${guardianLink.student.firstNameEn} ${guardianLink.student.lastNameEn}`.trim(),
       },
       wallet: wallet
         ? {

@@ -530,7 +530,11 @@ describe('ParentTeacherChatService', () => {
     prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
 
     await expect(
-      service.sendMessage('thread-1', { message: 'Following up' }, teacherActor),
+      service.sendMessage(
+        'thread-1',
+        { message: 'Following up' },
+        teacherActor,
+      ),
     ).rejects.toThrow(ConflictException);
 
     expect(prisma.parentTeacherMessage.create).not.toHaveBeenCalled();

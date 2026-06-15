@@ -442,7 +442,9 @@ export class ApprovalWorkflowService {
     }
   }
 
-  private buildSteps(policy: { approverRoles: unknown; approverPermissions: unknown } | null) {
+  private buildSteps(
+    policy: { approverRoles: unknown; approverPermissions: unknown } | null,
+  ) {
     const roles = Array.isArray(policy?.approverRoles)
       ? (policy?.approverRoles as string[])
       : [];

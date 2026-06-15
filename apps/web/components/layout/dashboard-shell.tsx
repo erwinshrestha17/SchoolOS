@@ -1,8 +1,8 @@
 'use client';
 
 import { ReactNode, useState } from 'react';
-import { Sidebar } from './sidebar';
-import { Header } from './header';
+import { GlobalAside } from './global-aside';
+import { TopBar } from './top-bar';
 import { Breadcrumbs } from './breadcrumbs';
 import { useSession } from '../session-provider';
 import { cn } from '../../lib/utils';
@@ -39,7 +39,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       >
         Skip to workspace
       </a>
-      <Sidebar
+      <GlobalAside
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         mobileOpen={mobileOpen}
@@ -48,7 +48,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <SupportOverrideBanner />
-        <Header onMobileMenuToggle={() => setMobileOpen(!mobileOpen)} />
+        <TopBar onMobileMenuToggle={() => setMobileOpen(!mobileOpen)} />
 
         <main
           id="dashboard-main"

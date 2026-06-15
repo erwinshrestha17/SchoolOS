@@ -13,18 +13,19 @@ import type {
 import Link from 'next/link';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { SectionCard } from '../ui/section-card';
-import { StatCard } from '../ui/stat-card';
 import { Badge } from '../ui/badge';
 import { Avatar } from '../ui/avatar';
 import { LoadingState } from '../ui/loading-state';
-import { EmptyState } from '../dashboard/empty-state';
-import { cn } from '../../lib/utils';
+import { EmptyState } from '../ui/empty-state';
+import { ErrorState } from '../ui/error-state';
+import { FilterBar } from '../ui/filter-bar';
+import { KpiCard, KpiGrid } from '../ui/kpi-card';
+import { ActionMenu } from '../ui/action-menu';
 import {
   BookOpenText,
   ContactRound,
   Download,
   FileText,
-  Filter,
   FolderOpen,
   MoreHorizontal,
   RotateCcw,
@@ -43,9 +44,11 @@ import { StatusChip } from '../dashboard/status-chip';
 type StudentDirectoryProps = {
   academicYears: AcademicYearSummary[];
   admissions: AdmissionSummary[];
+  admissionsTotal?: number;
   classes: ClassSummary[];
   isError: boolean;
   isLoading: boolean;
+  onRetry?: () => void;
   onOpenPdf: (studentId: string, kind: string) => void;
   pdfError: string;
   sections: SectionSummary[];
@@ -81,9 +84,11 @@ type StudentDirectoryProps = {
 export function StudentDirectory({
   academicYears,
   admissions,
+  admissionsTotal,
   classes,
   isError,
   isLoading,
+  onRetry,
   onOpenPdf,
   pdfError,
   sections,
@@ -171,9 +176,12 @@ export function StudentDirectory({
 
   if (isError) {
     return (
-      <SectionCard title="Error" className="border-danger-100 bg-danger-50/30">
-        <p className="text-sm text-danger-600">Student Directory could not load. Please check your connection.</p>
-      </SectionCard>
+      <ErrorState
+        title="Student directory could not load"
+        message="Please check your connection and try again. Student records were not changed."
+        onRetry={onRetry}
+        showReload={!onRetry}
+      />
     );
   }
 
@@ -194,35 +202,83 @@ export function StudentDirectory({
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="grid gap-4 flex-1 grid-cols-1 sm:grid-cols-3">
-          <StatCard title="Total Records" value={totalStudents} icon={<Users size={20} />} tone="info" />
-          <StatCard title="Active Enrollment" value={students.filter(s => s.lifecycleStatus === 'ACTIVE').length} icon={<UserCheck size={20} />} tone="success" />
-          <StatCard title="Current Page" value={currentPage} icon={<Filter size={20} />} tone="neutral" />
-        </div>
+        <KpiGrid className="flex-1 sm:grid-cols-2 xl:grid-cols-5">
+          <KpiCard
+            title="Student Records"
+            value={totalStudents}
+            icon={<Users size={20} />}
+            tone="info"
+            description="Server total for the current filters."
+          />
+          <KpiCard
+            title="Page Records"
+            value={students.length}
+            icon={<UserCheck size={20} />}
+            tone="success"
+            description={`Visible on page ${currentPage}.`}
+          />
+          <KpiCard
+            title="Admission Records"
+            value={admissionsTotal ?? 'Unavailable'}
+            icon={<ClipboardCheck size={20} />}
+            tone="neutral"
+            description={
+              admissionsTotal === undefined
+                ? 'Admissions total is not available.'
+                : 'Server total from admissions.'
+            }
+          />
+          <KpiCard
+            title="iEMIS Issues"
+            value={isLoadingIemisReadiness ? 'Loading' : iemisIssueRows.length}
+            icon={<AlertTriangle size={20} />}
+            tone={iemisIssueRows.length > 0 ? 'warning' : 'success'}
+            description="From the current readiness review."
+          />
+          <KpiCard
+            title="Missing Documents"
+            value="Unavailable"
+            icon={<FolderOpen size={20} />}
+            tone="neutral"
+            description="Needs backend summary API."
+          />
+        </KpiGrid>
         <div className="flex flex-wrap items-center gap-2 lg:justify-end shrink-0">
-          <button
-            type="button"
-            className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
-            onClick={() => onExportRoster('csv', { academicYearId, classId, sectionId })}
-          >
-            <Download size={18} />
-            Export CSV
-          </button>
-          <button
-            type="button"
-            className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={onExportIemis}
-            disabled={!canExportIemis || isExportingIemis}
-          >
-            <Download size={18} />
-            {isExportingIemis ? 'Exporting...' : 'iEMIS'}
-          </button>
+          <ActionMenu
+            label="Open student directory actions"
+            items={[
+              {
+                label: 'Export roster CSV',
+                icon: <Download size={16} />,
+                onClick: () =>
+                  onExportRoster('csv', { academicYearId, classId, sectionId }),
+              },
+              {
+                label: isExportingIemis
+                  ? 'Preparing iEMIS export'
+                  : 'Export iEMIS',
+                icon: <Download size={16} />,
+                disabled: !canExportIemis || isExportingIemis,
+                onClick: onExportIemis,
+              },
+            ]}
+            trigger={
+              <button
+                type="button"
+                className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
+              >
+                <MoreHorizontal size={18} />
+                More Actions
+              </button>
+            }
+          />
         </div>
       </div>
 
-      <SectionCard 
-        title="Directory Filters"
-        headerAction={
+      <FilterBar
+        label="Directory Filters"
+        description="Search and filter student records using server-backed directory filters."
+        actions={
           (academicYearId || classId || sectionId || status || search) && (
             <button 
               onClick={() => {
@@ -240,7 +296,7 @@ export function StudentDirectory({
           )
         }
       >
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid w-full gap-4 md:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1.5">
             <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Academic Year</label>
             <select
@@ -315,7 +371,7 @@ export function StudentDirectory({
             </div>
           </div>
         </div>
-      </SectionCard>
+      </FilterBar>
 
       <SectionCard
         title="Class iEMIS Readiness"
@@ -662,15 +718,4 @@ function initials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join('');
-}
-
-function primaryGuardianName(
-  student: StudentProfile,
-  admission: AdmissionSummary | undefined | null,
-) {
-  const primaryGuardian =
-    (student.guardians ?? admission?.guardians ?? []).find((guardian) => guardian.isPrimary) ??
-    (student.guardians ?? admission?.guardians ?? [])[0];
-
-  return primaryGuardian?.fullName ?? '';
 }

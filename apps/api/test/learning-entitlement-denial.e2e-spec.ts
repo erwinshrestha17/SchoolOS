@@ -9,11 +9,7 @@ import { SUSPENDED_TENANT_MESSAGE } from '../src/plans/tenant-access.constants';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
 import { AuthContext } from '../src/auth/auth.types';
-import {
-  PrismaMock,
-  createPrismaMock,
-  createQueueMock,
-} from './test-helpers';
+import { PrismaMock, createPrismaMock, createQueueMock } from './test-helpers';
 import { AuthenticatedRequest } from '../src/auth/auth-request.interface';
 
 describe('Learning entitlement denial (E2E)', () => {
@@ -114,7 +110,9 @@ describe('Learning entitlement denial (E2E)', () => {
 
     await expect(
       entitlementGuard.canActivate(buildContext(tenantId, actor)),
-    ).rejects.toThrow(new RegExp(LEARNING_MODULE_ENTITLEMENT.replace('.', '\\.')));
+    ).rejects.toThrow(
+      new RegExp(LEARNING_MODULE_ENTITLEMENT.replace('.', '\\.')),
+    );
   });
 
   it('denies learning routes for suspended tenants', async () => {

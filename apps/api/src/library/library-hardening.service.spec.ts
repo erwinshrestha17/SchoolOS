@@ -193,9 +193,7 @@ describe('LibraryHardeningService M8A workflows', () => {
         module: 'library',
       }),
     );
-    expect(result).toEqual(
-      expect.objectContaining({ fileAssetId: 'file-1' }),
-    );
+    expect(result).toEqual(expect.objectContaining({ fileAssetId: 'file-1' }));
   });
 });
 

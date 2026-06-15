@@ -149,7 +149,7 @@ export function AttendanceCorrectionReview({
                   </p>
                   <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
                     Requested by{' '}
-                    {correction.requestedBy?.email ?? correction.requestedById}
+                    {correction.requestedBy?.email ?? 'school staff'}
                   </p>
                 </div>
 
@@ -224,5 +224,5 @@ function correctionStudentName(correction: AttendanceCorrectionRequest) {
     return name;
   }
 
-  return student?.studentSystemId ?? correction.studentId;
+  return student?.studentSystemId ?? 'Student record';
 }

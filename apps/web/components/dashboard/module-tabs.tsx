@@ -13,7 +13,7 @@ export interface TabItem {
   count?: number;
 }
 
-interface ModuleTabsProps {
+export interface ModuleTabsProps {
   items: TabItem[];
   activeValue?: string;
   onValueChange?: (value: string) => void;

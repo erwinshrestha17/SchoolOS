@@ -23,7 +23,9 @@ describe('AccountingReportsProcessor', () => {
   beforeEach(() => {
     prisma = { reportExport: { update: jest.fn() } };
     exportsService = { completeQueuedReportExport: jest.fn() };
-    plansService = { shouldProcessTenantJob: jest.fn().mockResolvedValue(true) };
+    plansService = {
+      shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
+    };
     processor = new AccountingReportsProcessor(
       prisma as any,
       exportsService as any,

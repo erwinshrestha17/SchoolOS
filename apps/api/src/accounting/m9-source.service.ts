@@ -1,8 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  JournalEntryStatus,
-  JournalSourceType,
-} from '@prisma/client';
+import { JournalEntryStatus, JournalSourceType } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import {
