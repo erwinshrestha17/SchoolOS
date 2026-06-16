@@ -23,6 +23,14 @@ Before web work, read relevant root rules, web design plan, project status/plan,
 
 If a screen needs data and no safe endpoint exists, do not fake it or compute official values in the browser. Inspect existing API clients, backend controllers, OpenAPI/contracts, and permissions. If it meets production criteria, add/request a module-owned, tenant-scoped, RBAC/entitlement-gated backend API and connect it. If not, keep a friendly unavailable/locked/permission state and mark the gap as `needs backend verification` or `needs OpenAPI confirmation`.
 
+## Web guardrails
+
+- Contract first: confirm backend/OpenAPI/`packages/core` shape before integrating; do not guess arrays/envelopes/pagination.
+- Placeholder removal: developer-facing `Needs backend API` text is internal only; pilot-facing UI uses friendly unavailable/error/locked/permission copy.
+- Seed and smoke: new visible screens/cards need seed data and focused browser smoke where practical, or an explicit pending note.
+- Error shape: parse shared backend errors; never show raw technical/provider/storage/Prisma messages.
+- Stop on unknowns: mark `needs backend verification` or `needs OpenAPI confirmation` instead of guessing.
+
 ## Screen completion checklist
 
 Before marking a screen complete:
