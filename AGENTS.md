@@ -50,6 +50,10 @@ Mobile: companion app only; persona-first; purpose-limited APIs only; no admin-s
 
 Learning: school-controlled, teacher-led, lab/session or controlled-device student access; expiring session codes/QR; parent summaries child-scoped and non-comparative; no leaderboard, open student chat, harsh labels, AI tutor, adaptive runtime, or broad home learning unless approved.
 
+## Missing API decision rule
+
+If any web/mobile/platform surface needs data and no safe backend API exists, make a proper decision instead of faking it. First inspect existing code, OpenAPI/contracts, permissions, DTOs, and tests. If the need is real, repeatable, module-owned, tenant-scopable, RBAC/entitlement-gatable, and useful for a production workflow, implement a module-owned purpose-limited backend API and connect the surface. If not, keep a friendly unavailable/locked/permission state and mark the gap clearly. Never derive official totals from list APIs or browser/mobile calculations.
+
 ## Before coding
 
 1. Read focused docs and existing code first.
