@@ -51,6 +51,55 @@ Feature module -> FileRegistryService -> StorageService -> StorageAdapter
 - Do not store base64 files in PostgreSQL.
 - Use File Registry records for protected documents, media, exports, reports, receipts, payslips, report cards, homework attachments, notice/chat attachments, and learning resources.
 
+## API endpoint completion checklist
+
+Before adding or changing an endpoint, confirm:
+
+- The route is in the correct module/controller and does not bypass another module's service boundary.
+- The request is authenticated where required.
+- Tenant-owned data is scoped by authenticated `tenantId`.
+- Module entitlement and RBAC/permission checks are enforced in the backend.
+- Parent/student/driver/staff/mobile routes return purpose-limited DTOs only.
+- Input DTO validates required fields, enums, dates, IDs, money values, pagination, and filters.
+- Growing lists support server-side pagination and filtering.
+- Multi-step writes use a transaction where consistency requires it.
+- Sensitive writes are audited with actor, tenant, action, target, reason where required, and useful context.
+- Retryable writes are idempotent or have deterministic duplicate guards.
+- OpenAPI/shared contracts are updated when request or response shape changes.
+- Tests are added or updated for success, forbidden, validation, tenant boundary, and important edge cases.
+
+## Prisma/query checklist
+
+For tenant-owned Prisma queries:
+
+- Include `tenantId` in `where` clauses for reads, updates, deletes, counts, aggregates, and relation lookups.
+- Avoid fetching full records when a selected projection is enough.
+- Avoid unbounded `findMany` on growing tables.
+- Check nested relation filters for tenant leakage.
+- Prefer stable ordering for paginated lists.
+- Review indexes for high-volume filters such as tenant, status, date, class/section, student, staff, receipt, invoice, job, and file lookups.
+
+## Idempotency and job checklist
+
+For queues, provider callbacks, imports, exports, PDFs, reports, notifications, and payment-like flows:
+
+- Re-check tenant/module/entity/provider state inside the processor.
+- Prevent duplicate processing from retries, double-clicks, refreshes, and out-of-order callbacks.
+- Store durable job/export/report/file status where the UI needs to show progress.
+- Return safe diagnostics and do not expose raw provider payloads in normal responses.
+- Use File Registry for generated artifacts.
+
+## File Registry checklist
+
+For every API that creates or serves a file:
+
+- Register file metadata through FileRegistryService.
+- Store object data through StorageService only.
+- Enforce tenant, owner, role, module, and purpose checks before access.
+- Return app-controlled file identifiers or controlled access responses.
+- Audit access where required by the workflow.
+- Provide unavailable/expired/not-permitted states to the caller.
+
 ## Learning and AI
 
 - Keep M12 Learning inside the dedicated learning domain.
@@ -58,6 +107,17 @@ Feature module -> FileRegistryService -> StorageService -> StorageAdapter
 - Student session access, autosave, and submit must fail closed and be idempotent.
 - Parent summaries must be child-scoped, supportive, and non-comparative.
 - M11 AI remains roadmap only unless explicitly approved.
+
+## Verification matrix
+
+Use the smallest meaningful verification set, then expand when contracts or cross-module flows change.
+
+- Prisma/schema change: `pnpm db:generate`, `pnpm db:validate`, migration review, relevant tests.
+- DTO/contract change: `pnpm verify:openapi`, API typecheck, affected tests.
+- Service/controller change: API typecheck, affected unit/e2e tests.
+- Queue/job/provider change: affected processor tests plus smoke where relevant.
+- Finance/accounting change: relevant money/idempotency/reversal/accounting tests.
+- File/export/PDF change: File Registry/storage tests plus affected UI/helper smoke where relevant.
 
 ## Verification
 
