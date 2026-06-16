@@ -26,8 +26,9 @@ Do not recreate old split PRDs, repo-analysis docs, deployment checklists, mobil
 
 SchoolOS is a Nepal-first multi-tenant KG-12 school operating SaaS, not a generic CRUD dashboard.
 
-- Treat the product as demo/internal-QA/controlled-pilot stage, not full multi-school production-ready.
-- Do not claim production-ready until staging migration, provider/storage checks, browser E2E, pilot smoke, and real school workflow validation pass.
+- Aim every implementation toward production-ready and deploy-ready quality.
+- Current repo status remains demo/internal-QA/controlled-pilot until staging migration, provider/storage checks, browser E2E, pilot smoke, and real school workflow validation pass.
+- Be honest in readiness reports: close production gaps aggressively, but do not claim production-ready until the required gates actually pass.
 - Frontend standardization and real API-backed workspaces are the next priority.
 - Flutter mobile is a companion app, not a mini web dashboard.
 - M12 Learning has a separate implemented foundation and must remain its own domain.
@@ -163,7 +164,7 @@ See `apps/schoolos_mobile/AGENTS.md` for mobile-specific rules.
 - UI has loading, empty, error, success, permission denied, and module locked states.
 - Protected downloads use authenticated helpers.
 - Tests or focused regressions updated where appropriate.
-- No production-ready claim without staging/pilot verification.
+- Production/deploy-ready claims require actual staging/pilot verification results.
 
 ## Verification commands
 
