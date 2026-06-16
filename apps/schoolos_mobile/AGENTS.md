@@ -22,6 +22,14 @@ Before mobile work, read relevant root rules, `MOBILE_MASTER_GUIDE.md`, mobile d
 
 If a mobile screen needs data/action and no persona-safe endpoint exists, do not reuse admin-shaped APIs or fake state. Inspect backend/OpenAPI/contracts first. If it meets production criteria, add/request a module-owned, tenant-scoped, RBAC/entitlement-gated, purpose-limited mobile API. If not, keep a friendly unavailable/locked/offline/permission state and mark the gap as `needs backend verification`, `needs mobile DTO`, or `needs offline sync confirmation`.
 
+## Mobile guardrails
+
+- Contract first: confirm backend/OpenAPI/DTO shape before wiring repositories; do not guess envelopes, lists, or nullable fields.
+- Purpose-limited first: mobile DTOs should include only what the active persona needs now.
+- Seed and smoke: new persona surfaces need test/seed support and focused mobile/persona smoke where practical, or an explicit pending note.
+- Error shape: map shared backend errors to safe mobile copy; never show raw technical/provider/storage/Prisma messages.
+- Stop on unknowns: mark `needs backend verification`, `needs mobile DTO`, `needs idempotency confirmation`, or `needs offline sync confirmation` instead of guessing.
+
 ## Structure
 
 Use existing feature-first structure:
