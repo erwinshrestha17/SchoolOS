@@ -24,6 +24,14 @@ Before API work, read relevant parts of root `AGENTS.md`, project status/plan, F
 
 When web/mobile/platform needs data that has no safe API, first search existing controllers, services, DTOs, OpenAPI/shared contracts, permissions, and tests. If the need is real, repeatable, production-useful, module-owned, tenant-scopable, and RBAC/entitlement-gatable, create a module-owned purpose-limited endpoint. Do not create broad cross-module shortcuts unless they only compose existing module summaries. Do not use list endpoints as official totals.
 
+## API guardrails
+
+- Contract first: update DTO/OpenAPI/`packages/core` where needed before frontend/mobile consumes a new shape.
+- Module-owned summaries: summary endpoints belong to the source module; dashboard/composer endpoints may only compose existing module summaries.
+- Query performance: use aggregate/select queries, pagination where needed, no unbounded `findMany`, no avoidable dashboard raw-table scans, and review tenant-scoped indexes.
+- Error shape: return safe bounded errors; never leak Prisma, provider, storage, stack, object-key, token, or private payload details.
+- Stop on unknowns: if permission, DTO, idempotency, file access, or contract behavior is not confirmed, mark it instead of guessing.
+
 ## Implementation checklist
 
 Before adding/changing an endpoint:
