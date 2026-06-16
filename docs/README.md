@@ -1,7 +1,7 @@
 # SchoolOS Documentation
 
 **Status:** Active documentation map
-**Last updated:** 2026-06-15
+**Last updated:** 2026-06-16
 
 This folder contains the active detailed SchoolOS documentation. Use this page as the folder-level map only; the root `README.md` remains the repository entry point and source-of-truth summary.
 
@@ -21,8 +21,9 @@ SchoolOS is not in a planning-only documentation phase. Current work is controll
 | 6 | `project/SCHOOLOS_IMPLEMENTATION_PLAN.md` | Active implementation order, module backlogs, and phase gates. |
 | 7 | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Storage, File Registry, tenant isolation, scaling, performance, and security architecture. |
 | 8 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, and provider/queue operations. |
-| 9 | `design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md` | Single web/mobile product design, UI/UX, API contract, Flutter, and persona smoke plan. |
-| 10 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, and go/no-go checks. |
+| 9 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, wireframes, components, API usage, and web persona smoke plan. |
+| 10 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
+| 11 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, and go/no-go checks. |
 
 ---
 
@@ -36,7 +37,8 @@ project/SCHOOLOS_PROJECT_STATUS.md
 project/SCHOOLOS_IMPLEMENTATION_PLAN.md
 architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
 architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
-design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md
+design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
+design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
 production/SCHOOLOS_PRODUCTION_RUNBOOK.md
 ```
 
@@ -49,16 +51,16 @@ apps/web/e2e/README.md
 
 ## Design Planning Docs
 
-The combined web/mobile product direction remains:
+The active design folder intentionally contains only two source-of-truth documents:
 
-- `design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md`
+```text
+design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
+design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
+```
 
-Execution and companion wireframe/component plans:
+Use the web plan for `apps/web`, school dashboard, platform control plane, settings, module workspaces, reports, protected file actions, and web persona smoke planning.
 
-- `design/SCHOOLOS_WEB_FRONTEND_IMPLEMENTATION_MASTER_PLAN.md`
-- `design/SCHOOLOS_MOBILE_APP_IMPLEMENTATION_MASTER_PLAN.md`
-- `design/SCHOOLOS_SETTINGS_WIREFRAMES.md`
-- `design/SCHOOLOS_PLATFORM_CORE_WIREFRAMES_AND_COMPONENT_PLAN.md`
+Use the mobile plan for `apps/schoolos_mobile`, parent, teacher, principal, driver, staff self-service, and controlled student lab/session app design.
 
 ---
 
@@ -67,6 +69,6 @@ Execution and companion wireframe/component plans:
 1. Do not add a new `.md` file if the content belongs inside an active source-of-truth doc.
 2. Do not recreate planning-only docs that conflict with current implementation status.
 3. Keep old duplicated planning content in git history rather than active repo docs.
-4. For web/mobile implementation, use `design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md` as the consolidated active planning set.
-5. Use the split web/mobile implementation master plans for execution sequencing while keeping the combined design doc as product-direction source of truth.
-6. Add a split-out doc only when it has a clear owner, current status, and no overlap with an existing active doc.
+4. Keep `docs/design` limited to the two active design plans unless the owner explicitly approves another source-of-truth split.
+5. Web design belongs in `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`.
+6. Mobile app design belongs in `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`.
