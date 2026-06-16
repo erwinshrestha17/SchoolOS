@@ -59,7 +59,7 @@ presentation -> application/use-cases -> domain -> data
 - Use real backend APIs only.
 - Do not use admin-shaped endpoints for parent, teacher, principal, driver, staff self-service, or student session screens.
 - Do not invent endpoint contracts. Mark unknowns as `needs backend verification`, `needs OpenAPI confirmation`, `needs mobile DTO`, `needs idempotency confirmation`, or `needs offline sync confirmation`.
-- Every deep link must re-check session, tenant, role, permission, module entitlement, and ownership/assignment before rendering.
+- Every deep link must re-check login state, tenant, role, permission, module entitlement, and ownership/assignment before rendering.
 - Backend authorization remains the source of truth.
 
 ## State rules
@@ -74,48 +74,99 @@ Every screen should handle, where relevant:
 - Module locked
 - Pending sync
 - Success
-- Session expired
-- Protected file unavailable
+- Login expired
+- Private file unavailable
 
 Use shared state widgets and school-friendly messages. Show last-updated labels for cached reads.
 
-## Local storage and logout
+## Local app data and logout
 
-- Keep auth/session material only in the existing secure storage pattern.
-- Clear private caches on logout/session expiry.
-- Back navigation after logout must not expose previous user data.
-- Role switcher is allowed only where backend/session permissions support it.
+- Use the existing app storage pattern for login state.
+- Clear private app cache on logout or expired login.
+- Back navigation after logout must not show previous user data.
+- Role switcher is allowed only where backend permissions support it.
 
 ## Offline and sync
 
 Offline support is allowed only where safe and visible.
 
-Safe cached reads may include parent child summary, attendance summary, homework list, notices already opened, teacher timetable/roster, driver trip manifest with minimal safe fields, staff own profile/leave balance, and student current learning attempt draft where policy allows.
+Safe cached reads may include summaries and today-focused lists for the active persona.
 
 Offline writes require backend idempotency and visible queued/syncing/synced/failed states. Do not silently overwrite newer server data.
 
-Never allow offline payments, wallet debits/top-ups, refunds, payroll actions, accounting actions, report-card publish, tenant/platform settings, or high-risk writes.
+High-risk writes stay online-only. Follow the root `AGENTS.md` finance/accounting/mobile restrictions.
 
-## Protected files
+## Private files
 
 Use authenticated download/share helpers only. Do not expose storage internals or long-lived file links.
-
-Protected mobile files include receipts, report cards, payslips, notice attachments, homework attachments, activity media, student documents where allowed, learning resources, and payment proof files.
 
 ## Learning and student session
 
 - Student access is lab/session-only or controlled school-device only for MVP.
 - Join only valid live sessions for own class/section.
-- Session code/QR must expire and fail closed.
 - Student sees only own active attempt/result.
 - Autosave and submit must be idempotent.
 - No public leaderboard, open chat, AI tutor, broad student home, or harsh labels.
+
+## Mobile screen completion checklist
+
+Before marking a mobile screen complete, confirm:
+
+- The screen serves one persona and one primary job.
+- The route is allowed for that role and module entitlement.
+- Data comes from a real purpose-limited API.
+- No admin-shaped payload is used for mobile persona screens.
+- Loading, empty, error, offline, permission denied, module locked, login expired, and success states are handled where relevant.
+- The UI is low-bandwidth friendly and avoids unnecessary large media loading.
+- Cached data clearly shows last-updated time.
+- Logout or expired login clears private app cache.
+- Deep links re-check scope before rendering private content.
+- Private files use authenticated download/share helpers.
+- Mobile copy is school-friendly and clear for non-technical users.
+
+## Mobile API integration checklist
+
+When adding or changing a mobile API call:
+
+- Confirm the endpoint is intended for the mobile persona.
+- Confirm response DTO contains only fields the persona should see.
+- Map backend errors into safe mobile messages.
+- Handle expired login, permission denial, unavailable data, conflict, offline, timeout, and validation states.
+- Avoid storing unnecessary response data locally.
+- Do not queue writes unless backend idempotency and reconciliation are confirmed.
+
+## Offline and deep-link checklist
+
+For offline or cached flows:
+
+- Cache only safe read summaries.
+- Show last-updated time and offline banner/state.
+- Make retry obvious.
+- Use visible queued/syncing/synced/failed states for approved offline writes.
+- Re-check server state before finalizing a queued write.
+- Never hide sync conflicts or silently overwrite server data.
+
+For deep links:
+
+- Re-check login state.
+- Re-check tenant, role, permission, module, and ownership/assignment.
+- Show safe blocked state when the target is unavailable or not allowed.
+
+## Private file checklist
+
+For each mobile file action:
+
+- Use the shared authenticated helper.
+- Show pending/download/share state.
+- Show unavailable, denied, expired, offline, and retry states.
+- Do not store temporary file links as durable app state.
+- Clear file-related private cache on logout where applicable.
 
 ## Mobile implementation order
 
 Follow the mobile design plan order:
 
-1. Core shell and auth hardening.
+1. Core shell and login hardening.
 2. Parent MVP.
 3. Teacher MVP.
 4. Staff and driver MVP.
@@ -125,6 +176,15 @@ Follow the mobile design plan order:
 8. Device QA, offline/read cache, push notifications, accessibility, and low-bandwidth polish.
 
 Do not start a mobile screen if the only available endpoint is admin-shaped or exposes more data than the persona needs.
+
+## Verification matrix
+
+- UI-only screen change: `dart format .`, `flutter analyze`, focused widget/unit test where available.
+- API/data change: analyze, affected tests, and manual smoke with expected persona state.
+- Login/local-data change: analyze, tests, logout/expired-login smoke.
+- Offline/cache change: analyze, tests, offline/reconnect smoke.
+- Private file change: analyze, file open/download/share smoke.
+- Learning/student session change: analyze, tests, join/autosave/submit scope smoke.
 
 ## Verification
 
