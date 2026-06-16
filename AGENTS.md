@@ -1,174 +1,71 @@
 # SchoolOS Agent Instructions
 
-Root guidance for developer agents working in SchoolOS. Keep this file compact; detailed product behavior belongs in the active docs.
+Token-light global rules for agents. Detailed behavior lives in the active docs and existing code/contracts.
 
-## Read first
+## Read only what is relevant
 
-Before implementation, read the relevant active docs:
+Start with `README.md`, `docs/README.md`, `docs/project/SCHOOLOS_PROJECT_STATUS.md`, and `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md`. Then read the focused source for the touched area:
 
-1. `README.md`
-2. `docs/README.md`
-3. `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`
-4. `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`
-5. `docs/project/SCHOOLOS_PROJECT_STATUS.md`
-6. `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md`
-7. `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`
-8. `docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md`
-9. `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` for web work
-10. `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` for mobile work
-11. `docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md` for staging/production work
-12. `apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md` for Flutter work
-13. `apps/web/e2e/README.md` for browser smoke/E2E work
+- Product/function: `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`
+- Architecture/security/platform: `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md`
+- Web: `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `apps/web/e2e/README.md`
+- Mobile: `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`, `apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md`
+- Deploy/staging: `docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md`
 
-Do not recreate old split PRDs, repo-analysis docs, deployment checklists, mobile planning docs, or duplicate design docs. Update the smallest active source of truth when docs need changes.
+Do not recreate old split plans or duplicate docs. Update the smallest active source of truth only when docs truly need changes.
 
-## Current product stance
+## Product stance
 
-SchoolOS is a Nepal-first multi-tenant KG-12 school operating SaaS, not a generic CRUD dashboard.
+SchoolOS is a Nepal-first multi-tenant KG-12 school operating SaaS, not a CRUD dashboard. Aim every change toward production-ready and deploy-ready quality. Report readiness honestly: current status remains controlled-pilot/internal-QA until staging migration, provider/storage checks, browser E2E, pilot smoke, and real school workflow validation pass.
 
-- Aim every implementation toward production-ready and deploy-ready quality.
-- Current repo status remains demo/internal-QA/controlled-pilot until staging migration, provider/storage checks, browser E2E, pilot smoke, and real school workflow validation pass.
-- Be honest in readiness reports: close production gaps aggressively, but do not claim production-ready until the required gates actually pass.
-- Frontend standardization and real API-backed workspaces are the next priority.
-- Flutter mobile is a companion app, not a mini web dashboard.
-- M12 Learning has a separate implemented foundation and must remain its own domain.
-- M11 Intelligence/AI is roadmap only. Do not add AI/ML/LLM runtime unless explicitly approved.
+Current priorities: frontend real-API workspaces, verification gates, protected files, mobile companion polish, staging/browser smoke, M12 hardening. M11 AI is roadmap only unless explicitly approved.
 
-## Core architecture
+## Architecture: never break
 
-- Keep the NestJS modular monolith.
-- Keep PostgreSQL with Prisma.
-- Keep Redis/BullMQ for queues, retries, scheduled jobs, exports, report/PDF generation, provider work, and media processing.
-- Keep web in `apps/web` with Next.js App Router.
-- Keep mobile in `apps/schoolos_mobile` with Flutter.
-- Keep shared contracts/types in `packages/core` where available.
-- Do not migrate to Angular.
-- Do not introduce microservices, new databases, Kubernetes, search clusters, GPU workers, or separate deployment units unless explicitly approved with a measured reason.
-- Do not rename `tenantId` to `schoolId`.
-- Optimize tenant-scoped queries, indexes, pagination, payload size, file variants, summaries, and queued jobs before increasing infrastructure.
+- Keep NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js App Router, Flutter companion app, `packages/core` where available.
+- No Angular migration, microservices, new DB/search cluster/GPU/Kubernetes, or separate deployment units unless approved.
+- Do not rename `tenantId`.
+- Keep planes separate: `/platform/*` operator SaaS, `/dashboard/settings/*` school config, `/dashboard/*` school operations.
+- Do not mix SaaS billing with school fee collection/accounting.
+- Keep M12 Learning separate and reuse core students/staff/classes/subjects/timetable/files/RBAC/audit/communication.
 
-## Product planes
+## Security and data rules
 
-Keep the three planes separate:
+- `tenantId` is the strict boundary for API, jobs, files, cache, exports, reports, web, mobile, and learning.
+- Backend authorization is truth; frontend hiding is UX only.
+- Disabled modules and suspended tenants fail closed everywhere.
+- Parent = linked children only. Student = own/session-scoped only. Teacher = assigned class/section/subject only unless permitted. Driver = assigned trip only. Staff self-service = own data only.
+- Platform support override needs reason, audit, and expiry where supported.
+- Never expose unsafe internals, private payloads, provider/storage internals, raw stack traces, or private staff/finance data.
 
-- `/platform/*` = SchoolOS SaaS/operator control plane.
-- `/dashboard/settings/*` = one school's configuration.
-- `/dashboard/*` = daily school operations.
+## Files, money, web, mobile
 
-School users must not access platform controls. Platform support override requires explicit reason, expiry where supported, and audit. Do not mix SchoolOS SaaS billing with school fee collection.
+Files: always use `Feature module -> FileRegistryService -> StorageService -> StorageAdapter`. No provider SDKs in feature modules, no base64 files in DB, no raw private-file browser opens. Web/mobile use protected authenticated helpers.
 
-## Global safety rules
+Money: backend/database totals only. Money writes are idempotent and audited. Confirmed finance/accounting/payroll records use reversal/correction, not silent mutation. No offline financial writes unless explicitly approved with backend reconciliation.
 
-- `tenantId` is the strict tenant/school boundary.
-- Every tenant-owned query, mutation, job, export, report, cache key, file, and mobile response must be tenant-scoped.
-- Backend authorization is the source of truth. Frontend hiding is only UX.
-- Disabled modules and suspended tenants must fail closed across API, web, mobile, jobs, exports, files, providers, and learning sessions.
-- Parents access only linked children.
-- Students access only own allowed/session-scoped records.
-- Teachers access only assigned classes/sections/subjects unless explicitly permitted.
-- Drivers access only assigned trips.
-- Staff self-service accesses only own staff data.
-- Sensitive responses must never reveal internal errors, storage internals, provider internals, private staff/finance fields, or unsafe debug details.
-- Sensitive writes require permission, validation, audit, and reason where policy requires it.
+Web: one screen = one main job; real APIs only; no fake production data; server-side pagination for growing lists; states for loading/empty/error/success/permission/module locked/validation/file unavailable/queued/partial failure; high-risk actions need confirmation and reason where required.
 
-## File and storage rules
+Mobile: companion app only; persona-first; purpose-limited APIs only; no admin-shaped mobile payloads; safe offline reads only; visible sync states for approved idempotent writes; no broad student app.
 
-All files must follow:
+Learning: school-controlled, teacher-led, lab/session or controlled-device student access; expiring session codes/QR; parent summaries child-scoped and non-comparative; no leaderboard, open student chat, harsh labels, AI tutor, adaptive runtime, or broad home learning unless approved.
 
-```text
-Feature module -> FileRegistryService -> StorageService -> StorageAdapter
-```
+## Before coding
 
-Do not import provider SDKs inside feature modules. Do not store base64 files in PostgreSQL. Do not use raw browser opens for private files. Web must use protected file helpers/components. Mobile must use authenticated download/share helpers.
+1. Read focused docs and existing code first.
+2. Inspect contracts/OpenAPI, Prisma schema, DTOs, permissions, audit, API clients, and tests for the touched area.
+3. Implement missing production pieces only; do not rewrite working modules.
+4. Do not invent endpoint contracts. Mark unknowns as `needs backend verification`, `needs OpenAPI confirmation`, `needs mobile DTO`, `needs idempotency confirmation`, or `needs offline sync confirmation`.
+5. Add/update focused tests where appropriate.
+6. Run relevant checks and report only what actually ran.
 
-Protected files include receipts, cashier close PDFs, report cards, payslips, student docs/photos, activity media, notice/chat attachments, homework attachments, learning resources, accounting reports, exports, snapshots, and generated documents.
+## Done means
 
-## Finance/accounting rules
+Real persistence; no fake production data; tenant/RBAC/entitlement enforced; persona scopes fail closed; sensitive writes audited; money idempotent; files through File Registry/StorageService; paginated growing lists; complete UI states; protected downloads; focused regression updated where appropriate. Production/deploy-ready claims require actual staging/pilot verification results.
 
-- Money flows must be idempotent and auditable.
-- Official totals come from backend/database only.
-- Do not use JavaScript floating-point calculations as financial truth.
-- Confirmed financial records use reversal/correction workflows, not silent mutation.
-- Do not bypass accounting posting boundaries.
-- No offline financial writes on mobile unless explicitly approved with backend idempotency and reconciliation.
+## Verification
 
-## Web rules
-
-- Web is the daily school operating desk.
-- One screen = one main job.
-- Use real backend APIs only.
-- No fake dashboard data, placeholder metrics, mock production data, or browser-only production state.
-- Every screen must handle loading, empty, error, success, permission denied, module locked, validation, file unavailable, queued job, and partial failure states where relevant.
-- Growing lists must use server-side pagination/filtering.
-- Use shared UI primitives and protected file helpers.
-- Use school-friendly messages, not raw technical errors.
-- High-risk actions require confirmation, pending/success/error state, reason where required, and audit support.
-
-See `apps/web/AGENTS.md` for web-specific rules.
-
-## Mobile rules
-
-- Mobile shows what each persona needs to know or safely do now.
-- Use purpose-limited APIs; never reuse admin-shaped responses for parent, teacher, principal, driver, staff self-service, or student session flows.
-- Store credentials only in secure storage.
-- Clear private caches on logout/session expiry.
-- Offline support is only for safe reads and explicitly idempotent writes with visible queued/synced/failed states.
-- No offline payments, wallet debits, refunds, payroll actions, accounting actions, report-card publishing, tenant/platform settings, or high-risk writes.
-
-See `apps/schoolos_mobile/AGENTS.md` for mobile-specific rules.
-
-## Learning rules
-
-- M12 Learning is school-controlled and teacher-led.
-- Keep Learning separate under its own domain and reuse core students, staff, classes, sections, subjects, timetable, files, RBAC, audit, and communication.
-- Teachers create/launch activities only for assigned class/section/subject unless explicitly permitted.
-- Student access is lab/session-only or controlled-device only for MVP.
-- Session codes/QR tokens must expire and fail closed.
-- Parent learning summaries must be child-scoped, non-comparative, and supportive.
-- No public leaderboards, open student chat, harsh labels, AI tutor, adaptive recommendations, heavy simulations, or broad home learning app unless approved.
-
-## Implementation priority
-
-1. Security, auth, RBAC, tenant isolation, and permission fixes.
-2. Verification, migrations, seed data, OpenAPI, typecheck, tests, and smoke gates.
-3. Existing pilot workflows and frontend workspace completion.
-4. File Registry/protected file hardening.
-5. Loading/empty/error/permission/module-locked states.
-6. Browser E2E and staging smoke.
-7. Mobile polish/device QA through purpose-limited APIs.
-8. UI polish after real functionality works.
-9. AI only after M11 is explicitly approved.
-
-## Working protocol
-
-1. Read relevant docs and existing code first.
-2. Inspect backend, frontend, Prisma schema, API contracts, permissions, DTOs, audit logs, tests, and OpenAPI/shared contracts where relevant.
-3. Implement only missing production pieces.
-4. Do not rewrite working modules unnecessarily.
-5. Do not remove features unless obsolete and documented.
-6. Do not invent endpoint contracts. Mark unknowns as `needs backend verification`, `needs OpenAPI confirmation`, `needs mobile DTO`, `needs idempotency confirmation`, or `needs offline sync confirmation`.
-7. Add/update focused tests or regression coverage where appropriate.
-8. Run relevant verification and do not claim passing checks unless actually run.
-
-## Definition of done
-
-- Real API/database persistence.
-- No fake/mock/placeholder production data.
-- Tenant isolation enforced.
-- RBAC/module entitlement enforced.
-- Parent/student/driver/staff scopes fail closed.
-- Sensitive writes audited.
-- Money writes idempotent.
-- Files use File Registry/StorageService.
-- Growing lists paginated/filtered server-side.
-- UI has loading, empty, error, success, permission denied, and module locked states.
-- Protected downloads use authenticated helpers.
-- Tests or focused regressions updated where appropriate.
-- Production/deploy-ready claims require actual staging/pilot verification results.
-
-## Verification commands
-
-Run relevant checks after meaningful changes:
+Run relevant gates only, then report honestly:
 
 ```bash
 pnpm db:generate
@@ -183,30 +80,14 @@ pnpm verify:production
 pnpm smoke:pilot
 pnpm smoke:learning
 pnpm smoke:full
-```
-
-Web-specific:
-
-```bash
 pnpm --filter @schoolos/web typecheck
 pnpm test:web:e2e
+cd apps/schoolos_mobile && flutter pub get && dart format . && flutter analyze && flutter test
 ```
 
-Mobile-specific:
+Docs-only changes need no runtime checks.
 
-```bash
-cd apps/schoolos_mobile
-flutter pub get
-dart format .
-flutter analyze
-flutter test
-flutter build apk --debug
-flutter build ios --no-codesign
-```
-
-For docs-only changes, runtime verification is not required, but report that only docs/instructions changed.
-
-## Progress report format
+## Progress format
 
 ```text
 Current module:
