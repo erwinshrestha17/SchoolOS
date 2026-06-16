@@ -4,7 +4,7 @@ SchoolOS is a production-grade, multi-tenant SaaS School Operating System for Ne
 
 It is designed as a modular school operating platform covering admissions, student records, attendance, fees, notices, activity feed, academics, homework, timetable, HR/payroll, accounting, library, transport, canteen, classroom learning, parent engagement, and future intelligence/analytics.
 
-The current implemented core remains focused on controlled pilot readiness for existing management modules. M12 Learning Layer now has a verified backend MVP foundation; KG-12 breadth and Learning frontend/runtime depth remain staged expansion goals, not a claim that every KG-12 feature is already implemented.
+The current implemented core remains focused on controlled pilot readiness for existing management modules. M12 Learning Layer has a verified backend/web/mobile foundation; KG-12 breadth and deeper learning experiences remain staged expansion goals, not a claim that every KG-12 feature is already implemented.
 
 ---
 
@@ -26,7 +26,8 @@ docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
 docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
 docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
 
-docs/design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md
+docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
+docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
 
 docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md
 
@@ -34,7 +35,7 @@ apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md
 apps/web/e2e/README.md
 ```
 
-Historical/duplicate docs should not be recreated unless the project grows enough to justify splitting them again.
+Historical/duplicate docs should not be recreated unless the project owner explicitly approves a new source-of-truth split.
 
 ---
 
@@ -59,7 +60,7 @@ Stage E: Grade 9-10
 Stage F: Grade 11-12
 ```
 
-The current management modules remain the foundation. The Learning Layer is implemented backend-first as a separate M12 domain that reuses existing students, teachers, classes, subjects, timetable, communication, File Registry, audit, RBAC, and tenant isolation.
+The current management modules remain the foundation. The Learning Layer is implemented as a separate M12 domain that reuses existing students, teachers, classes, subjects, timetable, communication, File Registry, audit, RBAC, and tenant isolation.
 
 ---
 
@@ -78,7 +79,7 @@ M9 Accounting: Completed / Pilot-Ready
 M10 Notices/Communication/Chat: Foundation plus provider/attachment/retry depth implemented
 Pre-AI Advanced Operations: Backend foundation and additive Prisma migration added for approvals, automation, descriptive analytics summaries, mobile/offline reliability foundations, documents, and Nepal-school workflow depth; frontend/mobile workflow depth remains next-phase work
 M11 Intelligence/AI: Roadmap only
-M12 Learning Layer: Backend MVP foundation implemented and verified; frontend teacher/student/parent screens remain staged
+M12 Learning Layer: Production foundation implemented and verified; staging/browser/device depth remains staged
 KG-12 Expansion: Product direction added; Grade 11-12 and advanced learning features are staged future scope
 ```
 
@@ -133,3 +134,7 @@ The detailed source of truth for edge cases remains the PRD and FRS module secti
 - Parent can only access currently linked children.
 - Guardian removal or replacement must immediately revoke old parent access to child data, messages, files, notices, receipts, report cards, media, and learning summaries.
 - Student can only access their own allowed records.
+- Teachers can access only assigned classes/subjects/students unless explicit permissions allow broader access.
+- Drivers can access only assigned trips.
+- Staff self-service can access own staff data only.
+- Platform support access requires explicit audited override.
