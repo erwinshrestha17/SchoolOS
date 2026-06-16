@@ -19,6 +19,10 @@ Before web work, read relevant root rules, web design plan, project status/plan,
 - Private files use protected helpers, not raw private URLs.
 - High-risk actions need confirmation, pending/success/error state, and reason where required.
 
+## Backend gap rule
+
+If a screen needs data and no safe endpoint exists, do not fake it or compute official values in the browser. Inspect existing API clients, backend controllers, OpenAPI/contracts, and permissions. If it meets production criteria, add/request a module-owned, tenant-scoped, RBAC/entitlement-gated backend API and connect it. If not, keep a friendly unavailable/locked/permission state and mark the gap as `needs backend verification` or `needs OpenAPI confirmation`.
+
 ## Screen completion checklist
 
 Before marking a screen complete:
