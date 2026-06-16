@@ -18,6 +18,10 @@ Before mobile work, read relevant root rules, `MOBILE_MASTER_GUIDE.md`, mobile d
 - Offline support only where safe and visible; high-risk writes stay online-only per root rules.
 - Private files use authenticated download/share helpers.
 
+## Backend gap rule
+
+If a mobile screen needs data/action and no persona-safe endpoint exists, do not reuse admin-shaped APIs or fake state. Inspect backend/OpenAPI/contracts first. If it meets production criteria, add/request a module-owned, tenant-scoped, RBAC/entitlement-gated, purpose-limited mobile API. If not, keep a friendly unavailable/locked/offline/permission state and mark the gap as `needs backend verification`, `needs mobile DTO`, or `needs offline sync confirmation`.
+
 ## Structure
 
 Use existing feature-first structure:
