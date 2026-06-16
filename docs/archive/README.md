@@ -1,7 +1,7 @@
 # SchoolOS Documentation Archive
 
 **Status:** Archive index
-**Last updated:** 2026-06-15
+**Last updated:** 2026-06-16
 
 This folder is for old, superseded, duplicated, or one-off planning documents.
 
@@ -54,6 +54,7 @@ docs/project/SCHOOLOS_PROJECT_STATUS.md
 docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
 docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
 docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
-docs/design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md
+docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
+docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
 docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md
 ```
