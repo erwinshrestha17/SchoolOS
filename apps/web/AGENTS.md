@@ -78,6 +78,57 @@ Protected files include receipts, cashier close PDFs, report cards, payslips, st
 - Do not calculate official financial values in the browser.
 - Idempotent backend behavior is required for retryable money or document-generation actions.
 
+## Web screen completion checklist
+
+Before marking a web screen complete, confirm:
+
+- The screen has one clear main job, title, purpose line, and primary action.
+- It uses real backend APIs through existing API/client helpers.
+- It has loading, empty, error, success, permission denied, and module locked states.
+- It handles validation and slow-network/retry states where relevant.
+- It uses school-friendly copy, not raw API or technical errors.
+- Growing data uses server-side pagination/filtering/search.
+- Permission and entitlement checks are represented in UX but enforced by backend.
+- High-risk actions use confirmation and reason where required.
+- Official totals come from backend data.
+- Protected files use shared protected file helpers.
+- The screen works for direct URL access and forbidden/locked access.
+- Relevant browser smoke or focused regression is added/updated where appropriate.
+
+## API/query usage checklist
+
+When connecting a workspace to APIs:
+
+- Confirm endpoint shape from OpenAPI/shared contracts or existing client code.
+- Normalize response shape once in the API helper, not separately in many components.
+- Keep list filters, page, page size, sort, and search in URL/query state where useful.
+- Avoid loading large unbounded data sets into the browser.
+- Keep optimistic updates limited to low-risk UI improvements; backend remains truth.
+- Show queued/export/report job status instead of blocking the page.
+- Handle 401/session expiry, 403/permission, 404/unavailable, 409/conflict, and validation errors with safe messages.
+
+## Protected file checklist
+
+For every private file action:
+
+- Use `ProtectedFileButton`, `ProtectedFileLink`, or shared authenticated blob/download helper.
+- Show pending state while opening/downloading.
+- Show unavailable, denied, expired, and retry states.
+- Do not expose storage internals in UI state, logs, routes, or query params.
+- Do not use raw browser open for private file URLs.
+
+## Mutation checklist
+
+For create/update/delete/status actions:
+
+- Disable repeated submit while pending.
+- Show success and failure state.
+- Preserve form values after recoverable errors.
+- Ask for confirmation before destructive or high-risk actions.
+- Ask for reason where backend/audit policy requires it.
+- Refresh or invalidate the correct query after success.
+- Do not silently mutate confirmed finance/accounting/payroll records outside approved workflows.
+
 ## Web implementation order
 
 Follow the active web design plan order:
@@ -94,6 +145,14 @@ Follow the active web design plan order:
 Persona smoke should prove login, correct dashboard, role navigation, forbidden direct route handling, tenant-scoped allowed records, denied unallowed records, permitted actions with states, protected file access, and safe logout/session expiry.
 
 Priority personas include platform operator, principal, school admin, admission officer, teachers, accountant/cashier, HR/payroll, librarian, transport, driver, canteen, parent, student lab-only user, and staff self-service.
+
+## Verification matrix
+
+- Component-only UI change: web typecheck and focused browser/component check where available.
+- API-connected screen: web typecheck, affected browser smoke/e2e where practical.
+- Protected file change: helper usage check plus affected file-open/download flow.
+- Finance/accounting/payroll screen: verify backend totals are used and run focused regression where available.
+- Route/navigation/permission change: browser smoke for direct route, forbidden route, and module-locked state.
 
 ## Verification
 
