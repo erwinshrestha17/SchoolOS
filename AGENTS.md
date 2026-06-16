@@ -54,6 +54,16 @@ Learning: school-controlled, teacher-led, lab/session or controlled-device stude
 
 If any web/mobile/platform surface needs data and no safe backend API exists, make a proper decision instead of faking it. First inspect existing code, OpenAPI/contracts, permissions, DTOs, and tests. If the need is real, repeatable, module-owned, tenant-scopable, RBAC/entitlement-gatable, and useful for a production workflow, implement a module-owned purpose-limited backend API and connect the surface. If not, keep a friendly unavailable/locked/permission state and mark the gap clearly. Never derive official totals from list APIs or browser/mobile calculations.
 
+## Compact implementation guardrails
+
+- Contract first: confirm backend/OpenAPI/`packages/core` shape before frontend/mobile integration; update the contract first if missing; never guess response shape.
+- Summary ownership: dashboard summaries are module-owned first; main dashboard may compose module summaries but must not duplicate module business logic.
+- Placeholder removal: developer-facing `Needs backend API` copy is internal only; pilot-facing UI keeps friendly unavailable/error/locked/permission states.
+- Seed and smoke: any new visible workflow/card/screen needs supporting seed data and focused browser/mobile smoke where practical, or a clear pending note.
+- Query performance: new list/summary APIs use aggregate/select queries, pagination where needed, no unbounded `findMany`, and tenant-scoped index review for common filters.
+- Error shape: backend returns safe bounded error envelopes; web/mobile parse shared errors and never show raw technical/provider/storage/Prisma messages.
+- Stop on unknowns: do not guess contracts, permissions, DTOs, idempotency, file access, or offline behavior; mark the exact `needs ... confirmation` item.
+
 ## Before coding
 
 1. Read focused docs and existing code first.
