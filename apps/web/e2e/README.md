@@ -4,7 +4,7 @@ Browser smoke coverage verifies public routes, authenticated school-admin naviga
 
 The Playwright config is available at `apps/web/playwright.config.ts`.
 
-The active persona matrix lives in `docs/design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md`.
+The active web persona matrix lives in `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`. Mobile-specific persona expectations live in `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`.
 
 ## Local authenticated smoke
 
