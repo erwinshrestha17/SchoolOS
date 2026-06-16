@@ -20,6 +20,10 @@ Before API work, read relevant parts of root `AGENTS.md`, project status/plan, F
 - Files go through FileRegistryService and StorageService only.
 - M12 Learning stays in the learning domain; M11 AI stays roadmap unless approved.
 
+## Missing API rule
+
+When web/mobile/platform needs data that has no safe API, first search existing controllers, services, DTOs, OpenAPI/shared contracts, permissions, and tests. If the need is real, repeatable, production-useful, module-owned, tenant-scopable, and RBAC/entitlement-gatable, create a module-owned purpose-limited endpoint. Do not create broad cross-module shortcuts unless they only compose existing module summaries. Do not use list endpoints as official totals.
+
 ## Implementation checklist
 
 Before adding/changing an endpoint:
