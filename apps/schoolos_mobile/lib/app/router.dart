@@ -190,6 +190,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const TeacherAttendanceScreen(),
       ),
       GoRoute(
+        path: '${AppRoutes.teacherAttendance}/:classSectionId',
+        builder: (context, state) => TeacherAttendanceScreen(
+          classSectionId: state.pathParameters['classSectionId'],
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.driverHome,
         builder: (context, state) => const DriverDashboard(),
       ),
@@ -318,7 +324,8 @@ bool _isDriverRoute(String location) {
 bool _isTeacherRoute(String location) {
   return location == AppRoutes.teacherHome ||
       location == AppRoutes.teacherClasses ||
-      location == AppRoutes.teacherAttendance;
+      location == AppRoutes.teacherAttendance ||
+      location.startsWith('${AppRoutes.teacherAttendance}/');
 }
 
 bool _isParentRoute(String location) {

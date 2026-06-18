@@ -16,6 +16,7 @@ import {
   EnrollmentStatus,
   NotificationChannel,
   Prisma,
+  TimetableVersionStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -94,32 +95,40 @@ export class AttendanceService {
       return { items: [] };
     }
 
-    const [assignments, classTeacherSections, currentAcademicYear] =
-      await Promise.all([
-        this.prisma.subjectTeacherAssignment.findMany({
-          where: { tenantId: actor.tenantId, staffId: staff.id },
-          include: {
-            academicYear: { select: { id: true, name: true } },
-            class: { select: { id: true, name: true } },
-            section: { select: { id: true, name: true } },
-            subject: { select: { name: true } },
-          },
-          orderBy: [{ class: { level: 'asc' } }, { createdAt: 'asc' }],
-          take: 100,
-        }),
-        this.prisma.section.findMany({
-          where: { tenantId: actor.tenantId, classTeacherId: staff.id },
-          include: {
-            class: { select: { id: true, name: true, level: true } },
-          },
-          orderBy: [{ class: { level: 'asc' } }, { name: 'asc' }],
-          take: 100,
-        }),
-        this.prisma.academicYear.findFirst({
-          where: { tenantId: actor.tenantId, isCurrent: true },
-          select: { id: true, name: true },
-        }),
-      ]);
+    const currentAcademicYear = await this.prisma.academicYear.findFirst({
+      where: { tenantId: actor.tenantId, isCurrent: true },
+      select: { id: true, name: true },
+    });
+
+    if (!currentAcademicYear) {
+      return { items: [] };
+    }
+
+    const [assignments, classTeacherSections] = await Promise.all([
+      this.prisma.subjectTeacherAssignment.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: staff.id,
+          academicYearId: currentAcademicYear.id,
+        },
+        include: {
+          academicYear: { select: { id: true, name: true } },
+          class: { select: { id: true, name: true } },
+          section: { select: { id: true, name: true } },
+          subject: { select: { name: true } },
+        },
+        orderBy: [{ class: { level: 'asc' } }, { createdAt: 'asc' }],
+        take: 100,
+      }),
+      this.prisma.section.findMany({
+        where: { tenantId: actor.tenantId, classTeacherId: staff.id },
+        include: {
+          class: { select: { id: true, name: true, level: true } },
+        },
+        orderBy: [{ class: { level: 'asc' } }, { name: 'asc' }],
+        take: 100,
+      }),
+    ]);
 
     const items = new Map<
       string,
@@ -175,19 +184,17 @@ export class AttendanceService {
       });
     });
 
-    if (currentAcademicYear) {
-      classTeacherSections.forEach((section) => {
-        addItem({
-          academicYearId: currentAcademicYear.id,
-          academicYearName: currentAcademicYear.name,
-          classId: section.classId,
-          className: section.class.name,
-          sectionId: section.id,
-          sectionName: section.name,
-          subjectName: 'Class teacher',
-        });
+    classTeacherSections.forEach((section) => {
+      addItem({
+        academicYearId: currentAcademicYear.id,
+        academicYearName: currentAcademicYear.name,
+        classId: section.classId,
+        className: section.class.name,
+        sectionId: section.id,
+        sectionName: section.name,
+        subjectName: 'Class teacher',
       });
-    }
+    });
 
     return {
       items: Array.from(items.values())
@@ -196,6 +203,133 @@ export class AttendanceService {
           subject: Array.from(subjectNames).join(', '),
         }))
         .sort((a, b) => a.name.localeCompare(b.name)),
+    };
+  }
+
+  async getTeacherMobileToday(actor: AuthContext, dateInput?: string) {
+    const date = stripTime(dateInput ? new Date(dateInput) : new Date());
+    const classesResult = await this.listTeacherMobileClassSections(actor);
+    const staff = await this.prisma.staff.findFirst({
+      where: { userId: actor.userId, tenantId: actor.tenantId },
+      select: { id: true },
+    });
+
+    if (!staff || classesResult.items.length === 0) {
+      return {
+        date: date.toISOString(),
+        periods: [],
+        classes: [],
+        pendingAttendanceCount: 0,
+      };
+    }
+
+    const classScopes = classesResult.items.map((item) => ({
+      classId: item.classId,
+      sectionId: item.sectionId,
+    }));
+    const [sessions, periods] = await Promise.all([
+      this.prisma.attendanceSession.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          attendanceDate: date,
+          OR: classScopes,
+        },
+        select: {
+          classId: true,
+          sectionId: true,
+          submittedAt: true,
+          lockAt: true,
+          conflictStatus: true,
+        },
+        take: 100,
+      }),
+      this.prisma.timetableSlot.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: staff.id,
+          academicYearId: classesResult.items[0].academicYearId,
+          dayOfWeek: toIsoWeekday(date),
+          OR: [
+            { versionId: null },
+            {
+              version: {
+                status: {
+                  in: [
+                    TimetableVersionStatus.PUBLISHED,
+                    TimetableVersionStatus.LOCKED,
+                  ],
+                },
+              },
+            },
+          ],
+        },
+        select: {
+          id: true,
+          academicYearId: true,
+          classId: true,
+          sectionId: true,
+          startsAt: true,
+          endsAt: true,
+          class: { select: { name: true } },
+          section: { select: { name: true } },
+          subject: { select: { name: true } },
+        },
+        orderBy: [{ startsAt: 'asc' }],
+        take: 30,
+      }),
+    ]);
+
+    const sessionByScope = new Map(
+      sessions.map((session) => [
+        `${session.classId}:${session.sectionId ?? 'none'}`,
+        session,
+      ]),
+    );
+    const now = new Date();
+    const classes = classesResult.items.map((item) => {
+      const session = sessionByScope.get(
+        `${item.classId}:${item.sectionId ?? 'none'}`,
+      );
+      return {
+        ...item,
+        attendance: {
+          submittedAt: session?.submittedAt ?? null,
+          lockAt: session?.lockAt ?? null,
+          isSubmitted: Boolean(session?.submittedAt),
+          isLocked: Boolean(session && session.lockAt <= now),
+          conflictStatus: session?.conflictStatus ?? 'NONE',
+        },
+      };
+    });
+
+    return {
+      date: date.toISOString(),
+      periods: periods.map((period) => ({
+        id: period.id,
+        academicYearId: period.academicYearId,
+        classId: period.classId,
+        sectionId: period.sectionId,
+        className: period.section?.name
+          ? `${period.class.name} - ${period.section.name}`
+          : period.class.name,
+        subjectName: period.subject.name,
+        startsAt: period.startsAt,
+        endsAt: period.endsAt,
+      })),
+      classes,
+      pendingAttendanceCount: classes.filter((item) => {
+        const isClassTeacher = item.subject.includes('Class teacher');
+        const isScheduledToday = periods.some(
+          (period) =>
+            period.classId === item.classId &&
+            period.sectionId === item.sectionId,
+        );
+        return (
+          (isClassTeacher || isScheduledToday) &&
+          !item.attendance.isSubmitted &&
+          !item.attendance.isLocked
+        );
+      }).length,
     };
   }
 
@@ -2631,7 +2765,6 @@ export class AttendanceService {
         },
       }),
     ]);
-
     const existingRecordByStudent = new Map(
       existingSession?.records.map((record) => [record.studentId, record]) ??
         [],
@@ -2643,6 +2776,16 @@ export class AttendanceService {
       section,
       attendanceDate: parsedAttendanceDate,
       calendarDay,
+      attendanceState: {
+        submittedAt: existingSession?.submittedAt ?? null,
+        lockAt: existingSession?.lockAt ?? null,
+        isSubmitted: Boolean(existingSession?.submittedAt),
+        isLocked: Boolean(
+          existingSession && existingSession.lockAt <= new Date(),
+        ),
+        conflictStatus:
+          existingSession?.conflictStatus ?? AttendanceConflictStatus.NONE,
+      },
       existingSession: existingSession
         ? {
             id: existingSession.id,
@@ -4420,6 +4563,11 @@ export class AttendanceService {
       ]),
     );
   }
+}
+
+function toIsoWeekday(date: Date) {
+  const day = date.getDay();
+  return day === 0 ? 7 : day;
 }
 
 function summarizeAttendance(records: Array<{ status: AttendanceStatus }>) {

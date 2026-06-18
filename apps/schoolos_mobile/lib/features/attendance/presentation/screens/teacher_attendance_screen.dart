@@ -6,7 +6,8 @@ import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_empty_state.dart';
+import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/section_header.dart';
@@ -16,11 +17,32 @@ import '../../domain/attendance_models.dart';
 import '../widgets/attendance_status_helpers.dart';
 import '../widgets/attendance_status_segment.dart';
 
-class TeacherAttendanceScreen extends ConsumerWidget {
-  const TeacherAttendanceScreen({super.key});
+class TeacherAttendanceScreen extends ConsumerStatefulWidget {
+  const TeacherAttendanceScreen({super.key, this.classSectionId});
+
+  final String? classSectionId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TeacherAttendanceScreen> createState() =>
+      _TeacherAttendanceScreenState();
+}
+
+class _TeacherAttendanceScreenState
+    extends ConsumerState<TeacherAttendanceScreen> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.classSectionId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref
+            .read(teacherAttendanceControllerProvider.notifier)
+            .load(requestedClassSectionId: widget.classSectionId);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(teacherAttendanceControllerProvider);
     final controller = ref.read(teacherAttendanceControllerProvider.notifier);
 
@@ -39,13 +61,15 @@ class TeacherAttendanceScreen extends ConsumerWidget {
                 ],
               ),
             )
+          : state.error != null
+          ? AppExceptionView(error: state.error!, onRetry: controller.load)
           : state.entries.isEmpty
-          ? AppErrorView(
-              title: 'No attendance sheet',
-              message:
-                  state.message ??
-                  'No students are assigned for this class today.',
-              onRetry: controller.load,
+          ? AppEmptyState(
+              title: 'No students in this roster',
+              message: 'No active students are assigned to this class today.',
+              icon: Icons.group_off_rounded,
+              actionLabel: 'Retry',
+              onActionPressed: controller.load,
             )
           : ListView(
               padding: const EdgeInsets.fromLTRB(
@@ -56,9 +80,11 @@ class TeacherAttendanceScreen extends ConsumerWidget {
               ),
               children: [
                 _TeacherAttendanceHeader(state: state, controller: controller),
+                const SizedBox(height: AppSpacing.md),
+                _AttendanceSummary(state: state),
                 if (state.message != null) ...[
                   const SizedBox(height: AppSpacing.md),
-                  _SyncBanner(state: state),
+                  _SyncBanner(state: state, controller: controller),
                 ],
                 const SizedBox(height: AppSpacing.xl),
                 const SectionHeader(title: 'Students'),
@@ -66,6 +92,7 @@ class TeacherAttendanceScreen extends ConsumerWidget {
                 for (final entry in state.entries) ...[
                   _AttendanceStudentRow(
                     entry: entry,
+                    isReadOnly: state.isReadOnly || state.isSubmitting,
                     onChanged: (status) =>
                         controller.markStudent(entry.studentId, status),
                   ),
@@ -73,21 +100,60 @@ class TeacherAttendanceScreen extends ConsumerWidget {
                 ],
               ],
             ),
-      floatingActionButton: state.hasUnsavedChanges
+      floatingActionButton: state.hasUnsavedChanges && !state.isReadOnly
           ? Padding(
               padding: const EdgeInsets.only(left: AppSpacing.xl),
               child: AppButton(
-                label: state.isOffline
-                    ? 'Save offline draft'
+                label: state.isSubmitting
+                    ? 'Syncing attendance'
+                    : state.isOffline
+                    ? 'Queue draft'
+                    : state.syncStatus == AttendanceSyncStatus.failed
+                    ? 'Retry sync'
+                    : state.syncStatus == AttendanceSyncStatus.queued
+                    ? 'Retry sync'
                     : 'Submit attendance',
                 icon: state.isOffline
                     ? Icons.save_rounded
                     : Icons.cloud_done_rounded,
-                onPressed: controller.submit,
+                onPressed: state.isSubmitting
+                    ? null
+                    : () => _confirmSubmit(context, controller, state),
               ),
             )
           : null,
     );
+  }
+
+  Future<void> _confirmSubmit(
+    BuildContext context,
+    TeacherAttendanceController controller,
+    TeacherAttendanceState state,
+  ) async {
+    if (state.isOffline) {
+      await controller.submit();
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Submit attendance?'),
+        content: Text(
+          'Submit ${state.entries.length} student record(s) for ${state.selectedClass?.name ?? 'this class'}? This register becomes read-only after submission.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Review'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await controller.submit();
   }
 }
 
@@ -143,7 +209,7 @@ class _TeacherAttendanceHeader extends StatelessWidget {
                     context: context,
                     initialDate: state.date ?? DateTime.now(),
                     firstDate: DateTime(2024),
-                    lastDate: DateTime.now().add(const Duration(days: 1)),
+                    lastDate: DateTime.now(),
                   );
                   if (picked != null) {
                     await controller.selectDate(picked);
@@ -169,7 +235,7 @@ class _TeacherAttendanceHeader extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.md),
               OutlinedButton.icon(
-                onPressed: controller.bulkMarkPresent,
+                onPressed: state.isReadOnly ? null : controller.bulkMarkPresent,
                 icon: const Icon(Icons.done_all_rounded),
                 label: const Text('All present'),
               ),
@@ -182,16 +248,20 @@ class _TeacherAttendanceHeader extends StatelessWidget {
 }
 
 class _SyncBanner extends StatelessWidget {
-  const _SyncBanner({required this.state});
+  const _SyncBanner({required this.state, required this.controller});
 
   final TeacherAttendanceState state;
+  final TeacherAttendanceController controller;
 
   @override
   Widget build(BuildContext context) {
     final status = switch (state.syncStatus) {
-      AttendanceSyncStatus.pending => AppStatusType.pending,
+      AttendanceSyncStatus.draft => AppStatusType.draft,
+      AttendanceSyncStatus.queued => AppStatusType.pending,
+      AttendanceSyncStatus.syncing => AppStatusType.pending,
       AttendanceSyncStatus.synced => AppStatusType.approved,
       AttendanceSyncStatus.failed => AppStatusType.rejected,
+      AttendanceSyncStatus.conflict => AppStatusType.rejected,
     };
 
     return AppCard(
@@ -203,7 +273,24 @@ class _SyncBanner extends StatelessWidget {
         children: [
           StatusChip(status: status),
           const SizedBox(width: AppSpacing.md),
-          Expanded(child: Text(state.message!)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(state.message!),
+                if (state.isOffline && state.lastUpdated != null)
+                  Text(
+                    'Last updated ${TimeOfDay.fromDateTime(state.lastUpdated!.toLocal()).format(context)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+              ],
+            ),
+          ),
+          if (state.draftClientSubmissionId != null && !state.isSubmitting)
+            TextButton(
+              onPressed: controller.discardDraft,
+              child: const Text('Discard'),
+            ),
         ],
       ),
     );
@@ -211,10 +298,15 @@ class _SyncBanner extends StatelessWidget {
 }
 
 class _AttendanceStudentRow extends StatelessWidget {
-  const _AttendanceStudentRow({required this.entry, required this.onChanged});
+  const _AttendanceStudentRow({
+    required this.entry,
+    required this.onChanged,
+    required this.isReadOnly,
+  });
 
   final AttendanceStudentEntry entry;
   final ValueChanged<AttendanceStatus> onChanged;
+  final bool isReadOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -252,7 +344,70 @@ class _AttendanceStudentRow extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          AttendanceStatusSegment(value: entry.status, onChanged: onChanged),
+          AbsorbPointer(
+            absorbing: isReadOnly,
+            child: Opacity(
+              opacity: isReadOnly ? 0.7 : 1,
+              child: AttendanceStatusSegment(
+                value: entry.status,
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttendanceSummary extends StatelessWidget {
+  const _AttendanceSummary({required this.state});
+
+  final TeacherAttendanceState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final counts = {
+      for (final status in const [
+        AttendanceStatus.present,
+        AttendanceStatus.absent,
+        AttendanceStatus.late,
+        AttendanceStatus.leave,
+      ])
+        status: state.entries.where((entry) => entry.status == status).length,
+    };
+    final label = state.attendance.hasConflict
+        ? 'Conflict review required'
+        : state.attendance.isLocked
+        ? 'Locked - read only'
+        : state.attendance.isSubmitted
+        ? 'Submitted - read only'
+        : '${state.changedCount} student(s) changed';
+
+    return AppCard(
+      hasShadow: false,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              for (final status in counts.keys)
+                StatusChip(
+                  status: switch (status) {
+                    AttendanceStatus.present => AppStatusType.present,
+                    AttendanceStatus.absent => AppStatusType.absent,
+                    AttendanceStatus.late => AppStatusType.late,
+                    AttendanceStatus.leave => AppStatusType.approved,
+                    _ => AppStatusType.draft,
+                  },
+                  label: '${status.label}: ${counts[status]}',
+                ),
+            ],
+          ),
         ],
       ),
     );

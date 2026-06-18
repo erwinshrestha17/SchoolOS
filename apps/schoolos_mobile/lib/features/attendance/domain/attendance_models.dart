@@ -1,6 +1,6 @@
 enum AttendanceStatus { present, absent, late, leave, festival, holiday }
 
-enum AttendanceSyncStatus { pending, synced, failed }
+enum AttendanceSyncStatus { draft, queued, syncing, synced, failed, conflict }
 
 class AttendanceSummary {
   const AttendanceSummary({
@@ -53,6 +53,7 @@ class TeacherClassSection {
     this.sectionId,
     required this.name,
     required this.subject,
+    this.attendance,
   });
 
   final String id;
@@ -61,6 +62,7 @@ class TeacherClassSection {
   final String? sectionId;
   final String name;
   final String subject;
+  final TeacherAttendanceMeta? attendance;
 
   factory TeacherClassSection.fromJson(Map<String, dynamic> json) {
     final academicYearId = json['academicYearId'] as String? ?? '';
@@ -75,8 +77,159 @@ class TeacherClassSection {
       sectionId: sectionId,
       name: json['name'] as String? ?? 'Class section',
       subject: json['subject'] as String? ?? 'Attendance',
+      attendance: json['attendance'] is Map<String, dynamic>
+          ? TeacherAttendanceMeta.fromJson(
+              json['attendance'] as Map<String, dynamic>,
+            )
+          : null,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'academicYearId': academicYearId,
+    'classId': classId,
+    'sectionId': sectionId,
+    'name': name,
+    'subject': subject,
+    if (attendance != null) 'attendance': attendance!.toJson(),
+  };
+}
+
+class TeacherAttendanceMeta {
+  const TeacherAttendanceMeta({
+    this.submittedAt,
+    this.lockAt,
+    required this.isSubmitted,
+    required this.isLocked,
+    required this.conflictStatus,
+  });
+
+  final DateTime? submittedAt;
+  final DateTime? lockAt;
+  final bool isSubmitted;
+  final bool isLocked;
+  final String conflictStatus;
+
+  bool get hasConflict => conflictStatus != 'NONE';
+
+  factory TeacherAttendanceMeta.fromJson(Map<String, dynamic> json) {
+    return TeacherAttendanceMeta(
+      submittedAt: DateTime.tryParse(json['submittedAt'] as String? ?? ''),
+      lockAt: DateTime.tryParse(json['lockAt'] as String? ?? ''),
+      isSubmitted: json['isSubmitted'] as bool? ?? false,
+      isLocked: json['isLocked'] as bool? ?? false,
+      conflictStatus: json['conflictStatus'] as String? ?? 'NONE',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'submittedAt': submittedAt?.toIso8601String(),
+    'lockAt': lockAt?.toIso8601String(),
+    'isSubmitted': isSubmitted,
+    'isLocked': isLocked,
+    'conflictStatus': conflictStatus,
+  };
+}
+
+class TeacherRosterSnapshot {
+  const TeacherRosterSnapshot({
+    required this.entries,
+    required this.attendance,
+    required this.isWorkingDay,
+    this.fromCache = false,
+    required this.lastUpdated,
+  });
+
+  final List<AttendanceStudentEntry> entries;
+  final TeacherAttendanceMeta attendance;
+  final bool isWorkingDay;
+  final bool fromCache;
+  final DateTime lastUpdated;
+}
+
+class TeacherAttendanceDraft {
+  const TeacherAttendanceDraft({
+    required this.clientSubmissionId,
+    required this.savedAt,
+    required this.entries,
+  });
+
+  final String clientSubmissionId;
+  final DateTime savedAt;
+  final List<AttendanceStudentEntry> entries;
+}
+
+class TeacherAttendanceSubmitResult {
+  const TeacherAttendanceSubmitResult({
+    required this.status,
+    required this.replayed,
+  });
+
+  final AttendanceSyncStatus status;
+  final bool replayed;
+}
+
+class TeacherTodayPeriod {
+  const TeacherTodayPeriod({
+    required this.id,
+    required this.classSectionId,
+    required this.className,
+    required this.subjectName,
+    required this.startsAt,
+    required this.endsAt,
+  });
+
+  final String id;
+  final String classSectionId;
+  final String className;
+  final String subjectName;
+  final String startsAt;
+  final String endsAt;
+
+  factory TeacherTodayPeriod.fromJson(Map<String, dynamic> json) {
+    final academicYearId = json['academicYearId'] as String? ?? '';
+    final classId = json['classId'] as String? ?? '';
+    final sectionId = json['sectionId'] as String?;
+    return TeacherTodayPeriod(
+      id: json['id'] as String? ?? '',
+      classSectionId: '$academicYearId:$classId:${sectionId ?? 'none'}',
+      className: json['className'] as String? ?? 'Assigned class',
+      subjectName: json['subjectName'] as String? ?? 'Class period',
+      startsAt: json['startsAt'] as String? ?? '',
+      endsAt: json['endsAt'] as String? ?? '',
+    );
+  }
+}
+
+class TeacherTodaySnapshot {
+  const TeacherTodaySnapshot({
+    required this.date,
+    required this.periods,
+    required this.classes,
+    required this.pendingAttendanceCount,
+    required this.lastUpdated,
+    this.fromCache = false,
+  });
+
+  final DateTime date;
+  final List<TeacherTodayPeriod> periods;
+  final List<TeacherClassSection> classes;
+  final int pendingAttendanceCount;
+  final DateTime lastUpdated;
+  final bool fromCache;
+}
+
+class TeacherClassesSnapshot {
+  const TeacherClassesSnapshot({
+    required this.classes,
+    required this.lastUpdated,
+    this.fromCache = false,
+  });
+
+  final List<TeacherClassSection> classes;
+  final DateTime lastUpdated;
+  final bool fromCache;
 }
 
 class AttendanceStudentEntry {
@@ -113,6 +266,24 @@ class AttendanceStudentEntry {
       status: status ?? this.status,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'studentId': studentId,
+    'studentName': studentName,
+    'rollNumber': rollNumber,
+    'status': _attendanceStatusToApi(status),
+  };
+}
+
+String _attendanceStatusToApi(AttendanceStatus status) {
+  return switch (status) {
+    AttendanceStatus.present => 'PRESENT',
+    AttendanceStatus.absent => 'ABSENT',
+    AttendanceStatus.late => 'LATE',
+    AttendanceStatus.leave => 'EXCUSED_LEAVE',
+    AttendanceStatus.festival => 'HOLIDAY',
+    AttendanceStatus.holiday => 'HOLIDAY',
+  };
 }
 
 AttendanceStatus attendanceStatusFromApi(String? status) {

@@ -8,6 +8,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
+import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_gradient_card.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/dashboard_card.dart';
@@ -30,6 +31,7 @@ class TeacherDashboard extends ConsumerWidget {
     final controller = ref.read(teacherAttendanceControllerProvider.notifier);
     final displayName = user?.name ?? 'Teacher';
     final email = user?.email ?? 'teacher@schoolos.com';
+    final currentOrNextPeriod = _currentOrNextPeriod(state.todayPeriods);
 
     return RoleShellScaffold(
       role: 'TEACHER',
@@ -47,7 +49,7 @@ class TeacherDashboard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Welcome, $displayName',
+                        'Today, $displayName',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.headlineSmall
@@ -55,7 +57,7 @@ class TeacherDashboard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Teacher Space - $email',
+                        'Daily classroom work - $email',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -71,6 +73,16 @@ class TeacherDashboard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.xl),
+            if (state.isOffline && state.lastUpdated != null) ...[
+              Text(
+                'Offline data • Last updated ${_lastUpdatedLabel(context, state.lastUpdated!)}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.warning,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
             AppGradientCard(
               gradient: const LinearGradient(
                 colors: AppColors.teacherGradient,
@@ -131,6 +143,8 @@ class TeacherDashboard extends ConsumerWidget {
             const SizedBox(height: AppSpacing.xl),
             if (state.isLoading)
               const _TeacherDashboardLoading()
+            else if (state.error != null)
+              AppExceptionView(error: state.error!, onRetry: controller.load)
             else ...[
               const SectionHeader(title: 'Assigned classes'),
               const SizedBox(height: AppSpacing.sm),
@@ -162,8 +176,8 @@ class TeacherDashboard extends ConsumerWidget {
               const SectionHeader(title: 'Classroom focus'),
               const SizedBox(height: AppSpacing.sm),
               DashboardCard(
-                title: 'Today attendance',
-                value: _attendanceProgress(state),
+                title: 'Attendance pending',
+                value: '${state.pendingAttendanceCount} class(es)',
                 icon: Icons.fact_check_rounded,
                 iconColor: _attendanceColor(state),
                 badge: StatusChip(
@@ -175,13 +189,15 @@ class TeacherDashboard extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               DashboardCard(
-                title: 'Roster loaded',
-                value: '${state.entries.length} students',
-                icon: Icons.groups_rounded,
+                title: 'Current / next period',
+                value: currentOrNextPeriod == null
+                    ? 'No period today'
+                    : currentOrNextPeriod.className,
+                icon: Icons.schedule_rounded,
                 iconColor: AppColors.teacherAccent,
-                subtitle: state.selectedClass == null
-                    ? 'Select an assigned class to load the roster.'
-                    : state.selectedClass!.name,
+                subtitle: currentOrNextPeriod == null
+                    ? 'Your published timetable has no assigned period today.'
+                    : '${currentOrNextPeriod.startsAt}-${currentOrNextPeriod.endsAt} • ${currentOrNextPeriod.subjectName}',
               ),
               const SizedBox(height: AppSpacing.md),
               DashboardCard(
@@ -221,10 +237,10 @@ class TeacherDashboard extends ConsumerWidget {
                     onTap: controller.load,
                   ),
                   QuickActionCard(
-                    title: 'Notices',
-                    icon: Icons.campaign_rounded,
+                    title: 'Classes',
+                    icon: Icons.school_rounded,
                     color: AppColors.info,
-                    onTap: () => context.go(AppRoutes.notices),
+                    onTap: () => context.go(AppRoutes.teacherClasses),
                   ),
                 ],
               ),
@@ -307,16 +323,6 @@ String _selectedClassLabel(TeacherAttendanceState state) {
   return '${selected.name} - ${selected.subject}';
 }
 
-String _attendanceProgress(TeacherAttendanceState state) {
-  if (state.entries.isEmpty) {
-    return 'No roster';
-  }
-  final present = state.entries
-      .where((entry) => entry.status == AttendanceStatus.present)
-      .length;
-  return '$present/${state.entries.length} present';
-}
-
 String _attendanceSubtitle(TeacherAttendanceState state) {
   if (state.entries.isEmpty) {
     return 'Open attendance after the roster is available.';
@@ -324,34 +330,42 @@ String _attendanceSubtitle(TeacherAttendanceState state) {
   if (state.hasUnsavedChanges) {
     return 'Review and submit pending attendance changes.';
   }
-  return 'Roster loaded from the purpose-limited mobile attendance API.';
+  if (state.attendance.isSubmitted) {
+    return 'Attendance was submitted and is now read-only.';
+  }
+  return 'Attendance has not been submitted for this class yet.';
 }
 
 String _attendanceStatusLabel(TeacherAttendanceState state) {
   if (state.hasUnsavedChanges) {
-    return 'Draft';
+    return state.syncStatus == AttendanceSyncStatus.queued ? 'Queued' : 'Draft';
   }
   if (state.syncStatus == AttendanceSyncStatus.failed) {
     return 'Failed';
   }
-  if (state.entries.isEmpty) {
-    return 'Pending';
+  if (state.attendance.hasConflict) {
+    return 'Conflict';
   }
-  return 'Synced';
+  if (state.attendance.isSubmitted) {
+    return 'Submitted';
+  }
+  return 'Pending';
 }
 
 AppStatusType _attendanceStatusType(TeacherAttendanceState state) {
-  if (state.hasUnsavedChanges || state.entries.isEmpty) {
-    return AppStatusType.pending;
-  }
-  if (state.syncStatus == AttendanceSyncStatus.failed) {
+  if (state.attendance.hasConflict ||
+      state.syncStatus == AttendanceSyncStatus.failed) {
     return AppStatusType.rejected;
+  }
+  if (state.hasUnsavedChanges || !state.attendance.isSubmitted) {
+    return AppStatusType.pending;
   }
   return AppStatusType.completed;
 }
 
 Color _attendanceColor(TeacherAttendanceState state) {
-  if (state.syncStatus == AttendanceSyncStatus.failed) {
+  if (state.syncStatus == AttendanceSyncStatus.failed ||
+      state.attendance.hasConflict) {
     return AppColors.danger;
   }
   if (state.hasUnsavedChanges || state.entries.isEmpty) {
@@ -362,11 +376,36 @@ Color _attendanceColor(TeacherAttendanceState state) {
 
 String _syncLabel(AttendanceSyncStatus status) {
   switch (status) {
-    case AttendanceSyncStatus.pending:
-      return 'Pending';
+    case AttendanceSyncStatus.draft:
+      return 'Draft';
+    case AttendanceSyncStatus.queued:
+      return 'Queued';
+    case AttendanceSyncStatus.syncing:
+      return 'Syncing';
     case AttendanceSyncStatus.synced:
       return 'Synced';
     case AttendanceSyncStatus.failed:
       return 'Failed';
+    case AttendanceSyncStatus.conflict:
+      return 'Conflict';
   }
+}
+
+String _lastUpdatedLabel(BuildContext context, DateTime value) {
+  return TimeOfDay.fromDateTime(value.toLocal()).format(context);
+}
+
+TeacherTodayPeriod? _currentOrNextPeriod(List<TeacherTodayPeriod> periods) {
+  if (periods.isEmpty) return null;
+  final now = TimeOfDay.now();
+  final nowMinutes = now.hour * 60 + now.minute;
+  for (final period in periods) {
+    final parts = period.endsAt.split(':');
+    if (parts.length < 2) continue;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) continue;
+    if (hour * 60 + minute >= nowMinutes) return period;
+  }
+  return null;
 }

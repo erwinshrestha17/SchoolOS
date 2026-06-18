@@ -180,12 +180,73 @@ describe('attendance production hardening', () => {
 
     expect(prisma.subjectTeacherAssignment.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { tenantId: teacherActor.tenantId, staffId: 'staff-1' },
+        where: {
+          tenantId: teacherActor.tenantId,
+          staffId: 'staff-1',
+          academicYearId: 'ay-current',
+        },
       }),
     );
     expect(prisma.section.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { tenantId: teacherActor.tenantId, classTeacherId: 'staff-1' },
+      }),
+    );
+  });
+
+  it('builds a tenant and teacher scoped today board from current assignments', async () => {
+    const today = new Date();
+    const dateInput = `${String(today.getFullYear())}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const expectedIsoWeekday = today.getDay() === 0 ? 7 : today.getDay();
+    const { service, prisma } = buildService({
+      staffFindFirst: { id: 'staff-1' },
+      academicYear: { id: 'ay-current', name: '2082' },
+      teacherAssignments: [
+        {
+          id: 'assign-1',
+          academicYearId: 'ay-current',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          academicYear: { id: 'ay-current', name: '2082' },
+          class: { id: 'class-1', name: 'Grade 3' },
+          section: { id: 'section-1', name: 'A' },
+          subject: { name: 'Math' },
+        },
+      ],
+      attendanceSessions: [],
+      timetableSlots: [
+        {
+          id: 'slot-1',
+          academicYearId: 'ay-current',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          startsAt: '09:00',
+          endsAt: '09:45',
+          class: { name: 'Grade 3' },
+          section: { name: 'A' },
+          subject: { name: 'Math' },
+        },
+      ],
+    });
+
+    const result = await service.getTeacherMobileToday(teacherActor, dateInput);
+
+    expect(result.pendingAttendanceCount).toBe(1);
+    expect(result.periods).toEqual([
+      expect.objectContaining({
+        id: 'slot-1',
+        className: 'Grade 3 - A',
+        subjectName: 'Math',
+      }),
+    ]);
+    expect(prisma.timetableSlot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: teacherActor.tenantId,
+          staffId: 'staff-1',
+          academicYearId: 'ay-current',
+          dayOfWeek: expectedIsoWeekday,
+        }),
       }),
     );
   });
@@ -1339,6 +1400,7 @@ function buildService(options: {
   staffFindFirst?: unknown;
   teacherAssignments?: unknown[];
   classTeacherSections?: unknown[];
+  timetableSlots?: unknown[];
   guardianFindFirst?: unknown;
   m2Policy?: unknown;
 }) {
@@ -1487,6 +1549,9 @@ function buildService(options: {
     subjectTeacherAssignment: {
       findFirst: jest.fn().mockResolvedValue({ id: 'assign-1' }),
       findMany: jest.fn().mockResolvedValue(options.teacherAssignments ?? []),
+    },
+    timetableSlot: {
+      findMany: jest.fn().mockResolvedValue(options.timetableSlots ?? []),
     },
     $transaction: jest.fn().mockImplementation(async (input: unknown) => {
       if (Array.isArray(input)) {

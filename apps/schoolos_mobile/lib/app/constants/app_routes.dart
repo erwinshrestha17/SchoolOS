@@ -44,4 +44,6 @@ class AppRoutes {
 
   static String parentChildDetail(String id) => '/parent/child/$id';
   static String noticeDetail(String id) => '/notices/$id';
+  static String teacherAttendanceFor(String classSectionId) =>
+      '/teacher/attendance/${Uri.encodeComponent(classSectionId)}';
 }

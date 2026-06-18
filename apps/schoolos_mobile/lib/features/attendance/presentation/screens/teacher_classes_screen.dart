@@ -8,6 +8,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/section_header.dart';
@@ -31,6 +32,8 @@ class TeacherClassesScreen extends ConsumerWidget {
         onRefresh: controller.load,
         child: state.isLoading
             ? const _TeacherClassesLoading()
+            : state.error != null
+            ? AppExceptionView(error: state.error!, onRetry: controller.load)
             : state.syncStatus == AttendanceSyncStatus.failed &&
                   state.classes.isEmpty
             ? AppErrorView(
@@ -45,6 +48,16 @@ class TeacherClassesScreen extends ConsumerWidget {
                 children: [
                   const SectionHeader(title: 'Assigned classes'),
                   const SizedBox(height: AppSpacing.sm),
+                  if (state.isOffline && state.lastUpdated != null) ...[
+                    Text(
+                      'Offline data • Last updated ${TimeOfDay.fromDateTime(state.lastUpdated!.toLocal()).format(context)}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.warning,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
                   if (state.classes.isEmpty)
                     AppEmptyState(
                       title: 'No assigned class',
@@ -67,7 +80,11 @@ class TeacherClassesScreen extends ConsumerWidget {
                               onSelect: () async {
                                 await controller.selectClass(classSection.id);
                                 if (context.mounted) {
-                                  context.go(AppRoutes.teacherAttendance);
+                                  context.go(
+                                    AppRoutes.teacherAttendanceFor(
+                                      classSection.id,
+                                    ),
+                                  );
                                 }
                               },
                             ),

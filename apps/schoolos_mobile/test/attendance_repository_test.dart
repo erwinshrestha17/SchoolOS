@@ -88,13 +88,69 @@ void main() {
           ),
         );
 
-        final classes = await repository.getTeacherAssignedClasses();
+        final snapshot = await repository.getTeacherAssignedClasses();
+        final classes = snapshot.classes;
 
         expect(classes.single.id, 'year-1:class-1:section-1');
         expect(classes.single.academicYearId, 'year-1');
         expect(classes.single.classId, 'class-1');
         expect(classes.single.sectionId, 'section-1');
         expect(classes.single.subject, contains('Mathematics'));
+      },
+    );
+
+    test(
+      'loads the teacher today board from the mobile-safe endpoint',
+      () async {
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/today',
+            queryParameters: {'date': '2026-06-18'},
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/today',
+            ),
+            data: {
+              'date': '2026-06-18T00:00:00.000Z',
+              'pendingAttendanceCount': 1,
+              'periods': [
+                {
+                  'id': 'slot-1',
+                  'academicYearId': 'year-1',
+                  'classId': 'class-1',
+                  'sectionId': 'section-1',
+                  'className': 'Grade 3 - A',
+                  'subjectName': 'Mathematics',
+                  'startsAt': '09:00',
+                  'endsAt': '09:45',
+                },
+              ],
+              'classes': [
+                {
+                  'id': 'year-1:class-1:section-1',
+                  'academicYearId': 'year-1',
+                  'classId': 'class-1',
+                  'sectionId': 'section-1',
+                  'name': 'Grade 3 - A',
+                  'subject': 'Mathematics',
+                  'attendance': {
+                    'isSubmitted': false,
+                    'isLocked': false,
+                    'conflictStatus': 'NONE',
+                  },
+                },
+              ],
+            },
+          ),
+        );
+
+        final today = await repository.getTeacherToday(DateTime(2026, 6, 18));
+
+        expect(today.pendingAttendanceCount, 1);
+        expect(today.periods.single.subjectName, 'Mathematics');
+        expect(today.classes.single.attendance?.isSubmitted, isFalse);
       },
     );
 
@@ -143,13 +199,13 @@ void main() {
       );
       when(
         () => apiClient.post<dynamic>(
-          '/mobile/teacher/attendance/submit',
+          '/mobile/teacher/attendance/sync',
           data: any(named: 'data'),
         ),
       ).thenAnswer(
         (_) async => Response(
           requestOptions: RequestOptions(
-            path: '/mobile/teacher/attendance/submit',
+            path: '/mobile/teacher/attendance/sync',
           ),
           data: {'sessionId': 'session-1'},
         ),
@@ -159,20 +215,22 @@ void main() {
         classSection,
         DateTime(2026, 6, 2),
       );
-      final submitStatus = await repository.submitAttendance(
+      final submitResult = await repository.submitAttendance(
         classSection,
         DateTime(2026, 6, 2),
-        roster,
+        roster.entries,
+        'mobile-submit-1',
+        DateTime.utc(2026, 6, 2, 8),
       );
 
-      expect(roster, hasLength(2));
-      expect(roster.first.rollNumber, '7');
-      expect(roster.last.status, AttendanceStatus.absent);
-      expect(submitStatus, AttendanceSyncStatus.synced);
+      expect(roster.entries, hasLength(2));
+      expect(roster.entries.first.rollNumber, '7');
+      expect(roster.entries.last.status, AttendanceStatus.absent);
+      expect(submitResult.status, AttendanceSyncStatus.synced);
       final payload =
           verify(
                 () => apiClient.post<dynamic>(
-                  '/mobile/teacher/attendance/submit',
+                  '/mobile/teacher/attendance/sync',
                   data: captureAny(named: 'data'),
                 ),
               ).captured.single
@@ -181,6 +239,8 @@ void main() {
       expect(payload['classId'], 'class-1');
       expect(payload['sectionId'], 'section-1');
       expect(payload['attendanceDate'], '2026-06-02');
+      expect(payload['clientSubmissionId'], 'mobile-submit-1');
+      expect(payload['deviceTimestamp'], '2026-06-02T08:00:00.000Z');
       expect(payload['exceptions'], [
         {'studentId': 'student-2', 'status': 'ABSENT'},
       ]);
@@ -214,13 +274,13 @@ void main() {
         ];
         when(
           () => apiClient.post<dynamic>(
-            '/mobile/teacher/attendance/submit',
+            '/mobile/teacher/attendance/sync',
             data: any(named: 'data'),
           ),
         ).thenAnswer(
           (_) async => Response(
             requestOptions: RequestOptions(
-              path: '/mobile/teacher/attendance/submit',
+              path: '/mobile/teacher/attendance/sync',
             ),
             data: {'sessionId': 'session-1'},
           ),
@@ -236,17 +296,24 @@ void main() {
           date,
         );
 
-        expect(loadedDraft, hasLength(2));
-        expect(loadedDraft.last.studentId, 'student-2');
-        expect(loadedDraft.last.status, AttendanceStatus.late);
+        expect(loadedDraft, isNotNull);
+        expect(loadedDraft!.entries, hasLength(2));
+        expect(loadedDraft.entries.last.studentId, 'student-2');
+        expect(loadedDraft.entries.last.status, AttendanceStatus.late);
 
-        await repository.submitAttendance(classSection, date, loadedDraft);
+        await repository.submitAttendance(
+          classSection,
+          date,
+          loadedDraft.entries,
+          loadedDraft.clientSubmissionId,
+          loadedDraft.savedAt,
+        );
         final clearedDraft = await repository.loadDraftAttendance(
           classSection.id,
           date,
         );
 
-        expect(clearedDraft, isEmpty);
+        expect(clearedDraft, isNull);
       },
     );
   });
