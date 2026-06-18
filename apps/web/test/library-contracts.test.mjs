@@ -88,6 +88,14 @@ describe('Phase 3B Library frontend contracts', () => {
 
   it('builds Library UI sections with real API calls and production states', () => {
     const workspace = read('components/library/library-workspace.tsx');
+    const page = read('app/dashboard/library/page.tsx');
+
+    assert.match(page, /<ModuleHeader/);
+    assert.match(page, /primaryAction=/);
+    assert.match(page, /moreActionItems=/);
+    assert.match(page, /Issue \/ Return/);
+    assert.match(page, /\/dashboard\/library\/catalog/);
+    assert.match(page, /\/dashboard\/library\/copies/);
 
     for (const section of [
       'Total books',
@@ -109,6 +117,21 @@ describe('Phase 3B Library frontend contracts', () => {
       assert.match(workspace, new RegExp(section.replace('/', '\\/')));
     }
 
+    assert.match(workspace, /<KpiGrid/);
+    assert.match(workspace, /value=\{stats\.availableCopies\}/);
+    assert.match(workspace, /availableCopies: 'Unavailable' as const/);
+    assert.match(workspace, /issuedCopies: 'Unavailable' as const/);
+    assert.match(workspace, /lostDamaged: 'Unavailable' as const/);
+    assert.match(workspace, /Needs copy-status summary/);
+    assert.match(workspace, /Remaining Issues/);
+    assert.match(workspace, /listPageSize/);
+    assert.match(workspace, /page: String\(bookPage\)/);
+    assert.match(workspace, /page: String\(copyPage\)/);
+    assert.match(workspace, /page: String\(issuePage\)/);
+    assert.match(workspace, /page: String\(overduePage\)/);
+    assert.match(workspace, /page: String\(finePage\)/);
+    assert.match(workspace, /PaginationControls/);
+
     for (const apiCall of [
       'libraryApi.listBooks',
       'libraryApi.createBook',
@@ -127,6 +150,7 @@ describe('Phase 3B Library frontend contracts', () => {
       'libraryApi.downloadIssuedBooksCsv',
       'libraryApi.sendOverdueReminders',
       'libraryApi.postFineToFees',
+      'libraryApi.resolveScannedCopy',
     ]) {
       assert.match(workspace, new RegExp(apiCall.replace('.', '\\.')));
     }
@@ -182,8 +206,15 @@ describe('Phase 3B Library frontend contracts', () => {
       'onSubmit={props.onIssueSubmit}',
       'copies={availableCopies}',
     ]) {
-      assert.match(workspace, new RegExp(marker.replaceAll('/', '\\/')));
+      if (marker === 'copyMatchesScan') {
+        assert.doesNotMatch(workspace, /copyMatchesScan/);
+      } else {
+        assert.match(workspace, new RegExp(marker.replaceAll('/', '\\/')));
+      }
     }
+    assert.match(workspace, /onResolveCopyScan/);
+    assert.match(workspace, /resolveCopyScanMutation/);
+    assert.match(workspace, /Checking\.\.\./);
 
     assert.doesNotMatch(
       workspace,

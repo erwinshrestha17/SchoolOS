@@ -1,10 +1,18 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import {
+  BookOpen,
+  Copy,
+  FileText,
+  Library,
+  RotateCcw,
+} from 'lucide-react';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
 import { ModuleTabs } from '../../../components/dashboard/module-tabs';
 import { LibraryWorkspace } from '../../../components/library/library-workspace';
-import { PageHeader } from '../../../components/ui/page-header';
+import { ModuleHeader } from '../../../components/ui/module-header';
 
 const libraryTabs = [
   { label: 'Overview', href: '/dashboard/library' },
@@ -18,33 +26,48 @@ const libraryTabs = [
 ];
 
 export default function LibraryPage() {
-  const headerActions = (
-    <div className="flex flex-wrap gap-2">
-      <Link
-        href="/dashboard/library/issue-return"
-        className="inline-flex h-10 items-center justify-center rounded-xl bg-teal-700 px-4 text-sm font-bold text-white hover:bg-teal-800"
-      >
-        Issue / Return
-      </Link>
-      <Link
-        href="/dashboard/library/catalog"
-        className="inline-flex h-10 items-center justify-center rounded-xl border border-teal-100 bg-white px-4 text-sm font-bold text-teal-700 hover:bg-teal-50"
-      >
-        Catalog
-      </Link>
-    </div>
-  );
+  const router = useRouter();
 
   return (
     <DashboardPageShell>
-      <PageHeader
+      <ModuleHeader
+        eyebrow="M8A Library"
         title="Library"
         description="Manage book catalogues, barcode copies, scanner-first issue-return workflows, overdue tracking, and fine posting status."
-        actions={headerActions}
-      />
-      <div className="mb-6">
+        primaryAction={
+          <Link
+            href="/dashboard/library/issue-return"
+            className="inline-flex h-9 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 active:scale-[0.98]"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Issue / Return
+          </Link>
+        }
+        moreActionItems={[
+          {
+            label: 'Catalog',
+            icon: <BookOpen className="h-4 w-4" />,
+            onClick: () => router.push('/dashboard/library/catalog'),
+          },
+          {
+            label: 'Copies',
+            icon: <Copy className="h-4 w-4" />,
+            onClick: () => router.push('/dashboard/library/copies'),
+          },
+          {
+            label: 'Fines',
+            icon: <FileText className="h-4 w-4" />,
+            onClick: () => router.push('/dashboard/library/fines'),
+          },
+          {
+            label: 'Reports',
+            icon: <Library className="h-4 w-4" />,
+            onClick: () => router.push('/dashboard/library/reports'),
+          },
+        ]}
+      >
         <ModuleTabs items={libraryTabs} accentColor="emerald" variant="light" />
-      </div>
+      </ModuleHeader>
       <LibraryWorkspace initialTab="overview" />
     </DashboardPageShell>
   );

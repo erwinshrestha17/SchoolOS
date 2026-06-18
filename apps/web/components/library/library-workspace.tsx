@@ -29,13 +29,13 @@ import {
   type LibraryFineSummaryReport,
   type LibraryIssue,
   type LibraryIssuePayload,
+  type LibraryPaginationMeta,
   type LibraryPaginatedResult,
   type LibraryPopularBookReportItem,
   type ReturnLibraryIssuePayload,
 } from '../../lib/library-api';
 import { api } from '../../lib/api';
-import { PageHeader } from '../ui/page-header';
-import { StatCard } from '../ui/stat-card';
+import { KpiCard, KpiGrid } from '../ui/kpi-card';
 import { EmptyState } from '../ui/empty-state';
 import { LoadingState } from '../ui/loading-state';
 import { StatusBadge, type StatusTone } from '../ui/status-badge';
@@ -96,6 +96,7 @@ const emptyIssueForm: LibraryIssuePayload = {
 const emptyBooks: LibraryBook[] = [];
 const emptyCopies: LibraryCopy[] = [];
 const emptyIssues: LibraryIssue[] = [];
+const listPageSize = '25';
 
 type LibraryQrBorrower = {
   id?: string;
@@ -123,6 +124,11 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
   const [copySearch, setCopySearch] = useState('');
   const [copyStatus, setCopyStatus] = useState('');
   const [issueStatus, setIssueStatus] = useState('');
+  const [bookPage, setBookPage] = useState(1);
+  const [copyPage, setCopyPage] = useState(1);
+  const [issuePage, setIssuePage] = useState(1);
+  const [overduePage, setOverduePage] = useState(1);
+  const [finePage, setFinePage] = useState(1);
   const [bookForm, setBookForm] = useState<LibraryBookPayload>(emptyBookForm);
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
   const [copyForm, setCopyForm] = useState<LibraryCopyPayload>(emptyCopyForm);
@@ -137,29 +143,40 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
   const queryClient = useQueryClient();
 
   const booksQuery = useQuery({
-    queryKey: ['library-books', bookSearch],
-    queryFn: () => libraryApi.listBooks({ q: bookSearch, limit: '100' }),
+    queryKey: ['library-books', bookSearch, bookPage],
+    queryFn: () =>
+      libraryApi.listBooks({
+        q: bookSearch,
+        page: String(bookPage),
+        limit: listPageSize,
+      }),
   });
   const copiesQuery = useQuery({
-    queryKey: ['library-copies', copySearch, copyStatus],
+    queryKey: ['library-copies', copySearch, copyStatus, copyPage],
     queryFn: () =>
       libraryApi.listCopies({
         barcode: copySearch,
         status: copyStatus,
-        limit: '100',
+        page: String(copyPage),
+        limit: listPageSize,
       }),
   });
   const issuesQuery = useQuery({
-    queryKey: ['library-issues', issueStatus],
+    queryKey: ['library-issues', issueStatus, issuePage],
     queryFn: () =>
       libraryApi.listIssues({
         status: issueStatus,
-        limit: '100',
+        page: String(issuePage),
+        limit: listPageSize,
       }),
   });
   const overdueQuery = useQuery({
-    queryKey: ['library-overdue'],
-    queryFn: () => libraryApi.listOverdue({ limit: '100' }),
+    queryKey: ['library-overdue', overduePage],
+    queryFn: () =>
+      libraryApi.listOverdue({
+        page: String(overduePage),
+        limit: listPageSize,
+      }),
   });
   const schoolStudentsQuery = useQuery({ 
     queryKey: ['students-for-library'], 
@@ -171,8 +188,12 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
   });
 
   const finesQuery = useQuery({
-    queryKey: ['library-fines'],
-    queryFn: () => libraryApi.listFines({ limit: '100' }),
+    queryKey: ['library-fines', finePage],
+    queryFn: () =>
+      libraryApi.listFines({
+        page: String(finePage),
+        limit: listPageSize,
+      }),
     enabled: activeTab === 'fines' || activeTab === 'overview',
   });
 
@@ -353,6 +374,10 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
     },
   });
 
+  const resolveCopyScanMutation = useMutation({
+    mutationFn: libraryApi.resolveScannedCopy,
+  });
+
   const books = booksQuery.data?.items ?? emptyBooks;
   const copies = copiesQuery.data?.items ?? emptyCopies;
   const issues = issuesQuery.data?.items ?? emptyIssues;
@@ -361,21 +386,23 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
   const stats = useMemo(() => {
     const totalBooks = booksQuery.data?.meta.total ?? books.length;
     const totalCopies = copiesQuery.data?.meta.total ?? copies.length;
-    const availableCopies = copies.filter((copy) => copy.status === 'AVAILABLE').length;
-    const issuedCopies = copies.filter((copy) => copy.status === 'ISSUED').length;
-    const lostDamaged = copies.filter((copy) =>
-      ['LOST', 'DAMAGED'].includes(copy.status),
-    ).length;
 
     return {
       totalBooks,
       totalCopies,
-      availableCopies,
-      issuedCopies,
+      availableCopies: 'Unavailable' as const,
+      issuedCopies: 'Unavailable' as const,
       overdueIssues: overdueQuery.data?.meta.total ?? overdueIssues.length,
-      lostDamaged,
+      lostDamaged: 'Unavailable' as const,
     };
-  }, [books, booksQuery.data?.meta.total, copies, copiesQuery.data?.meta.total, overdueIssues.length, overdueQuery.data?.meta.total]);
+  }, [
+    books.length,
+    booksQuery.data?.meta.total,
+    copies.length,
+    copiesQuery.data?.meta.total,
+    overdueIssues.length,
+    overdueQuery.data?.meta.total,
+  ]);
 
   const isLoading = booksQuery.isLoading || copiesQuery.isLoading || issuesQuery.isLoading;
   const error =
@@ -478,7 +505,10 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
           books={books}
           copies={copies}
           search={bookSearch}
-          setSearch={setBookSearch}
+          setSearch={(value) => {
+            setBookSearch(value);
+            setBookPage(1);
+          }}
           form={bookForm}
           setForm={setBookForm}
           editingBookId={editingBookId}
@@ -489,6 +519,8 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
           isLoading={booksQuery.isLoading}
           isSaving={createBookMutation.isPending || updateBookMutation.isPending}
           error={createBookMutation.error || updateBookMutation.error}
+          meta={booksQuery.data?.meta}
+          onPageChange={setBookPage}
         />
       )}
 
@@ -497,9 +529,15 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
           books={books}
           copies={copies}
           search={copySearch}
-          setSearch={setCopySearch}
+          setSearch={(value) => {
+            setCopySearch(value);
+            setCopyPage(1);
+          }}
           status={copyStatus}
-          setStatus={setCopyStatus}
+          setStatus={(value) => {
+            setCopyStatus(value);
+            setCopyPage(1);
+          }}
           form={copyForm}
           setForm={setCopyForm}
           editingCopyId={editingCopyId}
@@ -532,6 +570,8 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
             copyStatusMutation.error ||
             archiveCopyMutation.error
           }
+          meta={copiesQuery.data?.meta}
+          onPageChange={setCopyPage}
         />
       )}
 
@@ -569,7 +609,10 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
           students={schoolStudentsQuery.data?.items ?? []}
           staff={staffQuery.data ?? []}
           status={issueStatus}
-          setStatus={setIssueStatus}
+          setStatus={(value) => {
+            setIssueStatus(value);
+            setIssuePage(1);
+          }}
           form={issueForm}
           setForm={setIssueForm}
           returnDrafts={returnDrafts}
@@ -579,6 +622,11 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
           isLoading={issuesQuery.isLoading}
           isSaving={issueMutation.isPending || returnMutation.isPending}
           error={issueMutation.error || returnMutation.error}
+          onResolveCopyScan={(code) => resolveCopyScanMutation.mutateAsync(code)}
+          isResolvingCopyScan={resolveCopyScanMutation.isPending}
+          scanError={resolveCopyScanMutation.error}
+          meta={issuesQuery.data?.meta}
+          onPageChange={setIssuePage}
         />
       )}
 
@@ -589,6 +637,8 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
           isSending={remindersMutation.isPending}
           onSendReminders={() => remindersMutation.mutate()}
           error={remindersMutation.error}
+          meta={overdueQuery.data?.meta}
+          onPageChange={setOverduePage}
         />
       )}
       
@@ -603,6 +653,8 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
           }
           isPosting={postFineToFeesMutation.isPending}
           postError={postFineToFeesMutation.error}
+          meta={finesQuery.data?.meta}
+          onPageChange={setFinePage}
         />
       )}
 
@@ -637,24 +689,24 @@ function OverviewPanel({
   stats: {
     totalBooks: number;
     totalCopies: number;
-    availableCopies: number;
-    issuedCopies: number;
+    availableCopies: number | 'Unavailable';
+    issuedCopies: number | 'Unavailable';
     overdueIssues: number;
-    lostDamaged: number;
+    lostDamaged: number | 'Unavailable';
   };
   isLoading: boolean;
   overdueIssues: LibraryIssue[];
 }) {
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard title="Total books" value={stats.totalBooks} icon={<BookOpen size={18} />} loading={isLoading} />
-        <StatCard title="Total copies" value={stats.totalCopies} icon={<Copy size={18} />} loading={isLoading} />
-        <StatCard title="Available copies" value={stats.availableCopies} icon={<PackageCheck size={18} />} loading={isLoading} />
-        <StatCard title="Issued copies" value={stats.issuedCopies} icon={<ClipboardList size={18} />} loading={isLoading} />
-        <StatCard title="Overdue issues" value={stats.overdueIssues} icon={<AlertCircle size={18} />} loading={isLoading} />
-        <StatCard title="Lost / damaged" value={stats.lostDamaged} icon={<Library size={18} />} loading={isLoading} />
-      </div>
+      <KpiGrid className="xl:grid-cols-3">
+        <KpiCard title="Total books" value={stats.totalBooks} icon={<BookOpen size={18} />} loading={isLoading} description="Backend catalog metadata" />
+        <KpiCard title="Total copies" value={stats.totalCopies} icon={<Copy size={18} />} loading={isLoading} description="Backend copy metadata" />
+        <KpiCard title="Available copies" value={stats.availableCopies} icon={<PackageCheck size={18} />} tone="neutral" description="Needs copy-status summary" />
+        <KpiCard title="Issued copies" value={stats.issuedCopies} icon={<ClipboardList size={18} />} tone="neutral" description="Needs circulation summary" />
+        <KpiCard title="Overdue issues" value={stats.overdueIssues} icon={<AlertCircle size={18} />} loading={isLoading} description="Backend overdue metadata" tone={stats.overdueIssues > 0 ? 'warning' : 'success'} />
+        <KpiCard title="Lost / damaged" value={stats.lostDamaged} icon={<Library size={18} />} tone="neutral" description="Needs inventory-health summary" />
+      </KpiGrid>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between gap-3">
@@ -675,6 +727,17 @@ function OverviewPanel({
             <EmptyState title="No overdue books" description="Library circulation is currently clear." />
           )}
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-warning-100 bg-warning-50 p-5">
+        <h2 className="text-sm font-black uppercase tracking-wide text-warning-800">
+          Remaining Issues
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-warning-800">
+          Available, issued, and lost/damaged official totals need a module-owned
+          Library summary endpoint. Until then, this overview only shows totals
+          from backend list metadata and marks missing summaries unavailable.
+        </p>
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -716,6 +779,8 @@ function BooksPanel(props: {
   isLoading: boolean;
   isSaving: boolean;
   error: Error | null;
+  meta?: LibraryPaginationMeta;
+  onPageChange: (page: number) => void;
 }) {
   const categories = Array.from(
     new Set(props.books.map((book) => book.subjectCategory).filter(Boolean)),
@@ -786,6 +851,7 @@ function BooksPanel(props: {
             );
           })}
         </div>
+        <PaginationControls meta={props.meta} onPageChange={props.onPageChange} />
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -838,6 +904,8 @@ function CopiesPanel(props: {
   isLoading: boolean;
   isSaving: boolean;
   error: Error | null;
+  meta?: LibraryPaginationMeta;
+  onPageChange: (page: number) => void;
 }) {
   const [pendingStatusChange, setPendingStatusChange] = useState<{
     copy: LibraryCopy;
@@ -905,6 +973,7 @@ function CopiesPanel(props: {
             </div>
           ))}
         </div>
+        <PaginationControls meta={props.meta} onPageChange={props.onPageChange} />
         <ConfirmDialog
           isOpen={Boolean(pendingStatusChange)}
           onClose={() => setPendingStatusChange(null)}
@@ -1027,14 +1096,29 @@ function IssuesPanel(props: {
   isLoading: boolean;
   isSaving: boolean;
   error: Error | null;
+  onResolveCopyScan: (code: string) => Promise<LibraryCopy>;
+  isResolvingCopyScan: boolean;
+  scanError: Error | null;
+  meta?: LibraryPaginationMeta;
+  onPageChange: (page: number) => void;
 }) {
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [copyScanValue, setCopyScanValue] = useState('');
   const [copyScanResult, setCopyScanResult] = useState<LibraryCopyScanResult | null>(null);
   const [recentCopyScans, setRecentCopyScans] = useState<LibraryCopyScanResult[]>([]);
   const [resolvedBorrower, setResolvedBorrower] = useState<LibraryQrBorrower | null>(null);
-  const availableCopies = props.copies.filter((copy) => copy.status === 'AVAILABLE');
-  const selectedCopy = props.copies.find((copy) => copy.id === props.form.copyId);
+  const [scannedCopy, setScannedCopy] = useState<LibraryCopy | null>(null);
+  const availableCopies = [
+    ...props.copies.filter((copy) => copy.status === 'AVAILABLE'),
+    ...(scannedCopy &&
+    scannedCopy.status === 'AVAILABLE' &&
+    !props.copies.some((copy) => copy.id === scannedCopy.id)
+      ? [scannedCopy]
+      : []),
+  ];
+  const selectedCopy =
+    props.copies.find((copy) => copy.id === props.form.copyId) ??
+    (scannedCopy?.id === props.form.copyId ? scannedCopy : undefined);
   const selectedStudent = props.students.find(
     (student) => student.id === props.form.borrowerStudentId,
   );
@@ -1053,6 +1137,7 @@ function IssuesPanel(props: {
   }
 
   function selectCopyFromScan(copy: LibraryCopy, code: string) {
+    setScannedCopy(copy);
     props.setForm({ ...props.form, copyId: copy.id });
     recordCopyScan({
       code,
@@ -1063,34 +1148,34 @@ function IssuesPanel(props: {
     });
   }
 
-  function handleCopyScan() {
+  async function handleCopyScan() {
     const code = copyScanValue.trim();
     if (!code) return;
 
-    const copy = props.copies.find((item) => copyMatchesScan(item, code));
-    if (!copy) {
+    try {
+      const copy = await props.onResolveCopyScan(code);
+
+      if (copy.status !== 'AVAILABLE') {
+        recordCopyScan({
+          code,
+          copy,
+          status: 'unavailable',
+          message: `${copy.book?.title ?? 'Copy'} is ${formatStatus(copy.status)} and cannot be issued.`,
+          scannedAt: new Date().toISOString(),
+        });
+        return;
+      }
+
+      selectCopyFromScan(copy, code);
+      setCopyScanValue('');
+    } catch {
       recordCopyScan({
         code,
         status: 'missing',
         message: 'No library copy matched this barcode or QR code.',
         scannedAt: new Date().toISOString(),
       });
-      return;
     }
-
-    if (copy.status !== 'AVAILABLE') {
-      recordCopyScan({
-        code,
-        copy,
-        status: 'unavailable',
-        message: `${copy.book?.title ?? 'Copy'} is ${formatStatus(copy.status)} and cannot be issued.`,
-        scannedAt: new Date().toISOString(),
-      });
-      return;
-    }
-
-    selectCopyFromScan(copy, code);
-    setCopyScanValue('');
   }
 
   function handleBorrowerResolved(data: LibraryQrBorrower) {
@@ -1153,6 +1238,7 @@ function IssuesPanel(props: {
             );
           })}
         </div>
+        <PaginationControls meta={props.meta} onPageChange={props.onPageChange} />
       </section>
 
       <section className="space-y-6">
@@ -1176,11 +1262,15 @@ function IssuesPanel(props: {
             <LibraryCopyScanner
               value={copyScanValue}
               onChange={setCopyScanValue}
-              onScan={handleCopyScan}
+              onScan={() => void handleCopyScan()}
               result={copyScanResult}
               recentScans={recentCopyScans}
               onSelectCopy={(copy, code) => selectCopyFromScan(copy, code)}
+              isResolving={props.isResolvingCopyScan}
             />
+            {props.scanError ? (
+              <ErrorNotice message="Copy scan lookup is unavailable. You can still select a visible copy manually." />
+            ) : null}
 
             <BookSelector
               mode="copy"
@@ -1276,6 +1366,7 @@ function LibraryCopyScanner({
   result,
   recentScans,
   onSelectCopy,
+  isResolving,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -1283,6 +1374,7 @@ function LibraryCopyScanner({
   result: LibraryCopyScanResult | null;
   recentScans: LibraryCopyScanResult[];
   onSelectCopy: (copy: LibraryCopy, code: string) => void;
+  isResolving: boolean;
 }) {
   return (
     <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
@@ -1321,8 +1413,8 @@ function LibraryCopyScanner({
             )}
           />
         </label>
-        <button type="button" onClick={onScan} disabled={!value.trim()} className="btn-secondary shrink-0">
-          Scan
+        <button type="button" onClick={onScan} disabled={!value.trim() || isResolving} className="btn-secondary shrink-0">
+          {isResolving ? 'Checking...' : 'Scan'}
         </button>
       </div>
 
@@ -1447,12 +1539,16 @@ function OverduePanel({
   isSending,
   onSendReminders,
   error,
+  meta,
+  onPageChange,
 }: {
   overdueIssues: LibraryIssue[];
   isLoading: boolean;
   isSending: boolean;
   onSendReminders: () => void;
   error: Error | null;
+  meta?: LibraryPaginationMeta;
+  onPageChange: (page: number) => void;
 }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -1476,6 +1572,7 @@ function OverduePanel({
           </div>
         ))}
       </div>
+      <PaginationControls meta={meta} onPageChange={onPageChange} />
     </section>
   );
 }
@@ -1509,6 +1606,49 @@ function BookMeta({ label, value }: { label: string; value: string }) {
     <div>
       <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</dt>
       <dd className="mt-0.5 truncate font-semibold text-slate-700">{value}</dd>
+    </div>
+  );
+}
+
+function PaginationControls({
+  meta,
+  onPageChange,
+}: {
+  meta?: LibraryPaginationMeta;
+  onPageChange: (page: number) => void;
+}) {
+  if (!meta || meta.total <= meta.limit) return null;
+
+  const totalPages = Math.max(1, Math.ceil(meta.total / meta.limit));
+  const from = (meta.page - 1) * meta.limit + 1;
+  const to = Math.min(meta.page * meta.limit, meta.total);
+
+  return (
+    <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+      <p>
+        Showing {from}-{to} of {meta.total}
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={meta.page <= 1}
+          onClick={() => onPageChange(Math.max(1, meta.page - 1))}
+        >
+          Previous
+        </button>
+        <span className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
+          Page {meta.page} of {totalPages}
+        </span>
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={meta.page >= totalPages}
+          onClick={() => onPageChange(Math.min(totalPages, meta.page + 1))}
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 }
@@ -1622,13 +1762,6 @@ function cleanCopyPayload(form: LibraryCopyPayload): LibraryCopyPayload {
   };
 }
 
-function copyMatchesScan(copy: LibraryCopy, code: string) {
-  const normalizedCode = code.trim().toLowerCase();
-  return [copy.barcode, copy.qrCode]
-    .filter(Boolean)
-    .some((value) => value?.trim().toLowerCase() === normalizedCode);
-}
-
 function formatStatus(status: string) {
   return status.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
@@ -1670,6 +1803,8 @@ function FinesPanel({
   onPostFineToFees,
   isPosting,
   postError,
+  meta,
+  onPageChange,
 }: {
   fines: any[];
   isLoading: boolean;
@@ -1678,6 +1813,8 @@ function FinesPanel({
   onPostFineToFees: (id: string, reason: string) => void;
   isPosting: boolean;
   postError: Error | null;
+  meta?: LibraryPaginationMeta;
+  onPageChange: (page: number) => void;
 }) {
   const [waivingId, setWaivingId] = useState<string | null>(null);
   const [waiveReason, setWaiveReason] = useState('');
@@ -1763,6 +1900,7 @@ function FinesPanel({
           );
         })}
       </div>
+      <PaginationControls meta={meta} onPageChange={onPageChange} />
 
       <ConfirmDialog
         isOpen={Boolean(waivingId)}
