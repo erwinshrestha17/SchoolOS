@@ -4,8 +4,8 @@
 **Market:** Nepal-focused school operating SaaS  
 **Target schools:** Kindergarten / Montessori to Grade 12 as the long-term product direction; current implementation remains staged around controlled pilot readiness for existing core modules  
 **Document type:** Functional Requirements Specification  
-**Status:** Active FRS aligned with KG-12 product direction and M12 Learning Layer production foundation implementation
-**Last updated:** 2026-06-12
+**Status:** Active FRS aligned with KG-12 product direction and M12 Learning Layer implementation foundation
+**Last updated:** 2026-06-18
 
 ---
 
@@ -18,9 +18,9 @@ The PRD remains the product master document. This FRS is meant for developers, Q
 Important distinction:
 
 ```text
-Current core = implemented/pilot-ready management modules with remaining hardening
+Current core = broad implemented management foundation with remaining seed, browser, mobile, staging, provider, and pilot verification gates
 KG-12 expansion = staged product direction
-M12 Learning Layer = backend, web runtime, parent/student web summary, and Flutter summary foundation implemented and verified; AI/adaptive/simulation depth remains staged
+M12 Learning Layer = backend, web runtime, parent/student web summary, and Flutter summary foundation implemented locally; AI/adaptive/simulation depth remains staged
 ```
 
 ---
@@ -290,7 +290,7 @@ Manage academic structure, subjects, exams, assessment components, CAS, report c
 
 Provide teacher-led, school-controlled learning workflows through smart-board activities, computer-lab practice, progress tracking, and parent learning summaries.
 
-Implementation note: the production foundation for this section is implemented under `apps/api/src/learning`, `apps/web` Learning routes, and `apps/schoolos_mobile/lib/features/learning`; advanced learning depth remains staged.
+Implementation note: the code foundation for this section exists under `apps/api/src/learning`, `apps/web` Learning routes, and `apps/schoolos_mobile/lib/features/learning`; staging/browser/device verification and advanced learning depth remain staged.
 
 ### 8.2 Primary actors
 

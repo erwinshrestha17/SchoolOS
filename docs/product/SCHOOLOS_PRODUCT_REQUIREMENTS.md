@@ -5,7 +5,7 @@
 **Target schools:** Kindergarten / Montessori to Grade 12 as the long-term product direction; current implementation remains staged around controlled pilot readiness for existing core modules  
 **Document type:** Combined master PRD merged from the original pilot-hardening PRD and the researched 2026 PRD draft  
 **Status:** Active product requirements document for controlled pilot hardening, KG-12 product planning, and M12 Learning Layer alignment  
-**Last updated:** 2026-06-12
+**Last updated:** 2026-06-18
 
 ---
 
@@ -16,12 +16,12 @@ This document is the active PRD for SchoolOS. It keeps the existing pilot-harden
 Important distinction:
 
 ```text
-Current implemented core = pilot-ready school management foundation plus M12 production foundation
+Current implemented core = broad school-management foundation with remaining seed, browser, mobile, staging, provider, and pilot verification gates
 KG-12 SchoolOS = staged product direction
-M12 Learning Layer = backend, web runtime, parent/student web summary, and Flutter summary foundation implemented and verified; AI/adaptive/simulation depth remains staged
+M12 Learning Layer = backend, web runtime, parent/student web summary, and Flutter summary foundation implemented locally; staging/browser/device depth remains staged
 ```
 
-Implementation claims must still be validated against real pilot-school workflows, official reporting templates, provider sandbox/staging flows, production security review, and the verification commands in the implementation plan.
+Implementation claims must still be validated against the evidence in `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`, real pilot-school workflows, official reporting templates, provider sandbox/staging flows, production security review, and the verification commands in the next-phase plan.
 
 ---
 
@@ -245,7 +245,7 @@ Stage F: Grade 11-12
 
 ## 8. M12 Learning Layer Summary
 
-M12 Learning Layer now has a verified production foundation across backend, web runtime, and Flutter parent/student summaries. The product vertical still needs staging fixtures, seeded browser E2E depth, school-only policy hardening, and later advanced learning phases before it is considered complete.
+M12 Learning Layer has an implemented backend/web/mobile foundation with local test evidence. It is not production-ready until staging fixtures, seeded authenticated browser E2E, device QA, school-only policy hardening, and later advanced learning phases are verified.
 
 M12 must include:
 

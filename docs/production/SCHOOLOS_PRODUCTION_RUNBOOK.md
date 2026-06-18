@@ -1,8 +1,10 @@
 # SchoolOS Production Runbook
 
-**Last updated:** 2026-06-03  
+**Last updated:** 2026-06-18  
 **Status:** Consolidated active production runbook, deployment manual, database backup/restore procedures, and pilot onboarding guidelines.  
 **Architecture:** NestJS modular monolith, PostgreSQL, Redis/BullMQ, private storage.
+
+This runbook defines the deployment and recovery procedure. It is not proof that SchoolOS is currently production-ready. Use `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` for current evidence, scores, blockers, and command results.
 
 ---
 

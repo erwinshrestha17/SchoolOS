@@ -1,7 +1,7 @@
 # SchoolOS Implementation Plan
 
-**Last updated:** 2026-06-15
-**Status:** Consolidated active implementation plan and module backlogs; backend/root/local smoke gates green after migration stabilization  
+**Last updated:** 2026-06-18
+**Status:** Consolidated implementation backlog and module history. Current readiness evidence lives in `SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`; active execution sequencing lives in `SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`.  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard, Flutter companion app
 
 ---
@@ -9,50 +9,42 @@
 ## 1. Project Verdict and Readiness Status
 
 ### Current Status Verdict
-* **Phase 0:** Completed
-* **Phase 1A:** Completed / Pilot-Ready
-* **Phase 1B:** Completed / Pilot-Ready
-* **M0 Platform Core:** Foundation complete; provider/queue/API-key/File Registry hardening implemented; DTO validation added for provider status/support override/billing reason payloads; queue retry/discard race checks and single-job retry UX added; staging/object-storage/browser coverage remains.
-* **M1 Admissions & Student Profiles:** Pilot-ready plus admission application pipeline, Student QR scan audit UI and operational analytics, storage/photo/logo, iEMIS artifact registration and class readiness review, duplicate candidate review, structured bulk-import duplicate review with persistent batch/row history, document audit/checklist expiry hardening, configurable automated document-expiry reminders, focused M1 hardening coverage for ownership/draft/duplicate/guardian-removal/generated-document/import-review/iEMIS/alumni paths, route-level M1 hardening controller permission/entitlement contracts, HTTP E2E coverage for ownership audit, guardian-removal, draft autosave/recovery, and import-review cross-tenant denial, mobile child profile foundation, and satellite-controller entitlement gating.
-* **M2 Smart Attendance:** Pilot-ready plus lock-window enforcement, working-day calendar policy, concurrent-session conflict handling, correction/offline-draft, rejected replay regressions, correction-review UI, operational anomaly dashboard, focused anomaly/cutoff automation hardening regression coverage, app-controlled monthly register exports, parent absence/late notifications and follow-up queue, mobile teacher scope, real-data teacher dashboard, and mobile parent attendance summary query validation.
-* **M3 Fees & Receipts:** Pilot-ready plus receipt reprint history UI, printed receipt QR verification, reversal/refund approval foundation, cashier close, method-specific cashier close, reconciliation, Analysis CSV exports, protected day-end PDF snapshots, transaction-race/idempotency coverage, segmented overdue reminder backend, and HMAC-secured online payment webhook verification with duplicate/already-paid/failed-event guards plus dotted provider event fixtures.
-* **M4 Academics / Exams / CAS / Report Cards:** Completed / Pilot-Ready with PDF/report/correction/snapshot polish, protected/app-controlled report-card PDF opening, retest/absent/withheld mark-state regression coverage, and backend assessment template presets that create audited exam-term/component structures.
-* **M5 Activity Feed & Milestones:** Strong foundation with media privacy, consent-aware blocking, removed-guardian visibility regression coverage, optimized previews, app-controlled private media preview/download helpers with active-child, tagged-student consent, and unavailable-post direct-signing enforcement, moderation controls, teacher media gallery, media-access gating, backend class/section/student audience preview, active-student-only activity tagging and notification delivery, retry-pending delivery replay idempotency, and backend milestone template presets.
-* **M6 Homework / Timetable:** Completed / Pilot-Ready with File Registry attachments, homework-specific attachment access helpers, filtered homework template APIs, reminder hardening, absence/substitution conflict coverage, mobile homework/timetable views, and improved substitution slot selection / absence recording UI.
-* **M7 HR / Payroll:** Completed / Pilot-Ready with posting locks, accounting integration, reversals, PII/self-service bank masking, payroll reports, mobile staff self-service, and statutory deduction retrieval from active salary structures.
-* **M8A Library:** Admin/backend foundation plus QR lookup, fines, staff borrowers, fine-to-fees/accounting tests, scanner-first UI, copy archive workflow, and reports/export polish.
-* **M8B Transport:** Admin/trip/location/report foundation plus Redis GPS/cache/pressure/retention hardening, driver mobile surfaces, parent latest-GPS view, and trip-history exports.
-* **M8C Canteen:** Admin/wallet/POS/inventory/vendor/report foundation plus receipt JSON/PDF, stock hardening, wallet guards, linked invoice handoff, parent mobile views, serving allergy acknowledgement, and canteen workspace polish.
-* **M9 Accounting:** Production-candidate / Pilot-Ready with Nepal school chart template preview/import, source-mapping health checks, PDFs, retry-safe report snapshot reuse, synchronous export row thresholds, queued large General Ledger/Cash Book exports through File Registry, platform-visible accounting report queue diagnostics, audit trail, reconciliation suggestions, File Registry export support, and hardened bank statement import/reconciliation DTO validation.
-* **M10 Notices / Communication / Chat:** Strong foundation with provider modes, HMAC-signed SMS/email/FCM provider callback verification, sanitized provider callback failures, duplicate/out-of-order provider status guards, provider-disabled retry fail-closed behavior, role-aware chat quiet-hours, escalation write locks, high-impact notice recipient preview, File Registry-backed notice attachments with raw object-key suppression, legacy messaging parent/guardian live-link scoping with unsafe attachment suppression and sanitized change streams, failure dashboard, moderation/escalation, unread-recipient follow-up, mobile notification/chat surfaces, and full communications/messaging sub-controller entitlement gating.
-* **Pre-AI Advanced Operations:** Backend foundation and additive Prisma migration are present for approval workflows, deterministic automation, descriptive analytics summaries, document templates/generated documents, verification/access logs, and data export jobs. Frontend workspaces, mobile/offline depth, seeded browser E2E, staging migration apply, provider/staging checks, and pilot workflow tuning remain.
-* **M12 Learning Layer:** Production foundation implemented and verified under `apps/api/src/learning`, `apps/web` Learning routes, and `apps/schoolos_mobile/lib/features/learning`: activity builder, school-only sessions, session monitoring/heartbeat/participants, resource library, QR/code join, lab attempts, autosave/submit, MCQ/true-false/short-answer/matching/ordering evaluation, progress recording, parent child-scoped summary, student self-scoped mobile summary, tenant isolation, RBAC, entitlement, audit logging, Prisma migrations, and focused E2E/contract/mobile coverage.
-* **Public Demo Requests:** Public POST intake plus platform operator list/detail/status-follow-up APIs and `/platform/demo-requests` review workspace with RBAC, audit logging, pagination/filtering, internal notes, public rate limiting, and tests.
-* **Settings / Audit Visibility:** Settings audit-log access, support-override banner visibility, and live tenant role/permission inspection added with access-control tests.
-* **M11 School Intelligence / AI:** Roadmap only.
-* **SchoolOS Flutter Mobile:** Active companion app with scoped parent/student/teacher/staff/driver/admin surfaces where APIs exist.
+
+Use the audit statuses and scores for current readiness:
+
+```text
+Product Implementation Completion Score: 74 / 100
+Production Deployment Readiness Score: 50 / 100
+Current recommended target: Internal QA
+Next execution phase: Phase 1 - Realistic Seeded Tenant, Role Assignment, and Smokeable Demo Flows
+```
+
+The repository has broad implemented foundations across M0-M12, web, mobile, File Registry, RBAC, entitlement, finance/accounting/payroll, learning, and platform operations. The blocking issue is not lack of source code; it is missing proof for realistic seeded flows, authenticated browser E2E, mobile device QA, staging deployment, provider/storage checks, backup restore, and pilot operation.
 
 ### Overall Product Readiness
-* **Demo-ready:** Yes
+* **Demo-ready:** Conditional
 * **Internal QA-ready:** Yes
-* **Controlled pilot-ready:** Yes, after staging checks, browser E2E, and pilot smoke verification
+* **Controlled pilot-ready:** Conditional, after staging checks, authenticated browser E2E, mobile emulator QA, backup restore, and pilot smoke verification
+* **Single-school production-ready:** No
 * **Multi-school production-ready:** Not yet
 * **Full SchoolOS product complete:** No
 
-**Verification snapshot:** Backend package gates pass, root `pnpm typecheck` and `pnpm build` pass, and local smoke suites pass (`pnpm smoke:pilot`, `pnpm smoke:learning`, `pnpm smoke:full`). These are local gates; staging/pilot deployment is still pending.
+**Verification snapshot:** On 2026-06-18, root lint/typecheck/test/E2E/build and local `pnpm verify:production` passed with caveats. `pnpm smoke:pilot` failed because Postgres, Redis, and the API were not running. `pnpm test:web:e2e` passed with 5 public checks and 12 authenticated checks skipped. See `SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` for exact command results.
 
-**Remaining work categories:** Frontend implementation is next. Remaining work is grouped as frontend workspace completion, mobile polish/device QA, provider/staging verification, browser E2E, pilot feedback, and future AI. M11 remains roadmap/deferred.
+**Remaining work categories:** realistic demo seed and role assignment, pilot smoke, authenticated browser E2E, mobile role/device QA, provider/staging verification, backup/restore, monitoring, pilot feedback, and future AI. M11 remains roadmap/deferred.
 
 ---
 
-## 2. Strict Phase-Wise Implementation Plan
+## 2. Historical Phase-Wise Implementation Backlog
 
-This order is mandatory. Do not start a later phase until the previous phase's exit criteria are fully met.
+The focused active delivery sequence is now `SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`. The section below is retained as historical module backlog context and must not be used to override the next-phase plan or the readiness audit.
+
+Do not start a later next-phase delivery item until the corresponding exit criteria in `SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` are met.
 
 ### Phase Gate 0 — Stabilize Main Before Frontend Scope
 * **Allowed work:** verification fixes, migration fixes, seed fixes, tenant isolation fixes, permission fixes, doc alignment, small code-file modularization in touched areas.
 * **Blocked work:** AI, Angular migration, microservices, broad new modules, deep mobile expansion without purpose-limited APIs/ownership tests, live transport map/WebSocket/SSE UI, biometric workflows.
-* **Current local status:** Backend gates, root typecheck/build, and local smoke suites are green. The advanced-operations additive migration exists as `20260615090000_advanced_operations_foundation`.
+* **Current local status:** Root local gates pass with the caveats documented in the 2026-06-18 audit. Local pilot smoke did not pass in the audit because required services were not running.
 * **Exit criteria:**
   1. Prisma generate and validate pass.
   2. OpenAPI gate passes.
@@ -112,7 +104,7 @@ Before adding or expanding visible features:
 8. Keep money flows idempotent and auditable.
 9. Keep private files behind FileRegistryService and StorageService.
 10. Keep AI/ML roadmap-only until reliable production data exists and M11 is approved.
-11. Follow `docs/design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md` before broad web/mobile visual redesign work.
+11. Follow `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` and `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` before broad web/mobile visual redesign work.
 12. Each school module should have dedicated web screens/workspaces for its real workflow.
 
 ---
@@ -435,7 +427,7 @@ Current implementation status:
 ```text
 Backend foundation: Implemented for approval workflows, deterministic automation, descriptive analytics summaries, document templates/generated documents, verification/access logs, and data export jobs.
 Migration: apps/api/prisma/migrations/20260615090000_advanced_operations_foundation adds advanced-operations enums, tenant-scoped tables, indexes, and foreign keys.
-Local verification: backend package gates, root typecheck/build, and local smoke suites pass.
+Local verification: root gates passed on 2026-06-18 with caveats; pilot smoke failed because local services were not running. See `SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
 Still pending: staging migration apply/deploy, seeded browser E2E, frontend workspaces, mobile/offline workflow depth, provider/staging checks, and pilot feedback.
 M11 AI: Deferred/roadmap only.
 ```

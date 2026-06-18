@@ -1,0 +1,250 @@
+# SchoolOS Production Readiness Audit
+
+**Status:** Canonical evidence-based audit  
+**Audit date:** 2026-06-18  
+**Branch audited:** `main`  
+**Commit audited:** `edeef795ecd16b02ab046a4b45a4c68503ab6bfc`  
+**Current target recommendation:** Internal QA, with demo readiness for controlled local demonstrations  
+
+This audit treats repository code, tests, CI, scripts, schema, migrations, deployment/runbook files, and commands run on 2026-06-18 as evidence. Documentation claims are not treated as proof by themselves.
+
+## Evidence Limitations
+
+- The worktree was dirty before this audit: `apps/api/prisma/seed.ts` was modified and `apps/api/prisma/seed.canonical.spec.ts` was untracked.
+- No staging environment, provider sandbox, object storage bucket, payment gateway, SMS, email, FCM, backup restore drill, or real pilot tenant was verified during this audit.
+- `pnpm verify:production` is a local deployment gate. In this shell, its production environment preflight skipped unless `DEPLOY_ENV=production` was forced.
+- Browser E2E completed, but 12 authenticated browser tests skipped; only 5 public/browser-independent checks ran.
+- `pnpm smoke:pilot` failed because Postgres, Redis, and the API were not running.
+- Mobile verification covered Flutter analyze/tests and Android debug APK build. It did not include an emulator/device role-flow walkthrough against a live seeded backend.
+
+## Commands Actually Run
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `git status --short` | PASS with dirty worktree | Pre-existing seed changes: `M apps/api/prisma/seed.ts`, `?? apps/api/prisma/seed.canonical.spec.ts`. |
+| `pnpm db:generate` | PASS | Prisma schema and core generated artifacts compiled; Prisma Client generated. |
+| `pnpm db:validate` | PASS | `apps/api/prisma/schema.prisma` valid. |
+| `pnpm verify:openapi` | PASS | OpenAPI wiring gate passed. |
+| `pnpm --filter @schoolos/api typecheck` | PASS | API TypeScript passed after core build and Prisma generation. |
+| `pnpm --filter @schoolos/web typecheck` | PASS | Web TypeScript passed. |
+| `pnpm --filter @schoolos/api test` | PASS | 149 suites, 1199 tests passed. Negative-path logs were expected by tests. |
+| `pnpm --filter @schoolos/api test:e2e` | PASS | 40 suites, 239 tests passed. |
+| `pnpm --filter @schoolos/web test` | PASS | 12 suites, 166 tests passed. |
+| `pnpm --filter @schoolos/web lint` | PASS | ESLint passed with zero warnings. |
+| `pnpm --filter @schoolos/web build` | PASS | Next.js production build generated 154 static pages plus dynamic routes. |
+| `pnpm typecheck` | PASS | Root aggregate typecheck and core boundary checks passed. |
+| `pnpm lint` | PASS | Root aggregate lint/format checks passed. |
+| `pnpm test` | PASS | Root aggregate API and web tests passed. |
+| `pnpm build` | PASS | Root aggregate core, API, and web build passed. |
+| `pnpm test:web:e2e` | PASS with skips | 5 passed, 12 skipped. Authenticated browser coverage did not run. |
+| `pnpm verify:production` | PASS with caveats | Rerun outside sandbox after `listen EPERM`; local deploy gate passed, production env preflight skipped, web E2E still 5 passed / 12 skipped. |
+| `pnpm smoke:pilot` | FAIL | Postgres, Redis, `/health`, `/ready`, and seeded admin login all failed because local services were not running. |
+| `DEPLOY_ENV=production pnpm verify:env:deploy` | FAIL as expected | Required production env values/secrets were absent. |
+| `flutter pub get` | PASS after escalation | Flutter SDK cache write required permission outside repository. |
+| `dart format --output=none --set-exit-if-changed .` | PASS | 127 files checked, 0 changed. |
+| `flutter analyze` | PASS | No issues found. |
+| `flutter test` | PASS | All Flutter tests passed. |
+| `flutter build apk --debug` | PASS after escalation | Built `build/app/outputs/flutter-apk/app-debug.apk`; plugin KGP deprecation warning remains. |
+
+## Readiness Scores
+
+### Product Implementation Completion: 74 / 100
+
+| Rubric Area | Weight | Score | Evidence |
+| --- | ---: | ---: | --- |
+| Backend/API implementation | 30 | 25 | Broad NestJS modules/controllers, RBAC/entitlement guards, 149 unit suites and 40 API E2E suites passed locally. |
+| Web frontend implementation | 25 | 19 | Next.js build, lint, typecheck, and 166 web contract tests passed; many routes exist. Authenticated browser E2E skipped. |
+| Mobile implementation | 15 | 8 | Flutter role shell, parent/teacher/staff/driver repositories and tests exist; analyze/tests/APK build passed. Device role-flow verification is missing. |
+| Data model, migrations, seed, workflows | 15 | 11 | Prisma schema validates and migrations exist. Current seed worktree is dirty and not independently verified in this audit; staging migration replay not run. |
+| Automated verification coverage | 15 | 11 | Strong local unit/E2E/contract gates; smoke failed without services, browser auth tests skipped, no coverage report or pilot evidence. |
+
+### Production Deployment Readiness: 50 / 100
+
+| Rubric Area | Weight | Score | Evidence |
+| --- | ---: | ---: | --- |
+| Build, typecheck, lint, automated tests | 20 | 17 | Root lint/typecheck/test/build and local deploy gate passed. |
+| Security, RBAC, tenant isolation, data protection | 20 | 14 | Guards, entitlement checks, safe errors, File Registry patterns, and many security tests exist; full role/device pilot proof is missing. |
+| DB migration, backup, restore, rollback readiness | 15 | 7 | Migrations and runbook exist; no restore drill or staging migration apply was executed during this audit. |
+| Staging deployment and environment validation | 15 | 2 | Production env preflight fails without required secrets; no staging deployment evidence. |
+| Browser/device E2E and pilot verification | 15 | 5 | Public browser smoke and Android debug build passed; authenticated browser checks skipped and no emulator/device role QA ran. |
+| Monitoring, logs, queues, alerts, runbook readiness | 15 | 5 | Health/queue/platform surfaces and runbook exist; no deployed monitoring/alerting proof. |
+
+## Readiness Levels
+
+| Level | Current State | Missing Gates | Proof Required |
+| --- | --- | --- | --- |
+| Demo-ready | Conditional | Pilot smoke requires local DB/Redis/API; realistic seed still has uncommitted work. | Seed default tenant, start services, pass `pnpm smoke:pilot`, verify parent/teacher/staff/driver demo logins. |
+| Internal QA-ready | Yes | QA must accept local-only evidence and skipped authenticated browser tests. | Root gates, API E2E, web contract tests, Flutter analyze/tests/APK build. |
+| Controlled pilot-ready | Conditional | Staging migration, provider/storage checks, authenticated browser E2E, mobile emulator role QA, backup restore drill. | Passing staging smoke and documented pilot checklist with real seeded school flows. |
+| Single-school production-ready | No | Production env/secrets, backup/restore, monitoring, provider validation, signed mobile release, rollback rehearsal. | Reproducible production deployment dry run and one controlled pilot exit report. |
+| Multi-school production-ready | No | Multi-tenant operational runbooks, support override drills, capacity/queue monitoring, tenant lifecycle proof, incident response evidence. | Multi-tenant staging/pilot evidence and rollback/recovery drills across tenants. |
+
+## Repository Readiness
+
+| Area | Status | Evidence |
+| --- | --- | --- |
+| Monorepo structure | VERIFIED_COMPLETE | `pnpm-workspace.yaml` covers `apps/*` and `packages/*`; root scripts coordinate core/api/web gates. |
+| Shared packages | IMPLEMENTED_UNVERIFIED | `@schoolos/core` builds and boundary checks pass; no standalone package tests beyond aggregate compile/typecheck evidence. |
+| Environment handling | PARTIALLY_IMPLEMENTED | API `.env.example` exists and production preflight exists; no committed web env example; production preflight fails when forced without secrets. |
+| Docker/local development | PARTIALLY_IMPLEMENTED | `docker-compose.yml` provisions Postgres and Redis only; app process orchestration remains script/manual. |
+| CI/CD | PARTIALLY_IMPLEMENTED | GitHub Actions runs deploy core and conditional web E2E with Redis service; no Postgres service or deployment workflow evidence. |
+| Deployment/rollback | PARTIALLY_IMPLEMENTED | Runbook has deployment, backup, restore, and rollback procedures; no executed staging/restore proof. |
+| Secret handling | PARTIALLY_IMPLEMENTED | Env examples avoid real secrets and production preflight requires strong secrets; local `.env` files are untracked and were not audited. |
+
+## API Readiness
+
+| Area | Status | Evidence |
+| --- | --- | --- |
+| NestJS module coverage | IMPLEMENTED_UNVERIFIED | Modules exist for platform, admissions, attendance, finance, academics, activity, homework, HR/payroll, library, transport, canteen, accounting, communications, learning, mobile, file registry, reports, usage, settings. |
+| Controllers/routes | IMPLEMENTED_UNVERIFIED | Broad controller surface under `apps/api/src/**`; OpenAPI wiring gate passed. |
+| RBAC and permissions | IMPLEMENTED_UNVERIFIED | `RolesPermissionsGuard`, permission aliases, controller decorators, and role/permission tests exist. |
+| Tenant isolation | IMPLEMENTED_UNVERIFIED | Tenant-scoped services and tenant-isolation E2E tests exist; full pilot data cross-scope checks not run. |
+| Module entitlement | IMPLEMENTED_UNVERIFIED | `EntitlementGuard`, `@RequiredModule`, feature checks, and module lock tests exist. |
+| Auth/session/cookies/JWT | IMPLEMENTED_UNVERIFIED | Auth service/guards/tests exist; local tests pass. Production cookie/domain behavior not staged. |
+| Input validation | IMPLEMENTED_UNVERIFIED | Global `ValidationPipe` with whitelist/forbid non-whitelisted; DTO tests exist. |
+| Safe errors | IMPLEMENTED_UNVERIFIED | `HttpExceptionFilter` returns bounded envelopes and masks 500 internals; tests pass. |
+| Prisma schema/migrations | IMPLEMENTED_UNVERIFIED | Schema validates; migrations exist. No fresh staging migration replay or restore drill in this audit. |
+| Seed behavior | PARTIALLY_IMPLEMENTED | Central seed exists but is currently dirty/uncommitted from demo-data work and was not run twice in this audit. |
+| Accounting/payroll boundaries | IMPLEMENTED_UNVERIFIED | Unit/E2E tests cover reversals/posting/salary slip flows; no live finance/payroll workflow smoke. |
+| Queue/Redis/BullMQ | PARTIALLY_IMPLEMENTED | BullMQ configured and queue tests exist; `pnpm smoke:pilot` failed Redis connectivity because services were down. |
+| File Registry/storage | IMPLEMENTED_UNVERIFIED | File Registry controllers/services/tests and protected-download patterns exist; no external object storage verification. |
+| Provider integrations/webhooks | PARTIALLY_IMPLEMENTED | Webhook and provider readiness code/tests exist; real provider sandbox verification is absent. |
+| Health/readiness | IMPLEMENTED_UNVERIFIED | Smoke runner checks `/health` and `/ready`; local smoke failed because API was not running. |
+| Audit logging | IMPLEMENTED_UNVERIFIED | Audit module and platform audit surfaces exist; no deployed retention/logging proof. |
+
+## Web Readiness
+
+| Area | Status | Evidence |
+| --- | --- | --- |
+| Next.js build health | VERIFIED_COMPLETE | `pnpm --filter @schoolos/web build` and root build passed. |
+| Auth/protected routes | IMPLEMENTED_UNVERIFIED | Cookie-first session metadata and permission checks exist; authenticated browser E2E skipped. |
+| Permission-aware navigation | IMPLEMENTED_UNVERIFIED | Web contract tests assert navigation/permission gates; live role walkthrough missing. |
+| Module entitlement states | IMPLEMENTED_UNVERIFIED | Design and contracts cover locked states; browser coverage incomplete. |
+| Loading/empty/error/locked states | IMPLEMENTED_UNVERIFIED | Shared primitives and many contract checks exist; not every screen was manually audited in-browser. |
+| Protected file handling | IMPLEMENTED_UNVERIFIED | Authenticated file helper patterns and tests exist; external storage not verified. |
+| Accessibility/responsive | PARTIALLY_IMPLEMENTED | Keyboard/route smoke specs exist; no full accessibility audit. |
+| Browser E2E | PARTIALLY_IMPLEMENTED | 5 public tests passed; 12 authenticated tests skipped. |
+| API contract consistency | IMPLEMENTED_UNVERIFIED | Web imports `@schoolos/core`, contract tests pass. |
+| Client security | IMPLEMENTED_UNVERIFIED | Browser stores metadata only, uses cookie credentials, validates PDF responses; full manual security review not complete. |
+
+## Mobile Readiness
+
+| Area | Status | Evidence |
+| --- | --- | --- |
+| Startup/config | IMPLEMENTED_UNVERIFIED | Flutter tests pass; Android debug APK builds. No emulator launch verified in this audit. |
+| API base URL | IMPLEMENTED_UNVERIFIED | Android emulator default is `http://10.0.2.2:4000/api/v1`; override supports `SCHOOL_OS_API_BASE_URL`. |
+| Secure storage/session | IMPLEMENTED_UNVERIFIED | Secure storage, token refresh, expired-token tests pass. |
+| Role navigation | IMPLEMENTED_UNVERIFIED | Role shell tests pass; no live role walkthrough. |
+| Parent flows | PARTIALLY_IMPLEMENTED | Parent repositories/screens and tests exist; depends on seeded guardian/student data. |
+| Teacher flows | PARTIALLY_IMPLEMENTED | Teacher attendance classes/roster/sync code/tests exist; broader subject/homework/timetable role flows need seeded proof. |
+| Principal flows | PARTIALLY_IMPLEMENTED | Principal/admin shell exists; principal-scoped mobile summaries are not proven end-to-end. |
+| Staff self-service | PARTIALLY_IMPLEMENTED | Staff repository/screens exist; staff attendance/leave/payslip screens still have generic load-error states for failures. |
+| Driver/transport | PARTIALLY_IMPLEMENTED | Driver transport repository/dashboard exists; no live assigned-trip/device QA. |
+| Notices/chat | PARTIALLY_IMPLEMENTED | Notices repository tests exist; chat/device notification proof missing. |
+| Empty/error/offline states | PARTIALLY_IMPLEMENTED | Shared state widgets exist; several screens still use generic “Could not load …” for actual request errors. |
+| Release readiness | BLOCKED | Debug APK builds; release signing/configuration and store/release workflow not verified. |
+
+## Module Readiness Matrix
+
+| Module | Backend | Web | Mobile | Tests | Deployment |
+| --- | --- | --- | --- | --- | --- |
+| M0 Platform Core | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | DEFERRED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| M1 Admissions and Student Profiles | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | PARTIALLY_IMPLEMENTED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| M2 Smart Attendance | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | PARTIALLY_IMPLEMENTED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| M3 Fees and Receipts | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | PARTIALLY_IMPLEMENTED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| M4 Academics, Exams, CAS, Report Cards | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | PARTIALLY_IMPLEMENTED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| M5 Activity Feed and Milestones | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | PARTIALLY_IMPLEMENTED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| M6 Homework and Timetable | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | PARTIALLY_IMPLEMENTED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| M7 HR and Payroll | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | PARTIALLY_IMPLEMENTED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| M8A Library | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | DEFERRED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| M8B Transport | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | PARTIALLY_IMPLEMENTED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| M8C Canteen | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | PARTIALLY_IMPLEMENTED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| M9 Accounting and Finance | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | DEFERRED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| M10 Notices, Communication, Chat | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | PARTIALLY_IMPLEMENTED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| M11 School Intelligence / AI | DEFERRED | DEFERRED | DEFERRED | DEFERRED | DEFERRED |
+| M12 Learning Layer | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | PARTIALLY_IMPLEMENTED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| Public marketing/demo intake | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | DEFERRED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| Platform admin and tenant administration | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | DEFERRED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| File Registry/protected documents | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | PARTIALLY_IMPLEMENTED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+| Multi-tenant isolation and lifecycle | IMPLEMENTED_UNVERIFIED | IMPLEMENTED_UNVERIFIED | PARTIALLY_IMPLEMENTED | IMPLEMENTED_UNVERIFIED | BLOCKED |
+
+Deployment is `BLOCKED` across modules because no staging deployment, production env validation, provider validation, restore drill, or pilot smoke passed during this audit.
+
+## Documentation Inventory and Consolidation Decisions
+
+| Markdown File | Decision | Notes |
+| --- | --- | --- |
+| `README.md` | UPDATE | Root orientation; link to this audit and next-phase plan. |
+| `AGENTS.md` | KEEP_AS_CANONICAL | Repository rules for agents. |
+| `apps/api/AGENTS.md` | KEEP_AS_CANONICAL | API-specific rules. |
+| `apps/web/AGENTS.md` | KEEP_AS_CANONICAL | Web-specific rules. |
+| `apps/schoolos_mobile/AGENTS.md` | KEEP_AS_CANONICAL | Mobile-specific rules. |
+| `apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md` | KEEP_AS_CANONICAL | App-local mobile guide pointing to canonical mobile plan. |
+| `apps/schoolos_mobile/docs/DESIGN_SYSTEM.md` | KEEP_AS_CANONICAL | Mobile app design system. |
+| `apps/schoolos_mobile/ios/Runner/Assets.xcassets/LaunchImage.imageset/README.md` | KEEP_AS_CANONICAL | Flutter asset placeholder. |
+| `apps/web/docs/DESIGN_SYSTEM.md` | KEEP_AS_CANONICAL | Web design system. |
+| `apps/web/e2e/README.md` | UPDATE | Keep as browser E2E guide; should clarify auth skips when API/seed unavailable. |
+| `docs/README.md` | UPDATE | Documentation index; add audit and next-phase plan. |
+| `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md` | UPDATE | Keep as product source of truth; avoid production-ready wording without proof. |
+| `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` | UPDATE | Keep as functional source of truth; avoid readiness claims. |
+| `docs/project/SCHOOLOS_PROJECT_STATUS.md` | UPDATE | Current status should be audit-led and conservative. |
+| `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md` | UPDATE | Keep as implementation backlog; next execution path moves to next-phase plan. |
+| `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` | KEEP_AS_CANONICAL | New canonical audit. |
+| `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` | KEEP_AS_CANONICAL | New focused delivery path. |
+| `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | KEEP_AS_CANONICAL | Architecture/security source of truth. |
+| `docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | KEEP_AS_CANONICAL | Platform/school operations boundary. |
+| `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | KEEP_AS_CANONICAL | Active web design plan. |
+| `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | KEEP_AS_CANONICAL | Active mobile design plan. |
+| `docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | UPDATE | Keep as operations runbook; clarify it is procedure, not proof. |
+| `docs/archive/README.md` | KEEP_AS_CANONICAL | Archive policy. |
+| `.cache/corepack/v1/pnpm/10.12.1/README.md` | REMOVE_AS_REDUNDANT | Tool cache artifact, not active repository documentation. No repo doc link should target it. |
+
+No active Markdown documents were deleted or archived in this audit. The consolidation action is to make this audit and `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` the active readiness and execution references, while keeping existing product, architecture, design, and runbook documents in their proper lanes.
+
+## Critical Blockers
+
+1. No staging deployment evidence.
+2. No successful pilot smoke in this audit.
+3. No production environment validation with real secrets and HTTPS origins.
+4. No backup restore drill or rollback rehearsal.
+5. Authenticated browser E2E skipped.
+6. Mobile role flows not verified on Android emulator/device against live seeded backend.
+7. Current central seed work is dirty/uncommitted and not proven idempotent by this audit.
+8. External providers and object storage are not verified.
+
+## High-Priority Gaps
+
+- Complete and verify one realistic default tenant seed with parent, teacher, staff, principal, driver, finance, transport, attendance, homework, notices, payroll, and mobile-ready relationships.
+- Start local services and make `pnpm smoke:pilot` pass before using “demo-ready” without qualification.
+- Make authenticated browser E2E run rather than skip.
+- Add mobile emulator QA scripts/checklists for parent, teacher, principal, staff, and driver.
+- Execute staging `prisma migrate deploy`, seed, `/health`, `/ready`, browser smoke, mobile smoke, provider readiness, and restore drill.
+
+## Medium-Priority Gaps
+
+- Add a committed web env example or documented web env matrix.
+- Expand observability evidence: deployed logs, queue dashboards, alerts, and on-call procedures.
+- Record browser accessibility and responsive QA beyond contract tests.
+- Keep app-level E2E README aligned with actual skip behavior.
+- Address Flutter plugin Kotlin Gradle Plugin deprecation before it becomes a build blocker.
+
+## Deferred Items
+
+- M11 Intelligence/AI remains `DEFERRED`.
+- Broad student mobile app remains `DEFERRED`; mobile remains companion/persona-scoped.
+- Kubernetes, microservices, search clusters, GPU services, and unrelated architecture rewrites remain out of scope.
+
+## Do Not Claim Yet
+
+Do not claim any of the following until the required proof exists:
+
+- Production-ready for a real school.
+- Multi-school production-ready.
+- Staging verified.
+- External provider verified.
+- Object storage verified.
+- Backup/restore verified.
+- Authenticated browser E2E complete.
+- Android/iOS release-ready.
+- Real pilot completed.
+- Seed idempotency verified for the current large demo dataset.

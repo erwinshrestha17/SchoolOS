@@ -4,7 +4,7 @@ SchoolOS is a production-grade, multi-tenant SaaS School Operating System for Ne
 
 It is designed as a modular school operating platform covering admissions, student records, attendance, fees, notices, activity feed, academics, homework, timetable, HR/payroll, accounting, library, transport, canteen, classroom learning, parent engagement, and future intelligence/analytics.
 
-The current implemented core remains focused on controlled pilot readiness for existing management modules. M12 Learning Layer has a verified backend/web/mobile foundation; KG-12 breadth and deeper learning experiences remain staged expansion goals, not a claim that every KG-12 feature is already implemented.
+The current implemented core remains focused on internal QA, realistic seeded demo flows, authenticated browser/mobile verification, and staging readiness for controlled pilot. M12 Learning Layer has a broad backend/web/mobile foundation; KG-12 breadth and deeper learning experiences remain staged expansion goals, not a claim that every KG-12 feature is already implemented.
 
 ---
 
@@ -22,6 +22,8 @@ docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
 
 docs/project/SCHOOLOS_PROJECT_STATUS.md
 docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
+docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md
+docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md
 
 docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
 docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
@@ -67,42 +69,47 @@ The current management modules remain the foundation. The Learning Layer is impl
 ## Current Stage
 
 ```text
-Phase 0: Completed
-Phase 1A: Completed / Pilot-Ready
-Phase 1B: Completed / Pilot-Ready
-M0 Platform Core Foundation Depth: Completed
-M4 Academics backend/admin UI: Completed / Pilot-Ready
-M6 Homework/Timetable: Completed / Pilot-Ready
-M7 HR/Payroll: Completed / Pilot-Ready
-M8A Library, M8B Transport, M8C Canteen: Admin/backend foundations implemented with hardening depth
-M9 Accounting: Completed / Pilot-Ready
-M10 Notices/Communication/Chat: Foundation plus provider/attachment/retry depth implemented
-Pre-AI Advanced Operations: Backend foundation and additive Prisma migration added for approvals, automation, descriptive analytics summaries, mobile/offline reliability foundations, documents, and Nepal-school workflow depth; frontend/mobile workflow depth remains next-phase work
+Local API/web/mobile foundations: Implemented with passing local unit, E2E, contract, build, and Flutter gates as recorded in docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md
+Default seeded tenant and role-assignment proof: In progress; current seed worktree is dirty and requires idempotency/scope verification before pilot claims
+Authenticated browser E2E: Partially implemented; latest audited run passed public checks but skipped authenticated checks
+Mobile role flows: Partially implemented; Flutter analyze/tests/APK build pass, but Android emulator role-flow QA against seeded backend is pending
+Staging/provider/storage/backup/restore verification: Blocked until staging environment and real credentials/procedures are executed
 M11 Intelligence/AI: Roadmap only
-M12 Learning Layer: Production foundation implemented and verified; staging/browser/device depth remains staged
+M12 Learning Layer: Implemented foundation; staging/browser/device depth remains staged
 KG-12 Expansion: Product direction added; Grade 11-12 and advanced learning features are staged future scope
 ```
 
-Latest local verification snapshot:
+Latest audited local verification snapshot:
 
 ```text
-2026-06-15: Backend package gates pass, root typecheck/build pass, and local smoke suites pass:
-- pnpm smoke:pilot
-- pnpm smoke:learning
-- pnpm smoke:full
+2026-06-18: Root local gates passed:
+- pnpm db:generate
+- pnpm db:validate
+- pnpm verify:openapi
+- pnpm lint
+- pnpm typecheck
+- pnpm test
+- pnpm test:e2e
+- pnpm build
+- pnpm verify:production
 
-Advanced-operations migration status:
-- apps/api/prisma/migrations/20260615090000_advanced_operations_foundation exists.
-- Migration SQL was reviewed as additive-only for the advanced-operations tables/enums/indexes/foreign keys.
-- Staging/pilot migration deployment remains pending; do not claim production-ready until staging migration and pilot checks pass.
+Important caveats:
+- pnpm smoke:pilot failed because local Postgres, Redis, and API were not running.
+- pnpm test:web:e2e passed with 5 public checks and 12 authenticated checks skipped.
+- DEPLOY_ENV=production pnpm verify:env:deploy failed because production secrets/origins were not configured in this local shell.
+- Flutter analyze/test/debug APK build passed, but no emulator role-flow QA was run.
 ```
 
 Current product readiness:
 
 ```text
-Demo-ready: Yes
+Product Implementation Completion Score: 74 / 100
+Production Deployment Readiness Score: 50 / 100
+Recommended target: Internal QA; demo-ready is conditional on local services, seed, and smoke passing
+Demo-ready: Conditional
 Internal QA-ready: Yes
-Controlled pilot-ready: Yes, after staging/pilot checks
+Controlled pilot-ready: Conditional, after staging/pilot/browser/mobile checks
+Single-school production-ready: No
 Multi-school production-ready: Not yet
 Full KG-12 SchoolOS product complete: No
 ```
