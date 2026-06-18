@@ -191,6 +191,16 @@ export class PayrollController {
     return this.payrollService.listMyPayslips(auth);
   }
 
+  @Get('me/payslips/:payslipNumber.pdf')
+  @Header('Content-Type', 'application/pdf')
+  @Permissions('staff:read')
+  getMyPayslipPdf(
+    @Param('payslipNumber') payslipNumber: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getPayslipPdf(payslipNumber, auth);
+  }
+
   @Get('payslips/:payslipNumber/pdf')
   @Header('Content-Type', 'application/pdf')
   @Permissions('payroll:payslip:read')

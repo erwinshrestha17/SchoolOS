@@ -7,6 +7,7 @@ import type {
   NoticeSummary,
   NotificationDelivery,
 } from '@schoolos/core';
+import type { NoticeRecipientPreview } from '../../lib/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { useEffect, useMemo, useState } from 'react';
@@ -19,9 +20,10 @@ import { EmptyState } from '../ui/empty-state';
 import { Tabs, TabsContent } from '../ui/tabs';
 import { Badge } from '../ui/badge';
 import { FileUploader } from '../ui/file-uploader';
+import { FilterBar } from '../ui/filter-bar';
 import { ModuleTabs } from '../dashboard/module-tabs';
 import { cn } from '../../lib/utils';
-import { RefreshCcw, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { RefreshCcw, AlertCircle, CheckCircle2, Clock, UsersRound } from 'lucide-react';
 
 const communicationSections = [
   'Notices',
@@ -40,6 +42,7 @@ const deliveryStatuses = [
   'SKIPPED',
   'PENDING',
   'RETRYING',
+  'RETRY_PENDING',
 ] as const;
 const consentTypes = [
   'PRIVACY',
@@ -146,6 +149,9 @@ export function CommunicationsForm({
   });
   const [noticeError, setNoticeError] = useState<string | null>(null);
   const [noticeSuccess, setNoticeSuccess] = useState<string | null>(null);
+  const [recipientPreview, setRecipientPreview] =
+    useState<NoticeRecipientPreview | null>(null);
+  const [highImpactConfirmed, setHighImpactConfirmed] = useState(false);
   const [event, setEvent] = useState<EventState>({
     title: '',
     description: '',
@@ -253,9 +259,6 @@ export function CommunicationsForm({
   const deliveryStats = useMemo(() => {
     const deliveries = deliveriesQuery.data ?? [];
     return {
-      total: deliveries.length,
-      sent: deliveries.filter((item) => item.status === 'SENT').length,
-      failed: deliveries.filter((item) => item.status === 'FAILED').length,
       pending: deliveries.filter((item) =>
         ['QUEUED', 'PENDING', 'RETRYING'].includes(item.status),
       ).length,
@@ -267,6 +270,18 @@ export function CommunicationsForm({
   useEffect(() => {
     setActiveSection(initialSection);
   }, [initialSection]);
+
+  useEffect(() => {
+    setRecipientPreview(null);
+    setHighImpactConfirmed(false);
+  }, [
+    notice.audienceType,
+    notice.body,
+    notice.classId,
+    notice.priority,
+    notice.sectionId,
+    notice.title,
+  ]);
 
   const noticeMutation = useMutation({
     mutationFn: api.createNotice,
@@ -281,6 +296,8 @@ export function CommunicationsForm({
           : 'Notice published. Delivery records have been queued.',
       );
       setNoticeError(null);
+      setRecipientPreview(null);
+      setHighImpactConfirmed(false);
       setNotice((current) => ({
         ...current,
         title: '',
@@ -291,9 +308,27 @@ export function CommunicationsForm({
         attachmentFileName: '',
       }));
     },
-    onError: (error) => {
-      setNoticeError(error.message);
+    onError: () => {
+      setNoticeError(
+        'The notice could not be published. Check your audience and try again.',
+      );
       setNoticeSuccess(null);
+    },
+  });
+
+  const recipientPreviewMutation = useMutation({
+    mutationFn: api.previewNoticeRecipients,
+    onSuccess: (result) => {
+      setRecipientPreview(result);
+      setNoticeError(null);
+      setHighImpactConfirmed(false);
+    },
+    onError: () => {
+      setRecipientPreview(null);
+      setHighImpactConfirmed(false);
+      setNoticeError(
+        'Recipient preview is unavailable right now. Review the audience and try again.',
+      );
     },
   });
 
@@ -376,20 +411,43 @@ export function CommunicationsForm({
       return;
     }
 
-    noticeMutation.mutate({
-      title: notice.title.trim(),
-      body: notice.body.trim(),
-      priority: notice.priority,
+    if (notice.priority === 'EMERGENCY' && !recipientPreview) {
+      setNoticeError(
+        'Preview recipients before publishing this high-impact notice.',
+      );
+      setNoticeSuccess(null);
+      return;
+    }
+
+    if (notice.priority === 'EMERGENCY' && !highImpactConfirmed) {
+      setNoticeError(
+        'Confirm the recipient preview before publishing this high-impact notice.',
+      );
+      setNoticeSuccess(null);
+      return;
+    }
+
+    noticeMutation.mutate(buildNoticePayload(notice));
+  }
+
+  function previewNoticeRecipients() {
+    const validationError = validateAudienceFields({
+      title: notice.title,
+      body: notice.body,
       audienceType: notice.audienceType,
-      classId: notice.audienceType === 'ALL' ? null : notice.classId || null,
-      sectionId:
-        notice.audienceType === 'SECTION' ? notice.sectionId || null : null,
-      attachmentFileId: notice.attachmentFileId || null,
+      classId: notice.classId,
+      sectionId: notice.sectionId,
       scheduledFor:
-        notice.scheduleMode === 'LATER' && notice.scheduledFor
-          ? new Date(notice.scheduledFor).toISOString()
-          : null,
+        notice.scheduleMode === 'LATER' ? notice.scheduledFor : null,
     });
+
+    if (validationError) {
+      setNoticeError(validationError);
+      setNoticeSuccess(null);
+      return;
+    }
+
+    recipientPreviewMutation.mutate(buildNoticePayload(notice));
   }
 
   function submitEvent() {
@@ -437,27 +495,8 @@ export function CommunicationsForm({
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[440px]">
-            <CommunicationMetric
-              label="Notices"
-              value={String(noticesQuery.data?.length ?? 0)}
-              tone="neutral"
-            />
-            <CommunicationMetric
-              label="Events"
-              value={String(eventsQuery.data?.length ?? 0)}
-              tone="info"
-            />
-            <CommunicationMetric
-              label="Sent"
-              value={String(deliveryStats.sent)}
-              tone="success"
-            />
-            <CommunicationMetric
-              label="Failed"
-              value={String(deliveryStats.failed)}
-              tone="danger"
-            />
+          <div className="max-w-md rounded-2xl border border-[var(--color-mod-notices-border)] bg-[var(--color-mod-notices-bg)] px-4 py-3 text-sm leading-6 text-[var(--color-mod-notices-text)]">
+            This workspace uses tenant-scoped backend records. Official M10 totals stay unavailable unless a summary contract owns them.
           </div>
         </div>
       </section>
@@ -501,9 +540,16 @@ export function CommunicationsForm({
             notices={noticesQuery.data ?? []}
             noticesLoading={noticesQuery.isLoading}
             noticesError={
-              noticesQuery.isError ? noticesQuery.error.message : null
+              noticesQuery.isError
+                ? 'Notices could not be loaded right now.'
+                : null
             }
             submitNotice={submitNotice}
+            previewRecipients={previewNoticeRecipients}
+            preview={recipientPreview}
+            previewPending={recipientPreviewMutation.isPending}
+            highImpactConfirmed={highImpactConfirmed}
+            setHighImpactConfirmed={setHighImpactConfirmed}
             isPending={noticeMutation.isPending}
             noticeError={noticeError}
             noticeSuccess={noticeSuccess}
@@ -531,7 +577,9 @@ export function CommunicationsForm({
             deliveries={filteredDeliveries}
             isLoading={deliveriesQuery.isLoading}
             error={
-              deliveriesQuery.isError ? deliveriesQuery.error.message : null
+              deliveriesQuery.isError
+                ? 'Delivery records could not be loaded right now.'
+                : null
             }
             filters={deliveryFilters}
             setFilters={setDeliveryFilters}
@@ -580,6 +628,11 @@ function NoticesSection({
   noticesLoading,
   noticesError,
   submitNotice,
+  previewRecipients,
+  preview,
+  previewPending,
+  highImpactConfirmed,
+  setHighImpactConfirmed,
   isPending,
   noticeError,
   noticeSuccess,
@@ -592,6 +645,11 @@ function NoticesSection({
   noticesLoading: boolean;
   noticesError: string | null;
   submitNotice: () => void;
+  previewRecipients: () => void;
+  preview: NoticeRecipientPreview | null;
+  previewPending: boolean;
+  highImpactConfirmed: boolean;
+  setHighImpactConfirmed: (confirmed: boolean) => void;
   isPending: boolean;
   noticeError: string | null;
   noticeSuccess: string | null;
@@ -805,9 +863,18 @@ function NoticesSection({
           {notice.priority === 'EMERGENCY' ? (
             <InlineMessage
               tone="error"
-              message="Emergency notices may trigger forced delivery channels depending on school settings."
+              message="Emergency notices use backend-selected high-impact delivery channels. Preview and confirm recipients before publishing."
             />
           ) : null}
+
+          <RecipientPreviewPanel
+            preview={preview}
+            isPending={previewPending}
+            isHighImpact={notice.priority === 'EMERGENCY'}
+            confirmed={highImpactConfirmed}
+            onConfirmedChange={setHighImpactConfirmed}
+            onPreview={previewRecipients}
+          />
           {noticeError ? (
             <InlineMessage tone="error" message={noticeError} />
           ) : null}
@@ -1204,7 +1271,7 @@ function DeliveryRecordsSection({
         <SectionHeader
           eyebrow="Delivery Records"
           title="Recent provider-neutral deliveries"
-          description="Local and development providers are stubbed/logged; no real external SMS, FCM, or email is sent by the frontend."
+          description="Delivery status is backend-owned. Disabled or unavailable providers remain explicit and cannot be treated as successful sends."
         />
 
         <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
@@ -1212,7 +1279,11 @@ function DeliveryRecordsSection({
         </span>
       </div>
 
-      <div className="mt-6 grid gap-3 md:grid-cols-3">
+      <FilterBar
+        className="mt-6"
+        label="Delivery filters"
+        description="Filter the latest backend delivery records by status, channel, or source."
+      >
         <select
           value={filters.status}
           onChange={(event) =>
@@ -1264,7 +1335,7 @@ function DeliveryRecordsSection({
             </option>
           ))}
         </select>
-      </div>
+      </FilterBar>
 
       <div className="mt-6 grid gap-3 md:grid-cols-2">
         {isLoading ? (
@@ -1286,18 +1357,16 @@ function DeliveryRecordsSection({
                   <span className="font-semibold text-gray-700">
                     {delivery.channel}
                   </span>{' '}
-                  / {delivery.destination ?? 'no destination'}
+                  / {formatEnumLabel(delivery.audienceType)} audience
                 </p>
-                <p className="text-xs">
-                  {delivery.sourceType} / {delivery.sourceId}
-                </p>
+                <p className="text-xs">{formatEnumLabel(delivery.sourceType)}</p>
               </div>
             </article>
           ))
         ) : (
           <EmptyState
             title="No delivery records found"
-            description="No records match the current filter selection."
+            description="No delivery records match these filters."
           />
         )}
       </div>
@@ -1482,32 +1551,6 @@ function SectionHeader({
   );
 }
 
-function CommunicationMetric({
-  label,
-  value,
-  tone = 'neutral',
-}: {
-  label: string;
-  value: string;
-  tone?: 'neutral' | 'info' | 'success' | 'danger';
-}) {
-  const toneClass = {
-    neutral: 'border-slate-200 bg-slate-50 text-slate-700',
-    info: 'border-blue-200 bg-blue-50 text-blue-700',
-    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    danger: 'border-rose-200 bg-rose-50 text-rose-700',
-  }[tone];
-
-  return (
-    <div className={`rounded-2xl border p-4 ${toneClass}`}>
-      <p className="text-[11px] font-bold uppercase tracking-wider opacity-70">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-black tabular-nums">{value}</p>
-    </div>
-  );
-}
-
 function ScheduleOption({
   title,
   description,
@@ -1654,6 +1697,105 @@ function filterSectionsForClass(
 
 function uniqueValues(values: string[]) {
   return Array.from(new Set(values.filter(Boolean))).sort();
+}
+
+function buildNoticePayload(notice: NoticeState) {
+  return {
+    title: notice.title.trim(),
+    body: notice.body.trim(),
+    priority: notice.priority,
+    audienceType: notice.audienceType,
+    classId: notice.audienceType === 'ALL' ? null : notice.classId || null,
+    sectionId:
+      notice.audienceType === 'SECTION' ? notice.sectionId || null : null,
+    attachmentFileId: notice.attachmentFileId || null,
+    scheduledFor:
+      notice.scheduleMode === 'LATER' && notice.scheduledFor
+        ? new Date(notice.scheduledFor).toISOString()
+        : null,
+  };
+}
+
+function RecipientPreviewPanel({
+  preview,
+  isPending,
+  isHighImpact,
+  confirmed,
+  onConfirmedChange,
+  onPreview,
+}: {
+  preview: NoticeRecipientPreview | null;
+  isPending: boolean;
+  isHighImpact: boolean;
+  confirmed: boolean;
+  onConfirmedChange: (confirmed: boolean) => void;
+  onPreview: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-[var(--color-mod-notices-border)] bg-[var(--color-mod-notices-bg)] p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <UsersRound className="mt-0.5 text-[var(--color-mod-notices-text)]" size={20} />
+          <div>
+            <p className="text-sm font-bold text-slate-950">Recipient preview</p>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              Confirm backend-resolved audience and channel counts before sending a high-impact notice.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onPreview}
+          disabled={isPending}
+          className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-[var(--color-mod-notices-border)] bg-white px-4 text-sm font-bold text-[var(--color-mod-notices-text)] disabled:opacity-50"
+        >
+          {isPending ? 'Checking recipients...' : 'Preview recipients'}
+        </button>
+      </div>
+
+      {preview ? (
+        <div className="mt-4 space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <PreviewFact label="Resolved" value={preview.recipientCount} />
+            <PreviewFact label="Allowed" value={preview.allowedRecipientCount} />
+            <PreviewFact label="Skipped" value={preview.skippedRecipientCount} />
+            <PreviewFact label="Delivery rows" value={preview.estimatedDeliveryRows} />
+          </div>
+          <p className="text-xs font-semibold text-slate-600">
+            Channels: {preview.channels.map(formatEnumLabel).join(', ') || 'Unavailable'}
+          </p>
+          {preview.skippedRecipientCount > 0 ? (
+            <InlineMessage
+              tone="info"
+              message="Some recipients cannot be reached under current consent or contact rules. Backend delivery policy remains authoritative."
+            />
+          ) : null}
+          {isHighImpact ? (
+            <label className="flex items-start gap-3 rounded-xl border border-rose-200 bg-white p-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(event) => onConfirmedChange(event.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                I reviewed the recipient and channel counts for this high-impact notice.
+              </span>
+            </label>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PreviewFact({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-white bg-white px-3 py-2 shadow-sm">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-black tabular-nums text-slate-950">{value}</p>
+    </div>
+  );
 }
 
 function validateAudienceFields(input: {

@@ -210,13 +210,13 @@ export function DeliveryRetryPanel() {
       {retryMutation.isError ? (
         <InlineRetryMessage
           tone="error"
-          message={retryMutation.error.message}
+          message="This delivery could not be retried. Check the provider state and your permission, then try again."
         />
       ) : null}
       {retryAllMutation.isError ? (
         <InlineRetryMessage
           tone="error"
-          message={retryAllMutation.error.message}
+          message="Failed deliveries could not be retried. The backend may have blocked the provider or retry state."
         />
       ) : null}
       {retryMutation.isSuccess ? (
@@ -287,7 +287,12 @@ export function DeliveryRetryPanel() {
                           delivery.body}
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-400">
-                        <span>{resolveRecipientLabel(delivery)}</span>
+                        <span>
+                          {resolveRecipientLabel(
+                            delivery,
+                            failureDetail?.recipientSummary.destinationMasked,
+                          )}
+                        </span>
                         {failureDetail ? (
                           <span>
                             Retries: {failureDetail.retryCount} /{' '}
@@ -432,7 +437,10 @@ function InlineRetryMessage({
   );
 }
 
-function resolveRecipientLabel(delivery: DeliveryRecord) {
+function resolveRecipientLabel(
+  delivery: DeliveryRecord,
+  maskedDestination?: string | null,
+) {
   const guardianName = delivery.guardian?.fullName;
   const studentName = [
     delivery.student?.firstNameEn,
@@ -449,7 +457,7 @@ function resolveRecipientLabel(delivery: DeliveryRecord) {
   return (
     guardianName ||
     studentName ||
-    delivery.destination ||
+    maskedDestination ||
     'Recipient unavailable'
   );
 }

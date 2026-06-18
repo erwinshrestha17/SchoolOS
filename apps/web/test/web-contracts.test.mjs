@@ -292,6 +292,38 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
+  it("keeps W4 operational routes behind matching module entitlement gates", () => {
+    const dashboardLayout = read("app/dashboard/layout.tsx");
+    const sidebar = read("components/layout/sidebar.tsx");
+
+    for (const source of [dashboardLayout, sidebar]) {
+      assert.match(
+        source,
+        /href\.startsWith\('\/dashboard\/timetable'\)\) return 'timetable'/,
+      );
+      assert.match(
+        source,
+        /href\.startsWith\('\/dashboard\/hr'\)\) return 'hr'/,
+      );
+      assert.match(
+        source,
+        /href\.startsWith\('\/dashboard\/payroll'\)\) return 'hr'/,
+      );
+      assert.match(
+        source,
+        /href\.startsWith\('\/dashboard\/library'\)\) return 'library'/,
+      );
+      assert.match(
+        source,
+        /href\.startsWith\('\/dashboard\/transport'\)\) return 'transport'/,
+      );
+      assert.match(
+        source,
+        /href\.startsWith\('\/dashboard\/canteen'\)\) return 'canteen'/,
+      );
+    }
+  });
+
   it("exposes client helpers for canonical Phase 1 and Phase 2 workflows", () => {
     const apiClient = readMany([
       "lib/api/client.ts",
@@ -2410,6 +2442,7 @@ describe("SchoolOS web production contracts", () => {
       "api.listAdmissions",
       "api.getGuardianConsentStatus",
       "api.createNotice",
+      "api.previewNoticeRecipients",
       "api.createEvent",
       "api.captureGuardianConsent",
       "api.revokeGuardianConsent",
@@ -2421,12 +2454,17 @@ describe("SchoolOS web production contracts", () => {
 
     assert.match(communicationsApi, /getNoticeDetail:/);
     assert.match(communicationsApi, /listNoticeUnreadRecipients:/);
+    assert.match(communicationsApi, /previewNoticeRecipients:/);
+    assert.match(communicationsApi, /getNotificationDeliveryAnalytics:/);
     assert.match(noticeDetailPage, /api\.getNoticeDetail\(noticeId\)/);
     assert.match(
       noticeDetailPage,
       /api\.listNoticeUnreadRecipients\(noticeId\)/,
     );
     assert.match(noticeDetailPage, /Open attachment/);
+    assert.match(noticeDetailPage, /ProtectedFileButton/);
+    assert.match(noticeDetailPage, /getProtectedFileId/);
+    assert.doesNotMatch(noticeDetailPage, /href=\{notice\.attachmentUrl\}/);
     assert.doesNotMatch(noticeDetailPage, /fetchNoticeDetail|API_BASE_URL/);
   });
 
@@ -2455,8 +2493,9 @@ describe("SchoolOS web production contracts", () => {
 
     assert.match(
       communicationsForm,
-      /Emergency notices may trigger forced delivery channels/,
+      /Preview and confirm recipients before publishing/,
     );
+    assert.match(communicationsForm, /I reviewed the recipient and channel counts/);
     assert.match(communicationsForm, /Publish notice/);
     assert.match(communicationsForm, /Schedule notice/);
   });
@@ -2470,6 +2509,7 @@ describe("SchoolOS web production contracts", () => {
       "SKIPPED",
       "PENDING",
       "RETRYING",
+      "RETRY_PENDING",
     ];
 
     assert.match(communicationsForm, /Event Publisher/);
@@ -2572,6 +2612,33 @@ describe("SchoolOS web production contracts", () => {
     ]) {
       assert.ok(retryPanel.includes(marker), `Missing marker: ${marker}`);
     }
+  });
+
+  it("uses the shared M10 workspace shell without browser-derived official totals", () => {
+    const workspace = read("components/notices/notices-workspace.tsx");
+    const communicationsForm = read("components/forms/communications-form.tsx");
+    const messaging = read(
+      "components/messaging/parent-teacher-messaging-workspace.tsx",
+    );
+
+    for (const marker of [
+      "<ModuleHeader",
+      "<KpiGrid",
+      "<KpiCard",
+      "<ModuleTabs",
+      "New Notice",
+      "moreActionItems",
+      "Needs a real M10 summary API",
+      "getNotificationDeliveryAnalytics",
+    ]) {
+      assert.ok(workspace.includes(marker), `Missing marker: ${marker}`);
+    }
+
+    assert.match(communicationsForm, /<FilterBar/);
+    assert.doesNotMatch(communicationsForm, /delivery\.destination \?\?/);
+    assert.doesNotMatch(communicationsForm, /delivery\.sourceId/);
+    assert.match(messaging, /TablePagination/);
+    assert.match(messaging, /escalated thread is locked/);
   });
 
   it("removes default emergency sample copy from communications", () => {

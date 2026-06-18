@@ -47,7 +47,7 @@ class StaffRepository {
     }
 
     final response = await _client.get<List<int>>(
-      '/payroll/payslips/${Uri.encodeComponent(payslip.payslipNumber)}.pdf',
+      '/payroll/me/payslips/${Uri.encodeComponent(payslip.payslipNumber)}.pdf',
       options: Options(
         responseType: ResponseType.bytes,
         headers: {Headers.acceptHeader: 'application/pdf'},

@@ -73,6 +73,24 @@ export type NoticeUnreadRecipientsResult = {
   recipients: NoticeUnreadRecipient[];
 };
 
+export type NoticeRecipientPreview = {
+  audienceType: string;
+  classId: string | null;
+  sectionId: string | null;
+  priority: string;
+  channels: string[];
+  recipientCount: number;
+  allowedRecipientCount: number;
+  skippedRecipientCount: number;
+  estimatedDeliveryRows: number;
+};
+
+export type NotificationDeliveryAnalytics = {
+  byStatus: Array<{ status: string; count: number }>;
+  byChannel: Array<{ channel: string; count: number }>;
+  emergencyNoticeCount: number;
+};
+
 export const communicationsApi = {
   listNotices: () => request<NoticeSummary[]>('/notices'),
   getNoticeDetail: (noticeId: string) =>
@@ -83,11 +101,20 @@ export const communicationsApi = {
     ),
   createNotice: (body: JsonBody) =>
     request<NoticeSummary>('/notices', { method: 'POST', json: body }),
+  previewNoticeRecipients: (body: JsonBody) =>
+    request<NoticeRecipientPreview>('/notices/recipient-preview', {
+      method: 'POST',
+      json: body,
+    }),
   listEvents: () => request<EventSummary[]>('/events'),
   createEvent: (body: JsonBody) =>
     request<EventSummary>('/events', { method: 'POST', json: body }),
   listNotificationDeliveries: () =>
     request<NotificationDelivery[]>('/communications/deliveries'),
+  getNotificationDeliveryAnalytics: () =>
+    request<NotificationDeliveryAnalytics>(
+      '/communications/deliveries/analytics',
+    ),
   listConsents: () => request<ConsentRecord[]>('/consents'),
   getGuardianConsentStatus: (guardianId: string) =>
     request<GuardianConsentStatus[]>(

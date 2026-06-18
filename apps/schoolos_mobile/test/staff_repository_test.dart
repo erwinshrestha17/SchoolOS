@@ -146,13 +146,13 @@ void main() {
 
       when(
         () => apiClient.get<List<int>>(
-          '/payroll/payslips/PAY%2F2026%2F05.pdf',
+          '/payroll/me/payslips/PAY%2F2026%2F05.pdf',
           options: any(named: 'options'),
         ),
       ).thenAnswer(
         (_) async => Response<List<int>>(
           requestOptions: RequestOptions(
-            path: '/payroll/payslips/PAY%2F2026%2F05.pdf',
+            path: '/payroll/me/payslips/PAY%2F2026%2F05.pdf',
           ),
           data: [37, 80, 68, 70],
         ),
@@ -165,7 +165,7 @@ void main() {
       expect(File(download.filePath).readAsBytesSync(), [37, 80, 68, 70]);
       verify(
         () => apiClient.get<List<int>>(
-          '/payroll/payslips/PAY%2F2026%2F05.pdf',
+          '/payroll/me/payslips/PAY%2F2026%2F05.pdf',
           options: any(named: 'options'),
         ),
       ).called(1);

@@ -25,9 +25,10 @@ import { useSession } from '@/components/session-provider';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { LoadingState } from '@/components/ui/loading-state';
+import { ModuleHeader } from '@/components/ui/module-header';
+import { ModuleTabs } from '@/components/ui/module-tabs';
+import { TablePagination } from '@/components/ui/table-pagination';
 import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
-import { ModuleTabs } from '@/components/dashboard/module-tabs';
-import { PageHeader } from '@/components/ui/page-header';
 import { SectionCard } from '@/components/ui/section-card';
 
 type MessageStatusFilter = '' | 'OPEN' | 'ESCALATED' | 'CLOSED';
@@ -46,6 +47,7 @@ export function ParentTeacherMessagingWorkspace({
   const { session } = useSession();
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [search, setSearch] = useState('');
+  const [threadPage, setThreadPage] = useState(1);
   const [studentId, setStudentId] = useState('');
   const [message, setMessage] = useState('');
   const [priority, setPriority] = useState<'NORMAL' | 'IMPORTANT' | 'EMERGENCY'>('NORMAL');
@@ -63,7 +65,12 @@ export function ParentTeacherMessagingWorkspace({
 
   useEffect(() => {
     setStatusFilter(initialStatusFilter);
+    setThreadPage(1);
   }, [initialStatusFilter]);
+
+  useEffect(() => {
+    setThreadPage(1);
+  }, [search, statusFilter]);
 
   const availabilityQuery = useQuery({
     queryKey: ['parent-teacher-availability-status'],
@@ -71,12 +78,13 @@ export function ParentTeacherMessagingWorkspace({
   });
 
   const threadsQuery = useQuery({
-    queryKey: ['parent-teacher-threads', statusFilter, search],
+    queryKey: ['parent-teacher-threads', statusFilter, search, threadPage],
     queryFn: () =>
       api.listParentTeacherThreads({
         status: statusFilter || undefined,
         search: search || undefined,
-        limit: '50',
+        page: String(threadPage),
+        limit: '20',
       }),
   });
 
@@ -168,41 +176,64 @@ export function ParentTeacherMessagingWorkspace({
     () => messagesQuery.data?.items ?? [],
     [messagesQuery.data?.items],
   );
+  const isEscalationLocked = Boolean(
+    activeThread?.status === 'ESCALATED' && !isModerator,
+  );
   const canSend = Boolean(
     activeThread &&
       activeThread.status !== 'CLOSED' &&
+      !isEscalationLocked &&
       message.trim().length > 0 &&
       message.trim().length <= 2000,
   );
 
   return (
     <DashboardPageShell>
-      <PageHeader
-        title="Messages"
+      <ModuleHeader
+        eyebrow="M10 Notices / Communication / Chat"
+        title="Parent-Teacher Chat"
         description="Parent and class-teacher conversations with school moderation, reporting, escalation, and quiet-hours controls."
+        moreActionItems={[
+          {
+            label: 'Notices',
+            icon: <MessageSquare size={16} />,
+            onClick: () => router.push('/dashboard/notices'),
+          },
+          {
+            label: 'Delivery Logs',
+            icon: <Clock size={16} />,
+            onClick: () => router.push('/dashboard/notices/deliveries'),
+          },
+          {
+            label: 'Escalated Chats',
+            icon: <ShieldCheck size={16} />,
+            onClick: () => router.push('/dashboard/messages/moderation'),
+          },
+        ]}
       />
 
-      <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-        <ModuleTabs
-          items={[
-            { href: '/dashboard/messages', label: 'Messages' },
-            { href: '/dashboard/messages/threads', label: 'Threads' },
-            { href: '/dashboard/messages/moderation', label: 'Moderation' },
-            { href: '/dashboard/notices', label: 'Notices' },
-          ]}
-          accentColor="rose"
-          variant="light"
+      <ModuleTabs
+        items={[
+          { href: '/dashboard/notices', label: 'Notices' },
+          { href: '/dashboard/notices/new', label: 'Compose' },
+          { href: '/dashboard/notices/deliveries', label: 'Delivery Logs' },
+          { href: '/dashboard/messages', label: 'Chat' },
+          { href: '/dashboard/messages/moderation', label: 'Escalations' },
+        ]}
+        accentColor="rose"
+        variant="light"
+      />
+
+      <div className="mt-6 space-y-6">
+        <AvailabilityBanner
+          isLoading={availabilityQuery.isLoading}
+          isError={availabilityQuery.isError}
+          notice={availabilityQuery.data?.notice}
+          sla={availabilityQuery.data?.sla}
+          isAvailable={availabilityQuery.data?.isAvailable}
         />
-      </div>
 
-      <AvailabilityBanner
-        isLoading={availabilityQuery.isLoading}
-        notice={availabilityQuery.data?.notice}
-        sla={availabilityQuery.data?.sla}
-        isAvailable={availabilityQuery.data?.isAvailable}
-      />
-
-      <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
+        <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
         <SectionCard title="Inbox" description="Student-linked parent-teacher threads">
           <div className="space-y-4">
             <FilterBar label="Inbox Filters">
@@ -263,7 +294,7 @@ export function ParentTeacherMessagingWorkspace({
             ) : threadsQuery.isError ? (
               <EmptyState
                 title="Messages unavailable"
-                description={(threadsQuery.error as Error).message}
+                description="Parent-teacher threads could not be loaded. Check your permission and try again."
                 icon={<Lock size={24} />}
               />
             ) : threads.length === 0 ? (
@@ -273,14 +304,22 @@ export function ParentTeacherMessagingWorkspace({
                 icon={<MessageSquare size={24} />}
               />
             ) : (
-              <div className="space-y-2">
-                {threads.map((thread) => (
-                  <ThreadListItem
-                    key={thread.id}
-                    thread={thread}
-                    active={thread.id === activeThreadId}
-                  />
-                ))}
+              <div className="overflow-hidden rounded-2xl border border-slate-100">
+                <div className="space-y-2 p-2">
+                  {threads.map((thread) => (
+                    <ThreadListItem
+                      key={thread.id}
+                      thread={thread}
+                      active={thread.id === activeThreadId}
+                    />
+                  ))}
+                </div>
+                <TablePagination
+                  page={threadsQuery.data?.page ?? threadPage}
+                  pageSize={threadsQuery.data?.limit ?? 20}
+                  total={threadsQuery.data?.total ?? 0}
+                  onPageChange={setThreadPage}
+                />
               </div>
             )}
           </div>
@@ -303,8 +342,7 @@ export function ParentTeacherMessagingWorkspace({
             <EmptyState
               title="Thread unavailable"
               description={
-                ((threadQuery.error || messagesQuery.error) as Error | null)?.message ??
-                'Unable to load this conversation.'
+                'This conversation could not be loaded. It may be outside your assigned or linked scope.'
               }
               icon={<Lock size={24} />}
             />
@@ -327,6 +365,10 @@ export function ParentTeacherMessagingWorkspace({
               {activeThread.status === 'CLOSED' ? (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                   This thread is closed. Normal replies are disabled for audit safety.
+                </div>
+              ) : isEscalationLocked ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  This escalated thread is locked until a school moderator resolves it.
                 </div>
               ) : (
                 <form
@@ -365,10 +407,18 @@ export function ParentTeacherMessagingWorkspace({
                     </button>
                   </div>
                   {sendMutation.isError ? (
-                    <p className="text-sm text-danger-700">{sendMutation.error.message}</p>
+                    <p className="text-sm text-danger-700">
+                      This message could not be sent. Check the thread state and try again.
+                    </p>
                   ) : null}
                 </form>
               )}
+
+              {closeMutation.isError || escalateMutation.isError || reportMutation.isError ? (
+                <p className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">
+                  This review action could not be completed. Check your permission and try again.
+                </p>
+              ) : null}
 
               <div className="grid gap-4 lg:grid-cols-2">
                 <ActionPanel
@@ -419,6 +469,7 @@ export function ParentTeacherMessagingWorkspace({
             </div>
           ) : null}
         </SectionCard>
+        </div>
       </div>
     </DashboardPageShell>
   );
@@ -426,11 +477,13 @@ export function ParentTeacherMessagingWorkspace({
 
 function AvailabilityBanner({
   isLoading,
+  isError,
   notice,
   sla,
   isAvailable,
 }: {
   isLoading: boolean;
+  isError: boolean;
   notice?: string;
   sla?: string;
   isAvailable?: boolean;
@@ -445,7 +498,13 @@ function AvailabilityBanner({
       )}
     >
       <Clock size={18} />
-      <span>{isLoading ? 'Checking school chat hours...' : notice}</span>
+      <span>
+        {isLoading
+          ? 'Checking school chat hours...'
+          : isError
+            ? 'School chat hours are unavailable right now. The backend will still enforce message policy.'
+            : notice}
+      </span>
       {sla ? <span className="font-semibold">{sla}</span> : null}
     </div>
   );

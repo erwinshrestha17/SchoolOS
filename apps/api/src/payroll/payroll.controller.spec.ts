@@ -217,12 +217,14 @@ describe('PayrollController M7 contracts', () => {
 
     expect(controller.listPayslips(actor)).toEqual([{ id: 'payslip-1' }]);
     expect(controller.listMyPayslips(actor)).toEqual([{ id: 'my-payslip-1' }]);
+    expect(controller.getMyPayslipPdf('PS-001', actor)).toBe(pdf);
     expect(controller.getPayslipPdf('PS-001', actor)).toBe(pdf);
     expect(controller.getStaffPayslipPdf('run-1', 'staff-1', actor)).toBe(pdf);
     expect(controller.getApprovedSalarySlipPdf('run-1', 'line-1', actor)).toBe(
       pdf,
     );
     expect(payrollService.getPayslipPdf).toHaveBeenCalledWith('PS-001', actor);
+    expect(payrollService.getPayslipPdf).toHaveBeenCalledTimes(2);
     expect(payrollService.getPayslipPdfForRunStaff).toHaveBeenCalledWith(
       'run-1',
       'staff-1',

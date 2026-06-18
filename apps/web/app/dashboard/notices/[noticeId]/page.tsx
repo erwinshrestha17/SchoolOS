@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { PageHeader } from '@/components/ui/page-header';
+import { ProtectedFileButton } from '@/components/ui/protected-file';
 import {
   ArrowLeft,
   CalendarClock,
@@ -54,7 +55,9 @@ export default function NoticeDetailPage() {
             Could not load notice
           </p>
           <h1 className="mt-2 text-2xl font-bold">Notice unavailable</h1>
-          <p className="mt-2 text-sm leading-6">{noticeQuery.error.message}</p>
+          <p className="mt-2 text-sm leading-6">
+            This notice could not be loaded. Check your permission and try again.
+          </p>
           <BackLink />
         </div>
       </NoticePageShell>
@@ -76,6 +79,8 @@ export default function NoticeDetailPage() {
       </NoticePageShell>
     );
   }
+
+  const attachmentFileId = getProtectedFileId(notice.attachmentUrl);
 
   return (
     <NoticePageShell>
@@ -111,16 +116,20 @@ export default function NoticeDetailPage() {
             {notice.body}
           </div>
 
-          {notice.attachmentUrl ? (
-            <a
-              href={notice.attachmentUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-2xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+          {attachmentFileId ? (
+            <ProtectedFileButton
+              fileAssetId={attachmentFileId}
+              ariaLabel="Open protected notice attachment"
+              className="mt-6"
+              errorLabel="Attachment preview is unavailable right now."
             >
               <Paperclip size={16} />
               Open attachment
-            </a>
+            </ProtectedFileButton>
+          ) : notice.attachmentUrl ? (
+            <p className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Attachment preview is unavailable right now.
+            </p>
           ) : null}
         </article>
 
@@ -164,7 +173,11 @@ export default function NoticeDetailPage() {
       <UnreadRecipientsPanel
         result={unreadRecipientsQuery.data}
         isLoading={unreadRecipientsQuery.isLoading}
-        error={unreadRecipientsQuery.isError ? unreadRecipientsQuery.error.message : null}
+        error={
+          unreadRecipientsQuery.isError
+            ? 'Unread recipient details could not be loaded right now.'
+            : null
+        }
       />
     </NoticePageShell>
   );
@@ -505,4 +518,18 @@ function formatDateTime(value: string) {
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date(value));
+}
+
+function getProtectedFileId(url: string | null) {
+  if (!url) {
+    return null;
+  }
+
+  try {
+    const pathname = new URL(url, 'http://schoolos.local').pathname;
+    const match = pathname.match(/\/files\/([^/]+)\/preview\/?$/);
+    return match?.[1] ? decodeURIComponent(match[1]) : null;
+  } catch {
+    return null;
+  }
 }

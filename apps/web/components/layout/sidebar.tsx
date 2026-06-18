@@ -66,12 +66,13 @@ function getRequiredModuleForHref(href: string): string | null {
   if (href.startsWith('/dashboard/admissions')) return 'students';
   if (href.startsWith('/dashboard/attendance')) return 'attendance';
   if (href.startsWith('/dashboard/academics')) return 'exams';
+  if (href.startsWith('/dashboard/timetable')) return 'timetable';
   if (href.startsWith('/dashboard/homework')) return 'homework';
   if (href.startsWith('/dashboard/learning')) return 'learning';
   if (href.startsWith('/dashboard/fees')) return 'fees';
   if (href.startsWith('/dashboard/accounting')) return 'accounting';
-  if (href.startsWith('/dashboard/hr')) return null;
-  if (href.startsWith('/dashboard/payroll')) return null;
+  if (href.startsWith('/dashboard/hr')) return 'hr';
+  if (href.startsWith('/dashboard/payroll')) return 'hr';
   if (href.startsWith('/dashboard/library')) return 'library';
   if (href.startsWith('/dashboard/transport')) return 'transport';
   if (href.startsWith('/dashboard/canteen')) return 'canteen';
