@@ -16,6 +16,8 @@ class AppRoutes {
   static const parentAttendance = '/parent/attendance';
   static const parentFees = '/parent/fees';
   static const parentHomework = '/parent/homework';
+  static const parentHomeworkItem = '/parent/homework/:id';
+  static const parentUpdates = '/parent/updates';
   static const parentTimetable = '/parent/timetable';
   static const parentReportCards = '/parent/report-cards';
   static const parentActivity = '/parent/activity';
@@ -43,6 +45,7 @@ class AppRoutes {
   static const adminHome = '/admin/home';
 
   static String parentChildDetail(String id) => '/parent/child/$id';
+  static String parentHomeworkDetail(String id) => '/parent/homework/$id';
   static String noticeDetail(String id) => '/notices/$id';
   static String teacherAttendanceFor(String classSectionId) =>
       '/teacher/attendance/${Uri.encodeComponent(classSectionId)}';

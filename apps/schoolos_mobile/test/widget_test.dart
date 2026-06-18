@@ -13,6 +13,7 @@ import 'package:schoolos_mobile/shared/widgets/app_button.dart';
 import 'package:schoolos_mobile/shared/widgets/status_chip.dart';
 import 'package:schoolos_mobile/shared/widgets/role_badge.dart';
 import 'package:schoolos_mobile/shared/widgets/role_shell_scaffold.dart';
+import 'package:schoolos_mobile/shared/widgets/school_os_app_shell.dart';
 
 class FakeTokenStorage extends Fake implements TokenStorageService {
   @override
@@ -169,5 +170,43 @@ void main() {
     expect(find.text('Timetable'), findsOneWidget);
     expect(find.text('Notices'), findsOneWidget);
     expect(find.text('More'), findsOneWidget);
+  });
+
+  testWidgets('parent portal tabs render on a compact phone viewport', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const ProviderScope(child: MaterialApp(home: SchoolOsAppShell())),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Namaste, Erwin'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Homework').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Homework summary'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Updates').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Holiday notice for Friday'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    final updateFilters = find.ancestor(
+      of: find.text('Events'),
+      matching: find.byType(SingleChildScrollView),
+    );
+    await tester.drag(updateFilters, const Offset(-220, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Events'));
+    await tester.pumpAndSettle();
+    expect(find.text('Parent–Teacher Meeting'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

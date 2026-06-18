@@ -22,12 +22,9 @@ import '../features/notices/presentation/screens/notification_center_screen.dart
 import '../features/parent/presentation/screens/parent_activity_screen.dart';
 import '../features/parent/presentation/screens/parent_canteen_screen.dart';
 import '../features/parent/presentation/screens/parent_chat_screen.dart';
-import '../features/parent/presentation/screens/child_profile_screen.dart';
-import '../features/parent/presentation/screens/parent_children_screen.dart';
 import '../features/parent/presentation/screens/parent_fees_screen.dart';
 import '../features/parent/presentation/screens/parent_homework_screen.dart';
-import '../features/parent/presentation/screens/parent_home_screen.dart';
-import '../features/parent/presentation/screens/parent_more_screen.dart';
+import '../features/parent/presentation/screens/parent_portal_detail_screens.dart';
 import '../features/parent/presentation/screens/parent_report_cards_screen.dart';
 import '../features/parent/presentation/screens/parent_timetable_screen.dart';
 import '../features/parent/presentation/screens/parent_transport_screen.dart';
@@ -40,6 +37,7 @@ import '../features/staff/presentation/screens/staff_payslips_screen.dart';
 import '../features/transport/presentation/screens/driver_route_screen.dart';
 import '../shared/widgets/app_empty_state.dart';
 import '../shared/widgets/app_scaffold.dart';
+import '../shared/widgets/school_os_app_shell.dart';
 import 'constants/app_routes.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -89,16 +87,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // Role Dashboards
       GoRoute(
         path: AppRoutes.parentHome,
-        builder: (context, state) => const ParentHomeScreen(),
+        builder: (context, state) => const SchoolOsAppShell(),
       ),
       GoRoute(
         path: AppRoutes.parentChildren,
-        builder: (context, state) => const ParentChildrenScreen(),
+        builder: (context, state) => const SchoolOsAppShell(initialIndex: 1),
       ),
       GoRoute(
         path: AppRoutes.parentChild,
-        builder: (context, state) =>
-            ChildProfileScreen(childId: state.pathParameters['id']),
+        builder: (context, state) => ParentPortalChildDetailScreen(
+          childId: state.pathParameters['id'] ?? '',
+        ),
       ),
       GoRoute(
         path: AppRoutes.parentAttendance,
@@ -111,7 +110,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.parentHomework,
-        builder: (context, state) => const ParentHomeworkScreen(),
+        builder: (context, state) => const SchoolOsAppShell(initialIndex: 2),
+      ),
+      GoRoute(
+        path: AppRoutes.parentHomeworkItem,
+        builder: (context, state) => ParentPortalHomeworkDetailScreen(
+          homeworkId: state.pathParameters['id'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.parentUpdates,
+        builder: (context, state) => const SchoolOsAppShell(initialIndex: 3),
       ),
       GoRoute(
         path: AppRoutes.parentTimetable,
@@ -143,7 +152,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.parentMore,
-        builder: (context, state) => const ParentMoreScreen(),
+        builder: (context, state) => const SchoolOsAppShell(initialIndex: 4),
       ),
       GoRoute(
         path: AppRoutes.studentHome,
@@ -331,10 +340,12 @@ bool _isTeacherRoute(String location) {
 bool _isParentRoute(String location) {
   return location == AppRoutes.parentHome ||
       location == AppRoutes.parentChildren ||
-      location == AppRoutes.parentChild ||
+      location.startsWith('/parent/child/') ||
       location == AppRoutes.parentAttendance ||
       location == AppRoutes.parentFees ||
       location == AppRoutes.parentHomework ||
+      location.startsWith('/parent/homework/') ||
+      location == AppRoutes.parentUpdates ||
       location == AppRoutes.parentTimetable ||
       location == AppRoutes.parentReportCards ||
       location == AppRoutes.parentActivity ||
