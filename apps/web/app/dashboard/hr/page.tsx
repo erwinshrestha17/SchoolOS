@@ -1,151 +1,402 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../../../lib/api';
 import {
-  Users,
+  AlertCircle,
+  ArrowRight,
+  BadgeCheck,
+  Briefcase,
   CalendarDays,
   ClipboardCheck,
-  Briefcase,
-  AlertCircle,
-  ArrowRight
+  FileText,
+  History,
+  Users,
 } from 'lucide-react';
-import { StatCard } from '../../../components/ui/stat-card';
 import Link from 'next/link';
+import { api } from '../../../lib/api';
 import { cn } from '../../../lib/utils';
+import { ModuleHeader } from '../../../components/ui/module-header';
+import { KpiCard, KpiGrid } from '../../../components/ui/kpi-card';
+import { ModuleTabs } from '../../../components/dashboard/module-tabs';
+import { StatusBadge } from '../../../components/ui/status-badge';
+import { LoadingState } from '../../../components/ui/loading-state';
+import { EmptyState } from '../../../components/ui/empty-state';
+import { ErrorState } from '../../../components/ui/error-state';
 
-const isDateWithinDays = (value?: string | null, days = 30) => {
-  if (!value) return false;
-  const target = new Date(value).getTime();
-  const now = new Date().getTime();
-  return target >= now && target <= now + days * 24 * 60 * 60 * 1000;
-};
+const moduleTabs = [
+  { href: '/dashboard/hr/staff', label: 'Staff', icon: Users },
+  { href: '/dashboard/hr/contracts', label: 'Contracts', icon: Briefcase },
+  { href: '/dashboard/hr/leave', label: 'Leave', icon: CalendarDays },
+  { href: '/dashboard/hr/attendance', label: 'Attendance', icon: ClipboardCheck },
+  { href: '/dashboard/payroll/runs', label: 'Payroll', icon: History },
+  { href: '/dashboard/payroll/payslips', label: 'Payslips', icon: FileText },
+  { href: '/dashboard/payroll/reports', label: 'Reports', icon: BadgeCheck },
+];
+
+function formatDate(value?: string | null) {
+  if (!value) return 'Not scheduled';
+  return new Intl.DateTimeFormat('en-NP', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value));
+}
+
+function unavailable(isError: boolean, value?: number | null) {
+  if (isError) return 'Unavailable';
+  return value ?? 0;
+}
 
 export default function HRDashboardPage() {
-  const staffQuery = useQuery({ queryKey: ['staff'], queryFn: api.listStaff });
-  const contractsQuery = useQuery({
-    queryKey: ['staff-contracts'],
-    queryFn: () => api.listStaffContracts(),
+  const router = useRouter();
+  const leaveQueueQuery = useQuery({
+    queryKey: ['hr-leave-queue-depth', 7],
+    queryFn: () => api.getLeaveQueueDepth({ staleDays: 7 }),
   });
-  const leaveRequestsQuery = useQuery({ queryKey: ['leave-requests'], queryFn: api.listLeaveRequests });
+  const contractRemindersQuery = useQuery({
+    queryKey: ['hr-contract-expiry-reminders', 30],
+    queryFn: () => api.listContractExpiryReminders({ days: 30 }),
+  });
+  const payrollRunsQuery = useQuery({
+    queryKey: ['payroll-runs', 'hr-overview'],
+    queryFn: api.listPayrollRuns,
+  });
 
-  const staff = staffQuery.data ?? [];
-  const contracts = contractsQuery.data ?? [];
-  const leaveRequests = leaveRequestsQuery.data ?? [];
-  const activeStaff = staff.filter((member) => member.status === 'ACTIVE' || !member.status).length;
-  const pendingLeave = leaveRequests.filter((leave) => leave.status === 'PENDING').length;
-  const today = new Date().toISOString().slice(0, 10);
-  const onLeaveToday = leaveRequests.filter((leave) => {
-    if (leave.status !== 'APPROVED') return false;
-    const start = new Date(leave.startsOn).toISOString().slice(0, 10);
-    const end = new Date(leave.endsOn).toISOString().slice(0, 10);
-    return start <= today && end >= today;
-  }).length;
-  const contractRenewalsDue = contracts.filter(
-    (contract) => contract.status === 'ACTIVE' && isDateWithinDays(contract.endDate),
-  ).length;
-
-  const stats = [
-    {
-      title: "Total Staff",
-      value: staff.length,
-      icon: <Users className="h-5 w-5" />,
-      loading: staffQuery.isLoading,
-      href: "/dashboard/hr/staff",
-      tone: 'neutral' as const,
-      description: `${activeStaff} active staff`,
-    },
-    {
-      title: "Active Contracts",
-      value: contracts.filter((c) => c.status === 'ACTIVE').length,
-      icon: <Briefcase className="h-5 w-5" />,
-      loading: contractsQuery.isLoading,
-      href: "/dashboard/hr/contracts",
-      tone: 'info' as const,
-      description: `${contractRenewalsDue} renewal(s) due in 30 days`,
-    },
-    {
-      title: "Pending Leave",
-      value: pendingLeave,
-      icon: <AlertCircle className="h-5 w-5" />,
-      loading: leaveRequestsQuery.isLoading,
-      href: "/dashboard/hr/leave",
-      tone: pendingLeave > 0 ? 'warning' as const : 'success' as const,
-      description: `${onLeaveToday} approved leave today`,
-    }
+  const leaveQueue = leaveQueueQuery.data;
+  const reminders = contractRemindersQuery.data;
+  const payrollRuns = payrollRunsQuery.data ?? [];
+  const postingBacklog = payrollRuns.filter((run) =>
+    ['GENERATED', 'UNDER_REVIEW', 'REVIEWED', 'APPROVED'].includes(run.status),
+  );
+  const latestRun = payrollRuns[0] ?? null;
+  const remainingIssues = [
+    'Active staff and on-leave-today KPIs need a module-owned HR summary endpoint before they can be shown as official totals.',
+    'Payroll exception totals need a backend workflow summary before this overview can display them as official KPIs.',
   ];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {stats.map((stat) => (
-          <StatCard
-            key={stat.title}
-            title={stat.title}
-            value={stat.value}
-            icon={stat.icon}
-            loading={stat.loading}
-            href={stat.href}
-            tone={stat.tone}
-            description={stat.description}
-          />
-        ))}
-      </div>
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <ModuleHeader
+        eyebrow="M7 HR & Payroll"
+        title="HR & Payroll"
+        description="Operate staff lifecycle, leave approvals, contract reminders, payroll run handoff, payslips, and reports from backend-owned M7 data."
+        primaryAction={
+          <Link
+            href="/dashboard/hr/staff"
+            className="inline-flex h-9 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 active:scale-[0.98]"
+          >
+            <Users className="h-4 w-4" />
+            Open Staff
+          </Link>
+        }
+        moreActionItems={[
+          {
+            label: 'Leave Queue',
+            icon: <CalendarDays className="h-4 w-4" />,
+            onClick: () => router.push('/dashboard/hr/leave'),
+          },
+          {
+            label: 'Payroll Runs',
+            icon: <History className="h-4 w-4" />,
+            onClick: () => router.push('/dashboard/payroll/runs'),
+          },
+          {
+            label: 'Payslips',
+            icon: <FileText className="h-4 w-4" />,
+            onClick: () => router.push('/dashboard/payroll/payslips'),
+          },
+          {
+            label: 'Payroll Reports',
+            icon: <BadgeCheck className="h-4 w-4" />,
+            onClick: () => router.push('/dashboard/payroll/reports'),
+          },
+        ]}
+      >
+        <ModuleTabs
+          items={moduleTabs}
+          accentColor="purple"
+          variant="light"
+        />
+      </ModuleHeader>
 
-      <div className="grid gap-8 lg:grid-cols-2">
-        <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold">HR Quick Actions</h3>
+      <KpiGrid className="xl:grid-cols-5">
+        <KpiCard
+          title="Active Staff"
+          value="Unavailable"
+          icon={<Users className="h-5 w-5" />}
+          tone="neutral"
+          description="Awaiting official HR summary"
+        />
+        <KpiCard
+          title="On Leave Today"
+          value="Unavailable"
+          icon={<ClipboardCheck className="h-5 w-5" />}
+          tone="neutral"
+          description="Awaiting official leave summary"
+        />
+        <KpiCard
+          title="Pending Leave"
+          value={unavailable(leaveQueueQuery.isError, leaveQueue?.pending)}
+          icon={<AlertCircle className="h-5 w-5" />}
+          loading={leaveQueueQuery.isLoading}
+          href="/dashboard/hr/leave"
+          tone={(leaveQueue?.pending ?? 0) > 0 ? 'warning' : 'success'}
+          description={`${leaveQueue?.stalePending ?? 0} stale beyond ${leaveQueue?.staleDays ?? 7} days`}
+        />
+        <KpiCard
+          title="Contract Expiring"
+          value={unavailable(contractRemindersQuery.isError, reminders?.total)}
+          icon={<Briefcase className="h-5 w-5" />}
+          loading={contractRemindersQuery.isLoading}
+          href="/dashboard/hr/contracts"
+          tone={(reminders?.total ?? 0) > 0 ? 'warning' : 'success'}
+          description={`Next ${reminders?.windowDays ?? 30} days`}
+        />
+        <KpiCard
+          title="Payroll Exceptions"
+          value="Unavailable"
+          icon={<BadgeCheck className="h-5 w-5" />}
+          tone="neutral"
+          description="Awaiting workflow summary"
+        />
+      </KpiGrid>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
+        <section className="shell-card p-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-black text-slate-950">Leave Approval Queue</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Pending leave requests from the approval queue endpoint.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/hr/leave"
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--primary-dark)] hover:text-slate-950"
+            >
+              Review Leave
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {[
-              { label: 'Add New Staff', href: '/dashboard/hr/staff', icon: Users, color: 'text-[var(--color-mod-hr-text)] bg-[var(--color-mod-hr-soft)]' },
-              { label: 'Approve Leave', href: '/dashboard/hr/leave', icon: CalendarDays, color: 'text-emerald-500 bg-emerald-50' },
-              { label: 'Staff Attendance', href: '/dashboard/hr/attendance', icon: ClipboardCheck, color: 'text-amber-500 bg-amber-50' },
-              { label: 'Manage Contracts', href: '/dashboard/hr/contracts', icon: Briefcase, color: 'text-indigo-500 bg-indigo-50' },
-            ].map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="group flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-[var(--color-mod-hr-border)] hover:bg-[var(--color-mod-hr-soft)]/40 transition-all"
-              >
-                <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl", item.color)}>
-                  <item.icon size={20} />
-                </div>
-                <div className="flex-1">
-                  <p className="font-bold text-slate-900">{item.label}</p>
-                </div>
-                <ArrowRight size={16} className="text-slate-300 group-hover:text-[var(--color-mod-hr-text)] transition-colors" />
-              </Link>
-            ))}
+
+          <div className="mt-5">
+            {leaveQueueQuery.isLoading ? (
+              <LoadingState variant="spinner" label="Loading leave queue..." />
+            ) : leaveQueueQuery.isError ? (
+              <ErrorState
+                title="Leave queue unavailable"
+                message="The approval queue could not be loaded. Check your leave approval permission and retry."
+                onRetry={() => void leaveQueueQuery.refetch()}
+              />
+            ) : leaveQueue?.preview?.length ? (
+              <div className="overflow-hidden rounded-2xl border border-slate-200">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3">Staff</th>
+                      <th className="px-4 py-3">Leave</th>
+                      <th className="px-4 py-3">Period</th>
+                      <th className="px-4 py-3 text-right">Days</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {leaveQueue.preview.slice(0, 6).map((request) => (
+                      <tr key={request.id} className="hover:bg-slate-50/60">
+                        <td className="px-4 py-3">
+                          <p className="font-bold text-slate-900">{request.staffName}</p>
+                          <p className="text-xs text-slate-500">{request.employeeId ?? 'No employee ID'}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <StatusBadge status={request.leaveType} tone={request.isPaid ? 'info' : 'partial'} />
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {formatDate(request.startsOn)} - {formatDate(request.endsOn)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold tabular-nums text-slate-900">
+                          {request.days}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState
+                title="Leave queue clear"
+                description="There are no pending leave requests in the approval queue."
+                icon={<CalendarDays className="h-7 w-7" />}
+              />
+            )}
           </div>
         </section>
 
-        <section className="shell-card p-8">
-          <h3 className="text-xl font-bold text-slate-950 mb-4">Operational Status</h3>
-          <p className="text-slate-500 text-sm mb-6">Overview from live staff, contract, and leave records.</p>
-          
-          <div className="space-y-4">
-            {[
-              {
-                label: 'Active Staff',
-                status: `${activeStaff}/${staff.length}`,
-                statusColor: 'text-success-700',
-              },
-              {
-                label: 'Pending Leave Requests',
-                status: String(pendingLeave),
-                statusColor: pendingLeave > 0 ? 'text-warning-700' : 'text-success-700',
-              },
-              {
-                label: 'Contract Renewals Due',
-                status: String(contractRenewalsDue),
-                statusColor: contractRenewalsDue > 0 ? 'text-danger-700' : 'text-success-700',
-              },
-            ].map((item) => (
-              <div key={item.label} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                <span className="text-slate-600 font-medium">{item.label}</span>
-                <span className={cn("font-bold tabular-nums", item.statusColor)}>{item.status}</span>
+        <section className="shell-card p-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-black text-slate-950">Contract Reminders</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Active contract and probation reminders for the next 30 days.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/hr/contracts"
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--primary-dark)] hover:text-slate-950"
+            >
+              Manage Contracts
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          <div className="mt-5">
+            {contractRemindersQuery.isLoading ? (
+              <LoadingState variant="spinner" label="Loading contract reminders..." />
+            ) : contractRemindersQuery.isError ? (
+              <ErrorState
+                title="Contract reminders unavailable"
+                message="Contract reminders could not be loaded. Check your HR staff permission and retry."
+                onRetry={() => void contractRemindersQuery.refetch()}
+              />
+            ) : reminders?.items?.length ? (
+              <div className="space-y-3">
+                {reminders.items.slice(0, 6).map((item) => (
+                  <div
+                    key={`${item.type}-${item.staffId}-${item.contractId ?? 'probation'}`}
+                    className="rounded-2xl border border-slate-200 bg-white p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-bold text-slate-950">{item.staffName}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {item.employeeId ?? 'No employee ID'} · {item.position ?? 'No position'}
+                        </p>
+                      </div>
+                      <StatusBadge
+                        status={item.type}
+                        label={item.type === 'PROBATION_END' ? 'Probation' : 'Contract'}
+                        tone={item.daysRemaining !== null && item.daysRemaining <= 7 ? 'conflict' : 'pending'}
+                      />
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+                      <span className="text-slate-500">{formatDate(item.expiresAt)}</span>
+                      <span
+                        className={cn(
+                          'font-bold tabular-nums',
+                          item.daysRemaining !== null && item.daysRemaining <= 7
+                            ? 'text-danger-700'
+                            : 'text-warning-700',
+                        )}
+                      >
+                        {item.daysRemaining ?? 'No'} days remaining
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No contract reminders"
+                description="No active contracts or probation periods expire inside the configured reminder window."
+                icon={<Briefcase className="h-7 w-7" />}
+              />
+            )}
+          </div>
+        </section>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(360px,1.05fr)]">
+        <section className="shell-card p-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-black text-slate-950">Payroll Posting Boundary</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Review, approve, and post payroll runs to accounting. Disbursement is not exposed here.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/payroll/runs"
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--primary-dark)] hover:text-slate-950"
+            >
+              Open Runs
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {payrollRunsQuery.isLoading ? (
+              <LoadingState variant="spinner" label="Loading payroll runs..." />
+            ) : payrollRunsQuery.isError ? (
+              <ErrorState
+                title="Payroll runs unavailable"
+                message="Payroll run statuses could not be loaded. Check your payroll permission and retry."
+                onRetry={() => void payrollRunsQuery.refetch()}
+              />
+            ) : (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Latest Run
+                    </p>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <span className="text-sm font-bold text-slate-900">
+                        {latestRun
+                          ? `${latestRun.periodMonth}/${latestRun.periodYear}`
+                          : 'No runs'}
+                      </span>
+                      <StatusBadge status={latestRun?.status ?? 'DRAFT'} tone={latestRun ? undefined : 'inactive'} />
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Awaiting Action
+                    </p>
+                    <p className="mt-3 text-2xl font-black tabular-nums text-slate-950">
+                      {postingBacklog.length}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">Loaded review, approval, or posting statuses</p>
+                  </div>
+                </div>
+                {payrollRuns.length ? (
+                  <div className="rounded-2xl border border-slate-200">
+                    <div className="divide-y divide-slate-100">
+                      {payrollRuns.slice(0, 4).map((run) => (
+                        <div
+                          key={run.id}
+                          className="flex flex-wrap items-center justify-between gap-3 p-4"
+                        >
+                          <div>
+                            <p className="font-bold text-slate-900">
+                              {run.periodMonth}/{run.periodYear}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {run.journalEntryId ? 'Accounting journal linked' : 'No accounting journal linked'}
+                            </p>
+                          </div>
+                          <StatusBadge status={run.status} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
+        </section>
+
+        <section className="shell-card p-6">
+          <h2 className="text-lg font-black text-slate-950">Remaining Issues</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Missing summaries are kept explicit until backend-owned M7 endpoints exist.
+          </p>
+          <div className="mt-5 space-y-3">
+            {remainingIssues.map((issue) => (
+              <div
+                key={issue}
+                className="flex gap-3 rounded-2xl border border-warning-100 bg-warning-50 p-4 text-sm text-warning-800"
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{issue}</span>
               </div>
             ))}
           </div>

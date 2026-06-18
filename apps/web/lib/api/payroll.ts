@@ -18,6 +18,63 @@ import {
   withQuery,
 } from './client';
 
+export type StaffContractExpiryReminder = {
+  type: 'CONTRACT_EXPIRY' | 'PROBATION_END';
+  staffId: string;
+  employeeId: string | null;
+  staffName: string;
+  department: string | null;
+  designation: string | null;
+  contractId: string | null;
+  contractNumber: string | null;
+  position: string | null;
+  expiresAt: string | null;
+  daysRemaining: number | null;
+};
+
+export type StaffContractExpiryReminderResponse = {
+  windowDays: number;
+  from: string;
+  to: string;
+  total: number;
+  items: StaffContractExpiryReminder[];
+};
+
+export type LeaveQueueDepthPreview = {
+  id: string;
+  staffId: string;
+  employeeId: string | null;
+  staffName: string;
+  department: string | null;
+  designation: string | null;
+  leaveType: string;
+  isPaid: boolean;
+  startsOn: string;
+  endsOn: string;
+  days: number;
+  createdAt: string;
+};
+
+export type LeaveQueueDepth = {
+  pending: number;
+  staleDays: number;
+  stalePending: number;
+  oldestPendingAt: string | null;
+  byLeaveType: Record<string, number>;
+  byDepartment: Record<string, number>;
+  preview: LeaveQueueDepthPreview[];
+};
+
+export type PayrollReportSummary = {
+  runCount: number;
+  staffCount: number;
+  gross: number;
+  deductions: number;
+  netPayable: number;
+  pf: number;
+  tds: number;
+};
+
 export const payrollApi = {
   listStaff: () => request<StaffSummary[]>('/staff'),
   getStaffDetail: (staffId: string) =>
@@ -45,6 +102,14 @@ export const payrollApi = {
       method: 'POST',
       json: body,
     }),
+  listContractExpiryReminders: (params?: { days?: number }) =>
+    request<StaffContractExpiryReminderResponse>(
+      withQuery('/hr/staff/contract-expiry/reminders', params ?? {}),
+    ),
+  getLeaveQueueDepth: (params?: { staleDays?: number }) =>
+    request<LeaveQueueDepth>(
+      withQuery('/hr/leave-queue/depth', params ?? {}),
+    ),
   listPayrollRuns: () => request<PayrollRunSummary[]>('/payroll/runs'),
   getPayrollRun: (id: string) =>
     request<PayrollRunSummary>(`/payroll/runs/${encodeURIComponent(id)}`),
@@ -100,7 +165,9 @@ export const payrollApi = {
   getPayrollRegister: (params?: JsonBody) =>
     request<unknown[]>(withQuery('/payroll/reports/register', params ?? {})),
   getPayrollReportSummary: (params?: JsonBody) =>
-    request<unknown>(withQuery('/payroll/reports/summary', params ?? {})),
+    request<PayrollReportSummary>(
+      withQuery('/payroll/reports/summary', params ?? {}),
+    ),
   getPayrollPfSummary: (params?: JsonBody) =>
     request<unknown>(withQuery('/payroll/reports/pf', params ?? {})),
   getPayrollTdsSummary: (params?: JsonBody) =>

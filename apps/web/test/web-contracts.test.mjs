@@ -2694,7 +2694,10 @@ describe("SchoolOS web production contracts", () => {
       "components/hr/staff-attendance-summary.tsx",
     );
     const staffDetail = read("components/hr/staff-detail-workspace.tsx");
-    const page = read("app/dashboard/payroll/page.tsx");
+    const hrPage = read("app/dashboard/hr/page.tsx");
+    const payrollPage = read("app/dashboard/payroll/page.tsx");
+    const payrollApi = read("lib/api/payroll.ts");
+    const payslipList = read("components/hr/payslip-list.tsx");
 
     assert.match(sidebar, /label: 'HR \/ Staff'/);
     assert.match(sidebar, /label: 'Payroll'/);
@@ -2704,18 +2707,43 @@ describe("SchoolOS web production contracts", () => {
       sidebar,
       /permissions: \['hr:read', 'payroll:read', 'payroll:manage'\]/,
     );
-    assert.match(page, /PayrollDashboardPage/);
-    assert.match(page, /api\.listPayrollRuns/);
+    assert.match(payrollPage, /PayrollDashboardPage/);
+    assert.match(payrollPage, /api\.listPayrollRuns/);
     assert.match(hrOverview, /No run processed/);
     assert.doesNotMatch(hrOverview, /\bN\/A\b/);
     assert.match(
       hrWorkspace,
       /'Staff Directory'|'Contracts'|'Leave Requests'|'Attendance Summary'|'Leave Balances'/,
     );
+    assert.match(hrPage, /<ModuleHeader/);
+    assert.match(hrPage, /<KpiGrid/);
+    assert.match(hrPage, /<ModuleTabs/);
+    assert.match(hrPage, /api\.getLeaveQueueDepth/);
+    assert.match(hrPage, /api\.listContractExpiryReminders/);
+    assert.match(hrPage, /\/dashboard\/payroll\/runs/);
+    assert.match(hrPage, /\/dashboard\/payroll\/payslips/);
+    assert.match(hrPage, /value="Unavailable"/);
+    assert.match(hrPage, /Remaining Issues/);
+    assert.doesNotMatch(hrPage, /api\.listStaff\(/);
+    assert.doesNotMatch(hrPage, /api\.listLeaveRequests/);
+    assert.match(payrollPage, /<ModuleHeader/);
+    assert.match(payrollPage, /<KpiGrid/);
+    assert.match(payrollPage, /api\.getPayrollReportSummary/);
+    assert.match(payrollPage, /salary disbursement remains outside this workspace/i);
+    assert.doesNotMatch(payrollPage, /statuses: \['PAID'\]/);
+    assert.doesNotMatch(payrollPage, /markPayrollRunPaid|Mark Paid|Disbursement Account Code/);
+    assert.match(payrollApi, /listContractExpiryReminders/);
+    assert.match(payrollApi, /\/hr\/staff\/contract-expiry\/reminders/);
+    assert.match(payrollApi, /getLeaveQueueDepth/);
+    assert.match(payrollApi, /\/hr\/leave-queue\/depth/);
+    assert.match(payrollApi, /PayrollReportSummary/);
 
     assert.match(contractList, /api\.listStaffContracts/);
     assert.match(contractList, /api\.listStaff/);
     assert.match(contractList, /api\.createStaffContract/);
+    assert.match(contractList, /hasPermissions\(\['payroll:read'\]\)/);
+    assert.match(contractList, /hasPermissions\(\['payroll:manage'\]\)/);
+    assert.match(contractList, /Restricted/);
     assert.match(contractList, /Base Salary/);
     assert.match(contractList, /Allowances/);
     assert.match(contractList, /bg-black\/40/);
@@ -2774,6 +2802,10 @@ describe("SchoolOS web production contracts", () => {
       payrollActionDialog,
       /paymentAccountCode|Payment Disbursement Account Code|Mark Paid/,
     );
+    assert.match(payslipList, /api\.openPayslipPdf/);
+    assert.match(payslipList, /openingPayslip/);
+    assert.match(payslipList, /Could not open this protected payslip/);
+    assert.doesNotMatch(payslipList, /window\.open|signedUrl|objectKey|bucket/i);
 
     assert.doesNotMatch(hrWorkspace, /replace-me|demo-staff|fake-contract/i);
     // Note: Payroll processing, salary slips, and M9 accounting auto-posting are deferred to future Phase 2 HR/Accounting work.

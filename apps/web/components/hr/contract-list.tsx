@@ -9,6 +9,7 @@ import { Select } from '../ui/select';
 import { FormField } from '../ui/form-field';
 import { LoadingState } from '../ui/loading-state';
 import { EmptyState } from '../ui/empty-state';
+import { useSession } from '../session-provider';
 
 const moneyFormatter = new Intl.NumberFormat('en-NP', {
   style: 'currency',
@@ -18,7 +19,11 @@ const moneyFormatter = new Intl.NumberFormat('en-NP', {
 
 export function ContractList() {
   const queryClient = useQueryClient();
+  const { hasPermissions } = useSession();
   const [search, setSearch] = useState('');
+  const canCreateContracts = hasPermissions(['hr:manage']);
+  const canViewPayrollAmounts =
+    hasPermissions(['payroll:read']) || hasPermissions(['payroll:manage']);
   
   const contractsQuery = useQuery({
     queryKey: ['staff-contracts'],
@@ -75,13 +80,15 @@ export function ContractList() {
             className="pl-11"
           />
         </div>
-        <button 
-          onClick={() => setIsCreating(true)}
-          className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-hr-accent)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-hr-text)] active:scale-[0.98]"
-        >
-          <Plus size={18} />
-          New Contract
-        </button>
+        {canCreateContracts ? (
+          <button
+            onClick={() => setIsCreating(true)}
+            className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-hr-accent)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-hr-text)] active:scale-[0.98]"
+          >
+            <Plus size={18} />
+            New Contract
+          </button>
+        ) : null}
       </div>
 
       {isCreating && (
@@ -212,10 +219,14 @@ export function ContractList() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm font-bold text-slate-900">
-                      {moneyFormatter.format(contract.baseSalary)}
+                      {canViewPayrollAmounts
+                        ? moneyFormatter.format(contract.baseSalary)
+                        : 'Restricted'}
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-slate-500">
-                      {moneyFormatter.format(contract.allowances)}
+                      {canViewPayrollAmounts
+                        ? moneyFormatter.format(contract.allowances)
+                        : 'Restricted'}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tight ${

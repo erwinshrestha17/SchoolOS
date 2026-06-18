@@ -7,6 +7,8 @@ import { useState } from 'react';
 
 export function PayslipList() {
   const [search, setSearch] = useState('');
+  const [openingPayslip, setOpeningPayslip] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const { data: payslips, isLoading, error } = useQuery({
     queryKey: ['payslips'],
     queryFn: api.listPayslips,
@@ -24,6 +26,21 @@ export function PayslipList() {
     maximumFractionDigits: 0,
   });
 
+  async function openPayslipPdf(payslipNumber: string) {
+    setOpeningPayslip(payslipNumber);
+    setDownloadError(null);
+
+    try {
+      await api.openPayslipPdf(payslipNumber);
+    } catch {
+      setDownloadError(
+        'Could not open this protected payslip. Check your permission and try again.',
+      );
+    } finally {
+      setOpeningPayslip(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -38,6 +55,14 @@ export function PayslipList() {
           />
         </div>
       </div>
+      {downloadError ? (
+        <div
+          role="alert"
+          className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700"
+        >
+          {downloadError}
+        </div>
+      ) : null}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
@@ -92,11 +117,12 @@ export function PayslipList() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button
-                        onClick={() => api.openPayslipPdf(payslip.payslipNumber)}
+                        onClick={() => void openPayslipPdf(payslip.payslipNumber)}
+                        disabled={openingPayslip === payslip.payslipNumber}
                         className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 font-bold text-slate-600 transition-all hover:bg-[var(--color-mod-hr-soft)] hover:text-[var(--color-mod-hr-text)]"
                       >
                         <Download size={14} />
-                        PDF
+                        {openingPayslip === payslip.payslipNumber ? 'Opening...' : 'PDF'}
                       </button>
                     </td>
                   </tr>
