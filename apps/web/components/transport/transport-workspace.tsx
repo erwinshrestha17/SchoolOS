@@ -3,7 +3,16 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { AlertTriangle, Bus, Download, MapPin, Navigation, ShieldCheck, Users } from 'lucide-react';
+import {
+  AlertTriangle,
+  Bus,
+  Download,
+  FileWarning,
+  Gauge,
+  MapPin,
+  Navigation,
+  Users,
+} from 'lucide-react';
 import type { StudentProfile } from '@schoolos/core';
 import { api } from '../../lib/api';
 import {
@@ -23,16 +32,10 @@ import {
 } from '../../lib/transport-api';
 import { EmptyState } from '../ui/empty-state';
 import { LoadingState } from '../ui/loading-state';
-import { PageHeader } from '../ui/page-header';
-import { StatCard } from '../ui/stat-card';
+import { KpiCard, KpiGrid } from '../ui/kpi-card';
 import { StatusBadge, type StatusTone } from '../ui/status-badge';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { cn } from '../../lib/utils';
-const addDays = (date: Date, days: number) => {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-};
 
 type TransportTab =
   | 'overview'
@@ -58,6 +61,12 @@ const tabs: Array<{ key: TransportTab; label: string; href: string }> = [
 ];
 
 const today = new Date().toISOString().slice(0, 10);
+
+const addDays = (date: Date, days: number) => {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+};
 
 const emptyRouteForm: TransportRoutePayload = {
   name: '',
@@ -144,6 +153,37 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
   const activeTripsQuery = useQuery({ queryKey: ['transport-active-trips'], queryFn: () => transportApi.listActiveTrips() });
   const tripsQuery = useQuery({ queryKey: ['transport-trips'], queryFn: () => transportApi.listTrips() });
   const reportsQuery = useQuery({ queryKey: ['transport-reports'], queryFn: () => transportApi.getReports() });
+  const staleGpsReportQuery = useQuery({
+    queryKey: ['transport-report-stale-gps'],
+    queryFn: () => transportApi.getStaleGpsReport(),
+  });
+  const vehicleDocumentsReportQuery = useQuery({
+    queryKey: ['transport-report-vehicle-documents', 30],
+    queryFn: () => transportApi.getVehicleDocumentExpiryReport({ days: 30 }),
+  });
+  const gpsQualityReportQuery = useQuery({
+    queryKey: [
+      'transport-report-gps-pings',
+      reportRouteId,
+      reportVehicleId,
+    ],
+    queryFn: () =>
+      transportApi.getGpsAcceptRejectReport({
+        routeId: reportRouteId,
+        vehicleId: reportVehicleId,
+      }),
+    enabled: activeTab === 'reports',
+  });
+  const oneDayRouteChangesReportQuery = useQuery({
+    queryKey: ['transport-report-one-day-route-changes', today],
+    queryFn: () => transportApi.getOneDayRouteChangesReport({ serviceDate: today }),
+    enabled: activeTab === 'reports',
+  });
+  const maintenanceReportQuery = useQuery({
+    queryKey: ['transport-report-maintenance'],
+    queryFn: () => transportApi.getMaintenanceReminderReport(),
+    enabled: activeTab === 'reports',
+  });
   const tripHistoryReportQuery = useQuery({ 
     queryKey: [
       'transport-report-trips',
@@ -184,6 +224,11 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
     void queryClient.invalidateQueries({ queryKey: ['transport-active-trips'] });
     void queryClient.invalidateQueries({ queryKey: ['transport-trips'] });
     void queryClient.invalidateQueries({ queryKey: ['transport-reports'] });
+    void queryClient.invalidateQueries({ queryKey: ['transport-report-stale-gps'] });
+    void queryClient.invalidateQueries({ queryKey: ['transport-report-vehicle-documents'] });
+    void queryClient.invalidateQueries({ queryKey: ['transport-report-gps-pings'] });
+    void queryClient.invalidateQueries({ queryKey: ['transport-report-one-day-route-changes'] });
+    void queryClient.invalidateQueries({ queryKey: ['transport-report-maintenance'] });
     void queryClient.invalidateQueries({ queryKey: ['transport-latest-location'] });
   };
 
@@ -332,18 +377,6 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
   const trips = tripsQuery.data ?? [];
   const selectedTrip = activeTrips.find((trip) => trip.id === selectedTripId) ?? trips.find((trip) => trip.id === selectedTripId);
   const locationFreshness = getLocationFreshness(locationQuery.data);
-  const activeTripStudentStatuses = activeTrips.flatMap(
-    (trip) => trip.studentStatuses ?? [],
-  );
-  const studentsOnboard = activeTripStudentStatuses.filter(
-    (status) => status.status === 'BOARDED',
-  ).length;
-  const studentsNotBoarded = activeTripStudentStatuses.filter((status) =>
-    ['PENDING', 'ABSENT'].includes(status.status),
-  ).length;
-  const driversOnline = new Set(
-    activeTrips.map((trip) => trip.driverAssignmentId).filter(Boolean),
-  ).size;
   const activeTripsMissingDriver = activeTrips.filter(
     (trip) => !trip.driverAssignmentId,
   ).length;
@@ -351,27 +384,14 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
     (trip) => (trip.studentStatuses ?? []).length === 0,
   ).length;
   const delayedActiveTrips = activeTrips.filter((trip) => trip.isDelayed).length;
-
-  const stats = {
-    activeTrips: reportsQuery.data?.activeTrips ?? activeTrips.length,
-    activeAssignments: reportsQuery.data?.activeAssignments ?? 0,
-    logsToday: reportsQuery.data?.logsToday ?? 0,
-    studentsOnboard,
-    studentsNotBoarded,
-    vehiclesActive: vehicles.filter((vehicle) => vehicle.status === 'ACTIVE').length,
-    driversOnline,
-    vehicleAlerts: vehicles.filter(v => {
-      const dates = [
-        v.fitnessCertificateExp,
-        v.insuranceExpiry,
-        v.registrationExpiry,
-        v.pollutionExpiry,
-        v.documentExpiry
-      ].filter(Boolean) as string[];
-      return dates.some(d => new Date(d) < addDays(new Date(), 30));
-    }).length,
-    driverAlerts: (reportsQuery.data?.driverLicenseAlerts as any[])?.length ?? 0,
-  };
+  const staleGpsItems = staleGpsReportQuery.data?.items ?? [];
+  const staleGpsCount = staleGpsReportQuery.data
+    ? staleGpsItems.filter((item) => item.isStale).length
+    : undefined;
+  const vehicleDocumentAlertCount = vehicleDocumentsReportQuery.data
+    ? countVehicleDocumentIssues(vehicleDocumentsReportQuery.data.items)
+    : undefined;
+  const driverLicenseAlertCount = reportsQuery.data?.driverLicenseAlerts?.length ?? 0;
 
   const firstError =
     routesQuery.error ||
@@ -381,7 +401,9 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
     studentsQuery.error ||
     activeTripsQuery.error ||
     tripsQuery.error ||
-    reportsQuery.error;
+    reportsQuery.error ||
+    staleGpsReportQuery.error ||
+    vehicleDocumentsReportQuery.error;
 
   return (
     <div className="space-y-6">
@@ -392,27 +414,66 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
 
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard title="Active Trips" value={stats.activeTrips} icon={<Navigation size={18} />} loading={activeTripsQuery.isLoading || reportsQuery.isLoading} />
-            <StatCard title="Routes" value={routes.length} icon={<MapPin size={18} />} loading={routesQuery.isLoading} />
-            <StatCard title="Vehicles" value={vehicles.length} icon={<Bus size={18} />} loading={vehiclesQuery.isLoading} />
-            <StatCard title="Drivers Assigned" value={driverAssignments.length} icon={<ShieldCheck size={18} />} loading={driversQuery.isLoading} />
-          </div>
+          <KpiGrid className="sm:grid-cols-2 xl:grid-cols-5">
+            <KpiCard
+              title="Active Trips"
+              value={reportsQuery.data?.activeTrips ?? 'Unavailable'}
+              icon={<Navigation size={18} />}
+              loading={reportsQuery.isLoading}
+              tone="neutral"
+              description="Official transport report total"
+            />
+            <KpiCard
+              title="Assigned Students"
+              value={reportsQuery.data?.activeAssignments ?? 'Unavailable'}
+              icon={<Users size={18} />}
+              loading={reportsQuery.isLoading}
+              tone="neutral"
+              description="Official active transport assignments"
+            />
+            <KpiCard
+              title="Stale GPS"
+              value={staleGpsCount ?? 'Unavailable'}
+              icon={<Gauge size={18} />}
+              loading={staleGpsReportQuery.isLoading}
+              tone={staleGpsCount && staleGpsCount > 0 ? 'warning' : 'neutral'}
+              description="Backend stale/missing latest-location report"
+            />
+            <KpiCard
+              title="Delays"
+              value="Unavailable"
+              icon={<AlertTriangle size={18} />}
+              tone="neutral"
+              description="Needs a report-level delay summary endpoint"
+            />
+            <KpiCard
+              title="Vehicle Document Expiry"
+              value={vehicleDocumentAlertCount ?? 'Unavailable'}
+              icon={<FileWarning size={18} />}
+              loading={vehicleDocumentsReportQuery.isLoading}
+              tone={
+                vehicleDocumentAlertCount && vehicleDocumentAlertCount > 0
+                  ? 'warning'
+                  : 'neutral'
+              }
+              description="Backend vehicle-document expiry report"
+            />
+          </KpiGrid>
 
           <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
             <div className="space-y-6">
-              {(stats.vehicleAlerts > 0 || stats.driverAlerts > 0) && (
+              {((vehicleDocumentAlertCount ?? 0) > 0 || driverLicenseAlertCount > 0) && (
                 <section className="rounded-2xl border border-red-200 bg-red-50 p-5">
                   <h3 className="flex items-center gap-2 font-bold text-red-900">
                     <AlertTriangle size={18} />
                     Operational Alerts
                   </h3>
                   <ul className="mt-3 space-y-2 text-sm text-red-800">
-                    {stats.vehicleAlerts > 0 && (
-                      <li>• {stats.vehicleAlerts} vehicles have documents expiring within 30 days.</li>
+                    {(vehicleDocumentAlertCount ?? 0) > 0 && (
+                      <li>{vehicleDocumentAlertCount} vehicles have documents missing, expired, or due within 30 days.</li>
                     )}
-                    {stats.driverAlerts > 0 && (
-                      <li>• {stats.driverAlerts} drivers have licenses expiring within 30 days.</li>
+                    {driverLicenseAlertCount > 0 && (
+                      <li>{driverLicenseAlertCount} driver licenses are expiring within 30 days.</li>
                     )}
                   </ul>
                 </section>
@@ -434,6 +495,13 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
               />
               
               <InfoCard title="Privacy and safety rules" lines={['Parents will only see their own child’s assigned vehicle/trip in the future parent view.', 'Driver app will only expose trips assigned to that driver later.', 'Never expose a full bus passenger list to parents.', 'Live map/WebSocket tracking is intentionally deferred; this admin slice shows latest coordinates only.']} />
+              <Panel title="Remaining Issues" description="Transport items that still need backend or pilot decisions before wider rollout.">
+                <ul className="space-y-2 text-sm text-slate-600">
+                  <li>Report-level delay totals are unavailable; the Trip Monitor still shows per-trip delay status from backend trip rows.</li>
+                  <li>Live map, route deviation, ETA, geofence, and overspeed views remain deferred until SSE/WebSocket and load-test decisions are approved.</li>
+                  <li>End-to-end GPS retention and route/CSV staging smoke still need staging provider data.</li>
+                </ul>
+              </Panel>
             </div>
 
             <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -776,6 +844,124 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
               <Notice tone="error" message={tripHistoryCsvMutation.error.message} />
             ) : null}
           </Panel>
+          <TwoColumn>
+            <Panel title="GPS Quality" description="Accepted persisted pings and observed rejection counters from the backend driver GPS endpoint.">
+              {gpsQualityReportQuery.isLoading ? <LoadingState label="Loading GPS quality..." /> : null}
+              {gpsQualityReportQuery.error ? <Notice tone="error" message={gpsQualityReportQuery.error.message} /> : null}
+              {gpsQualityReportQuery.data ? (
+                <div className="space-y-4" data-testid="transport-gps-quality-report">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <ReportMetric
+                      label="Accepted persisted"
+                      value={gpsQualityReportQuery.data.totals.acceptedPersisted}
+                    />
+                    <ReportMetric
+                      label="Rejected observed"
+                      value={gpsQualityReportQuery.data.totals.rejectedObserved}
+                      warning={gpsQualityReportQuery.data.totals.rejectedObserved > 0}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    {gpsQualityReportQuery.data.rejectedByTripAndReason.slice(0, 5).map((item, index) => (
+                      <div key={`${item.tripId ?? 'trip'}-${item.reason ?? 'reason'}-${index}`} className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                        <span className="font-bold">{item.count}</span> rejected pings
+                        {item.reason ? ` - ${formatStatus(item.reason)}` : ''}
+                      </div>
+                    ))}
+                    {gpsQualityReportQuery.data.rejectedByTripAndReason.length === 0 ? (
+                      <EmptyState title="No rejected pings" description="No GPS rejection counters were reported for this window." />
+                    ) : null}
+                  </div>
+                  {gpsQualityReportQuery.data.note ? (
+                    <p className="text-xs font-semibold text-slate-500">{gpsQualityReportQuery.data.note}</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </Panel>
+            <div className="space-y-6">
+              <Panel title="Stale GPS Report" description="Active trips whose latest backend coordinate is stale or missing.">
+                {staleGpsReportQuery.isLoading ? <LoadingState label="Loading stale GPS..." /> : null}
+                <div className="space-y-3" data-testid="transport-stale-gps-report">
+                  {staleGpsItems.filter((item) => item.isStale).slice(0, 5).map((item) => (
+                    <div key={item.tripId} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-bold text-slate-900">{item.route?.name ?? item.tripId}</span>
+                        <TransportStatusBadge status={item.staleLabel} />
+                      </div>
+                      <p className="mt-1 text-slate-500">{item.vehicle?.registrationNumber ?? 'Vehicle not linked'} - {item.driver?.name ?? 'Driver not linked'}</p>
+                      <p className="mt-2 text-xs font-semibold text-slate-400">Latest ping: {formatDateTime(item.timestamp)}</p>
+                    </div>
+                  ))}
+                  {staleGpsItems.filter((item) => item.isStale).length === 0 && !staleGpsReportQuery.isLoading ? (
+                    <EmptyState title="No stale active trips" description="Active trips do not currently have stale or missing GPS labels." />
+                  ) : null}
+                </div>
+              </Panel>
+              <Panel title="One-day route changes" description="Temporary route changes scheduled for today's service date.">
+                {oneDayRouteChangesReportQuery.isLoading ? <LoadingState label="Loading route changes..." /> : null}
+                <div className="space-y-3" data-testid="transport-one-day-route-changes-report">
+                  {(oneDayRouteChangesReportQuery.data?.items ?? []).slice(0, 5).map((item) => (
+                    <div key={item.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm">
+                      <p className="font-bold text-slate-900">{item.studentName}</p>
+                      <p className="mt-1 text-slate-500">{item.routeName} - {item.stopName}</p>
+                      {item.reason ? <p className="mt-2 text-xs font-semibold text-slate-400">{item.reason}</p> : null}
+                    </div>
+                  ))}
+                  {(oneDayRouteChangesReportQuery.data?.items ?? []).length === 0 && !oneDayRouteChangesReportQuery.isLoading ? (
+                    <EmptyState title="No temporary changes" description="No one-day route changes are scheduled for today." />
+                  ) : null}
+                </div>
+              </Panel>
+            </div>
+          </TwoColumn>
+          <TwoColumn>
+            <Panel title="Vehicle Documents" description="Backend vehicle-document expiry checks across active and inactive vehicles.">
+              {vehicleDocumentsReportQuery.isLoading ? <LoadingState label="Loading vehicle documents..." /> : null}
+              <div className="space-y-3" data-testid="transport-vehicle-documents-report">
+                {(vehicleDocumentsReportQuery.data?.items ?? [])
+                  .filter(hasVehicleDocumentIssue)
+                  .slice(0, 8)
+                  .map((item) => (
+                    <div key={item.vehicleId} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-bold text-slate-900">{item.registrationNumber}</span>
+                        <TransportStatusBadge status={item.status} />
+                      </div>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {Object.entries(item.documents)
+                          .filter(([, document]) => document.status !== 'VALID')
+                          .map(([name, document]) => (
+                            <div key={name} className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                              <p className="font-bold">{formatDocumentLabel(name)}</p>
+                              <p>{formatStatus(document.status)}{document.daysRemaining !== null ? ` - ${document.daysRemaining} days` : ''}</p>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  ))}
+                {(vehicleDocumentsReportQuery.data?.items ?? []).filter(hasVehicleDocumentIssue).length === 0 && !vehicleDocumentsReportQuery.isLoading ? (
+                  <EmptyState title="No document alerts" description="No vehicle documents are missing, expired, or due within the report window." />
+                ) : null}
+              </div>
+            </Panel>
+            <Panel title="Maintenance Reminders" description="Trip-count maintenance foundation from backend transport history.">
+              {maintenanceReportQuery.isLoading ? <LoadingState label="Loading maintenance..." /> : null}
+              <div className="space-y-3" data-testid="transport-maintenance-report">
+                {(maintenanceReportQuery.data?.items ?? []).slice(0, 8).map((item) => (
+                  <div key={item.vehicleId} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-bold text-slate-900">{item.registrationNumber}</span>
+                      <TransportStatusBadge status={item.reminderLevel} />
+                    </div>
+                    <p className="mt-1 text-slate-500">{item.recentTripCount} recent trips - latest {formatDateTime(item.latestTripAt)}</p>
+                  </div>
+                ))}
+                {(maintenanceReportQuery.data?.items ?? []).length === 0 && !maintenanceReportQuery.isLoading ? (
+                  <EmptyState title="No maintenance reminders" description="Maintenance reminders will appear after backend trip history exists." />
+                ) : null}
+              </div>
+            </Panel>
+          </TwoColumn>
           <TwoColumn>
             <Panel title="Trip History Report" description="Comprehensive history of all transport trips.">
                {tripHistoryReportQuery.isLoading ? <LoadingState label="Loading report..." /> : null}
@@ -1200,6 +1386,30 @@ function SafetyMetric({
   );
 }
 
+function ReportMetric({
+  label,
+  value,
+  warning = false,
+}: {
+  label: string;
+  value: number | string;
+  warning?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-xl border px-3 py-2',
+        warning
+          ? 'border-amber-200 bg-amber-50 text-amber-900'
+          : 'border-slate-100 bg-slate-50 text-slate-600',
+      )}
+    >
+      <p className="text-[10px] font-bold uppercase tracking-wide">{label}</p>
+      <p className="mt-1 text-lg font-black text-slate-950">{value}</p>
+    </div>
+  );
+}
+
 function TripList({ trips, emptyTitle, onComplete, onCancel, onSelect, onDelay, compact, showLocationWarning }: { trips: TransportTrip[]; emptyTitle: string; onComplete?: (tripId: string) => void; onCancel?: (tripId: string) => void; onSelect?: (tripId: string) => void; onDelay?: (tripId: string, isDelayed: boolean) => void; compact?: boolean; showLocationWarning?: boolean }) {
   if (trips.length === 0) return <EmptyState title={emptyTitle} description="Trip records will appear here." />;
 
@@ -1304,6 +1514,26 @@ function TransportStatusBadge({ status }: { status: string }) {
 
 function formatStatus(status: string) {
   return status.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function hasVehicleDocumentIssue(item: {
+  documents: Record<string, { status: string }>;
+}) {
+  return Object.values(item.documents).some(
+    (document) => document.status !== 'VALID',
+  );
+}
+
+function countVehicleDocumentIssues(
+  items: Array<{ documents: Record<string, { status: string }> }>,
+) {
+  return items.filter(hasVehicleDocumentIssue).length;
+}
+
+function formatDocumentLabel(value: string) {
+  return value
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function TextInput({ label, value, onChange, placeholder, type = 'text', required }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: string; required?: boolean }) {

@@ -189,6 +189,94 @@ export type TransportReports = {
   driverLicenseAlerts: any[];
 };
 
+export type TransportGpsAcceptRejectReport = {
+  generatedAt: string;
+  window: {
+    since: string;
+    until: string;
+  };
+  totals: {
+    acceptedPersisted: number;
+    rejectedObserved: number;
+  };
+  acceptedByTrip: Array<{ tripId: string; count: number }>;
+  rejectedByTripAndReason: Array<{
+    tripId?: string | null;
+    reason?: string | null;
+    count: number;
+  }>;
+  note?: string;
+};
+
+export type TransportStaleGpsReport = {
+  generatedAt: string;
+  items: Array<{
+    tripId: string;
+    route?: Pick<TransportRoute, 'id' | 'name' | 'code'>;
+    vehicle?: Pick<TransportVehicle, 'id' | 'registrationNumber'>;
+    driver?: {
+      assignmentId?: string | null;
+      staffId?: string;
+      name?: string;
+    };
+    startedAt?: string;
+    latestLocation?: TransportLocationPing | null;
+    timestamp?: string | null;
+    staleLabel: 'fresh' | 'delayed' | 'stale' | 'missing' | string;
+    isStale: boolean;
+  }>;
+};
+
+export type TransportOneDayRouteChangesReport = {
+  generatedAt: string;
+  serviceDate: string;
+  items: Array<{
+    id: string;
+    studentId: string;
+    studentName: string;
+    routeId: string;
+    routeName: string;
+    routeCode: string;
+    stopId: string;
+    stopName: string;
+    stopSequence: number;
+    serviceDate: string;
+    reason: string | null;
+    createdById: string;
+    createdAt: string;
+    status: 'ACTIVE_ONE_DAY_CHANGE';
+  }>;
+};
+
+export type TransportDocumentState = {
+  status: 'MISSING' | 'EXPIRED' | 'DUE_SOON' | 'VALID' | string;
+  expiresAt: string | null;
+  daysRemaining: number | null;
+};
+
+export type TransportVehicleDocumentExpiryReport = {
+  generatedAt: string;
+  windowDays: number;
+  items: Array<{
+    vehicleId: string;
+    registrationNumber: string;
+    status: TransportVehicleStatus;
+    documents: Record<string, TransportDocumentState>;
+  }>;
+};
+
+export type TransportMaintenanceReminderReport = {
+  generatedAt: string;
+  strategy: string;
+  items: Array<{
+    vehicleId: string;
+    registrationNumber: string;
+    recentTripCount: number;
+    latestTripAt: string;
+    reminderLevel: 'SERVICE_REVIEW_DUE' | 'MONITOR' | string;
+  }>;
+};
+
 export type TransportRoutePayload = {
   name: string;
   code: string;
@@ -346,6 +434,27 @@ export const transportApi = {
   listLogs: (params?: { routeId?: string | null }) =>
     request<TransportLog[]>(withQuery('/transport/logs', params ?? {})),
   getReports: () => request<TransportReports>('/transport/reports'),
+  getGpsAcceptRejectReport: (params?: {
+    routeId?: string | null;
+    vehicleId?: string | null;
+  }) =>
+    request<TransportGpsAcceptRejectReport>(
+      withQuery('/transport/reports/gps-pings', params ?? {}),
+    ),
+  getStaleGpsReport: () =>
+    request<TransportStaleGpsReport>('/transport/reports/stale-gps'),
+  getOneDayRouteChangesReport: (params?: { serviceDate?: string | null }) =>
+    request<TransportOneDayRouteChangesReport>(
+      withQuery('/transport/reports/one-day-route-changes', params ?? {}),
+    ),
+  getVehicleDocumentExpiryReport: (params?: { days?: number | string | null }) =>
+    request<TransportVehicleDocumentExpiryReport>(
+      withQuery('/transport/reports/vehicle-documents', params ?? {}),
+    ),
+  getMaintenanceReminderReport: () =>
+    request<TransportMaintenanceReminderReport>(
+      '/transport/reports/maintenance',
+    ),
   cancelTrip: (tripId: string, body?: { reason?: string }) =>
     request<TransportTrip>(`/transport/trips/${encodeURIComponent(tripId)}/cancel`, {
       method: 'PATCH',

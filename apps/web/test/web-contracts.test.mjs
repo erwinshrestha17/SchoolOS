@@ -2198,6 +2198,11 @@ describe("SchoolOS web production contracts", () => {
       "downloadTripHistoryCsv",
       "getBoardingReport",
       "getReports",
+      "getGpsAcceptRejectReport",
+      "getStaleGpsReport",
+      "getOneDayRouteChangesReport",
+      "getVehicleDocumentExpiryReport",
+      "getMaintenanceReminderReport",
     ]) {
       assert.match(
         transportClient,
@@ -2211,6 +2216,11 @@ describe("SchoolOS web production contracts", () => {
       "/transport/reports/trips",
       "/transport/reports/trips.csv",
       "/transport/reports/boarding",
+      "/transport/reports/gps-pings",
+      "/transport/reports/stale-gps",
+      "/transport/reports/one-day-route-changes",
+      "/transport/reports/vehicle-documents",
+      "/transport/reports/maintenance",
     ]) {
       assert.match(
         transportClient,
@@ -2228,12 +2238,46 @@ describe("SchoolOS web production contracts", () => {
       "setReportRouteId",
       "setReportVehicleId",
       "setReportDriverAssignmentId",
+      "transport-gps-quality-report",
+      "transport-stale-gps-report",
+      "transport-one-day-route-changes-report",
+      "transport-vehicle-documents-report",
+      "transport-maintenance-report",
+      "Remaining Issues",
     ]) {
       assert.ok(
         transportWorkspace.includes(marker),
         `Missing marker: ${marker}`,
       );
     }
+  });
+
+  it("keeps M8B transport navigation on shared module primitives", () => {
+    const transportLayout = read("app/dashboard/transport/layout.tsx");
+    const transportPage = read("app/dashboard/transport/page.tsx");
+    const transportWorkspace = read(
+      "components/transport/transport-workspace.tsx",
+    );
+
+    for (const marker of [
+      "ModuleHeader",
+      'eyebrow="M8B Transport"',
+      "primaryAction",
+      "moreActionItems",
+      "ModuleTabs",
+      "Location Status",
+      "/dashboard/transport/location",
+      "Open Trips",
+    ]) {
+      assert.ok(transportLayout.includes(marker), `Missing marker: ${marker}`);
+    }
+
+    for (const marker of ["KpiGrid", "KpiCard", "value=\"Unavailable\""]) {
+      assert.ok(transportWorkspace.includes(marker), `Missing marker: ${marker}`);
+    }
+
+    assert.doesNotMatch(transportPage, /PageHeader|headerActions/);
+    assert.doesNotMatch(transportLayout, /Live Status/);
   });
 
   it("keeps M8B transport workspace aligned to transport UI tokens", () => {
