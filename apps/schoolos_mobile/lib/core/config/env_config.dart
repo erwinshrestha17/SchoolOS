@@ -31,4 +31,14 @@ class EnvConfig {
   static bool get isDevelopment => environment == 'development';
   static bool get isStaging => environment == 'staging';
   static bool get isProduction => environment == 'production';
+
+  static void validate() {
+    final uri = Uri.tryParse(apiBaseUrl);
+    if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
+      throw StateError('SCHOOL_OS_API_BASE_URL must be an absolute URL.');
+    }
+    if (isProduction && uri.scheme != 'https') {
+      throw StateError('SchoolOS production mobile API must use HTTPS.');
+    }
+  }
 }

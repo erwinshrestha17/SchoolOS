@@ -6,6 +6,7 @@ import '../../../../app/constants/app_routes.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/app_scaffold.dart';
 import '../../../../shared/widgets/section_header.dart';
@@ -38,11 +39,16 @@ class NoticeListScreen extends ConsumerWidget {
               ),
             )
           : state.message != null && state.notices.isEmpty
-          ? AppErrorView(
-              title: 'Could not load notices',
-              message: state.message!,
-              onRetry: controller.load,
-            )
+          ? state.error == null
+                ? AppErrorView(
+                    title: 'Could not load notices',
+                    message: state.message!,
+                    onRetry: controller.load,
+                  )
+                : AppExceptionView(
+                    error: state.error!,
+                    onRetry: controller.load,
+                  )
           : RefreshIndicator(
               onRefresh: controller.load,
               child: ListView(

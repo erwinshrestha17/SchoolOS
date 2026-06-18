@@ -77,7 +77,9 @@ class ParentHomeScreen extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.sm),
                 DashboardCard(
                   title: 'Homework pending',
-                  value: '${state.dashboard!.homeworkPending} tasks',
+                  value: state.dashboard!.homeworkEnabled
+                      ? '${state.dashboard!.homeworkPending} tasks'
+                      : 'Not enabled',
                   icon: Icons.menu_book_rounded,
                   iconColor: AppColors.primary,
                   badge: StatusChip(
@@ -85,10 +87,14 @@ class ParentHomeScreen extends ConsumerWidget {
                         ? AppStatusType.completed
                         : AppStatusType.pending,
                   ),
-                  subtitle: state.dashboard!.homeworkPending == 0
+                  subtitle: !state.dashboard!.homeworkEnabled
+                      ? 'This module is not enabled for your school.'
+                      : state.dashboard!.homeworkPending == 0
                       ? 'No homework due today.'
                       : _dueLabel(state.dashboard!.nextHomeworkDueAt),
-                  onTap: () => context.go(AppRoutes.parentHomework),
+                  onTap: state.dashboard!.homeworkEnabled
+                      ? () => context.go(AppRoutes.parentHomework)
+                      : null,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DashboardCard(
@@ -113,31 +119,44 @@ class ParentHomeScreen extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.md),
                 DashboardCard(
                   title: 'Transport status',
-                  value: state.dashboard!.transportStatus,
+                  value: state.dashboard!.transportEnabled
+                      ? state.dashboard!.transportStatus
+                      : 'Not enabled',
                   icon: Icons.directions_bus_rounded,
                   iconColor: AppColors.driverAccent,
                   badge: const StatusChip(status: AppStatusType.onRoute),
-                  subtitle:
-                      state.dashboard!.transportDetail ??
-                      'Open route and trip details.',
-                  onTap: () => context.go(AppRoutes.parentTransport),
+                  subtitle: !state.dashboard!.transportEnabled
+                      ? 'This module is not enabled for your school.'
+                      : state.dashboard!.transportDetail ??
+                            'Open route and trip details.',
+                  onTap: state.dashboard!.transportEnabled
+                      ? () => context.go(AppRoutes.parentTransport)
+                      : null,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DashboardCard(
                   title: 'Canteen balance',
-                  value: _formatMoney(state.dashboard!.canteenBalance),
+                  value: state.dashboard!.canteenEnabled
+                      ? _formatMoney(state.dashboard!.canteenBalance)
+                      : 'Not enabled',
                   icon: Icons.restaurant_rounded,
                   iconColor: state.dashboard!.canteenIsLowBalance
                       ? AppColors.warning
                       : AppColors.success,
-                  subtitle: state.dashboard!.canteenIsLowBalance
+                  subtitle: !state.dashboard!.canteenEnabled
+                      ? 'This module is not enabled for your school.'
+                      : state.dashboard!.canteenIsLowBalance
                       ? 'Low balance. Top-up flow will connect after payments.'
                       : 'Meal wallet summary for quick parent awareness.',
-                  onTap: () => context.go(AppRoutes.parentCanteen),
+                  onTap: state.dashboard!.canteenEnabled
+                      ? () => context.go(AppRoutes.parentCanteen)
+                      : null,
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 AppCard(
-                  onTap: () => context.go(AppRoutes.parentActivity),
+                  onTap: state.dashboard!.activityEnabled
+                      ? () => context.go(AppRoutes.parentActivity)
+                      : null,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -151,13 +170,19 @@ class ParentHomeScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              state.dashboard!.latestActivityTitle ??
-                                  'Latest activity',
+                              !state.dashboard!.activityEnabled
+                                  ? 'Activity not enabled'
+                                  : state.dashboard!.latestActivityTitle ??
+                                        'Latest activity',
                               style: Theme.of(context).textTheme.titleSmall
                                   ?.copyWith(fontWeight: FontWeight.w800),
                             ),
                             const SizedBox(height: AppSpacing.xs),
-                            Text(state.dashboard!.latestActivity),
+                            Text(
+                              state.dashboard!.activityEnabled
+                                  ? state.dashboard!.latestActivity
+                                  : 'This module is not enabled for your school.',
+                            ),
                           ],
                         ),
                       ),
@@ -190,10 +215,14 @@ class _TodayOverviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final feesValue = summary.feesDue == 0
+    final feesValue = !summary.feesEnabled
+        ? 'Not enabled'
+        : summary.feesDue == 0
         ? 'No dues'
         : _formatMoney(summary.feesDue);
-    final homeworkValue = summary.homeworkPending == 0
+    final homeworkValue = !summary.homeworkEnabled
+        ? 'Not enabled'
+        : summary.homeworkPending == 0
         ? 'Done'
         : '${summary.homeworkPending} pending';
 
@@ -258,7 +287,9 @@ class _TodayOverviewCard extends StatelessWidget {
               Expanded(
                 child: _OverviewTile(
                   label: 'Attendance',
-                  value: summary.attendanceToday,
+                  value: summary.attendanceEnabled
+                      ? summary.attendanceToday
+                      : 'Not enabled',
                   icon: Icons.fact_check_rounded,
                   color: AppColors.success,
                 ),
@@ -307,7 +338,9 @@ class _TodayOverviewCard extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: onOpenAttendance,
+                  onPressed: summary.attendanceEnabled
+                      ? onOpenAttendance
+                      : null,
                   icon: const Icon(Icons.calendar_month_rounded, size: 18),
                   label: const Text('Attendance'),
                 ),
@@ -315,7 +348,7 @@ class _TodayOverviewCard extends StatelessWidget {
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: onOpenFees,
+                  onPressed: summary.feesEnabled ? onOpenFees : null,
                   icon: const Icon(Icons.receipt_long_rounded, size: 18),
                   label: const Text('Fees'),
                 ),

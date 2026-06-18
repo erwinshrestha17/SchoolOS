@@ -100,6 +100,32 @@ void main() {
       },
     );
 
+    test('loads one exact parent-visible notification detail', () async {
+      when(
+        () => apiClient.get<dynamic>('/mobile/me/notifications/delivery-2'),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(
+            path: '/mobile/me/notifications/delivery-2',
+          ),
+          data: {
+            'id': 'delivery-2',
+            'title': 'Bus update',
+            'message': 'The bus has arrived.',
+            'sourceType': 'TRANSPORT',
+            'createdAt': '2026-06-01T10:00:00.000Z',
+            'isRead': false,
+          },
+        ),
+      );
+
+      final notice = await repository.getNoticeDetail('delivery-2');
+
+      expect(notice.id, 'delivery-2');
+      expect(notice.title, 'Bus update');
+      expect(notice.body, 'The bus has arrived.');
+    });
+
     test('maps other backend notification source families', () {
       expect(
         NotificationItem.fromJson({

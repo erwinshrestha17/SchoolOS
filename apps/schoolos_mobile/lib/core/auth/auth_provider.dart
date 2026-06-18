@@ -69,6 +69,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final role = await _tokenStorage.getUserRole();
 
     if (token != null && role != null) {
+      if (_tokenStorage.isAccessTokenExpired(token)) {
+        await logout();
+        return;
+      }
       // Pre-populate role and token into state during load
       state = AuthState(status: AuthStatus.loading, role: role, token: token);
 
@@ -129,6 +133,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         ),
       );
 
+      await _appPrefs.clearPrivateData();
       await _tokenStorage.saveAccessToken(response.tokenPair.accessToken);
       await _tokenStorage.saveRefreshToken(response.tokenPair.refreshToken);
       await _tokenStorage.saveUserRole(response.user.role);
@@ -158,7 +163,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Ignore network errors during logout
     } finally {
       await _tokenStorage.clearTokens();
-      await _appPrefs.removeCachedUser();
+      await _appPrefs.clearPrivateData();
       state = AuthState(status: AuthStatus.unauthenticated);
     }
   }

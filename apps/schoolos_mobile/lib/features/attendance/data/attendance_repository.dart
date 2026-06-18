@@ -2,23 +2,37 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/errors/app_exception.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/storage/private_read_cache.dart';
 import '../domain/attendance_models.dart';
 
 class AttendanceRepository {
-  const AttendanceRepository(this._client);
+  const AttendanceRepository(this._client, {this.cache});
 
   final ApiClient _client;
+  final PrivateReadCache? cache;
 
   Future<AttendanceSnapshot> getParentAttendanceSnapshot(
     String studentId,
     DateTime month,
   ) async {
-    final response = await _client.get(
-      '/mobile/students/$studentId/attendance-summary',
-      queryParameters: {'month': month.month, 'year': month.year},
-    );
-    final data = response.data as Map<String, dynamic>;
+    final cacheKey = 'attendance_${studentId}_${month.year}_${month.month}';
+    late Map<String, dynamic> data;
+    try {
+      final response = await _client.get(
+        '/mobile/students/$studentId/attendance-summary',
+        queryParameters: {'month': month.month, 'year': month.year},
+      );
+      data = Map<String, dynamic>.from(response.data as Map<String, dynamic>);
+      data['_mobileLastUpdated'] = DateTime.now().toIso8601String();
+      await cache?.write(cacheKey, data);
+    } on AppException catch (error) {
+      if (error is! NetworkException && error is! TimeoutException) rethrow;
+      final cached = cache?.read(cacheKey);
+      if (cached == null) rethrow;
+      data = cached.withMetadata();
+    }
     final today = _asMap(data['today']);
     final monthSummary = _asMap(data['monthSummary']);
     final history = _asList(data['monthHistory']).isNotEmpty
@@ -35,7 +49,9 @@ class AttendanceRepository {
         absentCount: _asInt(monthSummary?['absent']),
         lateCount: _asInt(monthSummary?['late']),
         leaveCount: _asInt(monthSummary?['leave']),
-        lastUpdated: DateTime.now(),
+        lastUpdated:
+            DateTime.tryParse(data['_mobileLastUpdated'] as String? ?? '') ??
+            DateTime.now(),
       ),
       days: history.whereType<Map<String, dynamic>>().map((item) {
         return AttendanceDay(
@@ -43,6 +59,7 @@ class AttendanceRepository {
           status: attendanceStatusFromApi(item['status'] as String?),
         );
       }).toList(),
+      fromCache: data['_mobileFromCache'] as bool? ?? false,
     );
   }
 

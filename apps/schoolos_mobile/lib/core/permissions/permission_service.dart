@@ -1,4 +1,4 @@
-import 'package:permission_handler/permission_handler.dart';
+import 'package:permission_handler/permission_handler.dart' as permissions;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final permissionServiceProvider = Provider<PermissionService>((ref) {
@@ -9,42 +9,46 @@ class PermissionService {
   const PermissionService();
 
   Future<bool> requestCameraPermission() async {
-    final status = await Permission.camera.request();
-    return status.isGranted;
+    final status = await permissions.Permission.camera.request();
+    return status == permissions.PermissionStatus.granted;
   }
 
   Future<bool> hasCameraPermission() async {
-    return Permission.camera.isGranted;
+    return await permissions.Permission.camera.status ==
+        permissions.PermissionStatus.granted;
   }
 
   Future<bool> requestLocationPermission() async {
-    final status = await Permission.location.request();
-    return status.isGranted;
+    final status = await permissions.Permission.location.request();
+    return status == permissions.PermissionStatus.granted;
   }
 
   Future<bool> hasLocationPermission() async {
-    return Permission.location.isGranted;
+    return await permissions.Permission.location.status ==
+        permissions.PermissionStatus.granted;
   }
 
   Future<bool> requestPhotosPermission() async {
-    final status = await Permission.photos.request();
-    return status.isGranted;
+    final status = await permissions.Permission.photos.request();
+    return status == permissions.PermissionStatus.granted;
   }
 
   Future<bool> hasPhotosPermission() async {
-    return Permission.photos.isGranted;
+    return await permissions.Permission.photos.status ==
+        permissions.PermissionStatus.granted;
   }
 
   Future<bool> requestNotificationPermission() async {
-    final status = await Permission.notification.request();
-    return status.isGranted;
+    final status = await permissions.Permission.notification.request();
+    return status == permissions.PermissionStatus.granted;
   }
 
   Future<bool> hasNotificationPermission() async {
-    return Permission.notification.isGranted;
+    return await permissions.Permission.notification.status ==
+        permissions.PermissionStatus.granted;
   }
 
   Future<bool> openAppSettings() async {
-    return openAppSettings();
+    return permissions.openAppSettings();
   }
 }

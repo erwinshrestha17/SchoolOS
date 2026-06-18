@@ -4,16 +4,21 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/errors/app_exception.dart';
+import '../../../core/storage/private_read_cache.dart';
 import '../domain/parent_models.dart';
 
 class ParentRepository {
-  const ParentRepository(this._client);
+  const ParentRepository(this._client, {this.cache});
 
   final ApiClient _client;
+  final PrivateReadCache? cache;
 
   Future<List<GuardianChild>> getGuardianChildren() async {
-    final response = await _client.get('/mobile/me/students');
-    final data = response.data as Map<String, dynamic>;
+    final data = await _getMap(
+      '/mobile/me/students',
+      cacheKey: 'parent_children',
+    );
     final items = data['items'] as List<dynamic>? ?? const [];
 
     return items
@@ -30,15 +35,19 @@ class ParentRepository {
 
     final child = children.firstWhere(
       (item) => item.id == childId,
-      orElse: () => children.first,
+      orElse: () => throw const NotFoundAppException(
+        'This child is not linked to your guardian account.',
+      ),
     );
 
     return getChildProfileForChild(child);
   }
 
   Future<ChildProfile> getChildProfileForChild(GuardianChild child) async {
-    final response = await _client.get('/mobile/students/${child.id}/profile');
-    final data = response.data as Map<String, dynamic>;
+    final data = await _getMap(
+      '/mobile/students/${child.id}/profile',
+      cacheKey: 'parent_profile_${child.id}',
+    );
     final profile = data['profile'] as Map<String, dynamic>? ?? const {};
     final emergencyContact =
         profile['emergencyContact'] as Map<String, dynamic>?;
@@ -92,7 +101,9 @@ class ParentRepository {
 
     final child = children.firstWhere(
       (item) => item.id == childId,
-      orElse: () => children.first,
+      orElse: () => throw const NotFoundAppException(
+        'This child is not linked to your guardian account.',
+      ),
     );
 
     return getParentDashboardSummaryForChild(child);
@@ -101,11 +112,11 @@ class ParentRepository {
   Future<ParentDashboardSummary> getParentDashboardSummaryForChild(
     GuardianChild child,
   ) async {
-    final response = await _client.get(
+    final data = await _getMap(
       '/mobile/me/dashboard',
       queryParameters: {'studentId': child.id},
+      cacheKey: 'parent_dashboard_${child.id}',
     );
-    final data = response.data as Map<String, dynamic>;
 
     return ParentDashboardSummary.fromMobileDashboard(data, child);
   }
@@ -114,11 +125,11 @@ class ParentRepository {
     String childId, {
     int take = 30,
   }) async {
-    final response = await _client.get(
+    final data = await _getMap(
       '/mobile/students/$childId/homework',
       queryParameters: {'take': '$take'},
+      cacheKey: 'parent_homework_${childId}_$take',
     );
-    final data = response.data as Map<String, dynamic>;
     final items = data['items'] as List<dynamic>? ?? const [];
 
     return items
@@ -191,8 +202,8 @@ class ParentRepository {
       throw StateError('Receipt PDF was empty.');
     }
 
-    final documentsDir = await getApplicationDocumentsDirectory();
-    final receiptDir = Directory('${documentsDir.path}/receipts');
+    final temporaryDir = await getTemporaryDirectory();
+    final receiptDir = Directory('${temporaryDir.path}/schoolos/receipts');
     if (!receiptDir.existsSync()) {
       await receiptDir.create(recursive: true);
     }
@@ -263,6 +274,30 @@ class ParentRepository {
 
   Future<void> markParentTeacherThreadRead(String threadId) async {
     await _client.patch('/messaging/parent-teacher/threads/$threadId/read');
+  }
+
+  Future<Map<String, dynamic>> _getMap(
+    String path, {
+    required String cacheKey,
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    try {
+      final response = await _client.get(
+        path,
+        queryParameters: queryParameters,
+      );
+      final data = Map<String, dynamic>.from(
+        response.data as Map<String, dynamic>,
+      );
+      data['_mobileLastUpdated'] = DateTime.now().toIso8601String();
+      await cache?.write(cacheKey, data);
+      return data;
+    } on AppException catch (error) {
+      if (error is! NetworkException && error is! TimeoutException) rethrow;
+      final cached = cache?.read(cacheKey);
+      if (cached == null) rethrow;
+      return cached.withMetadata();
+    }
   }
 }
 

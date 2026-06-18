@@ -1,17 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/connectivity_provider.dart';
+import '../../../core/errors/app_exception.dart';
 import '../../../core/storage/app_preferences_service.dart';
+import '../../../core/storage/private_read_cache.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../data/parent_repository.dart';
 import '../domain/parent_models.dart';
 
 final parentRepositoryProvider = Provider<ParentRepository>((ref) {
-  return ParentRepository(ref.watch(apiClientProvider));
+  return ParentRepository(
+    ref.watch(apiClientProvider),
+    cache: ref.watch(privateReadCacheProvider),
+  );
 });
 
 final parentControllerProvider =
-    StateNotifierProvider<ParentController, ParentState>((ref) {
+    StateNotifierProvider.autoDispose<ParentController, ParentState>((ref) {
       return ParentController(
         repository: ref.watch(parentRepositoryProvider),
         preferences: ref.watch(appPreferencesServiceProvider),
@@ -19,53 +24,49 @@ final parentControllerProvider =
       );
     });
 
-final parentHomeworkProvider =
-    FutureProvider.family<List<ParentHomeworkItem>, String>((ref, childId) {
+final parentHomeworkProvider = FutureProvider.autoDispose
+    .family<List<ParentHomeworkItem>, String>((ref, childId) {
       return ref.watch(parentRepositoryProvider).getHomeworkForChild(childId);
     });
 
-final parentTimetableProvider = FutureProvider.family<ParentTimetable, String>((
-  ref,
-  childId,
-) {
-  return ref.watch(parentRepositoryProvider).getTimetableForChild(childId);
-});
+final parentTimetableProvider = FutureProvider.autoDispose
+    .family<ParentTimetable, String>((ref, childId) {
+      return ref.watch(parentRepositoryProvider).getTimetableForChild(childId);
+    });
 
-final parentReportCardsProvider =
-    FutureProvider.family<List<ParentReportCard>, String>((ref, childId) {
+final parentReportCardsProvider = FutureProvider.autoDispose
+    .family<List<ParentReportCard>, String>((ref, childId) {
       return ref
           .watch(parentRepositoryProvider)
           .getReportCardsForChild(childId);
     });
 
-final parentActivityFeedProvider =
-    FutureProvider.family<List<ParentActivityItem>, String>((ref, childId) {
+final parentActivityFeedProvider = FutureProvider.autoDispose
+    .family<List<ParentActivityItem>, String>((ref, childId) {
       return ref
           .watch(parentRepositoryProvider)
           .getActivityFeedForChild(childId);
     });
 
-final parentTransportProvider =
-    FutureProvider.family<ParentTransportInfo, String>((ref, childId) {
+final parentTransportProvider = FutureProvider.autoDispose
+    .family<ParentTransportInfo, String>((ref, childId) {
       return ref.watch(parentRepositoryProvider).getTransportForChild(childId);
     });
 
-final parentCanteenProvider = FutureProvider.family<ParentCanteenInfo, String>((
-  ref,
-  childId,
-) {
-  return ref.watch(parentRepositoryProvider).getCanteenForChild(childId);
-});
+final parentCanteenProvider = FutureProvider.autoDispose
+    .family<ParentCanteenInfo, String>((ref, childId) {
+      return ref.watch(parentRepositoryProvider).getCanteenForChild(childId);
+    });
 
-final parentTeacherThreadsProvider =
-    FutureProvider.family<ParentTeacherThreadPage, String?>((ref, childId) {
+final parentTeacherThreadsProvider = FutureProvider.autoDispose
+    .family<ParentTeacherThreadPage, String?>((ref, childId) {
       return ref
           .watch(parentRepositoryProvider)
           .getParentTeacherThreads(childId: childId);
     });
 
-final parentTeacherMessagesProvider =
-    FutureProvider.family<List<ParentTeacherMessage>, String>((ref, threadId) {
+final parentTeacherMessagesProvider = FutureProvider.autoDispose
+    .family<List<ParentTeacherMessage>, String>((ref, threadId) {
       return ref
           .watch(parentRepositoryProvider)
           .getParentTeacherMessages(threadId);
@@ -173,21 +174,32 @@ class ParentController extends StateNotifier<ParentState> {
       final profile = await _repository.getChildProfileForChild(selectedChild);
 
       state = ParentState(
-        status: _isOnline ? ParentDataStatus.success : ParentDataStatus.offline,
+        status: ParentDataStatus.success,
         children: children,
         selectedChildId: selectedChildId,
         dashboard: dashboard,
         profile: profile,
         lastUpdated: dashboard.lastUpdated,
-        isOffline: !_isOnline,
-        message: _isOnline
+        isOffline: !_isOnline || dashboard.fromCache,
+        message: _isOnline && !dashboard.fromCache
             ? null
             : 'You are offline. Showing last saved parent data.',
       );
-    } catch (_) {
+    } catch (error) {
+      final status = switch (error) {
+        ModuleLockedException() => ParentDataStatus.moduleLocked,
+        PermissionException() => ParentDataStatus.forbidden,
+        AuthException() => ParentDataStatus.sessionExpired,
+        TimeoutException() => ParentDataStatus.timeout,
+        NetworkException() => ParentDataStatus.offline,
+        _ => ParentDataStatus.error,
+      };
       state = state.copyWith(
-        status: ParentDataStatus.error,
-        message: 'Could not load parent dashboard. Please try again.',
+        status: status,
+        isOffline: error is NetworkException,
+        message: error is AppException
+            ? error.message
+            : 'Could not load parent dashboard. Please try again.',
       );
     }
   }

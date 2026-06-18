@@ -34,10 +34,15 @@ class AttendanceDay {
 }
 
 class AttendanceSnapshot {
-  const AttendanceSnapshot({required this.summary, required this.days});
+  const AttendanceSnapshot({
+    required this.summary,
+    required this.days,
+    this.fromCache = false,
+  });
 
   final AttendanceSummary summary;
   final List<AttendanceDay> days;
+  final bool fromCache;
 }
 
 class TeacherClassSection {

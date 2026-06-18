@@ -84,6 +84,18 @@ class NotificationItem {
   }
 }
 
+class NoticeFeed {
+  const NoticeFeed({
+    required this.items,
+    required this.lastUpdated,
+    required this.fromCache,
+  });
+
+  final List<Notice> items;
+  final DateTime lastUpdated;
+  final bool fromCache;
+}
+
 NoticeCategory _categoryFromSource(String? sourceType) {
   final source = (sourceType ?? '').trim().toLowerCase();
   if (source.isEmpty || source == 'notice' || source == 'event') {

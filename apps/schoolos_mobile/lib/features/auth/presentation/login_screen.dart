@@ -22,11 +22,15 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _tenantController = TextEditingController(text: 'default-school');
-  final _emailController = TextEditingController(
-    text: 'principal@schoolos.com',
+  final _tenantController = TextEditingController(
+    text: EnvConfig.isDevelopment ? 'default-school' : '',
   );
-  final _passwordController = TextEditingController(text: 'principal123');
+  final _emailController = TextEditingController(
+    text: EnvConfig.isDevelopment ? 'principal@schoolos.com' : '',
+  );
+  final _passwordController = TextEditingController(
+    text: EnvConfig.isDevelopment ? 'principal123' : '',
+  );
 
   final List<_DemoLoginAccount> _demoAccounts = const [
     _DemoLoginAccount(
@@ -94,10 +98,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       } catch (e) {
         if (mounted) {
           final message = e is NetworkException || e is TimeoutException
-              ? 'Cannot reach the SchoolOS backend at ${EnvConfig.apiBaseUrl}. Start the API server, then try again.'
+              ? EnvConfig.isDevelopment
+                    ? 'Cannot reach the SchoolOS backend at ${EnvConfig.apiBaseUrl}. Start the API server, then try again.'
+                    : 'SchoolOS could not connect. Check your internet and try again.'
               : e is AppException
               ? e.message
-              : e.toString();
+              : 'SchoolOS could not sign you in. Please try again.';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(message),
@@ -229,53 +235,56 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xl),
 
-                  Text(
-                    'Quick-fill sample accounts',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? AppColors.slate300 : AppColors.slate700,
+                  if (EnvConfig.isDevelopment) ...[
+                    Text(
+                      'Quick-fill sample accounts',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? AppColors.slate300 : AppColors.slate700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    'These only fill the form. Routing still comes from the backend login response.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: isDark ? AppColors.slate400 : AppColors.slate600,
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'These only fill the form. Routing still comes from the backend login response.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: isDark ? AppColors.slate400 : AppColors.slate600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final cardWidth =
-                          (constraints.maxWidth - AppSpacing.sm) / 2;
-
-                      return Wrap(
-                        spacing: AppSpacing.sm,
-                        runSpacing: AppSpacing.sm,
-                        children: [
-                          for (final account in _demoAccounts)
-                            SizedBox(
-                              width: cardWidth,
-                              child: _DemoAccountCard(
-                                account: account,
-                                isSelected:
-                                    _selectedDemoAccount?.role == account.role,
-                                isDark: isDark,
-                                onTap: () => _applyDemoAccount(account),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-                  if (_selectedDemoAccount != null) ...[
                     const SizedBox(height: AppSpacing.sm),
-                    _SelectedDemoAccountBanner(
-                      account: _selectedDemoAccount!,
-                      isDark: isDark,
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final cardWidth =
+                            (constraints.maxWidth - AppSpacing.sm) / 2;
+
+                        return Wrap(
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.sm,
+                          children: [
+                            for (final account in _demoAccounts)
+                              SizedBox(
+                                width: cardWidth,
+                                child: _DemoAccountCard(
+                                  account: account,
+                                  isSelected:
+                                      _selectedDemoAccount?.role ==
+                                      account.role,
+                                  isDark: isDark,
+                                  onTap: () => _applyDemoAccount(account),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
                     ),
+                    if (_selectedDemoAccount != null) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      _SelectedDemoAccountBanner(
+                        account: _selectedDemoAccount!,
+                        isDark: isDark,
+                      ),
+                    ],
+                    const SizedBox(height: AppSpacing.xl),
                   ],
-                  const SizedBox(height: AppSpacing.xl),
                   Center(
                     child: Text(
                       'Secured by SchoolOS platform architecture',

@@ -4,9 +4,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/app.dart';
 import 'core/storage/app_preferences_service.dart';
+import 'core/config/env_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  EnvConfig.validate();
 
   final sharedPrefs = await SharedPreferences.getInstance();
 

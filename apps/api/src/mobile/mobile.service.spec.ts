@@ -20,6 +20,7 @@ describe('MobileService', () => {
   let prisma: MobileServicePrismaMock;
   let attendanceService: { getParentSummary: jest.Mock };
   let financeService: { getReceiptPdfForStudent: jest.Mock };
+  let entitlementsService: { getEntitlements: jest.Mock };
   let service: MobileService;
   let actor: AuthContext;
 
@@ -61,10 +62,27 @@ describe('MobileService', () => {
     financeService = {
       getReceiptPdfForStudent: jest.fn(),
     };
+    entitlementsService = {
+      getEntitlements: jest.fn().mockResolvedValue({
+        modules: [
+          'students',
+          'attendance',
+          'fees',
+          'homework',
+          'activity',
+          'transport',
+          'canteen',
+        ],
+        features: [],
+        addOns: [],
+        tier: null,
+      }),
+    };
     service = new MobileService(
       prisma as never,
       attendanceService as never,
       financeService as never,
+      entitlementsService as never,
     );
     actor = {
       userId: 'parent-1',
@@ -305,6 +323,104 @@ describe('MobileService', () => {
       },
       update: { readAt: expect.any(Date) },
     });
+  });
+
+  it('returns only an exact parent-visible notification detail', async () => {
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.notificationDelivery.findFirst.mockResolvedValue({
+      id: 'delivery-1',
+      title: 'Bus update',
+      body: 'The bus has arrived.',
+      sourceType: 'TRANSPORT',
+      sourceId: 'trip-1',
+      channel: 'PUSH',
+      status: 'SENT',
+      createdAt: new Date('2026-05-01T08:00:00.000Z'),
+      sentAt: new Date('2026-05-01T08:01:00.000Z'),
+      readReceipts: [],
+    });
+
+    await expect(
+      service.getNotificationDetail('delivery-1', actor),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: 'delivery-1',
+        message: 'The bus has arrived.',
+        isRead: false,
+      }),
+    );
+    expect(prisma.notificationDelivery.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'delivery-1',
+          tenantId: 'tenant-1',
+          OR: [
+            { recipientUserId: 'parent-1' },
+            { studentId: { in: ['student-1'] } },
+          ],
+        },
+      }),
+    );
+  });
+
+  it('does not query disabled module data for the parent dashboard', async () => {
+    jest.spyOn(service, 'listMyStudents').mockResolvedValue({
+      items: [
+        {
+          id: 'student-1',
+          name: 'Asha Rai',
+          classSection: 'Grade 4 - A',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          rollNumber: '7',
+          academicYear: '2082',
+          relationship: 'Daughter',
+        },
+      ],
+    });
+    jest.spyOn(service, 'getStudentProfile').mockResolvedValue({
+      child: { id: 'student-1' },
+      profile: {},
+    } as never);
+    jest.spyOn(service, 'listNotifications').mockResolvedValue({
+      unreadCount: 0,
+      items: [],
+    });
+    const attendanceSpy = jest.spyOn(service, 'getStudentAttendanceSummary');
+    const feesSpy = jest.spyOn(service, 'getStudentFeesSummary');
+    const homeworkSpy = jest.spyOn(service, 'getStudentHomework');
+    const transportSpy = jest.spyOn(service, 'getStudentTransport');
+    const canteenSpy = jest.spyOn(service, 'getStudentCanteen');
+    const activitySpy = jest.spyOn(service, 'getStudentActivityFeed');
+    entitlementsService.getEntitlements.mockResolvedValue({
+      modules: ['students'],
+      features: [],
+      addOns: [],
+      tier: null,
+    });
+
+    const result = await service.getDashboard(actor, 'student-1');
+
+    expect(result.modules).toEqual({
+      attendance: false,
+      fees: false,
+      homework: false,
+      activity: false,
+      transport: false,
+      canteen: false,
+    });
+    expect(result.attendance).toBeNull();
+    expect(result.fees).toBeNull();
+    expect(result.homework).toBeNull();
+    expect(attendanceSpy).not.toHaveBeenCalled();
+    expect(feesSpy).not.toHaveBeenCalled();
+    expect(homeworkSpy).not.toHaveBeenCalled();
+    expect(transportSpy).not.toHaveBeenCalled();
+    expect(canteenSpy).not.toHaveBeenCalled();
+    expect(activitySpy).not.toHaveBeenCalled();
   });
 
   it('returns homework scoped to the linked child class and section', async () => {

@@ -84,6 +84,14 @@ void main() {
           'title': 'Sports day',
           'caption': 'Asha joined relay practice.',
         },
+        'modules': {
+          'attendance': true,
+          'fees': false,
+          'homework': true,
+          'activity': true,
+          'transport': false,
+          'canteen': true,
+        },
       }, child);
 
       expect(summary.child.name, 'Asha Rai');
@@ -102,6 +110,8 @@ void main() {
       expect(summary.transportDetail, 'Route A');
       expect(summary.canteenBalance, 450);
       expect(summary.latestActivityTitle, 'Sports day');
+      expect(summary.feesEnabled, isFalse);
+      expect(summary.transportEnabled, isFalse);
     });
   });
 

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'secure_storage_service.dart';
 
@@ -59,6 +61,26 @@ class TokenStorageService {
 
   Future<bool> hasValidSession() async {
     final token = await getAccessToken();
-    return token != null && token.isNotEmpty;
+    return token != null && token.isNotEmpty && !isAccessTokenExpired(token);
+  }
+
+  bool isAccessTokenExpired(String token, {DateTime? now}) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+      final payload = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      );
+      if (payload is! Map<String, dynamic> || payload['exp'] is! num) {
+        return true;
+      }
+      final expiresAt = DateTime.fromMillisecondsSinceEpoch(
+        (payload['exp'] as num).toInt() * 1000,
+        isUtc: true,
+      );
+      return !expiresAt.isAfter((now ?? DateTime.now()).toUtc());
+    } catch (_) {
+      return true;
+    }
   }
 }

@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/app_scaffold.dart';
 import '../../../../shared/widgets/status_chip.dart';
@@ -25,9 +25,8 @@ class NoticeDetailScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Notice detail')),
       body: notice.when(
         loading: () => const AppLoading(message: 'Opening notice...'),
-        error: (_, _) => AppErrorView(
-          title: 'Could not open notice',
-          message: 'Please try again in a moment.',
+        error: (error, _) => AppExceptionView(
+          error: error,
           onRetry: () => ref.invalidate(noticeDetailProvider(noticeId)),
         ),
         data: (item) => ListView(

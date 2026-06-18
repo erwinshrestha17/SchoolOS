@@ -38,6 +38,20 @@ class AuthException extends AppException {
   }) : super(message, code ?? 'AUTH_ERROR');
 }
 
+class SessionExpiredException extends AuthException {
+  const SessionExpiredException()
+    : super(message: 'Your session has expired. Please sign in again.');
+}
+
+class MfaRequiredException extends AuthException {
+  const MfaRequiredException()
+    : super(
+        message:
+            'This account needs an additional verification step. Please use the SchoolOS web sign-in or contact your school administrator.',
+        code: 'MFA_REQUIRED',
+      );
+}
+
 class ValidationException extends AppException {
   const ValidationException({
     required String message,
@@ -49,8 +63,28 @@ class ValidationException extends AppException {
 }
 
 class PermissionException extends AppException {
-  const PermissionException([String message = 'Permission denied.'])
-    : super(message, 'PERMISSION_DENIED');
+  const PermissionException([
+    String message = 'You do not have permission to view this information.',
+  ]) : super(message, 'PERMISSION_DENIED');
+}
+
+class ModuleLockedException extends AppException {
+  const ModuleLockedException()
+    : super('This module is not enabled for your school.', 'MODULE_LOCKED');
+}
+
+class NotFoundAppException extends AppException {
+  const NotFoundAppException([
+    String message = 'This information is no longer available.',
+  ]) : super(message, 'NOT_FOUND');
+}
+
+class ConflictAppException extends AppException {
+  const ConflictAppException()
+    : super(
+        'This information changed since it was opened. Refresh and try again.',
+        'CONFLICT',
+      );
 }
 
 class CacheException extends AppException {

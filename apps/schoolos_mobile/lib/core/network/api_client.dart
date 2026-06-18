@@ -178,18 +178,6 @@ class ApiClient {
     return InterceptorsWrapper(
       onRequest: (options, handler) {
         Logger.debug('API Request [${options.method}] -> ${options.uri}');
-        if (options.data != null) {
-          final path = options.path.toLowerCase();
-          if (path.contains('/auth/login') ||
-              path.contains('/auth/refresh') ||
-              path.contains('otp') ||
-              path.contains('password-recovery') ||
-              path.contains('mfa')) {
-            Logger.debug('Request Data: [REDACTED]');
-          } else {
-            Logger.debug('Request Data: ${options.data}');
-          }
-        }
         return handler.next(options);
       },
       onResponse: (response, handler) {
@@ -240,18 +228,29 @@ class ApiClient {
           final statusCode = response.statusCode;
           final dynamic data = response.data;
 
-          String message = 'A server error occurred. Please try again.';
           String? errorCode;
+          String backendMessage = '';
 
           if (data is Map<String, dynamic>) {
-            message = data['message'] ?? data['error'] ?? message;
-            errorCode = data['code'];
+            final rawMessage = data['message'] ?? data['error'];
+            backendMessage = rawMessage is String ? rawMessage : '';
+            errorCode = data['code'] as String?;
           }
 
           if (statusCode == HttpStatus.unauthorized) {
-            return AuthException(message: message, code: errorCode);
+            return const SessionExpiredException();
           } else if (statusCode == HttpStatus.forbidden) {
-            return PermissionException(message);
+            final normalized = backendMessage.toLowerCase();
+            if (normalized.contains('module') ||
+                normalized.contains('subscription plan') ||
+                normalized.contains('feature')) {
+              return const ModuleLockedException();
+            }
+            return const PermissionException();
+          } else if (statusCode == HttpStatus.notFound) {
+            return const NotFoundAppException();
+          } else if (statusCode == HttpStatus.conflict) {
+            return const ConflictAppException();
           } else if (statusCode == HttpStatus.unprocessableEntity ||
               statusCode == HttpStatus.badRequest) {
             final Map<String, dynamic> errors =
@@ -260,13 +259,14 @@ class ApiClient {
                 ? data['errors'] as Map<String, dynamic>
                 : {};
             return ValidationException(
-              message: message,
+              message: 'Please check the information entered and try again.',
               code: errorCode,
               errors: errors,
             );
           } else {
             return ServerException(
-              message: message,
+              message:
+                  'SchoolOS could not complete this request. Please try again.',
               code: errorCode,
               statusCode: statusCode,
             );

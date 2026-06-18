@@ -12,6 +12,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { FinanceService } from '../finance/finance.service';
+import { EntitlementsService } from '../plans/entitlements.service';
 
 interface MobileStudentRow extends Student {
   class: { id: string; name: string };
@@ -36,6 +37,7 @@ export class MobileService {
     private readonly prisma: PrismaService,
     private readonly attendanceService: AttendanceService,
     private readonly financeService: FinanceService,
+    private readonly entitlementsService: EntitlementsService,
   ) {}
 
   async listMyStudents(actor: AuthContext) {
@@ -101,6 +103,19 @@ export class MobileService {
   async getDashboard(actor: AuthContext, requestedStudentId?: string) {
     const children = await this.listMyStudents(actor);
     const selectedStudentId = requestedStudentId ?? children.items[0]?.id;
+    const entitlements = await this.entitlementsService.getEntitlements(
+      actor.tenantId,
+    );
+    const modules = new Set(entitlements.modules);
+    const enabled = (moduleName: string) => modules.has(moduleName);
+    const moduleAvailability = {
+      attendance: enabled('attendance'),
+      fees: enabled('fees'),
+      homework: enabled('homework'),
+      activity: enabled('activity'),
+      transport: enabled('transport'),
+      canteen: enabled('canteen'),
+    };
 
     if (!selectedStudentId) {
       return {
@@ -108,11 +123,12 @@ export class MobileService {
         children: children.items,
         attendance: null,
         fees: null,
-        homework: { pendingCount: 0, nextDueAt: null },
+        homework: null,
         notices: await this.listNotifications(actor),
         transport: null,
         canteen: null,
         latestActivity: null,
+        modules: moduleAvailability,
       };
     }
 
@@ -127,13 +143,25 @@ export class MobileService {
       activity,
     ] = await Promise.all([
       this.getStudentProfile(selectedStudentId, actor),
-      this.getStudentAttendanceSummary(selectedStudentId, actor),
-      this.getStudentFeesSummary(selectedStudentId, actor),
-      this.getStudentHomework(selectedStudentId, actor, '5'),
+      enabled('attendance')
+        ? this.getStudentAttendanceSummary(selectedStudentId, actor)
+        : Promise.resolve(null),
+      enabled('fees')
+        ? this.getStudentFeesSummary(selectedStudentId, actor)
+        : Promise.resolve(null),
+      enabled('homework')
+        ? this.getStudentHomework(selectedStudentId, actor, '5')
+        : Promise.resolve(null),
       this.listNotifications(actor),
-      this.getStudentTransport(selectedStudentId, actor),
-      this.getStudentCanteen(selectedStudentId, actor),
-      this.getStudentActivityFeed(selectedStudentId, actor, '1'),
+      enabled('transport')
+        ? this.getStudentTransport(selectedStudentId, actor)
+        : Promise.resolve(null),
+      enabled('canteen')
+        ? this.getStudentCanteen(selectedStudentId, actor)
+        : Promise.resolve(null),
+      enabled('activity')
+        ? this.getStudentActivityFeed(selectedStudentId, actor, '1')
+        : Promise.resolve(null),
     ]);
 
     return {
@@ -141,16 +169,21 @@ export class MobileService {
       children: children.items,
       attendance,
       fees,
-      homework: {
-        pendingCount: homework.items.filter((item) =>
-          ['NOT_SUBMITTED', 'NEEDS_CORRECTION'].includes(item.submissionStatus),
-        ).length,
-        nextDueAt: homework.items[0]?.dueAt ?? null,
-      },
+      homework: homework
+        ? {
+            pendingCount: homework.items.filter((item) =>
+              ['NOT_SUBMITTED', 'NEEDS_CORRECTION'].includes(
+                item.submissionStatus,
+              ),
+            ).length,
+            nextDueAt: homework.items[0]?.dueAt ?? null,
+          }
+        : null,
       notices,
       transport,
       canteen,
-      latestActivity: activity.items[0] ?? null,
+      latestActivity: activity?.items[0] ?? null,
+      modules: moduleAvailability,
     };
   }
 
@@ -234,6 +267,44 @@ export class MobileService {
     });
 
     return { success: true };
+  }
+
+  async getNotificationDetail(notificationId: string, actor: AuthContext) {
+    const studentIds = await this.getAllowedStudentIds(actor);
+    const notification = await this.prisma.notificationDelivery.findFirst({
+      where: {
+        id: notificationId,
+        tenantId: actor.tenantId,
+        OR: [
+          { recipientUserId: actor.userId },
+          ...(studentIds.length > 0 ? [{ studentId: { in: studentIds } }] : []),
+        ],
+      },
+      include: {
+        readReceipts: {
+          where: { tenantId: actor.tenantId, userId: actor.userId },
+          select: { readAt: true },
+        },
+      },
+    });
+
+    if (!notification) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    return {
+      id: notification.id,
+      title: notification.title,
+      message: notification.body,
+      sourceType: notification.sourceType,
+      sourceId: notification.sourceId,
+      channel: notification.channel,
+      status: notification.status,
+      createdAt: toIso(notification.createdAt),
+      sentAt: toIso(notification.sentAt),
+      readAt: toIso(notification.readReceipts[0]?.readAt),
+      isRead: notification.readReceipts.length > 0,
+    };
   }
 
   async getStudentProfile(studentId: string, actor: AuthContext) {

@@ -1,16 +1,22 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:schoolos_mobile/core/auth/data/auth_repository.dart';
 import 'package:schoolos_mobile/core/auth/models/auth_user.dart';
 import 'package:schoolos_mobile/core/auth/models/login_request.dart';
+import 'package:schoolos_mobile/core/errors/app_exception.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
 import 'package:schoolos_mobile/core/network/interceptors/token_refresh_interceptor.dart';
 import 'package:schoolos_mobile/core/storage/token_storage_service.dart';
+import 'package:schoolos_mobile/core/storage/secure_storage_service.dart';
 
 class MockApiClient extends Mock implements ApiClient {}
 
 class MockTokenStorageService extends Mock implements TokenStorageService {}
+
+class MockSecureStorageService extends Mock implements SecureStorageService {}
 
 class MockDio extends Mock implements Dio {}
 
@@ -95,6 +101,34 @@ void main() {
         'password': 'password',
       });
     });
+
+    test(
+      'login rejects MFA challenge responses as incomplete sessions',
+      () async {
+        when(
+          () => mockApiClient.post<dynamic>(
+            '/auth/login',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: '/auth/login'),
+            data: {'requiresMfa': true, 'challengeToken': 'challenge'},
+          ),
+        );
+
+        await expectLater(
+          repository.login(
+            const LoginRequest(
+              tenantSlug: 'test',
+              usernameOrEmail: 'test@school.edu',
+              password: 'password',
+            ),
+          ),
+          throwsA(isA<MfaRequiredException>()),
+        );
+      },
+    );
 
     test('getMe returns AuthUser on successful HTTP request', () async {
       final mockResponse = Response(
@@ -295,4 +329,23 @@ void main() {
       );
     });
   });
+
+  test('treats malformed and expired access tokens as invalid sessions', () {
+    final storage = TokenStorageService(MockSecureStorageService());
+    final now = DateTime.utc(2026, 6, 18, 12);
+    final validToken = _jwt(exp: now.add(const Duration(minutes: 5)));
+    final expiredToken = _jwt(exp: now.subtract(const Duration(minutes: 1)));
+
+    expect(storage.isAccessTokenExpired(validToken, now: now), isFalse);
+    expect(storage.isAccessTokenExpired(expiredToken, now: now), isTrue);
+    expect(storage.isAccessTokenExpired('not-a-jwt', now: now), isTrue);
+  });
+}
+
+String _jwt({required DateTime exp}) {
+  final header = base64Url.encode(utf8.encode(jsonEncode({'alg': 'HS256'})));
+  final payload = base64Url.encode(
+    utf8.encode(jsonEncode({'exp': exp.millisecondsSinceEpoch ~/ 1000})),
+  );
+  return '$header.$payload.signature';
 }

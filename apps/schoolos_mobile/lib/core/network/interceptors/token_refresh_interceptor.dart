@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import '../../auth/models/token_pair.dart';
@@ -13,6 +14,7 @@ class TokenRefreshInterceptor extends Interceptor {
   final TokenStorageService tokenStorage;
   final void Function() onSessionExpired;
   final Dio dio;
+  Future<TokenPair>? _refreshInFlight;
 
   @override
   Future<void> onError(
@@ -36,26 +38,12 @@ class TokenRefreshInterceptor extends Interceptor {
     }
 
     try {
-      // 1. Request new token pair using a separate Dio to bypass interceptors
-      final refreshDio = Dio(BaseOptions(baseUrl: err.requestOptions.baseUrl));
-      final response = await refreshDio.post(
-        '/auth/refresh',
-        data: {'refreshToken': refreshToken},
+      final tokenPair = await _refreshSession(
+        refreshToken,
+        err.requestOptions.baseUrl,
       );
 
-      final responseMap = response.data as Map<String, dynamic>;
-      final unwrappedData =
-          responseMap.containsKey('success') && responseMap.containsKey('data')
-          ? responseMap['data'] as Map<String, dynamic>
-          : responseMap;
-
-      final tokenPair = TokenPair.fromJson(unwrappedData);
-
-      // 2. Persist new tokens
-      await tokenStorage.saveAccessToken(tokenPair.accessToken);
-      await tokenStorage.saveRefreshToken(tokenPair.refreshToken);
-
-      // 3. Clone and retry the original request
+      // Clone and retry the original request after the shared refresh completes.
       final requestOptions = err.requestOptions;
       requestOptions.extra['isRetry'] = true;
       requestOptions.headers[HttpHeaders.authorizationHeader] =
@@ -69,5 +57,40 @@ class TokenRefreshInterceptor extends Interceptor {
       onSessionExpired();
       return handler.next(err);
     }
+  }
+
+  Future<TokenPair> _refreshSession(String refreshToken, String baseUrl) {
+    final active = _refreshInFlight;
+    if (active != null) return active;
+
+    final completer = Completer<TokenPair>();
+    _refreshInFlight = completer.future;
+    () async {
+      try {
+        final refreshDio = Dio(BaseOptions(baseUrl: baseUrl));
+        final response = await refreshDio.post(
+          '/auth/refresh',
+          data: {'refreshToken': refreshToken},
+        );
+        final responseMap = response.data as Map<String, dynamic>;
+        final unwrappedData =
+            responseMap.containsKey('success') &&
+                responseMap.containsKey('data')
+            ? responseMap['data'] as Map<String, dynamic>
+            : responseMap;
+        final tokenPair = TokenPair.fromJson(unwrappedData);
+        if (tokenPair.accessToken.isEmpty || tokenPair.refreshToken.isEmpty) {
+          throw const FormatException('Invalid refresh response');
+        }
+        await tokenStorage.saveAccessToken(tokenPair.accessToken);
+        await tokenStorage.saveRefreshToken(tokenPair.refreshToken);
+        completer.complete(tokenPair);
+      } catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      } finally {
+        _refreshInFlight = null;
+      }
+    }();
+    return completer.future;
   }
 }

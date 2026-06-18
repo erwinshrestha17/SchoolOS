@@ -2,15 +2,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/connectivity_provider.dart';
+import '../../../core/storage/private_read_cache.dart';
 import '../data/attendance_repository.dart';
 import '../domain/attendance_models.dart';
 
 final attendanceRepositoryProvider = Provider<AttendanceRepository>((ref) {
-  return AttendanceRepository(ref.watch(apiClientProvider));
+  return AttendanceRepository(
+    ref.watch(apiClientProvider),
+    cache: ref.watch(privateReadCacheProvider),
+  );
 });
 
-final parentAttendanceProvider =
-    FutureProvider.family<AttendanceViewData, String>((ref, studentId) async {
+final parentAttendanceProvider = FutureProvider.autoDispose
+    .family<AttendanceViewData, String>((ref, studentId) async {
       final repository = ref.watch(attendanceRepositoryProvider);
       final now = DateTime.now();
       final snapshot = await repository.getParentAttendanceSnapshot(
@@ -20,7 +24,7 @@ final parentAttendanceProvider =
       return AttendanceViewData(
         summary: snapshot.summary,
         days: snapshot.days,
-        isOffline: !ref.watch(connectivityProvider),
+        isOffline: !ref.watch(connectivityProvider) || snapshot.fromCache,
       );
     });
 

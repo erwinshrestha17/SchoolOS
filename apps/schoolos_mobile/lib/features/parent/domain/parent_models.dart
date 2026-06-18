@@ -6,6 +6,8 @@ enum ParentDataStatus {
   offline,
   unauthorized,
   forbidden,
+  moduleLocked,
+  sessionExpired,
   timeout,
 }
 
@@ -103,6 +105,13 @@ class ParentDashboardSummary {
     required this.latestActivity,
     this.latestActivityTitle,
     required this.lastUpdated,
+    this.attendanceEnabled = true,
+    this.feesEnabled = true,
+    this.homeworkEnabled = true,
+    this.activityEnabled = true,
+    this.transportEnabled = true,
+    this.canteenEnabled = true,
+    this.fromCache = false,
   });
 
   final GuardianChild child;
@@ -122,6 +131,13 @@ class ParentDashboardSummary {
   final String latestActivity;
   final String? latestActivityTitle;
   final DateTime lastUpdated;
+  final bool attendanceEnabled;
+  final bool feesEnabled;
+  final bool homeworkEnabled;
+  final bool activityEnabled;
+  final bool transportEnabled;
+  final bool canteenEnabled;
+  final bool fromCache;
 
   factory ParentDashboardSummary.fromMobileDashboard(
     Map<String, dynamic> json,
@@ -142,6 +158,7 @@ class ParentDashboardSummary {
     final canteen = _asMap(json['canteen']);
     final wallet = _asMap(canteen?['wallet']);
     final latestActivity = _asMap(json['latestActivity']);
+    final modules = _asMap(json['modules']);
     final recentInvoices = (_asList(fees?['recentInvoices']))
         .whereType<Map<String, dynamic>>()
         .map(ParentFeeInvoice.fromJson)
@@ -169,7 +186,16 @@ class ParentDashboardSummary {
       latestActivity:
           latestActivity?['caption'] as String? ?? 'No activity yet.',
       latestActivityTitle: latestActivity?['title'] as String?,
-      lastUpdated: DateTime.now(),
+      lastUpdated:
+          DateTime.tryParse(json['_mobileLastUpdated'] as String? ?? '') ??
+          DateTime.now(),
+      attendanceEnabled: modules?['attendance'] as bool? ?? true,
+      feesEnabled: modules?['fees'] as bool? ?? true,
+      homeworkEnabled: modules?['homework'] as bool? ?? true,
+      activityEnabled: modules?['activity'] as bool? ?? true,
+      transportEnabled: modules?['transport'] as bool? ?? true,
+      canteenEnabled: modules?['canteen'] as bool? ?? true,
+      fromCache: json['_mobileFromCache'] as bool? ?? false,
     );
   }
 }

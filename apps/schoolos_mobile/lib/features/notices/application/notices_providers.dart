@@ -1,37 +1,45 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/errors/app_exception.dart';
 import '../../../core/network/connectivity_provider.dart';
+import '../../../core/storage/private_read_cache.dart';
 import '../data/notices_repository.dart';
 import '../domain/notice_models.dart';
 
 final noticesRepositoryProvider = Provider<NoticesRepository>((ref) {
-  return NoticesRepository(ref.watch(apiClientProvider));
+  return NoticesRepository(
+    ref.watch(apiClientProvider),
+    cache: ref.watch(privateReadCacheProvider),
+  );
 });
 
 final noticesControllerProvider =
-    StateNotifierProvider<NoticesController, NoticesState>((ref) {
+    StateNotifierProvider.autoDispose<NoticesController, NoticesState>((ref) {
       return NoticesController(
         repository: ref.watch(noticesRepositoryProvider),
         isOnline: ref.watch(connectivityProvider),
       );
     });
 
-final noticeDetailProvider = FutureProvider.family<Notice, String>((
+final noticeDetailProvider = FutureProvider.autoDispose.family<Notice, String>((
   ref,
   noticeId,
 ) async {
   final repository = ref.watch(noticesRepositoryProvider);
   final notice = await repository.getNoticeDetail(noticeId);
-  await repository.markNoticeRead(noticeId);
+  try {
+    await repository.markNoticeRead(noticeId);
+  } on AppException catch (error) {
+    if (error is! NetworkException && error is! TimeoutException) rethrow;
+  }
   return notice.copyWith(isRead: true);
 });
 
-final notificationCenterProvider = FutureProvider<List<NotificationItem>>((
-  ref,
-) async {
-  return ref.watch(noticesRepositoryProvider).getNotificationCenter();
-});
+final notificationCenterProvider =
+    FutureProvider.autoDispose<List<NotificationItem>>((ref) async {
+      return ref.watch(noticesRepositoryProvider).getNotificationCenter();
+    });
 
 class NoticesState {
   const NoticesState({
@@ -41,6 +49,7 @@ class NoticesState {
     this.message,
     this.isOffline = false,
     this.lastUpdated,
+    this.error,
   });
 
   final bool isLoading;
@@ -49,6 +58,7 @@ class NoticesState {
   final String? message;
   final bool isOffline;
   final DateTime? lastUpdated;
+  final Object? error;
 
   List<Notice> get visibleNotices {
     final sorted = [...notices]
@@ -80,6 +90,7 @@ class NoticesState {
     String? message,
     bool? isOffline,
     DateTime? lastUpdated,
+    Object? error,
   }) {
     return NoticesState(
       isLoading: isLoading ?? this.isLoading,
@@ -88,6 +99,7 @@ class NoticesState {
       message: message ?? this.message,
       isOffline: isOffline ?? this.isOffline,
       lastUpdated: lastUpdated ?? this.lastUpdated,
+      error: error,
     );
   }
 }
@@ -111,20 +123,23 @@ class NoticesController extends StateNotifier<NoticesState> {
       message: null,
     );
     try {
-      final notices = await _repository.getNotices();
+      final feed = await _repository.getNoticeFeed();
       state = state.copyWith(
         isLoading: false,
-        notices: notices,
-        lastUpdated: DateTime.now(),
-        isOffline: !_isOnline,
-        message: !_isOnline
+        notices: feed.items,
+        lastUpdated: feed.lastUpdated,
+        isOffline: !_isOnline || feed.fromCache,
+        message: !_isOnline || feed.fromCache
             ? 'You are offline. Showing last saved notices.'
             : null,
       );
-    } catch (_) {
+    } catch (error) {
       state = state.copyWith(
         isLoading: false,
-        message: 'Could not load notices. Please try again.',
+        error: error,
+        message: error is AppException
+            ? error.message
+            : 'Could not load notices. Please try again.',
       );
     }
   }

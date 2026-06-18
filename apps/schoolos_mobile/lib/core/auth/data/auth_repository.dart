@@ -3,6 +3,7 @@ import '../models/auth_user.dart';
 import '../models/login_request.dart';
 import '../models/login_response.dart';
 import '../models/token_pair.dart';
+import '../../errors/app_exception.dart';
 
 class AuthRepository {
   const AuthRepository(this.client);
@@ -12,7 +13,20 @@ class AuthRepository {
   /// Sign in with tenant credentials
   Future<LoginResponse> login(LoginRequest request) async {
     final response = await client.post('/auth/login', data: request.toJson());
-    return LoginResponse.fromJson(response.data as Map<String, dynamic>);
+    final data = response.data as Map<String, dynamic>;
+    if (data['requiresMfa'] == true) {
+      throw const MfaRequiredException();
+    }
+    final result = LoginResponse.fromJson(data);
+    if (result.tokenPair.accessToken.isEmpty ||
+        result.tokenPair.refreshToken.isEmpty ||
+        result.user.id.isEmpty) {
+      throw const AuthException(
+        message: 'SchoolOS could not create a valid mobile session.',
+        code: 'INVALID_AUTH_RESPONSE',
+      );
+    }
+    return result;
   }
 
   /// Fetch active profile details

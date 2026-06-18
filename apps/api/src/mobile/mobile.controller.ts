@@ -24,11 +24,13 @@ export class MobileController {
   constructor(private readonly mobileService: MobileService) {}
 
   @Get('me/students')
+  @RequiredModule('students')
   listMyStudents(@CurrentAuth() auth: AuthContext) {
     return this.mobileService.listMyStudents(auth);
   }
 
   @Get('me/dashboard')
+  @RequiredModule('students')
   getDashboard(
     @CurrentAuth() auth: AuthContext,
     @Query('studentId') studentId?: string,
@@ -39,6 +41,14 @@ export class MobileController {
   @Get('me/notifications')
   listNotifications(@CurrentAuth() auth: AuthContext) {
     return this.mobileService.listNotifications(auth);
+  }
+
+  @Get('me/notifications/:id')
+  getNotificationDetail(
+    @Param('id') notificationId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.getNotificationDetail(notificationId, auth);
   }
 
   @Post('me/notifications/:id/read')
