@@ -1,566 +1,327 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import '../../domain/parent_feature_models.dart';
+import '../widgets/parent_detail_widgets.dart';
+import '../widgets/parent_portal_widgets.dart';
 
-import '../../../../app/design_system/app_radius.dart';
-import '../../../../app/design_system/app_spacing.dart';
-import '../../../../app/theme/app_colors.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/app_error_view.dart';
-import '../../../../shared/widgets/app_skeleton.dart';
-import '../../../../shared/widgets/role_shell_scaffold.dart';
-import '../../../../shared/widgets/section_header.dart';
-import '../../../../shared/widgets/status_chip.dart';
-import '../../application/parent_providers.dart';
-import '../../domain/parent_models.dart';
-import '../widgets/parent_state_view.dart';
-
-class ParentTransportScreen extends ConsumerWidget {
+class ParentTransportScreen extends StatefulWidget {
   const ParentTransportScreen({super.key});
-
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(parentControllerProvider);
-    final controller = ref.read(parentControllerProvider.notifier);
-    final childId = state.selectedChildId;
-
-    return RoleShellScaffold(
-      role: 'PARENT',
-      selectedIndex: 4,
-      title: 'Transport',
-      body: ParentStateView(
-        status: state.status,
-        message: state.message,
-        onRetry: controller.load,
-        child: childId == null
-            ? const AppEmptyState(
-                title: 'No child selected',
-                message: 'Select a child before viewing transport.',
-                icon: Icons.directions_bus_rounded,
-              )
-            : _TransportContent(childId: childId),
-      ),
-    );
-  }
+  State<ParentTransportScreen> createState() => _ParentTransportScreenState();
 }
 
-class _TransportContent extends ConsumerWidget {
-  const _TransportContent({required this.childId});
-
-  final String childId;
-
+class _ParentTransportScreenState extends State<ParentTransportScreen> {
+  ChildProfile child = parentChildren.first;
+  int eta = 7;
+  String updated = '6:20 AM';
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final transport = ref.watch(parentTransportProvider(childId));
-
-    return transport.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          children: [
-            AppSkeleton(width: double.infinity, height: 180),
-            SizedBox(height: AppSpacing.md),
-            AppSkeleton(width: double.infinity, height: 108),
-            SizedBox(height: AppSpacing.md),
-            AppSkeleton(width: double.infinity, height: 108),
-          ],
+  Widget build(BuildContext context) => ParentDetailScaffold(
+    title: 'Transport',
+    selectedIndex: 4,
+    body: ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+      children: [
+        ParentChildSelector(
+          child: child,
+          onChanged: (value) => setState(() => child = value),
         ),
-      ),
-      error: (_, _) => AppErrorView(
-        title: 'Could not load transport',
-        message: 'Please try again in a moment.',
-        onRetry: () => ref.invalidate(parentTransportProvider(childId)),
-      ),
-      data: (info) => RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(parentTransportProvider(childId));
-          await ref.read(parentTransportProvider(childId).future);
-        },
-        child: !info.hasRoute
-            ? ListView(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                children: const [
-                  AppEmptyState(
-                    title: 'No transport assigned',
-                    message: 'Bus route details will appear after assignment.',
-                    icon: Icons.directions_bus_rounded,
-                  ),
-                ],
-              )
-            : ListView(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                children: [
-                  _TripHero(info: info),
-                  const SizedBox(height: AppSpacing.xl),
-                  const SectionHeader(title: 'Route details'),
-                  const SizedBox(height: AppSpacing.sm),
-                  _TransportRow(
-                    icon: Icons.route_rounded,
-                    title: 'Route',
-                    value: _routeLabel(info),
-                    accent: AppColors.driverAccent,
-                  ),
-                  _TransportRow(
-                    icon: Icons.pin_drop_rounded,
-                    title: 'Boarding stop',
-                    value: _stopLabel(info),
-                    accent: AppColors.parentAccent,
-                  ),
-                  _TransportRow(
-                    icon: Icons.directions_bus_rounded,
-                    title: 'Vehicle',
-                    value: _vehicleLabel(info),
-                    accent: AppColors.info,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  const SectionHeader(title: 'Live signal'),
-                  const SizedBox(height: AppSpacing.sm),
-                  _LiveSignalCard(info: info),
-                  const SizedBox(height: AppSpacing.lg),
-                  const SectionHeader(title: 'Assignment'),
-                  const SizedBox(height: AppSpacing.sm),
-                  _AssignmentCard(info: info),
-                ],
-              ),
-      ),
-    );
-  }
-}
-
-class _TripHero extends StatelessWidget {
-  const _TripHero({required this.info});
-
-  final ParentTransportInfo info;
-
-  @override
-  Widget build(BuildContext context) {
-    final delayed = info.isDelayed || info.delayMinutes > 0;
-    final statusLabel = info.hasActiveTrip
-        ? _labelize(info.studentStatus ?? info.tripStatus ?? 'ON_ROUTE')
-        : 'Route assigned';
-
-    return AppCard(
-      color: delayed ? AppColors.warningLight : AppColors.secondaryLight,
-      border: Border.all(
-        color: delayed
-            ? AppColors.warning.withValues(alpha: 0.24)
-            : AppColors.secondary.withValues(alpha: 0.18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+        const SizedBox(height: 14),
+        PortalCard(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.8),
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
-                ),
-                child: Icon(
-                  delayed
-                      ? Icons.warning_amber_rounded
-                      : Icons.directions_bus_filled_rounded,
-                  color: delayed ? AppColors.warning : AppColors.secondary,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      info.hasActiveTrip ? 'Active trip' : 'Route ready',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.slate600,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      statusLabel,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(
-                            color: AppColors.slate900,
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      _routeLabel(info),
+              Row(
+                children: [
+                  const FeatureIcon(Icons.directions_bus_rounded),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      child.id == 'aarav'
+                          ? 'Butwal East Route'
+                          : 'Butwal Central Route',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.slate600,
-                        fontWeight: FontWeight.w600,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              StatusChip(
-                status: delayed
-                    ? AppStatusType.late
-                    : (info.hasActiveTrip
-                          ? AppStatusType.onRoute
-                          : AppStatusType.approved),
-                label: delayed
-                    ? 'Delayed'
-                    : (info.hasActiveTrip ? 'Tracking' : 'Assigned'),
-              ),
-            ],
-          ),
-          if (delayed) ...[
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              _delayLabel(info),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.warningDark,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _LiveSignalCard extends StatelessWidget {
-  const _LiveSignalCard({required this.info});
-
-  final ParentTransportInfo info;
-
-  @override
-  Widget build(BuildContext context) {
-    final coordinateLabel = _coordinateLabel(info);
-    final speedLabel = info.speedKph == null
-        ? 'Speed unavailable'
-        : '${_compactNumber(info.speedKph!)} km/h';
-
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _IconTile(
-                icon: info.hasLatestLocation
-                    ? Icons.gps_fixed_rounded
-                    : Icons.gps_off_rounded,
-                color: info.hasLatestLocation
-                    ? AppColors.success
-                    : AppColors.slate400,
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      info.hasLatestLocation
-                          ? 'Latest GPS update'
-                          : 'No live GPS update yet',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      _date(info.latestLocationAt) ??
-                          'The school transport team has not published a location ping for this trip.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.slate500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              StatusChip(
-                status: info.hasLatestLocation
-                    ? AppStatusType.onRoute
-                    : AppStatusType.draft,
-                label: info.hasLatestLocation ? 'Signal' : 'Waiting',
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _InlineMetric(label: 'Speed', value: speedLabel),
-          const SizedBox(height: AppSpacing.sm),
-          _InlineMetric(label: 'Coordinates', value: coordinateLabel),
-        ],
-      ),
-    );
-  }
-}
-
-class _AssignmentCard extends StatelessWidget {
-  const _AssignmentCard({required this.info});
-
-  final ParentTransportInfo info;
-
-  @override
-  Widget build(BuildContext context) {
-    final fee = info.feeAmount == null ? null : _money(info.feeAmount!);
-
-    return AppCard(
-      child: Column(
-        children: [
-          _CompactDetailRow(
-            title: 'Student status',
-            value: _labelize(info.studentStatus ?? 'Not boarded'),
-          ),
-          const Divider(),
-          _CompactDetailRow(
-            title: 'Trip direction',
-            value: _labelize(info.tripDirection ?? info.pickupDirection ?? ''),
-            fallback: 'Direction pending',
-          ),
-          const Divider(),
-          _CompactDetailRow(
-            title: 'Assignment',
-            value: _labelize(info.assignmentStatus ?? ''),
-            fallback: 'No active assignment record',
-          ),
-          const Divider(),
-          _CompactDetailRow(
-            title: 'Enrollment',
-            value: _joinPresent([_labelize(info.enrollmentStatus ?? ''), ?fee]),
-            fallback: 'No active fee enrollment record',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TransportRow extends StatelessWidget {
-  const _TransportRow({
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.accent,
-  });
-
-  final IconData icon;
-  final String title;
-  final String value;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: AppCard(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _IconTile(icon: icon, color: accent),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.slate500,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    value,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _IconTile extends StatelessWidget {
-  const _IconTile({required this.icon, required this.color});
-
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: Icon(icon, color: color),
-    );
-  }
-}
-
-class _InlineMetric extends StatelessWidget {
-  const _InlineMetric({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 96,
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.slate500,
-              fontWeight: FontWeight.w700,
-            ),
+              const SizedBox(height: 14),
+              const Row(
+                children: [
+                  Expanded(child: _RouteMetric('Pickup stop', 'Jankinagar')),
+                  Expanded(child: _RouteMetric('Morning pickup', '7:45 AM')),
+                  Expanded(child: _RouteMetric('Return drop', '3:15 PM')),
+                ],
+              ),
+            ],
           ),
         ),
-        Expanded(
-          child: Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+        const SizedBox(height: 14),
+        PortalCard(
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Bus on route',
+                          style: TextStyle(
+                            color: ParentPortalColors.green,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: StatusBadge(label: 'Live'),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'ETA',
+                          style: TextStyle(color: ParentPortalColors.muted),
+                        ),
+                        Text(
+                          '$eta minutes',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Bus number',
+                          style: TextStyle(color: ParentPortalColors.muted),
+                        ),
+                        const Text(
+                          'BA 2 KHA 1234',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(child: _MockRouteMap()),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Last updated • $updated',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: ParentPortalColors.muted,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _refresh,
+                    icon: const Icon(Icons.refresh_rounded),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        PortalCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              _contact(
+                context,
+                Icons.person_rounded,
+                'Driver',
+                'Ramesh Gurung',
+              ),
+              const Divider(height: 1),
+              _contact(
+                context,
+                Icons.apartment_rounded,
+                'Transport Office',
+                'Greenfield Academy Transport',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        PortalCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const ParentSectionHeader(title: 'Weekly trip schedule'),
+              const SizedBox(height: 8),
+              for (final day in const [
+                'Monday',
+                'Tuesday',
+                'Wednesday',
+                'Thursday',
+                'Friday',
+              ])
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 80,
+                        child: Text(
+                          day,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      const Expanded(
+                        child: Text(
+                          'Pickup 7:45 AM • Drop 3:15 PM',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: ParentPortalColors.muted,
+                          ),
+                        ),
+                      ),
+                      const StatusBadge(label: 'Scheduled'),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        const PortalCard(
+          color: ParentPortalColors.blueSoft,
+          padding: EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: ParentPortalColors.blue),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Live GPS location may be delayed by a few minutes.',
+                  style: TextStyle(color: ParentPortalColors.muted),
+                ),
+              ),
+            ],
           ),
         ),
       ],
-    );
+    ),
+  );
+  Widget _contact(
+    BuildContext context,
+    IconData icon,
+    String title,
+    String subtitle,
+  ) => ListTile(
+    leading: FeatureIcon(icon, color: ParentPortalColors.green, size: 42),
+    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+    subtitle: Text(subtitle),
+    trailing: OutlinedButton.icon(
+      onPressed: () =>
+          showFeatureSnack(context, 'Call confirmation opened for $title.'),
+      icon: const Icon(Icons.phone_rounded),
+      label: const Text('Call'),
+    ),
+  );
+  void _refresh() {
+    setState(() {
+      eta = 5 + Random().nextInt(5);
+      updated = 'Just now';
+    });
+    showFeatureSnack(context, 'Live route refreshed.');
   }
 }
 
-class _CompactDetailRow extends StatelessWidget {
-  const _CompactDetailRow({
-    required this.title,
-    required this.value,
-    this.fallback = 'Unavailable',
-  });
-
-  final String title;
+class _RouteMetric extends StatelessWidget {
+  const _RouteMetric(this.label, this.value);
+  final String label;
   final String value;
-  final String fallback;
-
   @override
-  Widget build(BuildContext context) {
-    final displayValue = value.trim().isEmpty ? fallback : value;
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: const TextStyle(fontSize: 11, color: ParentPortalColors.muted),
+      ),
+      Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
+    ],
+  );
+}
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.slate500,
-                fontWeight: FontWeight.w700,
+class _MockRouteMap extends StatelessWidget {
+  const _MockRouteMap();
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 170,
+    clipBehavior: Clip.antiAlias,
+    decoration: BoxDecoration(
+      color: const Color(0xFFF0F4F8),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Stack(
+      children: [
+        for (final p in const [20.0, 55.0, 90.0, 125.0])
+          Positioned(
+            left: p,
+            top: 0,
+            bottom: 0,
+            child: Container(width: 2, color: Colors.white),
+          ),
+        for (final p in const [24.0, 62.0, 100.0, 138.0])
+          Positioned(
+            left: 0,
+            right: 0,
+            top: p,
+            child: Container(height: 2, color: Colors.white),
+          ),
+        Positioned(
+          left: 28,
+          top: 38,
+          child: Transform.rotate(
+            angle: .35,
+            child: Container(
+              width: 120,
+              height: 5,
+              decoration: BoxDecoration(
+                color: ParentPortalColors.purple,
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
           ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            flex: 2,
-            child: Text(
-              displayValue,
-              textAlign: TextAlign.right,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w800),
-            ),
+        ),
+        const Positioned(
+          left: 22,
+          top: 30,
+          child: Icon(
+            Icons.location_on_rounded,
+            color: ParentPortalColors.green,
+            size: 28,
           ),
-        ],
-      ),
-    );
-  }
-}
-
-String _routeLabel(ParentTransportInfo info) {
-  return _joinPresent([
-    ?info.routeCode,
-    ?info.routeName,
-  ], fallback: 'Route assigned');
-}
-
-String _stopLabel(ParentTransportInfo info) {
-  final sequence = info.stopSequence == null
-      ? null
-      : 'Stop ${info.stopSequence}';
-  return _joinPresent([?info.stopName, ?sequence], fallback: 'Stop not set');
-}
-
-String _vehicleLabel(ParentTransportInfo info) {
-  final capacity = info.vehicleCapacity == null
-      ? null
-      : 'Capacity ${info.vehicleCapacity}';
-  return _joinPresent([
-    ?info.vehicleLabel,
-    ?info.vehicleModel,
-    ?capacity,
-  ], fallback: 'Vehicle not assigned');
-}
-
-String _delayLabel(ParentTransportInfo info) {
-  final minutes = info.delayMinutes > 0 ? '${info.delayMinutes} min' : null;
-  return _joinPresent(['Delay', ?minutes, ?info.delayReason]);
-}
-
-String _coordinateLabel(ParentTransportInfo info) {
-  if (info.latitude == null || info.longitude == null) {
-    return 'Coordinates unavailable';
-  }
-  return '${_compactNumber(info.latitude!)}, ${_compactNumber(info.longitude!)}';
-}
-
-String _joinPresent(List<String> values, {String fallback = ''}) {
-  final present = values.where((value) => value.trim().isNotEmpty).toList();
-  if (present.isEmpty) {
-    return fallback;
-  }
-  return present.join(' - ');
-}
-
-String _labelize(String value) {
-  return value
-      .split('_')
-      .where((part) => part.isNotEmpty)
-      .map((part) => part[0].toUpperCase() + part.substring(1).toLowerCase())
-      .join(' ');
-}
-
-String _money(num value) {
-  final formatted = NumberFormat.decimalPattern().format(value);
-  return 'NPR $formatted';
-}
-
-String _compactNumber(num value) {
-  if (value % 1 == 0) {
-    return value.toInt().toString();
-  }
-  return value.toStringAsFixed(4).replaceFirst(RegExp(r'0+$'), '');
-}
-
-String? _date(String? isoDate) {
-  if (isoDate == null || isoDate.isEmpty) {
-    return null;
-  }
-  final parsed = DateTime.tryParse(isoDate);
-  if (parsed == null) {
-    return null;
-  }
-  return DateFormat('MMM d, yyyy h:mm a').format(parsed);
+        ),
+        const Positioned(
+          left: 88,
+          top: 60,
+          child: FeatureIcon(Icons.directions_bus_rounded, size: 36),
+        ),
+        const Positioned(
+          right: 18,
+          bottom: 22,
+          child: Icon(
+            Icons.location_on_rounded,
+            color: ParentPortalColors.blue,
+            size: 30,
+          ),
+        ),
+      ],
+    ),
+  );
 }

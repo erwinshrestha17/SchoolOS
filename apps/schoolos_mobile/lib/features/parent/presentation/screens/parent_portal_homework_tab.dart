@@ -8,9 +8,14 @@ import '../widgets/parent_portal_widgets.dart';
 enum _HomeworkFilter { all, dueSoon, completed }
 
 class ParentPortalHomeworkTab extends StatefulWidget {
-  const ParentPortalHomeworkTab({super.key, required this.data});
+  const ParentPortalHomeworkTab({
+    super.key,
+    required this.data,
+    this.initialChildId,
+  });
 
   final ParentPortalData data;
+  final String? initialChildId;
 
   @override
   State<ParentPortalHomeworkTab> createState() =>
@@ -19,7 +24,7 @@ class ParentPortalHomeworkTab extends StatefulWidget {
 
 class _ParentPortalHomeworkTabState extends State<ParentPortalHomeworkTab>
     with AutomaticKeepAliveClientMixin {
-  String selectedChild = 'all';
+  late String selectedChild = widget.initialChildId ?? 'all';
   _HomeworkFilter filter = _HomeworkFilter.all;
 
   @override

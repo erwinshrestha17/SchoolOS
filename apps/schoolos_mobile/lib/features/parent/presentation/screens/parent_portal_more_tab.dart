@@ -65,11 +65,11 @@ class ParentPortalMoreTab extends ConsumerWidget {
             'Published results and protected reports',
             AppRoutes.parentReportCards,
           ),
-          const _Menu(
+          _Menu(
             Icons.calendar_month_outlined,
             'School Calendar',
             'Events, holidays, and important dates',
-            null,
+            AppRoutes.parentCalendar,
           ),
           _Menu(
             Icons.school_outlined,
@@ -83,7 +83,7 @@ class ParentPortalMoreTab extends ConsumerWidget {
             Icons.receipt_long_outlined,
             'Fees & Receipts',
             'Dues, invoices, and confirmed receipts',
-            AppRoutes.parentFees,
+            AppRoutes.parentFeesReceipts,
           ),
           _Menu(
             Icons.account_balance_wallet_outlined,
@@ -99,17 +99,17 @@ class ParentPortalMoreTab extends ConsumerWidget {
             'Pickup, route, and trip information',
             AppRoutes.parentTransport,
           ),
-          const _Menu(
+          _Menu(
             Icons.local_library_outlined,
             'Library',
             'Borrowed books and due dates',
-            null,
+            AppRoutes.parentLibrary,
           ),
-          const _Menu(
+          _Menu(
             Icons.fact_check_outlined,
             'Consent & Permissions',
             'Review school requests and approvals',
-            null,
+            AppRoutes.parentConsents,
           ),
         ]),
         const ParentSectionHeader(title: 'Account'),

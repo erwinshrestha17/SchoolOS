@@ -19,6 +19,8 @@ class ParentPortalColors {
   static const orange = Color(0xFFF28A3A);
   static const orangeSoft = Color(0xFFFFF2E8);
   static const red = Color(0xFFD64545);
+  static const redSoft = Color(0xFFFFEEEE);
+  static const surfaceAlt = Color(0xFFF1F4F8);
   static const page = Color(0xFFF6F8FB);
   static const border = Color(0xFFE6EBF1);
 }
@@ -63,12 +65,14 @@ class AvatarInitials extends StatelessWidget {
     this.radius = 24,
     this.backgroundColor = ParentPortalColors.greenSoft,
     this.foregroundColor = ParentPortalColors.green,
+    this.color,
   });
 
   final String name;
   final double radius;
   final Color backgroundColor;
   final Color foregroundColor;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -80,11 +84,11 @@ class AvatarInitials extends StatelessWidget {
         .join();
     return CircleAvatar(
       radius: radius,
-      backgroundColor: backgroundColor,
+      backgroundColor: color?.withValues(alpha: .10) ?? backgroundColor,
       child: Text(
         initials,
         style: TextStyle(
-          color: foregroundColor,
+          color: color ?? foregroundColor,
           fontWeight: FontWeight.w800,
           fontSize: radius * .62,
         ),
@@ -99,12 +103,14 @@ class StatusBadge extends StatelessWidget {
     required this.label,
     this.color = ParentPortalColors.green,
     this.backgroundColor = ParentPortalColors.greenSoft,
+    this.background,
     this.icon,
   });
 
   final String label;
   final Color color;
   final Color backgroundColor;
+  final Color? background;
   final IconData? icon;
 
   @override
@@ -112,7 +118,7 @@ class StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: background ?? backgroundColor,
         borderRadius: AppRadius.borderRadiusMax,
       ),
       child: Row(
@@ -141,11 +147,13 @@ class ParentSectionHeader extends StatelessWidget {
     required this.title,
     this.actionLabel,
     this.onAction,
+    this.trailing,
   });
 
   final String title;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -160,7 +168,8 @@ class ParentSectionHeader extends StatelessWidget {
             ),
           ),
         ),
-        if (actionLabel != null)
+        ...?trailing == null ? null : [trailing!],
+        if (trailing == null && actionLabel != null)
           TextButton(onPressed: onAction, child: Text(actionLabel!)),
       ],
     );
@@ -171,14 +180,16 @@ class ActionTile extends StatelessWidget {
   const ActionTile({
     super.key,
     required this.icon,
-    required this.title,
+    this.title,
+    this.label,
     required this.color,
     required this.onTap,
     this.subtitle,
   });
 
   final IconData icon;
-  final String title;
+  final String? title;
+  final String? label;
   final String? subtitle;
   final Color color;
   final VoidCallback onTap;
@@ -202,7 +213,7 @@ class ActionTile extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            title,
+            title ?? label ?? '',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(

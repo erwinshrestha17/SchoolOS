@@ -20,10 +20,14 @@ import '../features/notices/presentation/screens/notice_detail_screen.dart';
 import '../features/notices/presentation/screens/notice_list_screen.dart';
 import '../features/notices/presentation/screens/notification_center_screen.dart';
 import '../features/parent/presentation/screens/parent_activity_screen.dart';
+import '../features/parent/presentation/screens/parent_calendar_screen.dart';
 import '../features/parent/presentation/screens/parent_canteen_screen.dart';
 import '../features/parent/presentation/screens/parent_chat_screen.dart';
+import '../features/parent/presentation/screens/parent_consents_screen.dart';
 import '../features/parent/presentation/screens/parent_fees_screen.dart';
+import '../features/parent/presentation/screens/parent_fees_receipts_screen.dart';
 import '../features/parent/presentation/screens/parent_homework_screen.dart';
+import '../features/parent/presentation/screens/parent_library_screen.dart';
 import '../features/parent/presentation/screens/parent_portal_detail_screens.dart';
 import '../features/parent/presentation/screens/parent_report_cards_screen.dart';
 import '../features/parent/presentation/screens/parent_timetable_screen.dart';
@@ -102,7 +106,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.parentAttendance,
         builder: (context, state) =>
-            const ParentAttendanceScreen(studentId: 'selected-child'),
+            const ParentAttendanceScreen(studentId: 'aarav'),
+      ),
+      GoRoute(
+        path: AppRoutes.parentChildAttendance,
+        builder: (context, state) => ParentAttendanceScreen(
+          studentId: state.pathParameters['id'] ?? 'aarav',
+        ),
       ),
       GoRoute(
         path: AppRoutes.parentFees,
@@ -110,7 +120,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.parentHomework,
-        builder: (context, state) => const SchoolOsAppShell(initialIndex: 2),
+        builder: (context, state) => SchoolOsAppShell(
+          initialIndex: 2,
+          initialChildId: state.uri.queryParameters['child'],
+        ),
       ),
       GoRoute(
         path: AppRoutes.parentHomeworkItem,
@@ -131,6 +144,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ParentReportCardsScreen(),
       ),
       GoRoute(
+        path: AppRoutes.parentCalendar,
+        builder: (context, state) => const ParentCalendarScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.parentFeesReceipts,
+        builder: (context, state) => const ParentFeesReceiptsScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.parentActivity,
         builder: (context, state) => const ParentActivityScreen(),
       ),
@@ -145,6 +166,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.parentCanteen,
         builder: (context, state) => const ParentCanteenScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.parentConsents,
+        builder: (context, state) => const ParentConsentsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.parentLibrary,
+        builder: (context, state) => const ParentLibraryScreen(),
       ),
       GoRoute(
         path: AppRoutes.parentChat,
@@ -341,6 +370,7 @@ bool _isParentRoute(String location) {
   return location == AppRoutes.parentHome ||
       location == AppRoutes.parentChildren ||
       location.startsWith('/parent/child/') ||
+      location.startsWith('/parent/children/') ||
       location == AppRoutes.parentAttendance ||
       location == AppRoutes.parentFees ||
       location == AppRoutes.parentHomework ||
@@ -348,10 +378,14 @@ bool _isParentRoute(String location) {
       location == AppRoutes.parentUpdates ||
       location == AppRoutes.parentTimetable ||
       location == AppRoutes.parentReportCards ||
+      location == AppRoutes.parentCalendar ||
+      location == AppRoutes.parentFeesReceipts ||
       location == AppRoutes.parentActivity ||
       location == AppRoutes.parentLearning ||
       location == AppRoutes.parentTransport ||
       location == AppRoutes.parentCanteen ||
+      location == AppRoutes.parentConsents ||
+      location == AppRoutes.parentLibrary ||
       location == AppRoutes.parentChat ||
       location == AppRoutes.parentMore;
 }

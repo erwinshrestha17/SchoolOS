@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/constants/app_routes.dart';
+import '../../application/parent_feature_state.dart';
 import '../../domain/parent_portal_models.dart';
 import '../widgets/parent_portal_widgets.dart';
 
-class ParentPortalUpdatesTab extends StatefulWidget {
+class ParentPortalUpdatesTab extends ConsumerStatefulWidget {
   const ParentPortalUpdatesTab({super.key, required this.data});
 
   final ParentPortalData data;
 
   @override
-  State<ParentPortalUpdatesTab> createState() => _ParentPortalUpdatesTabState();
+  ConsumerState<ParentPortalUpdatesTab> createState() =>
+      _ParentPortalUpdatesTabState();
 }
 
-class _ParentPortalUpdatesTabState extends State<ParentPortalUpdatesTab>
+class _ParentPortalUpdatesTabState extends ConsumerState<ParentPortalUpdatesTab>
     with AutomaticKeepAliveClientMixin {
   ParentUpdateCategory? selected;
   bool attending = false;
@@ -25,6 +28,9 @@ class _ParentPortalUpdatesTabState extends State<ParentPortalUpdatesTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final noticeRead = ref.watch(
+      parentFeatureControllerProvider.select((state) => state.noticeRead),
+    );
     final items = selected == null
         ? widget.data.updates
         : widget.data.updates
@@ -51,6 +57,7 @@ class _ParentPortalUpdatesTabState extends State<ParentPortalUpdatesTab>
           _UpdateCard(
             item: item,
             attending: attending,
+            isRead: item.category == ParentUpdateCategory.notice && noticeRead,
             onTap: () => _handleItem(context, item),
           ),
           const SizedBox(height: 14),
@@ -108,9 +115,7 @@ class _ParentPortalUpdatesTabState extends State<ParentPortalUpdatesTab>
       case ParentUpdateCategory.message:
         context.push(AppRoutes.parentChat);
       case ParentUpdateCategory.notice:
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Notice marked as read.')));
+        context.push(AppRoutes.noticeDetail(item.id));
     }
   }
 }
@@ -119,11 +124,13 @@ class _UpdateCard extends StatelessWidget {
   const _UpdateCard({
     required this.item,
     required this.attending,
+    required this.isRead,
     required this.onTap,
   });
 
   final ParentPortalUpdate item;
   final bool attending;
+  final bool isRead;
   final VoidCallback onTap;
 
   @override
@@ -174,7 +181,7 @@ class _UpdateCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (item.unreadCount > 0)
+              if (item.unreadCount > 0 && !isRead)
                 StatusBadge(
                   label: '${item.unreadCount}',
                   color: Colors.white,
@@ -203,7 +210,7 @@ class _UpdateCard extends StatelessWidget {
               const Spacer(),
               Text(
                 switch (item.category) {
-                  ParentUpdateCategory.notice => 'Read',
+                  ParentUpdateCategory.notice => isRead ? 'Read ✓' : 'Read',
                   ParentUpdateCategory.message => 'Reply',
                   ParentUpdateCategory.event => attending ? 'Going ✓' : 'RSVP',
                   ParentUpdateCategory.gallery => 'View gallery',

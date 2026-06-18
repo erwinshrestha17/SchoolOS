@@ -1,149 +1,211 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
-import '../../../../app/design_system/app_spacing.dart';
-import '../../../../app/theme/app_colors.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/app_exception_view.dart';
-import '../../../../shared/widgets/app_loading.dart';
-import '../../../../shared/widgets/app_scaffold.dart';
-import '../../../../shared/widgets/status_chip.dart';
-import '../../application/notices_providers.dart';
-import '../widgets/notice_helpers.dart';
+import '../../../../features/parent/application/parent_feature_state.dart';
+import '../../../../features/parent/presentation/widgets/parent_detail_widgets.dart';
+import '../../../../features/parent/presentation/widgets/parent_portal_widgets.dart';
 
 class NoticeDetailScreen extends ConsumerWidget {
   const NoticeDetailScreen({super.key, required this.noticeId});
-
   final String noticeId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final notice = ref.watch(noticeDetailProvider(noticeId));
-
-    return AppScaffold(
-      appBar: AppBar(title: const Text('Notice detail')),
-      body: notice.when(
-        loading: () => const AppLoading(message: 'Opening notice...'),
-        error: (error, _) => AppExceptionView(
-          error: error,
-          onRetry: () => ref.invalidate(noticeDetailProvider(noticeId)),
-        ),
-        data: (item) => ListView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          children: [
-            AppCard(
-              color: item.isEmergency
-                  ? AppColors.dangerLight.withValues(alpha: 0.45)
-                  : null,
-              border: Border.all(
-                color: item.isEmergency
-                    ? AppColors.danger.withValues(alpha: 0.35)
-                    : AppColors.slate100,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+    final read = ref.watch(
+      parentFeatureControllerProvider.select((state) => state.noticeRead),
+    );
+    return ParentDetailScaffold(
+      title: 'Notice',
+      selectedIndex: 3,
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+        children: [
+          PortalCard(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const FeatureIcon(Icons.campaign_rounded, size: 66),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(item.category.icon, color: item.category.color),
-                      const SizedBox(width: AppSpacing.sm),
-                      StatusChip(
-                        status: item.isEmergency
-                            ? AppStatusType.due
-                            : AppStatusType.published,
-                        label: item.category.label,
+                      const Text(
+                        'Holiday notice for Friday',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: ParentPortalColors.navy,
+                        ),
                       ),
-                      const Spacer(),
-                      StatusChip(
-                        status: item.isRead
-                            ? AppStatusType.completed
-                            : AppStatusType.pending,
-                        label: item.isRead ? 'Read' : 'Unread',
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          const StatusBadge(
+                            label: 'School-wide',
+                            icon: Icons.groups_rounded,
+                          ),
+                          const StatusBadge(
+                            label: 'Important',
+                            color: ParentPortalColors.purple,
+                            background: ParentPortalColors.purpleSoft,
+                            icon: Icons.bookmark_rounded,
+                          ),
+                          StatusBadge(
+                            label: read ? 'Read' : 'Published today 9:00 AM',
+                            color: read
+                                ? ParentPortalColors.green
+                                : ParentPortalColors.muted,
+                            background: read
+                                ? ParentPortalColors.greenSoft
+                                : ParentPortalColors.surfaceAlt,
+                            icon: read
+                                ? Icons.done_all_rounded
+                                : Icons.schedule_rounded,
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.lg),
-                  Text(
-                    item.title,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    item.body,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyLarge?.copyWith(height: 1.55),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.lg),
-            AppCard(
-              child: Column(
-                children: [
-                  _DetailRow(label: 'Published by', value: item.publishedBy),
-                  const Divider(),
-                  _DetailRow(
-                    label: 'Date',
-                    value: DateFormat(
-                      'MMM d, yyyy • h:mm a',
-                    ).format(item.publishedAt),
+          ),
+          const SizedBox(height: 14),
+          const PortalCard(
+            color: ParentPortalColors.greenSoft,
+            child: Row(
+              children: [
+                FeatureIcon(
+                  Icons.groups_rounded,
+                  color: ParentPortalColors.green,
+                  size: 42,
+                ),
+                SizedBox(width: 12),
+                Text(
+                  'Applies to both children',
+                  style: TextStyle(
+                    color: ParentPortalColors.green,
+                    fontWeight: FontWeight.w800,
                   ),
-                  const Divider(),
-                  _DetailRow(label: 'Audience', value: item.audience),
-                  if (item.hasAttachment) ...[
-                    const Divider(),
-                    const _DetailRow(
-                      label: 'Attachments',
-                      value: '1 file available',
-                    ),
-                  ],
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
+          ),
+          const SizedBox(height: 14),
+          const PortalCard(
             child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.slate500,
-                fontWeight: FontWeight.w600,
+              'Dear Parents,\n\nThe school will remain closed this Friday for Eid and Ganatantra Diwas.\n\nClasses will resume on Sunday.',
+              style: TextStyle(
+                fontSize: 17,
+                height: 1.6,
+                color: ParentPortalColors.navy,
               ),
             ),
           ),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
+          const SizedBox(height: 18),
+          const ParentSectionHeader(title: 'Attachment'),
+          const SizedBox(height: 8),
+          PortalCard(
+            onTap: () => _preview(context),
+            child: const Row(
+              children: [
+                FeatureIcon(
+                  Icons.picture_as_pdf_rounded,
+                  color: ParentPortalColors.red,
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Holiday_Notice.pdf',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                      Text(
+                        'PDF • 256 KB',
+                        style: TextStyle(color: ParentPortalColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.download_rounded, color: ParentPortalColors.green),
+              ],
             ),
+          ),
+          const SizedBox(height: 18),
+          const ParentSectionHeader(title: 'Actions'),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: read
+                      ? null
+                      : () {
+                          ref
+                              .read(parentFeatureControllerProvider.notifier)
+                              .markNoticeRead();
+                          showFeatureSnack(context, 'Notice marked as read.');
+                        },
+                  icon: Icon(
+                    read
+                        ? Icons.done_all_rounded
+                        : Icons.check_circle_outline_rounded,
+                  ),
+                  label: Text(read ? 'Read' : 'Mark as read'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => showFeatureSnack(
+                    context,
+                    'Sharing is unavailable in this local preview.',
+                  ),
+                  icon: const Icon(Icons.share_rounded),
+                  label: const Text('Share'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+
+  void _preview(BuildContext context) => showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (_) => const SafeArea(
+      child: Padding(
+        padding: EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FeatureIcon(
+              Icons.picture_as_pdf_rounded,
+              color: ParentPortalColors.red,
+              size: 64,
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Holiday_Notice.pdf',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            ),
+            SizedBox(height: 6),
+            Text(
+              'Protected local preview placeholder\nPDF • 256 KB',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: ParentPortalColors.muted),
+            ),
+            SizedBox(height: 18),
+          ],
+        ),
+      ),
+    ),
+  );
 }

@@ -12,9 +12,14 @@ import '../../features/parent/presentation/screens/parent_portal_updates_tab.dar
 import '../../features/parent/presentation/widgets/parent_portal_widgets.dart';
 
 class SchoolOsAppShell extends ConsumerStatefulWidget {
-  const SchoolOsAppShell({super.key, this.initialIndex = 0});
+  const SchoolOsAppShell({
+    super.key,
+    this.initialIndex = 0,
+    this.initialChildId,
+  });
 
   final int initialIndex;
+  final String? initialChildId;
 
   @override
   ConsumerState<SchoolOsAppShell> createState() => _SchoolOsAppShellState();
@@ -49,7 +54,10 @@ class _SchoolOsAppShellState extends ConsumerState<SchoolOsAppShell> {
             children: [
               ParentPortalHomeTab(data: portal),
               ParentPortalChildrenTab(data: portal),
-              ParentPortalHomeworkTab(data: portal),
+              ParentPortalHomeworkTab(
+                data: portal,
+                initialChildId: widget.initialChildId,
+              ),
               ParentPortalUpdatesTab(data: portal),
               ParentPortalMoreTab(data: portal),
             ],

@@ -4,39 +4,42 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/constants/app_routes.dart';
 import '../../application/parent_portal_providers.dart';
-import '../../domain/parent_portal_models.dart';
+import '../../domain/parent_feature_models.dart';
+import '../widgets/parent_detail_widgets.dart';
 import '../widgets/parent_portal_widgets.dart';
 
 class ParentPortalChildDetailScreen extends ConsumerWidget {
   const ParentPortalChildDetailScreen({super.key, required this.childId});
-
   final String childId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final data = ref.watch(parentPortalDataProvider);
-    return Scaffold(
-      backgroundColor: ParentPortalColors.page,
-      appBar: AppBar(title: const Text('Child details')),
-      body: data.when(
+    final portal = ref.watch(parentPortalDataProvider);
+    return ParentDetailScaffold(
+      title: 'Child profile',
+      selectedIndex: 1,
+      body: portal.when(
         loading: () => const PortalLoadingState(),
         error: (_, _) => PortalErrorState(
           onRetry: () => ref.invalidate(parentPortalDataProvider),
         ),
-        data: (portal) {
-          final child = portal.children.firstWhere(
+        data: (data) {
+          final portalChild = data.children.firstWhere(
             (item) => item.id == childId,
-            orElse: () => portal.children.first,
+            orElse: () => data.children.first,
+          );
+          final child = parentChildren.firstWhere(
+            (item) => item.id == portalChild.id,
+            orElse: () => parentChildren.first,
           );
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
             children: [
               PortalCard(
-                color: ParentPortalColors.greenSoft,
                 child: Row(
                   children: [
-                    AvatarInitials(name: child.name, radius: 32),
-                    const SizedBox(width: 14),
+                    AvatarInitials(name: child.name, radius: 34),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -45,63 +48,175 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                             child.name,
                             style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(
-                                  color: ParentPortalColors.navy,
                                   fontWeight: FontWeight.w900,
+                                  color: ParentPortalColors.navy,
                                 ),
                           ),
-                          Text('${child.classSection} • ${child.teacher}'),
-                          const SizedBox(height: 7),
-                          const StatusBadge(label: 'Present today'),
+                          Text(
+                            '${child.classSection} • Roll ${child.roll}',
+                            style: const TextStyle(
+                              color: ParentPortalColors.muted,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const StatusBadge(label: 'In school today'),
                         ],
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 22),
-              const ParentSectionHeader(title: 'Overview'),
+              const SizedBox(height: 20),
+              const ParentSectionHeader(title: 'Today overview'),
               const SizedBox(height: 10),
-              _detail(
-                context,
-                Icons.person_outline_rounded,
-                'Profile',
-                '${child.classSection} • Greenfield Academy',
-                null,
+              Row(
+                children: [
+                  Expanded(
+                    child: SummaryMetric(
+                      icon: Icons.check_rounded,
+                      label: 'Present',
+                      value: child.id == 'aarav' ? '8:42 AM' : '8:38 AM',
+                      color: ParentPortalColors.green,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: SummaryMetric(
+                      icon: Icons.directions_bus_rounded,
+                      label: 'Pickup',
+                      value: '3:15 PM',
+                      color: ParentPortalColors.orange,
+                    ),
+                  ),
+                ],
               ),
-              _detail(
-                context,
-                Icons.fact_check_outlined,
-                'Attendance',
-                child.attendanceTime,
-                AppRoutes.parentAttendance,
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: SummaryMetric(
+                      icon: Icons.assignment_outlined,
+                      label: child.id == 'aarav' ? 'No homework' : '1 homework',
+                      value: child.id == 'aarav' ? 'due' : 'due tomorrow',
+                      color: ParentPortalColors.purple,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: SummaryMetric(
+                      icon: Icons.credit_card_rounded,
+                      label: 'No fee',
+                      value: 'due',
+                      color: ParentPortalColors.green,
+                    ),
+                  ),
+                ],
               ),
-              _detail(
-                context,
-                Icons.menu_book_outlined,
-                'Homework',
-                child.homework,
-                AppRoutes.parentHomework,
+              const SizedBox(height: 20),
+              const ParentSectionHeader(title: 'Quick actions'),
+              const SizedBox(height: 10),
+              GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1.65,
+                children: [
+                  ActionTile(
+                    icon: Icons.how_to_reg_rounded,
+                    label: 'Attendance',
+                    color: ParentPortalColors.green,
+                    onTap: () => context.push(
+                      AppRoutes.parentChildAttendanceDetail(child.id),
+                    ),
+                  ),
+                  ActionTile(
+                    icon: Icons.assignment_rounded,
+                    label: 'Homework',
+                    color: ParentPortalColors.purple,
+                    onTap: () => context.go(
+                      '${AppRoutes.parentHomework}?child=${child.id}',
+                    ),
+                  ),
+                  ActionTile(
+                    icon: Icons.forum_rounded,
+                    label: 'Message teacher',
+                    color: ParentPortalColors.purple,
+                    onTap: () =>
+                        showMessageComposer(context, childName: child.name),
+                  ),
+                  ActionTile(
+                    icon: Icons.credit_card_rounded,
+                    label: 'Fees',
+                    color: ParentPortalColors.green,
+                    onTap: () => context.push(AppRoutes.parentFees),
+                  ),
+                ],
               ),
-              _detail(
-                context,
-                Icons.receipt_long_outlined,
-                'Fees',
-                'NPR 4,500 due in 3 days',
-                AppRoutes.parentFees,
+              const SizedBox(height: 20),
+              const ParentSectionHeader(title: 'At school'),
+              const SizedBox(height: 10),
+              PortalCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    _infoRow(
+                      Icons.person_rounded,
+                      'Class teacher',
+                      'Ms. Sita Sharma',
+                      ParentPortalColors.purple,
+                    ),
+                    const Divider(height: 1),
+                    _infoRow(
+                      Icons.door_front_door_rounded,
+                      'Classroom',
+                      child.classSection,
+                      ParentPortalColors.green,
+                    ),
+                    const Divider(height: 1),
+                    _infoRow(
+                      Icons.event_rounded,
+                      'Upcoming event',
+                      'Parent–Teacher Meeting\nFriday 10:00 AM',
+                      ParentPortalColors.blue,
+                    ),
+                  ],
+                ),
               ),
-              _detail(
-                context,
-                Icons.directions_bus_outlined,
-                'Transport',
-                child.transport,
-                AppRoutes.parentTransport,
+              const SizedBox(height: 20),
+              ParentSectionHeader(
+                title: 'Today timeline',
+                trailing: TextButton(
+                  onPressed: () => _timelineSheet(context),
+                  child: const Text('View all'),
+                ),
               ),
-              _detail(
-                context,
-                Icons.notifications_none_rounded,
-                'Updates',
-                child.updates,
-                AppRoutes.parentUpdates,
+              const SizedBox(height: 8),
+              PortalCard(
+                child: Column(
+                  children: [
+                    _timeline(
+                      Icons.check_rounded,
+                      'Present at 8:42 AM',
+                      'Checked in by class teacher',
+                      ParentPortalColors.green,
+                    ),
+                    _timeline(
+                      Icons.directions_bus_rounded,
+                      'School bus pickup',
+                      'Expected at 3:15 PM',
+                      ParentPortalColors.orange,
+                    ),
+                    _timeline(
+                      Icons.notifications_rounded,
+                      'Last updated',
+                      'Today, 8:42 AM',
+                      ParentPortalColors.purple,
+                      last: true,
+                    ),
+                  ],
+                ),
               ),
             ],
           );
@@ -110,55 +225,100 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _detail(
-    BuildContext context,
+  Widget _infoRow(IconData icon, String title, String subtitle, Color color) =>
+      ListTile(
+        leading: FeatureIcon(icon, color: color, size: 42),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+        subtitle: Text(subtitle),
+        trailing: const ListChevron(),
+      );
+
+  Widget _timeline(
     IconData icon,
     String title,
     String subtitle,
-    String? route,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: PortalCard(
-        onTap: route == null ? null : () => context.push(route),
-        child: Row(
-          children: [
-            Icon(icon, color: ParentPortalColors.green),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: ParentPortalColors.muted),
-                  ),
-                ],
+    Color color, {
+    bool last = false,
+  }) => Padding(
+    padding: EdgeInsets.only(bottom: last ? 0 : 14),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FeatureIcon(icon, color: color, size: 34),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+              Text(
+                subtitle,
+                style: const TextStyle(color: ParentPortalColors.muted),
               ),
-            ),
-            if (route != null) const ListChevron(),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
-  }
+      ],
+    ),
+  );
+
+  Future<void> _timelineSheet(BuildContext context) =>
+      showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (_) => const SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Today timeline',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                ),
+                SizedBox(height: 16),
+                ListTile(
+                  leading: Icon(
+                    Icons.check_circle,
+                    color: ParentPortalColors.green,
+                  ),
+                  title: Text('8:42 AM • Present'),
+                  subtitle: Text('Checked in by class teacher'),
+                ),
+                ListTile(
+                  leading: Icon(
+                    Icons.directions_bus,
+                    color: ParentPortalColors.orange,
+                  ),
+                  title: Text('3:15 PM • Pickup expected'),
+                  subtitle: Text('Butwal East Route • Gate 2'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
 }
 
-class ParentPortalHomeworkDetailScreen extends ConsumerWidget {
+class ParentPortalHomeworkDetailScreen extends ConsumerStatefulWidget {
   const ParentPortalHomeworkDetailScreen({super.key, required this.homeworkId});
-
   final String homeworkId;
+  @override
+  ConsumerState<ParentPortalHomeworkDetailScreen> createState() =>
+      _ParentPortalHomeworkDetailScreenState();
+}
+
+class _ParentPortalHomeworkDetailScreenState
+    extends ConsumerState<ParentPortalHomeworkDetailScreen> {
+  DateTime? reminder;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final data = ref.watch(parentPortalDataProvider);
-    return Scaffold(
-      backgroundColor: ParentPortalColors.page,
-      appBar: AppBar(title: const Text('Homework details')),
+    return ParentDetailScaffold(
+      title: 'Homework detail',
+      selectedIndex: 2,
       body: data.when(
         loading: () => const PortalLoadingState(),
         error: (_, _) => PortalErrorState(
@@ -166,67 +326,213 @@ class ParentPortalHomeworkDetailScreen extends ConsumerWidget {
         ),
         data: (portal) {
           final item = portal.homework.firstWhere(
-            (entry) => entry.id == homeworkId,
+            (entry) => entry.id == widget.homeworkId,
             orElse: () => portal.homework.first,
+          );
+          final child = parentChildren.firstWhere(
+            (entry) => entry.name == item.childName,
+            orElse: () => parentChildren.last,
           );
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
             children: [
-              HomeworkCard(item: item, onOpen: () {}),
-              const SizedBox(height: 18),
-              const ParentSectionHeader(title: 'Assignment'),
-              const SizedBox(height: 10),
+              ParentChildSelector(child: child, onChanged: (_) {}),
+              const SizedBox(height: 16),
               PortalCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _instructions(item),
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyLarge?.copyWith(height: 1.5),
+                    Row(
+                      children: [
+                        const FeatureIcon(Icons.menu_book_rounded),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Subject',
+                                style: TextStyle(
+                                  color: ParentPortalColors.muted,
+                                ),
+                              ),
+                              Text(
+                                'English',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: ParentPortalColors.navy,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        StatusBadge(
+                          label: 'Due in 1 day',
+                          color: ParentPortalColors.orange,
+                          background: ParentPortalColors.orangeSoft,
+                          icon: Icons.schedule_rounded,
+                        ),
+                      ],
                     ),
                     const Divider(height: 28),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(
-                        Icons.attach_file_rounded,
-                        color: ParentPortalColors.purple,
+                    const Text(
+                      'Title',
+                      style: TextStyle(color: ParentPortalColors.muted),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Homework due tomorrow',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: ParentPortalColors.navy,
                       ),
-                      title: Text(
-                        '${item.attachmentCount} worksheet attachment${item.attachmentCount == 1 ? '' : 's'}',
-                      ),
-                      subtitle: const Text(
-                        'Protected school file • tap to preview',
-                      ),
-                      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Attachment preview opened.'),
-                        ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Read the phonics worksheet and complete the sounds exercise in your notebook.',
+                      style: TextStyle(fontSize: 16, height: 1.5),
+                    ),
+                    const Divider(height: 28),
+                    _homeworkInfo(
+                      Icons.event_rounded,
+                      'Due',
+                      'Tomorrow, 4:00 PM',
+                      ParentPortalColors.green,
+                    ),
+                    const SizedBox(height: 14),
+                    _homeworkInfo(
+                      Icons.person_rounded,
+                      'Assigned by',
+                      'Ms. Sita Sharma',
+                      ParentPortalColors.green,
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Attachment',
+                      style: TextStyle(color: ParentPortalColors.muted),
+                    ),
+                    const SizedBox(height: 8),
+                    PortalCard(
+                      onTap: () => _attachmentSheet(context),
+                      padding: const EdgeInsets.all(12),
+                      child: const Row(
+                        children: [
+                          FeatureIcon(
+                            Icons.picture_as_pdf_rounded,
+                            color: ParentPortalColors.red,
+                            size: 40,
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Phonics_Worksheet.pdf',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                                Text(
+                                  'PDF • 356 KB',
+                                  style: TextStyle(
+                                    color: ParentPortalColors.muted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ListChevron(),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: item.isCompleted
-                      ? null
-                      : () => ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Submission status saved locally for this prototype.',
+              PortalCard(
+                color: ParentPortalColors.redSoft,
+                child: const Row(
+                  children: [
+                    FeatureIcon(
+                      Icons.hourglass_bottom_rounded,
+                      color: ParentPortalColors.red,
+                    ),
+                    SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Status',
+                            style: TextStyle(color: ParentPortalColors.muted),
+                          ),
+                          Text(
+                            'Not submitted',
+                            style: TextStyle(
+                              color: ParentPortalColors.red,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
+                          Text('This homework is not yet submitted.'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (reminder != null) ...[
+                const SizedBox(height: 12),
+                PortalCard(
+                  color: ParentPortalColors.greenSoft,
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.notifications_active_rounded,
+                        color: ParentPortalColors.green,
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Reminder created for tomorrow at 3:00 PM',
+                          style: TextStyle(fontWeight: FontWeight.w800),
                         ),
-                  icon: Icon(
-                    item.isCompleted
-                        ? Icons.task_alt_rounded
-                        : Icons.check_rounded,
+                      ),
+                    ],
                   ),
-                  label: Text(item.isCompleted ? 'Completed' : 'Mark as done'),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _attachmentSheet(context),
+                      icon: const Icon(Icons.description_rounded),
+                      label: const Text('Open attachment'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () =>
+                          showMessageComposer(context, childName: child.name),
+                      icon: const Icon(Icons.forum_rounded),
+                      label: const Text('Message teacher'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  onPressed: _addReminder,
+                  icon: const Icon(Icons.notifications_none_rounded),
+                  label: Text(
+                    reminder == null ? 'Add reminder' : 'Change reminder',
+                  ),
                 ),
               ),
             ],
@@ -235,15 +541,88 @@ class ParentPortalHomeworkDetailScreen extends ConsumerWidget {
       ),
     );
   }
-}
 
-String _instructions(ParentPortalHomework item) {
-  return switch (item.id) {
-    'phonics' =>
-      'Read the attached phonics worksheet aloud with a guardian. Practice each sound twice and bring the worksheet to class.',
-    'fruit' =>
-      'Color each fruit neatly, name it aloud, and bring the completed worksheet to class.',
-    _ =>
-      'Complete the plant life worksheet and review the parts of a plant before the next class.',
-  };
+  Widget _homeworkInfo(
+    IconData icon,
+    String label,
+    String value,
+    Color color,
+  ) => Row(
+    children: [
+      FeatureIcon(icon, color: color, size: 42),
+      const SizedBox(width: 12),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(color: ParentPortalColors.muted)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
+        ],
+      ),
+    ],
+  );
+
+  Future<void> _attachmentSheet(BuildContext context) =>
+      showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (_) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const FeatureIcon(
+                  Icons.picture_as_pdf_rounded,
+                  color: ParentPortalColors.red,
+                  size: 64,
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Phonics_Worksheet.pdf',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Protected file preview placeholder\nPDF • 356 KB',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: ParentPortalColors.muted),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Done'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+  Future<void> _addReminder() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 15, minute: 0),
+    );
+    if (time == null || !mounted) return;
+    setState(
+      () => reminder = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      ),
+    );
+    showFeatureSnack(context, 'Homework reminder created.');
+  }
 }

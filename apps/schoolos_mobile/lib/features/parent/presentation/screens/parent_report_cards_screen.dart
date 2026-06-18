@@ -1,207 +1,305 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
-import '../../../../app/design_system/app_spacing.dart';
-import '../../../../app/theme/app_colors.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/app_error_view.dart';
-import '../../../../shared/widgets/app_skeleton.dart';
-import '../../../../shared/widgets/role_shell_scaffold.dart';
-import '../../../../shared/widgets/status_chip.dart';
-import '../../application/parent_providers.dart';
-import '../../domain/parent_models.dart';
-import '../widgets/parent_state_view.dart';
+import '../../domain/parent_feature_models.dart';
+import '../widgets/parent_detail_widgets.dart';
+import '../widgets/parent_portal_widgets.dart';
 
-class ParentReportCardsScreen extends ConsumerWidget {
+class ParentReportCardsScreen extends StatefulWidget {
   const ParentReportCardsScreen({super.key});
-
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(parentControllerProvider);
-    final controller = ref.read(parentControllerProvider.notifier);
-    final childId = state.selectedChildId;
-
-    return RoleShellScaffold(
-      role: 'PARENT',
-      selectedIndex: 4,
-      title: 'Report cards',
-      body: ParentStateView(
-        status: state.status,
-        message: state.message,
-        onRetry: controller.load,
-        child: childId == null
-            ? const AppEmptyState(
-                title: 'No child selected',
-                message: 'Select a child before viewing report cards.',
-                icon: Icons.analytics_rounded,
-              )
-            : _ReportCardsContent(childId: childId),
-      ),
-    );
-  }
+  State<ParentReportCardsScreen> createState() =>
+      _ParentReportCardsScreenState();
 }
 
-class _ReportCardsContent extends ConsumerWidget {
-  const _ReportCardsContent({required this.childId});
+class _ParentReportCardsScreenState extends State<ParentReportCardsScreen> {
+  ChildProfile child = parentChildren.first;
 
-  final String childId;
+  Map<String, String> get grades => child.id == 'aarav'
+      ? const {
+          'Mathematics': 'A-',
+          'English': 'B+',
+          'Science': 'A',
+          'Nepali': 'B+',
+        }
+      : const {
+          'Mathematics': 'B+',
+          'English': 'A',
+          'Science': 'A-',
+          'Nepali': 'A',
+        };
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cards = ref.watch(parentReportCardsProvider(childId));
-
-    return cards.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          children: [
-            AppSkeleton(width: double.infinity, height: 132),
-            SizedBox(height: AppSpacing.md),
-            AppSkeleton(width: double.infinity, height: 132),
-          ],
+  Widget build(BuildContext context) => ParentDetailScaffold(
+    title: 'Report Cards',
+    selectedIndex: 4,
+    body: ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+      children: [
+        ParentChildSelector(
+          child: child,
+          onChanged: (value) => setState(() => child = value),
         ),
-      ),
-      error: (_, _) => AppErrorView(
-        title: 'Could not load report cards',
-        message: 'Please try again in a moment.',
-        onRetry: () => ref.invalidate(parentReportCardsProvider(childId)),
-      ),
-      data: (items) => RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(parentReportCardsProvider(childId));
-          await ref.read(parentReportCardsProvider(childId).future);
-        },
-        child: items.isEmpty
-            ? ListView(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                children: const [
-                  AppEmptyState(
-                    title: 'No report cards published',
-                    message:
-                        'Published exam results will appear here when released.',
-                    icon: Icons.analytics_rounded,
+        const SizedBox(height: 16),
+        PortalCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const FeatureIcon(
+                    Icons.description_rounded,
+                    color: ParentPortalColors.green,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'First Terminal Examination',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          'Published on May 28, 2025 / 15 Ashadh 2083',
+                          style: TextStyle(color: ParentPortalColors.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const StatusBadge(
+                    label: 'Published',
+                    icon: Icons.check_rounded,
                   ),
                 ],
-              )
-            : ListView(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                children: [
-                  for (final card in items) ...[
-                    _ReportCardTile(card: card),
-                    const SizedBox(height: AppSpacing.md),
-                  ],
-                ],
               ),
-      ),
-    );
-  }
-}
-
-class _ReportCardTile extends StatelessWidget {
-  const _ReportCardTile({required this.card});
-
-  final ParentReportCard card;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.analytics_rounded, color: AppColors.primary),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 14),
+              const PortalCard(
+                color: ParentPortalColors.greenSoft,
+                child: Row(
                   children: [
-                    Text(
-                      card.examTerm,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      [
-                        card.academicYear,
-                        if (_date(card.publishedAt) != null)
-                          'Published ${_date(card.publishedAt)}',
-                      ].where((item) => item.isNotEmpty).join(' • '),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.slate500,
-                      ),
-                    ),
+                    Expanded(child: _ResultMetric('Overall result', 'Pass')),
+                    Expanded(child: _ResultMetric('Attendance', '94%')),
                   ],
                 ),
               ),
-              StatusChip(status: AppStatusType.completed, label: card.grade),
+              const SizedBox(height: 16),
+              const Text(
+                'Subject grades',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 10),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1.9,
+                children: [
+                  for (final entry in grades.entries)
+                    PortalCard(
+                      padding: const EdgeInsets.all(6),
+                      color: entry.value.startsWith('A')
+                          ? ParentPortalColors.greenSoft
+                          : ParentPortalColors.purpleSoft,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            entry.key,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: ParentPortalColors.muted,
+                            ),
+                          ),
+                          Text(
+                            entry.value,
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                              color: entry.value.startsWith('A')
+                                  ? ParentPortalColors.green
+                                  : ParentPortalColors.purple,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => showFeatureSnack(
+                        context,
+                        'Report card saved to the local preview.',
+                      ),
+                      icon: const Icon(Icons.download_rounded),
+                      label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('Download report card'),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _fullReport(context),
+                      icon: const Icon(Icons.open_in_new_rounded),
+                      label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('View full report'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
+        ),
+        const SizedBox(height: 14),
+        const PortalCard(
+          color: ParentPortalColors.surfaceAlt,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Metric(label: 'Percent', value: '${card.percentage}%'),
-              _Metric(label: 'GPA', value: card.gpa?.toString() ?? '-'),
-              _Metric(label: 'File', value: card.hasFile ? 'Ready' : 'None'),
+              Row(
+                children: [
+                  FeatureIcon(
+                    Icons.description_outlined,
+                    color: ParentPortalColors.muted,
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Second Terminal Examination',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          'Not published yet',
+                          style: TextStyle(color: ParentPortalColors.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  StatusBadge(
+                    label: 'Upcoming',
+                    color: ParentPortalColors.muted,
+                    background: Colors.white,
+                  ),
+                ],
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Results will appear here once they are finalized by the school.',
+                style: TextStyle(color: ParentPortalColors.muted),
+              ),
             ],
           ),
-          if (card.remarks != null && card.remarks!.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
+        ),
+        const SizedBox(height: 14),
+        PortalCard(
+          color: ParentPortalColors.purpleSoft,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.chat_rounded, color: ParentPortalColors.purple),
+                  SizedBox(width: 8),
+                  Text(
+                    'Teacher’s note',
+                    style: TextStyle(
+                      color: ParentPortalColors.purple,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${child.name.split(' ').first} is showing great progress and curiosity in class. Keep up the good work at home!',
+                style: const TextStyle(height: 1.45),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                '– Class Teacher',
+                style: TextStyle(color: ParentPortalColors.muted),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+
+  void _fullReport(BuildContext context) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Text(
-              card.remarks!,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.slate600),
+              '${child.name} • Full report',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 14),
+            for (final entry in grades.entries)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(entry.key),
+                trailing: StatusBadge(
+                  label: entry.value,
+                  color: ParentPortalColors.purple,
+                  background: ParentPortalColors.purpleSoft,
+                ),
+              ),
+            const Divider(),
+            const Text(
+              'Attendance: 94% • Overall result: Pass',
+              style: TextStyle(fontWeight: FontWeight.w800),
             ),
           ],
-        ],
+        ),
       ),
-    );
-  }
+    ),
+  );
 }
 
-class _Metric extends StatelessWidget {
-  const _Metric({required this.label, required this.value});
-
+class _ResultMetric extends StatelessWidget {
+  const _ResultMetric(this.label, this.value);
   final String label;
   final String value;
-
   @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.slate500,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-          ),
-        ],
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: const TextStyle(color: ParentPortalColors.muted)),
+      const SizedBox(height: 4),
+      Text(
+        value,
+        style: const TextStyle(
+          color: ParentPortalColors.green,
+          fontSize: 25,
+          fontWeight: FontWeight.w900,
+        ),
       ),
-    );
-  }
-}
-
-String? _date(String? isoDate) {
-  if (isoDate == null || isoDate.isEmpty) {
-    return null;
-  }
-  final parsed = DateTime.tryParse(isoDate);
-  if (parsed == null) {
-    return null;
-  }
-  return DateFormat('MMM d, yyyy').format(parsed);
+    ],
+  );
 }
