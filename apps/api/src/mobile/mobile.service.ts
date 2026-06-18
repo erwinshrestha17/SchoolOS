@@ -13,6 +13,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { FinanceService } from '../finance/finance.service';
 import { EntitlementsService } from '../plans/entitlements.service';
+import { ReportCardPdfService } from '../academics/report-card-pdf.service';
+import { CommunicationsService } from '../communications/communications.service';
+import { HomeworkAttachmentAccessService } from '../homework/homework-attachment-access.service';
 
 interface MobileStudentRow extends Student {
   class: { id: string; name: string };
@@ -38,6 +41,9 @@ export class MobileService {
     private readonly attendanceService: AttendanceService,
     private readonly financeService: FinanceService,
     private readonly entitlementsService: EntitlementsService,
+    private readonly reportCardPdfService: ReportCardPdfService,
+    private readonly communicationsService: CommunicationsService,
+    private readonly homeworkAttachmentAccessService: HomeworkAttachmentAccessService,
   ) {}
 
   async listMyStudents(actor: AuthContext) {
@@ -245,7 +251,7 @@ export class MobileService {
     return {
       unreadCount: await this.countUnreadNotifications(actor, studentIds),
       items,
-      nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
+      nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
     };
   }
 
@@ -518,6 +524,31 @@ export class MobileService {
     );
   }
 
+  async getMyConsentStatus(actor: AuthContext) {
+    const guardian = await this.prisma.guardian.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+      select: { id: true },
+    });
+
+    if (!guardian) {
+      throw new ForbiddenException('Parent consent status is not available');
+    }
+
+    const items = await this.communicationsService.getGuardianConsentStatus(
+      guardian.id,
+      actor,
+    );
+
+    return {
+      guardianId: guardian.id,
+      items: items.map((item) => ({
+        ...item,
+        capturedAt: toIso(item.capturedAt),
+        revokedAt: toIso(item.revokedAt),
+      })),
+    };
+  }
+
   async getStudentActivityFeed(
     studentId: string,
     actor: AuthContext,
@@ -633,6 +664,55 @@ export class MobileService {
     };
   }
 
+  async getStudentHomeworkAttachments(
+    studentId: string,
+    homeworkId: string,
+    actor: AuthContext,
+  ) {
+    const assignment = await this.getVisibleHomeworkAssignment(
+      studentId,
+      homeworkId,
+      actor,
+    );
+
+    return {
+      homeworkId: assignment.id,
+      items: assignment.attachments.map((attachment) => ({
+        id: attachment.id,
+        fileName: attachment.fileAsset.originalFilename,
+        mimeType: attachment.fileAsset.mimeType,
+        sizeBytes: Number(attachment.fileAsset.sizeBytes),
+        createdAt: toIso(attachment.createdAt),
+      })),
+    };
+  }
+
+  async getStudentHomeworkAttachmentDownloadUrl(
+    studentId: string,
+    homeworkId: string,
+    attachmentId: string,
+    actor: AuthContext,
+  ) {
+    const assignment = await this.getVisibleHomeworkAssignment(
+      studentId,
+      homeworkId,
+      actor,
+    );
+    const visibleAttachment = assignment.attachments.find(
+      (attachment) => attachment.id === attachmentId,
+    );
+
+    if (!visibleAttachment) {
+      throw new NotFoundException('Homework attachment not found');
+    }
+
+    return this.homeworkAttachmentAccessService.getAttachmentAccessUrl(
+      attachmentId,
+      actor,
+      'download',
+    );
+  }
+
   async getStudentTimetable(studentId: string, actor: AuthContext) {
     const student = await this.getAccessibleStudent(studentId, actor);
     const version = await this.prisma.timetableVersion.findFirst({
@@ -720,6 +800,30 @@ export class MobileService {
         hasFile: Boolean(card.fileId),
       })),
     };
+  }
+
+  async getStudentReportCardPdf(
+    studentId: string,
+    reportCardId: string,
+    actor: AuthContext,
+  ) {
+    await this.assertStudentAccess(studentId, actor);
+    const reportCard = await this.prisma.reportCard.findFirst({
+      where: {
+        id: reportCardId,
+        tenantId: actor.tenantId,
+        studentId,
+        isCurrent: true,
+        publishStatus: 'PUBLISHED',
+      },
+      select: { id: true },
+    });
+
+    if (!reportCard) {
+      throw new NotFoundException('Published report card not found');
+    }
+
+    return this.reportCardPdfService.getReportCardPdf(reportCard.id, actor);
   }
 
   async getStudentCanteen(studentId: string, actor: AuthContext) {
@@ -1031,6 +1135,44 @@ export class MobileService {
     return student;
   }
 
+  private async getVisibleHomeworkAssignment(
+    studentId: string,
+    homeworkId: string,
+    actor: AuthContext,
+  ) {
+    const student = await this.getAccessibleStudent(studentId, actor);
+    const assignment = await this.prisma.homeworkAssignment.findFirst({
+      where: {
+        id: homeworkId,
+        tenantId: actor.tenantId,
+        classId: student.classId,
+        status: { in: ['ASSIGNED', 'CLOSED'] },
+        OR: [{ sectionId: null }, { sectionId: student.sectionId }],
+      },
+      include: {
+        attachments: {
+          include: {
+            fileAsset: {
+              select: {
+                id: true,
+                originalFilename: true,
+                mimeType: true,
+                sizeBytes: true,
+              },
+            },
+          },
+          orderBy: [{ createdAt: 'asc' }],
+        },
+      },
+    });
+
+    if (!assignment) {
+      throw new NotFoundException('Homework assignment not found');
+    }
+
+    return assignment;
+  }
+
   private async assertStudentAccess(studentId: string, actor: AuthContext) {
     const student = await this.prisma.student.findFirst({
       where: {
@@ -1050,7 +1192,10 @@ export class MobileService {
     }
   }
 
-  private parentNotificationVisibility(actor: AuthContext, studentIds: string[]) {
+  private parentNotificationVisibility(
+    actor: AuthContext,
+    studentIds: string[],
+  ) {
     return {
       tenantId: actor.tenantId,
       OR: [
@@ -1111,13 +1256,20 @@ function parentNotificationRoute(item: {
   if (item.activityPostId || source.includes('gallery')) {
     return `/parent/activity?postId=${encodeURIComponent(item.activityPostId ?? item.sourceId)}`;
   }
-  if (source.includes('fee') || source.includes('invoice') || source.includes('payment')) {
+  if (
+    source.includes('fee') ||
+    source.includes('invoice') ||
+    source.includes('payment')
+  ) {
     return `/parent/fees?invoiceId=${encodeURIComponent(item.sourceId)}`;
   }
   if (source.includes('attendance') && item.studentId) {
     return `/parent/children/${encodeURIComponent(item.studentId)}/attendance`;
   }
-  if ((source.includes('transport') || source.includes('trip')) && item.studentId) {
+  if (
+    (source.includes('transport') || source.includes('trip')) &&
+    item.studentId
+  ) {
     return `/parent/more/transport?childId=${encodeURIComponent(item.studentId)}`;
   }
   return '/parent/updates';

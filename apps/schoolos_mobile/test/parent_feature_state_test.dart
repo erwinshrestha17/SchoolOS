@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:schoolos_mobile/core/auth/auth_provider.dart';
+import 'package:schoolos_mobile/core/network/api_client.dart';
+import 'package:schoolos_mobile/core/storage/app_preferences_service.dart';
+import 'package:schoolos_mobile/core/storage/token_storage_service.dart';
 import 'package:schoolos_mobile/features/parent/application/parent_feature_state.dart';
+import 'package:schoolos_mobile/features/parent/application/parent_portal_providers.dart';
+import 'package:schoolos_mobile/features/parent/domain/parent_portal_models.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_calendar_screen.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_canteen_screen.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_consents_screen.dart';
@@ -10,30 +18,164 @@ import 'package:schoolos_mobile/features/parent/presentation/screens/parent_libr
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_report_cards_screen.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_transport_screen.dart';
 
+class _TestTokenStorage extends Fake implements TokenStorageService {
+  @override
+  Future<String?> getAccessToken() async => 'test-token';
+
+  @override
+  Future<String?> getRefreshToken() async => null;
+}
+
+class _ParentScreenApiClient extends ApiClient {
+  _ParentScreenApiClient() : super(tokenStorage: _TestTokenStorage());
+
+  @override
+  Future<Response<T>> get<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
+    return Response<T>(
+      data: _payload(path) as T,
+      requestOptions: RequestOptions(path: path),
+    );
+  }
+
+  Map<String, dynamic> _payload(String path) {
+    if (path == '/mobile/me/students') {
+      return {
+        'items': [_child],
+      };
+    }
+    if (path == '/mobile/me/dashboard') {
+      return _dashboard;
+    }
+    if (path == '/mobile/students/child-1/profile') {
+      return {
+        'profile': {
+          'studentSystemId': 'STU-001',
+          'privacy': {
+            'photoUsageConsent': false,
+            'dataProcessingConsent': true,
+          },
+        },
+      };
+    }
+    if (path == '/mobile/students/child-1/report-cards') {
+      return {
+        'items': [
+          {
+            'id': 'report-1',
+            'examName': 'Term 1',
+            'status': 'PUBLISHED',
+            'publishedAt': '2026-06-01T00:00:00.000Z',
+            'fileId': null,
+            'summary': {'grade': 'A'},
+          },
+        ],
+      };
+    }
+    if (path == '/mobile/students/child-1/canteen') {
+      return {
+        'wallet': {
+          'balance': 450,
+          'lowBalanceThreshold': 200,
+          'isLowBalance': false,
+        },
+        'activeMealPlans': [],
+        'recentTransactions': [],
+        'menuItems': [],
+      };
+    }
+    if (path == '/mobile/students/child-1/transport') {
+      return {
+        'assignment': {
+          'status': 'ACTIVE',
+          'route': {'name': 'Route A', 'code': 'A'},
+          'stop': {'name': 'Gate 1', 'sequence': 1},
+        },
+        'activeTrip': null,
+      };
+    }
+    if (path == '/mobile/students/child-1/library') {
+      return {'activeIssues': [], 'recentHistory': [], 'fines': []};
+    }
+    return {};
+  }
+
+  static const _child = {
+    'id': 'child-1',
+    'name': 'Asha Rai',
+    'classSection': 'Grade 4 - A',
+    'rollNumber': '7',
+    'academicYear': '2026',
+    'relationship': 'Daughter',
+  };
+
+  static const _dashboard = {
+    'selectedStudent': _child,
+    'attendance': {
+      'today': {'label': 'Present today'},
+    },
+    'homework': {'pendingCount': 0, 'nextDueAt': null},
+    'fees': {
+      'totalOutstanding': 1200,
+      'overdueCount': 0,
+      'nextDueDate': '2026-06-25T00:00:00.000Z',
+      'recentInvoices': [
+        {
+          'id': 'invoice-1',
+          'invoiceNumber': 'INV-001',
+          'status': 'ISSUED',
+          'totalAmount': 1200,
+          'paidAmount': 0,
+          'outstandingAmount': 1200,
+          'isOverdue': false,
+          'receipts': [],
+        },
+      ],
+      'recentReceipts': [],
+    },
+    'notices': {'unreadCount': 0},
+    'transport': {
+      'activeTrip': {
+        'studentStatus': 'WAITING',
+        'route': {'name': 'Route A'},
+      },
+    },
+    'canteen': {
+      'wallet': {'balance': 450, 'isLowBalance': false},
+    },
+    'latestActivity': {'title': 'Class update', 'caption': 'Learning update'},
+    'modules': {
+      'attendance': true,
+      'fees': true,
+      'homework': true,
+      'activity': true,
+      'transport': true,
+      'canteen': true,
+    },
+  };
+}
+
 void main() {
-  test('shared parent feature state keeps related screens consistent', () {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  test('parent notice state tracks local read acknowledgement only', () {
     final controller = ParentFeatureController();
 
     controller.markNoticeRead();
-    controller.completePayment();
-    controller.topUp(500);
-    controller.setLowBalanceReminder(250);
-    controller.setConsent('media', false);
-    controller.decideTrip(true);
 
     expect(controller.state.noticeRead, isTrue);
-    expect(controller.state.invoicePaid, isTrue);
-    expect(controller.state.walletBalance, 1120);
-    expect(controller.state.lowBalanceReminder, 250);
-    expect(controller.state.walletTransactions.first.amount, 500);
-    expect(controller.state.mediaConsent, isFalse);
-    expect(controller.state.tripDecision, isTrue);
-    expect(controller.state.activityLog, isNotEmpty);
   });
 
   testWidgets('new parent More screens render on a compact phone', (
     tester,
   ) async {
+    final sharedPrefs = await SharedPreferences.getInstance();
     tester.view.physicalSize = const Size(360, 780);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -50,7 +192,47 @@ void main() {
     ];
 
     for (final screen in screens) {
-      await tester.pumpWidget(ProviderScope(child: MaterialApp(home: screen)));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appPreferencesServiceProvider.overrideWithValue(
+              AppPreferencesService(sharedPrefs),
+            ),
+            apiClientProvider.overrideWithValue(_ParentScreenApiClient()),
+            parentPortalDataProvider.overrideWith(
+              (ref) async => const ParentPortalData(
+                parentName: 'Parent',
+                schoolName: 'School',
+                lastUpdated: 'now',
+                children: [
+                  ParentPortalChild(
+                    id: 'child-1',
+                    name: 'Asha Rai',
+                    classSection: 'Grade 4 - A',
+                    teacher: 'Class teacher',
+                    attendance: 'Present today',
+                    attendanceTime: 'Updated now',
+                    transport: 'Route A',
+                    homework: 'No pending homework',
+                    updates: 'No unread updates',
+                  ),
+                ],
+                homework: [],
+                updates: [
+                  ParentPortalUpdate(
+                    id: 'event-1',
+                    category: ParentUpdateCategory.event,
+                    title: 'School event',
+                    body: 'Event details',
+                    metadata: 'School - now',
+                  ),
+                ],
+              ),
+            ),
+          ],
+          child: MaterialApp(home: screen),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(
         tester.takeException(),

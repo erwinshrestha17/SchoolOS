@@ -35,8 +35,7 @@ class _ParentPortalHomeworkTabState extends State<ParentPortalHomeworkTab>
     super.build(context);
     final items = widget.data.homework.where((item) {
       final childMatch =
-          selectedChild == 'all' ||
-          item.childName.toLowerCase().startsWith(selectedChild);
+          selectedChild == 'all' || item.childId == selectedChild;
       final filterMatch = switch (filter) {
         _HomeworkFilter.all => true,
         _HomeworkFilter.dueSoon => item.isDueSoon,
@@ -44,6 +43,15 @@ class _ParentPortalHomeworkTabState extends State<ParentPortalHomeworkTab>
       };
       return childMatch && filterMatch;
     }).toList();
+    final dueSoonCount = widget.data.homework
+        .where((item) => item.isDueSoon)
+        .length;
+    final pendingCount = widget.data.homework
+        .where((item) => !item.isCompleted)
+        .length;
+    final completedCount = widget.data.homework
+        .where((item) => item.isCompleted)
+        .length;
 
     return ListView(
       key: const PageStorageKey('parent-homework'),
@@ -56,16 +64,16 @@ class _ParentPortalHomeworkTabState extends State<ParentPortalHomeworkTab>
               value: selectedChild,
               isExpanded: true,
               icon: const Icon(Icons.keyboard_arrow_down_rounded),
-              items: const [
-                DropdownMenuItem(value: 'all', child: Text('All children')),
-                DropdownMenuItem(
-                  value: 'aarav',
-                  child: Text('Aarav Shrestha • Nursery-A'),
+              items: [
+                const DropdownMenuItem(
+                  value: 'all',
+                  child: Text('All children'),
                 ),
-                DropdownMenuItem(
-                  value: 'aarohi',
-                  child: Text('Aarohi Shrestha • LKG-A'),
-                ),
+                for (final child in widget.data.children)
+                  DropdownMenuItem(
+                    value: child.id,
+                    child: Text('${child.name} • ${child.classSection}'),
+                  ),
               ],
               onChanged: (value) =>
                   setState(() => selectedChild = value ?? 'all'),
@@ -115,12 +123,12 @@ class _ParentPortalHomeworkTabState extends State<ParentPortalHomeworkTab>
                 ),
               ),
               const SizedBox(height: 16),
-              const Row(
+              Row(
                 children: [
                   Expanded(
                     child: SummaryMetric(
                       icon: Icons.schedule_rounded,
-                      value: '1',
+                      value: '$dueSoonCount',
                       label: 'due tomorrow',
                       color: ParentPortalColors.orange,
                     ),
@@ -129,7 +137,7 @@ class _ParentPortalHomeworkTabState extends State<ParentPortalHomeworkTab>
                   Expanded(
                     child: SummaryMetric(
                       icon: Icons.pending_actions_rounded,
-                      value: '1',
+                      value: '$pendingCount',
                       label: 'pending',
                       color: ParentPortalColors.purple,
                     ),
@@ -138,7 +146,7 @@ class _ParentPortalHomeworkTabState extends State<ParentPortalHomeworkTab>
                   Expanded(
                     child: SummaryMetric(
                       icon: Icons.task_alt_rounded,
-                      value: '1',
+                      value: '$completedCount',
                       label: 'completed',
                       color: ParentPortalColors.green,
                     ),

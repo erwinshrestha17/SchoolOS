@@ -105,8 +105,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.parentAttendance,
-        builder: (context, state) =>
-            const ParentAttendanceScreen(studentId: 'aarav'),
+        builder: (context, state) => const ParentAttendanceScreen(),
       ),
       GoRoute(
         path: AppRoutes.parentChildAttendance,

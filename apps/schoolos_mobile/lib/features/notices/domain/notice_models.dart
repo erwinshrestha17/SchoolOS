@@ -74,6 +74,7 @@ class ParentNotification {
     required this.targetId,
     required this.route,
     required this.createdAt,
+    this.category = NoticeCategory.important,
     this.childId,
     this.sourceUpdateId,
     this.readAt,
@@ -89,12 +90,12 @@ class ParentNotification {
   final String? childId;
   final String? sourceUpdateId;
   final DateTime createdAt;
+  final NoticeCategory category;
   final DateTime? readAt;
   final Map<String, dynamic>? metadata;
 
   bool get isRead => readAt != null;
   String get message => body;
-  NoticeCategory get category => _categoryFromType(type);
 
   factory ParentNotification.fromJson(Map<String, dynamic> json) {
     final sourceType = json['sourceType'] as String? ?? '';
@@ -114,10 +115,15 @@ class ParentNotification {
       childId: json['childId'] as String?,
       sourceUpdateId:
           json['noticeId'] as String? ?? json['sourceId'] as String?,
+      category: _categoryFromSource(sourceType),
       createdAt:
           DateTime.tryParse(json['createdAt'] as String? ?? '') ??
           DateTime.now(),
-      readAt: DateTime.tryParse(json['readAt'] as String? ?? ''),
+      readAt:
+          DateTime.tryParse(json['readAt'] as String? ?? '') ??
+          (json['isRead'] == true
+              ? DateTime.fromMillisecondsSinceEpoch(0)
+              : null),
       metadata: Map<String, dynamic>.from(json),
     );
   }
@@ -133,6 +139,7 @@ class ParentNotification {
       childId: childId,
       sourceUpdateId: sourceUpdateId,
       createdAt: createdAt,
+      category: category,
       readAt: clearReadAt ? null : readAt ?? this.readAt,
       metadata: metadata,
     );
@@ -211,14 +218,6 @@ ParentNotificationType _notificationTypeFromSource(String sourceType) {
   }
   return ParentNotificationType.other;
 }
-
-NoticeCategory _categoryFromType(ParentNotificationType type) => switch (type) {
-  ParentNotificationType.homework => NoticeCategory.homework,
-  ParentNotificationType.fee => NoticeCategory.fee,
-  ParentNotificationType.transport => NoticeCategory.transport,
-  ParentNotificationType.attendance => NoticeCategory.academic,
-  _ => NoticeCategory.important,
-};
 
 String _routeFromSource(
   ParentNotificationType type,

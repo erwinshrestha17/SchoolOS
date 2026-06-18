@@ -1,292 +1,202 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../application/parent_feature_state.dart';
+import '../../application/parent_providers.dart';
+import '../../application/parent_portal_providers.dart';
+import '../../domain/parent_models.dart';
 import '../widgets/parent_detail_widgets.dart';
 import '../widgets/parent_portal_widgets.dart';
 
 class ParentConsentsScreen extends ConsumerWidget {
   const ParentConsentsScreen({super.key});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(parentFeatureControllerProvider);
+    final portal = ref.watch(parentPortalDataProvider);
+    final consents = ref.watch(parentConsentStatusProvider);
     return ParentDetailScaffold(
       title: 'Consent & Permissions',
       selectedIndex: 4,
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-        children: [
-          const Text(
-            'Manage approvals and permissions for Erwin.',
-            style: TextStyle(color: ParentPortalColors.muted, fontSize: 16),
-          ),
-          const SizedBox(height: 14),
-          _ConsentToggle(
-            icon: Icons.camera_alt_rounded,
-            title: 'Media consent',
-            description:
-                'Allow the school to use photos and videos of Erwin in school activities and publications.',
-            date: 'Approved on Jan 8, 2025',
-            value: state.mediaConsent,
-            onChanged: (value) => _confirmToggle(context, ref, 'media', value),
-          ),
-          const SizedBox(height: 12),
-          PortalCard(
-            child: Column(
-              children: [
-                Row(
+      body: portal.when(
+        loading: () => const _ConsentLoading(),
+        error: (_, _) => _ConsentUnavailable(
+          title: 'Could not load permission context',
+          message: 'Please try again in a moment.',
+          onRetry: () => ref.invalidate(parentPortalDataProvider),
+        ),
+        data: (data) => RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(parentPortalDataProvider);
+            ref.invalidate(parentConsentStatusProvider);
+            await ref.read(parentPortalDataProvider.future);
+            await ref.read(parentConsentStatusProvider.future);
+          },
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+            children: [
+              PortalCard(
+                color: ParentPortalColors.purpleSoft,
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const FeatureIcon(
-                      Icons.directions_bus_rounded,
-                      color: ParentPortalColors.orange,
+                      Icons.verified_user_rounded,
+                      color: ParentPortalColors.purple,
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Trip permission',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          Text('Field trip to City Science Museum'),
-                          SizedBox(height: 5),
-                          Text(
-                            'May 22, 2025 • 8:00 AM – 2:30 PM',
-                            style: TextStyle(color: ParentPortalColors.muted),
-                          ),
-                        ],
-                      ),
-                    ),
-                    StatusBadge(
-                      label: state.tripDecision == null
-                          ? 'Pending'
-                          : state.tripDecision!
-                          ? 'Approved'
-                          : 'Declined',
-                      color: state.tripDecision == null
-                          ? ParentPortalColors.orange
-                          : state.tripDecision!
-                          ? ParentPortalColors.green
-                          : ParentPortalColors.red,
-                      background: state.tripDecision == null
-                          ? ParentPortalColors.orangeSoft
-                          : state.tripDecision!
-                          ? ParentPortalColors.greenSoft
-                          : ParentPortalColors.redSoft,
-                    ),
-                  ],
-                ),
-                const Divider(height: 24),
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'We need your approval for Erwin to participate in this upcoming trip.',
-                        style: TextStyle(color: ParentPortalColors.muted),
-                      ),
-                    ),
-                    FilledButton(
-                      onPressed: () => _tripDialog(context, ref),
-                      child: const Text('Review request'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          _ConsentToggle(
-            icon: Icons.forum_rounded,
-            title: 'Communication consent',
-            description:
-                'Allow the school to send notices, updates, and teacher messages via app, email, and SMS.',
-            date: 'Approved on Aug 14, 2024',
-            value: state.communicationConsent,
-            onChanged: (value) =>
-                _confirmToggle(context, ref, 'communication', value),
-          ),
-          const SizedBox(height: 12),
-          PortalCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    FeatureIcon(Icons.group_rounded),
-                    SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Authorized pickup',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          Text(
-                            'People who are allowed to pick up Erwin from school.',
-                            style: TextStyle(color: ParentPortalColors.muted),
-                          ),
-                        ],
+                      child: Text(
+                        data.children.isEmpty
+                            ? 'Linked-child permission workflows will appear here when enabled by the school.'
+                            : 'Permission workflows for ${_childNames(data.children.map((child) => child.name).toList())} will appear here when enabled by the school.',
+                        style: const TextStyle(
+                          color: ParentPortalColors.muted,
+                          height: 1.4,
+                        ),
                       ),
                     ),
-                    ListChevron(),
                   ],
                 ),
-                const SizedBox(height: 12),
-                const _Pickup('Aarohi Shrestha', 'Mother'),
-                const SizedBox(height: 6),
-                const _Pickup('Aarav Shrestha', 'Father'),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () => _contacts(context),
-                    child: const Text('Manage contacts'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          const PortalCard(
-            color: ParentPortalColors.purpleSoft,
-            child: Row(
-              children: [
-                FeatureIcon(Icons.security_rounded, size: 42),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'For your child’s safety, all changes are recorded and visible to school administrators.',
-                    style: TextStyle(color: ParentPortalColors.muted),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (state.activityLog.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            const ParentSectionHeader(title: 'Recent consent activity'),
-            for (final entry in state.activityLog.take(3))
-              ListTile(
-                leading: const Icon(
-                  Icons.history_rounded,
-                  color: ParentPortalColors.purple,
-                ),
-                title: Text(entry),
-                subtitle: const Text('Recorded just now'),
               ),
-          ],
-        ],
+              const SizedBox(height: 14),
+              const _ConsentUnavailable(
+                title: 'Consent changes are not enabled in mobile',
+                message:
+                    'Current consent state is synced from school records. Changes still require the school approval workflow.',
+              ),
+              const SizedBox(height: 12),
+              _ConsentStatusSection(consents: consents),
+              const SizedBox(height: 12),
+              const _ReadOnlyPermissionCard(
+                icon: Icons.directions_bus_rounded,
+                title: 'Trip permission',
+                message:
+                    'Trip approvals will be shown here after the school publishes a mobile consent request.',
+                statusLabel: 'Pending API',
+              ),
+              const SizedBox(height: 12),
+              const _ReadOnlyPermissionCard(
+                icon: Icons.group_rounded,
+                title: 'Authorized pickup',
+                message:
+                    'Pickup contacts need a protected school approval workflow before editing is available in the parent app.',
+                statusLabel: 'Pending API',
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Future<void> _confirmToggle(
-    BuildContext context,
-    WidgetRef ref,
-    String id,
-    bool value,
-  ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(value ? 'Approve consent?' : 'Withdraw consent?'),
-        content: const Text(
-          'This change will be recorded and visible to school administrators.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) {
-      ref.read(parentFeatureControllerProvider.notifier).setConsent(id, value);
-    }
+  static String _childNames(List<String> names) {
+    if (names.isEmpty) return 'your children';
+    if (names.length == 1) return names.first;
+    return '${names.take(names.length - 1).join(', ')} and ${names.last}';
   }
-
-  Future<void> _tripDialog(BuildContext context, WidgetRef ref) async {
-    final decision = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Field trip permission'),
-        content: const Text(
-          'City Science Museum\nMay 22, 2025 • 8:00 AM – 2:30 PM\n\nApprove Erwin’s participation?',
-        ),
-        actions: [
-          OutlinedButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Decline'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Approve'),
-          ),
-        ],
-      ),
-    );
-    if (decision != null) {
-      ref.read(parentFeatureControllerProvider.notifier).decideTrip(decision);
-    }
-  }
-
-  void _contacts(BuildContext context) => showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    builder: (_) => const SafeArea(
-      child: Padding(
-        padding: EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Authorized pickup contacts',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-            ),
-            SizedBox(height: 10),
-            _Pickup('Aarohi Shrestha', 'Mother'),
-            SizedBox(height: 8),
-            _Pickup('Aarav Shrestha', 'Father'),
-            SizedBox(height: 12),
-            Text(
-              'Contact editing will connect to the school approval workflow in a future API integration.',
-              style: TextStyle(color: ParentPortalColors.muted),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
 }
 
-class _ConsentToggle extends StatelessWidget {
-  const _ConsentToggle({
+class _ConsentStatusSection extends StatelessWidget {
+  const _ConsentStatusSection({required this.consents});
+
+  final AsyncValue<List<ParentConsentStatus>> consents;
+
+  @override
+  Widget build(BuildContext context) {
+    return consents.when(
+      loading: () => const PortalCard(
+        child: Text(
+          'Loading consent status...',
+          style: TextStyle(color: ParentPortalColors.muted),
+        ),
+      ),
+      error: (_, _) => const _ConsentUnavailable(
+        title: 'Could not load consent status',
+        message: 'Please try again in a moment.',
+      ),
+      data: (items) => Column(
+        children: [
+          _ReadOnlyPermissionCard(
+            icon: Icons.camera_alt_rounded,
+            title: 'Media consent',
+            message:
+                _messageFor(items, 'PHOTO_USAGE') ??
+                'No media consent record is available yet.',
+            statusLabel: _statusFor(items, 'PHOTO_USAGE'),
+          ),
+          const SizedBox(height: 12),
+          _ReadOnlyPermissionCard(
+            icon: Icons.forum_rounded,
+            title: 'Communication consent',
+            message:
+                _messageFor(items, 'MESSAGING') ??
+                'No communication consent record is available yet.',
+            statusLabel: _statusFor(items, 'MESSAGING'),
+          ),
+          const SizedBox(height: 12),
+          _ReadOnlyPermissionCard(
+            icon: Icons.privacy_tip_rounded,
+            title: 'Data processing consent',
+            message:
+                _messageFor(items, 'DATA_PROCESSING') ??
+                'No data-processing consent record is available yet.',
+            statusLabel: _statusFor(items, 'DATA_PROCESSING'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static ParentConsentStatus? _find(
+    List<ParentConsentStatus> items,
+    String type,
+  ) {
+    for (final item in items) {
+      if (item.consentType == type) return item;
+    }
+    return null;
+  }
+
+  static String _statusFor(List<ParentConsentStatus> items, String type) {
+    final consent = _find(items, type);
+    if (consent == null) return 'Not recorded';
+    return consent.granted ? 'Granted' : 'Not granted';
+  }
+
+  static String? _messageFor(List<ParentConsentStatus> items, String type) {
+    final consent = _find(items, type);
+    if (consent == null) return null;
+    final date = _date(consent.revokedAt ?? consent.capturedAt);
+    if (consent.granted) {
+      return date == null
+          ? 'School records show this consent as granted.'
+          : 'School records show this consent as granted on $date.';
+    }
+    return date == null
+        ? 'School records show this consent is not granted.'
+        : 'School records show this consent is not granted as of $date.';
+  }
+
+  static String? _date(String? value) {
+    final parsed = DateTime.tryParse(value ?? '');
+    if (parsed == null) return null;
+    return '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}';
+  }
+}
+
+class _ReadOnlyPermissionCard extends StatelessWidget {
+  const _ReadOnlyPermissionCard({
     required this.icon,
     required this.title,
-    required this.description,
-    required this.date,
-    required this.value,
-    required this.onChanged,
+    required this.message,
+    required this.statusLabel,
   });
+
   final IconData icon;
-  final String title, description, date;
-  final bool value;
-  final ValueChanged<bool> onChanged;
+  final String title;
+  final String message;
+  final String statusLabel;
+
   @override
   Widget build(BuildContext context) => PortalCard(
     child: Row(
@@ -305,45 +215,113 @@ class _ConsentToggle extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              Text(description, style: const TextStyle(height: 1.4)),
-              const SizedBox(height: 7),
+              const SizedBox(height: 6),
               Text(
-                date,
-                style: const TextStyle(color: ParentPortalColors.muted),
+                message,
+                style: const TextStyle(
+                  color: ParentPortalColors.muted,
+                  height: 1.4,
+                ),
               ),
             ],
           ),
         ),
-        Switch(value: value, onChanged: onChanged),
+        StatusBadge(
+          label: statusLabel,
+          color: statusLabel == 'Granted'
+              ? ParentPortalColors.green
+              : ParentPortalColors.orange,
+          background: statusLabel == 'Granted'
+              ? ParentPortalColors.greenSoft
+              : ParentPortalColors.orangeSoft,
+        ),
       ],
     ),
   );
 }
 
-class _Pickup extends StatelessWidget {
-  const _Pickup(this.name, this.role);
-  final String name, role;
+class _ConsentUnavailable extends StatelessWidget {
+  const _ConsentUnavailable({
+    required this.title,
+    required this.message,
+    this.onRetry,
+  });
+
+  final String title;
+  final String message;
+  final VoidCallback? onRetry;
+
   @override
   Widget build(BuildContext context) => PortalCard(
-    padding: const EdgeInsets.all(10),
-    child: Row(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AvatarInitials(name: name, radius: 20),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(name, style: const TextStyle(fontWeight: FontWeight.w900)),
-              Text(
-                '$role • Can pickup',
-                style: const TextStyle(color: ParentPortalColors.muted),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const FeatureIcon(
+              Icons.lock_outline_rounded,
+              color: ParentPortalColors.orange,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    message,
+                    style: const TextStyle(
+                      color: ParentPortalColors.muted,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-        const StatusBadge(label: 'Approved'),
+        if (onRetry != null) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Retry'),
+          ),
+        ],
       ],
     ),
+  );
+}
+
+class _ConsentLoading extends StatelessWidget {
+  const _ConsentLoading();
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+    children: const [
+      PortalCard(
+        child: Row(
+          children: [
+            FeatureIcon(Icons.verified_user_rounded),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Loading linked-child permission context...',
+                style: TextStyle(color: ParentPortalColors.muted),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
   );
 }

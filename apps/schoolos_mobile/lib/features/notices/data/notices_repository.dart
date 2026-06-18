@@ -40,13 +40,17 @@ class NoticesRepository {
     String? cursor,
     bool unreadOnly = false,
   }) async {
+    final queryParameters = <String, dynamic>{'limit': '$limit'};
+    if (cursor != null) {
+      queryParameters['cursor'] = cursor;
+    }
+    if (unreadOnly) {
+      queryParameters['unreadOnly'] = 'true';
+    }
+
     final response = await _client.get(
       '/mobile/me/notifications',
-      queryParameters: {
-        'limit': '$limit',
-        if (cursor != null) 'cursor': cursor,
-        if (unreadOnly) 'unreadOnly': 'true',
-      },
+      queryParameters: queryParameters,
     );
     final data = response.data as Map<String, dynamic>;
     final items = data['items'] as List<dynamic>? ?? const [];
@@ -61,9 +65,7 @@ class NoticesRepository {
   }
 
   Future<int> getUnreadCount() async {
-    final response = await _client.get(
-      '/mobile/me/notifications/unread-count',
-    );
+    final response = await _client.get('/mobile/me/notifications/unread-count');
     final data = response.data as Map<String, dynamic>;
     return data['unreadCount'] as int? ?? 0;
   }

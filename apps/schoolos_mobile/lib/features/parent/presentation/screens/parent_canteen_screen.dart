@@ -1,298 +1,244 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../application/parent_feature_state.dart';
-import '../../domain/parent_feature_models.dart';
+import '../../application/parent_providers.dart';
+import '../../domain/parent_models.dart';
 import '../widgets/parent_detail_widgets.dart';
 import '../widgets/parent_portal_widgets.dart';
 
-class ParentCanteenScreen extends ConsumerStatefulWidget {
+class ParentCanteenScreen extends ConsumerWidget {
   const ParentCanteenScreen({super.key});
-  @override
-  ConsumerState<ParentCanteenScreen> createState() =>
-      _ParentCanteenScreenState();
-}
 
-class _ParentCanteenScreenState extends ConsumerState<ParentCanteenScreen> {
-  ChildProfile child = parentChildren.first;
   @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(parentFeatureControllerProvider);
-    final balance = child.id == 'aarav' ? state.walletBalance : 340;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(parentControllerProvider);
+    final controller = ref.read(parentControllerProvider.notifier);
+    final child = state.selectedChild;
+
     return ParentDetailScaffold(
       title: 'Canteen Wallet',
       selectedIndex: 4,
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-        children: [
-          ParentChildSelector(
-            child: child,
-            showPresence: true,
-            onChanged: (value) => setState(() => child = value),
+      body: switch (state.status) {
+        ParentDataStatus.loading => const PortalLoadingState(),
+        ParentDataStatus.success when child != null => RefreshIndicator(
+          onRefresh: controller.load,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+            children: [
+              ParentApiChildSelector(
+                child: child,
+                children: state.children,
+                onChanged: controller.selectChild,
+              ),
+              const SizedBox(height: 14),
+              _CanteenBody(childId: child.id),
+            ],
           ),
-          const SizedBox(height: 14),
-          PortalCard(
-            color: ParentPortalColors.greenSoft,
-            child: Column(
-              children: [
-                Row(
+        ),
+        _ => PortalErrorState(onRetry: controller.load),
+      },
+    );
+  }
+}
+
+class _CanteenBody extends ConsumerWidget {
+  const _CanteenBody({required this.childId});
+
+  final String childId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final canteen = ref.watch(parentCanteenProvider(childId));
+
+    return canteen.when(
+      loading: () => const PortalLoadingState(),
+      error: (_, _) => PortalErrorState(
+        onRetry: () => ref.invalidate(parentCanteenProvider(childId)),
+      ),
+      data: (info) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _WalletCard(info: info),
+          const SizedBox(height: 18),
+          const ParentSectionHeader(title: 'Active meal plans'),
+          const SizedBox(height: 8),
+          if (info.activeMealPlans.isEmpty)
+            const PortalCard(child: Text('No active meal plan assigned.'))
+          else
+            for (final plan in info.activeMealPlans) ...[
+              PortalCard(
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const FeatureIcon(Icons.restaurant_menu_rounded),
+                  title: Text(
+                    plan.name,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  subtitle: Text(plan.mealType),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+          const SizedBox(height: 18),
+          const ParentSectionHeader(title: 'Recent wallet activity'),
+          const SizedBox(height: 8),
+          if (info.recentTransactions.isEmpty)
+            const PortalCard(child: Text('No canteen transactions yet.'))
+          else
+            PortalCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  for (
+                    var index = 0;
+                    index < info.recentTransactions.length;
+                    index++
+                  ) ...[
+                    _TransactionTile(item: info.recentTransactions[index]),
+                    if (index != info.recentTransactions.length - 1)
+                      const Divider(height: 1),
+                  ],
+                ],
+              ),
+            ),
+          const SizedBox(height: 18),
+          const ParentSectionHeader(title: 'Menu preview'),
+          const SizedBox(height: 8),
+          if (info.menuItems.isEmpty)
+            const PortalCard(child: Text('No active menu items available.'))
+          else
+            for (final item in info.menuItems.take(6)) ...[
+              PortalCard(
+                child: Row(
                   children: [
-                    const FeatureIcon(
-                      Icons.account_balance_wallet_rounded,
-                      color: ParentPortalColors.green,
-                      size: 58,
-                    ),
-                    const SizedBox(width: 14),
+                    const FeatureIcon(Icons.lunch_dining_rounded),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Current balance',
-                            style: TextStyle(color: ParentPortalColors.muted),
+                          Text(
+                            item.name,
+                            style: const TextStyle(fontWeight: FontWeight.w900),
                           ),
                           Text(
-                            'NPR $balance',
+                            item.category,
                             style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              color: ParentPortalColors.navy,
+                              color: ParentPortalColors.muted,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-                const Align(
-                  alignment: Alignment.centerRight,
-                  child: StatusBadge(
-                    label: 'Sufficient balance',
-                    icon: Icons.check_rounded,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: _editReminder,
-                        child: Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                'Low reminder: NPR ${state.lowBalanceReminder}',
-                                style: const TextStyle(
-                                  color: ParentPortalColors.muted,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.edit_rounded,
-                              size: 16,
-                              color: ParentPortalColors.muted,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    FilledButton(
-                      onPressed: () => _topUp(context),
-                      child: const Text('Top up now'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          PortalCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const ParentSectionHeader(title: 'Weekly spending'),
-                const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    for (final day in const [
-                      ('Mon', 80),
-                      ('Tue', 50),
-                      ('Wed', 120),
-                      ('Thu', 45),
-                      ('Fri', 0),
-                    ])
-                      Expanded(
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 38,
-                              height: (day.$2 == 0 ? 8 : day.$2 * .45)
-                                  .toDouble(),
-                              decoration: BoxDecoration(
-                                color: day.$2 == 120
-                                    ? ParentPortalColors.orange
-                                    : day.$2 == 0
-                                    ? ParentPortalColors.surfaceAlt
-                                    : ParentPortalColors.green,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(day.$1, style: const TextStyle(fontSize: 12)),
-                            Text(
-                              day.$2 == 0 ? '—' : 'NPR ${day.$2}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: ParentPortalColors.muted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const PortalCard(
-                  color: ParentPortalColors.purpleSoft,
-                  padding: EdgeInsets.all(10),
-                  child: Text(
-                    'Total spent this week:  NPR 295',
-                    style: TextStyle(
-                      color: ParentPortalColors.purple,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          const ParentSectionHeader(title: 'Recent activity'),
-          const SizedBox(height: 8),
-          PortalCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                for (
-                  var i = 0;
-                  i < state.walletTransactions.take(4).length;
-                  i++
-                ) ...[
-                  ListTile(
-                    leading: FeatureIcon(
-                      state.walletTransactions[i].amount > 0
-                          ? Icons.add_card_rounded
-                          : Icons.lunch_dining_rounded,
-                      color: state.walletTransactions[i].amount > 0
-                          ? ParentPortalColors.green
-                          : ParentPortalColors.orange,
-                      size: 40,
-                    ),
-                    title: Text(
-                      state.walletTransactions[i].title,
+                    Text(
+                      _money(item.unitPrice),
                       style: const TextStyle(fontWeight: FontWeight.w900),
                     ),
-                    subtitle: Text(state.walletTransactions[i].time),
-                    trailing: Text(
-                      '${state.walletTransactions[i].amount > 0 ? '+' : '-'} NPR ${state.walletTransactions[i].amount.abs()}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        color: state.walletTransactions[i].amount > 0
-                            ? ParentPortalColors.green
-                            : ParentPortalColors.navy,
-                      ),
-                    ),
-                  ),
-                  if (i < state.walletTransactions.take(4).length - 1)
-                    const Divider(height: 1),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          PortalCard(
-            color: ParentPortalColors.purpleSoft,
-            child: Row(
-              children: [
-                const FeatureIcon(Icons.receipt_long_rounded),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Lunch purchased 3 times this week',
-                        style: TextStyle(fontWeight: FontWeight.w900),
-                      ),
-                      Text(
-                        'Average spend per lunch: NPR 65',
-                        style: TextStyle(color: ParentPortalColors.muted),
-                      ),
-                    ],
-                  ),
+                  ],
                 ),
-                TextButton(
-                  onPressed: () => showFeatureSnack(
-                    context,
-                    'Top up using eSewa, Khalti, or the school cashier.',
-                  ),
-                  child: const Text('Top-up instructions'),
-                ),
-              ],
-            ),
-          ),
+              ),
+              const SizedBox(height: 10),
+            ],
         ],
       ),
     );
-  }
-
-  Future<void> _topUp(BuildContext context) async {
-    final method = await showMockPaymentSheet(
-      context,
-      title: 'Top up canteen wallet',
-    );
-    if (method == null || !context.mounted) return;
-    ref.read(parentFeatureControllerProvider.notifier).topUp(500);
-    showFeatureSnack(context, 'NPR 500 added with $method.');
-  }
-
-  Future<void> _editReminder() async {
-    final controller = TextEditingController(
-      text: '${ref.read(parentFeatureControllerProvider).lowBalanceReminder}',
-    );
-    final value = await showDialog<int>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Low balance reminder'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            prefixText: 'NPR ',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.pop(context, int.tryParse(controller.text)),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (value != null) {
-      ref
-          .read(parentFeatureControllerProvider.notifier)
-          .setLowBalanceReminder(value);
-    }
   }
 }
+
+class _WalletCard extends StatelessWidget {
+  const _WalletCard({required this.info});
+
+  final ParentCanteenInfo info;
+
+  @override
+  Widget build(BuildContext context) {
+    final balance = info.walletBalance;
+    return PortalCard(
+      color: ParentPortalColors.greenSoft,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const FeatureIcon(
+                Icons.account_balance_wallet_rounded,
+                color: ParentPortalColors.green,
+                size: 58,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Current balance',
+                      style: TextStyle(color: ParentPortalColors.muted),
+                    ),
+                    Text(
+                      balance == null ? 'No wallet' : _money(balance),
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        color: ParentPortalColors.navy,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              StatusBadge(
+                label: info.isLowBalance ? 'Low balance' : 'OK',
+                color: info.isLowBalance
+                    ? ParentPortalColors.orange
+                    : ParentPortalColors.green,
+                background: info.isLowBalance
+                    ? ParentPortalColors.orangeSoft
+                    : Colors.white,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => showUnavailableWorkflowSnack(
+              context,
+              'Canteen top-up is not enabled in the parent app yet.',
+            ),
+            icon: const Icon(Icons.lock_outline_rounded),
+            label: const Text('Top-up unavailable'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TransactionTile extends StatelessWidget {
+  const _TransactionTile({required this.item});
+
+  final ParentCanteenTransaction item;
+
+  @override
+  Widget build(BuildContext context) {
+    final credit = item.amount > 0;
+    return ListTile(
+      leading: FeatureIcon(
+        credit ? Icons.add_card_rounded : Icons.lunch_dining_rounded,
+        color: credit ? ParentPortalColors.green : ParentPortalColors.orange,
+        size: 40,
+      ),
+      title: Text(
+        item.note?.isNotEmpty == true ? item.note! : item.type,
+        style: const TextStyle(fontWeight: FontWeight.w900),
+      ),
+      subtitle: Text('Balance after ${_money(item.balanceAfter)}'),
+      trailing: Text(
+        '${credit ? '+' : ''}${_money(item.amount)}',
+        style: TextStyle(
+          fontWeight: FontWeight.w900,
+          color: credit ? ParentPortalColors.green : ParentPortalColors.navy,
+        ),
+      ),
+    );
+  }
+}
+
+String _money(num value) => 'NPR ${value.toStringAsFixed(0)}';

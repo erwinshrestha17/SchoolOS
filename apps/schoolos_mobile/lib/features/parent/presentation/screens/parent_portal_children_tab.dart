@@ -12,6 +12,7 @@ class ParentPortalChildrenTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final linkedCount = data.children.length;
     return ListView(
       key: const PageStorageKey('parent-children'),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
@@ -30,12 +31,12 @@ class ParentPortalChildrenTab extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              const Row(
+              Row(
                 children: [
                   Expanded(
                     child: SummaryMetric(
                       icon: Icons.family_restroom_rounded,
-                      value: '2',
+                      value: '$linkedCount',
                       label: 'linked children',
                       color: ParentPortalColors.green,
                     ),
@@ -44,7 +45,7 @@ class ParentPortalChildrenTab extends StatelessWidget {
                   Expanded(
                     child: SummaryMetric(
                       icon: Icons.fact_check_outlined,
-                      value: '2 of 2',
+                      value: '${data.presentTodayCount} of $linkedCount',
                       label: 'present today',
                       color: ParentPortalColors.green,
                     ),

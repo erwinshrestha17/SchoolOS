@@ -11,7 +11,8 @@ describe('MobileService', () => {
     invoice: MockModel<'findMany'>;
     notificationDelivery: MockModel<'findMany' | 'findFirst' | 'count'>;
     notificationReadReceipt: MockModel<'upsert' | 'createMany'>;
-    homeworkAssignment: MockModel<'findMany'>;
+    homeworkAssignment: MockModel<'findMany' | 'findFirst'>;
+    reportCard: MockModel<'findMany' | 'findFirst'>;
     transportStudentAssignment: MockModel<'findFirst'>;
     transportEnrollment: MockModel<'findFirst'>;
     transportTripStudentStatus: MockModel<'findFirst'>;
@@ -21,6 +22,9 @@ describe('MobileService', () => {
   let attendanceService: { getParentSummary: jest.Mock };
   let financeService: { getReceiptPdfForStudent: jest.Mock };
   let entitlementsService: { getEntitlements: jest.Mock };
+  let reportCardPdfService: { getReportCardPdf: jest.Mock };
+  let communicationsService: { getGuardianConsentStatus: jest.Mock };
+  let homeworkAttachmentAccessService: { getAttachmentAccessUrl: jest.Mock };
   let service: MobileService;
   let actor: AuthContext;
 
@@ -47,6 +51,11 @@ describe('MobileService', () => {
       },
       homeworkAssignment: {
         findMany: jest.fn(),
+        findFirst: jest.fn(),
+      },
+      reportCard: {
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
       },
       transportStudentAssignment: {
         findFirst: jest.fn(),
@@ -80,11 +89,23 @@ describe('MobileService', () => {
         tier: null,
       }),
     };
+    reportCardPdfService = {
+      getReportCardPdf: jest.fn(),
+    };
+    communicationsService = {
+      getGuardianConsentStatus: jest.fn(),
+    };
+    homeworkAttachmentAccessService = {
+      getAttachmentAccessUrl: jest.fn(),
+    };
     service = new MobileService(
       prisma as never,
       attendanceService as never,
       financeService as never,
       entitlementsService as never,
+      reportCardPdfService as never,
+      communicationsService as never,
+      homeworkAttachmentAccessService as never,
     );
     actor = {
       userId: 'parent-1',
@@ -448,6 +469,7 @@ describe('MobileService', () => {
     jest.spyOn(service, 'listNotifications').mockResolvedValue({
       unreadCount: 0,
       items: [],
+      nextCursor: null,
     });
     const attendanceSpy = jest.spyOn(service, 'getStudentAttendanceSummary');
     const feesSpy = jest.spyOn(service, 'getStudentFeesSummary');
@@ -548,6 +570,121 @@ describe('MobileService', () => {
         attachmentCount: 2,
       }),
     ]);
+  });
+
+  it('lists homework attachments only for linked-child visible assignments', async () => {
+    prisma.student.findFirst
+      .mockResolvedValueOnce({ id: 'student-1' })
+      .mockResolvedValueOnce({
+        id: 'student-1',
+        tenantId: 'tenant-1',
+        firstNameEn: 'Asha',
+        lastNameEn: 'Rai',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        section: null,
+        rollNumber: 7,
+        class: { id: 'class-1', name: 'Grade 4' },
+        sectionRef: { id: 'section-1', name: 'A' },
+        guardianLinks: [],
+        enrollments: [],
+      });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.homeworkAssignment.findFirst.mockResolvedValue({
+      id: 'homework-1',
+      attachments: [
+        {
+          id: 'attachment-1',
+          createdAt: new Date('2026-05-01T00:00:00.000Z'),
+          fileAsset: {
+            originalFilename: 'worksheet.pdf',
+            mimeType: 'application/pdf',
+            sizeBytes: 1024,
+          },
+        },
+      ],
+    });
+
+    await expect(
+      service.getStudentHomeworkAttachments('student-1', 'homework-1', actor),
+    ).resolves.toEqual({
+      homeworkId: 'homework-1',
+      items: [
+        {
+          id: 'attachment-1',
+          fileName: 'worksheet.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 1024,
+          createdAt: '2026-05-01T00:00:00.000Z',
+        },
+      ],
+    });
+    expect(prisma.homeworkAssignment.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 'homework-1',
+          tenantId: 'tenant-1',
+          classId: 'class-1',
+          OR: [{ sectionId: null }, { sectionId: 'section-1' }],
+        }),
+      }),
+    );
+  });
+
+  it('delegates homework attachment download after linked-child visibility check', async () => {
+    prisma.student.findFirst
+      .mockResolvedValueOnce({ id: 'student-1' })
+      .mockResolvedValueOnce({
+        id: 'student-1',
+        tenantId: 'tenant-1',
+        firstNameEn: 'Asha',
+        lastNameEn: 'Rai',
+        classId: 'class-1',
+        sectionId: null,
+        section: null,
+        rollNumber: 7,
+        class: { id: 'class-1', name: 'Grade 4' },
+        sectionRef: null,
+        guardianLinks: [],
+        enrollments: [],
+      });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.homeworkAssignment.findFirst.mockResolvedValue({
+      id: 'homework-1',
+      attachments: [
+        {
+          id: 'attachment-1',
+          createdAt: new Date(),
+          fileAsset: {
+            originalFilename: 'worksheet.pdf',
+            mimeType: 'application/pdf',
+            sizeBytes: 1024,
+          },
+        },
+      ],
+    });
+    homeworkAttachmentAccessService.getAttachmentAccessUrl.mockResolvedValue({
+      attachmentId: 'attachment-1',
+      url: 'signed-url',
+    });
+
+    await expect(
+      service.getStudentHomeworkAttachmentDownloadUrl(
+        'student-1',
+        'homework-1',
+        'attachment-1',
+        actor,
+      ),
+    ).resolves.toEqual({ attachmentId: 'attachment-1', url: 'signed-url' });
+    expect(
+      homeworkAttachmentAccessService.getAttachmentAccessUrl,
+    ).toHaveBeenCalledWith('attachment-1', actor, 'download');
   });
 
   it('returns parent-safe transport route, vehicle, and latest location detail', async () => {
@@ -651,6 +788,69 @@ describe('MobileService', () => {
     expect(financeService.getReceiptPdfForStudent).toHaveBeenCalledWith(
       'REC-001',
       'student-1',
+      actor,
+    );
+  });
+
+  it('streams only published linked-child report-card PDFs', async () => {
+    const pdf = Buffer.from('%PDF report card');
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.reportCard.findFirst.mockResolvedValue({ id: 'report-card-1' });
+    reportCardPdfService.getReportCardPdf.mockResolvedValue(pdf);
+
+    await expect(
+      service.getStudentReportCardPdf('student-1', 'report-card-1', actor),
+    ).resolves.toBe(pdf);
+    expect(prisma.reportCard.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'report-card-1',
+        tenantId: 'tenant-1',
+        studentId: 'student-1',
+        isCurrent: true,
+        publishStatus: 'PUBLISHED',
+      },
+      select: { id: true },
+    });
+    expect(reportCardPdfService.getReportCardPdf).toHaveBeenCalledWith(
+      'report-card-1',
+      actor,
+    );
+  });
+
+  it('returns signed-in guardian consent status through the communications module', async () => {
+    prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+    communicationsService.getGuardianConsentStatus.mockResolvedValue([
+      {
+        guardianId: 'guardian-1',
+        consentType: 'PHOTO_USAGE',
+        granted: true,
+        latestConsentId: 'consent-1',
+        version: 'v1',
+        capturedAt: new Date('2026-06-01T00:00:00.000Z'),
+        revokedAt: null,
+      },
+    ]);
+
+    await expect(service.getMyConsentStatus(actor)).resolves.toEqual({
+      guardianId: 'guardian-1',
+      items: [
+        {
+          guardianId: 'guardian-1',
+          consentType: 'PHOTO_USAGE',
+          granted: true,
+          latestConsentId: 'consent-1',
+          version: 'v1',
+          capturedAt: '2026-06-01T00:00:00.000Z',
+          revokedAt: null,
+        },
+      ],
+    });
+    expect(communicationsService.getGuardianConsentStatus).toHaveBeenCalledWith(
+      'guardian-1',
       actor,
     );
   });

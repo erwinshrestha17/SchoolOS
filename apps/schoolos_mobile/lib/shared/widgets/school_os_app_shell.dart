@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/constants/app_routes.dart';
 import '../../features/parent/application/parent_portal_providers.dart';
+import '../../features/parent/domain/parent_portal_models.dart';
 import '../../features/parent/presentation/screens/parent_portal_children_tab.dart';
 import '../../features/parent/presentation/screens/parent_portal_home_tab.dart';
 import '../../features/parent/presentation/screens/parent_portal_homework_tab.dart';
@@ -72,7 +73,7 @@ class _SchoolOsAppShellState extends ConsumerState<SchoolOsAppShell> {
   }
 }
 
-class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
+class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
   const AppTopBar({super.key, required this.title});
 
   final String title;
@@ -81,7 +82,10 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final portal = ref.watch(parentPortalDataProvider).valueOrNull;
+    final parentName = portal?.parentName ?? 'Parent';
+    final unreadCount = portal?.unreadUpdates ?? 0;
     return AppBar(
       title: Text(
         title,
@@ -98,23 +102,24 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
           children: [
             IconButton(
               tooltip: 'Notifications',
-              onPressed: () => _showNotifications(context),
+              onPressed: () => _showNotifications(context, portal),
               icon: const Icon(Icons.notifications_none_rounded),
             ),
-            const Positioned(
-              right: 10,
-              top: 9,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: ParentPortalColors.green,
-                  shape: BoxShape.circle,
-                  border: Border.fromBorderSide(
-                    BorderSide(color: Colors.white, width: 1.5),
+            if (unreadCount > 0)
+              const Positioned(
+                right: 10,
+                top: 9,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: ParentPortalColors.green,
+                    shape: BoxShape.circle,
+                    border: Border.fromBorderSide(
+                      BorderSide(color: Colors.white, width: 1.5),
+                    ),
                   ),
+                  child: SizedBox(width: 9, height: 9),
                 ),
-                child: SizedBox(width: 9, height: 9),
               ),
-            ),
           ],
         ),
         Padding(
@@ -122,9 +127,9 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
           child: InkWell(
             onTap: () => context.push(AppRoutes.profile),
             borderRadius: BorderRadius.circular(999),
-            child: const Padding(
-              padding: EdgeInsets.all(4),
-              child: AvatarInitials(name: 'Erwin Shrestha', radius: 18),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: AvatarInitials(name: parentName, radius: 18),
             ),
           ),
         ),
@@ -132,7 +137,11 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  Future<void> _showNotifications(BuildContext context) async {
+  Future<void> _showNotifications(
+    BuildContext context,
+    ParentPortalData? portal,
+  ) async {
+    final updates = portal?.updates.take(5).toList() ?? const [];
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -149,35 +158,47 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 14),
-              const PortalCard(
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    Icons.menu_book_outlined,
-                    color: ParentPortalColors.purple,
+              if (updates.isEmpty)
+                const PortalCard(child: Text('No notifications yet.'))
+              else
+                for (final update in updates) ...[
+                  PortalCard(
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        _notificationIcon(update.category),
+                        color: _notificationColor(update.category),
+                      ),
+                      title: Text(update.title),
+                      subtitle: Text(update.metadata),
+                    ),
                   ),
-                  title: Text('Homework due tomorrow'),
-                  subtitle: Text('Aarohi • English'),
-                ),
-              ),
-              const SizedBox(height: 10),
-              const PortalCard(
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    Icons.campaign_outlined,
-                    color: ParentPortalColors.orange,
-                  ),
-                  title: Text('Holiday notice for Friday'),
-                  subtitle: Text('Greenfield Academy • School-wide'),
-                ),
-              ),
+                  const SizedBox(height: 10),
+                ],
             ],
           ),
         ),
       ),
     );
   }
+}
+
+IconData _notificationIcon(ParentUpdateCategory category) {
+  return switch (category) {
+    ParentUpdateCategory.message => Icons.chat_bubble_outline_rounded,
+    ParentUpdateCategory.event => Icons.event_outlined,
+    ParentUpdateCategory.gallery => Icons.photo_library_outlined,
+    ParentUpdateCategory.notice => Icons.campaign_outlined,
+  };
+}
+
+Color _notificationColor(ParentUpdateCategory category) {
+  return switch (category) {
+    ParentUpdateCategory.message => ParentPortalColors.purple,
+    ParentUpdateCategory.event => ParentPortalColors.blue,
+    ParentUpdateCategory.gallery => ParentPortalColors.green,
+    ParentUpdateCategory.notice => ParentPortalColors.orange,
+  };
 }
 
 class SchoolOsBottomNavigation extends StatelessWidget {

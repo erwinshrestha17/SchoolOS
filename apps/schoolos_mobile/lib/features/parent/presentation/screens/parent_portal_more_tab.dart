@@ -21,7 +21,7 @@ class ParentPortalMoreTab extends ConsumerWidget {
         PortalCard(
           child: Row(
             children: [
-              const AvatarInitials(name: 'Erwin Shrestha', radius: 31),
+              AvatarInitials(name: data.parentName, radius: 31),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -41,7 +41,7 @@ class ParentPortalMoreTab extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      '${data.schoolName} • 2 linked children',
+                      '${data.schoolName} • ${data.children.length} linked ${data.children.length == 1 ? 'child' : 'children'}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: ParentPortalColors.muted,
                       ),

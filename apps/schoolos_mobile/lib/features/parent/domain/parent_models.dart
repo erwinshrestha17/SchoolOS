@@ -442,6 +442,94 @@ class ParentReportCard {
   }
 }
 
+class ParentConsentStatus {
+  const ParentConsentStatus({
+    required this.consentType,
+    required this.granted,
+    this.version,
+    this.capturedAt,
+    this.revokedAt,
+  });
+
+  final String consentType;
+  final bool granted;
+  final String? version;
+  final String? capturedAt;
+  final String? revokedAt;
+
+  factory ParentConsentStatus.fromJson(Map<String, dynamic> json) {
+    return ParentConsentStatus(
+      consentType: json['consentType'] as String? ?? '',
+      granted: json['granted'] as bool? ?? false,
+      version: json['version'] as String?,
+      capturedAt: json['capturedAt'] as String?,
+      revokedAt: json['revokedAt'] as String?,
+    );
+  }
+}
+
+class ParentHomeworkAttachment {
+  const ParentHomeworkAttachment({
+    required this.id,
+    required this.fileName,
+    required this.mimeType,
+    required this.sizeBytes,
+    this.createdAt,
+  });
+
+  final String id;
+  final String fileName;
+  final String mimeType;
+  final int sizeBytes;
+  final String? createdAt;
+
+  factory ParentHomeworkAttachment.fromJson(Map<String, dynamic> json) {
+    return ParentHomeworkAttachment(
+      id: json['id'] as String? ?? '',
+      fileName: json['fileName'] as String? ?? 'Attachment',
+      mimeType: json['mimeType'] as String? ?? 'application/octet-stream',
+      sizeBytes: _asInt(json['sizeBytes']),
+      createdAt: json['createdAt'] as String?,
+    );
+  }
+}
+
+class ParentHomeworkAttachmentAccess {
+  const ParentHomeworkAttachmentAccess({
+    required this.attachmentId,
+    required this.fileName,
+    required this.mimeType,
+    required this.url,
+    required this.expiresInSeconds,
+  });
+
+  final String attachmentId;
+  final String fileName;
+  final String mimeType;
+  final String url;
+  final int expiresInSeconds;
+
+  factory ParentHomeworkAttachmentAccess.fromJson(Map<String, dynamic> json) {
+    return ParentHomeworkAttachmentAccess(
+      attachmentId: json['attachmentId'] as String? ?? '',
+      fileName: json['fileName'] as String? ?? 'Attachment',
+      mimeType: json['mimeType'] as String? ?? 'application/octet-stream',
+      url: json['url'] as String? ?? '',
+      expiresInSeconds: _asInt(json['expiresInSeconds']),
+    );
+  }
+}
+
+class ParentProtectedFileDownload {
+  const ParentProtectedFileDownload({
+    required this.fileName,
+    required this.filePath,
+  });
+
+  final String fileName;
+  final String filePath;
+}
+
 class ParentActivityItem {
   const ParentActivityItem({
     required this.id,
@@ -603,6 +691,108 @@ class ParentCanteenInfo {
       menuItems: _asList(
         json['menuItems'],
       ).whereType<Map<String, dynamic>>().map(ParentMenuItem.fromJson).toList(),
+    );
+  }
+}
+
+class ParentLibraryInfo {
+  const ParentLibraryInfo({
+    this.activeIssues = const [],
+    this.recentHistory = const [],
+    this.fines = const [],
+  });
+
+  final List<ParentLibraryIssue> activeIssues;
+  final List<ParentLibraryIssue> recentHistory;
+  final List<ParentLibraryFine> fines;
+
+  factory ParentLibraryInfo.fromJson(Map<String, dynamic> json) {
+    return ParentLibraryInfo(
+      activeIssues: _asList(json['activeIssues'])
+          .whereType<Map<String, dynamic>>()
+          .map(ParentLibraryIssue.fromJson)
+          .toList(),
+      recentHistory: _asList(json['recentHistory'])
+          .whereType<Map<String, dynamic>>()
+          .map(ParentLibraryIssue.fromJson)
+          .toList(),
+      fines: _asList(json['fines'])
+          .whereType<Map<String, dynamic>>()
+          .map(ParentLibraryFine.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class ParentLibraryIssue {
+  const ParentLibraryIssue({
+    required this.id,
+    required this.status,
+    required this.bookTitle,
+    this.author,
+    this.barcode,
+    this.shelfLocation,
+    this.issuedAt,
+    this.dueAt,
+    this.returnedAt,
+    this.fineAmount = 0,
+  });
+
+  final String id;
+  final String status;
+  final String bookTitle;
+  final String? author;
+  final String? barcode;
+  final String? shelfLocation;
+  final String? issuedAt;
+  final String? dueAt;
+  final String? returnedAt;
+  final num fineAmount;
+
+  bool get isOverdue => status == 'OVERDUE';
+
+  factory ParentLibraryIssue.fromJson(Map<String, dynamic> json) {
+    final book = _asMap(json['book']);
+    final copy = _asMap(json['copy']);
+    return ParentLibraryIssue(
+      id: json['id'] as String? ?? '',
+      status: json['status'] as String? ?? 'ISSUED',
+      bookTitle: book?['title'] as String? ?? 'Library book',
+      author: book?['author'] as String?,
+      barcode: copy?['barcode'] as String?,
+      shelfLocation: copy?['shelfLocation'] as String?,
+      issuedAt: json['issuedAt'] as String?,
+      dueAt: json['dueAt'] as String?,
+      returnedAt: json['returnedAt'] as String?,
+      fineAmount: _asNum(json['fineAmount']),
+    );
+  }
+}
+
+class ParentLibraryFine {
+  const ParentLibraryFine({
+    required this.id,
+    required this.status,
+    required this.amount,
+    required this.waivedAmount,
+    this.feeInvoiceId,
+  });
+
+  final String id;
+  final String status;
+  final num amount;
+  final num waivedAmount;
+  final String? feeInvoiceId;
+
+  num get outstandingAmount => amount - waivedAmount;
+
+  factory ParentLibraryFine.fromJson(Map<String, dynamic> json) {
+    return ParentLibraryFine(
+      id: json['id'] as String? ?? '',
+      status: json['status'] as String? ?? 'OPEN',
+      amount: _asNum(json['amount']),
+      waivedAmount: _asNum(json['waivedAmount']),
+      feeInvoiceId: json['feeInvoiceId'] as String?,
     );
   }
 }

@@ -24,6 +24,20 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final linkedCount = widget.data.children.length;
+    final attentionCount =
+        widget.data.pendingHomeworkCount +
+        widget.data.overdueFeesCount +
+        widget.data.unreadUpdates;
+    final nextAttentionChild = widget.data.children
+        .cast<ParentPortalChild?>()
+        .firstWhere(
+          (child) =>
+              (child?.homeworkPending ?? 0) > 0 ||
+              (child?.feesDue ?? 0) > 0 ||
+              (child?.unreadUpdates ?? 0) > 0,
+          orElse: () => null,
+        );
     final children = selectedChild == 'all'
         ? widget.data.children
         : widget.data.children
@@ -35,7 +49,7 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
       children: [
         Text(
-          'Namaste, Erwin',
+          'Namaste, ${_firstName(widget.data.parentName)}',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
             color: ParentPortalColors.navy,
             fontWeight: FontWeight.w900,
@@ -52,7 +66,7 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
             const SizedBox(width: 6),
             Expanded(
               child: Text(
-                '2 linked children • Updated ${widget.data.lastUpdated}',
+                '$linkedCount linked ${linkedCount == 1 ? 'child' : 'children'} - Updated ${widget.data.lastUpdated}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -74,19 +88,21 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
                 color: ParentPortalColors.orange.withValues(alpha: .45),
               ),
             ),
-            child: const FittedBox(
+            child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.error_outline_rounded,
                     size: 17,
                     color: ParentPortalColors.orange,
                   ),
-                  SizedBox(width: 7),
+                  const SizedBox(width: 7),
                   Text(
-                    '1 item needs attention',
+                    attentionCount == 0
+                        ? 'No urgent item'
+                        : '$attentionCount item${attentionCount == 1 ? '' : 's'} need attention',
                     style: TextStyle(
                       color: ParentPortalColors.orange,
                       fontWeight: FontWeight.w800,
@@ -125,12 +141,12 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
         PortalCard(
           child: Column(
             children: [
-              const Row(
+              Row(
                 children: [
                   Expanded(
                     child: SummaryMetric(
                       icon: Icons.fact_check_outlined,
-                      value: '2/2',
+                      value: '${widget.data.presentTodayCount}/$linkedCount',
                       label: 'present today',
                       color: ParentPortalColors.green,
                     ),
@@ -139,7 +155,7 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
                   Expanded(
                     child: SummaryMetric(
                       icon: Icons.menu_book_outlined,
-                      value: '1',
+                      value: '${widget.data.pendingHomeworkCount}',
                       label: 'homework due',
                       color: ParentPortalColors.purple,
                     ),
@@ -147,12 +163,12 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
                 ],
               ),
               const SizedBox(height: 18),
-              const Row(
+              Row(
                 children: [
                   Expanded(
                     child: SummaryMetric(
                       icon: Icons.notifications_none_rounded,
-                      value: '1',
+                      value: '${widget.data.unreadUpdates}',
                       label: 'unread update',
                       color: ParentPortalColors.blue,
                     ),
@@ -161,8 +177,8 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
                   Expanded(
                     child: SummaryMetric(
                       icon: Icons.directions_bus_outlined,
-                      value: '3:15 PM',
-                      label: 'next pickup',
+                      value: _transportMetric(widget.data.children),
+                      label: 'transport',
                       color: ParentPortalColors.orange,
                     ),
                   ),
@@ -192,58 +208,72 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
           ),
         ),
         const SizedBox(height: 16),
-        PortalCard(
-          color: ParentPortalColors.orangeSoft,
-          borderColor: ParentPortalColors.orange.withValues(alpha: .35),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  AvatarInitials(
-                    name: 'Aarohi Shrestha',
-                    radius: 21,
-                    backgroundColor: Colors.white,
-                    foregroundColor: ParentPortalColors.orange,
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Aarohi needs your attention',
-                      style: TextStyle(
-                        color: ParentPortalColors.navy,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
+        if (nextAttentionChild != null) ...[
+          PortalCard(
+            color: ParentPortalColors.orangeSoft,
+            borderColor: ParentPortalColors.orange.withValues(alpha: .35),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    AvatarInitials(
+                      name: nextAttentionChild.name,
+                      radius: 21,
+                      backgroundColor: Colors.white,
+                      foregroundColor: ParentPortalColors.orange,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${nextAttentionChild.name} needs your attention',
+                        style: const TextStyle(
+                          color: ParentPortalColors.navy,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                if (nextAttentionChild.homeworkPending > 0)
+                  _AttentionLine(
+                    icon: Icons.menu_book_outlined,
+                    text:
+                        '${nextAttentionChild.homeworkPending} homework pending',
+                  ),
+                if (nextAttentionChild.feesDue > 0) ...[
+                  const SizedBox(height: 9),
+                  _AttentionLine(
+                    icon: Icons.account_balance_wallet_outlined,
+                    text: 'NPR ${nextAttentionChild.feesDue} fees due',
                   ),
                 ],
-              ),
-              const SizedBox(height: 14),
-              const _AttentionLine(
-                icon: Icons.menu_book_outlined,
-                text: 'Homework due tomorrow',
-              ),
-              const SizedBox(height: 9),
-              const _AttentionLine(
-                icon: Icons.account_balance_wallet_outlined,
-                text: 'Tuition fee NPR 4,500 due in 3 days',
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => context.push(AppRoutes.parentFees),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: ParentPortalColors.orange,
+                if (nextAttentionChild.unreadUpdates > 0) ...[
+                  const SizedBox(height: 9),
+                  _AttentionLine(
+                    icon: Icons.notifications_none_rounded,
+                    text:
+                        '${nextAttentionChild.unreadUpdates} unread update${nextAttentionChild.unreadUpdates == 1 ? '' : 's'}',
                   ),
-                  child: const Text('Review now'),
+                ],
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => context.push(AppRoutes.parentUpdates),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: ParentPortalColors.orange,
+                    ),
+                    child: const Text('Review now'),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 24),
+          const SizedBox(height: 24),
+        ],
         const ParentSectionHeader(title: 'Children at a glance'),
         const SizedBox(height: 10),
         for (final child in children) ...[
@@ -290,59 +320,64 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
               icon: Icons.calendar_month_outlined,
               title: 'School calendar',
               color: ParentPortalColors.blue,
-              onTap: () => _message(context, 'School calendar opened.'),
+              onTap: () => context.push(AppRoutes.parentCalendar),
             ),
           ],
         ),
         const SizedBox(height: 24),
-        const ParentSectionHeader(title: 'Upcoming event'),
+        const ParentSectionHeader(title: 'Latest update'),
         const SizedBox(height: 10),
-        PortalCard(
-          onTap: () =>
-              _message(context, 'Parent–Teacher Meeting details opened.'),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: ParentPortalColors.blueSoft,
-                  borderRadius: BorderRadius.circular(14),
+        if (widget.data.updates.isEmpty)
+          const PortalCard(child: Text('No updates from school yet.'))
+        else
+          PortalCard(
+            onTap: () => context.push(AppRoutes.parentUpdates),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: ParentPortalColors.blueSoft,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.event_outlined,
+                    color: ParentPortalColors.blue,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.event_outlined,
-                  color: ParentPortalColors.blue,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Parent–Teacher Meeting',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: ParentPortalColors.navy,
-                        fontWeight: FontWeight.w800,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.data.updates.first.title,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: ParentPortalColors.navy,
+                              fontWeight: FontWeight.w800,
+                            ),
                       ),
-                    ),
-                    Text(
-                      'Friday, 10:00 AM',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    Text(
-                      'For Aarohi, LKG-A',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: ParentPortalColors.muted,
+                      Text(
+                        widget.data.updates.first.body,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
-                    ),
-                  ],
+                      Text(
+                        widget.data.updates.first.metadata,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: ParentPortalColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const ListChevron(),
-            ],
+                const ListChevron(),
+              ],
+            ),
           ),
-        ),
       ],
     );
   }
@@ -373,4 +408,18 @@ class _AttentionLine extends StatelessWidget {
 
 void _message(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
+String _firstName(String value) {
+  final parts = value.trim().split(RegExp(r'\s+'));
+  return parts.isEmpty || parts.first.isEmpty ? 'Parent' : parts.first;
+}
+
+String _transportMetric(List<ParentPortalChild> children) {
+  final active = children.where((child) {
+    final text = '${child.transport} ${child.transportDetail ?? ''}'
+        .toLowerCase();
+    return !text.contains('no transport') && !text.contains('locked');
+  }).length;
+  return active == 0 ? 'None' : '$active active';
 }

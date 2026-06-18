@@ -9,6 +9,8 @@ import 'package:schoolos_mobile/core/storage/token_storage_service.dart';
 import 'package:schoolos_mobile/core/auth/auth_provider.dart';
 import 'package:schoolos_mobile/core/auth/data/auth_repository.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
+import 'package:schoolos_mobile/features/parent/application/parent_portal_providers.dart';
+import 'package:schoolos_mobile/features/parent/domain/parent_portal_models.dart';
 import 'package:schoolos_mobile/shared/widgets/app_button.dart';
 import 'package:schoolos_mobile/shared/widgets/status_chip.dart';
 import 'package:schoolos_mobile/shared/widgets/role_badge.dart';
@@ -181,7 +183,82 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const ProviderScope(child: MaterialApp(home: SchoolOsAppShell())),
+      ProviderScope(
+        overrides: [
+          parentPortalDataProvider.overrideWith(
+            (ref) async => const ParentPortalData(
+              parentName: 'Erwin Shrestha',
+              schoolName: 'greenfield',
+              lastUpdated: '6:19 PM',
+              totalFeesDue: 4500,
+              overdueFeesCount: 1,
+              unreadUpdates: 1,
+              children: [
+                ParentPortalChild(
+                  id: 'aarav',
+                  name: 'Aarav Shrestha',
+                  classSection: 'Nursery-A',
+                  teacher: 'Class teacher details in timetable',
+                  attendance: 'Present today',
+                  attendanceTime: 'Updated 6:19 PM',
+                  transport: 'Pickup at 3:15 PM',
+                  homework: 'No pending homework',
+                  updates: 'No unread updates',
+                ),
+                ParentPortalChild(
+                  id: 'aarohi',
+                  name: 'Aarohi Shrestha',
+                  classSection: 'LKG-A',
+                  teacher: 'Class teacher details in timetable',
+                  attendance: 'Present today',
+                  attendanceTime: 'Updated 6:19 PM',
+                  transport: 'Guardian pickup',
+                  homework: '1 homework pending',
+                  updates: '1 unread update',
+                  homeworkPending: 1,
+                  unreadUpdates: 1,
+                  feesDue: 4500,
+                ),
+              ],
+              homework: [
+                ParentPortalHomework(
+                  id: 'phonics',
+                  childId: 'aarohi',
+                  childName: 'Aarohi Shrestha',
+                  classSection: 'LKG-A',
+                  subject: 'English',
+                  title: 'Read the phonics worksheet',
+                  dueLabel: 'Due tomorrow',
+                  status: 'Pending',
+                  attachmentCount: 1,
+                  teacher: 'Assigned by school',
+                ),
+              ],
+              updates: [
+                ParentPortalUpdate(
+                  id: 'holiday',
+                  category: ParentUpdateCategory.notice,
+                  title: 'Holiday notice for Friday',
+                  body: 'School will remain closed.',
+                  metadata: 'School - 6:19 PM',
+                  isImportant: true,
+                  unreadCount: 1,
+                  route: '/notices/holiday',
+                ),
+                ParentPortalUpdate(
+                  id: 'ptm',
+                  category: ParentUpdateCategory.event,
+                  title: 'Parent-Teacher Meeting',
+                  body: 'Friday, 10:00 AM-2:00 PM',
+                  metadata: 'Aarohi Shrestha - 6:19 PM',
+                  route: '/parent/updates?eventId=ptm',
+                ),
+              ],
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: SchoolOsAppShell()),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -206,7 +283,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Events'));
     await tester.pumpAndSettle();
-    expect(find.text('Parent–Teacher Meeting'), findsOneWidget);
+    expect(find.text('Parent-Teacher Meeting'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

@@ -11,6 +11,10 @@ class ParentPortalChild {
     required this.transport,
     required this.homework,
     required this.updates,
+    this.homeworkPending = 0,
+    this.unreadUpdates = 0,
+    this.feesDue = 0,
+    this.transportDetail,
   });
 
   final String id;
@@ -22,11 +26,16 @@ class ParentPortalChild {
   final String transport;
   final String homework;
   final String updates;
+  final int homeworkPending;
+  final int unreadUpdates;
+  final num feesDue;
+  final String? transportDetail;
 }
 
 class ParentPortalHomework {
   const ParentPortalHomework({
     required this.id,
+    required this.childId,
     required this.childName,
     required this.classSection,
     required this.subject,
@@ -38,6 +47,7 @@ class ParentPortalHomework {
   });
 
   final String id;
+  final String childId;
   final String childName;
   final String classSection;
   final String subject;
@@ -61,6 +71,7 @@ class ParentPortalUpdate {
     this.isPinned = false,
     this.isImportant = false,
     this.unreadCount = 0,
+    this.route,
   });
 
   final String id;
@@ -71,6 +82,7 @@ class ParentPortalUpdate {
   final bool isPinned;
   final bool isImportant;
   final int unreadCount;
+  final String? route;
 }
 
 class ParentPortalData {
@@ -81,6 +93,9 @@ class ParentPortalData {
     required this.children,
     required this.homework,
     required this.updates,
+    this.totalFeesDue = 0,
+    this.overdueFeesCount = 0,
+    this.unreadUpdates = 0,
   });
 
   final String parentName;
@@ -89,4 +104,17 @@ class ParentPortalData {
   final List<ParentPortalChild> children;
   final List<ParentPortalHomework> homework;
   final List<ParentPortalUpdate> updates;
+  final num totalFeesDue;
+  final int overdueFeesCount;
+  final int unreadUpdates;
+
+  int get presentTodayCount {
+    return children.where((child) {
+      return child.attendance.toLowerCase().contains('present');
+    }).length;
+  }
+
+  int get pendingHomeworkCount {
+    return homework.where((item) => !item.isCompleted).length;
+  }
 }

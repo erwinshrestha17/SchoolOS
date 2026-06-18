@@ -19,67 +19,64 @@ class NotificationCenterScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final notifications = ref.watch(notificationCenterProvider);
+    final notifications = ref.watch(parentNotificationsProvider);
 
     return AppScaffold(
       appBar: AppBar(title: const Text('Notifications')),
-      body: notifications.when(
-        loading: () => const Padding(
-          padding: EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            children: [
-              AppSkeleton(width: double.infinity, height: 96),
-              SizedBox(height: AppSpacing.md),
-              AppSkeleton(width: double.infinity, height: 96),
-            ],
-          ),
-        ),
-        error: (_, _) => AppErrorView(
-          title: 'Could not load notifications',
-          message: 'Please try again in a moment.',
-          onRetry: () => ref.invalidate(notificationCenterProvider),
-        ),
-        data: (items) {
-          if (items.isEmpty) {
-            return const AppEmptyState(
+      body: notifications.isLoading
+          ? const Padding(
+              padding: EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                children: [
+                  AppSkeleton(width: double.infinity, height: 96),
+                  SizedBox(height: AppSpacing.md),
+                  AppSkeleton(width: double.infinity, height: 96),
+                ],
+              ),
+            )
+          : notifications.error != null
+          ? AppErrorView(
+              title: 'Could not load notifications',
+              message: 'Please try again in a moment.',
+              onRetry: () =>
+                  ref.read(parentNotificationsProvider.notifier).refresh(),
+            )
+          : notifications.items.isEmpty
+          ? const AppEmptyState(
               title: 'No notifications',
               message: 'School alerts and reminders will appear here.',
               icon: Icons.notifications_none_rounded,
-            );
-          }
-
-          return RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(notificationCenterProvider);
-              await ref.read(notificationCenterProvider.future);
-            },
-            child: ListView.separated(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              itemBuilder: (context, index) => _NotificationTile(
-                item: items[index],
-                onTap: () => _markRead(context, ref, items[index]),
+            )
+          : RefreshIndicator(
+              onRefresh: () async {
+                await ref.read(parentNotificationsProvider.notifier).refresh();
+              },
+              child: ListView.separated(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                itemBuilder: (context, index) => _NotificationTile(
+                  item: notifications.items[index],
+                  onTap: () =>
+                      _markRead(context, ref, notifications.items[index]),
+                ),
+                separatorBuilder: (_, _) =>
+                    const SizedBox(height: AppSpacing.md),
+                itemCount: notifications.items.length,
               ),
-              separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
-              itemCount: items.length,
             ),
-          );
-        },
-      ),
     );
   }
 
   Future<void> _markRead(
     BuildContext context,
     WidgetRef ref,
-    NotificationItem item,
+    ParentNotification item,
   ) async {
     if (item.isRead) {
       return;
     }
 
     try {
-      await ref.read(noticesRepositoryProvider).markNoticeRead(item.id);
-      ref.invalidate(notificationCenterProvider);
+      await ref.read(parentNotificationsProvider.notifier).markRead(item.id);
     } catch (_) {
       if (!context.mounted) {
         return;
@@ -94,7 +91,7 @@ class NotificationCenterScreen extends ConsumerWidget {
 class _NotificationTile extends StatelessWidget {
   const _NotificationTile({required this.item, required this.onTap});
 
-  final NotificationItem item;
+  final ParentNotification item;
   final VoidCallback onTap;
 
   @override

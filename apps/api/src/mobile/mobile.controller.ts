@@ -123,6 +123,11 @@ export class MobileController {
     });
   }
 
+  @Get('me/consents')
+  getMyConsentStatus(@CurrentAuth() auth: AuthContext) {
+    return this.mobileService.getMyConsentStatus(auth);
+  }
+
   @Get('students/:id/activity-feed')
   @RequiredModule('activity')
   getStudentActivityFeed(
@@ -143,6 +148,38 @@ export class MobileController {
     return this.mobileService.getStudentHomework(studentId, auth, take);
   }
 
+  @Get('students/:id/homework/:homeworkId/attachments')
+  @RequiredModule('homework')
+  getStudentHomeworkAttachments(
+    @Param('id') studentId: string,
+    @Param('homeworkId') homeworkId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.getStudentHomeworkAttachments(
+      studentId,
+      homeworkId,
+      auth,
+    );
+  }
+
+  @Get(
+    'students/:id/homework/:homeworkId/attachments/:attachmentId/download-url',
+  )
+  @RequiredModule('homework')
+  getStudentHomeworkAttachmentDownloadUrl(
+    @Param('id') studentId: string,
+    @Param('homeworkId') homeworkId: string,
+    @Param('attachmentId') attachmentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.getStudentHomeworkAttachmentDownloadUrl(
+      studentId,
+      homeworkId,
+      attachmentId,
+      auth,
+    );
+  }
+
   @Get('students/:id/timetable')
   @RequiredModule('homework')
   getStudentTimetable(
@@ -159,6 +196,25 @@ export class MobileController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.mobileService.getStudentReportCards(studentId, auth);
+  }
+
+  @Get('students/:id/report-cards/:reportCardId.pdf')
+  @RequiredModule('exams')
+  async getStudentReportCardPdf(
+    @Param('id') studentId: string,
+    @Param('reportCardId') reportCardId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    const pdf = await this.mobileService.getStudentReportCardPdf(
+      studentId,
+      reportCardId,
+      auth,
+    );
+
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${safePdfFileName(`report-card-${reportCardId}.pdf`)}"`,
+    });
   }
 
   @Get('students/:id/canteen')

@@ -1,250 +1,165 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../application/parent_portal_providers.dart';
+import '../../domain/parent_portal_models.dart';
 import '../widgets/parent_detail_widgets.dart';
 import '../widgets/parent_portal_widgets.dart';
 
-class ParentCalendarScreen extends StatefulWidget {
+class ParentCalendarScreen extends ConsumerWidget {
   const ParentCalendarScreen({super.key});
-  @override
-  State<ParentCalendarScreen> createState() => _ParentCalendarScreenState();
-}
 
-class _ParentCalendarScreenState extends State<ParentCalendarScreen> {
-  int month = 6;
-  int selectedDay = 10;
-  final events = const [
-    (
-      6,
-      'Parent–Teacher Meeting',
-      'Friday • 10:00 AM\nFor Aarohi • LKG-A',
-      ParentPortalColors.purple,
-      Icons.event_available_rounded,
-    ),
-    (
-      9,
-      'School Holiday',
-      'Eid • Ganatantra Diwas',
-      ParentPortalColors.blue,
-      Icons.calendar_month_rounded,
-    ),
-    (
-      16,
-      'Unit Test Begins',
-      'Monday • For Aarav • Nursery-A',
-      ParentPortalColors.orange,
-      Icons.assignment_rounded,
-    ),
-    (
-      21,
-      'Annual Sports Day',
-      'Next week • Sat, 21 Jun',
-      ParentPortalColors.green,
-      Icons.emoji_events_rounded,
-    ),
-  ];
   @override
-  Widget build(BuildContext context) => ParentDetailScaffold(
-    title: 'School Calendar',
-    selectedIndex: 4,
-    body: ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-      children: [
-        PortalCard(
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: () => setState(() {
-                      month = month == 1 ? 12 : month - 1;
-                      selectedDay = 1;
-                    }),
-                    icon: const Icon(Icons.chevron_left),
-                  ),
-                  Expanded(
-                    child: Text(
-                      '${_monthName(month)} 2083',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final portal = ref.watch(parentPortalDataProvider);
+    return ParentDetailScaffold(
+      title: 'School Calendar',
+      selectedIndex: 4,
+      body: portal.when(
+        loading: () => const _CalendarLoading(),
+        error: (_, _) => _CalendarUnavailable(
+          title: 'Could not load calendar updates',
+          message: 'Please try again in a moment.',
+          onRetry: () => ref.invalidate(parentPortalDataProvider),
+        ),
+        data: (data) {
+          final events = data.updates
+              .where((item) => item.category == ParentUpdateCategory.event)
+              .toList();
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(parentPortalDataProvider);
+              await ref.read(parentPortalDataProvider.future);
+            },
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+              children: [
+                PortalCard(
+                  color: ParentPortalColors.blueSoft,
+                  child: Row(
+                    children: [
+                      const FeatureIcon(
+                        Icons.calendar_month_rounded,
+                        color: ParentPortalColors.blue,
                       ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => setState(() {
-                      month = month == 12 ? 1 : month + 1;
-                      selectedDay = 1;
-                    }),
-                    icon: const Icon(Icons.chevron_right),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  for (final d in [
-                    'Sun',
-                    'Mon',
-                    'Tue',
-                    'Wed',
-                    'Thu',
-                    'Fri',
-                    'Sat',
-                  ])
-                    Expanded(
-                      child: Text(
-                        d,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: ParentPortalColors.muted,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: 35,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 7,
-                ),
-                itemBuilder: (_, i) {
-                  final day = i + 1;
-                  final event = month == 6
-                      ? events.where((e) => e.$1 == day).firstOrNull
-                      : null;
-                  return InkWell(
-                    onTap: () => setState(() => selectedDay = day),
-                    child: Container(
-                      margin: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: selectedDay == day
-                            ? ParentPortalColors.greenSoft
-                            : null,
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '$day',
-                            style: TextStyle(
-                              fontWeight: selectedDay == day
-                                  ? FontWeight.w900
-                                  : null,
-                            ),
-                          ),
-                          if (event != null)
-                            Container(
-                              width: 6,
-                              height: 6,
-                              margin: const EdgeInsets.only(top: 3),
-                              decoration: BoxDecoration(
-                                color: event.$4,
-                                shape: BoxShape.circle,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'School events',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const Divider(),
-              const Wrap(
-                spacing: 16,
-                runSpacing: 8,
-                children: [
-                  _CalLegend('Events', ParentPortalColors.green),
-                  _CalLegend('Meetings', ParentPortalColors.purple),
-                  _CalLegend('Exams', ParentPortalColors.orange),
-                  _CalLegend('Holidays', ParentPortalColors.blue),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
-        const ParentSectionHeader(title: 'Upcoming'),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: () => showFeatureSnack(
-              context,
-              'Events added to the mock phone calendar.',
-            ),
-            icon: const Icon(Icons.calendar_month_rounded),
-            label: const Text('Add to phone calendar'),
-          ),
-        ),
-        const SizedBox(height: 8),
-        for (final event in events.where(
-          (event) =>
-              month != 6 ||
-              selectedDay == 1 ||
-              event.$1 == selectedDay ||
-              selectedDay == 10,
-        )) ...[
-          PortalCard(
-            onTap: () => _eventSheet(context, event),
-            child: Row(
-              children: [
-                FeatureIcon(event.$5, color: event.$4),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        event.$2,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
+                            Text(
+                              'Latest event updates from ${data.schoolName}.',
+                              style: const TextStyle(
+                                color: ParentPortalColors.muted,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      Text(
-                        event.$3,
-                        style: const TextStyle(color: ParentPortalColors.muted),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(height: 16),
+                const ParentSectionHeader(title: 'Upcoming'),
+                const SizedBox(height: 8),
+                if (events.isEmpty)
+                  const _CalendarUnavailable(
+                    title: 'No calendar events available',
+                    message:
+                        'School calendar events will appear here when the school publishes them.',
+                  )
+                else
+                  for (final event in events) ...[
+                    _CalendarEventCard(event: event),
+                    const SizedBox(height: 10),
+                  ],
+                const SizedBox(height: 14),
+                const PortalCard(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      FeatureIcon(
+                        Icons.sync_disabled_rounded,
+                        color: ParentPortalColors.orange,
+                        size: 42,
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Phone calendar sync is not enabled for this school app yet.',
+                          style: TextStyle(color: ParentPortalColors.muted),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CalendarEventCard extends StatelessWidget {
+  const _CalendarEventCard({required this.event});
+
+  final ParentPortalUpdate event;
+
+  @override
+  Widget build(BuildContext context) {
+    return PortalCard(
+      onTap: () => _eventSheet(context),
+      child: Row(
+        children: [
+          const FeatureIcon(
+            Icons.event_available_rounded,
+            color: ParentPortalColors.green,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  '${event.$1} Jun',
-                  style: TextStyle(
-                    color: event.$4,
+                  event.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  event.body,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: ParentPortalColors.muted),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  event.metadata,
+                  style: const TextStyle(
+                    color: ParentPortalColors.green,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const ListChevron(),
               ],
             ),
           ),
-          const SizedBox(height: 10),
+          const ListChevron(),
         ],
-      ],
-    ),
-  );
-  String _monthName(int value) => const [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'June',
-    'July',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ][value - 1];
-  void _eventSheet(
-    BuildContext context,
-    (int, String, String, Color, IconData) event,
-  ) => showModalBottomSheet<void>(
+      ),
+    );
+  }
+
+  void _eventSheet(BuildContext context) => showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
     builder: (_) => SafeArea(
@@ -253,22 +168,30 @@ class _ParentCalendarScreenState extends State<ParentCalendarScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            FeatureIcon(event.$5, color: event.$4, size: 60),
+            const FeatureIcon(
+              Icons.event_available_rounded,
+              color: ParentPortalColors.green,
+              size: 60,
+            ),
             const SizedBox(height: 12),
             Text(
-              event.$2,
+              event.title,
+              textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
             Text(
-              event.$3,
+              event.body,
               textAlign: TextAlign.center,
               style: const TextStyle(color: ParentPortalColors.muted),
             ),
             const SizedBox(height: 10),
             Text(
-              '${event.$1} June 2083',
-              style: TextStyle(color: event.$4, fontWeight: FontWeight.w800),
+              event.metadata,
+              style: const TextStyle(
+                color: ParentPortalColors.green,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ],
         ),
@@ -277,21 +200,83 @@ class _ParentCalendarScreenState extends State<ParentCalendarScreen> {
   );
 }
 
-class _CalLegend extends StatelessWidget {
-  const _CalLegend(this.label, this.color);
-  final String label;
-  final Color color;
+class _CalendarUnavailable extends StatelessWidget {
+  const _CalendarUnavailable({
+    required this.title,
+    required this.message,
+    this.onRetry,
+  });
+
+  final String title;
+  final String message;
+  final VoidCallback? onRetry;
+
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        width: 9,
-        height: 9,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  Widget build(BuildContext context) => PortalCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const FeatureIcon(
+              Icons.event_busy_rounded,
+              color: ParentPortalColors.orange,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    message,
+                    style: const TextStyle(color: ParentPortalColors.muted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (onRetry != null) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Retry'),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+class _CalendarLoading extends StatelessWidget {
+  const _CalendarLoading();
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+    children: const [
+      PortalCard(
+        child: Row(
+          children: [
+            FeatureIcon(Icons.calendar_month_rounded),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Loading school calendar updates...',
+                style: TextStyle(color: ParentPortalColors.muted),
+              ),
+            ),
+          ],
+        ),
       ),
-      const SizedBox(width: 5),
-      Text(label, style: const TextStyle(fontSize: 12)),
     ],
   );
 }

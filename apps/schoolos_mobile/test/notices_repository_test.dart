@@ -56,8 +56,58 @@ void main() {
             },
           ),
         );
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/me/notifications',
+            queryParameters: any(named: 'queryParameters'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: '/mobile/me/notifications'),
+            data: {
+              'unreadCount': 2,
+              'items': [
+                {
+                  'id': 'delivery-1',
+                  'title': 'Homework due',
+                  'message': 'Math worksheet is due tomorrow.',
+                  'sourceType': 'homework_due_soon',
+                  'createdAt': '2026-06-01T08:00:00.000Z',
+                  'isRead': false,
+                },
+                {
+                  'id': 'delivery-2',
+                  'title': 'Fee receipt',
+                  'body': 'Payment was confirmed.',
+                  'sourceType': 'FEE_PAYMENT_CONFIRMED',
+                  'createdAt': '2026-06-01T09:00:00.000Z',
+                  'isRead': true,
+                },
+                {
+                  'id': 'delivery-3',
+                  'title': 'Trip delay',
+                  'body': 'Bus is delayed by 10 minutes.',
+                  'sourceType': 'TRANSPORT',
+                  'createdAt': '2026-06-01T10:00:00.000Z',
+                  'isRead': false,
+                },
+              ],
+            },
+          ),
+        );
+        when(
+          () => apiClient.get<dynamic>('/mobile/me/notifications/unread-count'),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/me/notifications/unread-count',
+            ),
+            data: {'unreadCount': 2},
+          ),
+        );
 
-        final items = await repository.getNotificationCenter();
+        final page = await repository.getNotificationCenter();
+        final items = page.items;
         final notices = await repository.getNotices();
         final unreadCount = await repository.getUnreadCount();
 
@@ -70,7 +120,13 @@ void main() {
         expect(unreadCount, 2);
         verify(
           () => apiClient.get<dynamic>('/mobile/me/notifications'),
-        ).called(3);
+        ).called(1);
+        verify(
+          () => apiClient.get<dynamic>(
+            '/mobile/me/notifications',
+            queryParameters: any(named: 'queryParameters'),
+          ),
+        ).called(1);
       },
     );
 
@@ -128,21 +184,21 @@ void main() {
 
     test('maps other backend notification source families', () {
       expect(
-        NotificationItem.fromJson({
+        ParentNotification.fromJson({
           'id': 'delivery-4',
           'sourceType': 'attendance_absent',
         }).category,
         NoticeCategory.academic,
       );
       expect(
-        NotificationItem.fromJson({
+        ParentNotification.fromJson({
           'id': 'delivery-5',
           'sourceType': 'report_card_published',
         }).category,
         NoticeCategory.academic,
       );
       expect(
-        NotificationItem.fromJson({
+        ParentNotification.fromJson({
           'id': 'delivery-6',
           'sourceType': 'consent_required',
         }).category,

@@ -41,6 +41,24 @@ final parentReportCardsProvider = FutureProvider.autoDispose
           .getReportCardsForChild(childId);
     });
 
+final parentConsentStatusProvider =
+    FutureProvider.autoDispose<List<ParentConsentStatus>>((ref) {
+      return ref.watch(parentRepositoryProvider).getMyConsentStatus();
+    });
+
+final parentHomeworkAttachmentsProvider = FutureProvider.autoDispose
+    .family<
+      List<ParentHomeworkAttachment>,
+      ({String childId, String homeworkId})
+    >((ref, query) {
+      return ref
+          .watch(parentRepositoryProvider)
+          .getHomeworkAttachments(
+            childId: query.childId,
+            homeworkId: query.homeworkId,
+          );
+    });
+
 final parentActivityFeedProvider = FutureProvider.autoDispose
     .family<List<ParentActivityItem>, String>((ref, childId) {
       return ref
@@ -56,6 +74,11 @@ final parentTransportProvider = FutureProvider.autoDispose
 final parentCanteenProvider = FutureProvider.autoDispose
     .family<ParentCanteenInfo, String>((ref, childId) {
       return ref.watch(parentRepositoryProvider).getCanteenForChild(childId);
+    });
+
+final parentLibraryProvider = FutureProvider.autoDispose
+    .family<ParentLibraryInfo, String>((ref, childId) {
+      return ref.watch(parentRepositoryProvider).getLibraryForChild(childId);
     });
 
 final parentTeacherThreadsProvider = FutureProvider.autoDispose

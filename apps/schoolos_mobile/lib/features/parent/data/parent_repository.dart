@@ -157,6 +157,45 @@ class ParentRepository {
         .toList();
   }
 
+  Future<List<ParentConsentStatus>> getMyConsentStatus() async {
+    final response = await _client.get('/mobile/me/consents');
+    final data = response.data as Map<String, dynamic>;
+    final items = data['items'] as List<dynamic>? ?? const [];
+
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(ParentConsentStatus.fromJson)
+        .toList();
+  }
+
+  Future<List<ParentHomeworkAttachment>> getHomeworkAttachments({
+    required String childId,
+    required String homeworkId,
+  }) async {
+    final response = await _client.get(
+      '/mobile/students/$childId/homework/$homeworkId/attachments',
+    );
+    final data = response.data as Map<String, dynamic>;
+    final items = data['items'] as List<dynamic>? ?? const [];
+
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(ParentHomeworkAttachment.fromJson)
+        .toList();
+  }
+
+  Future<ParentHomeworkAttachmentAccess> getHomeworkAttachmentDownloadAccess({
+    required String childId,
+    required String homeworkId,
+    required String attachmentId,
+  }) async {
+    final response = await _client.get(
+      '/mobile/students/$childId/homework/$homeworkId/attachments/$attachmentId/download-url',
+    );
+    final data = response.data as Map<String, dynamic>;
+    return ParentHomeworkAttachmentAccess.fromJson(data);
+  }
+
   Future<List<ParentActivityItem>> getActivityFeedForChild(
     String childId, {
     int take = 20,
@@ -184,6 +223,12 @@ class ParentRepository {
     final response = await _client.get('/mobile/students/$childId/canteen');
     final data = response.data as Map<String, dynamic>;
     return ParentCanteenInfo.fromJson(data);
+  }
+
+  Future<ParentLibraryInfo> getLibraryForChild(String childId) async {
+    final response = await _client.get('/mobile/students/$childId/library');
+    final data = response.data as Map<String, dynamic>;
+    return ParentLibraryInfo.fromJson(data);
   }
 
   Future<ParentReceiptPdfDownload> downloadReceiptPdf({
@@ -217,6 +262,78 @@ class ParentRepository {
       filePath: file.path,
       receipt: receipt,
     );
+  }
+
+  Future<ParentProtectedFileDownload> downloadReportCardPdf({
+    required String childId,
+    required ParentReportCard reportCard,
+  }) async {
+    final response = await _client.get<List<int>>(
+      '/mobile/students/$childId/report-cards/${reportCard.id}.pdf',
+      options: Options(
+        responseType: ResponseType.bytes,
+        headers: {Headers.acceptHeader: 'application/pdf'},
+      ),
+    );
+    final bytes = response.data;
+    if (bytes == null || bytes.isEmpty) {
+      throw StateError('Report card PDF was empty.');
+    }
+
+    final temporaryDir = await getTemporaryDirectory();
+    final reportCardDir = Directory(
+      '${temporaryDir.path}/schoolos/report-cards',
+    );
+    if (!reportCardDir.existsSync()) {
+      await reportCardDir.create(recursive: true);
+    }
+
+    final fileName = '${_safeFileName(reportCard.id)}.pdf';
+    final file = File('${reportCardDir.path}/$fileName');
+    await file.writeAsBytes(bytes, flush: true);
+
+    return ParentProtectedFileDownload(fileName: fileName, filePath: file.path);
+  }
+
+  Future<ParentProtectedFileDownload> downloadHomeworkAttachment({
+    required String childId,
+    required String homeworkId,
+    required ParentHomeworkAttachment attachment,
+  }) async {
+    final access = await getHomeworkAttachmentDownloadAccess(
+      childId: childId,
+      homeworkId: homeworkId,
+      attachmentId: attachment.id,
+    );
+    if (access.url.isEmpty) {
+      throw StateError('Homework attachment download URL was empty.');
+    }
+
+    final response = await _client.dio.get<List<int>>(
+      access.url,
+      options: Options(
+        responseType: ResponseType.bytes,
+        headers: {Headers.acceptHeader: access.mimeType},
+      ),
+    );
+    final bytes = response.data;
+    if (bytes == null || bytes.isEmpty) {
+      throw StateError('Homework attachment was empty.');
+    }
+
+    final temporaryDir = await getTemporaryDirectory();
+    final attachmentDir = Directory(
+      '${temporaryDir.path}/schoolos/homework-attachments',
+    );
+    if (!attachmentDir.existsSync()) {
+      await attachmentDir.create(recursive: true);
+    }
+
+    final fileName = _safeFileName(access.fileName);
+    final file = File('${attachmentDir.path}/$fileName');
+    await file.writeAsBytes(bytes, flush: true);
+
+    return ParentProtectedFileDownload(fileName: fileName, filePath: file.path);
   }
 
   Future<ParentTeacherThreadPage> getParentTeacherThreads({
