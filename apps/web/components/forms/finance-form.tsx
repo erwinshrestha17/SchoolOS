@@ -445,7 +445,7 @@ export function FinanceForm() {
   const overpaymentBlocked = Boolean(selectedInvoice && payment.amount > outstanding);
   const invalidPaymentAmount = payment.amount <= 0 || overpaymentBlocked;
   const requiresReference = payment.method !== 'CASH';
-  const defaulters = defaultersQuery.data ?? [];
+  const defaulters = defaultersQuery.data?.items ?? [];
   const totalOutstanding = invoices.reduce((sum, invoice) => sum + getOutstanding(invoice), 0);
   const paidInvoices = invoices.filter((invoice) => invoice.status === 'PAID').length;
   const overdueInvoices = invoices.filter((invoice) => getOutstanding(invoice) > 0).length;

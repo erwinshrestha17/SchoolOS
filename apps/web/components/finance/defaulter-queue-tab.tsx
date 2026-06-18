@@ -73,7 +73,7 @@ export function DefaulterQueueTab() {
   };
 
   const handleSelectAll = () => {
-    const list = defaultersQuery.data || [];
+    const list = defaultersQuery.data?.items || [];
     if (selectedInvoiceIds.length === list.length) {
       setSelectedInvoiceIds([]);
     } else {
@@ -89,7 +89,7 @@ export function DefaulterQueueTab() {
     }).format(amount);
   };
 
-  const defaulters = defaultersQuery.data || [];
+  const defaulters = defaultersQuery.data?.items || [];
 
   return (
     <SectionCard

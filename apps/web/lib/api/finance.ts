@@ -112,6 +112,24 @@ export type ReceiptVerificationResult = {
   };
 };
 
+export type DefaultersResponse = {
+  filters: {
+    classId: string | null;
+    feeHeadId: string | null;
+    agingBucket: string | null;
+    minDaysOverdue: number | null;
+    maxDaysOverdue: number | null;
+  };
+  total: number;
+  totalOutstanding: number;
+  segments: Array<{
+    agingBucket: string;
+    count: number;
+    outstanding: number;
+  }>;
+  items: DefaulterSummary[];
+};
+
 export const financeApi = {
   listFeeHeads: () => request<FeeHeadSummary[]>('/fees/heads'),
   listFeePlans: () => request<FeePlanSummary[]>('/fees/plans'),
@@ -129,7 +147,7 @@ export const financeApi = {
     classId?: string | null;
     feeHeadId?: string | null;
   }) =>
-    request<DefaulterSummary[]>(withQuery('/fees/defaulters', params ?? {})),
+    request<DefaultersResponse>(withQuery('/fees/defaulters', params ?? {})),
   sendDefaulterReminders: (body: JsonBody) =>
     request<DefaulterReminderResult>('/fees/defaulters/reminders', {
       method: 'POST',

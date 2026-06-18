@@ -1,168 +1,204 @@
 'use client';
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CollectionSection } from '@/components/finance/collection-section';
-import { LedgerSection } from '@/components/finance/ledger-section';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { Wallet, Receipt, Settings, BarChart3, Calculator, History, FileText, Percent, Database, Play } from 'lucide-react';
-import { StatCard } from '@/components/ui/stat-card';
-import { DuesAnalysisSection } from '@/components/finance/dues-analysis-section';
-import { DefaulterAgingSummary } from '@/components/finance/defaulter-aging-summary';
-import { CashierCloseSection } from '@/components/finance/cashier-close-section';
-import { useSession } from '@/components/session-provider';
-import type { InvoiceSummary } from '@schoolos/core';
+import {
+  BarChart3,
+  Calculator,
+  FileText,
+  History,
+  Receipt,
+  Settings,
+  ShieldAlert,
+  Wallet,
+} from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { PageHeader } from '@/components/ui/page-header';
-
-// Parity Sub-Tabs Imports
-import { FeeSetupTab } from '@/components/finance/fee-setup-tab';
-import { DiscountsWaiversTab } from '@/components/finance/discounts-waivers-tab';
-import { BillingRunsTab } from '@/components/finance/billing-runs-tab';
+import { useState } from 'react';
+import { CashierCloseSection } from '@/components/finance/cashier-close-section';
+import { CollectionSection } from '@/components/finance/collection-section';
+import { DefaulterAgingSummary } from '@/components/finance/defaulter-aging-summary';
 import { DefaulterQueueTab } from '@/components/finance/defaulter-queue-tab';
+import { DiscountsWaiversTab } from '@/components/finance/discounts-waivers-tab';
+import { DuesAnalysisSection } from '@/components/finance/dues-analysis-section';
+import { FeeSetupTab } from '@/components/finance/fee-setup-tab';
+import { BillingRunsTab } from '@/components/finance/billing-runs-tab';
+import { LedgerSection } from '@/components/finance/ledger-section';
+import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
+import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
+import { ModuleHeader } from '@/components/ui/module-header';
+import { ModuleTabs } from '@/components/ui/module-tabs';
+import { PermissionState } from '@/components/ui/permission-state';
+import { api } from '@/lib/api';
+import { useSession } from '@/components/session-provider';
 
+type FinanceTab = 'collection' | 'ledger' | 'close' | 'reports' | 'setup';
 
-type InvoiceWithOutstanding = InvoiceSummary & {
-  outstandingAmount?: number;
-};
+const formatCurrency = (amount: number) =>
+  new Intl.NumberFormat('en-NP', {
+    style: 'currency',
+    currency: 'NPR',
+    maximumFractionDigits: 0,
+  }).format(amount);
 
 export default function FinancePage() {
-  const { session } = useSession();
+  const { hasPermissions, session } = useSession();
   const searchParams = useSearchParams();
   const initialInvoiceId = searchParams.get('invoiceId');
+
+  const canCollectPayments = hasPermissions(['payments:collect']);
+  const canManageFees = hasPermissions(['fees:manage']);
+  const canReadReceipts = hasPermissions(['receipts:read']);
+  const canCloseCashier = hasPermissions(['payments:close']);
+  const [activeTab, setActiveTab] = useState<FinanceTab>(() =>
+    canCollectPayments
+      ? 'collection'
+      : canManageFees
+        ? 'ledger'
+        : canCloseCashier
+          ? 'close'
+          : 'collection',
+  );
+
   const invoicesQuery = useQuery({
     queryKey: ['invoices'],
     queryFn: () => api.listInvoices(),
+    enabled: canCollectPayments,
+  });
+  const defaultersQuery = useQuery({
+    queryKey: ['defaulters', 'workspace-summary'],
+    queryFn: () => api.listDefaulters(),
+    enabled: canManageFees,
   });
 
-  const invoices: InvoiceWithOutstanding[] = invoicesQuery.data ?? [];
-  const totalOutstanding = invoices.reduce(
-    (sum, invoice) =>
-      sum +
-      (invoice.outstandingAmount ??
-        Math.max(0, invoice.totalAmount - (invoice.paidAmount ?? 0))),
-    0,
-  );
-  const totalInvoices = invoices.length;
-  const paidInvoices = invoices.filter(inv => inv.status === 'PAID').length;
-  const collectionRate = totalInvoices > 0 ? Math.round((paidInvoices / totalInvoices) * 100) : 0;
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-NP', {
-      style: 'currency',
-      currency: 'NPR',
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const selectTab = (tab: FinanceTab) => {
+    setActiveTab(tab);
+    window.requestAnimationFrame(() => {
+      document.getElementById('finance-workspace')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
   };
 
+  const tabs = [
+    ...(canCollectPayments
+      ? [{ value: 'collection', label: 'Collect', icon: Calculator }]
+      : []),
+    ...(canManageFees && canReadReceipts
+      ? [{ value: 'ledger', label: 'Invoices & Receipts', icon: Receipt }]
+      : []),
+    ...(canCloseCashier
+      ? [{ value: 'close', label: 'Cashier Close', icon: History }]
+      : []),
+    ...(canManageFees
+      ? [
+          { value: 'reports', label: 'Dues & Reports', icon: BarChart3 },
+          { value: 'setup', label: 'Fee Setup', icon: Settings },
+        ]
+      : []),
+  ];
+
   return (
-    <div className="space-y-8 animate-fade-in">
-      <PageHeader
+    <DashboardPageShell>
+      <ModuleHeader
+        eyebrow="M3 Fees & Receipts"
         title="Fees & Receipts"
-        description={`Collect student fees, close cashier days, and review outstanding dues${session?.tenant.name ? ` for ${session.tenant.name}` : ''}.`}
-      />
+        description={`Collect fees, issue protected receipts, follow up dues, and close the cashier with an auditable trail${session?.tenant.name ? ` for ${session.tenant.name}` : ''}.`}
+        primaryAction={
+          canCollectPayments ? (
+            <button
+              type="button"
+              onClick={() => selectTab('collection')}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-fees-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-fees-border)] focus:ring-offset-2"
+            >
+              <Calculator size={18} />
+              Collect Fee
+            </button>
+          ) : undefined
+        }
+        moreActionItems={[
+          ...(canReadReceipts
+            ? [
+                {
+                  label: 'Receipt History & Reprint',
+                  icon: <Receipt size={16} />,
+                  onClick: () => selectTab('ledger'),
+                },
+              ]
+            : []),
+          ...(canCloseCashier
+            ? [
+                {
+                  label: 'Cashier Close',
+                  icon: <History size={16} />,
+                  onClick: () => selectTab('close'),
+                },
+              ]
+            : []),
+          ...(canManageFees
+            ? [
+                {
+                  label: 'Reports & Exports',
+                  icon: <BarChart3 size={16} />,
+                  onClick: () => selectTab('reports'),
+                },
+                {
+                  label: 'Overdue Reminders',
+                  icon: <FileText size={16} />,
+                  onClick: () => selectTab('reports'),
+                },
+                {
+                  label: 'Fee Setup & Templates',
+                  icon: <Settings size={16} />,
+                  onClick: () => selectTab('setup'),
+                },
+              ]
+            : []),
+        ]}
+      >
+        <KpiGrid className="sm:grid-cols-2 xl:grid-cols-5">
+          <KpiCard title="Collected Today" value="Unavailable" icon={<Wallet size={20} />} tone="neutral" description="Needs a real M3 daily summary API." />
+          <KpiCard title="Total Due" value="Unavailable" icon={<Wallet size={20} />} tone="neutral" description="No whole-school summary contract is exposed." />
+          <KpiCard
+            title="Overdue Invoices"
+            value={!canManageFees ? 'Restricted' : defaultersQuery.isLoading ? 'Loading' : defaultersQuery.data?.total ?? 'Unavailable'}
+            icon={<FileText size={20} />}
+            tone={defaultersQuery.data?.total ? 'warning' : 'neutral'}
+            description="Backend defaulter summary, capped by the current API."
+          />
+          <KpiCard
+            title="Overdue Balance"
+            value={!canManageFees ? 'Restricted' : defaultersQuery.isLoading ? 'Loading' : defaultersQuery.data ? formatCurrency(defaultersQuery.data.totalOutstanding) : 'Unavailable'}
+            icon={<Receipt size={20} />}
+            tone={defaultersQuery.data?.totalOutstanding ? 'warning' : 'neutral'}
+            description="Official amount returned by the defaulter API."
+          />
+          <KpiCard title="Pending Reversals" value="Unavailable" icon={<ShieldAlert size={20} />} tone="neutral" description="Needs an approval-summary contract." />
+        </KpiGrid>
+      </ModuleHeader>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <StatCard
-          title="Total Outstanding"
-          value={formatCurrency(totalOutstanding)}
-          icon={<Wallet size={18} />}
-          loading={invoicesQuery.isLoading}
-          tone="warning"
-        />
-        <StatCard
-          title="Collection Rate"
-          value={`${collectionRate}%`}
-          loading={invoicesQuery.isLoading}
-          tone={collectionRate >= 80 ? 'success' : 'warning'}
-          trend={{
-            value: collectionRate,
-            label: 'Total paid',
-            isUp: collectionRate >= 80
-          }}
-        />
-        <StatCard
-          title="Active Invoices"
-          value={String(totalInvoices)}
-          loading={invoicesQuery.isLoading}
-          icon={<Receipt size={18} />}
-          tone="neutral"
-        />
-      </div>
+      <div id="finance-workspace" className="scroll-mt-24 space-y-6">
+        <ModuleTabs items={tabs} activeValue={activeTab} onValueChange={(value) => setActiveTab(value as FinanceTab)} accentColor="amber" variant="light" />
 
-      <Tabs defaultValue="collection" className="space-y-8">
-        <div className="flex items-center justify-between">
-          <TabsList className="h-auto gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
-            {[
-              { value: 'collection', label: 'Counter', icon: <Calculator size={14} /> },
-              { value: 'close', label: 'Day End', icon: <History size={14} /> },
-              { value: 'ledger', label: 'Ledger', icon: <FileText size={14} /> },
-              { value: 'reports', label: 'Analysis', icon: <BarChart3 size={14} /> },
-              { value: 'setup', label: 'Setup', icon: <Settings size={14} /> },
-            ].map((tab) => (
-              <TabsTrigger
-                key={tab.value}
-                value={tab.value}
-                className="flex items-center gap-2 rounded-lg bg-transparent px-6 py-2.5 font-bold text-slate-500 shadow-none transition-all hover:bg-slate-100 hover:text-slate-900 data-[state=active]:bg-[var(--color-mod-fees-accent)] data-[state=active]:text-white data-[state=active]:shadow-sm"
-              >
-                {tab.icon}
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        <div className="min-h-[420px]">
+          {activeTab === 'collection' ? (
+            canCollectPayments ? (
+              <CollectionSection
+                invoices={invoicesQuery.data ?? []}
+                isLoading={invoicesQuery.isLoading}
+                isError={invoicesQuery.isError}
+                onRetry={() => void invoicesQuery.refetch()}
+                initialInvoiceId={initialInvoiceId}
+              />
+            ) : (
+              <PermissionState title="Fee collection is restricted" description="You do not have permission to collect payments. Contact the school administrator if you need cashier access." />
+            )
+          ) : null}
+          {activeTab === 'ledger' && canManageFees && canReadReceipts ? <LedgerSection /> : null}
+          {activeTab === 'close' && canCloseCashier ? <CashierCloseSection /> : null}
+          {activeTab === 'reports' && canManageFees ? <div className="space-y-8"><DefaulterAgingSummary /><DefaulterQueueTab /><DuesAnalysisSection /></div> : null}
+          {activeTab === 'setup' && canManageFees ? <div className="space-y-8"><FeeSetupTab /><DiscountsWaiversTab /><BillingRunsTab /></div> : null}
         </div>
-
-        <TabsContent value="collection" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <CollectionSection invoices={invoices} isLoading={invoicesQuery.isLoading} initialInvoiceId={initialInvoiceId} />
-        </TabsContent>
-
-        <TabsContent value="close" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <CashierCloseSection />
-        </TabsContent>
-
-        <TabsContent value="ledger" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <LedgerSection />
-        </TabsContent>
-
-        <TabsContent value="reports" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <DefaulterAgingSummary />
-          <DefaulterQueueTab />
-          <DuesAnalysisSection />
-        </TabsContent>
-
-        <TabsContent value="setup" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <Tabs defaultValue="heads-plans" className="space-y-6">
-            <div className="flex justify-center sm:justify-start border-b border-slate-100 pb-2">
-              <TabsList className="rounded-xl border border-slate-100 bg-slate-50 p-1">
-                <TabsTrigger value="heads-plans" className="flex items-center gap-2 rounded-lg bg-transparent px-4 py-2 text-xs font-bold text-slate-500 shadow-none hover:text-slate-900 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                  <Database size={12} />
-                  Heads & Plans
-                </TabsTrigger>
-                <TabsTrigger value="discounts" className="flex items-center gap-2 rounded-lg bg-transparent px-4 py-2 text-xs font-bold text-slate-500 shadow-none hover:text-slate-900 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                  <Percent size={12} />
-                  Discounts & Waivers
-                </TabsTrigger>
-                <TabsTrigger value="billing-runs" className="flex items-center gap-2 rounded-lg bg-transparent px-4 py-2 text-xs font-bold text-slate-500 shadow-none hover:text-slate-900 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                  <Play size={12} />
-                  Billing Runs
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            <TabsContent value="heads-plans" className="animate-in fade-in duration-300">
-              <FeeSetupTab />
-            </TabsContent>
-
-            <TabsContent value="discounts" className="animate-in fade-in duration-300">
-              <DiscountsWaiversTab />
-            </TabsContent>
-
-            <TabsContent value="billing-runs" className="animate-in fade-in duration-300">
-              <BillingRunsTab />
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
-      </Tabs>
-    </div>
+      </div>
+    </DashboardPageShell>
   );
 }

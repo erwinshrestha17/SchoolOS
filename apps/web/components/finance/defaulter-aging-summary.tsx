@@ -21,25 +21,12 @@ export function DefaulterAgingSummary() {
 
   if (defaultersQuery.isLoading) return <LoadingState variant="page" label="Analyzing aging buckets..." />;
 
-  const defaulters = defaultersQuery.data || [];
-  
-  const buckets = {
-    '1-30': { count: 0, amount: 0 },
-    '31-60': { count: 0, amount: 0 },
-    '61-90': { count: 0, amount: 0 },
-    '90+': { count: 0, amount: 0 },
-  };
-
-  defaulters.forEach((d: any) => {
-    const bucket = d.agingBucket as keyof typeof buckets;
-    if (buckets[bucket] !== undefined) {
-      buckets[bucket].count++;
-      buckets[bucket].amount += d.outstanding;
-    } else {
-      buckets['90+'].count++;
-      buckets['90+'].amount += d.outstanding;
-    }
-  });
+  const segments = new Map(
+    (defaultersQuery.data?.segments ?? []).map((segment) => [
+      segment.agingBucket,
+      segment,
+    ]),
+  );
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NP', {
@@ -50,7 +37,7 @@ export function DefaulterAgingSummary() {
   };
 
   const bucketData = [
-    { label: '1-30 Days', key: '1-30', color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+    { label: '0-30 Days', key: '0-30', color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100' },
     { label: '31-60 Days', key: '31-60', color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100' },
     { label: '61-90 Days', key: '61-90', color: 'text-orange-500', bg: 'bg-orange-50', border: 'border-orange-100' },
     { label: '90+ Days', key: '90+', color: 'text-rose-500', bg: 'bg-rose-50', border: 'border-rose-100' },
@@ -106,11 +93,11 @@ export function DefaulterAgingSummary() {
             </div>
             
             <p className="text-3xl font-black text-slate-900 tracking-tighter">
-              {buckets[b.key].count}
+              {segments.get(b.key)?.count ?? 0}
             </p>
             <div className="flex items-center justify-between mt-1">
                <p className="text-[0.65rem] font-bold text-slate-500 uppercase tracking-tight">Defaulters</p>
-               <p className="text-xs font-black text-slate-700">{formatCurrency(buckets[b.key].amount)}</p>
+               <p className="text-xs font-black text-slate-700">{formatCurrency(segments.get(b.key)?.outstanding ?? 0)}</p>
             </div>
             
             <div className="mt-6 flex items-center justify-between pt-4 border-t border-slate-50">

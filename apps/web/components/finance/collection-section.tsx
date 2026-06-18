@@ -1,25 +1,42 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { CollectionCounter } from './collection-counter';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { CheckCircle2, AlertCircle, Printer, X } from 'lucide-react';
+import { ErrorState } from '@/components/ui/error-state';
 
 interface CollectionSectionProps {
   invoices: any[];
   isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   initialInvoiceId?: string | null;
 }
 
-export function CollectionSection({ invoices, isLoading, initialInvoiceId }: CollectionSectionProps) {
+export function CollectionSection({ invoices, isLoading, isError, onRetry, initialInvoiceId }: CollectionSectionProps) {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [lastReceipt, setLastReceipt] = useState<any>(null);
+  const paymentAttemptRef = useRef<{ fingerprint: string; key: string } | null>(null);
 
   const paymentMutation = useMutation({
-    mutationFn: async (payload: any) => await api.collectPayment(payload),
+    mutationFn: async (payload: any) => {
+      const fingerprint = JSON.stringify(payload);
+      if (paymentAttemptRef.current?.fingerprint !== fingerprint) {
+        paymentAttemptRef.current = {
+          fingerprint,
+          key: crypto.randomUUID(),
+        };
+      }
+      return api.collectPayment({
+        ...payload,
+        idempotencyKey: paymentAttemptRef.current.key,
+      });
+    },
     onSuccess: (result) => {
+      paymentAttemptRef.current = null;
       setLastReceipt(result);
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
       void queryClient.invalidateQueries({ queryKey: ['receipts'] });
@@ -42,6 +59,16 @@ export function CollectionSection({ invoices, isLoading, initialInvoiceId }: Col
     if (!lastReceipt?.receiptNumber) return;
     await api.openReceiptPdf(lastReceipt.receiptNumber);
   };
+
+  if (isError) {
+    return (
+      <ErrorState
+        title="Fee invoices could not load"
+        message="The collection counter is unavailable right now. No payment has been recorded."
+        onRetry={onRetry}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -89,6 +116,7 @@ export function CollectionSection({ invoices, isLoading, initialInvoiceId }: Col
         onSearch={setSearchQuery}
         invoices={filteredInvoices}
         isLoading={isLoading}
+        isSubmitting={paymentMutation.isPending}
         initialInvoiceId={initialInvoiceId}
         onCollect={(invoiceId, amount, method, reference, remarks) => {
           setLastReceipt(null);

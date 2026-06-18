@@ -171,9 +171,9 @@ export function DuesAnalysisSection() {
 
         {duesQuery.data?.summary && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <SummaryStat label="Gross Billing" value={duesQuery.data.summary.totalBilled} />
-            <SummaryStat label="Waivers Applied" value={duesQuery.data.summary.totalWaived} color="text-emerald-600" />
-            <SummaryStat label="Net Outstanding" value={duesQuery.data.summary.totalOutstanding} color="text-danger-600" isMain />
+            <SummaryStat label="Visible Page Billing" value={duesQuery.data.summary.totalBilled} />
+            <SummaryStat label="Visible Page Waivers" value={duesQuery.data.summary.totalWaived} color="text-emerald-600" />
+            <SummaryStat label="Visible Page Outstanding" value={duesQuery.data.summary.totalOutstanding} color="text-danger-600" isMain />
           </div>
         )}
       </div>

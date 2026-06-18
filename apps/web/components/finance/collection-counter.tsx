@@ -16,6 +16,7 @@ interface CollectionCounterProps {
   invoices: any[];
   onCollect: (invoiceId: string, amount: number, method: string, reference?: string, remarks?: string) => void;
   isLoading?: boolean;
+  isSubmitting?: boolean;
   initialInvoiceId?: string | null;
 }
 
@@ -34,7 +35,7 @@ const formatDate = (value: string) =>
     year: 'numeric',
   }).format(new Date(value));
 
-export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, initialInvoiceId }: CollectionCounterProps) {
+export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, isSubmitting, initialInvoiceId }: CollectionCounterProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [amount, setAmount] = useState<number>(0);
@@ -54,7 +55,7 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
 
   const handleSelectInvoice = (inv: any) => {
     setSelectedInvoiceId(inv.id);
-    setAmount(inv.outstandingAmount);
+    setAmount(0);
     setReference('');
     setRemarks('');
   };
@@ -67,10 +68,15 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
     if (!linkedInvoice) return;
 
     setSelectedInvoiceId(linkedInvoice.id);
-    setAmount(linkedInvoice.outstandingAmount);
+    setAmount(0);
     setReference('');
     setRemarks('');
   }, [initialInvoiceId, invoices, selectedInvoiceId]);
+
+  useEffect(() => {
+    if (!invoiceDetailQuery.data) return;
+    setAmount(invoiceDetailQuery.data.outstandingAmount);
+  }, [invoiceDetailQuery.data]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
@@ -120,7 +126,7 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
                   </div>
                 </div>
                 <div className="text-right flex flex-col items-end">
-                  <p className="text-sm font-black tabular-nums tracking-tighter">{formatCurrency(inv.outstandingAmount)}</p>
+                  <p className="text-xs font-bold text-slate-500">Open invoice</p>
                   <StatusBadge status={inv.status} className="mt-2 h-5" />
                 </div>
               </button>
@@ -149,22 +155,29 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
                <SummaryCard 
                 icon={<GraduationCap size={18} />} 
                 label="Student Detail" 
-                value={selectedInvoice.student?.name || 'Student name not set'}
-                sub={selectedInvoice.student?.studentSystemId || 'Student ID not set'}
+                value={invoiceDetailQuery.data?.student.name || selectedInvoice.student?.name || 'Student name not set'}
+                sub={invoiceDetailQuery.data?.student.studentSystemId || 'Student ID loading'}
                />
                <SummaryCard 
                 icon={<MapPin size={18} />} 
                 label="Class / Section" 
-                value={selectedInvoice.student?.class?.name || 'Class not set'}
-                sub={selectedInvoice.student?.section?.name || 'Section not set'}
+                value={invoiceDetailQuery.data?.student.className || 'Class not set'}
+                sub={invoiceDetailQuery.data?.student.sectionName || 'Section not set'}
                />
                <SummaryCard 
                 icon={<Phone size={18} />} 
                 label="Primary Guardian" 
-                value={selectedInvoice.student?.primaryGuardianName || 'Guardian not recorded'}
-                sub={selectedInvoice.student?.primaryGuardianPhone || 'Guardian phone not recorded'}
+                value={invoiceDetailQuery.data?.student.guardianName || 'Guardian not recorded'}
+                sub={invoiceDetailQuery.data?.student.guardianPhone || 'Guardian phone not recorded'}
                />
             </div>
+
+            {invoiceDetailQuery.isError ? (
+              <div className="flex items-center gap-3 rounded-2xl border border-danger-100 bg-danger-50 p-4 text-sm font-bold text-danger-700" role="alert">
+                <AlertCircle size={18} />
+                Invoice details could not load. Payment collection is disabled until you retry or select the invoice again.
+              </div>
+            ) : null}
 
             <SectionCard 
               title="Collection Detail" 
@@ -178,9 +191,9 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
             >
               <div className="space-y-8">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                  <StatItem label="Total Billed" value={formatCurrency(selectedInvoice.totalAmount)} />
-                  <StatItem label="Paid Amount" value={formatCurrency(selectedInvoice.totalAmount - selectedInvoice.outstandingAmount)} color="text-emerald-600" />
-                  <StatItem label="Current Balance" value={formatCurrency(selectedInvoice.outstandingAmount)} color="text-danger-600 font-black" />
+                  <StatItem label="Total Billed" value={invoiceDetailQuery.data ? formatCurrency(invoiceDetailQuery.data.totalAmount) : 'Loading'} />
+                  <StatItem label="Paid Amount" value={invoiceDetailQuery.data ? formatCurrency(invoiceDetailQuery.data.paidAmount) : 'Loading'} color="text-emerald-600" />
+                  <StatItem label="Current Balance" value={invoiceDetailQuery.data ? formatCurrency(invoiceDetailQuery.data.outstandingAmount) : 'Loading'} color="text-danger-600 font-black" />
                   <StatItem label="Due Date" value={formatDate(selectedInvoice.dueDate)} />
                 </div>
 
@@ -282,11 +295,17 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, in
                     </button>
                     <button
                       onClick={() => onCollect(selectedInvoice.id, amount, method, reference, remarks)}
-                      disabled={amount <= 0 || amount > selectedInvoice.outstandingAmount}
+                      disabled={
+                        isSubmitting ||
+                        invoiceDetailQuery.isLoading ||
+                        !invoiceDetailQuery.data ||
+                        amount <= 0 ||
+                        amount > invoiceDetailQuery.data.outstandingAmount
+                      }
                       className="flex items-center gap-3 px-12 py-4 bg-[var(--color-mod-fees-accent)] text-white rounded-2xl font-black text-sm shadow-sm transition-all hover:bg-[var(--color-mod-fees-text)] active:scale-95 disabled:opacity-50"
                     >
                       <CheckSquare size={20} />
-                      Finalize & Print Receipt
+                      {isSubmitting ? 'Recording Payment...' : 'Finalize & Print Receipt'}
                     </button>
                   </div>
                 </div>

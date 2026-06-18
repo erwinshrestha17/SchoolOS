@@ -73,22 +73,22 @@ export function CashierCloseSection() {
       <div className="grid gap-6 md:grid-cols-3">
          <CollectionStat 
           label="Total Collection" 
-          value={formatCurrency(preview?.totalCollected || 0)} 
-          sub={`${preview?.transactionCount || 0} Transactions`}
+          value={formatCurrency(preview?.netCollected ?? preview?.totalCollected ?? 0)}
+          sub={`${preview?.paymentCount ?? preview?.transactionCount ?? 0} Transactions`}
           icon={<Wallet size={20} />}
           color="emerald"
          />
          <CollectionStat 
           label="Cash in Hand" 
-          value={formatCurrency(preview?.byMethod?.find((m: any) => m.method === 'CASH')?.amount || 0)} 
+          value={formatCurrency(preview?.expectedCashAmount ?? 0)}
           sub="Physical Handover"
           icon={<Banknote size={20} />}
           color="primary"
          />
          <CollectionStat 
           label="Bank / Digital" 
-          value={formatCurrency((preview?.totalCollected || 0) - (preview?.byMethod?.find((m: any) => m.method === 'CASH')?.amount || 0))} 
-          sub="Verified in Statements"
+          value="See breakdown"
+          sub="Backend method totals below"
           icon={<CreditCard size={20} />}
           color="amber"
          />
