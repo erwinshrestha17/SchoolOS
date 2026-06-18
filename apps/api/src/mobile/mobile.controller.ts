@@ -16,6 +16,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { FEATURE_KEYS } from '@schoolos/core';
 import { MobileService } from './mobile.service';
 import { ParentAttendanceSummaryQueryDto } from './dto/parent-attendance-summary-query.dto';
+import { ParentNotificationQueryDto } from './dto/parent-notification-query.dto';
 
 @Controller('mobile')
 @UseGuards(JwtAuthGuard, EntitlementGuard)
@@ -39,8 +40,21 @@ export class MobileController {
   }
 
   @Get('me/notifications')
-  listNotifications(@CurrentAuth() auth: AuthContext) {
-    return this.mobileService.listNotifications(auth);
+  listNotifications(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: ParentNotificationQueryDto,
+  ) {
+    return this.mobileService.listNotifications(auth, query);
+  }
+
+  @Get('me/notifications/unread-count')
+  getNotificationUnreadCount(@CurrentAuth() auth: AuthContext) {
+    return this.mobileService.getNotificationUnreadCount(auth);
+  }
+
+  @Post('me/notifications/mark-all-read')
+  markAllNotificationsRead(@CurrentAuth() auth: AuthContext) {
+    return this.mobileService.markAllNotificationsRead(auth);
   }
 
   @Get('me/notifications/:id')

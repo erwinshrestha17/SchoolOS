@@ -9,8 +9,8 @@ describe('MobileService', () => {
     guardian: MockModel<'findFirst'>;
     student: MockModel<'findFirst' | 'findMany'>;
     invoice: MockModel<'findMany'>;
-    notificationDelivery: MockModel<'findMany' | 'findFirst'>;
-    notificationReadReceipt: MockModel<'upsert'>;
+    notificationDelivery: MockModel<'findMany' | 'findFirst' | 'count'>;
+    notificationReadReceipt: MockModel<'upsert' | 'createMany'>;
     homeworkAssignment: MockModel<'findMany'>;
     transportStudentAssignment: MockModel<'findFirst'>;
     transportEnrollment: MockModel<'findFirst'>;
@@ -39,9 +39,11 @@ describe('MobileService', () => {
       notificationDelivery: {
         findMany: jest.fn(),
         findFirst: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
       },
       notificationReadReceipt: {
         upsert: jest.fn(),
+        createMany: jest.fn(),
       },
       homeworkAssignment: {
         findMany: jest.fn(),
@@ -252,6 +254,7 @@ describe('MobileService', () => {
         readReceipts: [{ readAt: new Date('2026-05-01T10:00:00.000Z') }],
       },
     ]);
+    prisma.notificationDelivery.count.mockResolvedValue(1);
 
     const result = await service.listNotifications(actor);
 
@@ -267,6 +270,7 @@ describe('MobileService', () => {
       }),
     );
     expect(result.unreadCount).toBe(1);
+    expect(result.nextCursor).toBeNull();
     expect(result.items).toEqual([
       expect.objectContaining({
         id: 'notice-1',
@@ -279,6 +283,62 @@ describe('MobileService', () => {
         isRead: true,
       }),
     ]);
+  });
+
+  it('returns a parent-scoped unread count without loading notification bodies', async () => {
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.notificationDelivery.count.mockResolvedValue(3);
+
+    await expect(service.getNotificationUnreadCount(actor)).resolves.toEqual({
+      unreadCount: 3,
+    });
+    expect(prisma.notificationDelivery.count).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-1',
+        OR: [
+          { recipientUserId: 'parent-1' },
+          { studentId: { in: ['student-1'] } },
+        ],
+        readReceipts: {
+          none: { tenantId: 'tenant-1', userId: 'parent-1' },
+        },
+      },
+    });
+  });
+
+  it('marks only the signed-in parents visible unread notifications as read', async () => {
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.notificationDelivery.findMany.mockResolvedValue([
+      { id: 'delivery-1' },
+      { id: 'delivery-2' },
+    ]);
+    prisma.notificationReadReceipt.createMany.mockResolvedValue({ count: 2 });
+
+    await expect(service.markAllNotificationsRead(actor)).resolves.toEqual({
+      success: true,
+      markedCount: 2,
+    });
+    expect(prisma.notificationReadReceipt.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          tenantId: 'tenant-1',
+          notificationDeliveryId: 'delivery-1',
+          userId: 'parent-1',
+        },
+        {
+          tenantId: 'tenant-1',
+          notificationDeliveryId: 'delivery-2',
+          userId: 'parent-1',
+        },
+      ],
+      skipDuplicates: true,
+    });
   });
 
   it('marks only parent-visible mobile notifications as read', async () => {

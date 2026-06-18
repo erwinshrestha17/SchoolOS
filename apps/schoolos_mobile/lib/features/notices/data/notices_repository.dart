@@ -28,22 +28,48 @@ class NoticesRepository {
       '/mobile/me/notifications/$noticeId',
       cacheKey: 'notice_detail_$noticeId',
     );
-    return _noticeFromNotification(NotificationItem.fromJson(data));
+    return _noticeFromNotification(ParentNotification.fromJson(data));
   }
 
   Future<void> markNoticeRead(String noticeId) async {
     await _client.post('/mobile/me/notifications/$noticeId/read');
   }
 
-  Future<List<NotificationItem>> getNotificationCenter() async {
-    final center = await _getCenter();
-    return center.items;
+  Future<ParentNotificationPage> getNotificationCenter({
+    int limit = 30,
+    String? cursor,
+    bool unreadOnly = false,
+  }) async {
+    final response = await _client.get(
+      '/mobile/me/notifications',
+      queryParameters: {
+        'limit': '$limit',
+        if (cursor != null) 'cursor': cursor,
+        if (unreadOnly) 'unreadOnly': 'true',
+      },
+    );
+    final data = response.data as Map<String, dynamic>;
+    final items = data['items'] as List<dynamic>? ?? const [];
+    return ParentNotificationPage(
+      items: items
+          .whereType<Map<String, dynamic>>()
+          .map(ParentNotification.fromJson)
+          .toList(),
+      unreadCount: data['unreadCount'] as int? ?? 0,
+      nextCursor: data['nextCursor'] as String?,
+    );
   }
 
   Future<int> getUnreadCount() async {
-    final response = await _client.get('/mobile/me/notifications');
+    final response = await _client.get(
+      '/mobile/me/notifications/unread-count',
+    );
     final data = response.data as Map<String, dynamic>;
     return data['unreadCount'] as int? ?? 0;
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    await _client.post('/mobile/me/notifications/mark-all-read');
   }
 
   Future<_NotificationCenterPayload> _getCenter() async {
@@ -57,7 +83,7 @@ class NoticesRepository {
       unreadCount: data['unreadCount'] as int? ?? 0,
       items: items
           .whereType<Map<String, dynamic>>()
-          .map(NotificationItem.fromJson)
+          .map(ParentNotification.fromJson)
           .toList(),
       lastUpdated:
           DateTime.tryParse(data['_mobileLastUpdated'] as String? ?? '') ??
@@ -86,7 +112,7 @@ class NoticesRepository {
     }
   }
 
-  Notice _noticeFromNotification(NotificationItem item) {
+  Notice _noticeFromNotification(ParentNotification item) {
     return Notice(
       id: item.id,
       title: item.title,
@@ -110,7 +136,7 @@ class _NotificationCenterPayload {
   });
 
   final int unreadCount;
-  final List<NotificationItem> items;
+  final List<ParentNotification> items;
   final DateTime lastUpdated;
   final bool fromCache;
 }

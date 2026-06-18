@@ -187,15 +187,23 @@ export class MobileService {
     };
   }
 
-  async listNotifications(actor: AuthContext) {
+  async listNotifications(
+    actor: AuthContext,
+    query: { limit?: number; cursor?: string; unreadOnly?: boolean } = {},
+  ) {
     const studentIds = await this.getAllowedStudentIds(actor);
+    const visibility = this.parentNotificationVisibility(actor, studentIds);
+    const limit = Math.min(Math.max(query.limit ?? 30, 1), 100);
     const notifications = await this.prisma.notificationDelivery.findMany({
       where: {
-        tenantId: actor.tenantId,
-        OR: [
-          { recipientUserId: actor.userId },
-          ...(studentIds.length > 0 ? [{ studentId: { in: studentIds } }] : []),
-        ],
+        ...visibility,
+        ...(query.unreadOnly
+          ? {
+              readReceipts: {
+                none: { tenantId: actor.tenantId, userId: actor.userId },
+              },
+            }
+          : {}),
       },
       include: {
         readReceipts: {
@@ -209,15 +217,23 @@ export class MobileService {
         },
       },
       orderBy: [{ createdAt: 'desc' }],
-      take: 50,
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     });
 
-    const items = notifications.map((item) => ({
+    const hasMore = notifications.length > limit;
+    const page = hasMore ? notifications.slice(0, limit) : notifications;
+    const items = page.map((item) => ({
       id: item.id,
       title: item.title,
       message: item.body,
       sourceType: item.sourceType,
       sourceId: item.sourceId,
+      childId: item.studentId,
+      noticeId: item.noticeId,
+      eventId: item.eventId,
+      activityPostId: item.activityPostId,
+      route: parentNotificationRoute(item),
       channel: item.channel,
       status: item.status,
       createdAt: toIso(item.createdAt),
@@ -227,9 +243,45 @@ export class MobileService {
     }));
 
     return {
-      unreadCount: items.filter((item) => !item.isRead).length,
+      unreadCount: await this.countUnreadNotifications(actor, studentIds),
       items,
+      nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
     };
+  }
+
+  async getNotificationUnreadCount(actor: AuthContext) {
+    const studentIds = await this.getAllowedStudentIds(actor);
+    return {
+      unreadCount: await this.countUnreadNotifications(actor, studentIds),
+    };
+  }
+
+  async markAllNotificationsRead(actor: AuthContext) {
+    const studentIds = await this.getAllowedStudentIds(actor);
+    const unread = await this.prisma.notificationDelivery.findMany({
+      where: {
+        ...this.parentNotificationVisibility(actor, studentIds),
+        readReceipts: {
+          none: { tenantId: actor.tenantId, userId: actor.userId },
+        },
+      },
+      select: { id: true },
+    });
+
+    if (unread.length === 0) {
+      return { success: true, markedCount: 0 };
+    }
+
+    const result = await this.prisma.notificationReadReceipt.createMany({
+      data: unread.map((item) => ({
+        tenantId: actor.tenantId,
+        notificationDeliveryId: item.id,
+        userId: actor.userId,
+      })),
+      skipDuplicates: true,
+    });
+
+    return { success: true, markedCount: result.count };
   }
 
   async markNotificationRead(notificationId: string, actor: AuthContext) {
@@ -298,6 +350,11 @@ export class MobileService {
       message: notification.body,
       sourceType: notification.sourceType,
       sourceId: notification.sourceId,
+      childId: notification.studentId,
+      noticeId: notification.noticeId,
+      eventId: notification.eventId,
+      activityPostId: notification.activityPostId,
+      route: parentNotificationRoute(notification),
       channel: notification.channel,
       status: notification.status,
       createdAt: toIso(notification.createdAt),
@@ -993,6 +1050,27 @@ export class MobileService {
     }
   }
 
+  private parentNotificationVisibility(actor: AuthContext, studentIds: string[]) {
+    return {
+      tenantId: actor.tenantId,
+      OR: [
+        { recipientUserId: actor.userId },
+        ...(studentIds.length > 0 ? [{ studentId: { in: studentIds } }] : []),
+      ],
+    };
+  }
+
+  private countUnreadNotifications(actor: AuthContext, studentIds: string[]) {
+    return this.prisma.notificationDelivery.count({
+      where: {
+        ...this.parentNotificationVisibility(actor, studentIds),
+        readReceipts: {
+          none: { tenantId: actor.tenantId, userId: actor.userId },
+        },
+      },
+    });
+  }
+
   private async getAllowedStudentIds(actor: AuthContext) {
     const parentStudentIds = await getParentStudentIds(this.prisma, actor);
     if (parentStudentIds !== null) {
@@ -1006,6 +1084,43 @@ export class MobileService {
 
     throw new ForbiddenException('Mobile student scope is not available');
   }
+}
+
+function parentNotificationRoute(item: {
+  id: string;
+  sourceType: string;
+  sourceId: string;
+  studentId: string | null;
+  noticeId: string | null;
+  eventId: string | null;
+  activityPostId: string | null;
+}) {
+  const source = item.sourceType.toLowerCase();
+  if (item.noticeId || source.includes('notice')) {
+    return `/notices/${item.id}`;
+  }
+  if (source.includes('message')) {
+    return `/parent/chat?threadId=${encodeURIComponent(item.sourceId)}`;
+  }
+  if (source.includes('homework')) {
+    return `/parent/homework/${encodeURIComponent(item.sourceId)}`;
+  }
+  if (item.eventId || source.includes('event')) {
+    return `/parent/updates?eventId=${encodeURIComponent(item.eventId ?? item.sourceId)}`;
+  }
+  if (item.activityPostId || source.includes('gallery')) {
+    return `/parent/activity?postId=${encodeURIComponent(item.activityPostId ?? item.sourceId)}`;
+  }
+  if (source.includes('fee') || source.includes('invoice') || source.includes('payment')) {
+    return `/parent/fees?invoiceId=${encodeURIComponent(item.sourceId)}`;
+  }
+  if (source.includes('attendance') && item.studentId) {
+    return `/parent/children/${encodeURIComponent(item.studentId)}/attendance`;
+  }
+  if ((source.includes('transport') || source.includes('trip')) && item.studentId) {
+    return `/parent/more/transport?childId=${encodeURIComponent(item.studentId)}`;
+  }
+  return '/parent/updates';
 }
 
 function boundedTake(value: string | undefined, fallback: number) {

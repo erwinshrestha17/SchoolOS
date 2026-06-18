@@ -36,10 +36,107 @@ final noticeDetailProvider = FutureProvider.autoDispose.family<Notice, String>((
   return notice.copyWith(isRead: true);
 });
 
-final notificationCenterProvider =
-    FutureProvider.autoDispose<List<NotificationItem>>((ref) async {
-      return ref.watch(noticesRepositoryProvider).getNotificationCenter();
-    });
+final parentNotificationsProvider = StateNotifierProvider<
+  ParentNotificationsController,
+  ParentNotificationsState
+>((ref) {
+  return ParentNotificationsController(ref.watch(noticesRepositoryProvider));
+});
+
+class ParentNotificationsState {
+  const ParentNotificationsState({
+    this.items = const [],
+    this.unreadCount = 0,
+    this.isLoading = true,
+    this.isWriting = false,
+    this.error,
+  });
+
+  final List<ParentNotification> items;
+  final int unreadCount;
+  final bool isLoading;
+  final bool isWriting;
+  final Object? error;
+
+  ParentNotificationsState copyWith({
+    List<ParentNotification>? items,
+    int? unreadCount,
+    bool? isLoading,
+    bool? isWriting,
+    Object? error,
+  }) => ParentNotificationsState(
+    items: items ?? this.items,
+    unreadCount: unreadCount ?? this.unreadCount,
+    isLoading: isLoading ?? this.isLoading,
+    isWriting: isWriting ?? this.isWriting,
+    error: error,
+  );
+}
+
+class ParentNotificationsController
+    extends StateNotifier<ParentNotificationsState> {
+  ParentNotificationsController(this._repository)
+    : super(const ParentNotificationsState()) {
+    refresh();
+  }
+
+  final NoticesRepository _repository;
+
+  Future<void> refresh() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final page = await _repository.getNotificationCenter();
+      state = ParentNotificationsState(
+        items: page.items,
+        unreadCount: page.unreadCount,
+        isLoading: false,
+      );
+    } catch (error) {
+      state = state.copyWith(isLoading: false, error: error);
+    }
+  }
+
+  Future<bool> markRead(String id) async {
+    final previous = state;
+    final now = DateTime.now();
+    final items = [
+      for (final item in state.items)
+        if (item.id == id && !item.isRead) item.copyWith(readAt: now) else item,
+    ];
+    final changed = state.items.any((item) => item.id == id && !item.isRead);
+    state = state.copyWith(
+      items: items,
+      unreadCount: changed ? (state.unreadCount - 1).clamp(0, 9999) : null,
+      isWriting: true,
+    );
+    try {
+      await _repository.markNoticeRead(id);
+      state = state.copyWith(isWriting: false);
+      return true;
+    } catch (error) {
+      state = previous.copyWith(error: error);
+      return false;
+    }
+  }
+
+  Future<bool> markAllRead() async {
+    final previous = state;
+    final now = DateTime.now();
+    state = state.copyWith(
+      items: [for (final item in state.items) item.copyWith(readAt: now)],
+      unreadCount: 0,
+      isWriting: true,
+    );
+    try {
+      await _repository.markAllNotificationsRead();
+      state = state.copyWith(isWriting: false);
+      return true;
+    } catch (error) {
+      state = previous.copyWith(error: error);
+      return false;
+    }
+  }
+}
 
 class NoticesState {
   const NoticesState({
@@ -146,5 +243,17 @@ class NoticesController extends StateNotifier<NoticesState> {
 
   void setFilter(NoticeFilter filter) {
     state = state.copyWith(filter: filter);
+  }
+
+  void markReadLocally(String notificationId) {
+    state = state.copyWith(
+      notices: [
+        for (final notice in state.notices)
+          if (notice.id == notificationId)
+            notice.copyWith(isRead: true)
+          else
+            notice,
+      ],
+    );
   }
 }

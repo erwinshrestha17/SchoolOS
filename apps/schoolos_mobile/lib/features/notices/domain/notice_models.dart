@@ -53,35 +53,101 @@ class Notice {
   }
 }
 
-class NotificationItem {
-  const NotificationItem({
+enum ParentNotificationType {
+  notice,
+  message,
+  homework,
+  event,
+  gallery,
+  fee,
+  attendance,
+  transport,
+  other,
+}
+
+class ParentNotification {
+  const ParentNotification({
     required this.id,
+    required this.type,
     required this.title,
-    required this.message,
-    required this.category,
+    required this.body,
+    required this.targetId,
+    required this.route,
     required this.createdAt,
-    required this.isRead,
+    this.childId,
+    this.sourceUpdateId,
+    this.readAt,
+    this.metadata,
   });
 
   final String id;
+  final ParentNotificationType type;
   final String title;
-  final String message;
-  final NoticeCategory category;
+  final String body;
+  final String targetId;
+  final String route;
+  final String? childId;
+  final String? sourceUpdateId;
   final DateTime createdAt;
-  final bool isRead;
+  final DateTime? readAt;
+  final Map<String, dynamic>? metadata;
 
-  factory NotificationItem.fromJson(Map<String, dynamic> json) {
-    return NotificationItem(
+  bool get isRead => readAt != null;
+  String get message => body;
+  NoticeCategory get category => _categoryFromType(type);
+
+  factory ParentNotification.fromJson(Map<String, dynamic> json) {
+    final sourceType = json['sourceType'] as String? ?? '';
+    final type = _notificationTypeFromSource(sourceType);
+    return ParentNotification(
       id: json['id'] as String? ?? '',
+      type: type,
       title: json['title'] as String? ?? 'Notification',
-      message: json['body'] as String? ?? json['message'] as String? ?? '',
-      category: _categoryFromSource(json['sourceType'] as String?),
+      body: json['body'] as String? ?? json['message'] as String? ?? '',
+      targetId:
+          json['noticeId'] as String? ??
+          json['eventId'] as String? ??
+          json['activityPostId'] as String? ??
+          json['sourceId'] as String? ??
+          '',
+      route: json['route'] as String? ?? _routeFromSource(type, json),
+      childId: json['childId'] as String?,
+      sourceUpdateId:
+          json['noticeId'] as String? ?? json['sourceId'] as String?,
       createdAt:
           DateTime.tryParse(json['createdAt'] as String? ?? '') ??
           DateTime.now(),
-      isRead: json['isRead'] as bool? ?? false,
+      readAt: DateTime.tryParse(json['readAt'] as String? ?? ''),
+      metadata: Map<String, dynamic>.from(json),
     );
   }
+
+  ParentNotification copyWith({DateTime? readAt, bool clearReadAt = false}) {
+    return ParentNotification(
+      id: id,
+      type: type,
+      title: title,
+      body: body,
+      targetId: targetId,
+      route: route,
+      childId: childId,
+      sourceUpdateId: sourceUpdateId,
+      createdAt: createdAt,
+      readAt: clearReadAt ? null : readAt ?? this.readAt,
+      metadata: metadata,
+    );
+  }
+}
+
+class ParentNotificationPage {
+  const ParentNotificationPage({
+    required this.items,
+    required this.unreadCount,
+    this.nextCursor,
+  });
+  final List<ParentNotification> items;
+  final int unreadCount;
+  final String? nextCursor;
 }
 
 class NoticeFeed {
@@ -123,4 +189,55 @@ NoticeCategory _categoryFromSource(String? sourceType) {
     return NoticeCategory.approval;
   }
   return NoticeCategory.important;
+}
+
+ParentNotificationType _notificationTypeFromSource(String sourceType) {
+  final source = sourceType.toLowerCase();
+  if (source.contains('notice')) return ParentNotificationType.notice;
+  if (source.contains('message')) return ParentNotificationType.message;
+  if (source.contains('homework')) return ParentNotificationType.homework;
+  if (source.contains('event')) return ParentNotificationType.event;
+  if (source.contains('gallery') || source.contains('activity')) {
+    return ParentNotificationType.gallery;
+  }
+  if (source.contains('fee') ||
+      source.contains('invoice') ||
+      source.contains('payment')) {
+    return ParentNotificationType.fee;
+  }
+  if (source.contains('attendance')) return ParentNotificationType.attendance;
+  if (source.contains('transport') || source.contains('trip')) {
+    return ParentNotificationType.transport;
+  }
+  return ParentNotificationType.other;
+}
+
+NoticeCategory _categoryFromType(ParentNotificationType type) => switch (type) {
+  ParentNotificationType.homework => NoticeCategory.homework,
+  ParentNotificationType.fee => NoticeCategory.fee,
+  ParentNotificationType.transport => NoticeCategory.transport,
+  ParentNotificationType.attendance => NoticeCategory.academic,
+  _ => NoticeCategory.important,
+};
+
+String _routeFromSource(
+  ParentNotificationType type,
+  Map<String, dynamic> json,
+) {
+  final id = json['id'] as String? ?? '';
+  final sourceId = json['sourceId'] as String? ?? '';
+  final childId = json['childId'] as String?;
+  return switch (type) {
+    ParentNotificationType.notice => '/notices/$id',
+    ParentNotificationType.message => '/parent/chat?threadId=$sourceId',
+    ParentNotificationType.homework => '/parent/homework/$sourceId',
+    ParentNotificationType.event => '/parent/updates?eventId=$sourceId',
+    ParentNotificationType.gallery => '/parent/activity?postId=$sourceId',
+    ParentNotificationType.fee => '/parent/fees?invoiceId=$sourceId',
+    ParentNotificationType.attendance when childId != null =>
+      '/parent/children/$childId/attendance',
+    ParentNotificationType.transport when childId != null =>
+      '/parent/more/transport?childId=$childId',
+    _ => '/parent/updates',
+  };
 }
