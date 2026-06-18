@@ -4,7 +4,7 @@ SchoolOS is a production-grade, multi-tenant SaaS School Operating System for Ne
 
 It is designed as a modular school operating platform covering admissions, student records, attendance, fees, notices, activity feed, academics, homework, timetable, HR/payroll, accounting, library, transport, canteen, classroom learning, parent engagement, and future intelligence/analytics.
 
-The current implemented core remains focused on internal QA, realistic seeded demo flows, authenticated browser/mobile verification, and staging readiness for controlled pilot. M12 Learning Layer has a broad backend/web/mobile foundation; KG-12 breadth and deeper learning experiences remain staged expansion goals, not a claim that every KG-12 feature is already implemented.
+SchoolOS is now governed by a **Production / General Availability (GA)** release target, not an MVP target. Current work is focused on evidence-led internal QA, realistic seeded school workflows, authenticated browser/mobile verification, staging validation, controlled-pilot proof, and the operational gates required for a public production release. M12 Learning Layer has a broad backend/web/mobile foundation; KG-12 breadth and deeper learning experiences remain staged expansion goals, not a claim that every KG-12 feature is already implemented.
 
 ---
 
@@ -31,6 +31,7 @@ docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
 docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
 docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
 
+docs/production/SCHOOLOS_GA_RELEASE_POLICY.md
 docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md
 
 apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md
@@ -66,7 +67,19 @@ The current management modules remain the foundation. The Learning Layer is impl
 
 ---
 
-## Current Stage
+## Current Release Stage
+
+Release terminology and GA gates are defined by `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`. The evidence-based current state remains in `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
+
+```text
+Target release stage: GA / Production release
+Current evidenced release stage: Internal QA ready
+Next required release gate: Staging validated
+Controlled-pilot status: Not yet validated
+GA / public production release: Not achieved
+```
+
+Current evidence:
 
 ```text
 Local API/web/mobile foundations: Implemented with passing local unit, E2E, contract, build, and Flutter gates as recorded in docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md
@@ -105,12 +118,13 @@ Current product readiness:
 ```text
 Product Implementation Completion Score: 74 / 100
 Production Deployment Readiness Score: 50 / 100
-Recommended target: Internal QA; demo-ready is conditional on local services, seed, and smoke passing
-Demo-ready: Conditional
-Internal QA-ready: Yes
-Controlled pilot-ready: Conditional, after staging/pilot/browser/mobile checks
+Current evidenced release stage: Internal QA ready
+Staging validated: No
+Controlled pilot validated: No
+Release candidate: No
+GA / Production release: No
 Single-school production-ready: No
-Multi-school production-ready: Not yet
+Multi-school production-ready: No
 Full KG-12 SchoolOS product complete: No
 ```
 
@@ -118,7 +132,7 @@ Full KG-12 SchoolOS product complete: No
 
 ## Edge Case Hardening Checklist
 
-The detailed source of truth for edge cases remains the PRD and FRS module sections. This repo-level checklist must be used before claiming controlled pilot readiness, production readiness, or module completion.
+The detailed source of truth for edge cases remains the PRD and FRS module sections. This repo-level checklist must be used before claiming controlled pilot validation, release-candidate status, production readiness, or GA release.
 
 ### Global edge cases
 

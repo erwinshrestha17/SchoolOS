@@ -4,7 +4,7 @@ Token-light global rules for agents. Detailed behavior lives in the active docs 
 
 ## Read only what is relevant
 
-Start with `README.md`, `docs/README.md`, `docs/project/SCHOOLOS_PROJECT_STATUS.md`, and `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md`. Then read the focused source for the touched area:
+Start with `README.md`, `docs/README.md`, `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`, `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`, and `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`. Then read the focused source for the touched area:
 
 - Product/function: `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`
 - Architecture/security/platform: `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md`
@@ -14,11 +14,24 @@ Start with `README.md`, `docs/README.md`, `docs/project/SCHOOLOS_PROJECT_STATUS.
 
 Do not recreate old split plans or duplicate docs. Update the smallest active source of truth only when docs truly need changes.
 
-## Product stance
+## Product stance and release target
 
-SchoolOS is a Nepal-first multi-tenant KG-12 school operating SaaS, not a CRUD dashboard. Aim every change toward production-ready and deploy-ready quality. Report readiness honestly: current status remains controlled-pilot/internal-QA until staging migration, provider/storage checks, browser E2E, pilot smoke, and real school workflow validation pass.
+SchoolOS is a Nepal-first multi-tenant KG-12 school operating SaaS, not a CRUD dashboard and not an MVP delivery exercise. Every change must move the supported release boundary toward **Production / General Availability (GA)**.
 
-Current priorities: frontend real-API workspaces, verification gates, protected files, mobile companion polish, staging/browser smoke, M12 hardening. M11 AI is roadmap only unless explicitly approved.
+Use the release stages defined in `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`:
+
+```text
+Development complete
+Internal QA ready
+Staging validated
+Controlled pilot validated
+Release candidate
+GA / Production release
+```
+
+Report readiness honestly. The documented current stage is Internal QA ready; SchoolOS is not GA until staging migration and provider checks, authenticated browser E2E, device QA, backup/restore proof, controlled-pilot workflows, monitoring, rollback, and release evidence pass. Passing local tests, showing a demo, or completing backend code does not establish production or GA readiness.
+
+Current priorities: security/RBAC/tenant-isolation evidence; staging deployment and operational proof; browser E2E; real-API web workspaces; pilot workflows; mobile device QA; performance/backup/observability/release automation. M11 AI remains roadmap only unless explicitly approved.
 
 ## Architecture: never break
 
@@ -75,7 +88,9 @@ If any web/mobile/platform surface needs data and no safe backend API exists, ma
 
 ## Done means
 
-Real persistence; no fake production data; tenant/RBAC/entitlement enforced; persona scopes fail closed; sensitive writes audited; money idempotent; files through File Registry/StorageService; paginated growing lists; complete UI states; protected downloads; focused regression updated where appropriate. Production/deploy-ready claims require actual staging/pilot verification results.
+Development complete means real persistence; no fake production data; tenant/RBAC/entitlement enforced; persona scopes fail closed; sensitive writes audited; money idempotent; files through File Registry/StorageService; paginated growing lists; complete UI states; protected downloads; and focused regression updated where appropriate.
+
+A staging, release-candidate, production, or GA claim additionally requires the exact applicable evidence in `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`: staging migration and configuration validation, provider/storage checks, seeded authenticated browser E2E, device QA, backup/restore proof, monitoring/alerts, rollback readiness, and controlled-pilot workflow evidence. Do not substitute local checks for these gates.
 
 ## Verification
 
@@ -104,11 +119,13 @@ Docs-only changes need no runtime checks.
 ## Progress format
 
 ```text
+Release stage:
 Current module:
 Completed:
-Remaining:
+Remaining GA blockers:
 Risks:
 Verification run:
 Verification result:
-Next action:
+Staging/pilot evidence:
+Next release action:
 ```
