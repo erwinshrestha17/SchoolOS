@@ -33,6 +33,7 @@ import {
   MarkLockFilters,
   MarkLockRequestSummary,
   API_BASE_URL,
+  openProtectedFile,
   openPdfBlob,
   request,
   withQuery,
@@ -55,6 +56,42 @@ export type AcademicGradingPolicy = {
     marksDecimals: number;
     mode: 'HALF_UP' | 'FLOOR' | 'CEIL';
   };
+};
+
+export type HomeworkReminderBatchSummary = {
+  id: string;
+  homeworkId: string;
+  reminderType: string;
+  status: string;
+  targetCount?: number | null;
+  deliveryCount?: number | null;
+  skippedCount?: number | null;
+  failedReason?: string | null;
+  createdAt?: string | null;
+  completedAt?: string | null;
+};
+
+export type HomeworkCompletionReportRow = {
+  id: string;
+  title: string;
+  class: string;
+  section?: string | null;
+  subject: string;
+  dueDate: string;
+  totalSubmissions: number;
+  completed: number;
+  completionRate: number;
+};
+
+export type HomeworkMissingLateReportRow = {
+  submissionId: string;
+  studentName: string;
+  assignmentTitle: string;
+  subject: string;
+  class: string;
+  section?: string | null;
+  dueDate: string;
+  status: string;
 };
 
 export const academicsApi = {
@@ -503,6 +540,15 @@ export const academicsApi = {
     status?: string;
   }) =>
     request<HomeworkAssignmentSummary[]>(withQuery('/homework', params ?? {})),
+  listHomeworkTemplates: (params?: {
+    classId?: string;
+    subjectId?: string;
+    search?: string;
+    limit?: number;
+  }) =>
+    request<HomeworkAssignmentSummary[]>(
+      withQuery('/homework/templates', params ?? {}),
+    ),
   createHomework: (body: JsonBody) =>
     request<HomeworkAssignmentSummary>('/homework', {
       method: 'POST',
@@ -515,9 +561,17 @@ export const academicsApi = {
       method: 'PATCH',
       json: body,
     }),
+  publishHomework: (id: string) =>
+    request<HomeworkAssignmentSummary>(
+      `/homework/${encodeURIComponent(id)}/publish`,
+      {
+        method: 'PATCH',
+        json: {},
+      },
+    ),
   assignHomework: (id: string) =>
     request<HomeworkAssignmentSummary>(
-      `/homework/${encodeURIComponent(id)}/assign`,
+      `/homework/${encodeURIComponent(id)}/publish`,
       {
         method: 'PATCH',
         json: {},
@@ -546,6 +600,38 @@ export const academicsApi = {
       method: 'POST',
       json: {},
     }),
+  listHomeworkReminderBatches: (params?: {
+    homeworkId?: string;
+    reminderType?: string;
+    status?: string;
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    limit?: number;
+  }) =>
+    request<HomeworkReminderBatchSummary[]>(
+      withQuery('/homework/reminders/batches', params ?? {}),
+    ),
+  retryHomeworkReminderBatch: (batchId: string) =>
+    request<HomeworkReminderBatchSummary>(
+      `/homework/reminders/batches/${encodeURIComponent(batchId)}/retry`,
+      { method: 'POST', json: {} },
+    ),
+  getHomeworkCompletionReport: (params: {
+    academicYearId: string;
+    classId?: string;
+    sectionId?: string;
+  }) =>
+    request<HomeworkCompletionReportRow[]>(
+      withQuery('/homework/reports/completion', params),
+    ),
+  getHomeworkMissingLateReport: (params: {
+    academicYearId: string;
+    classId?: string;
+  }) =>
+    request<HomeworkMissingLateReportRow[]>(
+      withQuery('/homework/reports/missing-late', params),
+    ),
   getHomeworkAttachmentPreviewUrl: (attachmentId: string) =>
     request<HomeworkAttachmentAccess>(
       `/homework/attachments/${encodeURIComponent(attachmentId)}/preview-url`,
@@ -558,13 +644,13 @@ export const academicsApi = {
     const access = await request<HomeworkAttachmentAccess>(
       `/homework/attachments/${encodeURIComponent(attachmentId)}/preview-url`,
     );
-    openHomeworkAttachmentAccessUrl(access);
+    await openHomeworkAttachmentAccess(access);
   },
   openHomeworkAttachmentDownload: async (attachmentId: string) => {
     const access = await request<HomeworkAttachmentAccess>(
       `/homework/attachments/${encodeURIComponent(attachmentId)}/download-url`,
     );
-    openHomeworkAttachmentAccessUrl(access);
+    await openHomeworkAttachmentAccess(access);
   },
   listHomeworkSubmissions: () =>
     request<HomeworkSubmissionSummary[]>('/homework/submissions'),
@@ -691,12 +777,12 @@ export const academicsApi = {
   // Communications - Deliveries
 };
 
-function openHomeworkAttachmentAccessUrl(access: HomeworkAttachmentAccess) {
-  if (!access.url || access.expiresInSeconds <= 0) {
+async function openHomeworkAttachmentAccess(access: HomeworkAttachmentAccess) {
+  if (!access.fileAssetId || access.expiresInSeconds <= 0) {
     throw new Error('The homework attachment link is not available.');
   }
 
-  window.open(access.url, '_blank', 'noopener,noreferrer');
+  await openProtectedFile(access.fileAssetId, { fileName: access.fileName });
 }
 
 export type BatchReportCardGenerationResult = {

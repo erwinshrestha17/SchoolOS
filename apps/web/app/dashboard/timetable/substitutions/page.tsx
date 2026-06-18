@@ -10,7 +10,7 @@ export default function TimetableSubstitutionsPage() {
         title="Teacher Substitutions"
         description="Review absent teacher coverage, substitution records, and assigned substitute teachers."
       />
-      <TimetableWorkspace initialSection="Timetable Builder" />
+      <TimetableWorkspace initialSection="Substitutions" />
     </div>
   );
 }

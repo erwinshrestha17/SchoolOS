@@ -35,6 +35,13 @@ export function HomeworkCreateForm() {
     maxScore: 10,
     submissionRequired: true,
     attachmentFileIds: [] as string[],
+    saveAsTemplate: false,
+    templateName: '',
+    recurrenceEnabled: false,
+    recurrenceFrequency: 'WEEKLY' as 'DAILY' | 'WEEKLY',
+    recurrenceInterval: 1,
+    recurrenceOccurrenceCount: 4,
+    recurrenceRepeatUntil: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -76,10 +83,30 @@ export function HomeworkCreateForm() {
         maxScore: formData.maxScore,
         submissionRequired: formData.submissionRequired,
         attachmentFileIds: formData.attachmentFileIds,
+        saveAsTemplate: formData.saveAsTemplate,
+        templateName: formData.saveAsTemplate
+          ? formData.templateName.trim() || formData.title.trim()
+          : undefined,
+        recurrence: formData.recurrenceEnabled
+          ? {
+              frequency: formData.recurrenceFrequency,
+              interval: formData.recurrenceInterval,
+              occurrenceCount: formData.recurrenceRepeatUntil
+                ? undefined
+                : formData.recurrenceOccurrenceCount,
+              repeatUntil: formData.recurrenceRepeatUntil
+                ? new Date(formData.recurrenceRepeatUntil).toISOString()
+                : undefined,
+            }
+          : undefined,
       })) as HomeworkCreateResult;
 
       if (publish && created.id) {
         return api.assignHomework(created.id);
+      }
+
+      if (publish && created.items?.length) {
+        await Promise.all(created.items.map((item) => api.assignHomework(item.id)));
       }
 
       return created;
@@ -107,6 +134,25 @@ export function HomeworkCreateForm() {
     if (!formData.dueAt) newErrors.dueAt = 'Due date is required';
     if (formData.dueAt && new Date(formData.dueAt) < new Date()) {
       newErrors.dueAt = 'Due date cannot be in the past';
+    }
+    if (formData.recurrenceEnabled) {
+      if (formData.recurrenceInterval < 1 || formData.recurrenceInterval > 12) {
+        newErrors.recurrenceInterval = 'Repeat interval must be between 1 and 12';
+      }
+      if (!formData.recurrenceRepeatUntil) {
+        if (
+          formData.recurrenceOccurrenceCount < 2 ||
+          formData.recurrenceOccurrenceCount > 60
+        ) {
+          newErrors.recurrenceOccurrenceCount = 'Occurrences must be between 2 and 60';
+        }
+      }
+      if (
+        formData.recurrenceRepeatUntil &&
+        new Date(formData.recurrenceRepeatUntil) <= new Date(formData.dueAt)
+      ) {
+        newErrors.recurrenceRepeatUntil = 'Repeat until must be after the first due date';
+      }
     }
     
     setErrors(newErrors);
@@ -252,17 +298,112 @@ export function HomeworkCreateForm() {
         <SectionCard
           title="Submission Settings"
         >
-          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
-            <div className="flex flex-col">
-              <span className="text-sm font-bold text-slate-900">Require Submission</span>
-              <span className="text-xs text-slate-500">Should students upload work?</span>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-slate-900">Require Submission</span>
+                <span className="text-xs text-slate-500">Should students upload work?</span>
+              </div>
+              <input
+                type="checkbox"
+                checked={formData.submissionRequired}
+                onChange={(e) => setFormData({ ...formData, submissionRequired: e.target.checked })}
+                className="h-5 w-5 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary-soft)]"
+              />
             </div>
-            <input
-              type="checkbox"
-              checked={formData.submissionRequired}
-              onChange={(e) => setFormData({ ...formData, submissionRequired: e.target.checked })}
-              className="h-5 w-5 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary-soft)]"
-            />
+
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-slate-900">Save as Template</span>
+                <span className="text-xs text-slate-500">Make this assignment reusable in the template library.</span>
+              </div>
+              <input
+                type="checkbox"
+                checked={formData.saveAsTemplate}
+                onChange={(e) => setFormData({ ...formData, saveAsTemplate: e.target.checked })}
+                className="h-5 w-5 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary-soft)]"
+              />
+            </div>
+
+            {formData.saveAsTemplate ? (
+              <FormField label="Template Name">
+                <Input
+                  value={formData.templateName}
+                  onChange={(e) => setFormData({ ...formData, templateName: e.target.value })}
+                  placeholder="Defaults to assignment title"
+                />
+              </FormField>
+            ) : null}
+
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-slate-900">Repeat Assignment</span>
+                <span className="text-xs text-slate-500">Create a bounded recurring series through the backend recurrence contract.</span>
+              </div>
+              <input
+                type="checkbox"
+                checked={formData.recurrenceEnabled}
+                onChange={(e) => setFormData({ ...formData, recurrenceEnabled: e.target.checked })}
+                className="h-5 w-5 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary-soft)]"
+              />
+            </div>
+
+            {formData.recurrenceEnabled ? (
+              <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField label="Frequency">
+                    <Select
+                      value={formData.recurrenceFrequency}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        recurrenceFrequency: e.target.value as 'DAILY' | 'WEEKLY',
+                      })}
+                    >
+                      <option value="WEEKLY">Weekly</option>
+                      <option value="DAILY">Daily</option>
+                    </Select>
+                  </FormField>
+                  <FormField label="Repeat Every" error={errors.recurrenceInterval}>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={formData.recurrenceInterval}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        recurrenceInterval: Number(e.target.value),
+                      })}
+                    />
+                  </FormField>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField label="Occurrences" error={errors.recurrenceOccurrenceCount}>
+                    <Input
+                      type="number"
+                      min={2}
+                      max={60}
+                      value={formData.recurrenceOccurrenceCount}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        recurrenceOccurrenceCount: Number(e.target.value),
+                      })}
+                      disabled={Boolean(formData.recurrenceRepeatUntil)}
+                    />
+                  </FormField>
+                  <FormField label="Or Repeat Until" error={errors.recurrenceRepeatUntil}>
+                    <Input
+                      type="date"
+                      value={formData.recurrenceRepeatUntil}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        recurrenceRepeatUntil: e.target.value,
+                      })}
+                    />
+                  </FormField>
+                </div>
+              </div>
+            ) : null}
           </div>
         </SectionCard>
 

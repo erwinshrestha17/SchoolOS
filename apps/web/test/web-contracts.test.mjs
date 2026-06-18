@@ -206,6 +206,11 @@ describe("SchoolOS web production contracts", () => {
     assert.match(form, /dueDate,/);
     assert.match(form, /dueAt: dueDate/);
     assert.match(form, /submissionRequired: formData\.submissionRequired/);
+    assert.match(form, /saveAsTemplate: formData\.saveAsTemplate/);
+    assert.match(form, /templateName: formData\.saveAsTemplate/);
+    assert.match(form, /recurrence: formData\.recurrenceEnabled/);
+    assert.match(form, /recurrenceFrequency/);
+    assert.match(form, /Promise\.all\(created\.items\.map/);
     assert.match(form, /createMutation\.mutate\(\{ publish \}\)/);
     assert.doesNotMatch(form, /isSubmissionRequired/);
     assert.doesNotMatch(form, /status: publish/);
@@ -213,6 +218,26 @@ describe("SchoolOS web production contracts", () => {
       form,
       /text-primary-(50|100|200|300|400|500|600|700|800|900)|focus:ring-primary-(50|100|200|300|400|500|600|700|800|900)|shadow-xl|shadow-2xl|bg-slate-900|bg-slate-950|rounded-3xl|rounded-\[/,
     );
+  });
+
+  it("keeps the W4A homework workspace route-backed and real API backed", () => {
+    const page = read("app/dashboard/homework/page.tsx");
+    const academicsApi = read("lib/api/academics.ts");
+    const workloadRoute = read("app/dashboard/timetable/workload/page.tsx");
+
+    assert.match(page, /ModuleHeader/);
+    assert.match(page, /KpiGrid/);
+    assert.match(page, /ModuleTabs/);
+    assert.match(page, /api\.listHomeworkTemplates/);
+    assert.match(page, /api\.listHomeworkReminderBatches/);
+    assert.match(page, /api\.getHomeworkCompletionReport/);
+    assert.match(page, /api\.getHomeworkMissingLateReport/);
+    assert.match(page, /\/dashboard\/timetable\/workload/);
+    assert.match(workloadRoute, /initialSection="Teacher Workload"/);
+    assert.match(academicsApi, /\/homework\/\$\{encodeURIComponent\(id\)\}\/publish/);
+    assert.match(academicsApi, /openProtectedFile\(access\.fileAssetId/);
+    assert.doesNotMatch(academicsApi, /\/homework\/\$\{encodeURIComponent\(id\)\}\/assign/);
+    assert.doesNotMatch(page, /window\.open|signedUrl|objectKey|bucket/);
   });
 
   it("keeps the staff self-service profile shell tokenized and API-backed", () => {
@@ -380,10 +405,16 @@ describe("SchoolOS web production contracts", () => {
       "createSubstitution",
       "assignSubstitution",
       "createHomework",
+      "publishHomework",
       "assignHomework",
+      "listHomeworkTemplates",
       "closeHomework",
       "previewHomeworkReminders",
       "sendHomeworkReminders",
+      "listHomeworkReminderBatches",
+      "retryHomeworkReminderBatch",
+      "getHomeworkCompletionReport",
+      "getHomeworkMissingLateReport",
       "getHomeworkAttachmentPreviewUrl",
       "getHomeworkAttachmentDownloadUrl",
       "openHomeworkAttachmentPreview",
