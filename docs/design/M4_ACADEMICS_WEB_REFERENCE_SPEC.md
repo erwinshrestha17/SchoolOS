@@ -4,15 +4,13 @@
 **Updated:** 2026-06-19  
 **Scope:** M4 Academics, Exams, CAS, Results, Report Cards, and Promotion in `apps/web`  
 **Reference source:** M4 desktop reference-screen set reviewed on 2026-06-19  
-**Implementation status:** Documentation only. This document does not claim that any screen, API, migration, test, or browser workflow has been implemented or verified.
+**Implementation status:** Documentation only. No screen, API, migration, test, or browser workflow is claimed as implemented or verified by this document.
 
 ---
 
 ## 1. Purpose
 
-This document turns the approved M4 desktop references into an implementation-safe web design specification for SchoolOS.
-
-M4 is a connected academic operating workflow:
+This document converts the M4 desktop references into an implementation-safe SchoolOS design specification.
 
 ```text
 Academic structure
@@ -24,24 +22,21 @@ Academic structure
 -> promotion and Grade 11-12 readiness
 ```
 
-It must feel like a school academic desk, not a generic dashboard or a static report template.
+M4 must feel like a school academic operating desk, not a generic dashboard or static report template.
 
 ---
 
-## 2. Product and Safety Boundaries
+## 2. Non-Negotiable Boundaries
 
-All M4 work must preserve the following rules:
-
-1. `tenantId` remains the strict school boundary for every read, write, export, queue job, file, report, and direct route.
-2. Backend authorization, teacher assignment validation, module entitlement, and result-visibility rules remain the source of truth.
-3. A subject teacher may enter or review marks only for their assigned class, section, subject, assessment component, and academic context unless an explicit backend permission says otherwise.
-4. Parents and students may see only their own published, permission-safe academic data. Draft marks, internal remarks, peer data, approval history, and internal finance reasons are never exposed to them.
-5. Locked marks are changed through an audited correction workflow, not a silent edit or permanent client-side unlock.
-6. Result withholding must not expose finance-sensitive detail to teachers, parents, students, or unauthorized staff.
-7. Report cards, result snapshots, exports, and regenerated PDFs are protected files. They must use File Registry-backed authenticated helpers only.
-8. Official totals, readiness, grades, GPA, report-card status, generation progress, and publication state come from backend/database contracts. Browser calculations and list-length approximations are not production truth.
-9. Growing lists use server-side filtering and pagination.
-10. No AI, public rankings, comparative child-facing data, or unapproved M11 intelligence surfaces are part of M4.
+1. `tenantId` is the strict boundary for all M4 queries, mutations, jobs, exports, report cards, and files.
+2. Backend RBAC, teacher assignment validation, entitlement, mark-lock, and result-visibility rules are the source of truth.
+3. Teachers can enter or review marks only for backend-confirmed class, section, subject, component, and academic-year scope.
+4. Parents and students see only their own published, permission-safe data. Drafts, peer data, internal remarks, approval history, and finance details are not exposed.
+5. Locked marks use a reasoned and auditable correction workflow. They must not be silently edited or permanently unlocked in the client.
+6. Report cards, result snapshots, evidence, exports, and regenerated PDFs use File Registry-backed authenticated helpers only.
+7. Official grades, GPA, readiness, generation progress, and publication state come from backend/database truth, never browser calculations or list lengths.
+8. Growing lists must use server-side filtering and pagination.
+9. No AI, public ranking, comparative child-facing data, or M11 intelligence surfaces are in scope.
 
 ---
 
@@ -59,50 +54,36 @@ Global topbar
 + optional contextual right rail
 ```
 
-Use the shared SchoolOS design system rather than creating an M4-only visual language.
+Rules:
 
-### 3.1 Composition rules
-
-- Use a clear title, a one-line operational purpose, and one strong primary action.
-- Keep secondary actions inside `More Actions`, row menus, or contextual rails.
-- Use white work cards on the shared soft blue-grey app surface.
-- Keep tables dense but readable. Tables are appropriate for marks, corrections, templates, report-card jobs, and promotion readiness.
-- Use module accent colour to identify Academics, not as the sole source of meaning.
-- Every status needs text plus accessible semantic treatment; do not rely on colour only.
-- A right rail must have a real job: selected-student context, validation rules, approval history, publishing controls, or protected-file actions.
-- On narrower viewports, preserve the main grid/table first and move the rail to a drawer or dedicated route.
-
-### 3.2 Reference data rule
-
-The source references contain illustrative students, counts, dates, progress percentages, and statuses. They are visual examples only.
-
-```text
-Never use reference numbers, names, dates, percentages, or charts as production fallback data.
-```
-
-When a bounded backend summary is unavailable, show an explicit unavailable state rather than a mock KPI.
+- Use the shared SchoolOS visual system. Do not create an M4-only design language.
+- Use a clear title, short operational purpose, and one strong primary action.
+- Keep secondary actions in `More Actions`, row menus, or contextual rails.
+- Dense tables are appropriate for marks, corrections, templates, report-card jobs, and promotion readiness.
+- Status must have visible text and semantic treatment; colour alone is insufficient.
+- The right rail must have a job: selected-record context, validation, review history, visibility controls, or protected-file actions.
+- On smaller widths, preserve the primary grid/table first and collapse the right rail into a drawer or dedicated route.
+- The reference names, figures, dates, charts, and percentages are illustrative only. Never use them as production fallback data.
 
 ---
 
-## 4. Information Architecture and Screen Map
+## 4. Information Architecture
 
-| Workspace | Main job | Primary users | Route family / implementation note |
+| Workspace | Main job | Primary users | Route family / note |
 |---|---|---|---|
-| Academic Overview | Orient academic staff to real readiness, upcoming work, and drill-throughs | Academic admin, principal, exam coordinator | `/dashboard/academics` |
-| Academic Structure | Configure years, classes, sections, subjects, teacher assignments, streams, and combinations | Academic admin | Existing academics structure routes; exact route composition needs repository confirmation |
-| Exam Terms and Templates | Configure terms, assessment components, weights, templates, and presets | Academic admin, exam coordinator | Existing exam term/component routes |
-| Marks Entry | Enter, autosave, validate, and submit assigned marks | Subject teacher, class teacher where permitted | Existing marks routes |
-| CAS | Record continuous assessment, evidence, moderation, and summary | Subject teacher, coordinator | Existing CAS routes; rubric payload needs OpenAPI confirmation |
-| Grading Configuration | Configure grade bands, GPA mapping, rounding, aggregation, and passing policy | Academic admin | Existing grading-policy routes |
-| Review, Lock, and Corrections | Validate submitted mark sheets and process correction requests | Exam coordinator, authorized reviewer | Existing locks/corrections routes |
-| Results Publishing and Withholding | Prepare, schedule, publish, withhold, and audit result visibility | Academic admin, principal, authorized finance staff | Existing results/publishing routes |
-| Report Card Generation Center | Queue batches, track partial failures, retry safely, and reach protected output | Academic admin, exam coordinator | Existing report-card routes |
-| Report Card Detail and History | Review one protected card, versions, corrections, and regeneration | Authorized academic staff, parent/student published view | Existing report-card detail/history routes |
-| Promotion Readiness | Review academic eligibility and record manual decisions | Principal, academic admin | Existing promotion routes |
+| Academic Overview | Show real readiness and drill-throughs | Academic admin, principal, exam coordinator | `/dashboard/academics` |
+| Academic Structure | Maintain years, classes, subjects, teachers, streams | Academic admin | Confirm canonical routes in existing code |
+| Exam Terms and Templates | Configure terms, components, weights, templates, presets | Academic admin, exam coordinator | Existing exam/component routes |
+| Marks Entry | Enter, autosave, validate, submit assigned marks | Subject teacher, class teacher where permitted | Existing marks routes |
+| CAS | Record continuous assessment and moderation | Subject teacher, coordinator | Existing CAS routes; exact rubric/evidence DTO needs confirmation |
+| Grading Configuration | Grade bands, GPA, rounding, aggregation, passing rules | Academic admin | Existing grading-policy routes |
+| Review, Lock, Corrections | Validate submitted sheets and process changes | Exam coordinator, authorized reviewer | Existing locks/corrections routes |
+| Results Publishing | Publish, schedule, withhold, release, and audit outcomes | Academic admin, principal, authorized finance staff | Existing results/publishing routes |
+| Report Card Center | Queue generation, handle partial failure, reach protected output | Academic admin, exam coordinator | Existing report-card routes |
+| Report Card Detail | Inspect one card, history, correction, regeneration | Authorized academic staff; parent/student published view | Existing report-card detail/history routes |
+| Promotion Readiness | Evaluate eligibility and record manual decisions | Principal, academic admin | Existing promotion routes |
 
-### 4.1 Navigation structure
-
-The academics workspace may use module tabs, but each active surface still has one dominant job:
+### 4.1 Module navigation
 
 ```text
 Overview
@@ -115,13 +96,13 @@ Report Cards
 Promotion
 ```
 
-Use nested tabs only when they remain within one operational job. For example, Academic Structure may contain:
+Academic Structure may use sub-tabs:
 
 ```text
 Academic Years | Classes & Sections | Subjects | Teacher Assignments | Streams & Programs | Subject Combinations
 ```
 
-Do not place all academic master data, marks, and report-card actions inside one mega-dashboard.
+Each active workspace retains one dominant job. Do not build a mega-dashboard containing all master data, marks, results, and report cards at once.
 
 ---
 
@@ -129,23 +110,21 @@ Do not place all academic master data, marks, and report-card actions inside one
 
 ### 5.1 Academic context bar
 
-Every M4 workspace should carry the academic context needed for a safe decision:
+Every M4 workspace should carry the needed context:
 
 ```text
 Academic year | Term | Class | Section | Subject | Stream / Program | Status
 ```
 
-Rules:
-
-- Context values must come from current backend-backed lookups.
-- Filters must be represented in URL search parameters for growing lists where the existing route can support it safely.
-- Changing context must invalidate/refetch dependent data.
-- A teacher-facing route must show the effective backend-confirmed assignment scope.
-- Never assume that a teacher may switch to an arbitrary class or subject because it appears in a selector.
+- Use current backend-backed lookups only.
+- Filters for growing lists should use URL search parameters where the canonical route supports it.
+- Context changes refetch dependent data.
+- A teacher-facing page displays the effective backend-confirmed assignment scope.
+- A selector never grants permission by itself.
 
 ### 5.2 KPI strip
 
-Potential KPI concepts from the references:
+Possible reference concepts:
 
 ```text
 Active classes
@@ -156,12 +135,10 @@ Generated report cards
 Locked mark sheets
 ```
 
-Implementation rule:
-
-- Use only module-owned bounded summary fields.
-- Current repository alignment records that a single M4 overview contract for all six reference KPI cards is not confirmed.
-- Unsupported KPI cards must render `Not available yet` with no fabricated number or percentage.
-- KPI drill-through must route to a real filtered workflow, not a browser-only state.
+- Use only bounded, module-owned backend fields.
+- Current repository alignment does not confirm one M4 overview contract for all reference KPI cards.
+- Unsupported KPIs render an explicit unavailable state, not a fabricated number or percentage.
+- A KPI drill-through must open a real filtered route/workspace.
 
 ---
 
@@ -169,126 +146,73 @@ Implementation rule:
 
 ### 6.1 Academic Overview
 
-**Main job:** show real academic readiness and route the actor to the work that needs action.
-
-**Recommended composition:**
+**Main job:** orient academic staff to real readiness and direct them to work needing attention.
 
 ```text
 Header
 -> bounded KPI strip or explicit unavailable cards
--> tabs
 -> academic-context filters
 -> academic structure summary
 -> upcoming assessment timeline
 -> marks readiness by class
--> result / report-card queue summary
+-> result/report-card queue summary
 -> quick actions and shortcuts
 ```
 
-**Required behaviour:**
-
 - Do not deep-fetch unbounded student, marks, CAS, report-card, and promotion lists to calculate a dashboard.
-- Use a calendar/timeline only when actual assessment schedule data exists.
-- Show Grade 11-12 streams/programs only for enabled school levels and authorized actors.
-- Quick actions must open actual routes and preserve safe context.
-
-**Empty/error states:**
-
-```text
-No academic year is active.
-No exam term has been configured for this context.
-Academic overview is not available yet.
-You do not have permission to view school-wide marks readiness.
-```
+- Use calendar/timeline only with actual schedule data.
+- Grade 11-12 streams/programs appear only when school level and feature are enabled.
 
 ### 6.2 Academic Structure and Teacher Assignments
 
-**Main job:** maintain the authoritative academic structure that M4, M6, and M12 reuse.
+**Main job:** maintain academic structure shared by M4, M6, and M12.
 
-**Recommended sub-tabs:**
-
-```text
-Academic Years | Classes & Sections | Subjects | Teacher Assignments | Streams & Programs | Subject Combinations
-```
-
-**Primary actions by sub-tab:**
-
-```text
-Create Academic Year
-Add Class / Section
-Add Subject
-Assign Teacher
-Add Stream / Program
-Add Subject Combination
-```
-
-**Design rules:**
-
-- Keep each sub-tab focused; do not show the entire structure matrix, subject master, and teacher assignment table at full density on one page.
-- Teacher assignment matrix cells must show class/section/subject context and backend assignment status.
-- Grade 11-12 stream, practical, and subject-combination surfaces must be hidden or module-locked for schools where the level or feature is not enabled.
-- Imports, exports, and structure changes must be audit-supported and use real backend contracts.
+- Keep each sub-tab focused; do not show class directory, subject master, and teacher matrix at full density together.
+- Teacher assignment matrix cells must display class/section/subject context and backend assignment state.
+- Streams, practicals, and subject combinations are stage-aware and feature-gated.
+- Imports, exports, and structure changes use real contracts and audit-aware actions.
 
 ### 6.3 Exam Terms, Components, and Template Presets
 
-**Main job:** define reusable assessment structures safely.
-
-**Required sections:**
+**Main job:** define safe reusable assessment structures.
 
 ```text
-Exam Terms
-Assessment Components
-Template Presets
-Templates
-Rubrics
+Exam Terms | Components | Templates | Presets | Rubrics
 ```
-
-**Template builder requirements:**
 
 - Show component code, type, count, required flag, and weight.
-- Enforce visible total-weight validation before an assessment template can be published or applied.
-- Use existing backend template presets for terminal and theory/practical structures; do not rebuild presets in the browser.
-- Clone/apply actions need confirmation and a clear target class/subject scope.
+- Show visible total-weight validation before publish/apply.
+- Use backend template presets for terminal and theory/practical structures; do not recreate preset logic in the browser.
+- Clone/apply actions need confirmation and a clear target scope.
 - Archive actions require a reason where backend policy requires it.
-
-**States:**
-
-```text
-Weight total is incomplete.
-This template is already in use.
-No subjects are available for the selected class.
-Template presets are unavailable for this school configuration.
-```
 
 ### 6.4 Marks Entry Workspace
 
-**Main job:** allow a teacher to safely enter and submit marks only for assigned work.
-
-**Required layout:**
+**Main job:** enable assigned teachers to safely enter and submit marks.
 
 ```text
 Breadcrumb / title
 -> fixed academic context bar
 -> teacher scope banner
--> marks draft / autosave / pending-submission / locked summary
--> marks action toolbar
+-> draft/autosave/pending/locked summary
+-> marks toolbar
 -> marks grid
 -> validation and submission right rail
 -> state legend
 ```
 
-**Grid requirements:**
+Rules:
 
-- Use a spreadsheet-style grid only because it improves entry speed.
-- Support keyboard navigation and paste only through a validated, contract-confirmed path.
-- Keep student identity, roll number, component maximum, calculated total, remarks, and mark state readable.
-- Save draft only through backend-supported draft/autosave contracts.
-- Surface row-level and cell-level validation beside the relevant input.
-- Make `Absent`, `Withheld`, `Retest / Make-up`, `Practical Pending`, and `Project Pending` explicit selectable states where supported by the backend.
-- Do not convert a missing numeric mark into a state implicitly.
-- Locked sheets are read-only with a direct route to the correction request workflow.
+- Spreadsheet grid is allowed because it improves entry speed.
+- Support keyboard navigation and paste only when the validation path is confirmed.
+- Keep roll number, student identity, component maximum, total, remarks, and state visible.
+- Draft/autosave uses only existing backend support.
+- Surface cell and row validation beside the relevant input.
+- Make `Absent`, `Withheld`, `Retest / Make-up`, `Practical Pending`, and `Project Pending` explicit states only where confirmed by backend.
+- A missing number must not silently become a state.
+- Locked sheets are read-only and link to correction request.
 
-**Autosave states:**
+Autosave language:
 
 ```text
 Saving changes
@@ -299,19 +223,9 @@ Submitted for review
 Locked after review
 ```
 
-**Teacher scope banner:**
-
-```text
-You can enter marks for Grade X - Section Y - Subject Z - Component A.
-```
-
-The visible scope is a usability statement, not authorization; backend scope checks remain mandatory.
-
 ### 6.5 CAS Workspace
 
-**Main job:** record continuous assessment and supporting evidence with moderation visibility.
-
-**Required composition:**
+**Main job:** record continuous assessment with moderation and evidence visibility.
 
 ```text
 CAS context bar
@@ -319,34 +233,25 @@ CAS context bar
 -> rubric score grid
 -> moderation summary
 -> teacher remarks and evidence
--> selected-student trend / observations rail
+-> selected-student observations / trend rail
 ```
 
-**Contract rule:**
-
-The visual design may include rubric criteria, observations, evidence files, moderation status, and progress trends, but their mutation and query shape require OpenAPI confirmation before implementation.
-
-Mark as `needs OpenAPI confirmation` until verified:
+The visual design may include rubric criteria, observations, evidence files, moderation status, and trends. Before implementation, mark these as `needs OpenAPI confirmation` unless verified in current source:
 
 ```text
-Rubric criterion identifiers and scales
+Rubric criterion IDs and scales
 Observation payloads
-Evidence-file link fields
-Moderation status and review actions
-CAS trend-series data
-Teacher remarks history
+Evidence-file links
+Moderation status/review actions
+CAS trend series
+Teacher-remark history
 ```
 
-**Evidence files:**
-
-- Use File Registry-backed protected links only.
-- Do not show raw storage URLs, object keys, or unmanaged external file paths.
+Evidence files must use File Registry-backed protected actions.
 
 ### 6.6 Grade Scales and Grading Policy
 
-**Main job:** configure grade bands, GPA mapping, rounding, aggregation, and passing rules.
-
-**Required sections:**
+**Main job:** configure grade bands, GPA mapping, rounding, aggregation, and pass rules.
 
 ```text
 Grade Scale
@@ -356,53 +261,37 @@ Audit / Change History
 Quick Actions
 ```
 
-**Rules:**
+- Grade bands cannot overlap or leave gaps contrary to backend policy.
+- Rounding, decimal precision, grace marks, aggregation, best-of, pass, and override rules need explicit labels and audit-aware edits.
+- The preview illustrates backend calculation where available; it is not a second client grading engine.
 
-- Grade bands must not have gaps or overlaps.
-- A scale must cover the permitted score range according to the backend policy.
-- Rounding, decimal precision, grace marks, aggregation, best-of policies, minimum-pass requirements, and failure overrides require explicit labels and audit-aware edits.
-- Current scale changes should display draft/published status where backend supports it.
-- A sample preview may illustrate backend-calculated outcomes, but must not become an alternate client-side grading engine.
-
-### 6.7 Marks Review, Lock, and Correction Workflow
+### 6.7 Marks Review, Lock, and Correction
 
 **Main job:** validate submitted sheets, lock safe records, and process changes transparently.
-
-**Required tabs:**
 
 ```text
 Review Queue | Locked Sheets | Unlock Requests | Corrections | Audit Log
 ```
 
-**Correction workflow:**
+Required workflow:
 
 ```text
 Teacher requests correction
--> required reason and affected mark context
+-> reason + affected mark context
 -> reviewer validates before/after context
 -> authorized approver decides
--> limited correction window if policy supports it
+-> limited correction window if supported
 -> teacher corrects
 -> reviewer revalidates
--> sheet is locked again
+-> sheet re-locks
 -> audit history remains available
 ```
 
-**Do not implement:**
-
-```text
-Permanent direct unlock button
-Silent changes to locked marks
-Unlock without actor, reason, scope, expiry, and audit
-```
-
-A temporary unlock action is valid only when the backend supports a reasoned, time-bounded, auditable correction window.
+Do not implement a permanent direct unlock or silent locked-mark edit. A temporary unlock is valid only when backend supports an actor, reason, scope, expiry, re-lock, and audit trail.
 
 ### 6.8 Result Publishing and Withholding
 
 **Main job:** prepare and release results with safe visibility controls.
-
-**Required composition:**
 
 ```text
 Publish queue
@@ -413,19 +302,15 @@ Publish queue
 -> access and visibility controls
 ```
 
-**Role and privacy rules:**
-
-- Academic staff see readiness and publication status only within their scope.
-- Dues-related reason detail is limited to authorized finance/admin roles.
-- Teachers should see a neutral state such as `Not available for publication` where finance detail is not appropriate.
-- Parents and students see only their own final published or withheld result state. They never see internal rule configuration or another student’s outcome.
+- Academic staff see readiness and publication state within scope.
+- Finance-sensitive reason detail is limited to authorized finance/admin actors.
+- Teachers use a neutral state such as `Not available for publication` when finance detail is not appropriate.
+- Parent/student views are own-record and final published/withheld state only.
 - Scheduling, publishing, withholding, and release actions require confirmation and audit support.
 
 ### 6.9 Report Card Generation Center
 
-**Main job:** manage queued batch generation, inspect partial failure, retry safely, and retrieve protected outputs.
-
-**Required composition:**
+**Main job:** manage asynchronous batches, partial failure, safe retry, and protected output.
 
 ```text
 Generation queue
@@ -436,30 +321,26 @@ Generation queue
 -> safe retry / manifest / protected-PDF actions
 ```
 
-**Rules:**
-
-- Render queued, processing, completed, failed, and retry-safe state only when confirmed by persisted backend job contracts.
-- Do not simulate report progress from timers or browser list lengths.
-- Partial failure must list the affected student/record safely, error category, and permitted retry action without exposing implementation secrets.
-- Retry actions must be idempotent, reasoned where required, and bounded to safe failed work.
-- Reused/re-generated PDFs remain File Registry-protected.
+- Render queued, processing, completed, failed, and retry-safe only when backed by persisted job contracts.
+- Do not simulate progress with timers or list lengths.
+- Partial failure reveals safe error category and permitted retry action, not stack traces, object keys, or provider details.
+- Retry must be bounded to safe backend-supported work.
+- Generated and regenerated PDFs remain File Registry-protected.
 
 ### 6.10 Report Card Detail, History, and Regeneration
 
-**Main job:** inspect one protected report card, its snapshots, corrections, and regeneration history.
-
-**Required composition:**
+**Main job:** inspect one protected card and its versions/corrections.
 
 ```text
 Student identity and academic context
--> protected report-card preview state
+-> protected preview state
 -> version history
 -> correction summary
 -> actions rail
 -> protected-file status and metadata
 ```
 
-**Protected-file actions:**
+Actions:
 
 ```text
 Open Protected PDF
@@ -470,13 +351,11 @@ Compare Versions
 View Correction History
 ```
 
-Do not expose a reusable unrestricted raw link or raw signed storage URL. `Copy Link` must only be used when the actual backend supports a scoped secure-share flow with expiry, permission re-check, and audit.
+Do not expose reusable raw links or signed storage URLs. A copy-link action is permissible only for a confirmed secure-share contract with expiry, permission re-check, and audit.
 
-### 6.11 Promotion Readiness and Grade 11-12 Board Preparation
+### 6.11 Promotion and Grade 11-12 Board Preparation
 
-**Main job:** show eligibility, blockers, academic readiness, and controlled promotion decisions.
-
-**Required composition:**
+**Main job:** show eligibility, blockers, stage-aware readiness, and controlled decisions.
 
 ```text
 Promotion readiness table
@@ -484,21 +363,18 @@ Promotion readiness table
 -> board-preparation checklist
 -> pending practical/project completion
 -> selected-student rail
--> manual recommendation / decision actions
+-> manual decision actions
 ```
 
-**Rules:**
-
-- Automatic calculations must be backend-owned and explainable through visible prerequisites.
-- Manual promotion, hold, stream assignment, or override decisions require permission, confirmation, reason where policy requires it, and audit.
-- Grade 11-12 stream/program surfaces are stage-aware and should not appear for schools where they are not configured.
-- Parent/student access must show only released outcomes, never internal recommendation or board-preparation risk notes.
+- Automatic eligibility is backend truth and should expose prerequisites, not opaque scores.
+- Manual promotion, hold, stream assignment, or override needs permission, confirmation, reason where required, and audit.
+- Parent/student surfaces show released outcome only, never internal recommendations or board-preparation notes.
 
 ---
 
 ## 7. Shared Components
 
-Create or extend shared UI primitives rather than introducing an M4-only parallel system.
+Extend shared primitives; do not build a parallel M4 component system.
 
 ```text
 AcademicContextBar
@@ -526,129 +402,96 @@ PromotionReadinessTable
 PromotionDecisionDrawer
 ```
 
-All components must reuse shared loading, empty, error, permission-denied, module-locked, queued-job, partial-failure, confirmation, reason, and protected-file patterns.
+All use shared loading, empty, error, permission-denied, module-locked, queued-job, partial-failure, confirmation, reason, and protected-file patterns.
 
 ---
 
-## 8. Role and Visibility Matrix
+## 8. Role Matrix
 
-| Role | Allowed M4 work | Explicitly denied or restricted |
+| Role | Allowed M4 work | Restricted work |
 |---|---|---|
-| Academic Admin | Academic structure, exam setup, grading policy, report-card batches, results, promotion | Platform controls; finance-detail withholding reason unless separately permitted |
-| Exam Coordinator | Terms/components, review queue, lock/correction workflow, batch monitoring | Unscoped teacher marks; finance-only withholding details |
-| Subject Teacher | Assigned marks and CAS entry, own submission state | Other subject/class marks, result publish, policy edits, report-card batch action |
-| Class Teacher | Permitted class remarks, class-level review where assigned | Subject marks outside assignment; school-wide policy configuration |
-| Principal | Safe school-wide readiness, approvals, publishing/promotion decisions when permitted | Salary, fee, or private finance detail without separate permission |
-| Finance/Admin with separate permission | Dues-hold rule administration where implemented | Marks editing unless academic permission exists |
-| Parent / Student | Own published result/report-card only | Drafts, internal notes, correction history, peer data, queues, configuration |
+| Academic Admin | Structure, templates, grading policy, report-card batches, results, promotion | Platform controls and finance-only holding detail unless separately permitted |
+| Exam Coordinator | Terms/components, review queue, locks/corrections, batch monitoring | Unscoped teacher marks and finance-only detail |
+| Subject Teacher | Assigned marks/CAS entry and own submission state | Other class/subject marks, publishing, policy changes, batch generation |
+| Class Teacher | Permitted class remarks and class review | Subject marks outside assignment and school-wide configuration |
+| Principal | Safe readiness, approvals, publishing/promotion if permitted | Salary/finance detail without separate permission |
+| Parent / Student | Own published result/report card | Drafts, internal notes, correction history, peer data, queues, configuration |
 
 ---
 
-## 9. Required State Matrix
-
-Every M4 route must handle the following where relevant:
+## 9. Required States
 
 | State | Required response |
 |---|---|
-| Loading | Render a layout-matched skeleton while preserving title and selected context. |
-| Empty | Explain why no record exists and show one safe next action when allowed. |
-| Error | Show a parsed, school-friendly error; preserve filters and retry safely. |
-| Permission denied | Explain that access is not permitted without exposing hidden marks, students, or finance detail. |
-| Module locked | Show shared `ModuleLockedState`; backend must also reject the route/action. |
-| No active academic year | Explain configuration gap and route only authorized users to setup. |
-| No teacher assignment | Show teacher-scope denial; do not render an editable blank marks grid. |
-| Draft/autosave failed | Preserve local input only where the existing workflow safely supports it; show retry. |
-| Marks locked | Render read-only grid and correction request path. |
-| Validation failure | Place precise errors beside cells/fields and summarise only for long forms. |
-| Queued job | Render backend job state; do not invent progress. |
-| Partial report failure | Separate successful and failed records and offer only safe retry actions. |
-| Protected file unavailable | Explain missing, expired, or restricted file without raw provider detail. |
-| Result unpublished/withheld | Show safe actor-appropriate visibility state. |
-| Correction window expired | Explain that the record cannot be changed and route to authorized review if allowed. |
+| Loading | Layout-matched skeleton while title/context remain visible. |
+| Empty | Explain why no data exists and offer one safe next action if allowed. |
+| Error | School-friendly parsed error; preserve filters and retry. |
+| Permission denied | Do not reveal hidden marks, students, or finance detail. |
+| Module locked | Shared `ModuleLockedState`; backend also blocks action. |
+| No active academic year | Explain configuration gap and route authorized actor safely. |
+| No teacher assignment | Show scope denial; do not render editable blank grid. |
+| Draft/autosave failed | Preserve safe local input only where existing workflow supports it; show retry. |
+| Marks locked | Read-only grid with correction-request path. |
+| Queued job | Backend job state only. |
+| Partial report failure | Separate successful/failed records and offer only safe retry. |
+| Protected file unavailable | Explain missing/expired/restricted file without provider detail. |
+| Result unpublished/withheld | Actor-appropriate safe state. |
+| Correction window expired | Explain immutability and route to review if allowed. |
 
 ---
 
-## 10. API and Contract Verification Matrix
+## 10. Contract Verification Matrix
 
-Do not invent endpoint shapes. Confirm from backend controllers, OpenAPI, `packages/core`, current API helpers, DTOs, permissions, and tests before building each slice.
+Do not invent endpoint shapes. Confirm backend controller, OpenAPI, `packages/core`, API helper, DTO, permission, audit, and test coverage before implementation.
 
-| Workflow | Current repository-alignment evidence | Implementation status |
+| Workflow | Current alignment evidence | Implementation requirement |
 |---|---|---|
-| Academic years, classes, sections, subjects, assignments | Existing backend/API-client coverage recorded | Confirm exact query/mutation DTOs in touched route |
-| Exam terms, components, grading policy | Existing backend/API-client coverage recorded | Confirm exact apply/clone/preset behavior |
-| Marks and batch marks | Existing backend/API-client coverage recorded | Confirm autosave, row-state, bulk-edit, and submit semantics |
-| CAS | Existing backend/API-client coverage recorded | **Needs OpenAPI confirmation** for rubrics, evidence, moderation, and trend payloads |
-| Report-card generation/correction/history/PDF | Existing backend/API-client coverage recorded | Confirm persisted job-state and safe retry fields before progress UI |
-| Result readiness/preview/publish | Existing backend/API-client coverage recorded | Confirm publishing schedule, withholding, visibility, and audit payloads |
-| Promotion | Existing route family is recorded | **Needs backend/OpenAPI confirmation** for eligibility, manual decision, stream assignment, and audit semantics |
-| Grade 11-12 streams/subject combinations/practicals | Product direction requires staged support | **Needs backend verification** before route-level implementation |
-
-Unknowns must be labelled in code and implementation notes as one of:
-
-```text
-needs backend verification
-needs OpenAPI confirmation
-needs mobile DTO
-needs idempotency confirmation
-needs offline sync confirmation
-```
+| Academic years/classes/sections/subjects/assignments | Existing coverage recorded | Confirm exact touched query/mutation DTOs |
+| Exam terms/components/grading policy | Existing coverage recorded | Confirm preset apply/clone behavior |
+| Marks/batch marks | Existing coverage recorded | Confirm autosave, mark state, bulk edit, submit semantics |
+| CAS | Existing coverage recorded | **Needs OpenAPI confirmation** for rubrics/evidence/moderation/trends |
+| Report-card generation/correction/history/PDF | Existing coverage recorded | Confirm persisted job fields and safe retry scope before progress UI |
+| Results readiness/preview/publish | Existing coverage recorded | Confirm scheduling, holding, visibility, audit payloads |
+| Promotion | Existing route family recorded | **Needs backend/OpenAPI confirmation** for eligibility/manual decision/stream assignment |
+| Grade 11-12 depth | Product direction only | **Needs backend verification** before route-level work |
 
 ---
 
-## 11. Implementation Priority
+## 11. Priority and Definition of Done
 
-### P0 — Daily academic operational path
+### P0
 
-1. Academic Overview using existing bounded APIs and explicit unavailable KPI states.
-2. Teacher Marks Entry Workspace with backend-confirmed scope, autosave/draft, mark states, validation, and submit-for-review.
-3. Review, Lock, and Correction workflow with reason, before/after context, approval state, and audit trace.
-4. Result Publishing and Withholding controls with role-safe visibility.
-5. Report Card Generation Center with real job status, partial failure, retry-safe action, and protected outputs.
-6. Individual Report Card Detail, version history, correction history, and protected open/download actions.
+1. Academics overview with existing bounded APIs and unavailable KPI states.
+2. Teacher marks entry with confirmed scope, autosave/draft, states, validation, and review submission.
+3. Review, lock, and correction workflow.
+4. Result publishing and safe withholding visibility.
+5. Report-card generation center with real job/partial-failure/retry/protected outputs.
+6. Report-card detail/history/protected open and download.
 
-### P1 — Academic setup and quality controls
+### P1
 
-7. Academic Structure and Teacher Assignments.
-8. Exam Terms, Components, and Template Presets.
-9. Grade Scale and Grading Policy.
-10. CAS Entry and Moderation after contract confirmation.
-11. Promotion Readiness with automatic backend calculation plus auditable manual decision.
+7. Academic structure and teacher assignments.
+8. Exam terms/components/templates.
+9. Grading configuration.
+10. CAS after contract confirmation.
+11. Promotion readiness with backend-calculated eligibility and auditable manual decision.
 
-### P2 — Grade 11-12 depth
+### P2
 
-12. Streams / programs.
+12. Streams/programs.
 13. Subject combinations.
-14. Practical and project components.
+14. Practical/project components.
 15. Board-preparation readiness.
 
----
-
-## 12. Definition of Done
-
-An M4 web slice is complete only when:
-
-```text
-[ ] Uses a confirmed real API and shared types where available.
-[ ] Enforces tenant, role, assignment, and module scope through backend authorization.
-[ ] Has loading, empty, error, success, permission-denied, and module-locked states.
-[ ] Keeps filters and growing lists server-side and paginated.
-[ ] Does not use reference/mock production data.
-[ ] Shows official totals, grades, readiness, and job state from backend truth.
-[ ] Uses reason, confirmation, pending, and audit support for high-risk actions.
-[ ] Handles marks lock/correction without silent mutation.
-[ ] Uses File Registry-backed protected helpers for PDFs, exports, and evidence files.
-[ ] Preserves parent/student published-only, own-record access.
-[ ] Includes focused contract/regression coverage where appropriate.
-[ ] Includes a browser smoke case or updates an existing focused E2E path.
-```
+An M4 slice is complete only when it uses real confirmed APIs, enforces backend scope, handles all states, uses server-side lists, contains no mock data, protects files, preserves published-only own-record access, and has focused regression/browser coverage as appropriate.
 
 ---
 
-## 13. Verification Plan
+## 12. Verification and Risks
 
 No runtime verification is claimed by this documentation update.
 
-Before marking an M4 implementation slice complete, run the relevant checks:
+Run relevant checks before calling an M4 implementation complete:
 
 ```bash
 pnpm db:generate
@@ -663,37 +506,35 @@ pnpm verify:production
 pnpm smoke:pilot
 ```
 
-M4-focused browser smoke must include at minimum:
+Minimum M4 browser checks:
 
 ```text
-Subject teacher cannot open unassigned marks context.
-Teacher draft/autosave and failed-save state are visible.
+Teacher denied for unassigned marks context.
+Draft/autosave success and failure visible.
 Locked marks cannot be silently edited.
-Correction request requires reason and preserves before/after history.
-Parent/student cannot see unpublished result or another student's report card.
-Report-card file opens through protected authenticated helper.
-Report-card batch partial failure shows failed records without exposing unsafe details.
+Correction request requires reason and preserves history.
+Parent/student cannot see unpublished or another student's result.
+Report-card protected file success and failure states work.
+Batch partial failure is safe and retry-bounded.
 Module-locked and permission-denied routes fail safely.
 ```
 
----
+Key risks:
 
-## 14. Risks and Deferrals
-
-| Risk | Required mitigation |
+| Risk | Mitigation |
 |---|---|
-| CAS visual design exceeds confirmed backend contract | Implement read-only/available states until DTOs and OpenAPI are verified. |
-| Reference KPIs tempt mock data or browser aggregation | Use bounded module summaries or explicit unavailable cards. |
-| Temporary unlock becomes an uncontrolled edit path | Require backend-supported reason, actor, expiry, review, re-lock, and audit. |
-| Withholding leaks finance detail | Split academic visibility from finance-authorized policy detail. |
-| Report-card progress is simulated | Render only persisted backend job state. |
-| Protected PDFs become raw URLs | Use shared protected-file helpers only. |
-| Grade 11-12 surfaces appear for unsupported schools | Gate by tenant configuration, module entitlement, and academic-level feature support. |
-| Dense tables become unusable at smaller widths | Preserve primary workflow, collapse rail, use detail drawers, and avoid unreadable compression. |
+| Visual work invents API contracts | Confirm contracts before each slice; label unknowns. |
+| KPI cards use mock/list-length totals | Use bounded summaries or unavailable states. |
+| CAS outgrows contract | Hold write UI until OpenAPI verification. |
+| Progress is simulated | Render persisted backend job state only. |
+| Correction path undermines marks integrity | Require backend scope, reason, expiry, re-lock, and audit. |
+| Withholding leaks finance data | Purpose-limit detail by role. |
+| PDFs become raw URLs | Use authenticated File Registry helpers only. |
+| Grade 11-12 appears for unsupported school | Gate by tenant configuration/entitlement/academic level. |
 
 ---
 
-## 15. Related Documents
+## 13. Related Documents
 
 ```text
 docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
