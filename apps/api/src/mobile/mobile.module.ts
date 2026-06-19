@@ -8,6 +8,8 @@ import { FinanceModule } from '../finance/finance.module';
 import { AcademicsModule } from '../academics/academics.module';
 import { CommunicationsModule } from '../communications/communications.module';
 import { HomeworkModule } from '../homework/homework.module';
+import { FileRegistryModule } from '../file-registry/file-registry.module';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { HomeworkModule } from '../homework/homework.module';
     AcademicsModule,
     CommunicationsModule,
     HomeworkModule,
+    FileRegistryModule,
+    StorageModule,
   ],
   controllers: [MobileController, MobileTeacherAttendanceController],
   providers: [MobileService],

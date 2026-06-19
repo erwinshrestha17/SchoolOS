@@ -401,6 +401,21 @@ class ParentChildCard extends StatelessWidget {
             title: child.homework,
             subtitle: child.updates,
           ),
+          const SizedBox(height: 12),
+          _InfoLine(
+            icon: child.hasFeesDue
+                ? Icons.account_balance_wallet_outlined
+                : Icons.verified_rounded,
+            color: child.hasFeesDue
+                ? ParentPortalColors.orange
+                : ParentPortalColors.green,
+            title: child.hasFeesDue
+                ? 'Fees due NPR ${child.feesDue.toStringAsFixed(0)}'
+                : 'Fees paid',
+            subtitle: child.nextFeeDueDate == null
+                ? 'School fee status'
+                : 'Next due ${_shortDate(child.nextFeeDueDate)}',
+          ),
           if (!compact) ...[
             const Divider(height: 28),
             Row(
@@ -667,4 +682,12 @@ class _InfoLine extends StatelessWidget {
       ],
     );
   }
+}
+
+String _shortDate(String? value) {
+  final date = DateTime.tryParse(value ?? '');
+  if (date == null) {
+    return 'date unavailable';
+  }
+  return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 }

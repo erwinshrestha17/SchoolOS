@@ -20,12 +20,16 @@ class ParentPortalRepository {
   Future<ParentPortalData> load() async {
     final children = await parentRepository.getGuardianChildren();
     final dashboards = <String, ParentDashboardSummary>{};
+    final profiles = <String, ChildProfile>{};
     final homework = <ParentPortalHomework>[];
 
     for (final child in children) {
       final dashboard = await parentRepository
           .getParentDashboardSummaryForChild(child);
       dashboards[child.id] = dashboard;
+      profiles[child.id] = await parentRepository.getChildProfileForChild(
+        child,
+      );
 
       if (dashboard.homeworkEnabled) {
         final assignments = await parentRepository.getHomeworkForChild(
@@ -48,7 +52,7 @@ class ParentPortalRepository {
       lastUpdated: _formatTime(DateTime.now()),
       children: [
         for (final child in children)
-          _childFromApi(child, dashboards[child.id]),
+          _childFromApi(child, dashboards[child.id], profiles[child.id]),
       ],
       homework: homework,
       updates: [
@@ -69,12 +73,13 @@ class ParentPortalRepository {
   ParentPortalChild _childFromApi(
     GuardianChild child,
     ParentDashboardSummary? dashboard,
+    ChildProfile? profile,
   ) {
     return ParentPortalChild(
       id: child.id,
       name: child.name,
       classSection: child.classSection,
-      teacher: 'Class teacher details in timetable',
+      teacher: profile?.classTeacher ?? 'Class teacher not assigned',
       attendance: dashboard?.attendanceEnabled == false
           ? 'Attendance module locked'
           : dashboard?.attendanceToday ?? 'No attendance summary yet',
@@ -91,7 +96,13 @@ class ParentPortalRepository {
       homeworkPending: dashboard?.homeworkPending ?? 0,
       unreadUpdates: dashboard?.unreadNotices ?? 0,
       feesDue: dashboard?.feesDue ?? 0,
+      feesStatus: dashboard?.feesStatus ?? 'DUE',
+      feesPaidAmount: dashboard?.feesPaidAmount ?? 0,
+      feesTotalAmount: dashboard?.feesTotalAmount ?? 0,
+      nextFeeDueDate: dashboard?.nextFeeDueDate,
       transportDetail: dashboard?.transportDetail,
+      latestActivity: dashboard?.latestActivity,
+      latestActivityTitle: dashboard?.latestActivityTitle,
     );
   }
 
@@ -107,6 +118,7 @@ class ParentPortalRepository {
       subject: item.subjectName,
       title: item.title,
       dueLabel: _dueLabel(item),
+      dueAt: DateTime.tryParse(item.dueAt ?? item.dueDate ?? ''),
       status: _submissionLabel(item.submissionStatus),
       attachmentCount: item.attachmentCount,
       teacher: 'Assigned by school',
@@ -132,6 +144,7 @@ class ParentPortalRepository {
         if (child != null) child.name,
         _formatTime(item.createdAt),
       ].join(' - '),
+      createdAt: item.createdAt,
       route: item.route,
       isPinned: !item.isRead && item.type == ParentNotificationType.notice,
       isImportant: !item.isRead,

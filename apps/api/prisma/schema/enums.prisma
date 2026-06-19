@@ -74,6 +74,15 @@ enum PaymentStatus {
   FAILED
 }
 
+enum OnlinePaymentIntentStatus {
+  CREATED
+  READY
+  PENDING
+  SUCCEEDED
+  FAILED
+  EXPIRED
+}
+
 enum PaymentMethod {
   CASH
   BANK

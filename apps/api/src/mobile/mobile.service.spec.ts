@@ -13,6 +13,7 @@ describe('MobileService', () => {
     notificationReadReceipt: MockModel<'upsert' | 'createMany'>;
     homeworkAssignment: MockModel<'findMany' | 'findFirst'>;
     reportCard: MockModel<'findMany' | 'findFirst'>;
+    markEntry: MockModel<'findMany'>;
     transportStudentAssignment: MockModel<'findFirst'>;
     transportEnrollment: MockModel<'findFirst'>;
     transportTripStudentStatus: MockModel<'findFirst'>;
@@ -20,11 +21,21 @@ describe('MobileService', () => {
 
   let prisma: MobileServicePrismaMock;
   let attendanceService: { getParentSummary: jest.Mock };
-  let financeService: { getReceiptPdfForStudent: jest.Mock };
+  let financeService: {
+    getReceiptPdfForStudent: jest.Mock;
+    getParentPaymentGatewayReadiness: jest.Mock;
+    initiateParentOnlinePayment: jest.Mock;
+  };
   let entitlementsService: { getEntitlements: jest.Mock };
   let reportCardPdfService: { getReportCardPdf: jest.Mock };
   let communicationsService: { getGuardianConsentStatus: jest.Mock };
   let homeworkAttachmentAccessService: { getAttachmentAccessUrl: jest.Mock };
+  let fileRegistryService: {
+    listFilesByEntity: jest.Mock;
+    assertFileAccessForAuth: jest.Mock;
+    auditAccess: jest.Mock;
+  };
+  let storageService: { getObjectBuffer: jest.Mock };
   let service: MobileService;
   let actor: AuthContext;
 
@@ -57,6 +68,9 @@ describe('MobileService', () => {
         findMany: jest.fn(),
         findFirst: jest.fn(),
       },
+      markEntry: {
+        findMany: jest.fn(),
+      },
       transportStudentAssignment: {
         findFirst: jest.fn(),
       },
@@ -72,6 +86,8 @@ describe('MobileService', () => {
     };
     financeService = {
       getReceiptPdfForStudent: jest.fn(),
+      getParentPaymentGatewayReadiness: jest.fn(),
+      initiateParentOnlinePayment: jest.fn(),
     };
     entitlementsService = {
       getEntitlements: jest.fn().mockResolvedValue({
@@ -98,6 +114,14 @@ describe('MobileService', () => {
     homeworkAttachmentAccessService = {
       getAttachmentAccessUrl: jest.fn(),
     };
+    fileRegistryService = {
+      listFilesByEntity: jest.fn().mockResolvedValue([]),
+      assertFileAccessForAuth: jest.fn(),
+      auditAccess: jest.fn(),
+    };
+    storageService = {
+      getObjectBuffer: jest.fn(),
+    };
     service = new MobileService(
       prisma as never,
       attendanceService as never,
@@ -106,6 +130,8 @@ describe('MobileService', () => {
       reportCardPdfService as never,
       communicationsService as never,
       homeworkAttachmentAccessService as never,
+      fileRegistryService as never,
+      storageService as never,
     );
     actor = {
       userId: 'parent-1',
@@ -129,6 +155,52 @@ describe('MobileService', () => {
       service.getStudentFeesSummary('student-other', actor),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.invoice.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns gateway readiness only after linked-child authorization', async () => {
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    financeService.getParentPaymentGatewayReadiness.mockResolvedValue({
+      enabled: true,
+      status: 'ready',
+      provider: { name: 'NEPAL_GATEWAY' },
+    });
+
+    await expect(
+      service.getStudentPaymentGatewayReadiness('student-1', actor),
+    ).resolves.toEqual(
+      expect.objectContaining({ enabled: true, status: 'ready' }),
+    );
+  });
+
+  it('initiates a linked-child payment through the purpose-limited finance boundary', async () => {
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    financeService.initiateParentOnlinePayment.mockResolvedValue({
+      id: 'intent-1',
+      status: 'READY',
+    });
+    const dto = {
+      invoiceId: 'invoice-1',
+      amount: 500,
+      provider: 'NEPAL_GATEWAY',
+      idempotencyKey: 'parent-payment-test-0003',
+    };
+
+    await expect(
+      service.initiateStudentPayment('student-1', dto, actor),
+    ).resolves.toEqual({ id: 'intent-1', status: 'READY' });
+    expect(financeService.initiateParentOnlinePayment).toHaveBeenCalledWith(
+      'student-1',
+      dto,
+      actor,
+    );
   });
 
   it('returns a parent-safe fee summary with paid and overdue totals', async () => {
@@ -190,6 +262,9 @@ describe('MobileService', () => {
       }),
     );
     expect(summary).toEqual({
+      status: 'PARTIAL',
+      totalAmount: 325.25,
+      paidAmount: 150,
       totalOutstanding: 175.25,
       overdueCount: 1,
       nextDueDate: '2026-01-10T00:00:00.000Z',
@@ -242,6 +317,143 @@ describe('MobileService', () => {
         },
       ],
     });
+  });
+
+  it('returns class teacher details on linked-child profiles', async () => {
+    prisma.student.findFirst
+      .mockResolvedValueOnce({ id: 'student-1' })
+      .mockResolvedValueOnce({
+        id: 'student-1',
+        firstNameEn: 'Asha',
+        lastNameEn: 'Rai',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        section: null,
+        rollNumber: 7,
+        studentSystemId: 'SCH-001',
+        admissionNumber: 'ADM-001',
+        admissionDate: new Date('2026-04-01T00:00:00.000Z'),
+        dateOfBirth: new Date('2017-02-03T00:00:00.000Z'),
+        gender: 'FEMALE',
+        bloodGroup: 'O+',
+        nationality: 'Nepali',
+        lifecycleStatus: 'ENROLLED',
+        emergencyName: null,
+        emergencyPhone: null,
+        medicalConsentAt: null,
+        medicalConditions: null,
+        severeAllergies: null,
+        specialNeeds: null,
+        photoUsageConsentAt: new Date('2026-04-01T00:00:00.000Z'),
+        dataProcessingConsentedAt: new Date('2026-04-01T00:00:00.000Z'),
+        class: { id: 'class-1', name: 'Grade 4' },
+        sectionRef: {
+          id: 'section-1',
+          name: 'A',
+          classTeacher: {
+            id: 'staff-1',
+            firstName: 'Mina',
+            lastName: 'Shrestha',
+          },
+        },
+        guardianLinks: [{ relation: 'Daughter' }],
+        enrollments: [{ academicYear: { name: '2083' } }],
+      });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+
+    const result = await service.getStudentProfile('student-1', actor);
+
+    expect(result.profile.classTeacher).toEqual({
+      id: 'staff-1',
+      name: 'Mina Shrestha',
+    });
+    expect(result.child.classSection).toBe('Grade 4 - A');
+  });
+
+  it('returns subject grade summaries for published linked-child report cards', async () => {
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.reportCard.findMany.mockResolvedValue([
+      {
+        id: 'report-card-1',
+        examTermId: 'term-1',
+        academicYear: { id: 'year-1', name: '2083' },
+        examTerm: { id: 'term-1', name: 'First Terminal Examination' },
+        totalMarks: 170,
+        maxMarks: 200,
+        percentage: 85,
+        grade: 'A',
+        gpa: 3.7,
+        remarks: 'Strong progress',
+        publishedAt: new Date('2026-06-01T00:00:00.000Z'),
+        fileId: 'file-1',
+      },
+    ]);
+    prisma.markEntry.findMany.mockResolvedValue([
+      {
+        examTermId: 'term-1',
+        subjectId: 'subject-1',
+        marksObtained: 42,
+        subject: { id: 'subject-1', name: 'Mathematics', code: 'MATH' },
+        assessmentComponent: { maxMarks: 50 },
+      },
+      {
+        examTermId: 'term-1',
+        subjectId: 'subject-1',
+        marksObtained: 43,
+        subject: { id: 'subject-1', name: 'Mathematics', code: 'MATH' },
+        assessmentComponent: { maxMarks: 50 },
+      },
+      {
+        examTermId: 'term-1',
+        subjectId: 'subject-2',
+        marksObtained: 35,
+        subject: { id: 'subject-2', name: 'English', code: 'ENG' },
+        assessmentComponent: { maxMarks: 50 },
+      },
+    ]);
+
+    const result = await service.getStudentReportCards('student-1', actor);
+
+    expect(prisma.markEntry.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          studentId: 'student-1',
+          examTermId: { in: ['term-1'] },
+        }),
+      }),
+    );
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        id: 'report-card-1',
+        classTeacherRemark: 'Strong progress',
+        subjects: [
+          {
+            subjectId: 'subject-1',
+            subjectName: 'Mathematics',
+            marksObtained: 85,
+            maxMarks: 100,
+            percentage: 85,
+            grade: 'A',
+          },
+          {
+            subjectId: 'subject-2',
+            subjectName: 'English',
+            marksObtained: 35,
+            maxMarks: 50,
+            percentage: 70,
+            grade: 'B+',
+          },
+        ],
+      }),
+    );
   });
 
   it('lists notifications for the signed-in parent and linked students with read state', async () => {
@@ -444,6 +656,74 @@ describe('MobileService', () => {
           ],
         },
       }),
+    );
+    expect(fileRegistryService.listFilesByEntity).not.toHaveBeenCalled();
+  });
+
+  it('returns a parent-safe notice attachment descriptor and streams through File Registry', async () => {
+    const fileContent = Buffer.from('%PDF notice');
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.notificationDelivery.findFirst.mockResolvedValue({
+      id: 'delivery-1',
+      title: 'Circular',
+      body: 'Please read the attachment.',
+      sourceType: 'NOTICE',
+      sourceId: 'notice-1',
+      noticeId: 'notice-1',
+      studentId: 'student-1',
+      channel: 'PUSH',
+      status: 'SENT',
+      createdAt: new Date('2026-05-01T08:00:00.000Z'),
+      sentAt: new Date('2026-05-01T08:01:00.000Z'),
+      readReceipts: [],
+    });
+    fileRegistryService.listFilesByEntity.mockResolvedValue([
+      {
+        id: 'file-1',
+        originalFilename: 'circular.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: BigInt(1024),
+        objectKey: 'tenant-1/notices/circular.pdf',
+      },
+    ]);
+    storageService.getObjectBuffer.mockResolvedValue(fileContent);
+
+    await expect(
+      service.getNotificationDetail('delivery-1', actor),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        attachment: {
+          id: 'file-1',
+          fileName: 'circular.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 1024,
+          downloadPath: '/mobile/me/notifications/delivery-1/attachment',
+        },
+      }),
+    );
+
+    await expect(
+      service.getNotificationAttachment('delivery-1', actor),
+    ).resolves.toEqual({
+      fileName: 'circular.pdf',
+      mimeType: 'application/pdf',
+      content: fileContent,
+    });
+    expect(fileRegistryService.assertFileAccessForAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'file-1' }),
+      actor,
+    );
+    expect(fileRegistryService.auditAccess).toHaveBeenCalledWith(
+      'tenant-1',
+      'file-1',
+      'parent-1',
+      'download',
+    );
+    expect(storageService.getObjectBuffer).toHaveBeenCalledWith(
+      'tenant-1/notices/circular.pdf',
     );
   });
 

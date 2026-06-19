@@ -1,12 +1,12 @@
 import {
   IsNotEmpty,
   IsNumber,
-  IsString,
   IsPositive,
+  IsString,
   Length,
 } from 'class-validator';
 
-export class InitiateOnlinePaymentDto {
+export class InitiateParentPaymentDto {
   @IsString()
   @IsNotEmpty()
   invoiceId!: string;

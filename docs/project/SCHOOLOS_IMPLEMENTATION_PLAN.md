@@ -189,12 +189,11 @@ Before adding or expanding visible features:
   - Parent/student monthly attendance calendar with reason display.
 
 ### M3 Fees & Receipts (96-98%)
-* **Current Status:** Fee setup, invoices, student ledger, payments, receipts, printed receipt QR verification, receipt reprint with audit history UI, reversal/refund approval foundation, legacy payment-reversal compatibility route mapped to the reversal workflow and permission, cashier close, method-specific cashier close overlap rules, reconciliation, CSV exports, protected day-end PDFs, payment idempotency race handling, cashier-close unique-window race coverage plus HTTP method-specific isolation coverage, aging-bucket/min-max overdue defaulter segmentation with child-scoped reminder delivery/audit, service-hardened scholarship/waiver and invoice-adjustment workflows after invoice creation with HTTP tenant/paid-invoice denial coverage, and HMAC online payment webhook verification with duplicate, already-paid, missing-reference, zero-amount, dotted success/failure/pending provider events, and failed/pending event guards.
+* **Current Status:** Fee setup, invoices, student ledger, payments, receipts, printed receipt QR verification, receipt reprint with audit history UI, reversal/refund approval foundation, legacy payment-reversal compatibility route mapped to the reversal workflow and permission, cashier close, method-specific cashier close overlap rules, reconciliation, CSV exports, protected day-end PDFs, payment idempotency race handling, cashier-close unique-window race coverage plus HTTP method-specific isolation coverage, aging-bucket/min-max overdue defaulter segmentation with child-scoped reminder delivery/audit, service-hardened scholarship/waiver and invoice-adjustment workflows after invoice creation with HTTP tenant/paid-invoice denial coverage, HMAC online payment webhook verification, and purpose-limited parent payment intents with persisted idempotency, linked-child invoice scope, HTTPS checkout validation, exact-amount callback reconciliation, and receipt posting after verified success.
 * **Staging / Verification Remaining:**
   - Broader reversal/refund/cashier-close HTTP isolation tests and gateway sandbox verification.
 * **Backend Backlog:**
-  - Sandbox/staging payment gateway verification before enabling real gateways.
-  - Provider-specific gateway sandbox smoke before enabling real gateways.
+  - Execute and record provider-specific sandbox/staging payment intent, callback, duplicate callback, failed callback, and settlement/reconciliation smoke before enabling a real gateway.
   - Broader payment/cashier browser and HTTP workflow coverage, including cashier-close by manual reference and gateway mode once staging gateway verification exists.
 * **Web Frontend Backlog:**
   - Cashier-first collection screen (search student, partial/full collect, print/share).
@@ -204,7 +203,7 @@ Before adding or expanding visible features:
   - Overdue reminder preview UI for the existing backend defaulter segmentation.
 * **Mobile Frontend Backlog:**
   - Parent fee dashboard, invoice/receipt list/detail, PDF download/share, due alerts.
-  - Payment initiation remains disabled until gateway verification is staging-proven.
+  - Parent payment initiation is implemented as a network-only, backend-gated checkout flow. It remains unavailable unless the backend reports validated sandbox, intent adapter, signed webhook, and settlement configuration readiness; device/staging gateway evidence is still required before a release claim.
 
 ### M4 Academics / Exams / CAS / Report Cards (98-100%)
 * **Current Status:** Subjects, exams, marks, CAS, mark lock/unlock workflow, teacher marks autosave/draft backend support, absent/withheld/retest mark-state coverage, tenant grading scale/rounding policy, dues-aware result withholding, queued large-batch report-card generation with partial-failure job surfacing and retry-safe already-generated locked-card skipping, protected report-card PDFs, backend assessment template presets for terminal and theory/practical exam structures, and report/correction/history/snapshot/grading-policy workspace polish.

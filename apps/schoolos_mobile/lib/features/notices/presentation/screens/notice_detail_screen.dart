@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/platform/file_share_service.dart';
+import '../../../../features/parent/application/parent_portal_providers.dart';
 import '../../../../features/parent/presentation/widgets/parent_detail_widgets.dart';
 import '../../../../features/parent/presentation/widgets/parent_portal_widgets.dart';
 import '../../application/notices_providers.dart';
@@ -13,7 +15,15 @@ class NoticeDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detail = ref.watch(noticeDetailProvider(noticeId));
+    final provider = noticeDetailProvider(noticeId);
+    ref.listen<AsyncValue<Notice>>(provider, (previous, next) {
+      next.whenData((notice) {
+        ref.read(noticesControllerProvider.notifier).markReadLocally(notice.id);
+        ref.invalidate(parentNotificationsProvider);
+        ref.invalidate(parentPortalDataProvider);
+      });
+    });
+    final detail = ref.watch(provider);
     return ParentDetailScaffold(
       title: 'Notice',
       selectedIndex: 3,
@@ -127,40 +137,31 @@ class NoticeDetailScreen extends ConsumerWidget {
               const SizedBox(height: 18),
               const ParentSectionHeader(title: 'Attachment'),
               const SizedBox(height: 8),
-              PortalCard(
-                onTap: () => _attachmentUnavailable(context),
-                child: const Row(
-                  children: [
-                    FeatureIcon(
-                      Icons.picture_as_pdf_rounded,
-                      color: ParentPortalColors.red,
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Protected attachment download is not available in this mobile screen yet.',
-                        style: TextStyle(color: ParentPortalColors.muted),
-                      ),
-                    ),
-                    ListChevron(),
-                  ],
-                ),
+              _NoticeAttachmentCard(
+                attachment: notice.attachment,
+                onDownload: notice.attachment == null
+                    ? () => _attachmentUnavailable(context)
+                    : () =>
+                          _downloadAttachment(context, ref, notice.attachment!),
+                onShare: notice.attachment == null
+                    ? () => _attachmentUnavailable(context)
+                    : () => _shareAttachment(context, ref, notice.attachment!),
               ),
             ],
             const SizedBox(height: 18),
-            PortalCard(
+            const PortalCard(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   FeatureIcon(
-                    Icons.lock_outline_rounded,
-                    color: ParentPortalColors.orange,
+                    Icons.verified_user_rounded,
+                    color: ParentPortalColors.green,
                     size: 42,
                   ),
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Sharing and file actions require purpose-limited mobile endpoints before they can be enabled.',
+                      'This notice is loaded through your parent-scoped mobile account. Attachments stay protected and may require internet.',
                       style: TextStyle(color: ParentPortalColors.muted),
                     ),
                   ),
@@ -222,7 +223,127 @@ class NoticeDetailScreen extends ConsumerWidget {
   void _attachmentUnavailable(BuildContext context) {
     showUnavailableWorkflowSnack(
       context,
-      'Notice attachment download needs a confirmed mobile protected-file endpoint.',
+      'This notice attachment is not available for mobile download right now.',
     );
   }
+
+  Future<void> _downloadAttachment(
+    BuildContext context,
+    WidgetRef ref,
+    NoticeAttachment attachment,
+  ) async {
+    try {
+      final file = await ref
+          .read(noticesRepositoryProvider)
+          .downloadNoticeAttachment(attachment);
+      if (!context.mounted) return;
+      showFeatureSnack(context, 'Attachment downloaded: ${file.fileName}');
+    } catch (_) {
+      if (!context.mounted) return;
+      showFeatureSnack(context, 'Attachment is not available right now.');
+    }
+  }
+
+  Future<void> _shareAttachment(
+    BuildContext context,
+    WidgetRef ref,
+    NoticeAttachment attachment,
+  ) async {
+    try {
+      final file = await ref
+          .read(noticesRepositoryProvider)
+          .downloadNoticeAttachment(attachment);
+      await const FileShareService().shareFile(
+        filePath: file.filePath,
+        mimeType: attachment.mimeType,
+        subject: file.fileName,
+      );
+      if (!context.mounted) return;
+      showFeatureSnack(context, 'Attachment ready to share.');
+    } catch (_) {
+      if (!context.mounted) return;
+      showFeatureSnack(context, 'Could not share this attachment.');
+    }
+  }
+}
+
+class _NoticeAttachmentCard extends StatelessWidget {
+  const _NoticeAttachmentCard({
+    required this.attachment,
+    required this.onDownload,
+    required this.onShare,
+  });
+
+  final NoticeAttachment? attachment;
+  final VoidCallback onDownload;
+  final VoidCallback onShare;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = attachment == null
+        ? 'Protected attachment unavailable'
+        : attachment!.fileName;
+    final detail = attachment == null
+        ? 'The school has not exposed this file to parent mobile yet.'
+        : '${_formatSize(attachment!.sizeBytes)} - protected download';
+
+    return PortalCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const FeatureIcon(
+                Icons.attach_file_rounded,
+                color: ParentPortalColors.red,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    Text(
+                      detail,
+                      style: const TextStyle(color: ParentPortalColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onDownload,
+                  icon: const Icon(Icons.download_rounded, size: 18),
+                  label: const Text('Download'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onShare,
+                  icon: const Icon(Icons.ios_share_rounded, size: 18),
+                  label: const Text('Share'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatSize(int bytes) {
+  if (bytes <= 0) return 'Size unavailable';
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }

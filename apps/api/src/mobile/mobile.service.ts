@@ -16,10 +16,21 @@ import { EntitlementsService } from '../plans/entitlements.service';
 import { ReportCardPdfService } from '../academics/report-card-pdf.service';
 import { CommunicationsService } from '../communications/communications.service';
 import { HomeworkAttachmentAccessService } from '../homework/homework-attachment-access.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
+import { StorageService } from '../storage/storage.service';
+import { InitiateParentPaymentDto } from './dto/initiate-parent-payment.dto';
 
 interface MobileStudentRow extends Student {
   class: { id: string; name: string };
-  sectionRef: { id: string; name: string } | null;
+  sectionRef: {
+    id: string;
+    name: string;
+    classTeacher?: {
+      id: string;
+      firstName: string;
+      lastName: string;
+    } | null;
+  } | null;
   guardianLinks: Array<{
     relation: string;
     isPrimary: boolean;
@@ -44,6 +55,8 @@ export class MobileService {
     private readonly reportCardPdfService: ReportCardPdfService,
     private readonly communicationsService: CommunicationsService,
     private readonly homeworkAttachmentAccessService: HomeworkAttachmentAccessService,
+    private readonly fileRegistryService: FileRegistryService,
+    private readonly storageService: StorageService,
   ) {}
 
   async listMyStudents(actor: AuthContext) {
@@ -328,6 +341,75 @@ export class MobileService {
   }
 
   async getNotificationDetail(notificationId: string, actor: AuthContext) {
+    const notification = await this.getVisibleNotification(
+      notificationId,
+      actor,
+    );
+    const attachment = notification.noticeId
+      ? await this.getNoticeAttachmentDescriptor(
+          notification.noticeId,
+          notification.id,
+          actor,
+        )
+      : null;
+
+    return {
+      id: notification.id,
+      title: notification.title,
+      message: notification.body,
+      sourceType: notification.sourceType,
+      sourceId: notification.sourceId,
+      childId: notification.studentId,
+      noticeId: notification.noticeId,
+      eventId: notification.eventId,
+      activityPostId: notification.activityPostId,
+      route: parentNotificationRoute(notification),
+      channel: notification.channel,
+      status: notification.status,
+      createdAt: toIso(notification.createdAt),
+      sentAt: toIso(notification.sentAt),
+      readAt: toIso(notification.readReceipts[0]?.readAt),
+      isRead: notification.readReceipts.length > 0,
+      attachment,
+    };
+  }
+
+  async getNotificationAttachment(notificationId: string, actor: AuthContext) {
+    const notification = await this.getVisibleNotification(
+      notificationId,
+      actor,
+    );
+    if (!notification.noticeId) {
+      throw new NotFoundException('Notice attachment not found');
+    }
+
+    const [asset] = await this.fileRegistryService.listFilesByEntity(
+      actor.tenantId,
+      'notices',
+      notification.noticeId,
+    );
+    if (!asset) {
+      throw new NotFoundException('Notice attachment not found');
+    }
+
+    await this.fileRegistryService.assertFileAccessForAuth(asset, actor);
+    await this.fileRegistryService.auditAccess(
+      actor.tenantId,
+      asset.id,
+      actor.userId,
+      'download',
+    );
+    return {
+      fileName: asset.originalFilename,
+      mimeType: asset.mimeType,
+      content: await this.storageService.getObjectBuffer(asset.objectKey),
+    };
+  }
+
+  private async getVisibleNotification(
+    notificationId: string,
+    actor: AuthContext,
+  ) {
     const studentIds = await this.getAllowedStudentIds(actor);
     const notification = await this.prisma.notificationDelivery.findFirst({
       where: {
@@ -350,23 +432,29 @@ export class MobileService {
       throw new NotFoundException('Notification not found');
     }
 
+    return notification;
+  }
+
+  private async getNoticeAttachmentDescriptor(
+    noticeId: string,
+    notificationId: string,
+    actor: AuthContext,
+  ) {
+    const [asset] = await this.fileRegistryService.listFilesByEntity(
+      actor.tenantId,
+      'notices',
+      noticeId,
+    );
+    if (!asset) {
+      return null;
+    }
+
     return {
-      id: notification.id,
-      title: notification.title,
-      message: notification.body,
-      sourceType: notification.sourceType,
-      sourceId: notification.sourceId,
-      childId: notification.studentId,
-      noticeId: notification.noticeId,
-      eventId: notification.eventId,
-      activityPostId: notification.activityPostId,
-      route: parentNotificationRoute(notification),
-      channel: notification.channel,
-      status: notification.status,
-      createdAt: toIso(notification.createdAt),
-      sentAt: toIso(notification.sentAt),
-      readAt: toIso(notification.readReceipts[0]?.readAt),
-      isRead: notification.readReceipts.length > 0,
+      id: asset.id,
+      fileName: asset.originalFilename,
+      mimeType: asset.mimeType,
+      sizeBytes: Number(asset.sizeBytes),
+      downloadPath: `/mobile/me/notifications/${encodeURIComponent(notificationId)}/attachment`,
     };
   }
 
@@ -375,6 +463,17 @@ export class MobileService {
     return {
       child: toMobileStudent(student),
       profile: {
+        classTeacher: student.sectionRef?.classTeacher
+          ? {
+              id: student.sectionRef.classTeacher.id,
+              name: [
+                student.sectionRef.classTeacher.firstName,
+                student.sectionRef.classTeacher.lastName,
+              ]
+                .filter(Boolean)
+                .join(' '),
+            }
+          : null,
         studentSystemId: student.studentSystemId,
         admissionNumber: student.admissionNumber,
         admissionDate: toIso(student.admissionDate),
@@ -498,17 +597,49 @@ export class MobileService {
           timestampOrZero(a.issuedAt ?? a.paidAt),
       )
       .slice(0, 10);
+    const totalAmount = roundMoney(
+      items.reduce((sum, item) => sum + item.totalAmount, 0),
+    );
+    const paidAmount = roundMoney(
+      items.reduce((sum, item) => sum + item.paidAmount, 0),
+    );
+    const totalOutstanding = roundMoney(
+      items.reduce((sum, item) => sum + item.outstandingAmount, 0),
+    );
 
     return {
-      totalOutstanding: roundMoney(
-        items.reduce((sum, item) => sum + item.outstandingAmount, 0),
-      ),
+      status:
+        totalOutstanding <= 0 ? 'PAID' : paidAmount > 0 ? 'PARTIAL' : 'DUE',
+      totalAmount,
+      paidAmount,
+      totalOutstanding,
       overdueCount: items.filter((item) => item.isOverdue).length,
       nextDueDate:
         items.find((item) => item.outstandingAmount > 0)?.dueDate ?? null,
       recentInvoices: items.slice(0, 10),
       recentReceipts,
     };
+  }
+
+  async getStudentPaymentGatewayReadiness(
+    studentId: string,
+    actor: AuthContext,
+  ) {
+    await this.assertStudentAccess(studentId, actor);
+    return this.financeService.getParentPaymentGatewayReadiness();
+  }
+
+  async initiateStudentPayment(
+    studentId: string,
+    dto: InitiateParentPaymentDto,
+    actor: AuthContext,
+  ) {
+    await this.assertStudentAccess(studentId, actor);
+    return this.financeService.initiateParentOnlinePayment(
+      studentId,
+      dto,
+      actor,
+    );
   }
 
   async getStudentReceiptPdf(
@@ -784,6 +915,23 @@ export class MobileService {
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: 10,
     });
+    const examTermIds = reportCards.map((card) => card.examTermId);
+    const marks =
+      examTermIds.length === 0
+        ? []
+        : await this.prisma.markEntry.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId,
+              examTermId: { in: examTermIds },
+            },
+            include: {
+              subject: { select: { id: true, name: true, code: true } },
+              assessmentComponent: { select: { maxMarks: true } },
+            },
+            orderBy: [{ subject: { code: 'asc' } }],
+          });
+    const subjectsByTerm = groupReportCardSubjects(marks);
 
     return {
       items: reportCards.map((card) => ({
@@ -798,6 +946,9 @@ export class MobileService {
         remarks: card.remarks,
         publishedAt: toIso(card.publishedAt),
         hasFile: Boolean(card.fileId),
+        attendancePercentage: null,
+        classTeacherRemark: card.remarks,
+        subjects: subjectsByTerm.get(card.examTermId) ?? [],
       })),
     };
   }
@@ -1097,6 +1248,13 @@ export class MobileService {
           select: {
             id: true,
             name: true,
+            classTeacher: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
           },
         },
         guardianLinks: {
@@ -1314,6 +1472,82 @@ function hasToNumber(value: unknown): value is { toNumber: () => number } {
 
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function groupReportCardSubjects(
+  marks: Array<{
+    examTermId: string;
+    subjectId: string;
+    marksObtained: unknown;
+    subject: { id: string; name: string; code: string };
+    assessmentComponent: { maxMarks: unknown };
+  }>,
+) {
+  const grouped = new Map<
+    string,
+    Map<
+      string,
+      {
+        subjectId: string;
+        subjectName: string;
+        marksObtained: number;
+        maxMarks: number;
+      }
+    >
+  >();
+
+  for (const mark of marks) {
+    const termSubjects =
+      grouped.get(mark.examTermId) ??
+      new Map<
+        string,
+        {
+          subjectId: string;
+          subjectName: string;
+          marksObtained: number;
+          maxMarks: number;
+        }
+      >();
+    const subject = termSubjects.get(mark.subjectId) ?? {
+      subjectId: mark.subject.id,
+      subjectName: mark.subject.name,
+      marksObtained: 0,
+      maxMarks: 0,
+    };
+    subject.marksObtained += money(mark.marksObtained);
+    subject.maxMarks += money(mark.assessmentComponent.maxMarks);
+    termSubjects.set(mark.subjectId, subject);
+    grouped.set(mark.examTermId, termSubjects);
+  }
+
+  return new Map(
+    Array.from(grouped.entries()).map(([termId, subjects]) => [
+      termId,
+      Array.from(subjects.values()).map((subject) => {
+        const percentage =
+          subject.maxMarks <= 0
+            ? 0
+            : roundMoney((subject.marksObtained / subject.maxMarks) * 100);
+        return {
+          ...subject,
+          marksObtained: roundMoney(subject.marksObtained),
+          maxMarks: roundMoney(subject.maxMarks),
+          percentage,
+          grade: gradeFromPercentage(percentage),
+        };
+      }),
+    ]),
+  );
+}
+
+function gradeFromPercentage(percentage: number) {
+  if (percentage >= 90) return 'A+';
+  if (percentage >= 80) return 'A';
+  if (percentage >= 70) return 'B+';
+  if (percentage >= 60) return 'B';
+  if (percentage >= 50) return 'C+';
+  if (percentage >= 40) return 'C';
+  return 'D';
 }
 
 function toIso(value: Date | null | undefined) {

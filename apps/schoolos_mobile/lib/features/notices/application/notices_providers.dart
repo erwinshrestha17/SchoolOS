@@ -36,12 +36,15 @@ final noticeDetailProvider = FutureProvider.autoDispose.family<Notice, String>((
   return notice.copyWith(isRead: true);
 });
 
-final parentNotificationsProvider = StateNotifierProvider<
-  ParentNotificationsController,
-  ParentNotificationsState
->((ref) {
-  return ParentNotificationsController(ref.watch(noticesRepositoryProvider));
-});
+final parentNotificationsProvider =
+    StateNotifierProvider<
+      ParentNotificationsController,
+      ParentNotificationsState
+    >((ref) {
+      return ParentNotificationsController(
+        ref.watch(noticesRepositoryProvider),
+      );
+    });
 
 class ParentNotificationsState {
   const ParentNotificationsState({

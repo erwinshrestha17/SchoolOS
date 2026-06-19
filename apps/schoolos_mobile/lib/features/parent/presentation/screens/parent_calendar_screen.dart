@@ -1,30 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../application/parent_portal_providers.dart';
 import '../../domain/parent_portal_models.dart';
 import '../widgets/parent_detail_widgets.dart';
 import '../widgets/parent_portal_widgets.dart';
 
-class ParentCalendarScreen extends ConsumerWidget {
+class ParentCalendarScreen extends ConsumerStatefulWidget {
   const ParentCalendarScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ParentCalendarScreen> createState() =>
+      _ParentCalendarScreenState();
+}
+
+class _ParentCalendarScreenState extends ConsumerState<ParentCalendarScreen> {
+  late BsDate visibleMonth = NepaliBsCalendar.fromAd(DateTime.now());
+
+  @override
+  Widget build(BuildContext context) {
     final portal = ref.watch(parentPortalDataProvider);
     return ParentDetailScaffold(
-      title: 'School Calendar',
+      title: 'BS Calendar',
       selectedIndex: 4,
       body: portal.when(
-        loading: () => const _CalendarLoading(),
-        error: (_, _) => _CalendarUnavailable(
-          title: 'Could not load calendar updates',
-          message: 'Please try again in a moment.',
+        loading: () => const PortalLoadingState(),
+        error: (_, _) => PortalErrorState(
           onRetry: () => ref.invalidate(parentPortalDataProvider),
         ),
         data: (data) {
-          final events = data.updates
-              .where((item) => item.category == ParentUpdateCategory.event)
+          final markers = _calendarMarkers(data);
+          final visibleMarkers = markers
+              .where(
+                (item) =>
+                    item.bs.year == visibleMonth.year &&
+                    item.bs.month == visibleMonth.month,
+              )
               .toList();
           return RefreshIndicator(
             onRefresh: () async {
@@ -34,70 +46,43 @@ class ParentCalendarScreen extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
               children: [
-                PortalCard(
-                  color: ParentPortalColors.blueSoft,
-                  child: Row(
-                    children: [
-                      const FeatureIcon(
-                        Icons.calendar_month_rounded,
-                        color: ParentPortalColors.blue,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'School events',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            Text(
-                              'Latest event updates from ${data.schoolName}.',
-                              style: const TextStyle(
-                                color: ParentPortalColors.muted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                _CalendarHeader(
+                  month: visibleMonth,
+                  onPrevious: () => setState(() {
+                    visibleMonth = _addMonths(visibleMonth, -1);
+                  }),
+                  onNext: () => setState(() {
+                    visibleMonth = _addMonths(visibleMonth, 1);
+                  }),
                 ),
-                const SizedBox(height: 16),
-                const ParentSectionHeader(title: 'Upcoming'),
-                const SizedBox(height: 8),
-                if (events.isEmpty)
-                  const _CalendarUnavailable(
-                    title: 'No calendar events available',
-                    message:
-                        'School calendar events will appear here when the school publishes them.',
+                const SizedBox(height: 12),
+                _MonthGrid(month: visibleMonth, markers: visibleMarkers),
+                const SizedBox(height: 18),
+                const ParentSectionHeader(title: 'This month'),
+                const SizedBox(height: 10),
+                if (data.children.length == 1)
+                  _ChildCalendarSection(
+                    child: data.children.first,
+                    markers: visibleMarkers
+                        .where((item) => item.childId == data.children.first.id)
+                        .toList(),
                   )
                 else
-                  for (final event in events) ...[
-                    _CalendarEventCard(event: event),
-                    const SizedBox(height: 10),
+                  for (final child in data.children) ...[
+                    _ChildCalendarSection(
+                      child: child,
+                      markers: visibleMarkers
+                          .where((item) => item.childId == child.id)
+                          .toList(),
+                    ),
+                    const SizedBox(height: 12),
                   ],
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 const PortalCard(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      FeatureIcon(
-                        Icons.sync_disabled_rounded,
-                        color: ParentPortalColors.orange,
-                        size: 42,
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Phone calendar sync is not enabled for this school app yet.',
-                          style: TextStyle(color: ParentPortalColors.muted),
-                        ),
-                      ),
-                    ],
+                  color: ParentPortalColors.surfaceAlt,
+                  child: Text(
+                    'BS calendar dates are shown in English. School events and child items refresh from mobile parent APIs.',
+                    style: TextStyle(color: ParentPortalColors.muted),
                   ),
                 ),
               ],
@@ -109,174 +94,415 @@ class ParentCalendarScreen extends ConsumerWidget {
   }
 }
 
-class _CalendarEventCard extends StatelessWidget {
-  const _CalendarEventCard({required this.event});
+class _CalendarHeader extends StatelessWidget {
+  const _CalendarHeader({
+    required this.month,
+    required this.onPrevious,
+    required this.onNext,
+  });
 
-  final ParentPortalUpdate event;
+  final BsDate month;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
 
   @override
   Widget build(BuildContext context) {
     return PortalCard(
-      onTap: () => _eventSheet(context),
       child: Row(
         children: [
-          const FeatureIcon(
-            Icons.event_available_rounded,
-            color: ParentPortalColors.green,
+          IconButton(
+            tooltip: 'Previous month',
+            onPressed: onPrevious,
+            icon: const Icon(Icons.chevron_left_rounded),
           ),
-          const SizedBox(width: 12),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  event.title,
+                  '${month.monthName} ${month.year}',
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
+                    color: ParentPortalColors.navy,
                     fontWeight: FontWeight.w900,
-                    fontSize: 16,
+                    fontSize: 20,
                   ),
                 ),
-                Text(
-                  event.body,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: ParentPortalColors.muted),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  event.metadata,
-                  style: const TextStyle(
-                    color: ParentPortalColors.green,
-                    fontWeight: FontWeight.w800,
-                  ),
+                const Text(
+                  'Bikram Sambat',
+                  style: TextStyle(color: ParentPortalColors.muted),
                 ),
               ],
             ),
           ),
-          const ListChevron(),
+          IconButton(
+            tooltip: 'Next month',
+            onPressed: onNext,
+            icon: const Icon(Icons.chevron_right_rounded),
+          ),
         ],
       ),
     );
   }
-
-  void _eventSheet(BuildContext context) => showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    builder: (_) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const FeatureIcon(
-              Icons.event_available_rounded,
-              color: ParentPortalColors.green,
-              size: 60,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              event.title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              event.body,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: ParentPortalColors.muted),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              event.metadata,
-              style: const TextStyle(
-                color: ParentPortalColors.green,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
 }
 
-class _CalendarUnavailable extends StatelessWidget {
-  const _CalendarUnavailable({
-    required this.title,
-    required this.message,
-    this.onRetry,
-  });
+class _MonthGrid extends StatelessWidget {
+  const _MonthGrid({required this.month, required this.markers});
 
-  final String title;
-  final String message;
-  final VoidCallback? onRetry;
+  final BsDate month;
+  final List<_CalendarMarker> markers;
 
   @override
-  Widget build(BuildContext context) => PortalCard(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const FeatureIcon(
-              Icons.event_busy_rounded,
-              color: ParentPortalColors.orange,
+  Widget build(BuildContext context) {
+    final days = NepaliBsCalendar.daysInMonth(month.year, month.month);
+    final firstAd = BsDate(
+      year: month.year,
+      month: month.month,
+      day: 1,
+    ).approximateAdDate;
+    final leading = firstAd.weekday % 7;
+    final cells = leading + days;
+
+    return PortalCard(
+      child: Column(
+        children: [
+          const Row(
+            children: [
+              _WeekdayLabel('Sun'),
+              _WeekdayLabel('Mon'),
+              _WeekdayLabel('Tue'),
+              _WeekdayLabel('Wed'),
+              _WeekdayLabel('Thu'),
+              _WeekdayLabel('Fri'),
+              _WeekdayLabel('Sat'),
+            ],
+          ),
+          const SizedBox(height: 8),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              childAspectRatio: .82,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  Text(
-                    message,
-                    style: const TextStyle(color: ParentPortalColors.muted),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        if (onRetry != null) ...[
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Retry'),
+            itemCount: cells,
+            itemBuilder: (context, index) {
+              if (index < leading) {
+                return const SizedBox.shrink();
+              }
+              final day = index - leading + 1;
+              final date = BsDate(
+                year: month.year,
+                month: month.month,
+                day: day,
+              );
+              final adDate = date.approximateAdDate;
+              final dayMarkers = markers
+                  .where((item) => item.bs.day == day)
+                  .toList();
+              final isToday = _sameDay(adDate, DateTime.now());
+              final isHoliday = adDate.weekday == DateTime.saturday;
+              return _DayCell(
+                day: day,
+                isToday: isToday,
+                isHoliday: isHoliday,
+                markers: dayMarkers,
+              );
+            },
+          ),
+          const Divider(height: 18),
+          const Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              _LegendDot(color: ParentPortalColors.green, label: 'Attendance'),
+              _LegendDot(color: ParentPortalColors.purple, label: 'Homework'),
+              _LegendDot(color: ParentPortalColors.orange, label: 'Fees'),
+              _LegendDot(color: ParentPortalColors.blue, label: 'Notice/Event'),
+              _LegendDot(color: ParentPortalColors.red, label: 'Holiday'),
+            ],
           ),
         ],
-      ],
+      ),
+    );
+  }
+}
+
+class _WeekdayLabel extends StatelessWidget {
+  const _WeekdayLabel(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Text(
+      label,
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+        color: ParentPortalColors.muted,
+        fontWeight: FontWeight.w800,
+        fontSize: 12,
+      ),
     ),
   );
 }
 
-class _CalendarLoading extends StatelessWidget {
-  const _CalendarLoading();
+class _DayCell extends StatelessWidget {
+  const _DayCell({
+    required this.day,
+    required this.isToday,
+    required this.isHoliday,
+    required this.markers,
+  });
+
+  final int day;
+  final bool isToday;
+  final bool isHoliday;
+  final List<_CalendarMarker> markers;
 
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-    children: const [
-      PortalCard(
-        child: Row(
-          children: [
-            FeatureIcon(Icons.calendar_month_rounded),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Loading school calendar updates...',
-                style: TextStyle(color: ParentPortalColors.muted),
-              ),
-            ),
-          ],
-        ),
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: isToday ? ParentPortalColors.greenSoft : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        border: isToday
+            ? Border.all(color: ParentPortalColors.green.withValues(alpha: .4))
+            : null,
       ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '$day',
+            style: TextStyle(
+              color: isHoliday
+                  ? ParentPortalColors.red
+                  : ParentPortalColors.navy,
+              fontWeight: isToday ? FontWeight.w900 : FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 3,
+            runSpacing: 3,
+            children: [
+              if (isHoliday) const _MiniDot(ParentPortalColors.red),
+              for (final marker in markers.take(4)) _MiniDot(marker.color),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChildCalendarSection extends StatelessWidget {
+  const _ChildCalendarSection({required this.child, required this.markers});
+
+  final ParentPortalChild child;
+  final List<_CalendarMarker> markers;
+
+  @override
+  Widget build(BuildContext context) {
+    return PortalCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AvatarInitials(name: child.name, radius: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      child.name,
+                      style: const TextStyle(
+                        color: ParentPortalColors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      '${child.classSection} - ${child.teacher}',
+                      style: const TextStyle(color: ParentPortalColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (markers.isEmpty)
+            const Text(
+              'No dated child items in this BS month.',
+              style: TextStyle(color: ParentPortalColors.muted),
+            )
+          else
+            for (final item in markers.take(6)) ...[
+              _MarkerRow(marker: item),
+              const SizedBox(height: 8),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MarkerRow extends StatelessWidget {
+  const _MarkerRow({required this.marker});
+
+  final _CalendarMarker marker;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(marker.icon, size: 18, color: marker.color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            '${marker.bs.day} ${marker.bs.monthName}: ${marker.title}',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  const _LegendDot({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      _MiniDot(color),
+      const SizedBox(width: 5),
+      Text(label, style: const TextStyle(color: ParentPortalColors.muted)),
     ],
   );
+}
+
+class _MiniDot extends StatelessWidget {
+  const _MiniDot(this.color);
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    child: const SizedBox(width: 6, height: 6),
+  );
+}
+
+class _CalendarMarker {
+  const _CalendarMarker({
+    required this.childId,
+    required this.title,
+    required this.bs,
+    required this.color,
+    required this.icon,
+  });
+
+  final String childId;
+  final String title;
+  final BsDate bs;
+  final Color color;
+  final IconData icon;
+}
+
+List<_CalendarMarker> _calendarMarkers(ParentPortalData data) {
+  final nowBs = NepaliBsCalendar.fromAd(DateTime.now());
+  final markers = <_CalendarMarker>[];
+  for (final child in data.children) {
+    markers.add(
+      _CalendarMarker(
+        childId: child.id,
+        title: child.attendance,
+        bs: nowBs,
+        color: ParentPortalColors.green,
+        icon: Icons.fact_check_rounded,
+      ),
+    );
+    final feeDue = DateTime.tryParse(child.nextFeeDueDate ?? '');
+    if (child.hasFeesDue && feeDue != null) {
+      markers.add(
+        _CalendarMarker(
+          childId: child.id,
+          title: 'Fees due NPR ${child.feesDue.toStringAsFixed(0)}',
+          bs: NepaliBsCalendar.fromAd(feeDue),
+          color: ParentPortalColors.orange,
+          icon: Icons.account_balance_wallet_outlined,
+        ),
+      );
+    }
+  }
+
+  for (final item in data.homework) {
+    final dueAt = item.dueAt;
+    if (dueAt == null) continue;
+    markers.add(
+      _CalendarMarker(
+        childId: item.childId,
+        title: item.title,
+        bs: NepaliBsCalendar.fromAd(dueAt),
+        color: ParentPortalColors.purple,
+        icon: Icons.menu_book_outlined,
+      ),
+    );
+  }
+
+  for (final item in data.updates) {
+    final createdAt = item.createdAt;
+    if (createdAt == null) continue;
+    final childIds = data.children
+        .where((child) => item.metadata.contains(child.name))
+        .map((child) => child.id)
+        .toList();
+    final targetIds = childIds.isEmpty
+        ? data.children.map((child) => child.id).toList()
+        : childIds;
+    for (final childId in targetIds) {
+      markers.add(
+        _CalendarMarker(
+          childId: childId,
+          title: item.title,
+          bs: NepaliBsCalendar.fromAd(createdAt),
+          color: ParentPortalColors.blue,
+          icon: item.category == ParentUpdateCategory.event
+              ? Icons.event_outlined
+              : Icons.campaign_outlined,
+        ),
+      );
+    }
+  }
+
+  markers.sort((a, b) => a.bs.day.compareTo(b.bs.day));
+  return markers;
+}
+
+BsDate _addMonths(BsDate value, int delta) {
+  var year = value.year;
+  var month = value.month + delta;
+  while (month < 1) {
+    month += 12;
+    year -= 1;
+  }
+  while (month > 12) {
+    month -= 12;
+    year += 1;
+  }
+  return BsDate(year: year, month: month, day: 1);
+}
+
+bool _sameDay(DateTime a, DateTime b) {
+  return a.year == b.year && a.month == b.month && a.day == b.day;
 }

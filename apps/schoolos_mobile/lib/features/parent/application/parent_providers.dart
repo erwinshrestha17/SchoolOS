@@ -29,6 +29,18 @@ final parentHomeworkProvider = FutureProvider.autoDispose
       return ref.watch(parentRepositoryProvider).getHomeworkForChild(childId);
     });
 
+final parentDashboardSummaryProvider = FutureProvider.autoDispose
+    .family<ParentDashboardSummary, String>((ref, childId) {
+      return ref
+          .watch(parentRepositoryProvider)
+          .getParentDashboardSummary(childId);
+    });
+
+final parentChildProfileProvider = FutureProvider.autoDispose
+    .family<ChildProfile, String>((ref, childId) {
+      return ref.watch(parentRepositoryProvider).getChildProfile(childId);
+    });
+
 final parentTimetableProvider = FutureProvider.autoDispose
     .family<ParentTimetable, String>((ref, childId) {
       return ref.watch(parentRepositoryProvider).getTimetableForChild(childId);
@@ -39,6 +51,13 @@ final parentReportCardsProvider = FutureProvider.autoDispose
       return ref
           .watch(parentRepositoryProvider)
           .getReportCardsForChild(childId);
+    });
+
+final parentPaymentGatewayReadinessProvider = FutureProvider.autoDispose
+    .family<ParentPaymentGatewayReadiness, String>((ref, childId) {
+      return ref
+          .watch(parentRepositoryProvider)
+          .getPaymentGatewayReadiness(childId);
     });
 
 final parentConsentStatusProvider =

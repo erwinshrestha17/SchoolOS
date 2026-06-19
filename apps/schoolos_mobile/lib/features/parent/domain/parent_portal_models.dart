@@ -14,7 +14,13 @@ class ParentPortalChild {
     this.homeworkPending = 0,
     this.unreadUpdates = 0,
     this.feesDue = 0,
+    this.feesStatus = 'DUE',
+    this.feesPaidAmount = 0,
+    this.feesTotalAmount = 0,
+    this.nextFeeDueDate,
     this.transportDetail,
+    this.latestActivity,
+    this.latestActivityTitle,
   });
 
   final String id;
@@ -29,7 +35,15 @@ class ParentPortalChild {
   final int homeworkPending;
   final int unreadUpdates;
   final num feesDue;
+  final String feesStatus;
+  final num feesPaidAmount;
+  final num feesTotalAmount;
+  final String? nextFeeDueDate;
   final String? transportDetail;
+  final String? latestActivity;
+  final String? latestActivityTitle;
+
+  bool get hasFeesDue => feesDue > 0;
 }
 
 class ParentPortalHomework {
@@ -41,6 +55,7 @@ class ParentPortalHomework {
     required this.subject,
     required this.title,
     required this.dueLabel,
+    this.dueAt,
     required this.status,
     required this.attachmentCount,
     required this.teacher,
@@ -53,6 +68,7 @@ class ParentPortalHomework {
   final String subject;
   final String title;
   final String dueLabel;
+  final DateTime? dueAt;
   final String status;
   final int attachmentCount;
   final String teacher;
@@ -68,6 +84,7 @@ class ParentPortalUpdate {
     required this.title,
     required this.body,
     required this.metadata,
+    this.createdAt,
     this.isPinned = false,
     this.isImportant = false,
     this.unreadCount = 0,
@@ -79,6 +96,7 @@ class ParentPortalUpdate {
   final String title;
   final String body;
   final String metadata;
+  final DateTime? createdAt;
   final bool isPinned;
   final bool isImportant;
   final int unreadCount;

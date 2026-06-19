@@ -50,6 +50,7 @@ class ChildProfile {
     required this.homeworkSummary,
     required this.feesSummary,
     required this.qrLabel,
+    this.classTeacherId,
     this.studentSystemId,
     this.admissionNumber,
     this.admissionDate,
@@ -72,6 +73,7 @@ class ChildProfile {
   final String homeworkSummary;
   final String feesSummary;
   final String qrLabel;
+  final String? classTeacherId;
   final String? studentSystemId;
   final String? admissionNumber;
   final String? admissionDate;
@@ -93,6 +95,9 @@ class ParentDashboardSummary {
     required this.homeworkPending,
     this.nextHomeworkDueAt,
     required this.feesDue,
+    this.feesStatus = 'DUE',
+    this.feesPaidAmount = 0,
+    this.feesTotalAmount = 0,
     required this.overdueFeesCount,
     this.nextFeeDueDate,
     this.recentInvoices = const [],
@@ -119,6 +124,9 @@ class ParentDashboardSummary {
   final int homeworkPending;
   final String? nextHomeworkDueAt;
   final num feesDue;
+  final String feesStatus;
+  final num feesPaidAmount;
+  final num feesTotalAmount;
   final int overdueFeesCount;
   final String? nextFeeDueDate;
   final List<ParentFeeInvoice> recentInvoices;
@@ -174,6 +182,9 @@ class ParentDashboardSummary {
       homeworkPending: _asInt(homework?['pendingCount']),
       nextHomeworkDueAt: homework?['nextDueAt'] as String?,
       feesDue: _asNum(fees?['totalOutstanding']),
+      feesStatus: fees?['status'] as String? ?? _feeStatus(fees),
+      feesPaidAmount: _asNum(fees?['paidAmount']),
+      feesTotalAmount: _asNum(fees?['totalAmount']),
       overdueFeesCount: _asInt(fees?['overdueCount']),
       nextFeeDueDate: fees?['nextDueDate'] as String?,
       recentInvoices: recentInvoices,
@@ -275,6 +286,67 @@ class ParentFeeReceipt {
       method: json['method'] as String? ?? 'PAYMENT',
       paidAt: json['paidAt'] as String?,
       issuedAt: json['issuedAt'] as String?,
+    );
+  }
+}
+
+class ParentPaymentGatewayReadiness {
+  const ParentPaymentGatewayReadiness({
+    required this.enabled,
+    required this.status,
+    required this.providerName,
+    required this.message,
+  });
+
+  final bool enabled;
+  final String status;
+  final String? providerName;
+  final String message;
+
+  factory ParentPaymentGatewayReadiness.fromJson(Map<String, dynamic> json) {
+    final provider = _asMap(json['provider']);
+    return ParentPaymentGatewayReadiness(
+      enabled: json['enabled'] as bool? ?? false,
+      status: json['status'] as String? ?? 'not_configured',
+      providerName: provider?['name'] as String?,
+      message:
+          json['message'] as String? ??
+          'Online payments are not enabled for this school.',
+    );
+  }
+}
+
+class ParentPaymentIntent {
+  const ParentPaymentIntent({
+    required this.id,
+    required this.invoiceId,
+    required this.provider,
+    required this.amount,
+    required this.currency,
+    required this.status,
+    this.checkoutUrl,
+    this.expiresAt,
+  });
+
+  final String id;
+  final String invoiceId;
+  final String provider;
+  final num amount;
+  final String currency;
+  final String status;
+  final String? checkoutUrl;
+  final String? expiresAt;
+
+  factory ParentPaymentIntent.fromJson(Map<String, dynamic> json) {
+    return ParentPaymentIntent(
+      id: json['id'] as String? ?? '',
+      invoiceId: json['invoiceId'] as String? ?? '',
+      provider: json['provider'] as String? ?? '',
+      amount: _asNum(json['amount']),
+      currency: json['currency'] as String? ?? 'NPR',
+      status: json['status'] as String? ?? 'FAILED',
+      checkoutUrl: json['checkoutUrl'] as String?,
+      expiresAt: json['expiresAt'] as String?,
     );
   }
 }
@@ -411,6 +483,9 @@ class ParentReportCard {
     this.gpa,
     this.remarks,
     this.publishedAt,
+    this.attendancePercentage,
+    this.classTeacherRemark,
+    this.subjects = const [],
     required this.hasFile,
   });
 
@@ -422,6 +497,9 @@ class ParentReportCard {
   final num? gpa;
   final String? remarks;
   final String? publishedAt;
+  final num? attendancePercentage;
+  final String? classTeacherRemark;
+  final List<ParentReportCardSubject> subjects;
   final bool hasFile;
 
   factory ParentReportCard.fromJson(Map<String, dynamic> json) {
@@ -437,7 +515,42 @@ class ParentReportCard {
       gpa: json['gpa'] as num?,
       remarks: json['remarks'] as String?,
       publishedAt: json['publishedAt'] as String?,
+      attendancePercentage: _asNullableNum(json['attendancePercentage']),
+      classTeacherRemark: json['classTeacherRemark'] as String?,
+      subjects: _asList(json['subjects'])
+          .whereType<Map<String, dynamic>>()
+          .map(ParentReportCardSubject.fromJson)
+          .toList(),
       hasFile: json['hasFile'] as bool? ?? false,
+    );
+  }
+}
+
+class ParentReportCardSubject {
+  const ParentReportCardSubject({
+    required this.subjectId,
+    required this.subjectName,
+    required this.grade,
+    required this.percentage,
+    required this.marksObtained,
+    required this.maxMarks,
+  });
+
+  final String subjectId;
+  final String subjectName;
+  final String grade;
+  final num percentage;
+  final num marksObtained;
+  final num maxMarks;
+
+  factory ParentReportCardSubject.fromJson(Map<String, dynamic> json) {
+    return ParentReportCardSubject(
+      subjectId: json['subjectId'] as String? ?? '',
+      subjectName: json['subjectName'] as String? ?? 'Subject',
+      grade: json['grade'] as String? ?? '-',
+      percentage: _asNum(json['percentage']),
+      marksObtained: _asNum(json['marksObtained']),
+      maxMarks: _asNum(json['maxMarks']),
     );
   }
 }
@@ -1049,6 +1162,18 @@ num? _asNullableNum(Object? value) {
     return null;
   }
   return _asNum(value);
+}
+
+String _feeStatus(Map<String, dynamic>? fees) {
+  if (fees == null) {
+    return 'LOCKED';
+  }
+  final outstanding = _asNum(fees['totalOutstanding']);
+  final paid = _asNum(fees['paidAmount']);
+  if (outstanding <= 0) {
+    return 'PAID';
+  }
+  return paid > 0 ? 'PARTIAL' : 'DUE';
 }
 
 String _formatAttendancePercent(Map<String, dynamic>? attendance) {

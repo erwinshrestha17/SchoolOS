@@ -83,18 +83,19 @@ class ParentApiChildSelector extends StatelessWidget {
           ),
         ),
         if (statusLabel != null) StatusBadge(label: statusLabel!),
-        PopupMenuButton<String>(
-          tooltip: 'Select child',
-          icon: const Icon(Icons.keyboard_arrow_down_rounded),
-          onSelected: onChanged,
-          itemBuilder: (_) => [
-            for (final item in children)
-              PopupMenuItem(
-                value: item.id,
-                child: Text('${item.name} • ${item.classSection}'),
-              ),
-          ],
-        ),
+        if (children.length > 1)
+          PopupMenuButton<String>(
+            tooltip: 'Select child',
+            icon: const Icon(Icons.keyboard_arrow_down_rounded),
+            onSelected: onChanged,
+            itemBuilder: (_) => [
+              for (final item in children)
+                PopupMenuItem(
+                  value: item.id,
+                  child: Text('${item.name} • ${item.classSection}'),
+                ),
+            ],
+          ),
       ],
     ),
   );

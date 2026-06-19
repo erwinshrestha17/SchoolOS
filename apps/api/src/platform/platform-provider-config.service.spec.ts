@@ -783,4 +783,57 @@ describe('PlatformService provider config hardening', () => {
       data: expect.objectContaining({ validationStatus: 'FAILED' }),
     });
   });
+
+  it('marks a TEST payment gateway valid only after a real non-charge sandbox probe', async () => {
+    const provider = {
+      id: 'pg-test',
+      type: 'PAYMENT_GATEWAY',
+      name: 'NEPAL_GATEWAY',
+      enabled: true,
+      environment: 'TEST',
+      configEncrypted: {
+        merchantId: 'test-merchant',
+        adapter: 'generic_json_v1',
+        intentUrl: 'https://gateway.test/intents',
+        webhookUrl: 'https://school.test/payments/webhook',
+        settlementStatusUrl: 'https://gateway.test/settlements',
+        sandboxHealthUrl: 'https://gateway.test/health',
+      },
+      secretKeys: [],
+      updatedAt: new Date(),
+      lastValidatedAt: null,
+      validationStatus: null,
+    };
+    prisma.providerConfig.findUnique.mockResolvedValue(provider);
+    prisma.providerConfig.update.mockResolvedValue({
+      ...provider,
+      validationStatus: 'VALID',
+    });
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+    } as Response);
+
+    const result = await service.testProviderConnection(
+      'pg-test',
+      'platform-user-1',
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'ready',
+        mode: 'sandbox_probe',
+        message: expect.stringContaining('non-charge health probe'),
+      }),
+    );
+    expect(fetchSpy).toHaveBeenCalledWith(
+      new URL('https://gateway.test/health'),
+      expect.objectContaining({ method: 'GET' }),
+    );
+    expect(prisma.providerConfig.update).toHaveBeenCalledWith({
+      where: { id: 'pg-test' },
+      data: expect.objectContaining({ validationStatus: 'VALID' }),
+    });
+    fetchSpy.mockRestore();
+  });
 });

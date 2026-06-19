@@ -25,7 +25,13 @@ class SettingsScreen extends ConsumerWidget {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => context.go(AppRoutes.home),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.parentMore);
+            }
+          },
         ),
         title: const Text('Settings'),
       ),

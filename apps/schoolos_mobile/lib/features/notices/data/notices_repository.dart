@@ -1,3 +1,8 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+
 import '../../../core/errors/app_exception.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/private_read_cache.dart';
@@ -74,6 +79,42 @@ class NoticesRepository {
     await _client.post('/mobile/me/notifications/mark-all-read');
   }
 
+  Future<NoticeAttachmentDownload> downloadNoticeAttachment(
+    NoticeAttachment attachment,
+  ) async {
+    if (attachment.downloadPath.isEmpty) {
+      throw StateError('Notice attachment download path was empty.');
+    }
+
+    final response = await _client.get<List<int>>(
+      attachment.downloadPath,
+      options: Options(
+        responseType: ResponseType.bytes,
+        headers: {Headers.acceptHeader: attachment.mimeType},
+      ),
+    );
+    final bytes = response.data;
+    if (bytes == null || bytes.isEmpty) {
+      throw StateError('Notice attachment was empty.');
+    }
+
+    final temporaryDir = await getTemporaryDirectory();
+    final noticeDir = Directory('${temporaryDir.path}/schoolos/notices');
+    if (!noticeDir.existsSync()) {
+      await noticeDir.create(recursive: true);
+    }
+
+    final fileName = _safeFileName(attachment.fileName);
+    final file = File('${noticeDir.path}/$fileName');
+    await file.writeAsBytes(bytes, flush: true);
+
+    return NoticeAttachmentDownload(
+      fileName: fileName,
+      filePath: file.path,
+      attachment: attachment,
+    );
+  }
+
   Future<_NotificationCenterPayload> _getCenter() async {
     final data = await _getMap(
       '/mobile/me/notifications',
@@ -125,8 +166,15 @@ class NoticesRepository {
       audience: 'My notifications',
       category: item.category,
       isRead: item.isRead,
+      hasAttachment: item.attachment != null,
+      attachment: item.attachment,
     );
   }
+}
+
+String _safeFileName(String value) {
+  final sanitized = value.trim().replaceAll(RegExp(r'[^a-zA-Z0-9._-]+'), '-');
+  return sanitized.isEmpty ? 'notice-attachment' : sanitized;
 }
 
 class _NotificationCenterPayload {

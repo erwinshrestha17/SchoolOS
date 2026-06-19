@@ -1759,7 +1759,7 @@ describe('finance production controls', () => {
         providerAdapterReady: false,
         settlementTrackingReady: true,
         message:
-          'Online payment gateway configuration exists, but no approved server-side provider adapter is implemented. Use manual/cash/bank collection until gateway integration is approved.',
+          'Online payment gateway configuration exists, but no approved server-side provider adapter is configured.',
       }),
     );
   });
@@ -1788,10 +1788,105 @@ describe('finance production controls', () => {
           invoiceId: 'invoice-1',
           provider: 'Nepal Gateway',
           amount: 500,
+          idempotencyKey: 'parent-payment-test-0001',
         },
         actor as never,
       ),
     ).rejects.toThrow('Online payment provider is disabled or not configured.');
+  });
+
+  it('creates a retry-safe payment intent only through a validated sandbox adapter', async () => {
+    const provider = {
+      id: 'provider-1',
+      name: 'NEPAL_GATEWAY',
+      enabled: true,
+      environment: 'TEST',
+      validationStatus: 'VALID',
+      lastValidatedAt: new Date('2026-06-19T00:00:00.000Z'),
+      secretKeys: [],
+      configEncrypted: {
+        adapter: 'generic_json_v1',
+        merchantId: 'school-merchant',
+        webhookUrl: 'https://school.test/payments/webhook',
+        intentUrl: 'https://gateway.test/intents',
+        settlementStatusUrl: 'https://gateway.test/settlements',
+      },
+    };
+    const createdPaymentIntent = {
+      id: 'intent-1',
+      tenantId: actor.tenantId,
+      studentId: 'student-1',
+      invoiceId: 'invoice-1',
+      paymentId: null,
+      requestedByUserId: actor.userId,
+      provider: provider.name,
+      providerReference: null,
+      idempotencyKey: 'parent-payment-test-0002',
+      amount: new Prisma.Decimal(500),
+      currency: 'NPR',
+      status: 'CREATED',
+      checkoutUrl: null,
+      expiresAt: null,
+      failureCode: null,
+      failureMessage: null,
+      reconciledAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const { service, prisma } = buildService({
+      invoice: buildInvoice({
+        studentId: 'student-1',
+        totalAmount: new Prisma.Decimal(1000),
+        payments: [],
+      }),
+      feeHead: null,
+      gatewayProvider: provider,
+      createdPaymentIntent,
+    });
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        providerReference: 'gateway-123',
+        checkoutUrl: 'https://gateway.test/checkout/gateway-123',
+        expiresAt: '2026-06-19T01:00:00.000Z',
+      }),
+    } as Response);
+
+    await expect(
+      service.initiateOnlinePayment(
+        {
+          invoiceId: 'invoice-1',
+          provider: provider.name,
+          amount: 500,
+          idempotencyKey: 'parent-payment-test-0002',
+        },
+        actor as never,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: 'intent-1',
+        status: 'READY',
+        checkoutUrl: 'https://gateway.test/checkout/gateway-123',
+      }),
+    );
+    expect(prisma.onlinePaymentIntent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tenantId: actor.tenantId,
+          idempotencyKey: 'parent-payment-test-0002',
+        }),
+      }),
+    );
+    expect(fetchSpy).toHaveBeenCalledWith(
+      new URL('https://gateway.test/intents'),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Idempotency-Key': 'parent-payment-test-0002',
+        }),
+      }),
+    );
+    fetchSpy.mockRestore();
   });
 
   it('verifies online payment webhooks with configured HMAC signatures before audit', async () => {
@@ -2093,6 +2188,8 @@ function buildService(options: {
   reconciliationPaymentEntries?: unknown[];
   reconciliationRefundEntries?: unknown[];
   gatewayProvider?: unknown;
+  existingPaymentIntent?: unknown;
+  createdPaymentIntent?: unknown;
   cashierClosePdfFiles?: unknown[];
   fileRegistryService?: unknown;
   communicationsService?: unknown;
@@ -2178,6 +2275,17 @@ function buildService(options: {
     },
     providerConfig: {
       findFirst: jest.fn().mockResolvedValue(options.gatewayProvider ?? null),
+      findUnique: jest.fn().mockResolvedValue(options.gatewayProvider ?? null),
+    },
+    onlinePaymentIntent: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.existingPaymentIntent ?? null),
+      create: jest.fn().mockResolvedValue(options.createdPaymentIntent),
+      update: jest.fn().mockImplementation(async ({ data }) => ({
+        ...(options.createdPaymentIntent as Record<string, unknown>),
+        ...data,
+      })),
     },
     invoiceLine: {
       findFirst: jest

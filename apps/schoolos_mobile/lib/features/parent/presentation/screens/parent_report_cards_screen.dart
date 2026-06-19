@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/platform/file_share_service.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../application/parent_providers.dart';
 import '../../domain/parent_models.dart';
 import '../widgets/parent_detail_widgets.dart';
@@ -25,13 +27,22 @@ class ParentReportCardsScreen extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
             children: [
-              ParentApiChildSelector(
-                child: child,
-                children: state.children,
-                onChanged: controller.selectChild,
-              ),
-              const SizedBox(height: 16),
-              _ReportCardsBody(childId: child.id),
+              if (state.children.length == 1) ...[
+                ParentApiChildSelector(
+                  child: child,
+                  children: state.children,
+                  onChanged: controller.selectChild,
+                  statusLabel: state.isOffline ? 'Offline copy' : null,
+                ),
+                const SizedBox(height: 16),
+                _ReportCardsBody(child: child),
+              ] else
+                for (final linkedChild in state.children) ...[
+                  ParentSectionHeader(title: linkedChild.name),
+                  const SizedBox(height: 8),
+                  _ReportCardsBody(child: linkedChild),
+                  const SizedBox(height: 18),
+                ],
             ],
           ),
         ),
@@ -42,17 +53,17 @@ class ParentReportCardsScreen extends ConsumerWidget {
 }
 
 class _ReportCardsBody extends ConsumerWidget {
-  const _ReportCardsBody({required this.childId});
+  const _ReportCardsBody({required this.child});
 
-  final String childId;
+  final GuardianChild child;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cards = ref.watch(parentReportCardsProvider(childId));
+    final cards = ref.watch(parentReportCardsProvider(child.id));
     return cards.when(
       loading: () => const PortalLoadingState(),
       error: (_, _) => PortalErrorState(
-        onRetry: () => ref.invalidate(parentReportCardsProvider(childId)),
+        onRetry: () => ref.invalidate(parentReportCardsProvider(child.id)),
       ),
       data: (items) {
         if (items.isEmpty) {
@@ -64,7 +75,7 @@ class _ReportCardsBody extends ConsumerWidget {
         return Column(
           children: [
             for (final card in items) ...[
-              _ReportCardTile(childId: childId, card: card),
+              _ReportCardTile(childId: child.id, child: child, card: card),
               const SizedBox(height: 14),
             ],
             const PortalCard(
@@ -82,9 +93,14 @@ class _ReportCardsBody extends ConsumerWidget {
 }
 
 class _ReportCardTile extends ConsumerWidget {
-  const _ReportCardTile({required this.childId, required this.card});
+  const _ReportCardTile({
+    required this.childId,
+    required this.child,
+    required this.card,
+  });
 
   final String childId;
+  final GuardianChild child;
   final ParentReportCard card;
 
   @override
@@ -94,6 +110,7 @@ class _ReportCardTile extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const FeatureIcon(
                 Icons.description_rounded,
@@ -112,7 +129,7 @@ class _ReportCardTile extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      '${card.academicYear} - Published ${_date(card.publishedAt)}',
+                      '${child.classSection} - Published ${_bsDate(card.publishedAt)}',
                       style: const TextStyle(color: ParentPortalColors.muted),
                     ),
                   ],
@@ -135,27 +152,82 @@ class _ReportCardTile extends ConsumerWidget {
                 Expanded(child: _ResultMetric('Grade', card.grade)),
                 Expanded(
                   child: _ResultMetric(
-                    'GPA',
-                    card.gpa == null ? '-' : card.gpa!.toStringAsFixed(2),
+                    card.attendancePercentage == null ? 'GPA' : 'Attendance',
+                    card.attendancePercentage == null
+                        ? card.gpa == null
+                              ? '-'
+                              : card.gpa!.toStringAsFixed(2)
+                        : '${card.attendancePercentage!.toStringAsFixed(0)}%',
                   ),
                 ),
               ],
             ),
           ),
-          if (card.remarks?.isNotEmpty == true) ...[
+          if (card.subjects.isNotEmpty) ...[
             const SizedBox(height: 14),
-            Text(card.remarks!, style: const TextStyle(height: 1.45)),
+            const Text(
+              'Subject grades',
+              style: TextStyle(
+                color: ParentPortalColors.navy,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final subject in card.subjects.take(6))
+                  _SubjectGradeChip(subject: subject),
+              ],
+            ),
+          ],
+          if (_finalRemarks(card).isNotEmpty) ...[
+            const SizedBox(height: 14),
+            PortalCard(
+              color: ParentPortalColors.greenSoft,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const FeatureIcon(
+                    Icons.format_quote_rounded,
+                    color: ParentPortalColors.green,
+                    size: 38,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _finalRemarks(card),
+                      style: const TextStyle(height: 1.45),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: card.hasFile
-                  ? () => _downloadReportCard(context, ref)
-                  : null,
-              icon: const Icon(Icons.download_rounded),
-              label: Text(card.hasFile ? 'Download PDF' : 'No file'),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: card.hasFile
+                      ? () => _downloadReportCard(context, ref)
+                      : null,
+                  icon: const Icon(Icons.download_rounded),
+                  label: Text(card.hasFile ? 'Download' : 'No file'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: card.hasFile
+                      ? () => _shareReportCard(context, ref)
+                      : null,
+                  icon: const Icon(Icons.ios_share_rounded),
+                  label: const Text('Share'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -172,6 +244,24 @@ class _ReportCardTile extends ConsumerWidget {
     } catch (_) {
       if (!context.mounted) return;
       showFeatureSnack(context, 'Report card PDF is not available right now.');
+    }
+  }
+
+  Future<void> _shareReportCard(BuildContext context, WidgetRef ref) async {
+    try {
+      final file = await ref
+          .read(parentRepositoryProvider)
+          .downloadReportCardPdf(childId: childId, reportCard: card);
+      await const FileShareService().shareFile(
+        filePath: file.filePath,
+        mimeType: 'application/pdf',
+        subject: file.fileName,
+      );
+      if (!context.mounted) return;
+      showFeatureSnack(context, 'Report card ready to share.');
+    } catch (_) {
+      if (!context.mounted) return;
+      showFeatureSnack(context, 'Could not share this report card.');
     }
   }
 }
@@ -200,10 +290,58 @@ class _ResultMetric extends StatelessWidget {
   );
 }
 
-String _date(String? value) {
-  final date = DateTime.tryParse(value ?? '');
-  if (date == null) return 'date unavailable';
-  return '${date.year}-${_two(date.month)}-${_two(date.day)}';
+class _SubjectGradeChip extends StatelessWidget {
+  const _SubjectGradeChip({required this.subject});
+
+  final ParentReportCardSubject subject;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 124,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ParentPortalColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ParentPortalColors.border),
+      ),
+      child: Column(
+        children: [
+          Text(
+            subject.subjectName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: ParentPortalColors.navy,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subject.grade,
+            style: const TextStyle(
+              color: ParentPortalColors.green,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            '${subject.percentage.toStringAsFixed(0)}%',
+            style: const TextStyle(color: ParentPortalColors.muted),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-String _two(int value) => value.toString().padLeft(2, '0');
+String _bsDate(String? value) {
+  final date = DateTime.tryParse(value ?? '');
+  if (date == null) return 'date unavailable';
+  final bs = NepaliBsCalendar.fromAd(date);
+  return '${bs.day} ${bs.monthName} ${bs.year}';
+}
+
+String _finalRemarks(ParentReportCard card) {
+  return (card.classTeacherRemark ?? card.remarks ?? '').trim();
+}

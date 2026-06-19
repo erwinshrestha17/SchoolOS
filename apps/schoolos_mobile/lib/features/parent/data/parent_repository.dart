@@ -54,6 +54,8 @@ class ParentRepository {
     final medicalSummary =
         profile['medicalSummary'] as Map<String, dynamic>? ?? const {};
     final privacy = profile['privacy'] as Map<String, dynamic>? ?? const {};
+    final classTeacher =
+        profile['classTeacher'] as Map<String, dynamic>? ?? const {};
     final studentSystemId = profile['studentSystemId'] as String?;
     final admissionNumber = profile['admissionNumber'] as String?;
     final healthNote = _joinNonEmpty([
@@ -64,7 +66,9 @@ class ParentRepository {
 
     return ChildProfile(
       child: child,
-      classTeacher: 'Open timetable for teacher names by period.',
+      classTeacher:
+          classTeacher['name'] as String? ?? 'Class teacher not assigned',
+      classTeacherId: classTeacher['id'] as String?,
       guardianSummary:
           '${child.relationship} access verified for ${child.name}.',
       canViewGuardianSummary: true,
@@ -139,16 +143,48 @@ class ParentRepository {
   }
 
   Future<ParentTimetable> getTimetableForChild(String childId) async {
-    final response = await _client.get('/mobile/students/$childId/timetable');
-    final data = response.data as Map<String, dynamic>;
+    final data = await _getMap(
+      '/mobile/students/$childId/timetable',
+      cacheKey: 'parent_timetable_$childId',
+    );
     return ParentTimetable.fromJson(data);
   }
 
-  Future<List<ParentReportCard>> getReportCardsForChild(String childId) async {
+  Future<ParentPaymentGatewayReadiness> getPaymentGatewayReadiness(
+    String childId,
+  ) async {
     final response = await _client.get(
-      '/mobile/students/$childId/report-cards',
+      '/mobile/students/$childId/payment-gateway-readiness',
     );
-    final data = response.data as Map<String, dynamic>;
+    return ParentPaymentGatewayReadiness.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
+
+  Future<ParentPaymentIntent> initiatePayment({
+    required String childId,
+    required String invoiceId,
+    required num amount,
+    required String provider,
+    required String idempotencyKey,
+  }) async {
+    final response = await _client.post(
+      '/mobile/students/$childId/payment-intents',
+      data: {
+        'invoiceId': invoiceId,
+        'amount': amount,
+        'provider': provider,
+        'idempotencyKey': idempotencyKey,
+      },
+    );
+    return ParentPaymentIntent.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<List<ParentReportCard>> getReportCardsForChild(String childId) async {
+    final data = await _getMap(
+      '/mobile/students/$childId/report-cards',
+      cacheKey: 'parent_report_cards_$childId',
+    );
     final items = data['items'] as List<dynamic>? ?? const [];
 
     return items
@@ -200,11 +236,11 @@ class ParentRepository {
     String childId, {
     int take = 20,
   }) async {
-    final response = await _client.get(
+    final data = await _getMap(
       '/mobile/students/$childId/activity-feed',
       queryParameters: {'take': '$take'},
+      cacheKey: 'parent_activity_${childId}_$take',
     );
-    final data = response.data as Map<String, dynamic>;
     final items = data['items'] as List<dynamic>? ?? const [];
 
     return items
@@ -214,20 +250,26 @@ class ParentRepository {
   }
 
   Future<ParentTransportInfo> getTransportForChild(String childId) async {
-    final response = await _client.get('/mobile/students/$childId/transport');
-    final data = response.data as Map<String, dynamic>;
+    final data = await _getMap(
+      '/mobile/students/$childId/transport',
+      cacheKey: 'parent_transport_$childId',
+    );
     return ParentTransportInfo.fromJson(data);
   }
 
   Future<ParentCanteenInfo> getCanteenForChild(String childId) async {
-    final response = await _client.get('/mobile/students/$childId/canteen');
-    final data = response.data as Map<String, dynamic>;
+    final data = await _getMap(
+      '/mobile/students/$childId/canteen',
+      cacheKey: 'parent_canteen_$childId',
+    );
     return ParentCanteenInfo.fromJson(data);
   }
 
   Future<ParentLibraryInfo> getLibraryForChild(String childId) async {
-    final response = await _client.get('/mobile/students/$childId/library');
-    final data = response.data as Map<String, dynamic>;
+    final data = await _getMap(
+      '/mobile/students/$childId/library',
+      cacheKey: 'parent_library_$childId',
+    );
     return ParentLibraryInfo.fromJson(data);
   }
 

@@ -104,6 +104,7 @@ model Invoice {
   billingRun    FeeBillingRun? @relation(fields: [billingRunId], references: [id])
   lines         InvoiceLine[]
   payments      Payment[]
+  onlinePaymentIntents OnlinePaymentIntent[]
   libraryIssues LibraryIssue[]
 
   @@unique([tenantId, invoiceNumber])
@@ -158,11 +159,43 @@ model Payment {
   receipt     Receipt?
   refunds     PaymentRefund[]
   financeApprovalRequests FinanceApprovalRequest[]
+  onlinePaymentIntents OnlinePaymentIntent[]
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, method, referenceNumber])
   @@index([tenantId, paidAt, status])
   @@index([tenantId, studentId, paidAt])
+}
+
+model OnlinePaymentIntent {
+  id                String                    @id @default(uuid())
+  tenantId          String
+  studentId         String
+  invoiceId         String
+  paymentId         String?
+  requestedByUserId String
+  provider          String
+  providerReference String?
+  idempotencyKey    String
+  amount            Decimal                   @db.Decimal(12, 2)
+  currency          String                    @default("NPR")
+  status            OnlinePaymentIntentStatus @default(CREATED)
+  checkoutUrl       String?
+  expiresAt         DateTime?
+  failureCode       String?
+  failureMessage    String?
+  reconciledAt      DateTime?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  invoice Invoice  @relation(fields: [invoiceId], references: [id])
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@unique([tenantId, idempotencyKey])
+  @@unique([provider, providerReference])
+  @@index([tenantId, studentId, createdAt])
+  @@index([tenantId, invoiceId, status])
 }
 
 model PaymentRefund {

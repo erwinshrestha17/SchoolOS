@@ -67,3 +67,24 @@ flutter build ios --no-codesign
 ```
 
 Use the GA policy and production-readiness audit to record which local, emulator/device, staging, and controlled-pilot gates actually passed.
+
+## Parent Device QA Release Gate
+
+Parent mobile is not release-ready until the following Android emulator or physical-device checklist is run against a live seeded backend and evidence is recorded:
+
+```text
+1. Log in as Parent A and verify only Parent A linked children appear.
+2. Switch between linked children and verify every screen updates the selected child.
+3. Attempt a direct/deep link to an unlinked child attendance/profile/fees/homework/transport route and confirm denial without private preview data.
+4. Open Parent Home and verify the Today list ranks attendance, fees, homework, notices, transport, and latest teacher update by urgency.
+5. Open attendance online, then offline, and verify the last-updated/offline state is visible.
+6. Open homework online, then offline, and verify cached read-only homework appears or a friendly offline error appears.
+7. Open fees and receipts; download and share a confirmed receipt PDF. When the backend reports a validated payment provider, initiate one network-only payment, verify external HTTPS checkout opens, then verify the signed callback reconciles exactly once and the confirmed receipt appears. Never initiate or queue a payment offline.
+8. Open a notice with a File Registry attachment; download and share through the protected mobile endpoint.
+9. Open a published report card PDF and verify unpublished report cards are hidden/blocked.
+10. Open transport and verify only the linked child's route/trip-safe fields appear.
+11. Verify module-locked, permission-denied, session-expired, and logout-cache-clearing states.
+12. Record screenshots/log notes for pass/fail evidence before any pilot or release claim.
+```
+
+This checklist is required in addition to `flutter analyze`, `flutter test`, and debug/release build checks. Passing local Flutter tests alone is not parent mobile release evidence.

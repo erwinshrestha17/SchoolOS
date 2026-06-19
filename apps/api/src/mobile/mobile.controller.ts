@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
@@ -17,6 +18,7 @@ import { FEATURE_KEYS } from '@schoolos/core';
 import { MobileService } from './mobile.service';
 import { ParentAttendanceSummaryQueryDto } from './dto/parent-attendance-summary-query.dto';
 import { ParentNotificationQueryDto } from './dto/parent-notification-query.dto';
+import { InitiateParentPaymentDto } from './dto/initiate-parent-payment.dto';
 
 @Controller('mobile')
 @UseGuards(JwtAuthGuard, EntitlementGuard)
@@ -55,6 +57,22 @@ export class MobileController {
   @Post('me/notifications/mark-all-read')
   markAllNotificationsRead(@CurrentAuth() auth: AuthContext) {
     return this.mobileService.markAllNotificationsRead(auth);
+  }
+
+  @Get('me/notifications/:id/attachment')
+  async getNotificationAttachment(
+    @Param('id') notificationId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    const file = await this.mobileService.getNotificationAttachment(
+      notificationId,
+      auth,
+    );
+
+    return new StreamableFile(file.content, {
+      type: file.mimeType,
+      disposition: `attachment; filename="${safePdfFileName(file.fileName)}"`,
+    });
   }
 
   @Get('me/notifications/:id')
@@ -102,6 +120,28 @@ export class MobileController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.mobileService.getStudentFeesSummary(studentId, auth);
+  }
+
+  @Get('students/:id/payment-gateway-readiness')
+  @RequiredModule('fees')
+  getStudentPaymentGatewayReadiness(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.getStudentPaymentGatewayReadiness(
+      studentId,
+      auth,
+    );
+  }
+
+  @Post('students/:id/payment-intents')
+  @RequiredModule('fees')
+  initiateStudentPayment(
+    @Param('id') studentId: string,
+    @Body() dto: InitiateParentPaymentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.initiateStudentPayment(studentId, dto, auth);
   }
 
   @Get('students/:id/receipts/:receiptNumber.pdf')

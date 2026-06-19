@@ -114,28 +114,31 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
           ),
         ),
         const SizedBox(height: 16),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              ChildSelectorChip(
-                label: 'All children',
-                selected: selectedChild == 'all',
-                onSelected: () => setState(() => selectedChild = 'all'),
-              ),
-              const SizedBox(width: 8),
-              for (final child in widget.data.children) ...[
+        if (linkedCount > 1) ...[
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
                 ChildSelectorChip(
-                  label: child.name.split(' ').first,
-                  selected: selectedChild == child.id,
-                  onSelected: () => setState(() => selectedChild = child.id),
+                  label: 'All children',
+                  selected: selectedChild == 'all',
+                  onSelected: () => setState(() => selectedChild = 'all'),
                 ),
                 const SizedBox(width: 8),
+                for (final child in widget.data.children) ...[
+                  ChildSelectorChip(
+                    label: child.name.split(' ').first,
+                    selected: selectedChild == child.id,
+                    onSelected: () => setState(() => selectedChild = child.id),
+                  ),
+                  const SizedBox(width: 8),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
-        const SizedBox(height: 24),
+          const SizedBox(height: 24),
+        ] else
+          const SizedBox(height: 20),
         const ParentSectionHeader(title: 'Today for your family'),
         const SizedBox(height: 10),
         PortalCard(
@@ -183,6 +186,15 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 18),
+              SummaryMetric(
+                icon: Icons.account_balance_wallet_outlined,
+                value: _feesMetric(widget.data),
+                label: widget.data.totalFeesDue > 0 ? 'fees due' : 'fees paid',
+                color: widget.data.totalFeesDue > 0
+                    ? ParentPortalColors.orange
+                    : ParentPortalColors.green,
               ),
               const Divider(height: 28),
               Row(
@@ -422,4 +434,11 @@ String _transportMetric(List<ParentPortalChild> children) {
     return !text.contains('no transport') && !text.contains('locked');
   }).length;
   return active == 0 ? 'None' : '$active active';
+}
+
+String _feesMetric(ParentPortalData data) {
+  if (data.totalFeesDue <= 0) {
+    return 'Paid';
+  }
+  return 'NPR ${data.totalFeesDue.toStringAsFixed(0)}';
 }

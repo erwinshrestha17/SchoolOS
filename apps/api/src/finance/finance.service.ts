@@ -18,6 +18,7 @@ import {
   NotificationChannel,
   PaymentMethod,
   PaymentStatus,
+  OnlinePaymentIntentStatus,
   Prisma,
   ChartAccountType,
   FeeFrequency,
@@ -4284,6 +4285,21 @@ export class FinanceService {
   async getPaymentGatewayReadiness(actor: AuthContext) {
     assertAnyFinancePermission(actor, ['payments:collect', 'fees:manage']);
 
+    return this.resolvePaymentGatewayReadiness();
+  }
+
+  async getParentPaymentGatewayReadiness() {
+    const readiness = await this.resolvePaymentGatewayReadiness();
+    return {
+      enabled: readiness.enabled,
+      status: readiness.status,
+      provider: readiness.provider ? { name: readiness.provider.name } : null,
+      supportedPaymentMethods: readiness.supportedPaymentMethods,
+      message: readiness.message,
+    };
+  }
+
+  private async resolvePaymentGatewayReadiness() {
     const provider = await this.prisma.providerConfig.findFirst({
       where: {
         type: 'PAYMENT_GATEWAY',
@@ -4298,6 +4314,7 @@ export class FinanceService {
         validationStatus: true,
         lastValidatedAt: true,
         configEncrypted: true,
+        secretKeys: true,
       },
     });
 
@@ -4315,13 +4332,35 @@ export class FinanceService {
       };
     }
 
-    const config = normalizeJsonObject(provider.configEncrypted);
+    const config = this.decryptPaymentProviderConfig(
+      normalizeJsonObject(provider.configEncrypted),
+      provider.secretKeys,
+    );
     const webhookReady = Boolean(config?.webhookUrl || config?.webhookPath);
     const paymentIntentConfigured = Boolean(
       config?.initiateUrl || config?.intentUrl,
     );
-    const paymentIntentReady = false;
-    const providerAdapterReady = false;
+    const providerAdapterReady = config?.adapter === 'generic_json_v1';
+    const settlementTrackingReady = Boolean(config?.settlementStatusUrl);
+    const sandboxValidated =
+      provider.environment === 'TEST' ||
+      Boolean(
+        await this.prisma.providerConfig.findFirst({
+          where: {
+            type: 'PAYMENT_GATEWAY',
+            name: provider.name,
+            environment: 'TEST',
+            validationStatus: 'VALID',
+          },
+          select: { id: true },
+        }),
+      );
+    const paymentIntentReady = Boolean(
+      paymentIntentConfigured &&
+      providerAdapterReady &&
+      provider.lastValidatedAt &&
+      sandboxValidated,
+    );
 
     return {
       enabled: Boolean(
@@ -4329,13 +4368,16 @@ export class FinanceService {
         provider.validationStatus === 'VALID' &&
         webhookReady &&
         paymentIntentReady &&
-        providerAdapterReady,
+        providerAdapterReady &&
+        settlementTrackingReady,
       ),
       status:
         provider.validationStatus === 'VALID'
-          ? webhookReady && paymentIntentConfigured
-            ? 'adapter_not_implemented'
-            : 'configuration_incomplete'
+          ? webhookReady && paymentIntentReady && settlementTrackingReady
+            ? 'ready'
+            : webhookReady && paymentIntentConfigured && !providerAdapterReady
+              ? 'adapter_not_implemented'
+              : 'configuration_incomplete'
           : (provider.validationStatus ?? 'not_validated'),
       provider: {
         id: provider.id,
@@ -4348,12 +4390,15 @@ export class FinanceService {
       paymentIntentReady,
       paymentIntentConfigured,
       providerAdapterReady,
+      sandboxValidated,
       idempotencyRequired: true,
-      settlementTrackingReady: Boolean(config?.settlementStatusUrl),
+      settlementTrackingReady,
       message:
-        webhookReady && paymentIntentConfigured
-          ? 'Online payment gateway configuration exists, but no approved server-side provider adapter is implemented. Use manual/cash/bank collection until gateway integration is approved.'
-          : 'Online payments are not enabled for this school.',
+        webhookReady && paymentIntentConfigured && !providerAdapterReady
+          ? 'Online payment gateway configuration exists, but no approved server-side provider adapter is configured.'
+          : paymentIntentReady && settlementTrackingReady
+            ? 'Online payment initiation is enabled with validated sandbox and reconciliation configuration.'
+            : 'Online payments are not enabled for this school.',
     };
   }
 
@@ -4361,7 +4406,24 @@ export class FinanceService {
     dto: InitiateOnlinePaymentDto,
     actor: AuthContext,
   ) {
-    const readiness = await this.getPaymentGatewayReadiness(actor);
+    assertFinancePermission(actor, 'payments:collect');
+    return this.createOnlinePaymentIntent(dto, actor);
+  }
+
+  async initiateParentOnlinePayment(
+    studentId: string,
+    dto: InitiateOnlinePaymentDto,
+    actor: AuthContext,
+  ) {
+    return this.createOnlinePaymentIntent(dto, actor, studentId);
+  }
+
+  private async createOnlinePaymentIntent(
+    dto: InitiateOnlinePaymentDto,
+    actor: AuthContext,
+    expectedStudentId?: string,
+  ) {
+    const readiness = await this.resolvePaymentGatewayReadiness();
     if (!readiness.enabled) {
       throw new BadRequestException(
         'Online payment provider is disabled or not configured.',
@@ -4369,22 +4431,259 @@ export class FinanceService {
     }
 
     const invoice = await this.prisma.invoice.findFirst({
-      where: { id: dto.invoiceId, tenantId: actor.tenantId },
+      where: {
+        id: dto.invoiceId,
+        tenantId: actor.tenantId,
+        ...(expectedStudentId ? { studentId: expectedStudentId } : {}),
+      },
+      include: {
+        payments: { include: { refunds: true } },
+      },
     });
     if (!invoice) {
       throw new NotFoundException('Invoice not found in this tenant');
     }
 
-    if (
-      dto.amount <= 0 ||
-      new Prisma.Decimal(dto.amount).gt(invoice.totalAmount)
-    ) {
+    const requestedAmount = new Prisma.Decimal(dto.amount);
+    const remaining = invoice.totalAmount.sub(
+      sumNetPaidAmount(invoice.payments),
+    );
+    if (requestedAmount.lte(0) || requestedAmount.gt(remaining)) {
       throw new BadRequestException('Invalid payment amount.');
     }
 
-    throw new BadRequestException(
-      'Online payment initiation is disabled until an approved server-side payment provider adapter is implemented.',
+    const providerName = readiness.provider?.name;
+    if (
+      !providerName ||
+      providerName.toLowerCase() !== dto.provider.toLowerCase()
+    ) {
+      throw new BadRequestException(
+        'Requested payment provider is not enabled.',
+      );
+    }
+    const providerId = readiness.provider?.id;
+    if (!providerId) {
+      throw new BadRequestException('Online payment provider is unavailable.');
+    }
+
+    const existing = await this.prisma.onlinePaymentIntent.findFirst({
+      where: { tenantId: actor.tenantId, idempotencyKey: dto.idempotencyKey },
+    });
+    if (existing) {
+      if (
+        existing.invoiceId !== invoice.id ||
+        existing.studentId !== invoice.studentId ||
+        !existing.amount.equals(requestedAmount)
+      ) {
+        throw new ConflictException(
+          'This payment request key was already used for different payment details.',
+        );
+      }
+      return toOnlinePaymentIntentResponse(existing);
+    }
+
+    const providerConfig = await this.prisma.providerConfig.findUnique({
+      where: { id: providerId },
+    });
+    if (!providerConfig) {
+      throw new BadRequestException('Online payment provider is unavailable.');
+    }
+    const config = this.decryptPaymentProviderConfig(
+      normalizeJsonObject(providerConfig.configEncrypted),
+      providerConfig.secretKeys,
     );
+
+    let intent;
+    try {
+      intent = await this.prisma.onlinePaymentIntent.create({
+        data: {
+          tenantId: actor.tenantId,
+          studentId: invoice.studentId,
+          invoiceId: invoice.id,
+          requestedByUserId: actor.userId,
+          provider: providerConfig.name,
+          idempotencyKey: dto.idempotencyKey,
+          amount: requestedAmount,
+          status: 'CREATED',
+        },
+      });
+    } catch (error) {
+      if (!isPrismaUniqueConstraintError(error)) throw error;
+      const raced = await this.prisma.onlinePaymentIntent.findFirst({
+        where: { tenantId: actor.tenantId, idempotencyKey: dto.idempotencyKey },
+      });
+      if (!raced) throw error;
+      return toOnlinePaymentIntentResponse(raced);
+    }
+
+    try {
+      const providerIntent = await this.requestProviderPaymentIntent({
+        config,
+        intentId: intent.id,
+        invoiceNumber: invoice.invoiceNumber,
+        amount: Number(requestedAmount),
+        idempotencyKey: dto.idempotencyKey,
+      });
+      const readyIntent = await this.prisma.onlinePaymentIntent.update({
+        where: { id: intent.id },
+        data: {
+          status: 'READY',
+          providerReference: providerIntent.providerReference,
+          checkoutUrl: providerIntent.checkoutUrl,
+          expiresAt: providerIntent.expiresAt,
+          failureCode: null,
+          failureMessage: null,
+        },
+      });
+
+      await this.auditService.record({
+        action: 'initiate',
+        resource: 'online_payment_intent',
+        resourceId: readyIntent.id,
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        after: {
+          invoiceId: invoice.id,
+          studentId: invoice.studentId,
+          provider: providerConfig.name,
+          amount: Number(requestedAmount),
+          status: readyIntent.status,
+        },
+      });
+      return toOnlinePaymentIntentResponse(readyIntent);
+    } catch (error) {
+      await this.prisma.onlinePaymentIntent.update({
+        where: { id: intent.id },
+        data: {
+          status: 'FAILED',
+          failureCode: 'PROVIDER_INITIATION_FAILED',
+          failureMessage: 'The payment provider could not start this payment.',
+        },
+      });
+      throw error instanceof BadRequestException
+        ? error
+        : new BadRequestException(
+            'The payment provider could not start this payment. Please try again.',
+          );
+    }
+  }
+
+  private decryptPaymentProviderConfig(
+    config: Record<string, unknown> | null,
+    secretKeys: string[] = [],
+  ) {
+    if (!config) return null;
+    const output: Record<string, unknown> = { ...config };
+    for (const key of secretKeys) {
+      const value = output[key];
+      if (typeof value !== 'string') continue;
+      if (isEncryptedSensitiveField(value) && !this.configService) {
+        throw new BadRequestException(
+          'Payment provider secrets cannot be used without runtime configuration.',
+        );
+      }
+      output[key] = decryptSensitiveField(
+        value,
+        this.configService?.jwtSecret ?? '',
+      );
+    }
+    return output;
+  }
+
+  private async requestProviderPaymentIntent(input: {
+    config: Record<string, unknown> | null;
+    intentId: string;
+    invoiceNumber: string;
+    amount: number;
+    idempotencyKey: string;
+  }) {
+    const intentUrl = firstStringValue(input.config, [
+      'initiateUrl',
+      'intentUrl',
+    ]);
+    if (!intentUrl) {
+      throw new BadRequestException('Payment intent URL is not configured.');
+    }
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(intentUrl);
+    } catch {
+      throw new BadRequestException('Payment intent URL is invalid.');
+    }
+    if (parsedUrl.protocol !== 'https:') {
+      throw new BadRequestException('Payment intent URL must use HTTPS.');
+    }
+
+    const callbackUrl = firstStringValue(input.config, [
+      'webhookUrl',
+      'callbackUrl',
+    ]);
+    const returnUrl = firstStringValue(input.config, ['returnUrl']);
+    const merchantId = firstStringValue(input.config, ['merchantId']);
+    const apiToken = firstStringValue(input.config, [
+      'apiToken',
+      'accessToken',
+    ]);
+    const response = await fetch(parsedUrl, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'Idempotency-Key': input.idempotencyKey,
+        ...(apiToken ? { Authorization: `Bearer ${apiToken}` } : {}),
+      },
+      body: JSON.stringify({
+        merchantId,
+        amount: input.amount,
+        currency: 'NPR',
+        reference: input.intentId,
+        invoiceNumber: input.invoiceNumber,
+        callbackUrl,
+        returnUrl,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const payload = (await response.json().catch(() => null)) as Record<
+      string,
+      unknown
+    > | null;
+    if (!response.ok || !payload) {
+      throw new BadRequestException(
+        'The payment provider rejected this payment request.',
+      );
+    }
+
+    const checkoutUrl = firstStringValue(payload, [
+      'checkoutUrl',
+      'paymentUrl',
+      'redirectUrl',
+    ]);
+    const providerReference = firstStringValue(payload, [
+      'providerReference',
+      'transactionId',
+      'reference',
+      'id',
+    ]);
+    if (!checkoutUrl || !providerReference) {
+      throw new BadRequestException(
+        'The payment provider returned an incomplete payment intent.',
+      );
+    }
+    const checkout = new URL(checkoutUrl);
+    if (checkout.protocol !== 'https:') {
+      throw new BadRequestException(
+        'The payment provider returned an unsafe checkout URL.',
+      );
+    }
+    const expiresAtValue = firstStringValue(payload, ['expiresAt', 'expiry']);
+    const expiresAt = expiresAtValue ? new Date(expiresAtValue) : null;
+
+    return {
+      providerReference,
+      checkoutUrl: checkout.toString(),
+      expiresAt:
+        expiresAt && !Number.isNaN(expiresAt.getTime()) ? expiresAt : null,
+    };
   }
 
   async handleOnlinePaymentWebhook(
@@ -4396,6 +4695,8 @@ export class FinanceService {
       event?: string;
       amount?: number | string;
       reference?: string;
+      providerReference?: string;
+      intentId?: string;
       status?: string;
       tenantId?: string;
     };
@@ -4414,7 +4715,10 @@ export class FinanceService {
       );
     }
 
-    const config = normalizeJsonObject(activeProvider.configEncrypted);
+    const config = this.decryptPaymentProviderConfig(
+      normalizeJsonObject(activeProvider.configEncrypted),
+      activeProvider.secretKeys,
+    );
     const signingSecret = this.getWebhookSigningSecret(config);
 
     const sigHeaderName = `${provider.toLowerCase()}-signature`;
@@ -4435,17 +4739,40 @@ export class FinanceService {
       data.status ?? data.event,
     );
 
+    const reference = String(
+      data.intentId ?? data.providerReference ?? data.reference ?? '',
+    ).trim();
+    if (!reference) {
+      throw new BadRequestException('Webhook reference is required.');
+    }
+
+    const paymentIntent = await this.prisma.onlinePaymentIntent.findFirst({
+      where: {
+        provider: activeProvider.name,
+        OR: [{ id: reference }, { providerReference: reference }],
+      },
+    });
+
     if (webhookStatus !== 'SUCCESS') {
+      if (paymentIntent) {
+        await this.prisma.onlinePaymentIntent.update({
+          where: { id: paymentIntent.id },
+          data: {
+            status: webhookStatus === 'PENDING' ? 'PENDING' : 'FAILED',
+            failureCode:
+              webhookStatus === 'PENDING' ? null : `PROVIDER_${webhookStatus}`,
+            failureMessage:
+              webhookStatus === 'PENDING'
+                ? null
+                : 'The payment provider reported that this payment did not complete.',
+          },
+        });
+      }
       return {
         status: 'ignored',
         postedToLedger: false,
         message: `Webhook event ${webhookStatus.toLowerCase()} was acknowledged without creating a payment.`,
       };
-    }
-
-    const reference = data.reference ? String(data.reference).trim() : '';
-    if (!reference) {
-      throw new BadRequestException('Webhook reference is required.');
     }
 
     const requestedAmount = new Prisma.Decimal(data.amount || 0);
@@ -4455,7 +4782,8 @@ export class FinanceService {
       );
     }
 
-    let tenantId = headers['x-tenant-id'] || data?.tenantId;
+    let tenantId =
+      paymentIntent?.tenantId || headers['x-tenant-id'] || data?.tenantId;
     if (!tenantId) {
       const invoice = await this.prisma.invoice.findFirst({
         where: {
@@ -4472,13 +4800,25 @@ export class FinanceService {
     }
 
     // Duplicate event checking
-    const idempotencyKey = `webhook:${provider.toLowerCase()}:${reference}`;
+    const idempotencyKey = paymentIntent
+      ? `payment-intent:${paymentIntent.id}`
+      : `webhook:${provider.toLowerCase()}:${reference}`;
     const existingPayment = await this.prisma.payment.findFirst({
       where: { tenantId, idempotencyKey },
       include: { receipt: true },
     });
 
     if (existingPayment) {
+      if (paymentIntent && paymentIntent.status !== 'SUCCEEDED') {
+        await this.prisma.onlinePaymentIntent.update({
+          where: { id: paymentIntent.id },
+          data: {
+            status: 'SUCCEEDED',
+            paymentId: existingPayment.id,
+            reconciledAt: new Date(),
+          },
+        });
+      }
       return {
         status: 'verified',
         postedToLedger: true,
@@ -4491,7 +4831,9 @@ export class FinanceService {
     // Look up invoice
     const invoice = await this.prisma.invoice.findFirst({
       where: {
-        OR: [{ id: reference }, { invoiceNumber: reference }],
+        OR: paymentIntent
+          ? [{ id: paymentIntent.invoiceId }]
+          : [{ id: reference }, { invoiceNumber: reference }],
         tenantId,
       },
       include: {
@@ -4523,10 +4865,17 @@ export class FinanceService {
       };
     }
 
-    let paymentAmount = requestedAmount;
-    if (paymentAmount.gt(remaining)) {
-      paymentAmount = remaining;
+    if (paymentIntent && !requestedAmount.equals(paymentIntent.amount)) {
+      throw new BadRequestException(
+        'Webhook amount does not match the initiated payment amount.',
+      );
     }
+    if (requestedAmount.gt(remaining)) {
+      throw new BadRequestException(
+        'Webhook amount exceeds the remaining invoice balance.',
+      );
+    }
+    const paymentAmount = requestedAmount;
 
     const fiscalYear = resolveFiscalYear(new Date());
     const tenant = await this.prisma.tenant.findUniqueOrThrow({
@@ -4631,6 +4980,19 @@ export class FinanceService {
           paidAt: totalPaid.gte(invoice.totalAmount) ? new Date() : null,
         },
       });
+
+      if (paymentIntent) {
+        await tx.onlinePaymentIntent.update({
+          where: { id: paymentIntent.id },
+          data: {
+            status: 'SUCCEEDED',
+            paymentId: payment.id,
+            reconciledAt: new Date(),
+            failureCode: null,
+            failureMessage: null,
+          },
+        });
+      }
 
       await this.accountingPostingService.postFeePayment(
         {
@@ -6015,6 +6377,34 @@ function normalizeJsonObject(
   }
 
   return value;
+}
+
+function toOnlinePaymentIntentResponse(intent: {
+  id: string;
+  invoiceId: string;
+  studentId: string;
+  provider: string;
+  amount: Prisma.Decimal;
+  currency: string;
+  status: OnlinePaymentIntentStatus;
+  checkoutUrl: string | null;
+  expiresAt: Date | null;
+  paymentId: string | null;
+  failureMessage: string | null;
+}) {
+  return {
+    id: intent.id,
+    invoiceId: intent.invoiceId,
+    studentId: intent.studentId,
+    provider: intent.provider,
+    amount: Number(intent.amount),
+    currency: intent.currency,
+    status: intent.status,
+    checkoutUrl: intent.checkoutUrl,
+    expiresAt: intent.expiresAt,
+    paymentId: intent.paymentId,
+    message: intent.failureMessage,
+  };
 }
 
 function firstStringValue(

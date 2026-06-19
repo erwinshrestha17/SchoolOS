@@ -21,6 +21,7 @@ class Notice {
     required this.category,
     required this.isRead,
     this.hasAttachment = false,
+    this.attachment,
   });
 
   final String id;
@@ -33,6 +34,7 @@ class Notice {
   final NoticeCategory category;
   final bool isRead;
   final bool hasAttachment;
+  final NoticeAttachment? attachment;
 
   bool get isEmergency => category == NoticeCategory.emergency;
   bool get isImportant => category == NoticeCategory.important || isEmergency;
@@ -49,8 +51,47 @@ class Notice {
       category: category,
       isRead: isRead ?? this.isRead,
       hasAttachment: hasAttachment,
+      attachment: attachment,
     );
   }
+}
+
+class NoticeAttachment {
+  const NoticeAttachment({
+    required this.id,
+    required this.fileName,
+    required this.mimeType,
+    required this.sizeBytes,
+    required this.downloadPath,
+  });
+
+  final String id;
+  final String fileName;
+  final String mimeType;
+  final int sizeBytes;
+  final String downloadPath;
+
+  factory NoticeAttachment.fromJson(Map<String, dynamic> json) {
+    return NoticeAttachment(
+      id: json['id'] as String? ?? '',
+      fileName: json['fileName'] as String? ?? 'Notice attachment',
+      mimeType: json['mimeType'] as String? ?? 'application/octet-stream',
+      sizeBytes: json['sizeBytes'] as int? ?? 0,
+      downloadPath: json['downloadPath'] as String? ?? '',
+    );
+  }
+}
+
+class NoticeAttachmentDownload {
+  const NoticeAttachmentDownload({
+    required this.fileName,
+    required this.filePath,
+    required this.attachment,
+  });
+
+  final String fileName;
+  final String filePath;
+  final NoticeAttachment attachment;
 }
 
 enum ParentNotificationType {
@@ -79,6 +120,7 @@ class ParentNotification {
     this.sourceUpdateId,
     this.readAt,
     this.metadata,
+    this.attachment,
   });
 
   final String id;
@@ -93,6 +135,7 @@ class ParentNotification {
   final NoticeCategory category;
   final DateTime? readAt;
   final Map<String, dynamic>? metadata;
+  final NoticeAttachment? attachment;
 
   bool get isRead => readAt != null;
   String get message => body;
@@ -125,6 +168,11 @@ class ParentNotification {
               ? DateTime.fromMillisecondsSinceEpoch(0)
               : null),
       metadata: Map<String, dynamic>.from(json),
+      attachment: json['attachment'] is Map<String, dynamic>
+          ? NoticeAttachment.fromJson(
+              json['attachment'] as Map<String, dynamic>,
+            )
+          : null,
     );
   }
 
@@ -142,6 +190,7 @@ class ParentNotification {
       category: category,
       readAt: clearReadAt ? null : readAt ?? this.readAt,
       metadata: metadata,
+      attachment: attachment,
     );
   }
 }

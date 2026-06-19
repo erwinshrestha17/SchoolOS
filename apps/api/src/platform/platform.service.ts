@@ -51,7 +51,11 @@ import {
 import { ConfigService } from '../config/config.service';
 import { RedisService } from '../redis/redis.service';
 import { StorageService } from '../storage/storage.service';
-import { encryptSensitiveField } from '../common/security/field-encryption';
+import {
+  decryptSensitiveField,
+  encryptSensitiveField,
+  isEncryptedSensitiveField,
+} from '../common/security/field-encryption';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PlansService } from '../plans/plans.service';
@@ -2389,13 +2393,16 @@ export class PlatformService {
           };
         }
       } else {
-        readiness = this.buildProviderReadinessDetail(provider, checkedAt, []);
+        readiness = await this.testPaymentGatewaySandbox(provider, checkedAt);
       }
     } else {
       readiness = this.buildProviderReadinessDetail(provider, checkedAt, []);
     }
 
-    const validationStatus = readiness.status.toUpperCase();
+    const validationStatus =
+      provider.type === 'PAYMENT_GATEWAY' && readiness.status === 'ready'
+        ? 'VALID'
+        : readiness.status.toUpperCase();
 
     await this.prisma.providerConfig.update({
       where: { id: provider.id },
@@ -3291,6 +3298,100 @@ export class PlatformService {
         };
       }),
     };
+  }
+
+  private async testPaymentGatewaySandbox(
+    provider: DynamicRecord,
+    checkedAt: Date,
+  ): Promise<PlatformProviderReadinessDetail> {
+    const base = this.buildProviderReadinessDetail(provider, checkedAt, []);
+    if (base.status !== 'ready') return base;
+
+    const config = { ...asRecord(provider.configEncrypted) };
+    for (const key of asStringArray(provider.secretKeys)) {
+      const value = config[key];
+      if (typeof value === 'string' && isEncryptedSensitiveField(value)) {
+        config[key] = decryptSensitiveField(
+          value,
+          this.configService.jwtSecret,
+        );
+      }
+    }
+    const requiredAdapterKeys = [
+      'adapter',
+      'intentUrl',
+      'webhookUrl',
+      'settlementStatusUrl',
+      'sandboxHealthUrl',
+    ];
+    const missingKeys = requiredAdapterKeys.filter((key) => {
+      const value = config[key];
+      return typeof value !== 'string' || value.trim().length === 0;
+    });
+    if (config.adapter !== 'generic_json_v1' || missingKeys.length > 0) {
+      return {
+        ...base,
+        status: 'failed',
+        mode: 'sandbox_probe',
+        message: 'Payment gateway sandbox adapter configuration is incomplete.',
+        missingKeys,
+      };
+    }
+
+    let healthUrl: URL;
+    try {
+      healthUrl = new URL(String(config.sandboxHealthUrl));
+    } catch {
+      return {
+        ...base,
+        status: 'failed',
+        mode: 'sandbox_probe',
+        message: 'Payment gateway sandbox health URL is invalid.',
+        missingKeys: ['sandboxHealthUrl'],
+      };
+    }
+    if (healthUrl.protocol !== 'https:') {
+      return {
+        ...base,
+        status: 'failed',
+        mode: 'sandbox_probe',
+        message: 'Payment gateway sandbox health URL must use HTTPS.',
+        missingKeys: ['sandboxHealthUrl'],
+      };
+    }
+
+    try {
+      const apiToken = nullableString(config.apiToken ?? config.accessToken);
+      const response = await fetch(healthUrl, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          ...(apiToken ? { Authorization: `Bearer ${apiToken}` } : {}),
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) {
+        throw new Error(`sandbox returned HTTP ${response.status}`);
+      }
+      return {
+        ...base,
+        status: 'ready',
+        mode: 'sandbox_probe',
+        message:
+          'Payment gateway sandbox connectivity passed a non-charge health probe.',
+        paidExternalCallSkipped: true,
+        missingKeys: [],
+      };
+    } catch (error) {
+      return {
+        ...base,
+        status: 'failed',
+        mode: 'sandbox_probe',
+        message: `Payment gateway sandbox connectivity failed: ${error instanceof Error ? error.message : 'unknown error'}.`,
+        paidExternalCallSkipped: true,
+        missingKeys: [],
+      };
+    }
   }
 
   private async checkDatabase() {

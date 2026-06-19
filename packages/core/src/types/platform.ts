@@ -205,7 +205,7 @@ export type PlatformProviderConfigSummary = {
 export type PlatformProviderReadinessDetail = {
   provider: PlatformProviderConfigSummary;
   status: 'ready' | 'degraded' | 'not_configured' | 'failed';
-  mode: 'disabled' | 'dry_run';
+  mode: 'disabled' | 'dry_run' | 'sandbox_probe';
   message: string;
   missingKeys: string[];
   paidExternalCallSkipped: boolean;
