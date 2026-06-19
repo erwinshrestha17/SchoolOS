@@ -4,8 +4,8 @@
 **Market:** Nepal-focused school operating SaaS  
 **Target schools:** Kindergarten / Montessori to Grade 12 as the long-term product direction; current implementation remains staged around controlled pilot readiness for existing core modules  
 **Document type:** Functional Requirements Specification  
-**Status:** Active FRS aligned with KG-12 product direction and M12 Learning Layer implementation foundation
-**Last updated:** 2026-06-18
+**Status:** Active FRS aligned with KG-12 product direction and M12 Learning Layer implementation foundation  
+**Last updated:** 2026-06-19
 
 ---
 
@@ -22,6 +22,14 @@ Current core = broad implemented management foundation with remaining seed, brow
 KG-12 expansion = staged product direction
 M12 Learning Layer = backend, web runtime, parent/student web summary, and Flutter summary foundation implemented locally; AI/adaptive/simulation depth remains staged
 ```
+
+The dashboard and M1 desktop reference screens are documented in the supporting design appendix:
+
+```text
+docs/design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md
+```
+
+That appendix does not override this FRS, the canonical web design plan, backend contracts, OpenAPI, tenant isolation, RBAC, module entitlement, File Registry, audit, or financial/idempotency rules.
 
 ---
 
@@ -57,6 +65,34 @@ These rules apply to every module:
 12. Teacher-created learning content must be limited to assigned class/section/subject unless an explicit admin permission allows broader curriculum management.
 13. Student learning session access must fail closed when session, class, section, tenant, feature, or school-only policy validation fails.
 14. Parent learning summaries must be child-scoped, non-comparative, and free from public ranking.
+15. Dashboard and summary surfaces must use permission-filtered backend responses; a browser must not calculate official attendance, financial, payroll, accounting, readiness, or delivery totals.
+16. A missing, locked, unauthorized, queued, failed, partial-failure, or unavailable summary must remain distinct from a genuine zero state.
+17. Screen actions must resolve into a real permitted workflow. A dashboard card, right rail, quick action, or contextual button must not simulate a backend state in browser-only production state.
+18. Any user-visible aggregate that spans modules must be explicitly approved as a server-owned summary or consist only of separately authorized, non-official safe summaries.
+
+### 3.1 Principal dashboard and operating-desk requirements
+
+SchoolOS web must provide a role-aware operating desk rather than a generic shortcut dashboard.
+
+Principal/authorized-admin dashboard functions may include:
+
+1. View permission-filtered school health summary.
+2. View attention items and pending approvals.
+3. Drill into daily operations: attendance, fees, transport, canteen, admissions, and communication where enabled.
+4. View safe academic readiness, homework, report-card, and controlled-learning summaries.
+5. View safe collection/overdue/cashier summaries where finance permissions allow.
+6. View permission-filtered recent activity and upcoming/scheduled work.
+7. Use role-safe quick actions that open existing workflows.
+8. View module state only for enabled/entitled modules.
+
+Dashboard validation rules:
+
+1. The dashboard must not expose private message bodies, raw protected-file details, salary/bank data, accounting journals, or unavailable module data solely because a principal summary exists.
+2. The school-day/open status must come from configured/calendar-backed backend context where it is shown; it must not depend only on browser time.
+3. Charts render only when the backend returns valid, meaningful time-series data. A text summary replaces an absent series.
+4. A dashboard alert, KPI, queue item, or quick action must check current role, permission, tenant, module entitlement, and record scope again when opened.
+5. Financial cards and payment-method breakdowns use backend Decimal/numeric values. The UI must not calculate authoritative totals.
+6. Dashboard failure of one section must not blank independent successful sections.
 
 ---
 
@@ -188,58 +224,113 @@ Manage tenants, platform administration, feature controls, provider readiness, q
 
 ### 6.1 Purpose
 
-Manage student lifecycle from inquiry/admission to active, transferred, withdrawn, graduated, archived, or alumni state where enabled.
+Manage student lifecycle from inquiry/application to active, transferred, withdrawn, graduated, archived, or alumni state where enabled, including guardians, protected documents, deterministic duplicate review, QR/ID credential lifecycle, and iEMIS reporting readiness.
 
 ### 6.2 Primary actors
 
 - School Admin.
 - Principal.
-- Teacher with limited access.
-- Parent/Guardian with child-scoped access.
+- Admission Officer where configured.
+- Authorized reviewer/interviewer/counselor where configured.
+- Teacher with limited assigned-scope access.
+- Parent/Guardian with child-scoped access only.
 
 ### 6.3 Core functions
 
 1. Create inquiry/application.
-2. Convert application to student admission.
-3. Create student profile.
-4. Edit student profile.
-5. Manage guardian details and relationships.
-6. Assign class, section, roll number, and academic year.
-7. Upload student photo and documents.
-8. Generate student QR credential.
-9. Rotate/revoke student QR credential.
-10. Detect duplicate student candidates.
-11. Search students.
-12. View student lifecycle history.
-13. Maintain IEMIS/export readiness fields.
-14. Transfer, withdraw, graduate, archive, or reactivate according to policy.
-15. Support KG-12 student classification: ECD, primary, lower secondary, secondary, Grade 11-12 where enabled.
-16. Support later Grade 11-12 stream and subject-combination assignment through Academics.
+2. Create, reopen, and server-save application draft where supported.
+3. Capture student, guardian, address, academic, medical/emergency, and document information according to tenant admission policy.
+4. Validate required application fields/documents and calculate completeness from backend rules.
+5. Move an application through supported stages such as new, verification, interview, under review, approved, rejected, or waitlist where policy and contracts support them.
+6. Schedule/reschedule interview or assessment only where an approved contract and role permission exist.
+7. Capture reviewer notes, assessment data, missing-item requests, and an audited decision.
+8. Convert approved application to student admission.
+9. Create and edit student profile.
+10. Manage guardian details, relationship, verification, replacement, and removal.
+11. Assign class, section, roll number, academic year, and later configured academic/stream properties.
+12. Upload student photo and protected documents through File Registry.
+13. View document checklist, vault, request state, verification state, audit history, and expiry state where supported.
+14. Generate student QR credential.
+15. Rotate, revoke, deactivate, print, and view authorized QR/ID-card artifacts.
+16. Detect duplicate student/application candidates through deterministic, explainable backend factors.
+17. Review candidate pair, select primary record, resolve conflicts, and perform audited merge where allowed.
+18. Mark candidate as not duplicate with audit where supported.
+19. Search applications/students with server-side filtering, sort, pagination, and scope enforcement.
+20. View application, student lifecycle, document, QR, and safe activity history.
+21. Maintain iEMIS/export readiness fields.
+22. Run readiness validation, view validation issues, import jobs, export history, and mapping status where supported.
+23. Create protected error/export artifacts for authorized users.
+24. Transfer, withdraw, graduate, archive, or reactivate according to policy.
+25. Support KG-12 student classification: ECD, primary, lower secondary, secondary, Grade 11-12 where enabled.
+26. Support later Grade 11-12 stream and subject-combination assignment through Academics.
 
 ### 6.4 Key states
 
+- Application: local unsaved, draft, submitted/new, verification, interview scheduled, under review, approved, rejected, waitlisted where supported, incomplete, withdrawn where supported, archived where supported.
+- Application decision: ready, blocked by missing requirements, pending decision, request changes, approved, rejected, waitlisted where supported.
+- Interview/assessment: not required, pending scheduling, scheduled, completed, missed/cancelled where supported.
 - Student lifecycle: applicant, active, transferred, withdrawn, graduated, archived, alumni where enabled.
-- QR credential: active, rotated, revoked, expired.
-- Document: uploaded, linked, failed, archived.
-- Guardian link: active, removed, replaced.
+- QR credential: active, print queued, print ready, rotated, revoked/deactivated, expired, unavailable.
+- Document: required, uploading, uploaded, pending verification, verified, rejected, missing, expiring soon, expired, unavailable, archived.
+- Guardian link: active, pending verification, removed, replaced.
+- Duplicate candidate: pending review, merged, ignored/not duplicate, merge blocked, merge failed.
+- iEMIS import/export: validating, queued, processing, completed, partial failure, failed, artifact unavailable.
 
 ### 6.5 Validation rules
 
 1. Admission number must be unique within tenant where policy requires.
 2. Same admission number cannot be created concurrently.
-3. Duplicate candidates must be shown before risky merge actions.
-4. Parent access must be revoked immediately when guardian linkage is removed.
-5. QR resolve must fail for revoked, rotated, or expired credentials.
-6. Student lifecycle change must preserve historical attendance, fees, report cards, files, learning history, and accounting links.
-7. Same student name in another tenant must not affect local student search or merge.
+3. Draft status may only be shown after explicit server persistence. Recoverable local form state must be visually distinct from a saved draft.
+4. Required application fields/documents must come from configured admission policy, applicant class/level, transfer status, and current academic-year context; do not hard-code one universal checklist.
+5. Application stage transitions must be backend-authorized, role-aware, tenant-scoped, audited, and validated against prerequisite requirements.
+6. Application completeness, missing items, and readiness counts must be backend-derived. The browser must not infer them from currently visible fields.
+7. Reviewer score components, assessment rules, and decision formulas must be tenant/configuration-backed where used. Do not assume every school follows the same 100-point scheme.
+8. Application decision and parent/guardian notification are separate states. A successful approval/rejection does not imply delivery success.
+9. Duplicate candidates must be shown before risky merge actions.
+10. Duplicate matching must be explainable and deterministic unless M11 is explicitly approved later. UI labels must use `Match Breakdown` or equivalent, not `AI Similarity Breakdown`.
+11. Merge must require primary-record selection, conflict resolution, impact preview, confirmation, reason where policy requires, transactional backend behavior, and audit.
+12. Merge must preserve or explicitly resolve linked documents, guardians, attendance, fees, report cards, learning history, QR credentials, and audit evidence. It must not silently discard linked data.
+13. Parent access must be revoked immediately when guardian linkage is removed.
+14. QR resolve must fail for revoked, rotated, or expired credentials.
+15. QR/card previews, print queues, exports, documents, and iEMIS artifacts must use protected File Registry flows; no raw credential token, object key, permanent URL, or private storage path may be shown.
+16. QR generate/rotate/revoke/deactivate and bulk print must be permission-gated and audited; rotating/revoking invalidates prior credentials according to backend policy.
+17. iEMIS validation/export/import must use versioned backend rules/mapping. Imports require file validation, mapped-column preview, row-level error summary, duplicate policy, retry/idempotency policy, and auditable outcome.
+18. Partial or failed import/export job state must be explicit; it must never leave an ambiguous apparent-success state.
+19. Student lifecycle change must preserve historical attendance, fees, report cards, files, learning history, and accounting links.
+20. Same student name in another tenant must not affect local student search, duplicate candidate handling, merge, QR, document, import, or export behavior.
+21. Health/emergency data must be restricted to authorized roles and must not appear in generic lists, search results, or detail rails.
+22. Sibling/house/transport/etc. contextual fields appear only if configured and authorized; the browser must not infer relationships from surname, address, or guardian name.
 
-### 6.6 Acceptance criteria
+### 6.6 Edge cases
 
-1. Student creation and editing are tenant-scoped.
-2. Guardian removal immediately blocks parent access.
-3. Student documents/photos do not expose raw storage keys.
-4. QR lifecycle works with generate, rotate, revoke, and fail-closed resolve.
-5. Historical records remain available after transfer, withdrawal, graduation, archive, or alumni transition.
+1. Double-click/retry on application submit must not create duplicate application/admission records.
+2. A user loses permission or tenant/module access while an application, student, document, QR card, or export panel is open.
+3. A previously selected record becomes filtered out, archived, merged, deleted/soft-deleted, or no longer authorized.
+4. A file upload succeeds but File Registry association fails, or an association succeeds but protected preview is unavailable.
+5. A document requirement changes after a draft was saved.
+6. An interview is cancelled/rescheduled after review work begins.
+7. A decision is recorded but notification delivery is delayed, duplicated, failed, or out of order.
+8. A duplicate merge request is stale because a linked record changed after the review was opened.
+9. A QR print/export job is queued but the record is rotated/revoked before the artifact is downloaded.
+10. An iEMIS import completes partially; the UI must identify succeeded/failed rows and safe next steps without treating the whole job as clean success.
+11. A child is linked to multiple guardians, one guardian is removed, and a protected file deep link is revisited.
+12. Existing student and new applicant match only partially; the UI must show uncertainty and require reviewer decision rather than automatically merge.
+
+### 6.7 Acceptance criteria
+
+1. Application, student, guardian, document, duplicate, QR/ID, iEMIS, import, and export queries/mutations are tenant-scoped.
+2. Admission officer/admin can create a server-backed draft, restore it, see validation state, and submit it without duplicate creation.
+3. Pipeline stage, completeness, missing item, interview, review, and decision states are backend-backed and audit-visible.
+4. Guardian removal immediately blocks parent access.
+5. Student documents/photos and exports do not expose raw storage keys, permanent URLs, or private credentials.
+6. Protected document/card/export preview/download uses authenticated File Registry helpers.
+7. QR lifecycle works with generate, rotate, revoke/deactivate, print-queue state, and fail-closed resolve.
+8. Duplicate review shows explainable deterministic factors; merge requires explicit selection/confirmation and preserves linked history.
+9. Student directory/list uses server pagination/filtering and fail-closed assigned-scope access.
+10. Unauthorized actors do not receive health/emergency data, unrelated guardian data, or cross-module student details.
+11. iEMIS readiness behaves as validation/import/export job workflow with clear queued, completed, partial-failure, failed, and protected-artifact states.
+12. Historical records remain available after transfer, withdrawal, graduation, archive, alumni transition, or approved merge according to policy.
+13. Browser smoke covers application draft/submit, decision safeguards, protected documents, guardian access revocation, duplicate merge safety, QR lifecycle, iEMIS job state, and tenant/role denial.
 
 ---
 
@@ -403,6 +494,7 @@ Use the existing communication system to send learning-related summaries and not
 6. Do not introduce AI tutor, adaptive recommendations, advanced simulations, or open chat until a later approved phase.
 7. Parent learning access is own-child only.
 8. Student learning access is school lab/session only unless a future school-controlled device policy is explicitly approved.
-5. Do not implement open-ended student AI in MVP.
-6. Do not expose admin-shaped APIs to student, parent, board, or lab routes.
-7. Do not claim KG-12 completion until the matching code, tests, data models, and workflows exist.
+9. Do not implement open-ended student AI in MVP.
+10. Do not expose admin-shaped APIs to student, parent, board, or lab routes.
+11. Do not claim KG-12 completion until the matching code, tests, data models, and workflows exist.
+12. Do not claim the dashboard, M1 workflow states, saved views, score formulas, e-sign, calendar scheduling, print queues, or iEMIS job flows are implemented until confirmed by backend/OpenAPI and verified in browser/staging/pilot workflows.
