@@ -23,13 +23,14 @@ SchoolOS is now governed by a Production / General Availability (GA) release tar
 | 8 | `project/SCHOOLOS_PROJECT_STATUS.md` | Current implementation status snapshot; should summarize, not replace, the audit. |
 | 9 | `project/SCHOOLOS_IMPLEMENTATION_PLAN.md` | Longer implementation backlog and module detail; execution priority is governed by the next-phase plan and GA policy. |
 | 10 | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Storage, File Registry, tenant isolation, scaling, performance, and security architecture. |
-| 11 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, and provider/queue operations. |
-| 12 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, wireframes, components, API usage, and web persona smoke plan. |
-| 13 | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Approved supporting visual-reference appendix for the supplied principal dashboard and M1 desktop screens. Canonical web-plan rules take precedence. |
-| 14 | `design/M8B_TRANSPORT_WEB_REFERENCE_ANALYSIS.md` | Approved supporting visual-reference appendix for the supplied M8B Transport desktop, parent, and driver/mobile screens. Canonical web-plan and backend contracts take precedence. |
-| 15 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit, including contract-safe M3 Fees & Receipts and M5 Activity Feed & Milestones reference-screen implementation slices. |
-| 16 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
-| 17 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
+| 11 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, provider/queue operations, and platform notification-provider governance. |
+| 12 | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | Canonical cross-module notification event, recipient-resolution, delivery, preference, retry, audit, and notification-center architecture. |
+| 13 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, wireframes, components, API usage, and web persona smoke plan. |
+| 14 | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Approved supporting visual-reference appendix for the supplied principal dashboard and M1 desktop screens. Canonical web-plan rules take precedence. |
+| 15 | `design/M8B_TRANSPORT_WEB_REFERENCE_ANALYSIS.md` | Approved supporting visual-reference appendix for the supplied M8B Transport desktop, parent, and driver/mobile screens. Canonical web-plan and backend contracts take precedence. |
+| 16 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit, including contract-safe M3 Fees & Receipts and M5 Activity Feed & Milestones reference-screen implementation slices. |
+| 17 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
+| 18 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
 
 ---
 
@@ -45,6 +46,7 @@ project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md
 project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md
 architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
 architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
+architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md
 design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
 design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md
 design/M8B_TRANSPORT_WEB_REFERENCE_ANALYSIS.md
@@ -72,6 +74,7 @@ apps/web/e2e/README.md
 | Functional behavior | `product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` | Engineering, QA |
 | Architecture/security rules | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Engineering, security |
 | Platform operations boundary | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform/admin engineers |
+| Cross-module notification events, delivery, preferences, retry, audit, and notification center | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | Product, engineering, QA, platform/admin engineers |
 | Web UI and state rules | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Web engineers |
 | Dashboard and M1 visual-reference detail | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` (supporting appendix; canonical web plan takes precedence) | Product, design, web engineers |
 | M8B Transport visual-reference detail | `design/M8B_TRANSPORT_WEB_REFERENCE_ANALYSIS.md` (supporting appendix; canonical web plan and backend/OpenAPI contracts take precedence) | Product, design, web engineers, QA |
@@ -120,7 +123,7 @@ Use the mobile plan for `apps/schoolos_mobile`, parent, teacher, principal, driv
 
 ## Cleanup Rules
 
-1. Do not add a new `.md` file if the content belongs inside an active source-of-truth doc, unless the owner explicitly approves a supporting visual-reference appendix and its relationship to the canonical doc is recorded here.
+1. Do not add a new `.md` file if the content belongs inside an active source-of-truth doc, unless the owner explicitly approves a supporting visual-reference appendix or architecture companion and its relationship to the canonical doc is recorded here.
 2. `production/SCHOOLOS_GA_RELEASE_POLICY.md` is an approved canonical release-governance document; do not duplicate or fork its stage definitions in new docs.
 3. Do not recreate planning-only docs that conflict with current implementation status.
 4. Keep old duplicated planning content in git history rather than active repo docs.
