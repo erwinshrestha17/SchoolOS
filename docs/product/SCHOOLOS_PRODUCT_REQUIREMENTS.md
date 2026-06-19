@@ -3,8 +3,8 @@
 **Product:** SchoolOS  
 **Market:** Nepal-focused school operating SaaS  
 **Target schools:** Kindergarten / Montessori to Grade 12 as the long-term product direction; current implementation remains staged around controlled pilot readiness for existing core modules  
-**Document type:** Combined master PRD merged from the original pilot-hardening PRD and the researched 2026 PRD draft  
-**Status:** Active product requirements document for controlled pilot hardening, KG-12 product planning, M12 Learning Layer alignment, and planned M13 Inventory & Asset Management  
+**Document type:** Combined master PRD  
+**Status:** Active product requirements document for controlled pilot hardening, KG-12 product planning, notification module alignment, and M13 Learning Layer alignment  
 **Last updated:** 2026-06-19
 
 ---
@@ -18,8 +18,10 @@ Important distinction:
 ```text
 Current implemented core = broad school-management foundation with remaining seed, browser, mobile, staging, provider, and pilot verification gates
 KG-12 SchoolOS = staged product direction
-M12 Learning Layer = backend, web runtime, parent/student web summary, and Flutter summary foundation implemented locally; staging/browser/device depth remains staged
-M13 Inventory & Asset Management = planned Nepal-focused module; product/design/implementation docs exist but code/contracts/migrations/tests are not yet proven
+M12 Notification Module = explicit product module for notification center, events, delivery, preferences, retries, provider diagnostics, read state, and audit
+M13 Learning Layer = backend, web runtime, parent/student web summary, and Flutter summary foundation implemented locally; staging/browser/device depth remains staged
+M14 Intelligence / AI = roadmap-only until production data, privacy, audit, and human-review controls are ready
+Inventory & Asset Management = scrapped from active module taxonomy
 ```
 
 Implementation claims must still be validated against the evidence in `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`, real pilot-school workflows, official reporting templates, provider sandbox/staging flows, production security review, and the verification commands in the next-phase plan.
@@ -33,19 +35,19 @@ SchoolOS should be positioned as a **Nepal-first KG-12 school operating system**
 The core product thesis:
 
 ```text
-One login, one school ledger, one student record, one learning record, one asset register, one audit trail.
+One login, one school record, one fee ledger, one attendance truth, one learning record, one communication trail, one audit trail.
 ```
 
-SchoolOS must help Nepali schools manage daily operations, student records, guardians, attendance, fees, receipts, accounting, academics, exams, report cards, parent communication, HR/payroll, library, transport, canteen, inventory/assets, classroom learning, file privacy, reporting readiness, and future school intelligence from one tenant-isolated platform.
+SchoolOS must help Nepali schools manage daily operations, student records, guardians, attendance, fees, receipts, accounting, academics, exams, report cards, parent communication, HR/payroll, library, transport, canteen, classroom learning, file privacy, reporting readiness, notifications, and future school intelligence from one tenant-isolated platform.
 
 The strongest product direction is to build around six anchors:
 
 1. **School master data** strong enough to support admissions, government-reporting readiness, class setup, student lifecycle, staff assignments, and school configuration.
 2. **Academic operations** covering attendance, timetable, homework, gradebook, exams, CAS, report cards, promotion, streams, practicals, and parent/student visibility.
 3. **Cashier and finance operations** reliable enough for real-world fee collection, receipt generation, refunds, reversals, day-end close, reconciliation, and accounting controls.
-4. **Physical operations** covering library, transport, canteen, inventory, fixed assets, maintenance, stocktake, purchase requests, and school resource visibility.
-5. **Learning operations** covering teacher-created activities, smart-board sessions, school-only computer-lab practice, progress tracking, and parent learning summaries.
-6. **Privacy, auditability, and tenant isolation** as first-class requirements because SchoolOS stores student, guardian, staff, financial, operational, learning, communication, inventory, and asset data.
+4. **Physical operations** covering library, transport, canteen, HR/payroll, and daily school resource workflows.
+5. **Communication and notification operations** covering notices, in-app notifications, SMS/email/push routing, quiet hours, delivery logs, parent-teacher communication, chat moderation, and emergency messaging.
+6. **Privacy, auditability, and tenant isolation** as first-class requirements because SchoolOS stores student, guardian, staff, financial, operational, learning, and communication data.
 
 The product should first prove:
 
@@ -55,16 +57,42 @@ The product should first prove:
 1 reconciled fee flow
 1 teacher-friendly daily workflow
 1 parent-visible student record
+1 safe notification/communication flow
 1 safe classroom-learning workflow
 1 reporting/export validation layer
-1 controlled inventory/asset record later when M13 is implemented
 ```
 
 Do not expand into open-ended AI, microservices, Angular migration, broad live-map workflows, biometric workflows, or deep mobile expansion until the pilot workflows are stable.
 
 ---
 
-## 2. Product Overview
+## 2. Active Module Taxonomy
+
+| Module | Name | Product intent |
+|---|---|---|
+| M0 | Platform Core | SaaS tenancy, plans, settings, File Registry, providers, queues, support override, audit. |
+| M1 | Admissions and Student Profiles | Inquiry, admission, student lifecycle, guardians, documents, QR/ID, alumni/transfer states. |
+| M2 | Smart Attendance | Daily attendance, corrections, registers, alerts, parent visibility, teacher mobile flow. |
+| M3 | Fees and Receipts | Fee plans, invoices, payments, receipts, discounts, waivers, reversals, cashier close. |
+| M4 | Academics, Exams, CAS, Report Cards | Subjects, marks, CAS, exams, report cards, promotion, streams/practicals later. |
+| M5 | Activity Feed and Milestones | Class/activity updates, media, milestones, consent-aware parent visibility. |
+| M6 | Homework and Timetable | Homework, timetable, substitutions, conflict detection, teacher/student/parent visibility. |
+| M7 | HR and Payroll | Staff records, leave, attendance, salary structures, payroll, payslips, staff self-service. |
+| M8 | Library | Catalogue, copies, issue/return, reservations, fines, lost/damaged, scanner, parent view. |
+| M9 | Transport | Routes, vehicles, drivers, trips, boarding/deboarding, parent status, GPS-readiness. |
+| M10 | Canteen | Menu, POS, wallet/debit controls, meal QR, allergy warnings, stock/vendor links. |
+| M11 | Accounting and Finance | Chart of accounts, vouchers, journals, fiscal locks, reconciliation, reports, snapshots. |
+| M12 | Notifications, Notices, Communication, Chat | Notification center, templates, delivery, notices, read receipts, chat, moderation, emergency audit. |
+| M13 | Learning Layer | Teacher-created activities, smart-board mode, lab sessions, practice, progress, parent summary. |
+| M14 | Intelligence / AI | Deferred teacher-reviewed analytics and safe AI after reliable production data exists. |
+
+`M8A`, `M8B`, and `M8C` must not be used as active module numbers. Library, Transport, and Canteen are standalone modules.
+
+Inventory & Asset Management is not part of the active taxonomy.
+
+---
+
+## 3. Product Overview
 
 SchoolOS is a production-grade, multi-tenant SaaS school operating system for Nepali schools. It should support Kindergarten / Montessori to Grade 12 through staged implementation.
 
@@ -78,7 +106,7 @@ Guardians and parent access
 Smart attendance
 Fees and receipts
 Accounting and finance
-Notices and communication
+Notifications, notices, communication, and chat
 Activity feed and milestones
 Academics, exams, CAS, report cards, streams, practicals, and projects
 Homework and timetable
@@ -86,22 +114,21 @@ HR and payroll
 Library
 Transport
 Canteen
-Inventory and asset management
 Reports and exports
 Protected File Registry
-M12 Learning Layer
+M13 Learning Layer
 Future school intelligence
 ```
 
-SchoolOS should not feel like a generic CRUD dashboard. It must match real school-office and classroom workflows in Nepal: front-desk fee collection, principal oversight, teacher attendance/marks entry, guardian communication, smart-board teaching, computer-lab practice, transport tracking, library/canteen counters, inventory/store-room control, asset register review, maintenance tracking, and periodic reporting pressure.
+SchoolOS should not feel like a generic CRUD dashboard. It must match real school-office and classroom workflows in Nepal: front-desk fee collection, principal oversight, teacher attendance/marks entry, guardian communication, smart-board teaching, computer-lab practice, transport tracking, library/canteen counters, and periodic reporting pressure.
 
-The product should first prioritize pilot reliability, financial correctness, tenant isolation, parent/student access boundaries, protected files, auditability, and operational stability before expanding into advanced AI, mobile, payment, biometric, live-map, advanced learning, or broad inventory scanner workflows.
+The product should first prioritize pilot reliability, financial correctness, tenant isolation, parent/student access boundaries, protected files, auditability, notification reliability, and operational stability before expanding into advanced AI, mobile, payment, biometric, live-map, or advanced learning workflows.
 
 ---
 
-## 3. Problem Statement
+## 4. Problem Statement
 
-Many schools in Nepal still operate through fragmented systems: paper registers, Excel sheets, manual fee ledgers, offline accounting tools, attendance notebooks, printed/PDF report-card templates, WhatsApp/Viber groups, unstructured Google Drive folders, disconnected parent communication channels, manual store-room registers, asset lists in notebooks, vendor bills in files, and separate or informal classroom-learning tools.
+Many schools in Nepal still operate through fragmented systems: paper registers, Excel sheets, manual fee ledgers, offline accounting tools, attendance notebooks, printed/PDF report-card templates, WhatsApp/Viber groups, unstructured Google Drive folders, disconnected parent communication channels, library notebooks, transport trip sheets, and canteen counter records.
 
 This creates:
 
@@ -110,34 +137,14 @@ This creates:
 - Fee receipt/accounting mismatch risk.
 - Inconsistent student records.
 - Slow parent communication.
+- Missed or duplicated notices.
+- Weak delivery evidence for critical alerts.
 - Poor auditability.
 - Weak file privacy.
 - Limited school-level analytics.
 - Difficult official-reporting preparation.
-- Poor visibility over stationery, lab supplies, furniture, electronics, repairs, donated assets, and school resources.
-- Little connection between classroom activities, teacher planning, student practice, and parent progress summaries.
 
-SchoolOS solves this by providing a single tenant-isolated system where each school can manage operations, academics, finance, communication, files, reporting workflows, staged classroom-learning workflows, and planned inventory/asset workflows in one place.
-
----
-
-## 4. Product Vision
-
-To become the default KG-12 operating system for Nepali schools by offering a reliable, locally relevant, financially accurate, classroom-aware, resource-aware, and easy-to-use SaaS platform that supports the full school lifecycle from admission to learning progress, accounting, reporting, school resources, and parent engagement.
-
-SchoolOS should win through:
-
-- Nepal-first workflows.
-- Strong accounting and fee correctness.
-- Tenant-safe SaaS architecture.
-- Parent/teacher/mobile readiness.
-- Protected File Registry and private media access.
-- QR identity for student operations.
-- IEMIS/reporting readiness matrix.
-- Canteen, library, transport, HR, payroll, academics, communication, inventory/assets, learning, and accounting in one connected platform.
-- Smart-board and computer-lab friendly classroom support.
-- Practical low-bandwidth and school-office UX.
-- Gradual code-file modularization instead of premature microservices.
+SchoolOS solves this by providing a single tenant-isolated system where each school can manage operations, academics, finance, communication, notifications, files, reporting workflows, and staged classroom-learning workflows in one place.
 
 ---
 
@@ -147,25 +154,25 @@ SchoolOS should win through:
 
 1. Enable multiple schools to run independently on one SaaS platform.
 2. Support controlled pilot deployment after staging verification.
-3. Provide strong coverage for school operations, fees, accounting, academics, attendance, communication, and parent access.
-4. Build trust through accurate receipts, ledgers, reports, audit trails, protected files, permission-scoped learning records, and later inventory/asset accountability.
-5. Prepare a foundation for KG-12 expansion, analytics, mobile expansion, provider integrations, SaaS billing automation, M12 Learning, and M13 Inventory & Asset Management.
-6. Differentiate through Nepal-first operating context, cashier workflows, IEMIS readiness, smart-board learning support, computer-lab practice, store-room/asset accountability, and strong tenant isolation.
+3. Provide strong coverage for school operations, fees, accounting, academics, attendance, communication, notifications, and parent access.
+4. Build trust through accurate receipts, ledgers, reports, audit trails, protected files, permission-scoped learning records, and delivery evidence.
+5. Prepare a foundation for KG-12 expansion, analytics, mobile expansion, provider integrations, SaaS billing automation, M13 Learning, and M14 Intelligence/AI.
+6. Differentiate through Nepal-first operating context, cashier workflows, IEMIS readiness, smart-board learning support, computer-lab practice, and strong tenant isolation.
 
 ### 5.2 Product Goals
 
 1. Centralize school data under secure tenant isolation.
 2. Provide school administrators with one operational dashboard.
-3. Provide principals with visibility into school health, collections, attendance gaps, academic status, pending approvals, learning adoption, reporting-readiness issues, and later inventory/asset risks.
+3. Provide principals with visibility into school health, collections, attendance gaps, academic status, pending approvals, communication delivery, reporting-readiness issues, and learning adoption.
 4. Allow teachers to manage attendance, homework, academics, marks/CAS, timetable, communication, and planned classroom activities.
-5. Allow parents to view child-specific notices, dues, fees, receipts, attendance, homework, progress, report cards, and safe learning summaries.
+5. Allow parents to view child-specific notices, notifications, dues, fees, receipts, attendance, homework, progress, report cards, and safe learning summaries.
 6. Allow students to view their own timetable, homework, notices, attendance, report cards, library/canteen information, and school-approved learning activities where enabled.
 7. Provide finance staff/cashiers with fee ledgers, receipts, refunds, reversals, cashier close, reconciliation, and accounting controls.
-8. Provide storekeepers/inventory officers with catalogue, stock, purchase, issue/return, asset, maintenance, stocktake, and report workflows when M13 is implemented.
+8. Provide school operations staff with library, transport, canteen, and daily workflow tools.
 9. Keep platform administration separate from tenant/school operations.
 10. Treat official reporting and IEMIS readiness as a validation workflow, not a static export button.
-11. Treat M12 Learning as a separate product vertical that reuses SchoolOS Core data instead of duplicating it.
-12. Treat M13 Inventory & Asset Management as a school-operations module with safe accounting handoff, not as a replacement for M9 Accounting or a generic warehouse ERP.
+11. Treat M12 Notifications/Communication as a first-class module, not a side effect of notices.
+12. Treat M13 Learning as a separate product vertical that reuses SchoolOS Core data instead of duplicating it.
 
 ### 5.3 Technical Goals
 
@@ -177,58 +184,28 @@ SchoolOS should win through:
 6. Keep browser auth cookie-first and mobile/API access bearer-token compatible.
 7. Split large services/components by responsibility as code-file modularization, not microservices.
 8. Keep parent/student/driver/mobile APIs purpose-limited and avoid exposing admin-shaped responses.
-9. Implement M12 Learning as `apps/api/src/learning`, `apps/web/app/dashboard/learning`, `apps/web/app/classroom/board`, `apps/web/app/student/learning`, `apps/web/app/parent/learning`, and `packages/core/src/learning` when implementation begins.
-10. Implement M13 Inventory & Asset Management as a modular monolith domain with shared contracts, tenant-scoped tables, File Registry-backed attachments, idempotent stock movements, and M9-owned accounting handoff when prioritized.
+9. Implement M12 notification delivery through module-emitted events, backend-owned recipient resolution, templates, preferences, channel routing, queues, provider callbacks, delivery logs, and read state.
+10. Keep M13 Learning as `apps/api/src/learning`, `apps/web/app/dashboard/learning`, `apps/web/app/classroom/board`, `apps/web/app/student/learning`, `apps/web/app/parent/learning`, and `packages/core/src/learning` where implemented.
 
 ---
 
-## 6. Nepal Market and School Operating Context
-
-### 6.1 Nepal-First Requirements
+## 6. Nepal-First Requirements
 
 | Area | Product implication |
 |---|---|
 | Academic year and fiscal year may differ | Support academic-year context and fiscal-year/accounting period context separately. |
 | Schools use class/section/roll conventions | Class, section, roll number, academic year, and lifecycle status must be first-class fields. |
 | KG, primary, secondary, and +2 workflows differ | Use grade bands, school levels, streams, practicals, and product edition settings. |
-| Parents expect simple communication | Parent app/portal should show child-specific dues, attendance, notices, homework, results, receipts, and learning summaries without admin complexity. |
+| Parents expect simple communication | Parent app/portal should show child-specific dues, attendance, notices, notifications, homework, results, receipts, and learning summaries without admin complexity. |
 | School offices often use mixed manual/digital workflows | Import/export, CSV/Excel, printable receipts, and manual reconciliation must be supported. |
-| Nepali and English usage both matter | UI labels, reports, receipts, notices, learning activities, purchase forms, asset labels, and templates should be localization-ready. |
+| Nepali and English usage both matter | UI labels, reports, receipts, notices, notifications, learning activities, and templates should be localization-ready. |
 | Official reporting pressure exists | IEMIS/export readiness must be treated as a validation workflow, not a single static file export. |
-| Connectivity can be inconsistent | Important workflows need drafts, retry-safe submissions, and clear sync/conflict behavior. |
-| Smart boards and computer labs may exist before 1:1 devices | M12 Learning should prioritize teacher-led board mode and school-only lab mode. |
+| Connectivity can be inconsistent | Important workflows need drafts, retry-safe submissions, clear sync/conflict behavior, and queued notification delivery. |
+| Smart boards and computer labs may exist before 1:1 devices | M13 Learning should prioritize teacher-led board mode and school-only lab mode. |
 | Local financial workflows matter | Cash, manual bank transfer, eSewa/Khalti readiness, cashier close, and reconciliation must be explicit. |
-| Local procurement and asset workflows matter | VAT/PAN bills, non-VAT bills, handwritten bills, vendor quotation comparison, purchase approvals, donations/grants, stocktake, warranty, repair, and asset write-off need audit-ready handling. |
+| Local communication workflows matter | Notices, parent-teacher messages, push, SMS, email, quiet hours, language-ready templates, and delivery logs must be explicit. |
 | Local naming patterns matter | Nepali names, mixed scripts, guardian phone reuse, and duplicate candidate matching must be handled. |
-| Low-bandwidth usage is common | Media, dashboards, learning activities, reports, inventory tables, and protected documents must degrade gracefully. |
-
-### 6.2 Education System and Reporting Context
-
-SchoolOS should support the operational structure used by Nepali schools:
-
-- Kindergarten / Montessori / ECD and primary levels.
-- Basic and secondary class progression.
-- Grade 11-12 / +2 extensibility through streams and subject combinations.
-- Class and section setup.
-- Roll number assignment by academic year/class/section.
-- Teacher, class teacher, and subject teacher assignments.
-- Exam terms, assessment components, CAS/continuous assessment, grade sheets, and report cards.
-- Promotion, transfer, withdrawal, graduation, and archived student states.
-- Practical, project, and stream-based academic records for Grade 11-12 later.
-- Scholarships, student category flags, and official/export-related fields where needed.
-- School profile readiness, infrastructure fields, stream/program flags, and staff roster readiness.
-- Store, lab, asset, transport spare, furniture, equipment, donation/grant, maintenance, and warranty records where M13 is enabled.
-
-The product should maintain a clean distinction between:
-
-```text
-Academic structure: class, section, subject, timetable, exam term, stream, subject combination
-Student lifecycle: applicant, active, transferred, withdrawn, graduated, archived
-Financial lifecycle: fee plan, invoice, payment, receipt, reversal, refund, cashier close, journal posting
-Learning lifecycle: activity draft, scheduled session, live session, attempt, progress, parent summary
-Inventory lifecycle: purchase request, approval, quotation, purchase order, GRN, stock movement, stocktake, maintenance, write-off, accounting handoff
-Reporting lifecycle: draft data, validation errors, official-ready state, exported artifact, audit trail
-```
+| Low-bandwidth usage is common | Media, dashboards, learning activities, reports, protected documents, and notification center pages must degrade gracefully. |
 
 ---
 
@@ -252,15 +229,57 @@ Stage F: Grade 11-12
 | Grade 9-10 | SEE preparation, exams, report cards, topic mastery, academic tracking |
 | Grade 11-12 | streams, subject combinations, practicals, projects, advanced learning labs, board exam preparation |
 
-M13 Inventory & Asset Management applies across all stages but its visible scope should adapt by school size, permissions, and plan. Small schools may need catalogue, stock, purchases, and asset register first; larger schools may need multi-store, department issue, stocktake, maintenance, and accounting handoff depth.
+---
+
+## 8. M12 Notification, Notices, Communication, and Chat Summary
+
+M12 is the explicit notification and communication module. It covers both broadcast communication workflows and system-generated alerts.
+
+M12 must include:
+
+```text
+Notification Event Intake
+Recipient Resolver
+Template Engine
+Notification Center
+Unread Counts
+Notification Preferences
+Quiet Hours
+Channel Routing
+SMS/Email/Push/In-app Delivery
+Provider Callback Verification
+Delivery Logs
+Read Receipts
+Notice Templates
+Recipient Targeting and Preview
+Scheduled Notices
+Parent-Teacher Chat
+Chat Moderation / Report / Block / Escalation
+Emergency Broadcast Audit
+```
+
+Core rule:
+
+```text
+Feature modules emit events.
+M12 owns recipient resolution, templates, preferences, delivery routing, retries, delivery logs, read state, and audit.
+```
+
+M12 must not:
+
+- Allow each feature module to call SMS/email/push providers directly.
+- Expose provider secrets, callback payload secrets, raw object keys, or permanent private URLs.
+- Pretend delivery succeeded when a provider is disabled, mocked, or failed.
+- Leak private chat bodies or message recipients through dashboard summaries.
+- Replace backend authorization with browser-side recipient filtering.
 
 ---
 
-## 8. M12 Learning Layer Summary
+## 9. M13 Learning Layer Summary
 
-M12 Learning Layer has an implemented backend/web/mobile foundation with local test evidence. It is not production-ready until staging fixtures, seeded authenticated browser E2E, device QA, school-only policy hardening, and later advanced learning phases are verified.
+M13 Learning Layer has an implemented backend/web/mobile foundation with local test evidence. It is not production-ready until staging fixtures, seeded authenticated browser E2E, device QA, school-only policy hardening, and later advanced learning phases are verified.
 
-M12 must include:
+M13 must include:
 
 ```text
 Teacher Activity Builder
@@ -272,27 +291,10 @@ Progress & Mastery Tracking
 Parent Learning Summary
 Learning Resource Library
 Adaptive Recommendations later
-Safe AI Assistant later
+Safe AI Assistant later only if approved
 ```
 
-Implemented on 2026-06-12:
-
-```text
-Teacher Activity Builder APIs and web workspace
-Easy / Medium / Hard difficulty
-Smart Board and Computer Lab session backend plus web runtime routes
-School-Only Learning Sessions
-Session list, heartbeat, and participant monitor
-Practice & Quiz Engine for MCQ, true/false, normalized short answer, matching, and ordering
-Attempt autosave and idempotent submission
-Progress & Mastery Tracking foundation
-Parent Learning Summary foundation on web and mobile
-Student self-scoped mobile learning summary
-Learning Resource Library endpoints and activity resource panel
-Tenant isolation, RBAC, entitlement, audit logs, E2E, web contract, and mobile test coverage
-```
-
-M12 must reuse:
+M13 must reuse:
 
 ```text
 M0 Platform entitlement and feature settings
@@ -301,126 +303,12 @@ M2 Attendance context
 M4 Academics subjects/topics/outcomes
 M6 Timetable/homework
 M7 Teacher/staff assignments
-M10 Communication
+M12 Communication and Notifications
 File Registry and Storage
 Audit logs and RBAC
 ```
 
-M12 must not duplicate core student, teacher, class, subject, parent, file, notification, or audit systems.
-
-### 8.1 Product Positioning
-
-SchoolOS is positioned as a KG-12 school operating platform with three connected layers:
-
-```text
-1. School Management Layer
-2. Learning Layer
-3. Intelligence & Insight Layer later
-```
-
-The School Management Layer runs daily school operations: records, fees, attendance, academics, staff, communication, transport, canteen, library, inventory/assets, accounting, reports, and platform controls.
-
-The Learning Layer improves classroom teaching and school-controlled student practice. It supports teacher-led interactive learning, smart-board sessions, lab practice, progress tracking, and parent-safe summaries.
-
-The future Intelligence Layer is deferred until reliable production data, tenant-safe aggregation, explainability, human review, and explicit product approval exist. It must not become open-ended student AI chat or automatic punishment/risk scoring.
-
-### 8.2 KG-12 Learning Stages
-
-| Stage | Primary mode | Product expectations | Avoid / defer |
-|---|---|---|---|
-| Stage A - Kindergarten / ECD / Montessori | Smart-board teacher-led only | Picture matching, letter/Nepali character sounds, number counting, colors/shapes, rhymes, story sequencing, movement activities, milestones, parent daily summary | Independent long screen sessions, ranking, open-ended AI, heavy quizzes |
-| Stage B - Grade 1-3 | Teacher-led smart board plus short guided practice | Phonics, Nepali reading, basic math, picture vocabulary, story comprehension, science sorting, short quizzes, supportive progress labels | Competitive ranking and unsupervised screen-heavy learning |
-| Stage C - Grade 4-5 | Smart-board explanation plus group/lab practice | Fractions, science diagrams, Nepal map basics, grammar, revision quizzes, library-linked reading, parent weekly summary | Public comparisons and broad home learning app |
-| Stage D - Grade 6-8 | Smart-board concepts plus computer-lab practice | Algebra, geometry visualizer, science simulations, maps/timelines, paragraph writing, coding basics, digital safety, projects | AI tutor/open chat and heavy simulations until later |
-| Stage E - Grade 9-10 | Concept mastery plus SEE-style preparation | Topic mastery, mock tests, mistake notebook, math/science/social studies revision, teacher weak-topic dashboard | Raw prediction scores to parents/students |
-| Stage F - Grade 11-12 | Stream-based advanced learning, practicals, projects, board prep | Science, Management, Humanities, Education, Computer Science, accountancy/economics/coding labs, project/practical tracking, career/counselling notes | Full adaptive recommendations and AI tutor until approved |
-
-### 8.3 Nepal-First Learning Rules
-
-The Learning Layer must support smart-board classrooms, projector-based teaching, shared computer labs, low-bandwidth environments, mixed manual/digital workflows, English/Nepali/mixed explanations, local examples, curriculum alignment, teacher-controlled session flow, and parent-safe summaries.
-
-Local content examples should use familiar Nepal contexts such as momo, roti, rice, rupees, local markets, monsoon, Terai, Hills, Himalayas, Bagmati, Lumbini, school bus, crops, festivals, and community life.
-
-Allowed usage modes:
-
-```text
-SMART_BOARD  = one screen, whole class
-GROUP        = students participate in groups
-COMPUTER_LAB = individual attempts in school lab
-WORKSHEET    = printable fallback
-HYBRID       = smart-board explanation + lab practice
-```
-
-### 8.4 Deferred Boundaries
-
-Explicitly deferred until later approval:
-
-```text
-Full adaptive learning and recommendations
-AI tutor or open chat
-Heavy simulations and advanced subject labs
-Public leaderboards or comparative ranking
-Full Flutter smart-board/lab runtime
-Broad student mobile/home app
-School-only network/location hardening beyond authenticated membership and expiring code/QR token
-```
-
----
-
-## 9. M13 Inventory & Asset Management Summary
-
-M13 Inventory & Asset Management is a planned Nepal-focused school operations module. Its detailed requirements live in:
-
-```text
-docs/product/M13_INVENTORY_ASSET_MANAGEMENT.md
-docs/design/modules/M13_INVENTORY_ASSET_FRONTEND_REFERENCE.md
-docs/implementation/M13_INVENTORY_ASSET_IMPLEMENTATION_PLAN.md
-```
-
-M13 should cover:
-
-```text
-Inventory catalogue
-Consumable stock
-Fixed asset register
-Stores and locations
-Purchase requests
-Quotation comparison
-Vendor management
-Purchase orders
-Goods received notes
-Stock issue and return
-Transfers and adjustments
-Asset assignment
-Maintenance and repair
-Stocktake and variance review
-Lost/damaged/write-off lifecycle
-Barcode/QR labels
-Protected bills, warranties, quotations, and reports
-Accounting handoff to M9
-```
-
-Nepal-first M13 requirements:
-
-- Support local vendors, VAT/PAN bill metadata, non-VAT/manual bills, quotation comparison, and approval notes.
-- Support Nepali school item categories such as stationery, exam materials, lab supplies, sports goods, cleaning items, uniforms/distributables, furniture, electronics, computer-lab equipment, transport spare parts, donated/grant assets, and infrastructure assets.
-- Support academic-year and fiscal-year filtering where useful.
-- Support store/location hierarchy such as main store, office store, science lab, computer lab, sports room, exam room, transport store, hostel store, building, floor, room, rack, shelf, cupboard, or bin.
-- Support principal/owner/SMC-style approvals for high-value purchases and write-offs where configured.
-- Keep stock movement, receive, issue, return, transfer, adjustment, stocktake approval, maintenance completion, and asset write-off idempotent and audited.
-- Use File Registry for bills, quotations, purchase orders, GRNs, warranties, asset photos, stocktake sheets, repair invoices, write-off approvals, labels, and exported reports.
-- Never post direct accounting entries from the browser; M9 Accounting owns official ledger posting, reversal, fiscal locks, and report snapshots.
-
-M13 must not replace:
-
-```text
-M8A Library book-copy lifecycle
-M8B Transport trip/GPS operations
-M8C Canteen POS/meal stock controls
-M9 Accounting official ledgers
-M7 HR staff master records
-M10 notification delivery ownership
-```
+M13 must not duplicate core student, teacher, class, subject, parent, file, notification, or audit systems.
 
 ---
 
@@ -429,14 +317,15 @@ M10 notification delivery ownership
 | User | Needs / daily workflows |
 |---|---|
 | SchoolOS Platform Operator | Manage SaaS tenants, subscriptions, platform settings, provider readiness, billing records, feature access, usage, queues, API keys, support override, and audit logs. |
-| School Owner / Principal | View school health, finance, collections, attendance gaps, academics, staff, communication, pending approvals, reports, learning adoption, inventory/asset risks where enabled, and operational risks. |
-| School Admin | Manage admissions, students, guardians, classes, settings, documents, notices, school profile, module settings, and daily records. |
-| Accountant / Finance Staff | Manage fee setup, invoices, payments, receipts, refunds, reversals, accounting, ledgers, reports, reconciliation, day-end close, inventory bill review, and M13 accounting handoff where enabled. |
-| Storekeeper / Inventory Officer | Manage item catalogue, stores, stock, purchases, GRNs, issue/return, transfers, assets, maintenance, stocktake, labels, and reports where M13 is enabled. |
-| Department Head / Lab In-charge | Request supplies, receive issued materials, track department/lab items, report loss/damage, and review assigned assets. |
-| Teacher | Manage assigned attendance, homework, marks, class activities, smart-board sessions, lab sessions, progress review, and item requests where allowed. |
-| Parent / Guardian | View child-specific attendance, dues, receipts, homework, notices, results, media, and learning summaries. |
-| Student | View allowed timetable, homework, notices, results, library/canteen information, and school-approved learning sessions where enabled. |
+| School Owner / Principal | View school health, finance, collections, attendance gaps, academics, staff, communication delivery, pending approvals, reports, learning adoption, and operational risks. |
+| School Admin | Manage admissions, students, guardians, classes, settings, documents, notices, notification settings, school profile, module settings, and daily records. |
+| Accountant / Finance Staff | Manage fee setup, invoices, payments, receipts, refunds, reversals, accounting, ledgers, reports, reconciliation, and day-end close. |
+| Librarian | Manage catalogue, copies, issue/return, reservations, overdues, fines, lost/damaged cases, labels, and parent-safe library visibility. |
+| Transport Manager / Driver / Conductor | Manage routes, vehicles, assignments, trips, boarding/deboarding, safety alerts, parent trip status, and vehicle/driver documents where supported. |
+| Canteen Staff | Manage menu, POS, student meal QR, allergy warnings, wallet/spending controls, receipts, and stock/vendor workflows where supported. |
+| Teacher | Manage assigned attendance, homework, marks, class activities, smart-board sessions, lab sessions, progress review, and parent communication. |
+| Parent / Guardian | View child-specific attendance, dues, receipts, homework, notices, notifications, results, media, and learning summaries. |
+| Student | View allowed timetable, homework, notices, notifications, results, library/canteen information, and school-approved learning sessions where enabled. |
 
 ---
 
@@ -447,12 +336,11 @@ M10 notification delivery ownership
 3. SchoolOS SaaS billing must not mix with school fee collection.
 4. Money flows must be idempotent and auditable.
 5. Private files must use StorageService/FileRegistryService boundaries.
-6. Learning must be a separate M12 domain, not scattered through existing modules.
-7. Learning activities must be school-only by default.
-8. Teachers can create/launch activities only for assigned classes/subjects.
-9. Parent learning summaries must be child-scoped and non-comparative.
-10. AI/analytics remain roadmap-only until reliable production data exists and human-review controls are approved.
-11. Inventory and asset stock/valuation truth must be backend-owned; browser UI must not calculate official stock, depreciation, valuation, or accounting results.
-12. M13 Inventory & Asset Management may emit accounting handoff events, but M9 Accounting owns official ledger records, posting, reversal, fiscal locks, and snapshots.
-13. Protected inventory and asset documents must use File Registry-backed access, not raw object keys or permanent public URLs.
-14. M13 must remain separate from Library, Transport, Canteen, HR/Payroll, and Accounting ownership boundaries unless a deliberate contract integration exists.
+6. M12 owns notification delivery lifecycle: recipient resolution, templates, preferences, provider routing, delivery logs, retries, read state, and audit.
+7. Source modules may emit notification events but must not directly own provider delivery.
+8. Learning must be a separate M13 domain, not scattered through existing modules.
+9. Learning activities must be school-only by default.
+10. Teachers can create/launch activities only for assigned classes/subjects unless an explicit admin permission allows broader curriculum management.
+11. Parent learning summaries must be child-scoped and non-comparative.
+12. M14 AI/analytics remain roadmap-only until reliable production data exists and human-review controls are approved.
+13. Inventory & Asset Management is not active scope and should not appear in active module lists unless re-approved.
