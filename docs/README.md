@@ -26,7 +26,7 @@ SchoolOS is now governed by a Production / General Availability (GA) release tar
 | 11 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, and provider/queue operations. |
 | 12 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, wireframes, components, API usage, and web persona smoke plan. |
 | 13 | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Approved supporting visual-reference appendix for the supplied principal dashboard and M1 desktop screens. Canonical web-plan rules take precedence. |
-| 14 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit, including the contract-safe M3 Fees & Receipts reference-screen implementation slice. |
+| 14 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit, including contract-safe M3 Fees & Receipts and M5 Activity Feed & Milestones reference-screen implementation slices. |
 | 15 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
 | 16 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
 
@@ -72,7 +72,7 @@ apps/web/e2e/README.md
 | Platform operations boundary | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform/admin engineers |
 | Web UI and state rules | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Web engineers |
 | Dashboard and M1 visual-reference detail | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` (supporting appendix; canonical web plan takes precedence) | Product, design, web engineers |
-| M3 reference-to-contract implementation guidance | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` (implementation audit; canonical web plan and backend/OpenAPI contracts take precedence) | Web engineers, QA |
+| M3 and M5 reference-to-contract implementation guidance | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` (implementation audit; canonical web plan and backend/OpenAPI contracts take precedence) | Web engineers, QA |
 | Mobile companion app rules | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Mobile engineers |
 | Deployment and recovery procedure | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment/operator team |
 | Historical/superseded docs | `archive/README.md` | Maintainers |
@@ -100,13 +100,13 @@ design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md
 
 The visual appendix is not a competing product, architecture, release, or API-contract source. It documents the supplied principal dashboard and M1 desktop reference screens. The canonical web plan takes precedence for shared UI rules, route boundaries, tenant/RBAC/module entitlement rules, protected files, data truth, and acceptance criteria.
 
-The M3 Fees & Receipts desktop references are recorded as a contract-safe implementation slice in `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md`. That audit does not create a competing design or API source: the canonical web plan remains authoritative for shared design rules, and backend/OpenAPI/shared contracts remain authoritative for fields, routes, totals, actions, and permissions.
+The M3 Fees & Receipts and M5 Activity Feed & Milestones desktop references are recorded as contract-safe implementation slices in `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md`. That audit does not create a competing design or API source: the canonical web plan remains authoritative for shared design rules, and backend/OpenAPI/shared contracts remain authoritative for fields, routes, totals, actions, permissions, file access, consent, audience scope, and provider ownership.
 
 Use the web plan for `apps/web`, school dashboard, platform control plane, settings, module workspaces, reports, protected file actions, and web persona smoke planning.
 
 Use the dashboard/M1 appendix when implementing or reviewing the referenced principal dashboard and M1 Admissions / Student Profiles workspaces.
 
-Use the M3 section of the UI/API alignment audit when implementing or reviewing the supplied M3 Fees & Receipts desktop references against existing real routes and backend contracts.
+Use the M3 and M5 sections of the UI/API alignment audit when implementing or reviewing the supplied desktop references against existing real routes and backend contracts. The M5 section explicitly preserves the boundary between M5 classroom activity work, M10 delivery operations, and M0/File Registry or platform storage operations.
 
 Use the mobile plan for `apps/schoolos_mobile`, parent, teacher, principal, driver, staff self-service, and controlled student lab/session app design.
 
