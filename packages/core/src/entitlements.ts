@@ -12,7 +12,7 @@ export const CUSTOMER_TIERS = [
   SubscriptionTier.ENTERPRISE,
 ];
 
-// Customer Modules only (excl M0)
+// Customer Modules only (excl M0). Module keys remain stable even when display numbering changes.
 export const CUSTOMER_MODULES = [
   'students', // M1 Admissions & Student Profiles
   'attendance', // M2 Smart Attendance
@@ -21,12 +21,12 @@ export const CUSTOMER_MODULES = [
   'activity', // M5 Activity Feed & Milestones
   'homework', // M6 Homework & Timetable
   'hr', // M7 HR & Payroll
-  'library', // M8A Library Management
-  'transport', // M8B Transport Management
-  'canteen', // M8C Canteen Management
-  'accounting', // M9 Accounting & Finance
-  'notices', // M10 Notices & Communication
-  'learning', // M12 Learning Layer
+  'library', // M8 Library
+  'transport', // M9 Transport
+  'canteen', // M10 Canteen
+  'accounting', // M11 Accounting & Finance
+  'notices', // M12 Notifications, Notices, Communication & Chat
+  'learning', // M13 Learning Layer
 ];
 
 export const FEATURE_KEYS = {
@@ -56,7 +56,7 @@ export const FEATURE_KEYS = {
   TIMETABLE_CONFLICTS: 'feature.timetable.conflicts',
   TIMETABLE_ADVANCED: 'feature.timetable.advanced',
 
-  // M12 Learning Layer
+  // M13 Learning Layer
   LEARNING_BASIC: 'feature.learning.basic',
   LEARNING_FULL: 'feature.learning.full',
 
@@ -65,26 +65,26 @@ export const FEATURE_KEYS = {
   HR_FULL: 'feature.hr.full',
   HR_SELF_SERVICE: 'feature.hr.self_service',
 
-  // M8A Library Management
+  // M8 Library
   LIBRARY_BASIC: 'feature.library.basic',
   LIBRARY_FULL: 'feature.library.full',
 
-  // M8B Transport Management
+  // M9 Transport
   TRANSPORT_BASIC: 'feature.transport.basic',
   TRANSPORT_FULL: 'feature.transport.full',
   GPS_LIVE_TRACKING: 'feature.transport.gps_live',
 
-  // M8C Canteen Management
+  // M10 Canteen
   CANTEEN_BASIC: 'feature.canteen.basic',
   CANTEEN_FULL: 'feature.canteen.full',
   CANTEEN_WALLET_CONTROLS: 'feature.canteen.wallet_controls',
 
-  // M9 Accounting & Finance
+  // M11 Accounting & Finance
   ACCOUNTING_BASIC_FINANCE: 'feature.accounting.basic_finance',
   ACCOUNTING_FULL: 'feature.accounting.full',
   ACCOUNTING_AUDIT: 'feature.accounting.audit',
 
-  // M10 Notices & Communication
+  // M12 Notifications, Notices, Communication & Chat
   NOTICES_BASIC: 'feature.notices.basic',
   NOTICES_FULL: 'feature.notices.full',
   NOTICES_READ_TRACKING: 'feature.notices.read_tracking',
@@ -285,5 +285,5 @@ export const ENTITLEMENT_MATRIX: Record<
   },
 };
 
-// Standard allows add-ons: Library, Transport, Canteen
+// Standard allows add-ons: M8 Library, M9 Transport, M10 Canteen.
 export const STANDARD_ALLOWED_ADDONS = ['library', 'transport', 'canteen'];
