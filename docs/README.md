@@ -56,9 +56,13 @@ Inventory & Asset Management is not an active module. Do not recreate M13 Invent
 | 15 | `design/modules/README.md` | Module-level design reference index. |
 | 16 | `design/modules/M8_LIBRARY_FRONTEND_REFERENCE.md` | M8 Library module-level frontend reference. |
 | 17 | `design/M9_TRANSPORT_WEB_REFERENCE_ANALYSIS.md` | M9 Transport supporting web reference analysis. |
-| 18 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit, including contract-safe M3 Fees & Receipts and M5 Activity Feed & Milestones reference-screen implementation slices. |
-| 19 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
-| 20 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
+| 18 | `design/M10_CANTEEN_WEB_REFERENCE_ANALYSIS.md` | M10 Canteen supporting web reference analysis. |
+| 19 | `design/M11_ACCOUNTING_WEB_REFERENCE_ANALYSIS.md` | M11 Accounting supporting web reference analysis. |
+| 20 | `design/M12_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md` | M12 Notifications/Communication supporting web reference analysis. |
+| 21 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit, including contract-safe M3 Fees & Receipts and M5 Activity Feed & Milestones reference-screen implementation slices. |
+| 22 | `project/M10_CANTEEN_FRONTEND_IMPLEMENTATION_CHECKLIST.md` | M10 Canteen frontend implementation checklist. |
+| 23 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
+| 24 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
 
 ---
 
@@ -80,6 +84,10 @@ design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md
 design/modules/README.md
 design/modules/M8_LIBRARY_FRONTEND_REFERENCE.md
 design/M9_TRANSPORT_WEB_REFERENCE_ANALYSIS.md
+design/M10_CANTEEN_WEB_REFERENCE_ANALYSIS.md
+design/M11_ACCOUNTING_WEB_REFERENCE_ANALYSIS.md
+design/M12_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md
+project/M10_CANTEEN_FRONTEND_IMPLEMENTATION_CHECKLIST.md
 implementation/WEB_UI_API_ALIGNMENT_AUDIT.md
 design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
 production/SCHOOLOS_GA_RELEASE_POLICY.md
@@ -90,7 +98,16 @@ App-specific active docs outside this folder:
 
 ```text
 apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md
+apps/web/AGENTS.md
 apps/web/e2e/README.md
+apps/web/docs/modules/README.md
+apps/web/docs/modules/M8_LIBRARY_FRONTEND_IMPLEMENTATION_GUIDE.md
+```
+
+Retired supporting reference:
+
+```text
+design/HOSTEL_WEB_REFERENCE_ANALYSIS_RETIRED.md
 ```
 
 ---
@@ -111,7 +128,11 @@ apps/web/e2e/README.md
 | Dashboard and M1 visual-reference detail | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Product, design, web engineers |
 | M8 Library frontend detail | `design/modules/M8_LIBRARY_FRONTEND_REFERENCE.md` | Product, design, web engineers, QA |
 | M9 Transport web reference detail | `design/M9_TRANSPORT_WEB_REFERENCE_ANALYSIS.md` | Product, design, web engineers, QA |
+| M10 Canteen web reference detail | `design/M10_CANTEEN_WEB_REFERENCE_ANALYSIS.md` | Product, design, web engineers, QA |
+| M11 Accounting web reference detail | `design/M11_ACCOUNTING_WEB_REFERENCE_ANALYSIS.md` | Product, design, web engineers, QA |
+| M12 Notifications/Communication web reference detail | `design/M12_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md` | Product, design, web engineers, QA |
 | M3 and M5 reference-to-contract implementation guidance | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Web engineers, QA |
+| M10 Canteen frontend checklist | `project/M10_CANTEEN_FRONTEND_IMPLEMENTATION_CHECKLIST.md` | Web engineers, QA |
 | Mobile companion app rules | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Mobile engineers |
 | Deployment and recovery procedure | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment/operator team |
 | Historical/superseded docs | `archive/README.md` | Maintainers |
