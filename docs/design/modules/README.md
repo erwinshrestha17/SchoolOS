@@ -3,7 +3,7 @@
 **Status:** Module-level frontend design reference index.  
 **Updated:** 2026-06-19
 
-This folder contains focused module design references derived from SchoolOS web design rules, recent module-specific design work, product analysis, and backend-alignment needs.
+This folder contains the implementation-ready M1-M13 frontend web design references. Each file owns its module's feature explanations, personas, route plan, screen specifications, one simple wireframe per screen, component plan, backend/API needs, state matrix, security boundaries, Nepal-specific requirements, implementation checklist, and done definition.
 
 These files complement and must follow the main web design sources:
 
@@ -21,19 +21,19 @@ Backend/OpenAPI/shared contracts remain authoritative for DTOs, API names, route
 
 | Module | Name | Design reference |
 |---|---|---|
-| M1 | Admissions and Student Profiles | `M1_ADMISSIONS_STUDENT_PROFILES_FRONTEND_REFERENCE.md` |
-| M2 | Smart Attendance | `M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md` |
-| M3 | Fees and Receipts | `M3_FEES_RECEIPTS_FRONTEND_REFERENCE.md` |
-| M4 | Academics, Exams, CAS, Report Cards | `M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md` |
-| M5 | Activity Feed and Milestones | `M5_ACTIVITY_FEED_MILESTONES_FRONTEND_REFERENCE.md` |
-| M6 | Homework and Timetable | `M6_HOMEWORK_TIMETABLE_FRONTEND_REFERENCE.md` |
-| M7 | HR and Payroll | `M7_HR_PAYROLL_FRONTEND_REFERENCE.md` |
-| M8 | Library | `M8_LIBRARY_FRONTEND_REFERENCE.md` |
-| M9 | Transport | `M9_TRANSPORT_FRONTEND_REFERENCE.md` |
-| M10 | Canteen | `M10_CANTEEN_FRONTEND_REFERENCE.md` |
-| M11 | Accounting and Finance | `M11_ACCOUNTING_FINANCE_FRONTEND_REFERENCE.md` |
-| M12 | Notifications, Notices, Communication, Chat | `M12_NOTIFICATIONS_COMMUNICATION_FRONTEND_REFERENCE.md` |
-| M13 | Learning Layer | `M13_LEARNING_LAYER_FRONTEND_REFERENCE.md` |
+| M1 | Admissions and Student Profiles | [M1 reference](M1_ADMISSIONS_STUDENT_PROFILES_FRONTEND_REFERENCE.md) |
+| M2 | Smart Attendance | [M2 reference](M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md) |
+| M3 | Fees and Receipts | [M3 reference](M3_FEES_RECEIPTS_FRONTEND_REFERENCE.md) |
+| M4 | Academics, Exams, CAS, Report Cards | [M4 reference](M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md) |
+| M5 | Activity Feed and Milestones | [M5 reference](M5_ACTIVITY_FEED_MILESTONES_FRONTEND_REFERENCE.md) |
+| M6 | Homework and Timetable | [M6 reference](M6_HOMEWORK_TIMETABLE_FRONTEND_REFERENCE.md) |
+| M7 | HR and Payroll | [M7 reference](M7_HR_PAYROLL_FRONTEND_REFERENCE.md) |
+| M8 | Library | [M8 reference](M8_LIBRARY_FRONTEND_REFERENCE.md) |
+| M9 | Transport | [M9 reference](M9_TRANSPORT_FRONTEND_REFERENCE.md) |
+| M10 | Canteen | [M10 reference](M10_CANTEEN_FRONTEND_REFERENCE.md) |
+| M11 | Accounting and Finance | [M11 reference](M11_ACCOUNTING_FINANCE_FRONTEND_REFERENCE.md) |
+| M12 | Notifications, Notices, Communication, Chat | [M12 reference](M12_NOTIFICATIONS_COMMUNICATION_FRONTEND_REFERENCE.md) |
+| M13 | Learning Layer | [M13 reference](M13_LEARNING_LAYER_FRONTEND_REFERENCE.md) |
 
 `M8A`, `M8B`, and `M8C` are obsolete labels. Library, Transport, and Canteen are standalone modules.
 

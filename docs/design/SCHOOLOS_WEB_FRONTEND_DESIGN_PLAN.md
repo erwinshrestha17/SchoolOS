@@ -1,14 +1,36 @@
 # SchoolOS Web Frontend Design Plan
 
-**Status:** Active source of truth for SchoolOS web frontend design, UI/UX, route behavior, API usage, and web persona smoke expectations.  
-**Updated:** 2026-06-19  
-**Scope:** `apps/web`, Next.js App Router, school dashboard, platform control plane, settings, reports, protected files, and dense school operation workspaces.
+**Status:** Active global source of truth for SchoolOS web design rules.
+**Updated:** 2026-06-19
+**Scope:** `apps/web`, Next.js App Router, school operations, school settings, platform control plane, shared states, protected files, and contract-safe frontend behavior.
 
-This document is planning and design guidance only. It does not implement backend, frontend, mobile, database, migration, package, or test code.
+This document contains global web rules only. Feature lists, module workflows, expected screens, wireframes, role projections, and module backend needs live in [`docs/design/modules/`](modules/README.md). This is design guidance, not evidence that a route or API exists.
 
 ---
 
-## 1. Active Module Numbering
+## 1. Product and Release Stance
+
+SchoolOS web is the daily operating desk for Nepal schools. It is not a decorative dashboard, generic ERP skin, shortcut wall, or fake demo.
+
+The governing interaction rule is:
+
+```text
+One screen = one main job.
+```
+
+A user should quickly understand:
+
+```text
+Where am I?
+What needs attention?
+What can I safely do next?
+```
+
+Every screen must use real backend data or an honest unavailable state. Local UI completeness does not establish staging, pilot, release-candidate, or GA readiness; release claims follow `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`.
+
+---
+
+## 2. Active Module Taxonomy
 
 | Module | Name |
 |---|---|
@@ -26,421 +48,314 @@ This document is planning and design guidance only. It does not implement backen
 | M11 | Accounting and Finance |
 | M12 | Notifications, Notices, Communication, Chat |
 | M13 | Learning Layer |
-| M14 | Intelligence / AI |
+| M14 | Intelligence / AI — deferred roadmap only |
 
-`M8A`, `M8B`, and `M8C` are obsolete labels. Library, Transport, and Canteen are standalone modules.
-
-Inventory & Asset Management is not active web scope.
+Legacy compound M8 labels are not active module identifiers. Library, Transport, and Canteen are independent modules. Inventory & Asset Management is outside active scope. Do not create M14 runtime, prediction, tutor, generation, or automated-decision UI unless the owner explicitly approves it.
 
 ---
 
-## 2. Product Principle
+## 3. Web Theme
 
-SchoolOS web is the daily command center for Nepal schools. It should help school staff run real school work quickly, safely, and confidently.
+SchoolOS uses a calm, light, operations-first visual language:
 
-It must feel like:
+- Soft blue-grey application background.
+- White cards, tables, panels, forms, and drawers.
+- Deep blue/indigo primary identity.
+- Module accent colors for location only.
+- Semantic success, warning, danger, and information colors for status.
+- Subtle borders and shadows where hierarchy needs them.
+- Rounded panels consistent with the shared design system.
+- Charts only when they make a decision materially easier.
+- No decorative gradients or crowded KPI walls.
 
-```text
-A school operating desk.
-```
-
-It must not feel like:
-
-```text
-A generic ERP.
-A decorative dashboard template.
-A shortcut wall.
-A fake demo UI.
-A technical admin console for non-technical school users.
-```
-
-Core rule:
-
-```text
-One screen = one main job.
-```
-
-Every web screen must answer quickly:
-
-```text
-1. Where am I?
-2. What needs my attention?
-3. What can I safely do here?
-```
-
-A good SchoolOS screen has:
-
-- A clear page title.
-- A short school-friendly purpose line.
-- One primary action.
-- Secondary actions under `More Actions`.
-- Real backend data or an honest unavailable/empty state.
-- Permission-safe visibility.
-- Clear next action.
-- No fake numbers.
-- No hidden financial, staff, student, file, or communication risk.
+The token values and shared visual primitives are defined in [`apps/web/docs/DESIGN_SYSTEM.md`](../../apps/web/docs/DESIGN_SYSTEM.md).
 
 ---
 
-## 3. Web Surface Boundaries
+## 4. App Shell and Surface Boundaries
 
-| Plane | Route family | User | Purpose |
+| Plane | Route family | Primary user | Purpose |
 |---|---|---|---|
-| School Operations | `/dashboard/*` | School staff | Daily school workflows. |
-| Tenant Configuration | `/dashboard/settings/*` | School admin / authorized roles | One school's configuration. |
-| Platform Control Plane | `/platform/*` | SchoolOS operator / platform admin | SaaS tenant, provider, queue, support, and platform operations. |
+| School Operations | `/dashboard/*` | School staff | Daily school workflows |
+| Tenant Configuration | `/dashboard/settings/*` | Authorized school admin | One school's configuration |
+| Platform Control Plane | `/platform/*` | SchoolOS platform operator | SaaS tenant/provider/queue/support operations |
 
-Rules:
-
-- School Operations must never expose platform-only controls.
-- School Settings must not become SaaS billing/platform configuration.
-- Platform must not expose tenant-private data unless explicit audited support override is active.
-- School fee collection is not SchoolOS SaaS billing.
-- M11 Accounting is a school accounting module, not a platform billing microservice.
-
----
-
-## 4. Non-Negotiable Web Guardrails
-
-### 4.1 Security and tenant isolation
-
-- Keep `tenantId` as the tenant boundary everywhere.
-- Backend RBAC, tenant scope, module entitlement, and route guards are the source of truth.
-- Frontend hiding is only UX; it is never security.
-- Every API call must rely on authenticated session context and backend authorization.
-- Do not expose raw Prisma errors, stack traces, secrets, provider credentials, object keys, or permanent public storage URLs.
-- Parent, driver, staff self-service, and student lab/session routes must use purpose-limited data, not admin-shaped payloads.
-
-### 4.2 Data truth
-
-- Real APIs only.
-- No fake frontend data.
-- No placeholder production metrics.
-- No browser-only production state.
-- No client-side money truth.
-- No client-calculated official attendance, fees, payroll, accounting, library, transport, canteen, notification, or learning totals.
-- Growing lists must be paginated and filtered server-side.
-- Dashboard summaries may show unavailable states if a summary API is missing.
-
-### 4.3 Protected files
-
-Protected files include:
+The authenticated shell uses:
 
 ```text
-Receipts
-Cashier close PDFs
-Report cards
-Payscale/payroll slips
-Student documents
-Student photos
-School logo where private
-Activity media
-Notice attachments
-Chat attachments
-Homework attachments
-Learning resources
-Accounting reports
-Exports and snapshots
-Generated documents
+Global topbar
+Role- and entitlement-aware sidebar
+Page header
+Optional context/filter bar
+Summary strip when useful
+Primary work area
+Optional detail drawer
 ```
 
 Rules:
 
-- Use File Registry-backed authenticated helpers.
-- Use `ProtectedFileButton`, `ProtectedFileLink`, or shared blob/download helpers.
-- Do not use raw `window.open` for private files.
-- Do not persist raw signed URLs in client state beyond the immediate action.
-- Do not expose object keys, provider bucket URLs, or permanent signed URLs.
+- The topbar contains global school/year context, search, notifications, support-override banner where applicable, and the user menu.
+- The sidebar is navigation, not a KPI or action surface.
+- School operations never expose platform-only controls.
+- School settings never become SaaS billing or platform configuration.
+- Platform views do not expose tenant-private records without an explicit audited support override.
+- School fee collection and M11 school accounting remain separate from SchoolOS subscription billing.
 
 ---
 
-## 5. Standard Layout Pattern
+## 5. Navigation Rules
 
-Every operations workspace should follow this rhythm:
+- Group navigation by school work: Home; Students; Daily Operations; Academics; School Operations; Staff and Finance; Reports; System.
+- Derive visible destinations from authenticated role, tenant status, and module entitlement.
+- Frontend hiding improves usability only. Direct route/API access still requires backend authorization.
+- Show a subtle locked indicator only where useful; direct locked-route access renders the full module-locked state.
+- Preserve meaningful academic year, fiscal period, class/section, date, and filter context during drill-down.
+- Deep links reauthorize current tenant, role, entitlement, recipient, assignment, and record scope.
+- Do not expose implementation sprint names, obsolete module labels, internal IDs, or provider concepts in school-user navigation.
+
+---
+
+## 6. Standard Layout Rules
+
+The default operations workspace is:
 
 ```text
 ModuleHeader
-KPI strip / Summary strip where useful
-Quick actions or tabs
-Filter bar
-Main table / form / workflow area
-Right detail drawer or full detail route
-Audit / export / protected file actions
-Footer timestamp / last updated where API provides it
+KpiGrid / SummaryStrip (only when backed by a summary contract)
+Tabs or subnavigation (only for stable subdomains)
+FilterBar
+Main table / grid / form / workflow
+Detail drawer or full detail route
+Audit / export / protected-file actions
+Last-updated or snapshot time when supplied by backend
 ```
 
 Header rules:
 
-- One primary action per route.
-- Put secondary actions such as import, export, print, and settings under `More Actions` where possible.
-- Destructive actions are never primary decorative CTAs.
-- High-risk actions require confirmation and reason where policy requires it.
+- One primary action.
+- A short school-language purpose line.
+- Secondary import, export, print, settings, and uncommon actions under `More Actions`.
+- Destructive actions are separated from routine actions.
+- High-risk actions show impact, require confirmation, collect a reason where policy requires it, and expose pending/success/failure state.
+
+Drawer rules:
+
+- Use a drawer for row/card detail that benefits from preserving filters and selection.
+- Use a full route for long forms, multi-stage review, complex history, or a shareable/bookmarkable record.
+- At smaller desktop/tablet widths, convert persistent rails into drawers.
 
 ---
 
-## 6. Required Web States
+## 7. Shared Components and Reuse Rules
 
-Every screen must explicitly handle:
+Prefer existing shared primitives before creating module-specific variants:
 
-```text
-Loading
-Empty
-No search results
-Error with retry
-Permission denied
-Module locked
-Validation failure
-Mutation pending
-Mutation success
-Mutation error
-Partial success
-Queued / processing job
-File unavailable
-Provider disabled / mock / failed where relevant
-Session expired
-Slow network
-```
+| Shared primitive | Global use |
+|---|---|
+| `ModuleHeader` | Title, purpose, primary action, secondary menu |
+| `KpiGrid` / `SummaryStrip` | Backend-owned summaries |
+| `FilterBar` | Server-side query controls and active filters |
+| Paginated table | Growing operational lists |
+| Status badge | Text plus semantic color |
+| Detail drawer | Selected detail, actions, audit |
+| Validated form sections | Create/edit/review workflows |
+| Confirmation/reason dialog | High-risk mutations |
+| `ProtectedFileButton` / `ProtectedFileLink` | Authenticated file access |
+| Upload widget | File Registry-backed upload and processing state |
+| Timeline/audit panel | Backend actor, time, reason, and state history |
+| Shared state components | Loading, empty, error, permission, locked, unavailable |
 
-Never show raw technical copy such as:
-
-```text
-403 Forbidden
-Mutation failed
-Unhandled exception
-PrismaClientKnownRequestError
-Invalid payload
-Object key missing
-```
-
-Use school-friendly copy, for example:
-
-```text
-Save failed. Please check the highlighted fields.
-You do not have permission to reverse payments. Please contact the school administrator.
-This module is not enabled for this school.
-Receipt download is unavailable right now.
-This report is being prepared. You can download it when it is ready.
-```
+A module may compose these primitives into purpose-built widgets. It must not fork the theme, error language, file behavior, or authorization model.
 
 ---
 
-## 7. Module Workspace Expectations
+## 8. Typography, Spacing, and Density
 
-### M1 Admissions and Student Profiles
-
-- Inquiry/admission workflow, duplicate review, student profile, guardians, documents, QR/ID, transfer/withdrawal/graduation/alumni states, and IEMIS readiness.
-- Teacher limited scope must not see unrelated students.
-- Student files use protected helpers.
-
-### M2 Smart Attendance
-
-- Teacher assigned-class marking.
-- Correction requests with reason.
-- Lock windows and non-working-day states.
-- Parent alerts through M12.
-- Monthly register exports through protected helper.
-
-### M3 Fees and Receipts
-
-- Backend-owned fee, invoice, receipt, payment, reversal, refund, waiver, and cashier-close totals.
-- Payment submission must be idempotent.
-- Receipt appears only after confirmed backend success.
-- Reversal/refund requires reason, permission, and audit.
-
-### M4 Academics, Exams, CAS, Report Cards
-
-- Subject teacher assignment scope.
-- Grade sheets, CAS, exam terms, report-card generation/publish states.
-- Report-card files use protected helpers.
-- Parent/student see published child/self-scoped results only.
-
-### M5 Activity Feed and Milestones
-
-- Consent-aware activity posts and media.
-- Parent sees linked-child and consent-safe media only.
-- Removed guardians lose access.
-- Moderation actions are audited.
-
-### M6 Homework and Timetable
-
-- Homework publish/lock/archive states.
-- Timetable conflict panel.
-- Attachments through File Registry.
-- Parent/student see assigned published work only.
-
-### M7 HR and Payroll
-
-- Admin HR/payroll routes separate from staff self-service.
-- Staff documents, contracts, salary, bank, PAN, payslip fields are permission-gated and masked by default.
-- Payroll totals are backend-owned.
-- Posted payroll uses reversal/correction workflow only.
-
-### M8 Library
-
-- Catalogue and copy management remain separate.
-- Issue/return/renew is scanner-first.
-- Borrower eligibility and policy state show before confirmation.
-- Parent library view is child-scoped.
-- Fine calculations and copy totals come from backend.
-
-### M9 Transport
-
-- Parent status is child-route scoped and timestamped/stale-labelled.
-- Driver/conductor screens are assigned-trip scoped.
-- Live map/WebSocket/SSE UI is deferred unless backend/provider/load/privacy decisions are confirmed.
-- Vehicle/route/trip documents use protected file helpers.
-
-### M10 Canteen
-
-- POS/wallet/meal serving values are backend-owned truth.
-- Allergy/medical warning visible before serving.
-- Duplicate serve and receipt reprint states are idempotency-aware.
-- Parent spending APIs are child-scoped.
-
-### M11 Accounting and Finance
-
-- No client-owned accounting truth.
-- Posted records use reversal/correction flow.
-- Period close/reopen is high risk and requires reason.
-- Large exports use File Registry and job status.
-- Bank reconciliation suggestions must not auto-post.
-
-### M12 Notifications, Notices, Communication, Chat
-
-- Source modules emit events; M12 owns delivery lifecycle.
-- Notification center and unread counts are user-scoped.
-- Notice targeting/preview is backend-owned.
-- Provider-disabled, mock, failed, partial, and queued states are explicit.
-- Parent-teacher chat remains assignment/permission scoped.
-- Attachments use File Registry.
-- Escalation/report actions are audited.
-
-### M13 Learning Layer
-
-- Teacher assigned-scope.
-- Resources protected.
-- Student runtime is active-session only.
-- Parent sees own child only.
-- Student sees own attempt/result only.
-- No public leaderboard.
-- No AI tutor/runtime unless approved.
-
-### M14 Intelligence / AI
-
-- Deferred roadmap only.
-- No AI runtime, LLM calls, prediction UI, or automated decisions unless explicitly approved.
+- Use the design-system type scale; page title, section heading, body, label, helper, and table text have stable hierarchy.
+- Keep body text readable and labels explicit. Do not replace labels with placeholder-only inputs.
+- Use consistent spacing increments from the design system; avoid arbitrary one-off gaps.
+- Dense tables are appropriate for school operations, but essential columns, row actions, and status must remain readable on common laptops.
+- Prioritize columns on narrower widths. Do not squeeze every desktop column into an unreadable table.
+- Long filters collapse into an expandable filter panel.
+- Sticky action bars are reserved for long forms and review flows.
+- Color is never the only carrier of state.
+- Keyboard focus, form errors, table controls, dialog focus, and protected-file actions must remain accessible.
 
 ---
 
-## 8. Main Dashboard Rules
+## 9. State Handling Rules
 
-The dashboard is the school command center. It is not a place to show every module in depth.
+Every route explicitly handles:
 
-Dashboard layout:
+| State | Required behavior |
+|---|---|
+| Loading | Layout-matching skeleton; preserve title and context |
+| Empty | Explain why and offer one permitted next action |
+| No results | Preserve filters and provide clear-filter action |
+| Error | Parse bounded backend error, retain safe context, offer retry |
+| Permission denied | Reveal no forbidden data or identifiers |
+| Module locked | Show entitlement state; no fake fallback values |
+| Validation failure | Inline field errors and summary for long forms |
+| Mutation pending | Prevent duplicate submission |
+| Success | Confirm outcome and refetch/invalidate affected data |
+| Mutation failure | School-friendly message; preserve safe input |
+| Partial success | Itemize successful and failed records |
+| Queued/processing | Show backend job lifecycle and refresh |
+| File unavailable | Explain missing, expired, restricted, or generation failure safely |
+| Provider disabled/mock/degraded | State the mode precisely where relevant |
+| Session expired | Return safely to authentication without leaking cached data |
+| Slow/stale data | Preserve current data, show timestamp/stale label, offer refresh |
+
+Never render raw HTTP codes, stack traces, Prisma messages, provider payloads, object keys, or internal exception text.
+
+---
+
+## 10. Protected File Rules
+
+Protected files include student documents/photos, receipts, cashier-close reports, report cards, activity media, homework/learning resources, staff documents/contracts/payslips, vehicle documents, notice/chat attachments, accounting evidence/reports, labels, exports, and generated certificates.
+
+Required flow:
 
 ```text
-Welcome / School Status Header
-School-wide KPI Strip
-Today's Operations
-Pending Approvals and Alerts
-Module Summary Grid
-Recent Activity Timeline
-Role-Based Quick Actions
-Optional decision charts
+Feature UI
+-> authenticated File Registry helper
+-> backend authorization
+-> short-lived protected access or authenticated download
 ```
 
 Rules:
 
-- Use dedicated summary APIs.
-- Use safe module summary metadata.
-- Use permission-filtered response shapes.
-- Show unavailable summary state when the summary endpoint is missing.
-- Do not deep-fetch every module.
-- Do not show private payroll details.
-- Do not show private chat contents.
-- Do not show raw student-sensitive data.
-- Do not show locked module fake values.
-- Do not show finance totals if the user lacks permission.
-- KPI click-through should preserve filters.
+- Use shared protected-file buttons, links, blob helpers, and upload components.
+- Never use a raw private URL or raw `window.open`.
+- Never expose object keys, bucket/provider URLs, or storage internals.
+- Do not persist signed URLs beyond the immediate action.
+- Reauthorize tenant, role, record scope, and current relationship/assignment on every open/download.
+- Render unavailable, missing, processing, failed, expired, and permission states explicitly.
+- Generated files show backend job state, version/snapshot time, and protected download only after confirmation.
 
 ---
 
-## 9. Web Persona Smoke Expectations
+## 11. Backend and API Usage Rules
 
-Every persona smoke should prove:
+- Backend/OpenAPI/shared contracts are authoritative for route names, DTOs, totals, transitions, locks, permissions, files, jobs, audit, and error envelopes.
+- Inspect current routes, API clients, OpenAPI, shared types, permissions, and tests before implementation.
+- Do not invent endpoint names or response shapes.
+- Mark unresolved design dependencies `needs OpenAPI confirmation` or `needs backend verification`.
+- Use authenticated cookie/session-aware shared API clients.
+- Growing lists filter and paginate server-side.
+- Official money, attendance, payroll, accounting, library, transport, canteen, notification, and learning values come from backend responses.
+- Dashboard/module summaries use module-owned summary APIs. Do not derive official totals by fetching or summing list pages.
+- Mutations recheck authorization and current state, handle idempotency where required, and invalidate/refetch the relevant backend truth.
+- Large exports and generation work use backend jobs with queued/processing/succeeded/failed UI.
+- Missing safe APIs produce an honest unavailable/locked/permission state, never fake production behavior.
 
-1. User can log in.
-2. User lands on the correct dashboard/surface.
-3. Navigation matches role permissions.
-4. Hidden modules are not visible.
-5. Direct forbidden routes show safe state.
-6. Allowed tenant records are visible.
-7. Unallowed records are not visible.
-8. Allowed actions work with loading/success/error handling.
-9. Forbidden actions are hidden and backend-blocked if attempted.
-10. Protected files require authenticated access.
-11. Logout/session expiry returns safely to login.
+---
 
-Cross-persona checks:
+## 12. Role and Scope Rules
+
+Backend enforcement is mandatory for every surface:
+
+- Admin/principal access follows explicit permissions and never implies universal sensitive-data access.
+- Teacher access is limited to assigned class, section, subject, or student context unless a broader permission is verified.
+- Parent access is limited to currently linked children; unlinking removes data and file access immediately.
+- Student access is self/session scoped.
+- Staff self-service is own-data only and uses purpose-limited payloads.
+- Driver/conductor access is assigned-trip only.
+- Cashier, accountant, librarian, transport, canteen, HR/payroll, and communication roles receive the minimum data/actions required for their job.
+- Platform operator access stays on `/platform/*`; tenant-private detail requires audited support override.
+- Disabled modules and suspended tenants fail closed.
+- Sensitive salary, bank, tax, medical, identity, communication, finance, and provider fields are omitted or masked by backend permission.
+
+---
+
+## 13. Responsive and Interaction Rules
+
+- Desktop/laptop is the primary dense-operations target; tablet widths remain usable.
+- Collapse right rails into drawers.
+- Prioritize table columns and keep row actions reachable.
+- Convert multi-column forms to one column while preserving section order.
+- Keep the primary action visible; do not create competing sticky CTAs.
+- Preserve selected record/conversation/case state.
+- Use horizontal scrolling only for genuinely wide data such as marks or accounting lines, with identity columns kept understandable.
+- Do not imply offline mutation support. If an approved read-only cached state exists, label its age and disable unsafe writes.
+
+---
+
+## 14. Main Dashboard Rules
+
+The main dashboard composes safe module summaries; it does not duplicate module business logic.
+
+Recommended rhythm:
 
 ```text
-Parent cannot access another parent's child.
-Student lab user cannot access another student's attempt/progress.
-Teacher cannot access another class unless assigned or explicitly permitted.
-Subject teacher cannot enter marks for unassigned subject.
-Cashier cannot reverse/refund without permission.
-Principal cannot view salary details without payroll permission.
-Driver cannot view another trip.
-Platform operator cannot view tenant-private data without support override.
-Module-locked route shows ModuleLockedState and backend blocks action.
+School status header
+Backend-owned school summary
+Today's operations
+Pending approvals and alerts
+Module summary grid
+Recent activity
+Role-based quick actions
 ```
 
+Rules:
+
+- Request purpose-built, permission-filtered summaries.
+- Never deep-fetch every module or calculate official totals in the browser.
+- Locked/unavailable summaries remain honest.
+- Do not expose private messages, salary/bank details, journal lines, raw student-sensitive data, or protected-file metadata.
+- Click-through reauthorizes and preserves safe filters.
+- One unavailable module summary must not block the rest of the dashboard.
+
 ---
 
-## 10. Screen Completion Checklist
+## 15. Module Design References
 
-Before marking a web screen/module complete:
+All feature explanations, personas, routes, screen specifications, wireframes, component plans, backend dependencies, state matrices, security rules, Nepal requirements, and done definitions live in these files:
+
+| Module | Frontend web design reference |
+|---|---|
+| M1 Admissions and Student Profiles | [M1 reference](modules/M1_ADMISSIONS_STUDENT_PROFILES_FRONTEND_REFERENCE.md) |
+| M2 Smart Attendance | [M2 reference](modules/M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md) |
+| M3 Fees and Receipts | [M3 reference](modules/M3_FEES_RECEIPTS_FRONTEND_REFERENCE.md) |
+| M4 Academics, Exams, CAS, Report Cards | [M4 reference](modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md) |
+| M5 Activity Feed and Milestones | [M5 reference](modules/M5_ACTIVITY_FEED_MILESTONES_FRONTEND_REFERENCE.md) |
+| M6 Homework and Timetable | [M6 reference](modules/M6_HOMEWORK_TIMETABLE_FRONTEND_REFERENCE.md) |
+| M7 HR and Payroll | [M7 reference](modules/M7_HR_PAYROLL_FRONTEND_REFERENCE.md) |
+| M8 Library | [M8 reference](modules/M8_LIBRARY_FRONTEND_REFERENCE.md) |
+| M9 Transport | [M9 reference](modules/M9_TRANSPORT_FRONTEND_REFERENCE.md) |
+| M10 Canteen | [M10 reference](modules/M10_CANTEEN_FRONTEND_REFERENCE.md) |
+| M11 Accounting and Finance | [M11 reference](modules/M11_ACCOUNTING_FINANCE_FRONTEND_REFERENCE.md) |
+| M12 Notifications, Notices, Communication, Chat | [M12 reference](modules/M12_NOTIFICATIONS_COMMUNICATION_FRONTEND_REFERENCE.md) |
+| M13 Learning Layer | [M13 reference](modules/M13_LEARNING_LAYER_FRONTEND_REFERENCE.md) |
+
+M14 remains deferred and intentionally has no active implementation reference.
+
+---
+
+## 16. Common Implementation Checklist
 
 ```text
-[ ] One clear title, purpose line, main job, and primary action.
-[ ] Uses real backend APIs only.
+[ ] One clear title, purpose, main job, and primary action.
+[ ] Uses the app shell and shared design-system primitives.
+[ ] Current route, OpenAPI, shared contracts, permissions, DTOs, and tests inspected.
+[ ] Real APIs and backend-owned totals only.
 [ ] No fake/mock/placeholder production data.
-[ ] Endpoint shape confirmed from code/OpenAPI/contracts.
-[ ] Tenant-scoped API calls and backend checks confirmed.
-[ ] RBAC and module entitlement states handled.
-[ ] Direct forbidden route shows safe state.
-[ ] Loading, empty, error, success, permission, and locked states exist.
-[ ] Lists are paginated and filtered server-side where needed.
-[ ] Protected files use authenticated helpers.
-[ ] Mutations show pending/success/error state.
-[ ] High-risk mutations require confirmation and reason where required.
-[ ] Financial totals come from backend.
-[ ] Audit-sensitive action has UI reason and backend audit support.
-[ ] No raw Prisma/storage/provider errors exposed.
-[ ] No raw object keys or signed URLs displayed.
-[ ] Accessibility basics checked.
-[ ] Browser smoke route added or updated where useful.
+[ ] Tenant/RBAC/entitlement and persona scope fail closed.
+[ ] Loading, empty, no-results, error, permission, locked, validation, mutation,
+    partial, queued, stale, and file states implemented.
+[ ] Growing lists filter and paginate server-side.
+[ ] High-risk mutation confirms impact, collects reason where required,
+    prevents duplicate submission, and shows audit state.
+[ ] Protected files use File Registry-backed authenticated helpers.
+[ ] No raw backend/provider/storage errors, object keys, or private URLs.
+[ ] Responsive and accessibility basics verified.
+[ ] Module-specific reference followed.
 ```
 
 ---
 
-## 11. Verification Commands
+## 17. Documentation and Verification Rule
 
-Run relevant gates only and report honestly:
+Module-specific details belong only in `docs/design/modules/`; keep this file global. When module behavior changes, update the smallest matching module reference rather than adding another split plan.
 
-```bash
-pnpm db:generate
-pnpm db:validate
-pnpm verify:openapi
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:e2e
-pnpm build
-pnpm verify:production
-pnpm smoke:pilot
-pnpm --filter @schoolos/web typecheck
-pnpm test:web:e2e
-```
-
-Docs-only changes need no runtime checks.
+Docs-only edits require no application build. Run documentation/status/text checks relevant to the change and report only commands that actually ran.

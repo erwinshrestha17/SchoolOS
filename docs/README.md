@@ -62,6 +62,24 @@ Inventory & Asset Management is not an active module. Do not recreate M13 Invent
 
 ## Active Docs
 
+### M1-M13 Frontend Web Design References
+
+| Module | Reference |
+|---|---|
+| M1 Admissions and Student Profiles | [M1 frontend reference](design/modules/M1_ADMISSIONS_STUDENT_PROFILES_FRONTEND_REFERENCE.md) |
+| M2 Smart Attendance | [M2 frontend reference](design/modules/M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md) |
+| M3 Fees and Receipts | [M3 frontend reference](design/modules/M3_FEES_RECEIPTS_FRONTEND_REFERENCE.md) |
+| M4 Academics, Exams, CAS, Report Cards | [M4 frontend reference](design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md) |
+| M5 Activity Feed and Milestones | [M5 frontend reference](design/modules/M5_ACTIVITY_FEED_MILESTONES_FRONTEND_REFERENCE.md) |
+| M6 Homework and Timetable | [M6 frontend reference](design/modules/M6_HOMEWORK_TIMETABLE_FRONTEND_REFERENCE.md) |
+| M7 HR and Payroll | [M7 frontend reference](design/modules/M7_HR_PAYROLL_FRONTEND_REFERENCE.md) |
+| M8 Library | [M8 frontend reference](design/modules/M8_LIBRARY_FRONTEND_REFERENCE.md) |
+| M9 Transport | [M9 frontend reference](design/modules/M9_TRANSPORT_FRONTEND_REFERENCE.md) |
+| M10 Canteen | [M10 frontend reference](design/modules/M10_CANTEEN_FRONTEND_REFERENCE.md) |
+| M11 Accounting and Finance | [M11 frontend reference](design/modules/M11_ACCOUNTING_FINANCE_FRONTEND_REFERENCE.md) |
+| M12 Notifications, Notices, Communication, Chat | [M12 frontend reference](design/modules/M12_NOTIFICATIONS_COMMUNICATION_FRONTEND_REFERENCE.md) |
+| M13 Learning Layer | [M13 frontend reference](design/modules/M13_LEARNING_LAYER_FRONTEND_REFERENCE.md) |
+
 ```text
 README.md
 product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
