@@ -3,43 +3,100 @@
 **Status:** Module-level frontend design reference index.  
 **Updated:** 2026-06-19
 
-This folder contains focused module design references derived from SchoolOS visual references and product analysis. These files complement the main web design source of truth:
+This folder contains focused module design references derived from SchoolOS web design rules, recent module-specific design work, product analysis, and backend-alignment needs.
+
+These files complement and must follow the main web design sources:
 
 ```text
 docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
+apps/web/docs/DESIGN_SYSTEM.md
+apps/web/AGENTS.md
 ```
+
+Backend/OpenAPI/shared contracts remain authoritative for DTOs, API names, route guards, permissions, totals, state transitions, file access, jobs, and audit behavior.
 
 ---
 
-## Active module numbering
+## Active Module Numbering
 
-| Module | Name |
-|---|---|
-| M8 | Library |
-| M9 | Transport |
-| M10 | Canteen |
-| M12 | Notifications, Notices, Communication, Chat |
-| M13 | Learning Layer |
+| Module | Name | Design reference |
+|---|---|---|
+| M1 | Admissions and Student Profiles | `M1_ADMISSIONS_STUDENT_PROFILES_FRONTEND_REFERENCE.md` |
+| M2 | Smart Attendance | `M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md` |
+| M3 | Fees and Receipts | `M3_FEES_RECEIPTS_FRONTEND_REFERENCE.md` |
+| M4 | Academics, Exams, CAS, Report Cards | `M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md` |
+| M5 | Activity Feed and Milestones | `M5_ACTIVITY_FEED_MILESTONES_FRONTEND_REFERENCE.md` |
+| M6 | Homework and Timetable | `M6_HOMEWORK_TIMETABLE_FRONTEND_REFERENCE.md` |
+| M7 | HR and Payroll | `M7_HR_PAYROLL_FRONTEND_REFERENCE.md` |
+| M8 | Library | `M8_LIBRARY_FRONTEND_REFERENCE.md` |
+| M9 | Transport | `M9_TRANSPORT_FRONTEND_REFERENCE.md` |
+| M10 | Canteen | `M10_CANTEEN_FRONTEND_REFERENCE.md` |
+| M11 | Accounting and Finance | `M11_ACCOUNTING_FINANCE_FRONTEND_REFERENCE.md` |
+| M12 | Notifications, Notices, Communication, Chat | `M12_NOTIFICATIONS_COMMUNICATION_FRONTEND_REFERENCE.md` |
+| M13 | Learning Layer | `M13_LEARNING_LAYER_FRONTEND_REFERENCE.md` |
 
 `M8A`, `M8B`, and `M8C` are obsolete labels. Library, Transport, and Canteen are standalone modules.
 
 Inventory & Asset Management is scrapped from active design scope.
 
----
-
-## Available references
-
-| Module | Reference |
-|---|---|
-| M8 Library | `M8_LIBRARY_FRONTEND_REFERENCE.md` |
+M14 Intelligence / AI is deferred and intentionally has no active frontend implementation reference.
 
 ---
 
-## Usage rules
+## How to Use These Files
 
-- Treat these files as implementation guidance, not backend contract truth.
+For module-specific frontend implementation, read in this order:
+
+```text
+1. docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
+2. apps/web/docs/DESIGN_SYSTEM.md
+3. apps/web/AGENTS.md
+4. docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
+5. docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
+6. The matching module reference in this folder
+7. Existing routes/components/API clients/OpenAPI/contracts/tests for the touched module
+```
+
+---
+
+## Common Design Rules Across All Module References
+
+- One screen = one main job.
+- Use real backend APIs only.
+- Do not add fake dashboard metrics to match visual references.
+- Official totals, status, scope, locks, money, delivery state, files, and audit behavior are backend-owned.
 - Confirm API names, DTOs, permissions, route guards, and protected-file behavior against backend/OpenAPI before coding.
-- Do not use fake frontend data to match visual references.
-- Keep parent, student, staff self-service, driver, and mobile companion surfaces purpose-limited.
-- Use active module numbers in new docs and UI copy.
-- Do not create Inventory & Asset Management references unless that module is explicitly re-approved.
+- Use protected file helpers for private PDFs, receipts, photos, reports, labels, attachments, snapshots, payslips, report cards, and learning resources.
+- Growing lists use server-side pagination and filtering.
+- Parent, student, staff self-service, driver, and mobile companion surfaces are purpose-limited.
+- High-risk actions require confirmation, reason where required, pending/success/error state, and audit visibility.
+- Missing APIs should render friendly unavailable/locked/permission states and implementation notes such as `needs OpenAPI confirmation`, not fake data.
+
+---
+
+## Backend Alignment Rule
+
+Each module reference includes a backend alignment section. Treat those backend feature lists as implementation guidance, not as proof that the current backend already exposes every endpoint.
+
+Before implementing a screen:
+
+```text
+Inspect existing backend module
+Inspect OpenAPI/shared contracts
+Inspect API client files
+Inspect permissions/entitlements
+Inspect File Registry usage
+Inspect tests and seeds
+Then implement against confirmed contracts
+```
+
+Do not invent response shapes in frontend code.
+
+---
+
+## Cleanup Rules
+
+- Do not create new module design files outside this folder unless there is a clear reason and this index is updated.
+- Do not reintroduce `M8A`, `M8B`, or `M8C` module numbering.
+- Do not create Inventory & Asset Management references unless the project owner explicitly re-approves the module.
+- Do not create M14 AI frontend implementation docs until M14 is approved for active implementation.
