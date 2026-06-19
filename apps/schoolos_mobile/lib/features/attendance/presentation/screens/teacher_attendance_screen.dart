@@ -226,6 +226,7 @@ class _TeacherAttendanceHeader extends StatelessWidget {
         children: [
           DropdownButtonFormField<String>(
             initialValue: state.selectedClassId,
+            isExpanded: true,
             decoration: const InputDecoration(labelText: 'Class / section'),
             items: [
               for (final item in state.classes)

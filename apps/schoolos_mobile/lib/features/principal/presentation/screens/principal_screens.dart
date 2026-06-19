@@ -1240,52 +1240,62 @@ class _SummaryCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: values.length >= 4 ? 2 : values.length.clamp(1, 3),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: values.length >= 4 ? 1.35 : 1.65,
-      crossAxisSpacing: AppSpacing.md,
-      mainAxisSpacing: AppSpacing.md,
-      children: values
-          .map(
-            (value) => AppCard(
-              child: Row(
-                children: [
-                  _IconBubble(icon: value.icon, color: value.color),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          value.label,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.slate700,
-                          ),
-                        ),
-                        Text(
-                          '${value.value}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(
-                                color: value.color,
-                                fontWeight: FontWeight.w900,
+    if (values.isEmpty) return const SizedBox.shrink();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth < 340
+            ? 1
+            : constraints.maxWidth < 720
+            ? 2
+            : values.length.clamp(1, 3);
+        return GridView.count(
+          crossAxisCount: crossAxisCount,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: crossAxisCount == 1 ? 3.1 : 1.55,
+          crossAxisSpacing: AppSpacing.md,
+          mainAxisSpacing: AppSpacing.md,
+          children: values
+              .map(
+                (value) => AppCard(
+                  child: Row(
+                    children: [
+                      _IconBubble(icon: value.icon, color: value.color),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              value.label,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.slate700,
                               ),
+                            ),
+                            Text(
+                              '${value.value}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
+                                    color: value.color,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          )
-          .toList(),
+                ),
+              )
+              .toList(),
+        );
+      },
     );
   }
 }
