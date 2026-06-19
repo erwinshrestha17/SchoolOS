@@ -51,18 +51,12 @@ Inventory & Asset Management is not an active module. Do not recreate M13 Invent
 | 10 | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Storage, File Registry, tenant isolation, scaling, performance, and security architecture. |
 | 11 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, and provider/queue operations. |
 | 12 | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | M12 notification events, delivery, preferences, retries, provider operations, notification center, notices, chat, and audit behavior. |
-| 13 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, wireframes, components, API usage, and web persona smoke plan. |
-| 14 | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Approved supporting visual-reference appendix for the supplied principal dashboard and M1 desktop screens. |
-| 15 | `design/modules/README.md` | Module-level design reference index. |
-| 16 | `design/modules/M8_LIBRARY_FRONTEND_REFERENCE.md` | M8 Library module-level frontend reference. |
-| 17 | `design/M9_TRANSPORT_WEB_REFERENCE_ANALYSIS.md` | M9 Transport supporting web reference analysis. |
-| 18 | `design/M10_CANTEEN_WEB_REFERENCE_ANALYSIS.md` | M10 Canteen supporting web reference analysis. |
-| 19 | `design/M11_ACCOUNTING_WEB_REFERENCE_ANALYSIS.md` | M11 Accounting supporting web reference analysis. |
-| 20 | `design/M12_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md` | M12 Notifications/Communication supporting web reference analysis. |
-| 21 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit, including contract-safe M3 Fees & Receipts and M5 Activity Feed & Milestones reference-screen implementation slices. |
-| 22 | `project/M10_CANTEEN_FRONTEND_IMPLEMENTATION_CHECKLIST.md` | M10 Canteen frontend implementation checklist. |
-| 23 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
-| 24 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
+| 13 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, components, route behavior, API usage, and web persona smoke plan. |
+| 14 | `design/modules/README.md` | M1-M13 module-level frontend design reference index. |
+| 15 | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Approved supporting visual-reference appendix for the supplied principal dashboard and M1 desktop screens. |
+| 16 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit and contract-safe reference-screen implementation guidance. |
+| 17 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
+| 18 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
 
 ---
 
@@ -82,7 +76,19 @@ architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md
 design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
 design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md
 design/modules/README.md
+design/modules/M1_ADMISSIONS_STUDENT_PROFILES_FRONTEND_REFERENCE.md
+design/modules/M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md
+design/modules/M3_FEES_RECEIPTS_FRONTEND_REFERENCE.md
+design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md
+design/modules/M5_ACTIVITY_FEED_MILESTONES_FRONTEND_REFERENCE.md
+design/modules/M6_HOMEWORK_TIMETABLE_FRONTEND_REFERENCE.md
+design/modules/M7_HR_PAYROLL_FRONTEND_REFERENCE.md
 design/modules/M8_LIBRARY_FRONTEND_REFERENCE.md
+design/modules/M9_TRANSPORT_FRONTEND_REFERENCE.md
+design/modules/M10_CANTEEN_FRONTEND_REFERENCE.md
+design/modules/M11_ACCOUNTING_FINANCE_FRONTEND_REFERENCE.md
+design/modules/M12_NOTIFICATIONS_COMMUNICATION_FRONTEND_REFERENCE.md
+design/modules/M13_LEARNING_LAYER_FRONTEND_REFERENCE.md
 design/M9_TRANSPORT_WEB_REFERENCE_ANALYSIS.md
 design/M10_CANTEEN_WEB_REFERENCE_ANALYSIS.md
 design/M11_ACCOUNTING_WEB_REFERENCE_ANALYSIS.md
@@ -125,14 +131,7 @@ design/HOSTEL_WEB_REFERENCE_ANALYSIS_RETIRED.md
 | Platform operations boundary | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform/admin engineers |
 | M12 notification events, delivery, preferences, retry, audit, and notification center | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | Product, engineering, QA, platform/admin engineers |
 | Web UI and state rules | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Web engineers |
-| Dashboard and M1 visual-reference detail | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Product, design, web engineers |
-| M8 Library frontend detail | `design/modules/M8_LIBRARY_FRONTEND_REFERENCE.md` | Product, design, web engineers, QA |
-| M9 Transport web reference detail | `design/M9_TRANSPORT_WEB_REFERENCE_ANALYSIS.md` | Product, design, web engineers, QA |
-| M10 Canteen web reference detail | `design/M10_CANTEEN_WEB_REFERENCE_ANALYSIS.md` | Product, design, web engineers, QA |
-| M11 Accounting web reference detail | `design/M11_ACCOUNTING_WEB_REFERENCE_ANALYSIS.md` | Product, design, web engineers, QA |
-| M12 Notifications/Communication web reference detail | `design/M12_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md` | Product, design, web engineers, QA |
-| M3 and M5 reference-to-contract implementation guidance | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Web engineers, QA |
-| M10 Canteen frontend checklist | `project/M10_CANTEEN_FRONTEND_IMPLEMENTATION_CHECKLIST.md` | Web engineers, QA |
+| M1-M13 module-level frontend design details | `design/modules/README.md` and matching module file | Product, design, web engineers, QA, Codex agents |
 | Mobile companion app rules | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Mobile engineers |
 | Deployment and recovery procedure | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment/operator team |
 | Historical/superseded docs | `archive/README.md` | Maintainers |
@@ -156,7 +155,7 @@ The generated/tool-cache Markdown file `.cache/corepack/v1/pnpm/10.12.1/README.m
 3. Do not recreate planning-only docs that conflict with current implementation status.
 4. Keep old duplicated planning content in git history rather than active repo docs.
 5. Keep `docs/design` limited to the source-of-truth design plans and owner-approved supporting reference appendices/module references; do not add new design docs without owner approval and an index update here.
-6. Web design belongs in `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`; reference-to-contract implementation notes belong in existing implementation audits and must explicitly defer to the canonical web plan and backend/OpenAPI contracts.
+6. Web design belongs in `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`; module-level design details belong in `design/modules/` and must defer to backend/OpenAPI contracts.
 7. Mobile app design belongs in `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`.
 8. Release evidence and scores belong in `project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
 9. Forward execution sequencing belongs in `project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`.
