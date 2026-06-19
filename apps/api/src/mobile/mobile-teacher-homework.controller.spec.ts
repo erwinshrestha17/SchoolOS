@@ -7,6 +7,7 @@ describe('MobileTeacherHomeworkController', () => {
   let homeworkService: jest.Mocked<
     Pick<
       HomeworkService,
+      | 'listTeacherMobileHomeworkScopes'
       | 'listTeacherMobileHomework'
       | 'createTeacherMobileHomework'
       | 'getTeacherMobileHomework'
@@ -21,6 +22,7 @@ describe('MobileTeacherHomeworkController', () => {
 
   beforeEach(() => {
     homeworkService = {
+      listTeacherMobileHomeworkScopes: jest.fn(),
       listTeacherMobileHomework: jest.fn(),
       createTeacherMobileHomework: jest.fn(),
       getTeacherMobileHomework: jest.fn(),
@@ -41,6 +43,19 @@ describe('MobileTeacherHomeworkController', () => {
       roles: ['teacher'],
       permissions: ['homework:read', 'homework:create', 'homework:review'],
     };
+  });
+
+  it('delegates assigned homework scopes to the teacher-scoped service', async () => {
+    homeworkService.listTeacherMobileHomeworkScopes.mockResolvedValue({
+      items: [{ id: 'year-1:class-1:section-1:subject-1' }],
+    } as never);
+
+    await expect(controller.listScopes(actor)).resolves.toEqual({
+      items: [{ id: 'year-1:class-1:section-1:subject-1' }],
+    });
+    expect(
+      homeworkService.listTeacherMobileHomeworkScopes,
+    ).toHaveBeenCalledWith(actor);
   });
 
   it('delegates list to teacher-scoped mobile homework service', async () => {

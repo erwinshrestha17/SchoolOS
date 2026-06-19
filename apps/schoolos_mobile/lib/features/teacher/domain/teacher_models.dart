@@ -171,6 +171,183 @@ class TeacherNoticeSummary {
   final DateTime lastUpdated;
 }
 
+class TeacherHomeworkScope {
+  const TeacherHomeworkScope({
+    required this.id,
+    required this.academicYearId,
+    required this.academicYearName,
+    required this.classId,
+    required this.className,
+    this.sectionId,
+    this.sectionName,
+    required this.subjectId,
+    required this.subjectName,
+  });
+
+  final String id;
+  final String academicYearId;
+  final String academicYearName;
+  final String classId;
+  final String className;
+  final String? sectionId;
+  final String? sectionName;
+  final String subjectId;
+  final String subjectName;
+
+  String get label => [
+    className,
+    if (sectionName != null && sectionName!.isNotEmpty) sectionName!,
+    subjectName,
+  ].join(' • ');
+
+  factory TeacherHomeworkScope.fromJson(Map<String, dynamic> json) {
+    return TeacherHomeworkScope(
+      id: json['id'] as String? ?? '',
+      academicYearId: json['academicYearId'] as String? ?? '',
+      academicYearName: json['academicYearName'] as String? ?? '',
+      classId: json['classId'] as String? ?? '',
+      className: json['className'] as String? ?? 'Class',
+      sectionId: json['sectionId'] as String?,
+      sectionName: json['sectionName'] as String?,
+      subjectId: json['subjectId'] as String? ?? '',
+      subjectName: json['subjectName'] as String? ?? 'Subject',
+    );
+  }
+}
+
+class TeacherHomeworkCounts {
+  const TeacherHomeworkCounts({
+    required this.total,
+    required this.submitted,
+    required this.reviewed,
+    required this.toReview,
+    required this.notSubmitted,
+  });
+
+  final int total;
+  final int submitted;
+  final int reviewed;
+  final int toReview;
+  final int notSubmitted;
+
+  factory TeacherHomeworkCounts.fromJson(Map<String, dynamic> json) {
+    return TeacherHomeworkCounts(
+      total: _asInt(json['total']),
+      submitted: _asInt(json['submitted']),
+      reviewed: _asInt(json['reviewed']),
+      toReview: _asInt(json['toReview']),
+      notSubmitted: _asInt(json['notSubmitted']),
+    );
+  }
+}
+
+class TeacherHomeworkItem {
+  const TeacherHomeworkItem({
+    required this.id,
+    required this.title,
+    required this.instructions,
+    required this.className,
+    this.sectionName,
+    required this.subjectName,
+    required this.dueDate,
+    required this.status,
+    required this.submissionRequired,
+    required this.attachmentCount,
+    required this.submissions,
+  });
+
+  final String id;
+  final String title;
+  final String instructions;
+  final String className;
+  final String? sectionName;
+  final String subjectName;
+  final DateTime? dueDate;
+  final String status;
+  final bool submissionRequired;
+  final int attachmentCount;
+  final TeacherHomeworkCounts submissions;
+
+  String get classLabel => [
+    className,
+    if (sectionName != null && sectionName!.isNotEmpty) sectionName!,
+    subjectName,
+  ].join(' • ');
+
+  factory TeacherHomeworkItem.fromJson(Map<String, dynamic> json) {
+    final submissions = json['submissions'] is Map<String, dynamic>
+        ? json['submissions'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    return TeacherHomeworkItem(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? 'Homework',
+      instructions: json['instructions'] as String? ?? '',
+      className: json['className'] as String? ?? 'Class',
+      sectionName: json['sectionName'] as String?,
+      subjectName: json['subjectName'] as String? ?? 'Subject',
+      dueDate: DateTime.tryParse(json['dueDate'] as String? ?? ''),
+      status: json['status'] as String? ?? 'DRAFT',
+      submissionRequired: json['submissionRequired'] as bool? ?? true,
+      attachmentCount: _asInt(json['attachmentCount']),
+      submissions: TeacherHomeworkCounts.fromJson(submissions),
+    );
+  }
+}
+
+class TeacherHomeworkSnapshot {
+  const TeacherHomeworkSnapshot({
+    required this.items,
+    required this.scopes,
+    required this.total,
+    required this.lastUpdated,
+    this.fromCache = false,
+  });
+
+  final List<TeacherHomeworkItem> items;
+  final List<TeacherHomeworkScope> scopes;
+  final int total;
+  final DateTime lastUpdated;
+  final bool fromCache;
+
+  int get toReview =>
+      items.fold(0, (count, item) => count + item.submissions.toReview);
+}
+
+class TeacherHomeworkSubmission {
+  const TeacherHomeworkSubmission({
+    required this.id,
+    required this.studentName,
+    required this.rollNumber,
+    required this.status,
+    this.submittedAt,
+    this.teacherRemarks,
+    this.correctionRemarks,
+    required this.attachmentCount,
+  });
+
+  final String id;
+  final String studentName;
+  final String rollNumber;
+  final String status;
+  final DateTime? submittedAt;
+  final String? teacherRemarks;
+  final String? correctionRemarks;
+  final int attachmentCount;
+
+  factory TeacherHomeworkSubmission.fromJson(Map<String, dynamic> json) {
+    return TeacherHomeworkSubmission(
+      id: json['id'] as String? ?? '',
+      studentName: json['studentName'] as String? ?? 'Student',
+      rollNumber: '${json['rollNumber'] ?? '-'}',
+      status: json['status'] as String? ?? 'NOT_SUBMITTED',
+      submittedAt: DateTime.tryParse(json['submittedAt'] as String? ?? ''),
+      teacherRemarks: json['teacherRemarks'] as String?,
+      correctionRemarks: json['correctionRemarks'] as String?,
+      attachmentCount: _asInt(json['attachmentCount']),
+    );
+  }
+}
+
 int _asInt(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();

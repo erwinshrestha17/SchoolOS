@@ -32,6 +32,12 @@ import {
 export class MobileTeacherHomeworkController {
   constructor(private readonly homeworkService: HomeworkService) {}
 
+  @Get('scopes')
+  @Permissions('homework:read')
+  listScopes(@CurrentAuth() auth: AuthContext) {
+    return this.homeworkService.listTeacherMobileHomeworkScopes(auth);
+  }
+
   @Get()
   @Permissions('homework:read')
   listHomework(

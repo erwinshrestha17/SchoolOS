@@ -14,6 +14,9 @@ import 'package:schoolos_mobile/features/attendance/domain/attendance_models.dar
 import 'package:schoolos_mobile/features/attendance/presentation/screens/teacher_attendance_screen.dart';
 import 'package:schoolos_mobile/features/principal/application/principal_providers.dart';
 import 'package:schoolos_mobile/features/principal/presentation/screens/principal_screens.dart';
+import 'package:schoolos_mobile/features/teacher/application/teacher_providers.dart';
+import 'package:schoolos_mobile/features/teacher/domain/teacher_models.dart';
+import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_homework_screen.dart';
 
 class _MockAttendanceRepository extends Mock implements AttendanceRepository {}
 
@@ -209,6 +212,119 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Asha Sharma'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('teacher attendance paints an assigned empty roster state', (
+    tester,
+  ) async {
+    final repository = _MockAttendanceRepository();
+    when(() => repository.getTeacherToday(any())).thenAnswer(
+      (_) async => TeacherTodaySnapshot(
+        date: DateTime(2026, 6, 19),
+        periods: const [],
+        classes: const [assignedClass],
+        pendingAttendanceCount: 1,
+        lastUpdated: DateTime(2026, 6, 19, 8),
+      ),
+    );
+    when(
+      () => repository.loadDraftAttendance(any(), any()),
+    ).thenAnswer((_) async => null);
+    when(() => repository.getClassAttendanceSheet(any(), any())).thenAnswer(
+      (_) async => TeacherRosterSnapshot(
+        entries: const [],
+        attendance: const TeacherAttendanceMeta(
+          isSubmitted: false,
+          isLocked: false,
+          conflictStatus: 'NONE',
+        ),
+        isWorkingDay: true,
+        lastUpdated: DateTime(2026, 6, 19, 8),
+      ),
+    );
+    final controller = TeacherAttendanceController(
+      repository: repository,
+      isOnline: true,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          teacherAttendanceControllerProvider.overrideWith((ref) => controller),
+        ],
+        child: const MaterialApp(home: TeacherAttendanceScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Grade 3 - A • Mathematics'), findsOneWidget);
+    expect(find.text('No students in this roster'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('teacher homework paints real assignment content', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final snapshot = TeacherHomeworkSnapshot(
+      items: [
+        TeacherHomeworkItem(
+          id: 'homework-1',
+          title: 'Fractions practice',
+          instructions: 'Complete questions 1 to 10.',
+          className: 'Grade 3',
+          sectionName: 'A',
+          subjectName: 'Mathematics',
+          dueDate: DateTime(2026, 6, 20),
+          status: 'DRAFT',
+          submissionRequired: true,
+          attachmentCount: 0,
+          submissions: const TeacherHomeworkCounts(
+            total: 24,
+            submitted: 2,
+            reviewed: 1,
+            toReview: 1,
+            notSubmitted: 22,
+          ),
+        ),
+      ],
+      scopes: const [
+        TeacherHomeworkScope(
+          id: 'year-1:class-1:section-1:subject-1',
+          academicYearId: 'year-1',
+          academicYearName: '2082',
+          classId: 'class-1',
+          className: 'Grade 3',
+          sectionId: 'section-1',
+          sectionName: 'A',
+          subjectId: 'subject-1',
+          subjectName: 'Mathematics',
+        ),
+      ],
+      total: 1,
+      lastUpdated: DateTime(2026, 6, 19, 8),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          teacherHomeworkProvider.overrideWith((ref, status) async => snapshot),
+        ],
+        child: const MaterialApp(home: TeacherHomeworkScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Fractions practice'), findsOneWidget);
+    expect(find.text('Grade 3 • A • Mathematics'), findsOneWidget);
+    expect(find.text('Publish'), findsOneWidget);
+    expect(find.text('Review'), findsOneWidget);
+    expect(find.textContaining('API not confirmed'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

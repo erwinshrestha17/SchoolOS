@@ -188,6 +188,51 @@ export class HomeworkService {
     };
   }
 
+  async listTeacherMobileHomeworkScopes(actor: AuthContext) {
+    const staffId = await this.resolveActorStaffId(actor);
+    if (!staffId) {
+      throw new ForbiddenException('Active teacher profile is required');
+    }
+
+    const items = await this.prisma.subjectTeacherAssignment.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        staffId,
+        academicYear: { isCurrent: true },
+      },
+      select: {
+        academicYearId: true,
+        classId: true,
+        sectionId: true,
+        subjectId: true,
+        academicYear: { select: { name: true } },
+        class: { select: { name: true } },
+        section: { select: { name: true } },
+        subject: { select: { name: true } },
+      },
+      orderBy: [
+        { class: { level: 'asc' } },
+        { section: { name: 'asc' } },
+        { subject: { name: 'asc' } },
+      ],
+      take: 200,
+    });
+
+    return {
+      items: items.map((item) => ({
+        id: `${item.academicYearId}:${item.classId}:${item.sectionId ?? 'none'}:${item.subjectId}`,
+        academicYearId: item.academicYearId,
+        academicYearName: item.academicYear.name,
+        classId: item.classId,
+        className: item.class.name,
+        sectionId: item.sectionId,
+        sectionName: item.section?.name ?? null,
+        subjectId: item.subjectId,
+        subjectName: item.subject.name,
+      })),
+    };
+  }
+
   async getTeacherMobileHomework(actor: AuthContext, id: string) {
     const assignment = await this.findAssignmentOrThrow(actor, id);
     await this.ensureSubjectTeacherScope(

@@ -35,3 +35,25 @@ final teacherMessageDetailProvider = FutureProvider.autoDispose
     .family<TeacherMessageDetail, String>((ref, threadId) async {
       return ref.watch(teacherRepositoryProvider).getMessageDetail(threadId);
     });
+
+final teacherHomeworkProvider = FutureProvider.autoDispose
+    .family<TeacherHomeworkSnapshot, String?>((ref, status) async {
+      final snapshot = await ref
+          .watch(teacherRepositoryProvider)
+          .getHomework(status: status);
+      final isOnline = ref.watch(connectivityProvider);
+      return TeacherHomeworkSnapshot(
+        items: snapshot.items,
+        scopes: snapshot.scopes,
+        total: snapshot.total,
+        lastUpdated: snapshot.lastUpdated,
+        fromCache: snapshot.fromCache || !isOnline,
+      );
+    });
+
+final teacherHomeworkSubmissionsProvider = FutureProvider.autoDispose
+    .family<List<TeacherHomeworkSubmission>, String>((ref, homeworkId) {
+      return ref
+          .watch(teacherRepositoryProvider)
+          .getHomeworkSubmissions(homeworkId);
+    });

@@ -8,7 +8,6 @@ import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
-import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/section_header.dart';
 import '../../../../shared/widgets/status_chip.dart';
@@ -59,25 +58,52 @@ class _TeacherAttendanceScreenState
       selectedIndex: 1,
       title: 'Attendance',
       body: state.isLoading
-          ? const Padding(
-              padding: EdgeInsets.all(AppSpacing.lg),
+          ? const Center(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  AppSkeleton(width: double.infinity, height: 96),
+                  CircularProgressIndicator(),
                   SizedBox(height: AppSpacing.md),
-                  AppSkeleton(width: double.infinity, height: 420),
+                  Text('Loading assigned classes and roster…'),
                 ],
               ),
             )
           : state.error != null
           ? AppExceptionView(error: state.error!, onRetry: controller.load)
           : state.entries.isEmpty
-          ? AppEmptyState(
-              title: 'No students in this roster',
-              message: 'No active students are assigned to this class today.',
-              icon: Icons.group_off_rounded,
-              actionLabel: 'Retry',
-              onActionPressed: controller.load,
+          ? RefreshIndicator(
+              onRefresh: controller.load,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  120,
+                ),
+                children: [
+                  if (state.classes.isNotEmpty) ...[
+                    _TeacherAttendanceHeader(
+                      state: state,
+                      controller: controller,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
+                  AppEmptyState(
+                    title: state.classes.isEmpty
+                        ? 'No assigned attendance classes'
+                        : 'No students in this roster',
+                    message: state.classes.isEmpty
+                        ? 'Classes assigned to you for the current school year will appear here.'
+                        : 'No active students are assigned to this class today.',
+                    icon: state.classes.isEmpty
+                        ? Icons.school_outlined
+                        : Icons.group_off_rounded,
+                    actionLabel: 'Retry',
+                    onActionPressed: controller.load,
+                  ),
+                ],
+              ),
             )
           : ListView(
               padding: const EdgeInsets.fromLTRB(
