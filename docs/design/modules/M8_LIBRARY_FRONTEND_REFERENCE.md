@@ -1,136 +1,98 @@
-# M8 Library Frontend Reference
+# M8 Library — Frontend Design Reference
 
-**Status:** Active module-level frontend design reference for SchoolOS M8 Library.  
+**Status:** Active module-level frontend design reference.  
 **Updated:** 2026-06-19  
-**Scope:** SchoolOS web library dashboards and workspaces, parent child-scoped library view, and mobile scanner companion UX.  
-**Primary consumers:** Web frontend implementers, mobile companion implementers, Codex agents, QA reviewers, and product/design reviewers.
+**Module:** M8 Library  
+**Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`  
+**Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
 
-This document replaces the obsolete `M8A_LIBRARY_FRONTEND_REFERENCE.md` numbering. Library is now **M8**, not M8A.
+This document defines implementation-ready frontend design guidance and backend-alignment expectations for M8. Backend/OpenAPI/shared contracts remain authoritative.
 
 ---
 
-## 1. Product Intent
+## 1. Module Intent
 
-M8 Library is not only a book list. It is a complete school library operations module covering:
+M8 Library is not only a book list. It is a complete school library operations module covering catalogue, physical copy lifecycle, issue/return, borrower rules, reservations, overdues, fines, lost/damaged cases, labels, reports, parent visibility, and scanner workflows.
+
+Core flow:
 
 ```text
-Catalogue -> Copy lifecycle -> Issue/return -> Borrower policy -> Reservations -> Overdues/fines -> Lost/damaged cases -> Reports -> Parent visibility -> Mobile scanner
+Catalogue
+-> copy lifecycle
+-> issue / return / renew
+-> borrower policy validation
+-> reservation / hold queue
+-> overdue / fine calculation
+-> lost / damaged / replacement workflow
+-> reports / exports
+-> parent child-scoped visibility
 ```
 
-The frontend must feel like a fast library counter and inventory-control desk for real schools in Nepal while keeping official copy/fine/accounting truth backend-owned.
-
 ---
 
-## 2. Non-Negotiable Frontend Rules
+## 2. Theme and Layout Alignment
 
-- Separate title-level metadata from physical copy-level records.
-- Treat issue/return/renew as scanner-first workflows.
-- Show borrower eligibility before confirming issue or renewal.
-- Use backend summary, list, policy, and fine APIs as truth.
-- Do not calculate official fines, borrower eligibility, accounting charges, or copy totals only in the browser.
-- Use server-side pagination and filtering for catalogue, copies, borrowers, reservations, overdues, and reports.
-- Parent routes must be child-scoped and purpose-limited.
-- Override, waive, close, archive, lost/damaged, replacement, and accounting-link actions require permission-aware confirmation, reason where required, mutation state, and audit visibility.
-- Protected files, exports, slips, barcode sheets, QR labels, and reports must use authenticated/protected file helpers.
-- Scanner/mobile offline state must be explicit: pending sync, synced, failed, conflict, or review required.
-
----
-
-## 3. Recommended Information Architecture
+Use a counter-friendly operations workbench:
 
 ```text
-Library
-├── Dashboard
-├── Catalogue
-│   ├── Book Titles
-│   ├── Metadata
-│   ├── Categories
-│   └── Publishers
-├── Copies
-│   ├── Copy List
-│   ├── Shelf Map
-│   ├── Barcode / QR Labels
-│   └── Lifecycle History
-├── Circulation
-│   ├── Issue
-│   ├── Return
-│   ├── Renew
-│   └── Scanner Workspace
-├── Borrowers
-│   ├── Student Borrowers
-│   ├── Staff Borrowers
-│   ├── Eligibility
-│   └── Policy Groups
-├── Reservations
-│   ├── Active Holds
-│   ├── Waitlist
-│   ├── Ready for Pickup
-│   └── Expired Holds
-├── Overdues & Fines
-│   ├── Overdue Items
-│   ├── Fine Calculation
-│   ├── Waivers
-│   └── Fee Links
-├── Lost / Damaged
-│   ├── Lost Cases
-│   ├── Damaged Cases
-│   ├── Replacement
-│   └── Case Closure
-├── Reports
-│   ├── Circulation
-│   ├── Overdues
-│   ├── Fines
-│   ├── Popular Books
-│   └── Export Jobs
-└── Settings
-    ├── Library Policy
-    ├── Fine Rules
-    ├── Holiday Calendar
-    ├── Barcode / QR Settings
-    └── Notification Rules
+ModuleHeader
+Library KPI strip
+Quick actions
+Tabs
+FilterBar
+Catalogue/copy/circulation workspace
+Right detail drawer
+Scanner panel
+Protected export/label actions
+Audit timeline
 ```
+
+Design rules:
+
+- Keep title-level metadata separate from physical copy records.
+- Scanner-first issue/return/renew should feel fast and resilient.
+- Borrower eligibility must be visible before confirmation.
+- Parent route must be child-scoped and simple.
+- Fine and copy totals are backend-owned.
+- Protected files, barcode sheets, QR labels, slips, and reports use authenticated helpers.
+
+---
+
+## 3. Personas and Scope
+
+| Persona | Main job | Scope rule |
+|---|---|---|
+| Librarian | Manage catalogue, copies, circulation, reservations, fines. | Tenant-scoped library permission. |
+| Admin | Configure policy and high-risk actions. | Permission-gated. |
+| Principal | View library health and overdue/fine summaries. | Summary/read-only unless permitted. |
+| Teacher/staff borrower | Borrow/return where supported. | Own borrowing records where exposed. |
+| Parent | View linked child borrowed books/fines. | Linked-child only. |
+| Student | View own borrowed books where enabled. | Self only. |
 
 ---
 
 ## 4. Recommended Route Map
 
-### Admin / librarian web routes
-
 ```text
 /dashboard/library
 /dashboard/library/catalogue
-/dashboard/library/catalogue/:bookId
-/dashboard/library/catalogue/:bookId/copies
+/dashboard/library/catalogue/[bookId]
+/dashboard/library/catalogue/[bookId]/copies
 /dashboard/library/copies
 /dashboard/library/circulation
 /dashboard/library/circulation/scanner
 /dashboard/library/borrowers
-/dashboard/library/borrowers/:borrowerId
+/dashboard/library/borrowers/[borrowerId]
 /dashboard/library/reservations
 /dashboard/library/overdues
 /dashboard/library/fines
 /dashboard/library/lost-damaged
 /dashboard/library/reports
 /dashboard/library/settings
-```
-
-### Parent portal routes
-
-```text
 /parent/library
-/parent/library/borrowed
-/parent/library/reservations
-/parent/library/fines
-/parent/library/policy
-```
-
-### Mobile scanner surface
-
-```text
+/student/library
 /mobile/library-scanner
 ```
-
-Use the final route shape from existing app conventions where they differ. Mark unknown route/API shape as `needs OpenAPI confirmation` instead of guessing.
 
 ---
 
@@ -138,163 +100,132 @@ Use the final route shape from existing app conventions where they differ. Mark 
 
 ### 5.1 Library Dashboard
 
-Required sections:
-
 - KPI cards: total titles, total copies, issued today, overdue books, reservations pending, fine due, lost/damaged cases.
-- Quick actions: add book, issue book, return book, scan barcode/QR, manage reservations, export report.
-- Operational widgets: circulation snapshot, popular categories, recent issue/return activity, overdue alerts, reservations queue, fine collection summary, lost/damaged workflow status.
+- Quick actions: Add Book, Issue Book, Return Book, Scan Barcode/QR, Manage Reservations, Export Report.
+- Widgets: circulation snapshot, popular categories, recent activity, overdue alerts, reservations queue, fine collection summary.
 
-### 5.2 Catalogue and Copy Management
+### 5.2 Catalogue and Copies
 
-Catalogue manages title metadata. Copies manage physical school-owned book copies.
+- Catalogue table: cover, title, ISBN, author, publisher, category, shelf summary, total copies, available, issued, reserved, status.
+- Copy table: copy ID, accession no., barcode, QR, shelf, rack, condition, status, borrower, last activity, acquisition date.
+- Detail drawer for title/copy history, labels, shelf movement, archive/lost/damaged workflow.
 
-Required title fields:
+### 5.3 Circulation / Scanner Workspace
 
-- title, subtitle, ISBN, author, publisher, category/subjects, language, edition, format, cover image, description, total/available/issued/reserved copy summary.
-
-Required copy fields:
-
-- copy ID, accession number, barcode, QR code, shelf, rack, condition, status, borrower if issued, acquisition date, price/supplier where allowed.
-
-Recommended copy statuses:
+Session model:
 
 ```text
-AVAILABLE
-ISSUED
-RESERVED
-LOST
-DAMAGED
-ARCHIVED
-UNDER_REPAIR
-REPLACEMENT_PENDING
+mode: issue | return | renew
+borrower
+scannedCopies[]
+warnings[]
+blockingErrors[]
+overrideReason
+sessionStatus
 ```
 
-### 5.3 Scanner Workspace
-
-Required modes:
+Required areas:
 
 ```text
-Issue
-Return
-Renew
+Scanner mode tabs
+Barcode/QR scan area
+Borrower lookup
+Borrower eligibility card
+Borrower alerts
+Scanned items table
+Latest scan activity
+Policy summary
+Session action bar
 ```
-
-Required layout:
-
-- scanner/camera input area
-- borrower lookup with Student/Staff toggle
-- borrower eligibility card
-- warnings/blockers
-- scanned items session table
-- latest scan activity
-- policy summary
-- sticky session actions
-
-Blocking states must be explicit for fine threshold, overdue items, borrowing limit, already-issued copy, reserved copy, lost/damaged/archived copy, and override-required cases.
 
 ### 5.4 Borrowers, Reservations, Fines, Lost/Damaged
 
-Required workflows:
+- Borrower profile with eligibility, loans, overdues, fine due, reservations, history.
+- Reservation queue with hold, pickup deadline, queue position, notification state.
+- Fine/lost/damaged workflow with reason, confirmation, protected proof, audit trail.
+- Manual queue/fine changes require reason and audit.
 
-- borrower eligibility and policy groups
-- active loans and overdue lists
-- reservation queue and pickup deadline
-- holiday-aware fine breakdown
-- waiver/replacement/case-closure workflow
-- explicit fee/accounting linkage state without silent posting
+### 5.5 Parent / Student View
 
-### 5.5 Parent Library View
+- Borrowed books.
+- Due soon and overdue status.
+- Fine due.
+- Reservation status.
+- Library policy.
+- Protected notice/file access only where scoped.
 
-Parent can see only linked-child information:
-
-- borrowed books
-- due dates
-- overdue status
-- fine due
-- reservation status
-- due-soon reminders
-- library notices
-- library policy
-
-Parent must not see other borrowers, staff borrowing, internal policy controls, audit trail, accounting posting details, or librarian override notes.
+Do not expose other borrowers, global reservation queue, staff borrowing, admin notes, accounting posting detail, or override notes.
 
 ---
 
-## 6. Required UX States
+## 6. Backend Alignment
 
-Every Library screen must handle:
+Required backend capabilities:
+
+```text
+Book title CRUD APIs
+Book copy lifecycle APIs
+Barcode/QR label generation APIs
+Borrower lookup and eligibility APIs
+Issue/return/renew idempotent workflows
+Reservation and hold queue APIs
+Overdue and fine calculation APIs
+Lost/damaged/replacement workflows
+Library report/export job APIs
+Parent/student purpose-limited read APIs
+File Registry for labels/slips/reports
+M12 library notification events
+Audit logs for override, waive, lost/damaged, archive, queue changes
+```
+
+Backend ownership rules:
+
+- Borrower eligibility is backend-owned.
+- Copy/fine totals are backend-owned.
+- Fine calculations are backend-owned.
+- Parent/student visibility is child/self-scoped by backend.
+- Reports and labels use protected file/job flow.
+
+---
+
+## 7. Required States
 
 ```text
 Loading
-Empty
+Empty catalogue
 No search results
-Permission denied
-Module locked
 Scanner unavailable
 Camera permission blocked
-Offline mode
-Sync pending
-Sync conflict
+Unknown barcode
+Duplicate scan
+Borrower blocked
+Copy unavailable
+Policy missing
+Override required
+Issue pending
+Return pending
+Partial success
+Reservation expired
 Fine calculation unavailable
 Export queued
-Export processing
-Export failed
-Reservation expired
-Copy unavailable
-Borrower blocked
-Policy missing
-Accounting link failed
-Partial success
+File unavailable
+Permission denied
+Module locked
 ```
 
 ---
 
-## 7. Permission Matrix
+## 8. Implementation Checklist
 
-| Action | Librarian | Admin | Principal | Teacher | Parent |
-|---|---:|---:|---:|---:|---:|
-| View library dashboard | Yes | Yes | Summary | No | No |
-| Add title | Yes | Yes | No | No | No |
-| Add copy | Yes | Yes | No | No | No |
-| Issue / return / renew | Yes | Yes | No | No | No |
-| Override restriction | Limited | Yes | No | No | No |
-| Waive fine | Limited | Yes | No | No | No |
-| Post/link fee charge | Limited/No | Yes | Read-only | No | No |
-| View reports | Yes | Yes | Yes | Limited | No |
-| View child loans | No | No | No | No | Yes |
-| Request child renewal | No | No | No | No | Yes |
-| Pay child fine | No | No | No | No | Yes |
-
-The UI may hide actions for clarity, but backend RBAC remains the authority.
-
----
-
-## 8. Implementation Priority
-
-1. Library shell, sidebar active state, KPI cards, quick actions, status badges, and shared table/drawer patterns.
-2. Catalogue and copy management with strict title/copy separation.
-3. Scanner-first issue/return/renew workspace with borrower eligibility and session state.
-4. Borrower directory and policy controls.
-5. Overdue/fine/lost/damaged workflows with audit-safe actions.
-6. Reservations queue and hold fulfillment workflow.
-7. Reports and async export jobs.
-8. Parent child-scoped library portal.
-9. Mobile scanner companion with offline sync and conflict states.
-
----
-
-## 9. QA Checklist
-
-- Catalogue totals come from backend summary/list metadata.
-- Copy statuses are not inferred from title counts alone.
-- Issue is blocked when policy says borrower is not eligible.
-- Return updates scanned item state only after backend confirmation.
-- Renewal respects policy and reservation constraints.
-- Override requires permission and reason.
-- Fine breakdown is displayed from backend calculation response.
-- Waive/mark paid/create charge/post accounting actions have confirmation and mutation states.
-- Reservation queue changes are audited.
-- Parent view is child-scoped.
-- Exports show job status and protected download behavior.
-- Mobile scanner shows sync pending/synced/failed/conflict states.
-- No fake production metrics or placeholder library data remain in implemented routes.
+```text
+[ ] Reads main web design plan and design system.
+[ ] Catalogue and copy records are clearly separated.
+[ ] Scanner workflow validates borrower and copy before confirmation.
+[ ] Borrower eligibility and policy state come from backend.
+[ ] Fine and overdue calculations come from backend.
+[ ] Parent/student views are child/self-scoped.
+[ ] Reports/labels/slips use protected job/file helpers.
+[ ] Override/waive/lost/damaged actions require reason and audit.
+[ ] M12 library notifications are represented accurately.
+[ ] No fake library metrics remain.
+```
