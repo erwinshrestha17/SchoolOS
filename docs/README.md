@@ -50,13 +50,15 @@ Inventory & Asset Management is not an active module. Do not recreate M13 Invent
 | 9 | `project/SCHOOLOS_IMPLEMENTATION_PLAN.md` | Longer implementation backlog and module detail; execution priority is governed by the next-phase plan and GA policy. |
 | 10 | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Storage, File Registry, tenant isolation, scaling, performance, and security architecture. |
 | 11 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, and provider/queue operations. |
-| 12 | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | M12 notification events, delivery, preferences, retries, provider operations, notification center, and audit behavior. |
+| 12 | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | M12 notification events, delivery, preferences, retries, provider operations, notification center, notices, chat, and audit behavior. |
 | 13 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, wireframes, components, API usage, and web persona smoke plan. |
 | 14 | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Approved supporting visual-reference appendix for the supplied principal dashboard and M1 desktop screens. |
 | 15 | `design/modules/README.md` | Module-level design reference index. |
-| 16 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit, including contract-safe M3 Fees & Receipts and M5 Activity Feed & Milestones reference-screen implementation slices. |
-| 17 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
-| 18 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
+| 16 | `design/modules/M8_LIBRARY_FRONTEND_REFERENCE.md` | M8 Library module-level frontend reference. |
+| 17 | `design/M9_TRANSPORT_WEB_REFERENCE_ANALYSIS.md` | M9 Transport supporting web reference analysis. |
+| 18 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit, including contract-safe M3 Fees & Receipts and M5 Activity Feed & Milestones reference-screen implementation slices. |
+| 19 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
+| 20 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
 
 ---
 
@@ -77,6 +79,7 @@ design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
 design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md
 design/modules/README.md
 design/modules/M8_LIBRARY_FRONTEND_REFERENCE.md
+design/M9_TRANSPORT_WEB_REFERENCE_ANALYSIS.md
 implementation/WEB_UI_API_ALIGNMENT_AUDIT.md
 design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
 production/SCHOOLOS_GA_RELEASE_POLICY.md
@@ -107,6 +110,7 @@ apps/web/e2e/README.md
 | Web UI and state rules | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Web engineers |
 | Dashboard and M1 visual-reference detail | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Product, design, web engineers |
 | M8 Library frontend detail | `design/modules/M8_LIBRARY_FRONTEND_REFERENCE.md` | Product, design, web engineers, QA |
+| M9 Transport web reference detail | `design/M9_TRANSPORT_WEB_REFERENCE_ANALYSIS.md` | Product, design, web engineers, QA |
 | M3 and M5 reference-to-contract implementation guidance | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Web engineers, QA |
 | Mobile companion app rules | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Mobile engineers |
 | Deployment and recovery procedure | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment/operator team |
