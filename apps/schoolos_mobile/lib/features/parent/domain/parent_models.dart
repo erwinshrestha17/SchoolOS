@@ -19,6 +19,8 @@ class GuardianChild {
     required this.rollNumber,
     required this.academicYear,
     required this.relationship,
+    this.academicYearStartsOn,
+    this.academicYearEndsOn,
   });
 
   final String id;
@@ -27,6 +29,8 @@ class GuardianChild {
   final String rollNumber;
   final String academicYear;
   final String relationship;
+  final String? academicYearStartsOn;
+  final String? academicYearEndsOn;
 
   factory GuardianChild.fromJson(Map<String, dynamic> json) {
     return GuardianChild(
@@ -36,6 +40,8 @@ class GuardianChild {
       rollNumber: json['rollNumber'] as String? ?? '',
       academicYear: json['academicYear'] as String? ?? '',
       relationship: json['relationship'] as String? ?? 'Child',
+      academicYearStartsOn: json['academicYearStartsOn'] as String?,
+      academicYearEndsOn: json['academicYearEndsOn'] as String?,
     );
   }
 }
@@ -296,12 +302,16 @@ class ParentPaymentGatewayReadiness {
     required this.status,
     required this.providerName,
     required this.message,
+    this.providers = const [],
+    this.sandbox = false,
   });
 
   final bool enabled;
   final String status;
   final String? providerName;
   final String message;
+  final List<String> providers;
+  final bool sandbox;
 
   factory ParentPaymentGatewayReadiness.fromJson(Map<String, dynamic> json) {
     final provider = _asMap(json['provider']);
@@ -312,6 +322,39 @@ class ParentPaymentGatewayReadiness {
       message:
           json['message'] as String? ??
           'Online payments are not enabled for this school.',
+      providers: _asList(json['providers'])
+          .whereType<Map<String, dynamic>>()
+          .map((item) => item['name'] as String? ?? '')
+          .where((name) => name.isNotEmpty)
+          .toList(),
+      sandbox: json['sandbox'] as bool? ?? false,
+    );
+  }
+}
+
+class ParentSandboxPaymentResult {
+  const ParentSandboxPaymentResult({
+    required this.status,
+    required this.provider,
+    required this.amount,
+    this.receiptNumber,
+    this.walletBalance,
+  });
+
+  final String status;
+  final String provider;
+  final num amount;
+  final String? receiptNumber;
+  final num? walletBalance;
+
+  factory ParentSandboxPaymentResult.fromJson(Map<String, dynamic> json) {
+    final wallet = _asMap(json['wallet']);
+    return ParentSandboxPaymentResult(
+      status: json['status'] as String? ?? 'FAILED',
+      provider: json['provider'] as String? ?? '',
+      amount: _asNum(json['amount']),
+      receiptNumber: json['receiptNumber'] as String?,
+      walletBalance: wallet == null ? null : _asNum(wallet['balance']),
     );
   }
 }
@@ -777,6 +820,7 @@ class ParentCanteenInfo {
     this.activeMealPlans = const [],
     this.recentTransactions = const [],
     this.menuItems = const [],
+    this.recentServings = const [],
   });
 
   final num? walletBalance;
@@ -785,6 +829,7 @@ class ParentCanteenInfo {
   final List<ParentMealPlan> activeMealPlans;
   final List<ParentCanteenTransaction> recentTransactions;
   final List<ParentMenuItem> menuItems;
+  final List<ParentMealServing> recentServings;
 
   factory ParentCanteenInfo.fromJson(Map<String, dynamic> json) {
     final wallet = _asMap(json['wallet']);
@@ -804,6 +849,10 @@ class ParentCanteenInfo {
       menuItems: _asList(
         json['menuItems'],
       ).whereType<Map<String, dynamic>>().map(ParentMenuItem.fromJson).toList(),
+      recentServings: _asList(json['recentServings'])
+          .whereType<Map<String, dynamic>>()
+          .map(ParentMealServing.fromJson)
+          .toList(),
     );
   }
 }
@@ -957,12 +1006,16 @@ class ParentMenuItem {
     required this.category,
     required this.unitPrice,
     required this.allergenTags,
+    this.description,
+    this.isMealItem = false,
   });
 
   final String name;
   final String category;
   final num unitPrice;
   final List<String> allergenTags;
+  final String? description;
+  final bool isMealItem;
 
   factory ParentMenuItem.fromJson(Map<String, dynamic> json) {
     return ParentMenuItem(
@@ -970,6 +1023,40 @@ class ParentMenuItem {
       category: json['category'] as String? ?? 'CANTEEN',
       unitPrice: _asNum(json['unitPrice']),
       allergenTags: _asList(json['allergenTags']).whereType<String>().toList(),
+      description: json['description'] as String?,
+      isMealItem: json['isMealItem'] as bool? ?? false,
+    );
+  }
+}
+
+class ParentMealServing {
+  const ParentMealServing({
+    required this.id,
+    required this.mealType,
+    required this.status,
+    this.mealDate,
+    this.servedAt,
+    this.mealPlanName,
+    this.notes,
+  });
+
+  final String id;
+  final String mealType;
+  final String status;
+  final String? mealDate;
+  final String? servedAt;
+  final String? mealPlanName;
+  final String? notes;
+
+  factory ParentMealServing.fromJson(Map<String, dynamic> json) {
+    return ParentMealServing(
+      id: json['id'] as String? ?? '',
+      mealType: json['mealType'] as String? ?? 'Meal',
+      status: json['status'] as String? ?? 'SERVED',
+      mealDate: json['mealDate'] as String?,
+      servedAt: json['servedAt'] as String?,
+      mealPlanName: json['mealPlanName'] as String?,
+      notes: json['notes'] as String?,
     );
   }
 }

@@ -103,6 +103,9 @@ class ParentPortalRepository {
       transportDetail: dashboard?.transportDetail,
       latestActivity: dashboard?.latestActivity,
       latestActivityTitle: dashboard?.latestActivityTitle,
+      academicYearStartsOn: child.academicYearStartsOn,
+      academicYearEndsOn: child.academicYearEndsOn,
+      academicYear: child.academicYear,
     );
   }
 
@@ -141,9 +144,11 @@ class ParentPortalRepository {
       title: item.title,
       body: item.body,
       metadata: [
-        if (child != null) child.name,
+        item.audience.label,
+        if (child != null && item.audience.childName == null) child.name,
         _formatTime(item.createdAt),
       ].join(' - '),
+      audience: item.audience.label,
       createdAt: item.createdAt,
       route: item.route,
       isPinned: !item.isRead && item.type == ParentNotificationType.notice,

@@ -73,6 +73,10 @@ import { resolveCashAccountCode } from './finance.defaults';
 import { ReprintReceiptDto } from './dto/reprint-receipt.dto';
 import { DuesQueryDto } from './dto/dues-query.dto';
 import { FeeAgingBucket, ListDefaultersDto } from './dto/list-defaulters.dto';
+import {
+  PARENT_SANDBOX_PAYMENT_PROVIDERS,
+  type ParentSandboxPaymentProvider,
+} from './sandbox-payment-provider';
 
 interface CollectedPaymentWithReceipt {
   id: string;
@@ -4289,13 +4293,80 @@ export class FinanceService {
   }
 
   async getParentPaymentGatewayReadiness() {
+    if (isParentPaymentSandboxEnabled()) {
+      return {
+        enabled: true,
+        status: 'sandbox',
+        provider: null,
+        providers: PARENT_SANDBOX_PAYMENT_PROVIDERS.map((name) => ({ name })),
+        supportedPaymentMethods: ['MOBILE'],
+        sandbox: true,
+        message:
+          'Sandbox mode is active. Test payments are confirmed immediately and recorded in SchoolOS.',
+      };
+    }
     const readiness = await this.resolvePaymentGatewayReadiness();
     return {
       enabled: readiness.enabled,
       status: readiness.status,
       provider: readiness.provider ? { name: readiness.provider.name } : null,
+      providers: readiness.provider ? [{ name: readiness.provider.name }] : [],
       supportedPaymentMethods: readiness.supportedPaymentMethods,
+      sandbox: false,
       message: readiness.message,
+    };
+  }
+
+  async collectParentSandboxPayment(
+    studentId: string,
+    input: {
+      invoiceId: string;
+      amount: number;
+      provider: ParentSandboxPaymentProvider;
+      idempotencyKey: string;
+    },
+    actor: AuthContext,
+  ) {
+    if (!isParentPaymentSandboxEnabled()) {
+      throw new ForbiddenException('Parent sandbox payments are disabled.');
+    }
+    if (!PARENT_SANDBOX_PAYMENT_PROVIDERS.includes(input.provider)) {
+      throw new BadRequestException('Unsupported sandbox payment provider.');
+    }
+    const invoice = await this.prisma.invoice.findFirst({
+      where: {
+        id: input.invoiceId,
+        tenantId: actor.tenantId,
+        studentId,
+        status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
+      },
+      select: { id: true },
+    });
+    if (!invoice) {
+      throw new NotFoundException('Payable invoice not found for this child.');
+    }
+
+    const result = await this.collectPayment(
+      {
+        invoiceId: invoice.id,
+        amount: input.amount,
+        method: PaymentMethod.MOBILE,
+        narration: `Parent sandbox payment via ${input.provider}`,
+        idempotencyKey: `parent-sandbox-fee:${input.idempotencyKey}`,
+      },
+      {
+        ...actor,
+        permissions: Array.from(
+          new Set([...actor.permissions, 'payments:collect']),
+        ),
+      },
+    );
+
+    return {
+      ...result,
+      provider: input.provider,
+      sandbox: true,
+      status: 'SUCCEEDED',
     };
   }
 
@@ -6588,6 +6659,14 @@ function normalizeOnlinePaymentWebhookStatus(value: unknown) {
   }
 
   return 'UNKNOWN';
+}
+
+function isParentPaymentSandboxEnabled() {
+  return (
+    process.env.SCHOOLOS_PARENT_PAYMENT_SANDBOX === 'true' ||
+    (process.env.NODE_ENV !== 'production' &&
+      process.env.DEPLOY_ENV !== 'production')
+  );
 }
 
 function startOfToday() {

@@ -163,7 +163,7 @@ class NoticesRepository {
       body: item.message,
       publishedBy: 'SchoolOS',
       publishedAt: item.createdAt,
-      audience: 'My notifications',
+      audience: item.audience.label,
       category: item.category,
       isRead: item.isRead,
       hasAttachment: item.attachment != null,

@@ -180,6 +180,46 @@ class ParentRepository {
     return ParentPaymentIntent.fromJson(response.data as Map<String, dynamic>);
   }
 
+  Future<ParentSandboxPaymentResult> payInvoiceInSandbox({
+    required String childId,
+    required String invoiceId,
+    required num amount,
+    required String provider,
+    required String idempotencyKey,
+  }) async {
+    final response = await _client.post(
+      '/mobile/students/$childId/sandbox-payments/fees',
+      data: {
+        'invoiceId': invoiceId,
+        'amount': amount,
+        'provider': provider,
+        'idempotencyKey': idempotencyKey,
+      },
+    );
+    return ParentSandboxPaymentResult.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
+
+  Future<ParentSandboxPaymentResult> topUpCanteenInSandbox({
+    required String childId,
+    required num amount,
+    required String provider,
+    required String idempotencyKey,
+  }) async {
+    final response = await _client.post(
+      '/mobile/students/$childId/sandbox-payments/canteen-top-up',
+      data: {
+        'amount': amount,
+        'provider': provider,
+        'idempotencyKey': idempotencyKey,
+      },
+    );
+    return ParentSandboxPaymentResult.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
+
   Future<List<ParentReportCard>> getReportCardsForChild(String childId) async {
     final data = await _getMap(
       '/mobile/students/$childId/report-cards',

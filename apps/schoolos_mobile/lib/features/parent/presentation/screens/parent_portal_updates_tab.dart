@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../notices/application/notices_providers.dart';
+import '../../application/parent_portal_providers.dart';
 import '../../domain/parent_portal_models.dart';
 import '../widgets/parent_portal_widgets.dart';
 
-class ParentPortalUpdatesTab extends StatefulWidget {
+class ParentPortalUpdatesTab extends ConsumerStatefulWidget {
   const ParentPortalUpdatesTab({super.key, required this.data});
 
   final ParentPortalData data;
 
   @override
-  State<ParentPortalUpdatesTab> createState() => _ParentPortalUpdatesTabState();
+  ConsumerState<ParentPortalUpdatesTab> createState() =>
+      _ParentPortalUpdatesTabState();
 }
 
-class _ParentPortalUpdatesTabState extends State<ParentPortalUpdatesTab>
+class _ParentPortalUpdatesTabState extends ConsumerState<ParentPortalUpdatesTab>
     with AutomaticKeepAliveClientMixin {
   ParentUpdateCategory? selected;
 
@@ -76,6 +80,21 @@ class _ParentPortalUpdatesTabState extends State<ParentPortalUpdatesTab>
     BuildContext context,
     ParentPortalUpdate item,
   ) async {
+    if (item.unreadCount > 0) {
+      try {
+        await ref.read(noticesRepositoryProvider).markNoticeRead(item.id);
+        ref.invalidate(parentPortalDataProvider);
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not mark this update as read.'),
+            ),
+          );
+        }
+      }
+    }
+    if (!context.mounted) return;
     final route = item.route;
     if (route != null && route.isNotEmpty && route != '/parent/updates') {
       context.push(route);
@@ -162,15 +181,30 @@ class _UpdateCard extends StatelessWidget {
             ).textTheme.bodySmall?.copyWith(color: ParentPortalColors.muted),
           ),
           const SizedBox(height: 14),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
+              StatusBadge(
+                label: item.audience,
+                icon: item.audience == 'Whole school'
+                    ? Icons.apartment_rounded
+                    : Icons.person_pin_circle_outlined,
+                color: ParentPortalColors.blue,
+                backgroundColor: ParentPortalColors.blueSoft,
+              ),
               if (item.isImportant)
                 const StatusBadge(
                   label: 'Important',
                   color: ParentPortalColors.orange,
                   backgroundColor: Colors.white,
                 ),
-              const Spacer(),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
               Text(
                 switch (item.category) {
                   ParentUpdateCategory.notice => 'Read',

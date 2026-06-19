@@ -10,6 +10,7 @@ import { CommunicationsModule } from '../communications/communications.module';
 import { HomeworkModule } from '../homework/homework.module';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { StorageModule } from '../storage/storage.module';
+import { CanteenModule } from '../canteen/canteen.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { StorageModule } from '../storage/storage.module';
     HomeworkModule,
     FileRegistryModule,
     StorageModule,
+    CanteenModule,
   ],
   controllers: [MobileController, MobileTeacherAttendanceController],
   providers: [MobileService],

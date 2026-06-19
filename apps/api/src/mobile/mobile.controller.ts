@@ -19,6 +19,10 @@ import { MobileService } from './mobile.service';
 import { ParentAttendanceSummaryQueryDto } from './dto/parent-attendance-summary-query.dto';
 import { ParentNotificationQueryDto } from './dto/parent-notification-query.dto';
 import { InitiateParentPaymentDto } from './dto/initiate-parent-payment.dto';
+import {
+  ParentSandboxCanteenTopUpDto,
+  ParentSandboxFeePaymentDto,
+} from './dto/parent-sandbox-payment.dto';
 
 @Controller('mobile')
 @UseGuards(JwtAuthGuard, EntitlementGuard)
@@ -142,6 +146,30 @@ export class MobileController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.mobileService.initiateStudentPayment(studentId, dto, auth);
+  }
+
+  @Post('students/:id/sandbox-payments/fees')
+  @RequiredModule('fees')
+  collectStudentSandboxFeePayment(
+    @Param('id') studentId: string,
+    @Body() dto: ParentSandboxFeePaymentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.collectStudentSandboxFeePayment(
+      studentId,
+      dto,
+      auth,
+    );
+  }
+
+  @Post('students/:id/sandbox-payments/canteen-top-up')
+  @RequiredModule('canteen')
+  topUpStudentCanteenSandbox(
+    @Param('id') studentId: string,
+    @Body() dto: ParentSandboxCanteenTopUpDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.topUpStudentCanteenSandbox(studentId, dto, auth);
   }
 
   @Get('students/:id/receipts/:receiptNumber.pdf')

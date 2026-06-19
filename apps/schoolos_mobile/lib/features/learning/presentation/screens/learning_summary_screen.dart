@@ -55,40 +55,112 @@ class LearningSummaryScreen extends ConsumerWidget {
               )
             : isStudent
             ? _StudentLearningSummary(childId: childId)
-            : _ParentLearningSummary(childId: childId),
+            : const _ParentLearningSummary(),
       ),
     );
   }
 }
 
 class _ParentLearningSummary extends ConsumerWidget {
-  const _ParentLearningSummary({required this.childId});
-
-  final String childId;
+  const _ParentLearningSummary();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final summary = ref.watch(parentLearningSummariesProvider(childId));
+    final summary = ref.watch(parentLearningSummariesProvider(null));
 
     return summary.when(
       loading: () => const _LearningLoading(),
       error: (_, _) => AppErrorView(
         title: 'Could not load learning summary',
         message: 'Please try again in a moment.',
-        onRetry: () => ref.invalidate(parentLearningSummariesProvider(childId)),
+        onRetry: () => ref.invalidate(parentLearningSummariesProvider(null)),
       ),
       data: (items) {
         if (items.isEmpty) {
           return const _LearningEmpty();
         }
-        return _LearningSummaryList(
-          summary: items.first,
+        return _ParentLearningSummariesList(
+          summaries: items,
           onRefresh: () async {
-            ref.invalidate(parentLearningSummariesProvider(childId));
-            await ref.read(parentLearningSummariesProvider(childId).future);
+            ref.invalidate(parentLearningSummariesProvider(null));
+            await ref.read(parentLearningSummariesProvider(null).future);
           },
         );
       },
+    );
+  }
+}
+
+class _ParentLearningSummariesList extends StatelessWidget {
+  const _ParentLearningSummariesList({
+    required this.summaries,
+    required this.onRefresh,
+  });
+
+  final List<LearningSummary> summaries;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        children: [
+          Text(
+            summaries.length == 1
+                ? 'Learning progress for your child'
+                : 'Learning progress for all ${summaries.length} children',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          for (final summary in summaries) ...[
+            _SummaryHeader(summary: summary),
+            const SizedBox(height: AppSpacing.md),
+            _ChildLearningHighlights(summary: summary),
+            const SizedBox(height: AppSpacing.xxl),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ChildLearningHighlights extends StatelessWidget {
+  const _ChildLearningHighlights({required this.summary});
+
+  final LearningSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final progressItems = summary.progress.isEmpty
+        ? [...summary.strongTopics, ...summary.needsPracticeTopics]
+        : summary.progress;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'Recent completions'),
+        const SizedBox(height: AppSpacing.sm),
+        if (summary.recentCompletedActivities.isEmpty)
+          const AppCard(child: Text('No completed learning activities yet.'))
+        else
+          for (final activity in summary.recentCompletedActivities.take(3)) ...[
+            _CompletionCard(activity: activity),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+        const SizedBox(height: AppSpacing.md),
+        const SectionHeader(title: 'Learning focus'),
+        const SizedBox(height: AppSpacing.sm),
+        if (progressItems.isEmpty)
+          const AppCard(child: Text('No topic summary yet.'))
+        else
+          for (final topic in progressItems.take(4)) ...[
+            _TopicCard(topic: topic),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+      ],
     );
   }
 }

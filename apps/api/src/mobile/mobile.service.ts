@@ -19,6 +19,12 @@ import { HomeworkAttachmentAccessService } from '../homework/homework-attachment
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { StorageService } from '../storage/storage.service';
 import { InitiateParentPaymentDto } from './dto/initiate-parent-payment.dto';
+import { CanteenService } from '../canteen/canteen.service';
+import {
+  ParentSandboxCanteenTopUpDto,
+  ParentSandboxFeePaymentDto,
+} from './dto/parent-sandbox-payment.dto';
+import { PaymentMethod } from '@prisma/client';
 
 interface MobileStudentRow extends Student {
   class: { id: string; name: string };
@@ -41,6 +47,8 @@ interface MobileStudentRow extends Student {
   enrollments: Array<{
     academicYear: {
       name: string;
+      startsOn: Date;
+      endsOn: Date;
     };
   }>;
 }
@@ -57,6 +65,7 @@ export class MobileService {
     private readonly homeworkAttachmentAccessService: HomeworkAttachmentAccessService,
     private readonly fileRegistryService: FileRegistryService,
     private readonly storageService: StorageService,
+    private readonly canteenService: CanteenService,
   ) {}
 
   async listMyStudents(actor: AuthContext) {
@@ -104,6 +113,8 @@ export class MobileService {
             academicYear: {
               select: {
                 name: true,
+                startsOn: true,
+                endsOn: true,
               },
             },
           },
@@ -234,6 +245,36 @@ export class MobileService {
             readAt: true,
           },
         },
+        student: {
+          select: {
+            id: true,
+            firstNameEn: true,
+            lastNameEn: true,
+            class: { select: { name: true } },
+            sectionRef: { select: { name: true } },
+          },
+        },
+        notice: {
+          select: {
+            audienceType: true,
+            class: { select: { name: true } },
+            section: { select: { name: true } },
+          },
+        },
+        event: {
+          select: {
+            audienceType: true,
+            class: { select: { name: true } },
+            section: { select: { name: true } },
+          },
+        },
+        activityPost: {
+          select: {
+            audienceType: true,
+            class: { select: { name: true } },
+            section: { select: { name: true } },
+          },
+        },
       },
       orderBy: [{ createdAt: 'desc' }],
       take: limit + 1,
@@ -259,6 +300,7 @@ export class MobileService {
       sentAt: toIso(item.sentAt),
       readAt: toIso(item.readReceipts[0]?.readAt),
       isRead: item.readReceipts.length > 0,
+      audience: parentNotificationAudience(item),
     }));
 
     return {
@@ -370,6 +412,7 @@ export class MobileService {
       sentAt: toIso(notification.sentAt),
       readAt: toIso(notification.readReceipts[0]?.readAt),
       isRead: notification.readReceipts.length > 0,
+      audience: parentNotificationAudience(notification),
       attachment,
     };
   }
@@ -424,6 +467,36 @@ export class MobileService {
         readReceipts: {
           where: { tenantId: actor.tenantId, userId: actor.userId },
           select: { readAt: true },
+        },
+        student: {
+          select: {
+            id: true,
+            firstNameEn: true,
+            lastNameEn: true,
+            class: { select: { name: true } },
+            sectionRef: { select: { name: true } },
+          },
+        },
+        notice: {
+          select: {
+            audienceType: true,
+            class: { select: { name: true } },
+            section: { select: { name: true } },
+          },
+        },
+        event: {
+          select: {
+            audienceType: true,
+            class: { select: { name: true } },
+            section: { select: { name: true } },
+          },
+        },
+        activityPost: {
+          select: {
+            audienceType: true,
+            class: { select: { name: true } },
+            section: { select: { name: true } },
+          },
         },
       },
     });
@@ -640,6 +713,53 @@ export class MobileService {
       dto,
       actor,
     );
+  }
+
+  async collectStudentSandboxFeePayment(
+    studentId: string,
+    dto: ParentSandboxFeePaymentDto,
+    actor: AuthContext,
+  ) {
+    await this.assertStudentAccess(studentId, actor);
+    return this.financeService.collectParentSandboxPayment(
+      studentId,
+      dto,
+      actor,
+    );
+  }
+
+  async topUpStudentCanteenSandbox(
+    studentId: string,
+    dto: ParentSandboxCanteenTopUpDto,
+    actor: AuthContext,
+  ) {
+    await this.assertStudentAccess(studentId, actor);
+    const readiness =
+      await this.financeService.getParentPaymentGatewayReadiness();
+    if (!('sandbox' in readiness) || readiness.sandbox !== true) {
+      throw new ForbiddenException('Parent sandbox top-up is disabled.');
+    }
+    const result = await this.canteenService.topUpWallet(
+      studentId,
+      {
+        amount: dto.amount,
+        note: `Parent sandbox top-up via ${dto.provider}`,
+        idempotencyKey: `parent-sandbox-canteen:${dto.idempotencyKey}`,
+        paymentMethod: PaymentMethod.MOBILE,
+      },
+      actor,
+    );
+    return {
+      sandbox: true,
+      status: 'SUCCEEDED',
+      provider: dto.provider,
+      amount: dto.amount,
+      wallet: {
+        id: result.wallet.id,
+        balance: money(result.wallet.balance),
+      },
+      transactionId: result.transaction.id,
+    };
   }
 
   async getStudentReceiptPdf(
@@ -979,7 +1099,7 @@ export class MobileService {
 
   async getStudentCanteen(studentId: string, actor: AuthContext) {
     await this.assertStudentAccess(studentId, actor);
-    const [wallet, enrollments, recentTransactions, menuItems] =
+    const [wallet, enrollments, recentTransactions, menuItems, recentServings] =
       await Promise.all([
         this.prisma.canteenWallet.findFirst({
           where: { tenantId: actor.tenantId, studentId },
@@ -1013,6 +1133,20 @@ export class MobileService {
           where: { tenantId: actor.tenantId, status: 'ACTIVE' },
           orderBy: [{ category: 'asc' }, { name: 'asc' }],
           take: 25,
+        }),
+        this.prisma.canteenMealServing.findMany({
+          where: { tenantId: actor.tenantId, studentId },
+          select: {
+            id: true,
+            mealType: true,
+            mealDate: true,
+            servedAt: true,
+            status: true,
+            notes: true,
+            mealPlan: { select: { name: true } },
+          },
+          orderBy: [{ mealDate: 'desc' }, { servedAt: 'desc' }],
+          take: 30,
         }),
       ]);
 
@@ -1053,6 +1187,15 @@ export class MobileService {
         unitPrice: money(item.unitPrice),
         isMealItem: item.isMealItem,
         allergenTags: item.allergenTags,
+      })),
+      recentServings: recentServings.map((serving) => ({
+        id: serving.id,
+        mealType: serving.mealType,
+        mealDate: toIso(serving.mealDate),
+        servedAt: toIso(serving.servedAt),
+        status: serving.status,
+        notes: serving.notes,
+        mealPlanName: serving.mealPlan?.name ?? null,
       })),
     };
   }
@@ -1277,6 +1420,8 @@ export class MobileService {
             academicYear: {
               select: {
                 name: true,
+                startsOn: true,
+                endsOn: true,
               },
             },
           },
@@ -1433,6 +1578,87 @@ function parentNotificationRoute(item: {
   return '/parent/updates';
 }
 
+function parentNotificationAudience(item: {
+  audienceType: string;
+  studentId: string | null;
+  student?: {
+    firstNameEn: string;
+    lastNameEn: string;
+    class: { name: string };
+    sectionRef: { name: string } | null;
+  } | null;
+  notice?: {
+    audienceType: string;
+    class: { name: string } | null;
+    section: { name: string } | null;
+  } | null;
+  event?: {
+    audienceType: string;
+    class: { name: string } | null;
+    section: { name: string } | null;
+  } | null;
+  activityPost?: {
+    audienceType: string;
+    class: { name: string } | null;
+    section: { name: string } | null;
+  } | null;
+}) {
+  const source = item.notice ?? item.event ?? item.activityPost;
+  const audienceType = source?.audienceType ?? item.audienceType;
+  const className = source?.class?.name ?? item.student?.class.name ?? null;
+  const sectionName =
+    source?.section?.name ?? item.student?.sectionRef?.name ?? null;
+  const childName = item.student
+    ? [item.student.firstNameEn, item.student.lastNameEn]
+        .filter(Boolean)
+        .join(' ')
+    : null;
+
+  if (audienceType === 'STUDENT' || item.studentId) {
+    return {
+      type: 'STUDENT',
+      label: childName ? `For ${childName}` : 'For a specific child',
+      childName,
+      className,
+      sectionName,
+    };
+  }
+  if (audienceType === 'SECTION') {
+    return {
+      type: 'SECTION',
+      label: [className, sectionName].filter(Boolean).join(' - ') || 'Section',
+      childName: null,
+      className,
+      sectionName,
+    };
+  }
+  if (audienceType === 'CLASS') {
+    return {
+      type: 'CLASS',
+      label: className ? `Class: ${className}` : 'Specific class',
+      childName: null,
+      className,
+      sectionName: null,
+    };
+  }
+  if (audienceType === 'ROLE') {
+    return {
+      type: 'ROLE',
+      label: 'Parent-specific update',
+      childName: null,
+      className: null,
+      sectionName: null,
+    };
+  }
+  return {
+    type: 'ALL',
+    label: 'Whole school',
+    childName: null,
+    className: null,
+    sectionName: null,
+  };
+}
+
 function boundedTake(value: string | undefined, fallback: number) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -1575,6 +1801,8 @@ function toMobileStudent(student: MobileStudentRow) {
     sectionId: student.sectionId,
     rollNumber: student.rollNumber?.toString() ?? '',
     academicYear: student.enrollments[0]?.academicYear.name ?? '',
+    academicYearStartsOn: toIso(student.enrollments[0]?.academicYear.startsOn),
+    academicYearEndsOn: toIso(student.enrollments[0]?.academicYear.endsOn),
     relationship: guardianLink?.relation ?? 'Self',
   };
 }

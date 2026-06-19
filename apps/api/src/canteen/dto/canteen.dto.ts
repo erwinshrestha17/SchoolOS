@@ -11,6 +11,8 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { PaymentMethod } from '@prisma/client';
+import { IsEnum } from 'class-validator';
 
 export class CreateCanteenMenuItemDto {
   @IsString() name!: string;
@@ -92,6 +94,7 @@ export class TopUpCanteenWalletDto {
   @IsOptional() @IsString() note?: string;
   @IsOptional() @IsString() idempotencyKey?: string;
   @IsOptional() @IsNumber() @Min(0) lowBalanceThreshold?: number;
+  @IsOptional() @IsEnum(PaymentMethod) paymentMethod?: PaymentMethod;
 }
 
 export class CreateCanteenPosSaleItemDto {

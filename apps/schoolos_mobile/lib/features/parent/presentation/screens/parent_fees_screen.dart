@@ -354,17 +354,21 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
 
   Future<void> _confirmAndStartPayment() async {
     final readiness = widget.readiness;
-    if (readiness == null ||
-        !readiness.enabled ||
-        readiness.providerName == null) {
-      return;
-    }
+    if (readiness == null || !readiness.enabled) return;
+    final providers = readiness.providers.isNotEmpty
+        ? readiness.providers
+        : [if (readiness.providerName != null) readiness.providerName!];
+    if (providers.isEmpty) return;
+    final provider = providers.length == 1
+        ? providers.first
+        : await _chooseProvider(providers);
+    if (provider == null || !mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Continue to secure payment?'),
         content: Text(
-          '${widget.invoice.invoiceNumber}\nAmount: ${_money(widget.invoice.outstandingAmount)}\nProvider: ${readiness.providerName}',
+          '${widget.invoice.invoiceNumber}\nAmount: ${_money(widget.invoice.outstandingAmount)}\nProvider: ${_providerLabel(provider)}${readiness.sandbox ? '\n\nSandbox mode: this test payment will be confirmed immediately.' : ''}',
         ),
         actions: [
           TextButton(
@@ -383,13 +387,36 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
     setState(() => _startingPayment = true);
     _paymentRequestKey ??= _newPaymentRequestKey();
     try {
+      if (readiness.sandbox) {
+        final result = await ref
+            .read(parentRepositoryProvider)
+            .payInvoiceInSandbox(
+              childId: widget.childId,
+              invoiceId: widget.invoice.id,
+              amount: widget.invoice.outstandingAmount,
+              provider: provider,
+              idempotencyKey: _paymentRequestKey!,
+            );
+        if (result.status != 'SUCCEEDED') {
+          throw StateError('Sandbox payment was not confirmed.');
+        }
+        await ref
+            .read(parentControllerProvider.notifier)
+            .load(childId: widget.childId);
+        if (!mounted) return;
+        showFeatureSnack(
+          context,
+          'Sandbox payment confirmed${result.receiptNumber == null ? '' : ' • Receipt ${result.receiptNumber}'}.',
+        );
+        return;
+      }
       final intent = await ref
           .read(parentRepositoryProvider)
           .initiatePayment(
             childId: widget.childId,
             invoiceId: widget.invoice.id,
             amount: widget.invoice.outstandingAmount,
-            provider: readiness.providerName!,
+            provider: provider,
             idempotencyKey: _paymentRequestKey!,
           );
       final checkoutUrl = Uri.tryParse(intent.checkoutUrl ?? '');
@@ -421,6 +448,40 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
     } finally {
       if (mounted) setState(() => _startingPayment = false);
     }
+  }
+
+  Future<String?> _chooseProvider(List<String> providers) {
+    return showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Choose payment provider',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 12),
+              for (final provider in providers)
+                ListTile(
+                  leading: const FeatureIcon(Icons.account_balance_rounded),
+                  title: Text(
+                    _providerLabel(provider),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: const Text('Sandbox • confirmed immediately'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.pop(context, provider),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -539,3 +600,10 @@ String _newPaymentRequestKey() {
   ).join();
   return 'parent-${DateTime.now().microsecondsSinceEpoch}-$entropy';
 }
+
+String _providerLabel(String value) => switch (value) {
+  'ESEWA' => 'eSewa',
+  'KHALTI' => 'Khalti',
+  'CONNECT_IPS' => 'connectIPS',
+  _ => value,
+};

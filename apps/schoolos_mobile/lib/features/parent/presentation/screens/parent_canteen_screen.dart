@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -58,7 +60,7 @@ class _CanteenBody extends ConsumerWidget {
       data: (info) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _WalletCard(info: info),
+          _WalletCard(info: info, childId: childId),
           const SizedBox(height: 18),
           const ParentSectionHeader(title: 'Active meal plans'),
           const SizedBox(height: 8),
@@ -79,6 +81,30 @@ class _CanteenBody extends ConsumerWidget {
               ),
               const SizedBox(height: 10),
             ],
+          const SizedBox(height: 18),
+          const ParentSectionHeader(title: 'What your child consumed'),
+          const SizedBox(height: 8),
+          if (info.recentServings.isEmpty)
+            const PortalCard(
+              child: Text('No meal consumption has been recorded yet.'),
+            )
+          else
+            PortalCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  for (
+                    var index = 0;
+                    index < info.recentServings.length;
+                    index++
+                  ) ...[
+                    _ServingTile(item: info.recentServings[index]),
+                    if (index != info.recentServings.length - 1)
+                      const Divider(height: 1),
+                  ],
+                ],
+              ),
+            ),
           const SizedBox(height: 18),
           const ParentSectionHeader(title: 'Recent wallet activity'),
           const SizedBox(height: 8),
@@ -102,12 +128,15 @@ class _CanteenBody extends ConsumerWidget {
               ),
             ),
           const SizedBox(height: 18),
-          const ParentSectionHeader(title: 'Menu preview'),
+          const ParentSectionHeader(title: 'School cooked menu'),
           const SizedBox(height: 8),
-          if (info.menuItems.isEmpty)
-            const PortalCard(child: Text('No active menu items available.'))
+          if (info.menuItems.where((item) => item.isMealItem).isEmpty)
+            const PortalCard(
+              child: Text('The school has not published a cooked menu.'),
+            )
           else
-            for (final item in info.menuItems.take(6)) ...[
+            for (final item
+                in info.menuItems.where((item) => item.isMealItem).take(6)) ...[
               PortalCard(
                 child: Row(
                   children: [
@@ -122,7 +151,11 @@ class _CanteenBody extends ConsumerWidget {
                             style: const TextStyle(fontWeight: FontWeight.w900),
                           ),
                           Text(
-                            item.category,
+                            [
+                              item.category,
+                              if (item.description?.isNotEmpty == true)
+                                item.description,
+                            ].whereType<String>().join(' • '),
                             style: const TextStyle(
                               color: ParentPortalColors.muted,
                             ),
@@ -145,14 +178,59 @@ class _CanteenBody extends ConsumerWidget {
   }
 }
 
-class _WalletCard extends StatelessWidget {
-  const _WalletCard({required this.info});
+class _ServingTile extends StatelessWidget {
+  const _ServingTile({required this.item});
 
-  final ParentCanteenInfo info;
+  final ParentMealServing item;
 
   @override
   Widget build(BuildContext context) {
-    final balance = info.walletBalance;
+    final consumed = item.status == 'SERVED';
+    return ListTile(
+      leading: FeatureIcon(
+        consumed ? Icons.restaurant_rounded : Icons.no_meals_rounded,
+        color: consumed ? ParentPortalColors.green : ParentPortalColors.orange,
+        size: 40,
+      ),
+      title: Text(
+        item.notes?.isNotEmpty == true
+            ? item.notes!
+            : item.mealPlanName ?? item.mealType,
+        style: const TextStyle(fontWeight: FontWeight.w900),
+      ),
+      subtitle: Text('${_dateLabel(item.mealDate)} • ${_label(item.mealType)}'),
+      trailing: StatusBadge(
+        label: consumed ? 'Consumed' : _label(item.status),
+        color: consumed ? ParentPortalColors.green : ParentPortalColors.orange,
+        background: consumed
+            ? ParentPortalColors.greenSoft
+            : ParentPortalColors.orangeSoft,
+      ),
+    );
+  }
+}
+
+class _WalletCard extends ConsumerStatefulWidget {
+  const _WalletCard({required this.info, required this.childId});
+
+  final ParentCanteenInfo info;
+  final String childId;
+
+  @override
+  ConsumerState<_WalletCard> createState() => _WalletCardState();
+}
+
+class _WalletCardState extends ConsumerState<_WalletCard> {
+  bool _isToppingUp = false;
+  String? _requestKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final balance = widget.info.walletBalance;
+    final readiness = ref.watch(
+      parentPaymentGatewayReadinessProvider(widget.childId),
+    );
+    final canTopUp = readiness.valueOrNull?.sandbox == true && !_isToppingUp;
     return PortalCard(
       color: ParentPortalColors.greenSoft,
       child: Column(
@@ -186,11 +264,11 @@ class _WalletCard extends StatelessWidget {
                 ),
               ),
               StatusBadge(
-                label: info.isLowBalance ? 'Low balance' : 'OK',
-                color: info.isLowBalance
+                label: widget.info.isLowBalance ? 'Low balance' : 'OK',
+                color: widget.info.isLowBalance
                     ? ParentPortalColors.orange
                     : ParentPortalColors.green,
-                background: info.isLowBalance
+                background: widget.info.isLowBalance
                     ? ParentPortalColors.orangeSoft
                     : Colors.white,
               ),
@@ -198,16 +276,126 @@ class _WalletCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
-            onPressed: () => showUnavailableWorkflowSnack(
-              context,
-              'Canteen top-up is not enabled in the parent app yet.',
+            onPressed: canTopUp ? _topUp : null,
+            icon: _isToppingUp
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(
+                    canTopUp
+                        ? Icons.add_card_rounded
+                        : Icons.lock_outline_rounded,
+                  ),
+            label: Text(
+              _isToppingUp
+                  ? 'Adding balance...'
+                  : canTopUp
+                  ? 'Sandbox top-up'
+                  : 'Top-up unavailable',
             ),
-            icon: const Icon(Icons.lock_outline_rounded),
-            label: const Text('Top-up unavailable'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _topUp() async {
+    final readiness = await ref.read(
+      parentPaymentGatewayReadinessProvider(widget.childId).future,
+    );
+    if (!readiness.sandbox || readiness.providers.isEmpty || !mounted) return;
+    var amount = 1000;
+    var provider = readiness.providers.first;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Sandbox wallet top-up'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Choose amount'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final value in const [500, 1000, 2000])
+                    ChoiceChip(
+                      label: Text(_money(value)),
+                      selected: amount == value,
+                      onSelected: (_) => setDialogState(() => amount = value),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text('Payment provider'),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: provider,
+                items: [
+                  for (final item in readiness.providers)
+                    DropdownMenuItem(
+                      value: item,
+                      child: Text(_providerLabel(item)),
+                    ),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setDialogState(() => provider = value);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'This is a test payment. SchoolOS will add the amount immediately.',
+                style: TextStyle(color: ParentPortalColors.muted),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Confirm top-up'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isToppingUp = true);
+    _requestKey ??= _sandboxRequestKey();
+    try {
+      final result = await ref
+          .read(parentRepositoryProvider)
+          .topUpCanteenInSandbox(
+            childId: widget.childId,
+            amount: amount,
+            provider: provider,
+            idempotencyKey: _requestKey!,
+          );
+      ref.invalidate(parentCanteenProvider(widget.childId));
+      await ref.read(parentCanteenProvider(widget.childId).future);
+      if (!mounted) return;
+      showFeatureSnack(
+        context,
+        '${_providerLabel(provider)} sandbox top-up added. Balance ${_money(result.walletBalance ?? 0)}.',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      showFeatureSnack(
+        context,
+        'Top-up failed. No wallet balance was changed.',
+      );
+    } finally {
+      if (mounted) setState(() => _isToppingUp = false);
+    }
   }
 }
 
@@ -242,3 +430,30 @@ class _TransactionTile extends StatelessWidget {
 }
 
 String _money(num value) => 'NPR ${value.toStringAsFixed(0)}';
+
+String _dateLabel(String? value) {
+  final date = DateTime.tryParse(value ?? '')?.toLocal();
+  if (date == null) return 'Date not recorded';
+  return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+}
+
+String _label(String value) => value
+    .toLowerCase()
+    .split('_')
+    .map(
+      (part) =>
+          part.isEmpty ? part : '${part[0].toUpperCase()}${part.substring(1)}',
+    )
+    .join(' ');
+
+String _providerLabel(String value) => switch (value) {
+  'ESEWA' => 'eSewa',
+  'KHALTI' => 'Khalti',
+  'CONNECT_IPS' => 'connectIPS',
+  _ => value,
+};
+
+String _sandboxRequestKey() {
+  final random = Random.secure();
+  return 'canteen-${DateTime.now().microsecondsSinceEpoch}-${random.nextInt(1 << 32).toRadixString(16)}';
+}

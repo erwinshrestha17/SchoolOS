@@ -15,6 +15,7 @@ import {
   CanteenWalletTransactionSource,
   CanteenWalletTransactionType,
   Prisma,
+  PaymentMethod,
   StudentLifecycleStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -801,7 +802,10 @@ export class CanteenService {
           source: CanteenWalletTransactionSource.MANUAL,
           amount: new Prisma.Decimal(dto.amount),
           balanceAfter: updated.balance,
-          referenceType: 'manual_top_up',
+          referenceType:
+            dto.paymentMethod === PaymentMethod.MOBILE
+              ? 'parent_sandbox_mobile_top_up'
+              : 'manual_top_up',
           referenceId: dto.idempotencyKey ?? null,
           idempotencyKey: dto.idempotencyKey ?? null,
           note: dto.note ?? null,
@@ -816,7 +820,7 @@ export class CanteenService {
           transactionId: transaction.id,
           studentId,
           amount: new Prisma.Decimal(dto.amount),
-          paymentMethod: 'CASH', // Assuming cash for manual top-up or add to DTO
+          paymentMethod: dto.paymentMethod ?? PaymentMethod.CASH,
           note: dto.note,
         },
         actor,

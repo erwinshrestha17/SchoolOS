@@ -11,6 +11,7 @@ import '../../features/parent/presentation/screens/parent_portal_homework_tab.da
 import '../../features/parent/presentation/screens/parent_portal_more_tab.dart';
 import '../../features/parent/presentation/screens/parent_portal_updates_tab.dart';
 import '../../features/parent/presentation/widgets/parent_portal_widgets.dart';
+import '../../features/notices/application/notices_providers.dart';
 
 class SchoolOsAppShell extends ConsumerStatefulWidget {
   const SchoolOsAppShell({
@@ -102,7 +103,7 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
           children: [
             IconButton(
               tooltip: 'Notifications',
-              onPressed: () => _showNotifications(context, portal),
+              onPressed: () => _showNotifications(context, ref, portal),
               icon: const Icon(Icons.notifications_none_rounded),
             ),
             if (unreadCount > 0)
@@ -139,43 +140,119 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
 
   Future<void> _showNotifications(
     BuildContext context,
+    WidgetRef ref,
     ParentPortalData? portal,
   ) async {
     final updates = portal?.updates.take(5).toList() ?? const [];
-    await showModalBottomSheet<void>(
+    await showGeneralDialog<void>(
       context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Notifications',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 14),
-              if (updates.isEmpty)
-                const PortalCard(child: Text('No notifications yet.'))
-              else
-                for (final update in updates) ...[
-                  PortalCard(
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        _notificationIcon(update.category),
-                        color: _notificationColor(update.category),
-                      ),
-                      title: Text(update.title),
-                      subtitle: Text(update.metadata),
-                    ),
+      barrierDismissible: true,
+      barrierLabel: 'Close notifications',
+      barrierColor: Colors.black26,
+      transitionDuration: const Duration(milliseconds: 220),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final offset = Tween(
+          begin: const Offset(0, -0.12),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut));
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(position: offset, child: child),
+        );
+      },
+      pageBuilder: (dialogContext, animation, secondaryAnimation) => SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 560, maxHeight: 560),
+              margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+              decoration: BoxDecoration(
+                color: ParentPortalColors.page,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: ParentPortalColors.border),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x220F172A),
+                    blurRadius: 28,
+                    offset: Offset(0, 12),
                   ),
-                  const SizedBox(height: 10),
                 ],
-            ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Notifications',
+                        style: Theme.of(dialogContext).textTheme.titleLarge
+                            ?.copyWith(fontWeight: FontWeight.w900),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.pop(dialogContext),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: updates.isEmpty
+                        ? const PortalCard(child: Text('No notifications yet.'))
+                        : ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: updates.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (context, index) {
+                              final update = updates[index];
+                              return PortalCard(
+                                onTap: () async {
+                                  Navigator.pop(dialogContext);
+                                  if (update.unreadCount > 0) {
+                                    await ref
+                                        .read(noticesRepositoryProvider)
+                                        .markNoticeRead(update.id);
+                                    ref.invalidate(parentPortalDataProvider);
+                                  }
+                                  if (context.mounted &&
+                                      update.route?.isNotEmpty == true) {
+                                    context.push(update.route!);
+                                  }
+                                },
+                                child: ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Icon(
+                                    _notificationIcon(update.category),
+                                    color: _notificationColor(update.category),
+                                  ),
+                                  title: Text(
+                                    update.title,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  subtitle: Text(update.metadata),
+                                  trailing: update.unreadCount > 0
+                                      ? const Icon(
+                                          Icons.circle,
+                                          size: 9,
+                                          color: ParentPortalColors.green,
+                                        )
+                                      : null,
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

@@ -60,6 +60,12 @@ class ParentPortalMoreTab extends ConsumerWidget {
         const SizedBox(height: 24),
         _group(context, 'Academic', [
           _Menu(
+            Icons.event_note_outlined,
+            'Subject Timetable',
+            'Subjects, periods, teachers, rooms, and class teacher',
+            AppRoutes.parentTimetable,
+          ),
+          _Menu(
             Icons.assessment_outlined,
             'Report Cards',
             'Published results and protected reports',

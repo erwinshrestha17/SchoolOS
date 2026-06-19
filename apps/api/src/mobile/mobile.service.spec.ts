@@ -14,6 +14,7 @@ describe('MobileService', () => {
     homeworkAssignment: MockModel<'findMany' | 'findFirst'>;
     reportCard: MockModel<'findMany' | 'findFirst'>;
     markEntry: MockModel<'findMany'>;
+    canteenMealServing: MockModel<'findMany'>;
     transportStudentAssignment: MockModel<'findFirst'>;
     transportEnrollment: MockModel<'findFirst'>;
     transportTripStudentStatus: MockModel<'findFirst'>;
@@ -25,7 +26,9 @@ describe('MobileService', () => {
     getReceiptPdfForStudent: jest.Mock;
     getParentPaymentGatewayReadiness: jest.Mock;
     initiateParentOnlinePayment: jest.Mock;
+    collectParentSandboxPayment: jest.Mock;
   };
+  let canteenService: { topUpWallet: jest.Mock };
   let entitlementsService: { getEntitlements: jest.Mock };
   let reportCardPdfService: { getReportCardPdf: jest.Mock };
   let communicationsService: { getGuardianConsentStatus: jest.Mock };
@@ -71,6 +74,9 @@ describe('MobileService', () => {
       markEntry: {
         findMany: jest.fn(),
       },
+      canteenMealServing: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       transportStudentAssignment: {
         findFirst: jest.fn(),
       },
@@ -88,6 +94,7 @@ describe('MobileService', () => {
       getReceiptPdfForStudent: jest.fn(),
       getParentPaymentGatewayReadiness: jest.fn(),
       initiateParentOnlinePayment: jest.fn(),
+      collectParentSandboxPayment: jest.fn(),
     };
     entitlementsService = {
       getEntitlements: jest.fn().mockResolvedValue({
@@ -122,6 +129,9 @@ describe('MobileService', () => {
     storageService = {
       getObjectBuffer: jest.fn(),
     };
+    canteenService = {
+      topUpWallet: jest.fn(),
+    };
     service = new MobileService(
       prisma as never,
       attendanceService as never,
@@ -132,6 +142,7 @@ describe('MobileService', () => {
       homeworkAttachmentAccessService as never,
       fileRegistryService as never,
       storageService as never,
+      canteenService as never,
     );
     actor = {
       userId: 'parent-1',
@@ -199,6 +210,80 @@ describe('MobileService', () => {
     expect(financeService.initiateParentOnlinePayment).toHaveBeenCalledWith(
       'student-1',
       dto,
+      actor,
+    );
+  });
+
+  it('collects a linked-child fee through the sandbox finance boundary', async () => {
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    financeService.collectParentSandboxPayment.mockResolvedValue({
+      sandbox: true,
+      status: 'SUCCEEDED',
+      provider: 'ESEWA',
+      receipt: { receiptNumber: 'REC-001' },
+    });
+    const dto = {
+      invoiceId: 'invoice-1',
+      amount: 500,
+      provider: 'ESEWA' as const,
+      idempotencyKey: 'parent-sandbox-fee-0001',
+    };
+
+    await expect(
+      service.collectStudentSandboxFeePayment('student-1', dto, actor),
+    ).resolves.toEqual(
+      expect.objectContaining({ sandbox: true, status: 'SUCCEEDED' }),
+    );
+    expect(financeService.collectParentSandboxPayment).toHaveBeenCalledWith(
+      'student-1',
+      dto,
+      actor,
+    );
+  });
+
+  it('persists a linked-child sandbox canteen top-up as a mobile payment', async () => {
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    financeService.getParentPaymentGatewayReadiness.mockResolvedValue({
+      enabled: true,
+      sandbox: true,
+      providers: ['KHALTI'],
+    });
+    canteenService.topUpWallet.mockResolvedValue({
+      wallet: { id: 'wallet-1', balance: 1500 },
+      transaction: { id: 'transaction-1' },
+    });
+    const dto = {
+      amount: 1000,
+      provider: 'KHALTI' as const,
+      idempotencyKey: 'parent-sandbox-canteen-0001',
+    };
+
+    await expect(
+      service.topUpStudentCanteenSandbox('student-1', dto, actor),
+    ).resolves.toEqual({
+      sandbox: true,
+      status: 'SUCCEEDED',
+      provider: 'KHALTI',
+      amount: 1000,
+      wallet: { id: 'wallet-1', balance: 1500 },
+      transactionId: 'transaction-1',
+    });
+    expect(canteenService.topUpWallet).toHaveBeenCalledWith(
+      'student-1',
+      {
+        amount: 1000,
+        note: 'Parent sandbox top-up via KHALTI',
+        idempotencyKey: 'parent-sandbox-canteen:parent-sandbox-canteen-0001',
+        paymentMethod: 'MOBILE',
+      },
       actor,
     );
   });
@@ -738,6 +823,8 @@ describe('MobileService', () => {
           sectionId: 'section-1',
           rollNumber: '7',
           academicYear: '2082',
+          academicYearStartsOn: '2025-04-14T00:00:00.000Z',
+          academicYearEndsOn: '2026-04-13T00:00:00.000Z',
           relationship: 'Daughter',
         },
       ],

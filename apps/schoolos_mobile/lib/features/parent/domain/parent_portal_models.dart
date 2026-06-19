@@ -21,6 +21,9 @@ class ParentPortalChild {
     this.transportDetail,
     this.latestActivity,
     this.latestActivityTitle,
+    this.academicYearStartsOn,
+    this.academicYearEndsOn,
+    this.academicYear = '',
   });
 
   final String id;
@@ -42,6 +45,9 @@ class ParentPortalChild {
   final String? transportDetail;
   final String? latestActivity;
   final String? latestActivityTitle;
+  final String? academicYearStartsOn;
+  final String? academicYearEndsOn;
+  final String academicYear;
 
   bool get hasFeesDue => feesDue > 0;
 }
@@ -89,6 +95,7 @@ class ParentPortalUpdate {
     this.isImportant = false,
     this.unreadCount = 0,
     this.route,
+    this.audience = 'Whole school',
   });
 
   final String id;
@@ -101,6 +108,7 @@ class ParentPortalUpdate {
   final bool isImportant;
   final int unreadCount;
   final String? route;
+  final String audience;
 }
 
 class ParentPortalData {

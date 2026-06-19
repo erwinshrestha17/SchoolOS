@@ -121,6 +121,7 @@ class ParentNotification {
     this.readAt,
     this.metadata,
     this.attachment,
+    this.audience = const ParentNotificationAudience(),
   });
 
   final String id;
@@ -136,6 +137,7 @@ class ParentNotification {
   final DateTime? readAt;
   final Map<String, dynamic>? metadata;
   final NoticeAttachment? attachment;
+  final ParentNotificationAudience audience;
 
   bool get isRead => readAt != null;
   String get message => body;
@@ -173,6 +175,11 @@ class ParentNotification {
               json['attachment'] as Map<String, dynamic>,
             )
           : null,
+      audience: json['audience'] is Map<String, dynamic>
+          ? ParentNotificationAudience.fromJson(
+              json['audience'] as Map<String, dynamic>,
+            )
+          : const ParentNotificationAudience(),
     );
   }
 
@@ -191,6 +198,33 @@ class ParentNotification {
       readAt: clearReadAt ? null : readAt ?? this.readAt,
       metadata: metadata,
       attachment: attachment,
+      audience: audience,
+    );
+  }
+}
+
+class ParentNotificationAudience {
+  const ParentNotificationAudience({
+    this.type = 'ALL',
+    this.label = 'Whole school',
+    this.childName,
+    this.className,
+    this.sectionName,
+  });
+
+  final String type;
+  final String label;
+  final String? childName;
+  final String? className;
+  final String? sectionName;
+
+  factory ParentNotificationAudience.fromJson(Map<String, dynamic> json) {
+    return ParentNotificationAudience(
+      type: json['type'] as String? ?? 'ALL',
+      label: json['label'] as String? ?? 'Whole school',
+      childName: json['childName'] as String?,
+      className: json['className'] as String?,
+      sectionName: json['sectionName'] as String?,
     );
   }
 }

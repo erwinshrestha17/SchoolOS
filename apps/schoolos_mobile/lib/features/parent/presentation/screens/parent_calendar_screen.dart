@@ -30,6 +30,8 @@ class _ParentCalendarScreenState extends ConsumerState<ParentCalendarScreen> {
           onRetry: () => ref.invalidate(parentPortalDataProvider),
         ),
         data: (data) {
+          final bounds = _academicBounds(data);
+          visibleMonth = _clampMonth(visibleMonth, bounds.$1, bounds.$2);
           final markers = _calendarMarkers(data);
           final visibleMarkers = markers
               .where(
@@ -54,6 +56,9 @@ class _ParentCalendarScreenState extends ConsumerState<ParentCalendarScreen> {
                   onNext: () => setState(() {
                     visibleMonth = _addMonths(visibleMonth, 1);
                   }),
+                  canGoPrevious: _compareMonth(visibleMonth, bounds.$1) > 0,
+                  canGoNext: _compareMonth(visibleMonth, bounds.$2) < 0,
+                  academicYearLabel: _academicYearLabel(data),
                 ),
                 const SizedBox(height: 12),
                 _MonthGrid(month: visibleMonth, markers: visibleMarkers),
@@ -99,11 +104,17 @@ class _CalendarHeader extends StatelessWidget {
     required this.month,
     required this.onPrevious,
     required this.onNext,
+    required this.canGoPrevious,
+    required this.canGoNext,
+    required this.academicYearLabel,
   });
 
   final BsDate month;
   final VoidCallback onPrevious;
   final VoidCallback onNext;
+  final bool canGoPrevious;
+  final bool canGoNext;
+  final String academicYearLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +123,7 @@ class _CalendarHeader extends StatelessWidget {
         children: [
           IconButton(
             tooltip: 'Previous month',
-            onPressed: onPrevious,
+            onPressed: canGoPrevious ? onPrevious : null,
             icon: const Icon(Icons.chevron_left_rounded),
           ),
           Expanded(
@@ -127,16 +138,16 @@ class _CalendarHeader extends StatelessWidget {
                     fontSize: 20,
                   ),
                 ),
-                const Text(
-                  'Bikram Sambat',
-                  style: TextStyle(color: ParentPortalColors.muted),
+                Text(
+                  academicYearLabel,
+                  style: const TextStyle(color: ParentPortalColors.muted),
                 ),
               ],
             ),
           ),
           IconButton(
             tooltip: 'Next month',
-            onPressed: onNext,
+            onPressed: canGoNext ? onNext : null,
             icon: const Icon(Icons.chevron_right_rounded),
           ),
         ],
@@ -505,4 +516,49 @@ BsDate _addMonths(BsDate value, int delta) {
 
 bool _sameDay(DateTime a, DateTime b) {
   return a.year == b.year && a.month == b.month && a.day == b.day;
+}
+
+(BsDate, BsDate) _academicBounds(ParentPortalData data) {
+  final starts = data.children
+      .map((child) => DateTime.tryParse(child.academicYearStartsOn ?? ''))
+      .whereType<DateTime>()
+      .toList();
+  final ends = data.children
+      .map((child) => DateTime.tryParse(child.academicYearEndsOn ?? ''))
+      .whereType<DateTime>()
+      .toList();
+  final now = DateTime.now();
+  final start = starts.isEmpty
+      ? DateTime(now.year, now.month - 6, 1)
+      : starts.reduce((a, b) => a.isBefore(b) ? a : b);
+  final end = ends.isEmpty
+      ? DateTime(now.year, now.month + 6, 1)
+      : ends.reduce((a, b) => a.isAfter(b) ? a : b);
+  final startBs = NepaliBsCalendar.fromAd(start);
+  final endBs = NepaliBsCalendar.fromAd(end);
+  return (
+    BsDate(year: startBs.year, month: startBs.month, day: 1),
+    BsDate(year: endBs.year, month: endBs.month, day: 1),
+  );
+}
+
+BsDate _clampMonth(BsDate value, BsDate start, BsDate end) {
+  if (_compareMonth(value, start) < 0) return start;
+  if (_compareMonth(value, end) > 0) return end;
+  return value;
+}
+
+int _compareMonth(BsDate a, BsDate b) {
+  return (a.year * 12 + a.month).compareTo(b.year * 12 + b.month);
+}
+
+String _academicYearLabel(ParentPortalData data) {
+  final years = data.children
+      .map((child) => child.academicYear)
+      .where((value) => value.trim().isNotEmpty)
+      .toSet()
+      .toList();
+  if (years.isEmpty) return 'Current academic year';
+  if (years.length == 1) return 'Academic year ${years.first}';
+  return 'Academic years ${years.join(', ')}';
 }
