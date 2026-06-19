@@ -1,15 +1,16 @@
 # SchoolOS Project Status
 
 **Status:** Current evidence-based project status snapshot  
-**Last updated:** 2026-06-18  
+**Last updated:** 2026-06-19  
 **Product:** Nepal-first multi-tenant school operating SaaS with staged KG-12 direction  
-**Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js App Router, Flutter companion app, shared `@schoolos/core` contracts  
+**Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js App Router, Flutter companion app, shared `@schoolos/core` contracts
 
 This document is the concise current status snapshot. It does not replace:
 
 - `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` for readiness evidence, command results, scores, and blockers.
 - `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` for the focused phase-wise execution path.
 - `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md` for longer module backlog and implementation history.
+- `docs/product/M13_INVENTORY_ASSET_MANAGEMENT.md` and `docs/implementation/M13_INVENTORY_ASSET_IMPLEMENTATION_PLAN.md` for planned Inventory & Asset Management scope.
 
 ## Current Readiness Decision
 
@@ -64,18 +65,20 @@ Important caveats:
 - `DEPLOY_ENV=production pnpm verify:env:deploy` failed because required production secrets/origins were absent.
 - `pnpm smoke:pilot` failed because Postgres, Redis, and the API were not running.
 - No staging, provider, object storage, backup restore, signed release, or pilot workflow was verified.
+- M13 Inventory & Asset Management is now documented but has no code/contracts/migrations/tests/staging proof yet.
 
 ## Current Implementation Snapshot
 
 | Area | Current Status | Notes |
 | --- | --- | --- |
 | Repository and shared contracts | IMPLEMENTED_UNVERIFIED | Workspace scripts, `@schoolos/core`, Prisma compile artifacts, and boundary checks pass locally. |
-| Backend/API | IMPLEMENTED_UNVERIFIED | Broad module implementation and tests exist across platform, admissions, attendance, finance, academics, activity, homework, HR/payroll, library, transport, canteen, accounting, communications, learning, mobile, File Registry, reports, usage, and settings. Production/staging evidence is missing. |
-| Web | IMPLEMENTED_UNVERIFIED | Next.js routes, shared primitives, API helpers, cookie-first session metadata, contract tests, lint, typecheck, and build pass. Authenticated browser E2E still needs to run with live seeded backend. |
-| Flutter mobile | PARTIALLY_IMPLEMENTED | Secure storage/session handling, role shell, parent/teacher/staff/driver repositories/screens, tests, analyze, and debug APK build pass. Emulator role-flow QA against live seeded backend is pending. |
-| Seed/demo data | PARTIALLY_IMPLEMENTED | Central seed exists and is being expanded, but current seed changes are uncommitted and were not proven idempotent in this audit. |
+| Backend/API | IMPLEMENTED_UNVERIFIED | Broad module implementation and tests exist across platform, admissions, attendance, finance, academics, activity, homework, HR/payroll, library, transport, canteen, accounting, communications, learning, mobile, File Registry, reports, usage, and settings. Production/staging evidence is missing. M13 Inventory is not yet implemented. |
+| Web | IMPLEMENTED_UNVERIFIED | Next.js routes, shared primitives, API helpers, cookie-first session metadata, contract tests, lint, typecheck, and build pass. Authenticated browser E2E still needs to run with live seeded backend. M13 Inventory web is planned only. |
+| Flutter mobile | PARTIALLY_IMPLEMENTED | Secure storage/session handling, role shell, parent/teacher/staff/driver repositories/screens, tests, analyze, and debug APK build pass. Emulator role-flow QA against live seeded backend is pending. No M13 scanner/mobile implementation yet. |
+| Seed/demo data | PARTIALLY_IMPLEMENTED | Central seed exists and is being expanded, but current seed changes are uncommitted and were not proven idempotent in this audit. M13 seed data is planned only. |
 | Staging/deployment | BLOCKED | No staging deployment, production env validation, provider/storage checks, backup restore, rollback, or monitoring proof. |
 | M11 Intelligence/AI | DEFERRED | Roadmap only until production data quality, privacy, audit, and human-review foundations are proven. |
+| M13 Inventory & Asset Management | PLANNED_DOCUMENTED | Nepal-focused product, frontend, and implementation docs added. No backend/web/mobile code evidence yet. |
 
 ## Module Status Summary
 
@@ -98,6 +101,7 @@ Use the readiness statuses from the audit. Most modules are `IMPLEMENTED_UNVERIF
 | M10 Notices, Communication, Chat | IMPLEMENTED_UNVERIFIED | Provider callbacks, mobile notices/chat, and delivery smoke. |
 | M11 Intelligence/AI | DEFERRED | Not approved for active implementation. |
 | M12 Learning Layer | IMPLEMENTED_UNVERIFIED | Authenticated browser, lab/device, and staging proof. |
+| M13 Inventory & Asset Management | PLANNED_DOCUMENTED | Product/design/implementation docs exist; code/contracts/migrations/tests/seed/smoke proof are pending. |
 
 ## Current Blockers
 
@@ -107,6 +111,7 @@ Use the readiness statuses from the audit. Most modules are `IMPLEMENTED_UNVERIF
 4. Run Android emulator role-flow QA against the seeded backend.
 5. Run staging migration/deploy/provider/storage/backup/restore verification.
 6. Resolve production environment requirements and document validated deployment values without committing secrets.
+7. For M13, design and implement contracts, migrations, APIs, permissions, File Registry flows, web screens, seed data, tests, and smoke flows before any implementation-readiness claim.
 
 ## Active Next Phase
 
@@ -125,3 +130,5 @@ Exit criteria:
 - Parent, teacher, staff, and driver scope tests pass.
 - `pnpm smoke:pilot` passes with local Postgres, Redis, API, and seeded data.
 - Mobile role endpoints return real records or valid empty responses, not generic backend failures.
+
+M13 should not displace the active release gate unless explicitly reprioritized; it can be prepared as a planned module after the current QA/staging/pilot proof path is stable.
