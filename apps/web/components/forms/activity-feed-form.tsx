@@ -16,7 +16,6 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { filesToBase64Payloads } from '../../lib/files';
 import { cn } from '../../lib/utils';
-import { StatCard } from '../ui/stat-card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { Badge } from '../ui/badge';
 import { EmptyState } from '../ui/empty-state';
@@ -461,13 +460,6 @@ export function ActivityFeedForm() {
 
   return (
     <div className="space-y-8">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Posts" value={posts.length} tone="neutral" />
-        <StatCard title="Media" value={galleryItems.length} tone="info" />
-        <StatCard title="Mood Logs" value={moodLogs.length} tone="success" />
-        <StatCard title="Milestones" value={milestones.length} tone="warning" />
-      </div>
-
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-start gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--color-mod-activity-soft)] text-[var(--color-mod-activity-text)]">

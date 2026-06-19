@@ -3,7 +3,6 @@
 import { ReactNode, useState } from 'react';
 import { GlobalAside } from './global-aside';
 import { TopBar } from './top-bar';
-import { Breadcrumbs } from './breadcrumbs';
 import { useSession } from '../session-provider';
 import { cn } from '../../lib/utils';
 import { LoadingState } from '../ui/loading-state';
@@ -55,10 +54,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           className="flex-1 overflow-y-auto scroll-smooth bg-[var(--background)] focus:outline-none"
           tabIndex={-1}
         >
-          <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 xl:px-10">
-            <div className="mb-5">
-              <Breadcrumbs />
-            </div>
+          <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-7 xl:px-8">
             <div className="animate-fade-in transition-all duration-300">
               <ErrorBoundary>
                 {children}

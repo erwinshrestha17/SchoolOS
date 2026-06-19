@@ -44,7 +44,8 @@ import { StatusChip } from '../dashboard/status-chip';
 type StudentDirectoryProps = {
   academicYears: AcademicYearSummary[];
   admissions: AdmissionSummary[];
-  admissionsTotal?: number;
+  activeStudentsTotal?: number;
+  pendingAdmissionsTotal?: number;
   classes: ClassSummary[];
   isError: boolean;
   isLoading: boolean;
@@ -84,7 +85,8 @@ type StudentDirectoryProps = {
 export function StudentDirectory({
   academicYears,
   admissions,
-  admissionsTotal,
+  activeStudentsTotal,
+  pendingAdmissionsTotal,
   classes,
   isError,
   isLoading,
@@ -202,45 +204,48 @@ export function StudentDirectory({
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <KpiGrid className="flex-1 sm:grid-cols-2 xl:grid-cols-5">
+        <KpiGrid className="flex-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           <KpiCard
-            title="Student Records"
-            value={totalStudents}
+            title="Active Students"
+            value={activeStudentsTotal ?? 'Unavailable'}
             icon={<Users size={20} />}
             tone="info"
-            description="Server total for the current filters."
+            description="Server total for active records."
           />
           <KpiCard
-            title="Page Records"
-            value={students.length}
-            icon={<UserCheck size={20} />}
-            tone="success"
-            description={`Visible on page ${currentPage}.`}
-          />
-          <KpiCard
-            title="Admission Records"
-            value={admissionsTotal ?? 'Unavailable'}
+            title="Pending Applications"
+            value={pendingAdmissionsTotal ?? 'Unavailable'}
             icon={<ClipboardCheck size={20} />}
-            tone="neutral"
-            description={
-              admissionsTotal === undefined
-                ? 'Admissions total is not available.'
-                : 'Server total from admissions.'
-            }
-          />
-          <KpiCard
-            title="iEMIS Issues"
-            value={isLoadingIemisReadiness ? 'Loading' : iemisIssueRows.length}
-            icon={<AlertTriangle size={20} />}
-            tone={iemisIssueRows.length > 0 ? 'warning' : 'success'}
-            description="From the current readiness review."
+            tone="warning"
+            description="Server total awaiting review."
           />
           <KpiCard
             title="Missing Documents"
             value="Unavailable"
             icon={<FolderOpen size={20} />}
             tone="neutral"
-            description="Needs backend summary API."
+            description="Summary is not available yet."
+          />
+          <KpiCard
+            title="Duplicate Candidates"
+            value="Unavailable"
+            icon={<UserCheck size={20} />}
+            tone="neutral"
+            description="Candidate review is available below."
+          />
+          <KpiCard
+            title="iEMIS Issues"
+            value={isLoadingIemisReadiness ? 'Loading' : iemisIssueRows.length}
+            icon={<AlertTriangle size={20} />}
+            tone={iemisIssueRows.length > 0 ? 'warning' : 'success'}
+            description="From backend readiness validation."
+          />
+          <KpiCard
+            title="QR Active"
+            value="Unavailable"
+            icon={<ContactRound size={20} />}
+            tone="neutral"
+            description="QR controls remain available per student."
           />
         </KpiGrid>
         <div className="flex flex-wrap items-center gap-2 lg:justify-end shrink-0">

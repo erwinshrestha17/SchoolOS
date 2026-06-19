@@ -60,6 +60,7 @@ export function ModuleHeader({
 
         {(primaryAction || hasMoreActionItems) ? (
           <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {primaryAction}
             {hasMoreActionItems ? (
               <ActionMenu
                 items={moreActionItems ?? []}
@@ -72,7 +73,6 @@ export function ModuleHeader({
                 }
               />
             ) : null}
-            {primaryAction}
           </div>
         ) : null}
       </div>

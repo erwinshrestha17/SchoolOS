@@ -84,6 +84,16 @@ const dashboardRouteGates: RouteGate[] = [
     permissions: ['activity_feed:read', 'activity_feed:create'],
   },
   {
+    prefix: '/dashboard/communications',
+    label: 'Communications',
+    permissions: [
+      'notices:read',
+      'notices:create',
+      'messaging:create',
+      'messaging:manage',
+    ],
+  },
+  {
     prefix: '/dashboard/notices',
     label: 'Notices',
     permissions: ['notices:read', 'notices:create'],
@@ -115,6 +125,20 @@ const dashboardRouteGates: RouteGate[] = [
       'accounting:read',
       'accounting:accounts:read',
       'accounting:reports:read',
+    ],
+  },
+  {
+    prefix: '/dashboard/operations',
+    label: 'School Operations',
+    permissions: [
+      'library:read',
+      'library:manage',
+      'transport:read',
+      'transport:manage',
+      'transport:operate',
+      'canteen:menu:read',
+      'canteen:plans:read',
+      'canteen:enrollments:read',
     ],
   },
   {
@@ -158,6 +182,8 @@ const dashboardRouteGates: RouteGate[] = [
 ];
 
 function getRequiredModuleForHref(href: string): string | null {
+  if (href.startsWith('/dashboard/communications')) return 'notices';
+  if (href.startsWith('/dashboard/operations')) return null;
   if (href.startsWith('/dashboard/students')) return 'students';
   if (href.startsWith('/dashboard/admissions')) return 'students';
   if (href.startsWith('/dashboard/attendance')) return 'attendance';

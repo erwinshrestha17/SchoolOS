@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { 
   TrendingUp, Calculator, Wallet, Landmark, 
   BarChart3, FileText, PieChart, History, 
@@ -10,7 +11,9 @@ import {
 import Link from 'next/link';
 import { api } from '../../lib/api';
 import { SectionCard } from '../ui/section-card';
-import { StatCard } from '../ui/stat-card';
+import { KpiCard, KpiGrid } from '../ui/kpi-card';
+import { ModuleHeader } from '../ui/module-header';
+import { ModuleTabs } from '../ui/module-tabs';
 import { Badge } from '../ui/badge';
 import { cn } from '../../lib/utils';
 import { PageState } from '../ui/page-state';
@@ -19,6 +22,7 @@ import { ReportTable } from './report-table';
 import { VoucherDialog } from './voucher-dialog';
 
 export function AccountingDashboardView() {
+  const router = useRouter();
   const summaryQuery = useQuery({
     queryKey: ['accounting-summary'],
     queryFn: () => api.listAccountingReports({}),
@@ -44,7 +48,8 @@ export function AccountingDashboardView() {
   const activeFiscalYear = (fiscalYearsQuery.data ?? []).find(y => y.status === 'OPEN') ?? fiscalYearsQuery.data?.[0];
   const activePeriod = activeFiscalYear?.periods?.find((p: any) => p.status === 'OPEN');
 
-  const formatMoney = (amount: number) => {
+  const formatMoney = (amount?: number | null) => {
+    if (amount === undefined || amount === null) return 'Unavailable';
     return new Intl.NumberFormat('en-NP', {
       style: 'currency',
       currency: 'NPR',
@@ -56,6 +61,50 @@ export function AccountingDashboardView() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-10">
+      <ModuleHeader
+        title="Accounting & Finance"
+        description="Manage journals, ledgers, reconciliation, fiscal controls, and financial reports."
+        primaryAction={
+          <button
+            type="button"
+            onClick={() => setIsVoucherDialogOpen(true)}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-accounting-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-accounting-border)] focus:ring-offset-2"
+          >
+            <FileText className="h-4 w-4" />
+            New Journal Entry
+          </button>
+        }
+        moreActionItems={[
+          { label: 'Chart of Accounts', icon: <Calculator className="h-4 w-4" />, onClick: () => router.push('/dashboard/accounting/chart-of-accounts') },
+          { label: 'Bank Reconciliation', icon: <Landmark className="h-4 w-4" />, onClick: () => router.push('/dashboard/accounting/reconciliation') },
+          { label: 'Financial Reports', icon: <BarChart3 className="h-4 w-4" />, onClick: () => router.push('/dashboard/accounting/reports') },
+          { label: 'Period Close', icon: <Clock className="h-4 w-4" />, onClick: () => router.push('/dashboard/accounting/fiscal-periods') },
+        ]}
+      >
+        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+          <KpiCard title="Fiscal Year Status" value={fiscalYearsQuery.isLoading ? 'Loading' : activeFiscalYear?.status ?? 'Unavailable'} icon={<Clock size={20} />} tone={activeFiscalYear?.status === 'OPEN' ? 'success' : 'neutral'} description={activeFiscalYear?.name ?? 'Fiscal year is not configured.'} />
+          <KpiCard title="Pending Journals" value="Unavailable" icon={<FileText size={20} />} tone="neutral" description="Needs a bounded journal summary." />
+          <KpiCard title="Unreconciled Items" value="Unavailable" icon={<Landmark size={20} />} tone="neutral" description="Select an account in reconciliation." />
+          <KpiCard title="Mapping Issues" value="Unavailable" icon={<AlertCircle size={20} />} tone="neutral" description="Needs a bounded M9 mapping summary." />
+          <KpiCard title="Export Jobs" value="Unavailable" icon={<History size={20} />} tone="neutral" description="Open reports for backend job status." />
+          <KpiCard title="Trial Balance Readiness" value={summaryQuery.isLoading ? 'Loading' : summaryQuery.data ? (summaryQuery.data.balanced ? 'Ready' : 'Needs review') : 'Unavailable'} icon={<CheckCircle2 size={20} />} tone={summaryQuery.data?.balanced ? 'success' : 'warning'} description="Backend double-entry balance check." />
+        </KpiGrid>
+      </ModuleHeader>
+
+      <ModuleTabs
+        items={[
+          { href: '/dashboard/accounting', label: 'Dashboard', icon: BarChart3 },
+          { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts', icon: Calculator },
+          { href: '/dashboard/accounting/journals', label: 'Journals', icon: FileText },
+          { href: '/dashboard/accounting/accounts', label: 'Ledger', icon: History },
+          { href: '/dashboard/accounting/reports', label: 'Reports', icon: PieChart },
+          { href: '/dashboard/accounting/reconciliation', label: 'Reconciliation', icon: Landmark },
+          { href: '/dashboard/accounting/fiscal-periods', label: 'Period Close', icon: Clock },
+        ]}
+        accentColor="emerald"
+        variant="light"
+      />
+
       {noFiscalYear && (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 shadow-sm animate-in slide-in-from-top-4">
           <div className="flex gap-5">
@@ -79,37 +128,6 @@ export function AccountingDashboardView() {
           </div>
         </div>
       )}
-
-      <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Revenue"
-          value={formatMoney(summaryQuery.data?.incomeStatement?.income ?? 0)}
-          icon={<TrendingUp size={20} />}
-          loading={summaryQuery.isLoading}
-          className="border-emerald-100 bg-emerald-50/30"
-        />
-        <StatCard
-          title="Total Expenses"
-          value={formatMoney(summaryQuery.data?.incomeStatement?.expenses ?? 0)}
-          icon={<Calculator size={20} />}
-          loading={summaryQuery.isLoading}
-          className="border-rose-100 bg-rose-50/30"
-        />
-        <StatCard
-          title="Net Balance"
-          value={formatMoney(summaryQuery.data?.incomeStatement?.netIncome ?? 0)}
-          icon={<Wallet size={20} />}
-          loading={summaryQuery.isLoading}
-          className="border-[var(--color-mod-accounting-border)] bg-[var(--color-mod-accounting-bg)]/70"
-        />
-        <StatCard
-          title="Cash/Bank"
-          value={formatMoney(summaryQuery.data?.cashFlow?.netCashMovement ?? 0)}
-          icon={<Landmark size={20} />}
-          loading={summaryQuery.isLoading}
-          className="border-amber-100 bg-amber-50/30"
-        />
-      </section>
 
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-8">
@@ -288,12 +306,12 @@ export function AccountingDashboardView() {
                 <div className="mt-3 flex justify-between items-end">
                   <div>
                     <p className="text-[10px] text-[var(--color-mod-accounting-text)]/70 uppercase font-bold">Debit</p>
-                    <p className="text-sm font-bold">{formatMoney(summaryQuery.data?.totals?.debit ?? 0)}</p>
+                    <p className="text-sm font-bold">{formatMoney(summaryQuery.data?.totals?.debit)}</p>
                   </div>
                   <div className="h-8 w-px bg-[var(--color-mod-accounting-border)]" />
                   <div className="text-right">
                     <p className="text-[10px] text-[var(--color-mod-accounting-text)]/70 uppercase font-bold">Credit</p>
-                    <p className="text-sm font-bold">{formatMoney(summaryQuery.data?.totals?.credit ?? 0)}</p>
+                    <p className="text-sm font-bold">{formatMoney(summaryQuery.data?.totals?.credit)}</p>
                   </div>
                 </div>
               </div>

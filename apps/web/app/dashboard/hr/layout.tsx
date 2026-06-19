@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { Users, LayoutDashboard, CalendarDays, ClipboardCheck, FileText } from 'lucide-react';
 import { useSession } from '../../../components/session-provider';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
@@ -9,6 +10,7 @@ import { PageHeader } from '../../../components/ui/page-header';
 
 export default function HRLayout({ children }: { children: ReactNode }) {
   const { session } = useSession();
+  const pathname = usePathname();
 
   const navItems = [
     { href: '/dashboard/hr', label: 'Overview', icon: LayoutDashboard },
@@ -19,6 +21,10 @@ export default function HRLayout({ children }: { children: ReactNode }) {
   ];
 
   const tabs = <ModuleTabs items={navItems} accentColor="purple" variant="light" />;
+
+  if (pathname === '/dashboard/hr') {
+    return <DashboardPageShell>{children}</DashboardPageShell>;
+  }
 
   return (
     <DashboardPageShell>

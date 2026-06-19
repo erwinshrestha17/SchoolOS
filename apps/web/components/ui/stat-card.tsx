@@ -45,34 +45,32 @@ export function StatCard({
 }: StatCardProps) {
   const content = (
     <>
-      <div className="flex items-start justify-between gap-4">
-        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-          {title}
-        </p>
-        {icon && (
-          <div
-            className={cn(
-              'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border',
-              toneStyles[tone],
-            )}
-          >
-            {icon}
-          </div>
-        )}
-      </div>
+      {icon && (
+        <div
+          className={cn(
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border',
+            toneStyles[tone],
+          )}
+        >
+          {icon}
+        </div>
+      )}
 
-      <div className="mt-2">
-        <h3 className="break-words text-[30px] font-extrabold leading-[38px] text-slate-950 tabular-nums">
+      <div className={cn(icon ? 'mt-4' : undefined)}>
+        <h3 className="break-words text-2xl font-extrabold leading-8 text-slate-950 tabular-nums">
           {value}
         </h3>
+        <p className="mt-0.5 text-xs font-semibold leading-5 text-slate-700">
+          {title}
+        </p>
         {trend && (
-          <div className="mt-1 flex items-center gap-1.5">
+          <div className="mt-2 flex items-center gap-1.5">
             <span
               className={cn(
-                'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-semibold',
+                'inline-flex items-center gap-0.5 text-xs font-semibold',
                 trend.isUp
-                  ? 'bg-success-50 text-success-700'
-                  : 'bg-danger-50 text-danger-700',
+                  ? 'text-success-700'
+                  : 'text-danger-700',
               )}
             >
               {trend.isUp ? (
@@ -86,7 +84,7 @@ export function StatCard({
           </div>
         )}
         {description && (
-          <p className="mt-1 text-xs leading-[18px] text-slate-500">
+          <p className="mt-2 text-xs leading-[18px] text-slate-500">
             {description}
           </p>
         )}
@@ -96,13 +94,10 @@ export function StatCard({
 
   if (loading) {
     return (
-      <div className={cn('shell-card animate-pulse p-5 lg:p-6', className)}>
-        <div className="flex items-center justify-between">
-          <div className="h-4 w-24 rounded bg-gray-200" />
-          <div className="h-10 w-10 rounded-xl bg-gray-100" />
-        </div>
-        <div className="mt-4 h-8 w-16 rounded bg-gray-200" />
-        <div className="mt-2 h-4 w-32 rounded bg-gray-100" />
+      <div className={cn('shell-card animate-pulse p-5', className)}>
+        <div className="h-10 w-10 rounded-xl bg-gray-100" />
+        <div className="mt-4 h-7 w-20 rounded bg-gray-200" />
+        <div className="mt-2 h-4 w-28 rounded bg-gray-100" />
       </div>
     );
   }
@@ -112,7 +107,7 @@ export function StatCard({
       <Link
         href={href}
         className={cn(
-          'shell-card block p-5 transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 active:translate-y-0 lg:p-6',
+          'shell-card block min-h-40 p-5 transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 active:translate-y-0',
           className,
         )}
       >
@@ -122,7 +117,7 @@ export function StatCard({
   }
 
   return (
-    <div className={cn('shell-card p-5 lg:p-6', className)}>
+    <div className={cn('shell-card min-h-40 p-5', className)}>
       {content}
     </div>
   );

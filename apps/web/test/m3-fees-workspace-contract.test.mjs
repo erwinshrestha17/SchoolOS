@@ -12,7 +12,7 @@ describe('M3 fees workspace contract', () => {
     assert.match(page, /<ModuleHeader/);
     assert.match(page, /<KpiGrid/);
     assert.match(page, /<ModuleTabs/);
-    assert.match(page, />\s*Collect Fee\s*</);
+    assert.match(page, />\s*Record Payment\s*</);
     assert.match(page, /moreActionItems/);
     assert.match(page, /Receipt History & Reprint/);
     assert.match(page, /Cashier Close/);
@@ -25,6 +25,8 @@ describe('M3 fees workspace contract', () => {
     assert.doesNotMatch(page, /collectionRate/);
     assert.match(page, /Needs a real M3 daily summary API/);
     assert.match(page, /defaultersQuery\.data\.totalOutstanding/);
+    assert.match(page, /Cashier Close Status/);
+    assert.match(page, /Receipts Issued/);
   });
 
   it('matches defaulter metadata and guards duplicate payment submission', () => {

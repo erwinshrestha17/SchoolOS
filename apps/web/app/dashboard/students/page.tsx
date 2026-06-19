@@ -31,6 +31,10 @@ export default function StudentsPage() {
     queryKey: ['admissions'],
     queryFn: () => api.listAdmissions({ limit: 100 }),
   });
+  const pendingAdmissionsQuery = useQuery({
+    queryKey: ['admissions', 'summary', 'pending'],
+    queryFn: () => api.listAdmissions({ status: 'PENDING', page: 1, limit: 1 }),
+  });
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
     queryFn: api.listAcademicYears,
@@ -49,6 +53,10 @@ export default function StudentsPage() {
       const { academicYearId, ...studentFilters } = filters;
       return api.listStudents(studentFilters);
     } 
+  });
+  const activeStudentsQuery = useQuery({
+    queryKey: ['students', 'summary', 'active'],
+    queryFn: () => api.listStudents({ status: 'ACTIVE', page: 1, limit: 1 }),
   });
   const duplicateCandidatesQuery = useQuery({
     queryKey: ['student-duplicate-candidates'],
@@ -119,9 +127,8 @@ export default function StudentsPage() {
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M1 Admissions & Student Profiles"
-        title="Student Directory"
-        description="Search student records, manage placement, review iEMIS readiness, and open safe profile context."
+        title="Admissions & Student Profiles"
+        description="Manage admissions, student records, guardians, documents, QR, and iEMIS readiness."
         primaryAction={
           <Link
             href="/dashboard/admissions"
@@ -153,21 +160,26 @@ export default function StudentsPage() {
       <StudentDirectory
         academicYears={academicYearsQuery.data ?? []}
         admissions={admissionsQuery.data?.items ?? []}
-        admissionsTotal={admissionsQuery.data?.total}
+        activeStudentsTotal={activeStudentsQuery.data?.total}
+        pendingAdmissionsTotal={pendingAdmissionsQuery.data?.total}
         classes={classesQuery.data ?? []}
         isError={
           academicYearsQuery.isError ||
           classesQuery.isError ||
           sectionsQuery.isError ||
           studentsQuery.isError ||
-          admissionsQuery.isError
+          admissionsQuery.isError ||
+          activeStudentsQuery.isError ||
+          pendingAdmissionsQuery.isError
         }
         isLoading={
           academicYearsQuery.isLoading ||
           classesQuery.isLoading ||
           sectionsQuery.isLoading ||
           studentsQuery.isLoading ||
-          admissionsQuery.isLoading
+          admissionsQuery.isLoading ||
+          activeStudentsQuery.isLoading ||
+          pendingAdmissionsQuery.isLoading
         }
         pdfError={pdfError}
         onRetry={() => {
@@ -176,6 +188,8 @@ export default function StudentsPage() {
           void sectionsQuery.refetch();
           void studentsQuery.refetch();
           void admissionsQuery.refetch();
+          void activeStudentsQuery.refetch();
+          void pendingAdmissionsQuery.refetch();
           void duplicateCandidatesQuery.refetch();
           void iemisReadinessQuery.refetch();
         }}

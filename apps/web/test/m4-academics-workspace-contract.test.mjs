@@ -12,6 +12,7 @@ describe('M4 academics workspace contract', () => {
     assert.match(page, /<ModuleHeader/);
     assert.match(page, /<KpiGrid/);
     assert.match(page, /<ModuleTabs/);
+    assert.match(page, />\s*Create Exam Term\s*</);
     assert.match(page, />\s*Enter Marks\s*</);
     assert.match(page, /moreActionItems/);
     assert.match(page, /Assessment Components/);
@@ -27,6 +28,8 @@ describe('M4 academics workspace contract', () => {
     assert.doesNotMatch(page, /reportsQuery\.data\?\.length/);
     assert.match(page, /Needs a real M4 summary API/);
     assert.match(page, /Official readiness remains backend-owned/);
+    assert.match(page, /Draft Marks/);
+    assert.match(page, /Active Subjects/);
   });
 
   it('links only to existing M4 workspaces and preserves protected workflow language', () => {
@@ -40,6 +43,7 @@ describe('M4 academics workspace contract', () => {
       '/dashboard/academics/report-cards',
       '/dashboard/academics/promotion',
       '/dashboard/academics/publishing',
+      '/dashboard/academics/results',
     ]) {
       assert.match(page, new RegExp(route.replaceAll('/', '\\/')));
     }

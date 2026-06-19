@@ -62,6 +62,8 @@ const learningPermissions: PermissionKey[] = [
 ];
 
 function getRequiredModuleForHref(href: string): string | null {
+  if (href.startsWith('/dashboard/communications')) return 'notices';
+  if (href.startsWith('/dashboard/operations')) return null;
   if (href.startsWith('/dashboard/students')) return 'students';
   if (href.startsWith('/dashboard/admissions')) return 'students';
   if (href.startsWith('/dashboard/attendance')) return 'attendance';
@@ -115,6 +117,17 @@ export const dashboardNavGroups: NavGroup[] = [
         permissions: ['attendance:read', 'attendance:mark'],
       },
       {
+        href: '/dashboard/communications',
+        label: 'Communication',
+        icon: MessageSquare,
+        permissions: [
+          'notices:read',
+          'notices:create',
+          'messaging:create',
+          'messaging:manage',
+        ],
+      },
+      {
         href: '/dashboard/homework',
         label: 'Homework',
         icon: BookOpen,
@@ -166,6 +179,21 @@ export const dashboardNavGroups: NavGroup[] = [
   {
     label: 'School Operations',
     items: [
+      {
+        href: '/dashboard/operations',
+        label: 'Operations Hub',
+        icon: School,
+        permissions: [
+          'library:read',
+          'library:manage',
+          'transport:read',
+          'transport:manage',
+          'transport:operate',
+          'canteen:menu:read',
+          'canteen:plans:read',
+          'canteen:enrollments:read',
+        ],
+      },
       {
         href: '/dashboard/library',
         label: 'Library',
@@ -325,6 +353,13 @@ export function Sidebar({
           return false;
         }
 
+        if (
+          item.href === '/dashboard/operations' &&
+          !['library', 'transport', 'canteen'].some((module) => hasModule(module))
+        ) {
+          return false;
+        }
+
         return true;
       }),
     }))
@@ -398,13 +433,13 @@ function SidebarContent({
   return (
     <div
       className={cn(
-        'sidebar-transition flex h-full flex-col border-r border-white/[0.06] bg-sidebar-900 text-white shadow-lg shadow-black/10',
-        collapsed ? 'w-[72px]' : 'w-[280px]',
+        'sidebar-transition flex h-full flex-col border-r border-slate-200 bg-white text-slate-700',
+        collapsed ? 'w-[72px]' : 'w-[232px]',
       )}
     >
-      <div className="flex h-16 items-center gap-3 border-b border-white/[0.06] px-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)] text-sm font-bold shadow-sm shadow-black/20">
-          S
+      <div className="flex h-16 items-center gap-3 border-b border-slate-200 px-4">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)] text-sm font-bold text-white shadow-sm">
+          <School size={18} aria-hidden="true" />
         </div>
 
         <div
@@ -413,23 +448,20 @@ function SidebarContent({
             collapsed ? 'w-0 opacity-0' : 'opacity-100',
           )}
         >
-          <span className="block truncate text-sm font-bold text-white">
-            SchoolOS
-          </span>
-          <span className="block truncate text-[0.68rem] font-semibold text-slate-400">
-            School operations
+          <span className="block truncate text-lg font-extrabold tracking-tight text-[var(--primary)]">
+            School<span className="font-semibold">OS</span>
           </span>
         </div>
       </div>
 
       <nav
-        className="flex-1 overflow-y-auto px-3 py-6 scrollbar-hide"
+        className="flex-1 overflow-y-auto px-2.5 py-4 scrollbar-hide"
         aria-label="Dashboard navigation"
       >
         {groups.map((group) => (
-          <div key={group.label} className="mb-6 last:mb-0">
+          <div key={group.label} className="mb-4 last:mb-0">
             {!collapsed && (
-              <p className="px-3 pb-2 text-[0.65rem] font-bold uppercase tracking-[0.2em] text-slate-600">
+              <p className="px-2.5 pb-1.5 text-[0.62rem] font-bold uppercase tracking-[0.08em] text-slate-500">
                 {group.label}
               </p>
             )}
@@ -449,9 +481,9 @@ function SidebarContent({
         ))}
 
         {platformItems.length > 0 && (
-          <div className="mt-8 border-t border-white/[0.06] pt-6">
+          <div className="mt-6 border-t border-slate-200 pt-4">
             {!collapsed && (
-              <p className="px-3 pb-2 text-[0.65rem] font-bold uppercase tracking-[0.2em] text-slate-600">
+              <p className="px-2.5 pb-1.5 text-[0.62rem] font-bold uppercase tracking-[0.08em] text-slate-500">
                 Platform
               </p>
             )}
@@ -472,11 +504,11 @@ function SidebarContent({
       </nav>
 
       {onToggle && (
-        <div className="border-t border-white/[0.06] px-3 py-3 lg:block">
+        <div className="border-t border-slate-200 px-2.5 py-2.5 lg:block">
           <button
             type="button"
             onClick={onToggle}
-            className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-500 transition-colors hover:bg-white/[0.06] hover:text-slate-300"
+            className="flex min-h-10 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-sm text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? (
@@ -517,7 +549,7 @@ function NavEntry({
   const content = (
     <>
       {active && !item.disabled && (
-        <span className="absolute left-0 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--primary-soft)]" />
+        <span className="absolute -left-2.5 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--primary)]" />
       )}
 
       <Icon
@@ -525,8 +557,8 @@ function NavEntry({
         className={cn(
           'shrink-0 transition-colors',
           active && !item.disabled
-            ? 'text-white'
-            : 'text-slate-500 group-hover:text-slate-300',
+            ? 'text-[var(--primary)]'
+            : 'text-slate-500 group-hover:text-slate-800',
         )}
       />
 
@@ -546,7 +578,7 @@ function NavEntry({
       )}
 
       {collapsed && (
-        <div className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-lg bg-sidebar-800 px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+        <div className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
           {item.label}
         </div>
       )}
@@ -554,12 +586,12 @@ function NavEntry({
   );
 
   const className = cn(
-    'group relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 focus:ring-offset-sidebar-900',
+    'group relative flex min-h-9 items-center gap-3 rounded-lg px-2.5 py-2 text-[0.78rem] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 focus:ring-offset-white',
     active && !item.disabled
-      ? 'bg-[var(--primary)] text-white shadow-sm shadow-black/20'
-      : 'text-slate-400 hover:bg-white/[0.04] hover:text-white',
+      ? 'bg-[var(--primary-soft)] font-semibold text-[var(--primary-dark)]'
+      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950',
     item.disabled &&
-      'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-400',
+      'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-500',
   );
 
   if (item.disabled) {

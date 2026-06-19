@@ -78,16 +78,15 @@ export default function HRDashboardPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <ModuleHeader
-        eyebrow="M7 HR & Payroll"
         title="HR & Payroll"
-        description="Operate staff lifecycle, leave approvals, contract reminders, payroll run handoff, payslips, and reports from backend-owned M7 data."
+        description="Manage staff records, leave, attendance, payroll runs, and payslips."
         primaryAction={
           <Link
             href="/dashboard/hr/staff"
             className="inline-flex h-9 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 active:scale-[0.98]"
           >
             <Users className="h-4 w-4" />
-            Open Staff
+            Add Staff
           </Link>
         }
         moreActionItems={[
@@ -120,7 +119,7 @@ export default function HRDashboardPage() {
         />
       </ModuleHeader>
 
-      <KpiGrid className="xl:grid-cols-5">
+      <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
         <KpiCard
           title="Active Staff"
           value="Unavailable"
@@ -159,6 +158,13 @@ export default function HRDashboardPage() {
           icon={<BadgeCheck className="h-5 w-5" />}
           tone="neutral"
           description="Awaiting workflow summary"
+        />
+        <KpiCard
+          title="Payslips Generated"
+          value="Unavailable"
+          icon={<FileText className="h-5 w-5" />}
+          tone="neutral"
+          description="Awaiting bounded payroll summary"
         />
       </KpiGrid>
 

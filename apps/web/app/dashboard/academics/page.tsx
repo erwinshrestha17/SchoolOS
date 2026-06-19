@@ -25,12 +25,12 @@ import { ModuleTabs } from '@/components/ui/module-tabs';
 import { SectionCard } from '@/components/ui/section-card';
 
 const workspaceTabs = [
-  { href: '/dashboard/academics', label: 'Overview', icon: ClipboardCheck },
+  { href: '/dashboard/academics', label: 'Subjects', icon: ClipboardCheck },
   { href: '/dashboard/academics/exam-terms', label: 'Exam Terms', icon: ClipboardList },
   { href: '/dashboard/academics/marks', label: 'Marks Entry', icon: PencilLine },
   { href: '/dashboard/academics/cas', label: 'CAS', icon: Layers3 },
   { href: '/dashboard/academics/report-cards', label: 'Report Cards', icon: FileText },
-  { href: '/dashboard/academics/publishing', label: 'Publishing', icon: Megaphone },
+  { href: '/dashboard/academics/results', label: 'Results', icon: Megaphone },
 ];
 
 const workflowSections = [
@@ -92,11 +92,18 @@ export default function AcademicsOverviewPage() {
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M4 Academics / Exams / CAS / Report Cards"
         title="Academics"
-        description={`Coordinate exam setup, marks and CAS, report cards, promotion, and result publishing${session?.tenant.name ? ` for ${session.tenant.name}` : ''}. Official readiness remains backend-owned.`}
+        description={`Manage exam terms, marks, CAS, report cards, and result publishing${session?.tenant.name ? ` for ${session.tenant.name}` : ''}. Official readiness remains backend-owned.`}
         primaryAction={
-          canEnterMarks ? (
+          canManageAcademics ? (
+            <Link
+              href="/dashboard/academics/exam-terms"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-academics-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-academics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-academics-border)] focus:ring-offset-2"
+            >
+              <ClipboardList size={18} />
+              Create Exam Term
+            </Link>
+          ) : canEnterMarks ? (
             <Link
               href="/dashboard/academics/marks"
               className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-academics-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-academics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-academics-border)] focus:ring-offset-2"
@@ -142,12 +149,13 @@ export default function AcademicsOverviewPage() {
             : []),
         ]}
       >
-        <KpiGrid className="sm:grid-cols-2 xl:grid-cols-5">
-          <KpiCard title="Active Exam Terms" value="Unavailable" icon={<ClipboardList size={20} />} tone="neutral" description="Needs a real M4 summary API." />
+        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+          <KpiCard title="Active Terms" value="Unavailable" icon={<ClipboardList size={20} />} tone="neutral" description="Needs a real M4 summary API." />
           <KpiCard title="Marks Pending" value="Unavailable" icon={<PencilLine size={20} />} tone="neutral" description="Needs a real M4 summary API." />
-          <KpiCard title="Generated Report Cards" value="Unavailable" icon={<FileCheck2 size={20} />} tone="neutral" description="Needs a real M4 summary API." />
+          <KpiCard title="Draft Marks" value="Unavailable" icon={<ShieldCheck size={20} />} tone="neutral" description="Needs a real M4 summary API." />
+          <KpiCard title="Report Cards Generated" value="Unavailable" icon={<FileCheck2 size={20} />} tone="neutral" description="Needs a real M4 summary API." />
           <KpiCard title="Publish Blockers" value="Unavailable" icon={<AlertTriangle size={20} />} tone="neutral" description="Needs a real M4 summary API." />
-          <KpiCard title="Correction Requests" value="Unavailable" icon={<ShieldCheck size={20} />} tone="neutral" description="Needs a real M4 summary API." />
+          <KpiCard title="Active Subjects" value="Unavailable" icon={<GraduationCap size={20} />} tone="neutral" description="Needs a real M4 summary API." />
         </KpiGrid>
       </ModuleHeader>
 

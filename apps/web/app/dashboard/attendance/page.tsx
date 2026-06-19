@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Clock3,
   FileText,
+  RefreshCw,
   UserX,
 } from 'lucide-react';
 import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
@@ -45,23 +46,38 @@ export default function AttendancePage() {
       api.listAttendanceCorrections({ status: 'PENDING', limit: 25 }),
   });
 
-  const tabItems = [
-    { value: 'marking', label: 'Marking', icon: CalendarCheck },
-    { value: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { value: 'conflicts', label: 'Conflicts', icon: AlertTriangle },
-  ];
   const analytics = analyticsQuery.data;
   const anomalies = anomaliesQuery.data;
   const pendingCorrections = correctionsQuery.data?.total;
   const unsubmittedWorkingDays =
     anomalies?.anomalies.unsubmittedWorkingDays.length;
 
+  const tabItems = [
+    { value: 'marking', label: 'Daily Attendance', icon: CalendarCheck },
+    {
+      href: '/dashboard/attendance/register',
+      label: 'Monthly Register',
+      icon: FileText,
+    },
+    {
+      href: '/dashboard/attendance/corrections',
+      label: 'Corrections',
+      icon: FileText,
+      count: pendingCorrections,
+    },
+    { value: 'conflicts', label: 'Offline Drafts', icon: RefreshCw },
+    { value: 'analytics', label: 'Anomalies', icon: AlertTriangle },
+    {
+      href: '/dashboard/attendance/reports',
+      label: 'Reports',
+      icon: BarChart3,
+    },
+  ];
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M2 Smart Attendance"
-        title="Attendance"
-        description="Mark daily attendance, review exceptions, and keep locked or corrected records explicit."
+        title="Smart Attendance"
+        description="Mark daily attendance, review corrections, monitor anomalies, and export registers."
         primaryAction={
           <button
             type="button"
@@ -90,7 +106,7 @@ export default function AttendancePage() {
           },
         ]}
       >
-        <KpiGrid className="sm:grid-cols-2 xl:grid-cols-5">
+        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           <KpiCard
             title="Present Today"
             value={
@@ -125,17 +141,6 @@ export default function AttendancePage() {
             description="Official daily summary when available."
           />
           <KpiCard
-            title="Pending Corrections"
-            value={
-              correctionsQuery.isLoading
-                ? 'Loading'
-                : pendingCorrections ?? 'Unavailable'
-            }
-            icon={<FileText size={20} />}
-            tone={pendingCorrections ? 'warning' : 'neutral'}
-            description="Teacher correction requests awaiting review."
-          />
-          <KpiCard
             title="Classes Not Marked"
             value={
               anomaliesQuery.isLoading
@@ -145,6 +150,24 @@ export default function AttendancePage() {
             icon={<AlertTriangle size={20} />}
             tone={unsubmittedWorkingDays ? 'warning' : 'neutral'}
             description="From backend anomaly checks."
+          />
+          <KpiCard
+            title="Correction Requests"
+            value={
+              correctionsQuery.isLoading
+                ? 'Loading'
+                : pendingCorrections ?? 'Unavailable'
+            }
+            icon={<FileText size={20} />}
+            tone={pendingCorrections ? 'warning' : 'neutral'}
+            description="Awaiting backend review."
+          />
+          <KpiCard
+            title="Parent Alerts Sent"
+            value="Unavailable"
+            icon={<RefreshCw size={20} />}
+            tone="neutral"
+            description="Alert totals are not available yet."
           />
         </KpiGrid>
       </ModuleHeader>

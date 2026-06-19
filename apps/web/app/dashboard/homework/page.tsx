@@ -280,9 +280,8 @@ export default function HomeworkPage() {
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M6 Homework & Timetable"
-        title="Homework"
-        description={`Assign homework, review submissions, open protected attachments, inspect reminders, and use backend report contracts${session?.tenant.name ? ` for ${session.tenant.name}` : ''}.`}
+        title="Homework & Timetable"
+        description={`Assign homework, manage submissions, build timetables, and handle substitutions${session?.tenant.name ? ` for ${session.tenant.name}` : ''}.`}
         primaryAction={primaryAction}
         moreActionItems={[
           {
@@ -311,15 +310,15 @@ export default function HomeworkPage() {
           items={[
             { href: '/dashboard/homework', label: 'Homework', icon: BookOpen },
             { href: '/dashboard/homework/review', label: 'Submissions', icon: CheckCircle2 },
-            { href: '/dashboard/timetable', label: 'Timetable', icon: ClipboardCheck },
-            { href: '/dashboard/timetable/builder', label: 'Builder', icon: Settings },
-            { href: '/dashboard/timetable/substitutions', label: 'Substitutions', icon: Users },
-            { href: '/dashboard/timetable/workload', label: 'Workload', icon: BarChart3 },
+            { href: '/dashboard/timetable/builder', label: 'Timetable Builder', icon: Settings },
+            { href: '/dashboard/timetable/substitutions', label: 'Substitution', icon: Users },
+            { href: '/dashboard/timetable/workload', label: 'Teacher Workload', icon: BarChart3 },
+            { href: '/dashboard/timetable', label: 'Reports', icon: ClipboardCheck },
           ]}
           accentColor="blue"
           variant="light"
         />
-        <KpiGrid className="mt-5 sm:grid-cols-2 xl:grid-cols-5">
+        <KpiGrid className="mt-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           <KpiCard
             title="Homework Assigned"
             value={filters.academicYearId && completionReportQuery.data ? completionRows.length : 'Unavailable'}
@@ -336,29 +335,16 @@ export default function HomeworkPage() {
             description="No module-owned due-soon summary contract is exposed."
           />
           <KpiCard
-            title="Pending or Late"
+            title="Pending Submissions"
             value={filters.academicYearId && missingLateReportQuery.data ? missingLateRows.length : 'Unavailable'}
             icon={<AlertCircle size={20} />}
             tone={missingLateRows.length ? 'warning' : 'neutral'}
             loading={missingLateReportQuery.isLoading}
             description={filters.academicYearId ? 'Backend missing/late report rows.' : 'Select an academic year to load the report contract.'}
           />
-          <KpiCard
-            title="Templates"
-            value={templatesQuery.isLoading ? 'Loading' : templatesQuery.data?.length ?? 'Unavailable'}
-            icon={<FileText size={20} />}
-            tone="info"
-            loading={templatesQuery.isLoading}
-            description="Filtered metadata-backed homework templates."
-          />
-          <KpiCard
-            title="Reminder Batches"
-            value={reminderBatchesQuery.isLoading ? 'Loading' : reminderBatchesQuery.data?.length ?? 'Unavailable'}
-            icon={<RefreshCcw size={20} />}
-            tone="info"
-            loading={reminderBatchesQuery.isLoading}
-            description="Latest backend reminder batch history."
-          />
+          <KpiCard title="Timetable Conflicts" value="Unavailable" icon={<AlertCircle size={20} />} tone="neutral" description="Open timetable validation for backend conflict truth." />
+          <KpiCard title="Substitutions" value="Unavailable" icon={<Users size={20} />} tone="neutral" description="Open the scoped substitution workspace." />
+          <KpiCard title="Teacher Workload" value="Unavailable" icon={<BarChart3 size={20} />} tone="neutral" description="Open the backend workload report." />
         </KpiGrid>
       </ModuleHeader>
 

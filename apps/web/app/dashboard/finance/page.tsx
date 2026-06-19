@@ -81,18 +81,59 @@ export default function FinancePage() {
 
   const tabs = [
     ...(canCollectPayments
-      ? [{ value: 'collection', label: 'Collect', icon: Calculator }]
+      ? [
+          {
+            href: '/dashboard/finance',
+            label: 'Dues',
+            icon: Wallet,
+          },
+          {
+            href: '/dashboard/finance/invoices',
+            label: 'Invoices',
+            icon: FileText,
+          },
+          {
+            href: '/dashboard/finance/collections',
+            label: 'Payments',
+            icon: Calculator,
+          },
+        ]
       : []),
     ...(canManageFees && canReadReceipts
-      ? [{ value: 'ledger', label: 'Invoices & Receipts', icon: Receipt }]
-      : []),
-    ...(canCloseCashier
-      ? [{ value: 'close', label: 'Cashier Close', icon: History }]
+      ? [
+          {
+            href: '/dashboard/finance/receipts',
+            label: 'Receipts',
+            icon: Receipt,
+          },
+        ]
       : []),
     ...(canManageFees
       ? [
-          { value: 'reports', label: 'Dues & Reports', icon: BarChart3 },
-          { value: 'setup', label: 'Fee Setup', icon: Settings },
+          { value: 'setup', label: 'Discounts', icon: Settings },
+          {
+            href: '/dashboard/finance/reversals-refunds',
+            label: 'Refunds / Reversals',
+            icon: ShieldAlert,
+          },
+        ]
+      : []),
+    ...(canCloseCashier
+      ? [
+          {
+            href: '/dashboard/finance/cashier-close',
+            label: 'Cashier Close',
+            icon: History,
+          },
+        ]
+      : []),
+    ...(canManageFees
+      ? [
+          {
+            href: '/dashboard/finance/reports',
+            label: 'Reports',
+            icon: BarChart3,
+          },
         ]
       : []),
   ];
@@ -100,7 +141,6 @@ export default function FinancePage() {
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M3 Fees & Receipts"
         title="Fees & Receipts"
         description={`Collect fees, issue protected receipts, follow up dues, and close the cashier with an auditable trail${session?.tenant.name ? ` for ${session.tenant.name}` : ''}.`}
         primaryAction={
@@ -111,7 +151,7 @@ export default function FinancePage() {
               className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-fees-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-fees-border)] focus:ring-offset-2"
             >
               <Calculator size={18} />
-              Collect Fee
+              Record Payment
             </button>
           ) : undefined
         }
@@ -155,24 +195,23 @@ export default function FinancePage() {
             : []),
         ]}
       >
-        <KpiGrid className="sm:grid-cols-2 xl:grid-cols-5">
+        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           <KpiCard title="Collected Today" value="Unavailable" icon={<Wallet size={20} />} tone="neutral" description="Needs a real M3 daily summary API." />
           <KpiCard title="Total Due" value="Unavailable" icon={<Wallet size={20} />} tone="neutral" description="No whole-school summary contract is exposed." />
           <KpiCard
-            title="Overdue Invoices"
+            title="Overdue Students"
             value={!canManageFees ? 'Restricted' : defaultersQuery.isLoading ? 'Loading' : defaultersQuery.data?.total ?? 'Unavailable'}
             icon={<FileText size={20} />}
             tone={defaultersQuery.data?.total ? 'warning' : 'neutral'}
-            description="Backend defaulter summary, capped by the current API."
-          />
-          <KpiCard
-            title="Overdue Balance"
-            value={!canManageFees ? 'Restricted' : defaultersQuery.isLoading ? 'Loading' : defaultersQuery.data ? formatCurrency(defaultersQuery.data.totalOutstanding) : 'Unavailable'}
-            icon={<Receipt size={20} />}
-            tone={defaultersQuery.data?.totalOutstanding ? 'warning' : 'neutral'}
-            description="Official amount returned by the defaulter API."
+            description={
+              defaultersQuery.data
+                ? `${formatCurrency(defaultersQuery.data.totalOutstanding)} outstanding.`
+                : 'Backend defaulter summary.'
+            }
           />
           <KpiCard title="Pending Reversals" value="Unavailable" icon={<ShieldAlert size={20} />} tone="neutral" description="Needs an approval-summary contract." />
+          <KpiCard title="Cashier Close Status" value={!canCloseCashier ? 'Restricted' : 'Unavailable'} icon={<History size={20} />} tone="neutral" description="Open the backend-backed close workspace." />
+          <KpiCard title="Receipts Issued" value={!canReadReceipts ? 'Restricted' : 'Unavailable'} icon={<Receipt size={20} />} tone="neutral" description="Needs a bounded daily receipt summary." />
         </KpiGrid>
       </ModuleHeader>
 
