@@ -1,7 +1,7 @@
 # SchoolOS Documentation
 
 **Status:** Active documentation map and GA release-governance index  
-**Last updated:** 2026-06-18
+**Last updated:** 2026-06-19
 
 This folder contains the active detailed SchoolOS documentation. Use this page as the folder-level map only; the root `README.md` remains the repository entry point and source-of-truth summary.
 
@@ -25,8 +25,9 @@ SchoolOS is now governed by a Production / General Availability (GA) release tar
 | 10 | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Storage, File Registry, tenant isolation, scaling, performance, and security architecture. |
 | 11 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, and provider/queue operations. |
 | 12 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, wireframes, components, API usage, and web persona smoke plan. |
-| 13 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
-| 14 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
+| 13 | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Approved supporting visual-reference appendix for the supplied principal dashboard and M1 desktop screens. Canonical web-plan rules take precedence. |
+| 14 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
+| 15 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
 
 ---
 
@@ -43,6 +44,7 @@ project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md
 architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
 architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
 design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
+design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md
 design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
 production/SCHOOLOS_GA_RELEASE_POLICY.md
 production/SCHOOLOS_PRODUCTION_RUNBOOK.md
@@ -67,6 +69,7 @@ apps/web/e2e/README.md
 | Architecture/security rules | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Engineering, security |
 | Platform operations boundary | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform/admin engineers |
 | Web UI and state rules | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Web engineers |
+| Dashboard and M1 visual-reference detail | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` (supporting appendix; canonical web plan takes precedence) | Product, design, web engineers |
 | Mobile companion app rules | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Mobile engineers |
 | Deployment and recovery procedure | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment/operator team |
 | Historical/superseded docs | `archive/README.md` | Maintainers |
@@ -79,14 +82,24 @@ The generated/tool-cache Markdown file `.cache/corepack/v1/pnpm/10.12.1/README.m
 
 ## Design Planning Docs
 
-The active design folder intentionally contains only two source-of-truth documents:
+The active design folder has two source-of-truth documents:
 
 ```text
 design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
 design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
 ```
 
+It also contains one owner-approved **supporting visual-reference appendix**:
+
+```text
+design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md
+```
+
+The visual appendix is not a competing product, architecture, release, or API-contract source. It documents the supplied principal dashboard and M1 desktop reference screens. The canonical web plan takes precedence for shared UI rules, route boundaries, tenant/RBAC/module entitlement rules, protected files, data truth, and acceptance criteria.
+
 Use the web plan for `apps/web`, school dashboard, platform control plane, settings, module workspaces, reports, protected file actions, and web persona smoke planning.
+
+Use the dashboard/M1 appendix when implementing or reviewing the referenced principal dashboard and M1 Admissions / Student Profiles workspaces.
 
 Use the mobile plan for `apps/schoolos_mobile`, parent, teacher, principal, driver, staff self-service, and controlled student lab/session app design.
 
@@ -94,12 +107,12 @@ Use the mobile plan for `apps/schoolos_mobile`, parent, teacher, principal, driv
 
 ## Cleanup Rules
 
-1. Do not add a new `.md` file if the content belongs inside an active source-of-truth doc.
+1. Do not add a new `.md` file if the content belongs inside an active source-of-truth doc, unless the owner explicitly approves a supporting visual-reference appendix and its relationship to the canonical doc is recorded here.
 2. `production/SCHOOLOS_GA_RELEASE_POLICY.md` is an approved canonical release-governance document; do not duplicate or fork its stage definitions in new docs.
 3. Do not recreate planning-only docs that conflict with current implementation status.
 4. Keep old duplicated planning content in git history rather than active repo docs.
-5. Keep `docs/design` limited to the two active design plans unless the owner explicitly approves another source-of-truth split.
-6. Web design belongs in `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`.
+5. Keep `docs/design` limited to the two active design plans plus the owner-approved supporting dashboard/M1 reference appendix; do not add new design docs without owner approval.
+6. Web design belongs in `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`; visual-reference detail may live in the approved dashboard/M1 appendix only while it explicitly defers to the canonical plan.
 7. Mobile app design belongs in `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`.
 8. Release evidence and scores belong in `project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
 9. Forward execution sequencing belongs in `project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`.
