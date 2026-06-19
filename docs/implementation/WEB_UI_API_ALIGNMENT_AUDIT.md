@@ -3,9 +3,9 @@
 **Status:** Active implementation audit  
 **Date:** 2026-06-19  
 **Release stage:** Internal QA ready  
-**Scope:** School operations web routes for M1-M10, the shared authenticated dashboard shell, and M3 Fees & Receipts reference-to-contract alignment.
+**Scope:** School operations web routes for M1-M10, the shared authenticated dashboard shell, and contract-safe desktop-reference alignment for M3 Fees & Receipts and M5 Activity Feed & Milestones.
 
-This audit records repository truth before and during reference-dashboard alignment. The supplied reference images are visual specifications only; their sample names, counts, dates, money, progress, and provider states are not production data.
+This audit records repository truth before and during reference-dashboard alignment. The supplied reference images are visual specifications only; their sample names, counts, dates, money, progress, provider states, uploads, and audit entries are not production data.
 
 ## Shared foundation
 
@@ -19,9 +19,9 @@ The main foundation gaps are visual alignment and duplication: shared primitives
 | --- | --- | --- | --- |
 | M1 Admissions & Students | `/dashboard/students`, `/dashboard/students/[studentId]`, `/dashboard/admissions`, `/dashboard/admissions/new`, `/dashboard/admissions/review` | Students/admissions lists and writes; profile/guardian/lifecycle; documents and history; protected preview/download; duplicate review/merge; iEMIS readiness/export; QR generate/status/history/rotate/revoke | No module-owned six-metric overview response. Directory/admissions remain separate primary routes; tabs for Documents, Duplicates, iEMIS, and QR need route/query-state composition. Do not infer missing-document or QR totals from paginated rows. |
 | M2 Attendance | `/dashboard/attendance`, `/register`, `/corrections`, `/reports` | Roster, official summary/register/analytics/anomalies, conflicts, corrections, submit/sync/draft, protected register export, staff attendance/leave | Current workspace has five KPIs and three local tabs. Parent-alert count and a purpose-limited offline-draft/conflict summary are not exposed as one overview contract. Teacher selector/scope must remain backend-owned. |
-| M3 Fees & Receipts | `/dashboard/finance`, `/collections`, `/invoices`, `/receipts`, `/reversals-refunds`, `/cashier-close`, `/reports`; canonical `/dashboard/fees` compatibility route | Fee heads/plans/invoices/ledger/billing; defaulters/reminders; idempotent collection; refund/reversal; cashier close; receipts/reprints/verification/protected PDF; report snapshots | The M3 reference slice is now documented below. No single overview contract exists for all visual KPI cards. Payment screen can use selected real invoice/ledger responses, but total due, overdue, close status, and receipt counts must not be recomputed from partial lists. New visual concepts remain unavailable until backend/OpenAPI contracts exist. |
+| M3 Fees & Receipts | `/dashboard/finance`, `/collections`, `/invoices`, `/receipts`, `/reversals-refunds`, `/cashier-close`, `/reports`; canonical `/dashboard/fees` compatibility route | Fee heads/plans/invoices/ledger/billing; defaulters/reminders; idempotent collection; refund/reversal; cashier close; receipts/reprints/verification/protected PDF; report snapshots | The M3 reference slice is documented below. No single overview contract exists for all visual KPI cards. Payment screen can use selected real invoice/ledger responses, but total due, overdue, close status, and receipt counts must not be recomputed from partial lists. New visual concepts remain unavailable until backend/OpenAPI contracts exist. |
 | M4 Academics | `/dashboard/academics` plus exam terms, assessment components, exams, marks, CAS, report cards, results, publishing, locks, promotion | Years/classes/sections/subjects/assignments; exam terms/components/grading policy; marks/batch marks; CAS; report-card generation/correction/history/protected PDF; result readiness/preview/publish | No single overview contract for the six KPI cards. Existing report-card lifecycle is real, but the reference job-progress rail needs confirmed persisted job-state fields before it is represented as asynchronous progress. |
-| M5 Activity Feed | `/dashboard/activity`, `/new`, `/moderation`, `/gallery`, `/milestones`, `/[postId]`, `/parent` | Activity posts, moderation, media/file access, consent/audience checks, milestones and parent-scoped feed through `activity-feed` APIs | The reference overview metrics and compose rail need a bounded summary/audience-preview contract. Unsupported post types must stay unavailable; do not render poll/video controls solely from the reference. |
+| M5 Activity Feed | `/dashboard/activity`, `/new`, `/moderation`, `/gallery`, `/milestones`, `/[postId]`, `/parent` | Activity posts, moderation, media/file access, consent/audience checks, milestones and parent-scoped feed through `activity-feed` APIs | The M5 reference slice is documented below. Overview KPIs, post-level delivery summaries, media processing states, and composer controls must use bounded contracts; unsupported post types, provider jobs, storage metrics, or global audit views stay unavailable or remain in their owning M10/M0 workspace. |
 | M6 Homework & Timetable | `/dashboard/homework`, `/new`, `/review`, `/[homeworkId]`; `/dashboard/timetable`, `/builder`, `/conflicts`, `/substitutions`, `/versions`, `/workload` | Homework CRUD/submissions/reminders/attachments; timetable periods/rooms/versions/slots/validation/publish/lock/archive; teacher availability/workload; substitutions | Homework and timetable are separate real workspaces. A combined six-metric overview contract is absent. The combined reference route can compose module APIs, but official totals and conflicts must come from bounded backend summaries. |
 | M7 HR & Payroll | `/dashboard/hr`, `/staff`, `/contracts`, `/leave`, `/attendance`; `/dashboard/payroll`, `/runs`, `/payslips`, `/salary-structures`, `/reports` | Staff/lifecycle/contracts/documents; leave/attendance/balances; payroll run lifecycle, preview, summary reports, posting/locking; protected payslips | HR and payroll are separate route layouts. Payroll summary exists, but the complete six-card HR overview and masked selected-payslip rail require composition without exposing salary/bank fields to unauthorized roles. |
 | M8 Operations | Library, transport, and canteen each have complete route families under `/dashboard/library`, `/dashboard/transport`, and `/dashboard/canteen` | Library catalog/copies/members/issues/returns/overdue/fines/reports; transport routes/stops/vehicles/assignments/trips/stale-GPS/reports; canteen menu/plans/enrolments/wallet/POS/serving/reports | `/dashboard/operations` does not exist. There is no cross-module operations summary API. The overview may call three purpose-limited module summaries, but it must not deep-fetch unbounded lists or expose allergy details outside canteen permissions. |
@@ -133,6 +133,120 @@ Before marking an M3 reference screen complete, verify:
 8. Gateway UI remains disabled/unavailable until validated sandbox/staging readiness is returned by backend; no client fallback marks an invoice as paid.
 9. Authenticated browser QA covers populated, empty, error, forbidden, module-locked, payment-pending, file-unavailable, and responsive right-rail/drawer states.
 
+## M5 Activity Feed & Milestones reference-screen implementation slice
+
+### Scope and status
+
+The supplied M5 references establish the desired desktop operating-desk composition for classroom activity posts, consent-safe media, moderation, teacher media work, milestone templates, and a parent child-scoped feed. They do not authorize new API shapes, post types, provider states, media-processing claims, storage operations, audit access, or seeded data.
+
+The canonical web design plan remains authoritative for shared visual rules, tenant/RBAC/module-entitlement behavior, protected files, and required screen states. Activity-feed controllers, OpenAPI, and shared contracts remain authoritative for fields, post statuses, audience rules, consent outcomes, file actions, mutation behavior, and parent scope.
+
+### M5 ownership boundary
+
+| Work area shown in the references | Owning SchoolOS domain | Contract-safe rule |
+| --- | --- | --- |
+| Activity overview, teacher composer, post detail, audience preview, consent summary, moderation, teacher media gallery, milestones, parent child feed | M5 Activity Feed & Milestones | Keep the user focused on a classroom-post or milestone job. Use activity-feed APIs and protected media helpers only. |
+| Post-level notification outcome and recipient follow-up link | M5 summary with M10 handoff | Show only a bounded post-level delivery outcome when exposed. Route detailed retry, provider, device, and recipient operations to M10. |
+| Delivery queue, failed-recipient replay, provider diagnostics, templates, device logs | M10 Notices & Communication | Do not create a second delivery operations center inside M5. Retry/replay remains reasoned, provider-safe, and idempotent under M10 contracts. |
+| Global protected-media policy, File Registry administration, global access audit, storage integrity, cleanup, orphan recovery | M0/File Registry, school settings, or platform operations | Do not expose storage cleanup, raw secure links, global access logs, or integrity repair controls in normal teacher M5 routes. |
+
+### M5 screen map
+
+| Reference work area | Primary SchoolOS route or canonical workspace | Main job | Contract-safe implementation requirement |
+| --- | --- | --- | --- |
+| Activity overview | `/dashboard/activity` | Find current posts, review attention items, and start a post. | Show no more than four actionable KPI cards unless a bounded module summary supports more. Use explicit unavailable states rather than counts derived from paginated lists. |
+| Teacher post composer | `/dashboard/activity/new` | Create one class, section, or student-targeted post safely. | Use existing class/section/student audience preview and active-student-only tagging. Show `Publish` or `Submit for Approval` only where the API/permission contract supports it. |
+| Activity post detail | `/dashboard/activity/[postId]` | Inspect one post, its media, audience, consent outcome, status, and allowed actions. | Use a full route when media, tagged-student context, comments, audit, or protected files require detail. Do not expose cross-child visibility, internal review notes, or raw file data. |
+| Moderation queue | `/dashboard/activity/moderation` | Review pending posts and media. | Approve, reject, request changes, archive, or restore only through supported actions. Rejection, archive, and restore must capture a reason whenever backend policy requires it. |
+| Teacher media gallery | `/dashboard/activity/gallery` | Browse own or permitted activity albums and resolve upload issues. | Use server pagination/filtering and File Registry-backed thumbnails/previews. Teachers can retry permitted failed uploads; cleanup, storage repair, and integrity jobs stay outside this route. |
+| Milestone templates and progress | `/dashboard/activity/milestones` | Choose or apply Montessori/ECD/Primary milestone templates. | Use backend stage/domain filters and presets. Do not manufacture milestone completion or class progress totals in the browser. |
+| Parent child-scoped feed | `/dashboard/activity/parent` | Show a guardian only their linked child’s safe activity updates. | Re-check guardian-child linkage, active child scope, post state, media consent, and protected-file permission on every route and file action. |
+| Protected media preview | Selected media within M5 detail/gallery/parent surfaces | Preview or download a permitted activity asset. | Use authenticated preview/download helpers. A label such as `Protected preview` or `Download allowed` must be derived from backend permission, never from a client-held signed URL. |
+
+### M5 desktop composition rules
+
+1. Keep the stable shell visible: topbar, school and academic-year context, left navigation, module header, context filters, KPI strip, main work area, and a right rail only when it has an active M5 job such as audience preview, approval review, selected post context, or allowed protected-media actions.
+2. Use one primary action per screen. The overview primary action is `Create Activity Post`; a composer may offer `Save Draft`, `Submit for Approval`, or `Publish` only when the actual activity contract supports that state and action.
+3. Limit the overview to the most actionable bounded metrics: published posts, pending moderation, consent-restricted media, and failed upload or delivery exceptions. Parent reach, milestones this week, storage volume, total protected files, or provider retry queue metrics belong in a secondary context or their owning module when a bounded response exists.
+4. Use the post detail route, not a narrow drawer, for full tagged-student lists, consent evidence, multi-item media, comments, moderation history, protected media, and audit context. Drawers are suitable for quick composer, selected summary, or approval review context only.
+5. The parent route must look and behave differently from the staff operating desk: it is child-scoped, focused on readable post cards, clear consent restrictions, safe media actions, and linked-child context. It must never expose moderation, delivery, audit, other children, or internal school operations.
+6. Do not expose `Copy Secure Link` as a permanent or freely shareable URL. Any allowed short-lived share/download behavior must be an authenticated, tenant-scoped, auditable backend action and requires existing contract confirmation.
+7. Labels such as `Faces visible` are manual reviewer checklist items only. Do not imply face detection, image classification, automated moderation, AI safety scoring, or any M11 runtime.
+8. Use a local school date/time presentation consistent with backend-supported B.S./NPT context. Do not hard-code mixed Gregorian month labels with B.S. years from the visual references.
+9. Media thumbnails must fail closed per asset. A consent-restricted image/video must not reveal a usable thumbnail, filename, object key, or source link to an unauthorized guardian.
+
+### M5 composer and audience-preview workbench
+
+The reference composer should be implemented as a teacher-safe workflow, not a generic social-media form.
+
+```text
+Header: Create Activity Post
+Context: class | section | audience type | visibility | notify parents where the backend supports it
+
+Main: title + activity type + description + tags + event date + audience selection
+Right rail: backend audience preview + consent summary + validation/safety checks
+Media area: File Registry-backed upload queue + per-file state + allowed retry action
+Footer: Save Draft | Preview | Submit for Approval or Publish
+```
+
+Required behavior:
+
+- Start with class, section, audience type, and visibility choices supported by the existing activity domain. Do not invent poll, reaction, video, comment, or audience modes from the reference alone.
+- Use backend audience preview for recipient, active-student, guardian-link, and consent counts. Never calculate those counts from a loaded roster or browser-side filter.
+- Permit tagged students only when they are active and in the permitted tenant/class/section scope.
+- Preserve form input after recoverable upload or validation errors. Save draft only if backend draft persistence exists.
+- Use File Registry and existing upload/media APIs. Display queued, processing, uploaded, restricted, failed, retrying, paused, or compressed states only when the backend/media pipeline exposes them truthfully.
+- A low-bandwidth or compression control must be connected to an actual supported upload/variant workflow; otherwise omit it rather than simulating compression.
+- Submit/publish actions show pending, success, validation, partial-failure, permission-denied, module-locked, and error states. Downstream cleanup failures must never leave a client claim that the post or media is safely published.
+- Notification settings are not delivery truth. Show queued or outcome state only when returned by backend; use an M10 link for detailed delivery diagnostics where permitted.
+
+### Consent, media, and parent safety requirements
+
+| Situation | Required UI behaviour |
+| --- | --- |
+| Audience preview is unavailable | Disable unsafe publish if required by backend, retain the form, show a safe retry/error state, and never guess recipients or consent counts. |
+| Tagged student is inactive, outside the selected scope, or removed | Reject the selection and refresh the backend audience context. |
+| One or more media items are consent-restricted | Show the staff user an exact backend-provided restriction summary. For parents, hide blocked assets and show a respectful message such as `Some media is not available for your child’s privacy settings.` |
+| Parent/guardian link is removed | Remove post and protected-media access on refresh/deep link/file action; do not reveal post titles, thumbnails, or filenames first. |
+| Post is pending approval | Show status and safe next action. Do not present it as visible to parents until backend status confirms publication. |
+| Post is rejected | Show permitted reviewer reason and allow permitted correction/resubmission only through the actual workflow. |
+| Post is archived, rejected, soft-deleted, or otherwise unavailable | Fail closed for parent and direct protected-media access. Staff UI shows a safe status and permitted restore/archive action only. |
+| Protected media action is denied, expired, missing, or failed | Use shared file unavailable/retry/permission states. Never show object keys, storage URLs, provider details, or an unsafe browser `window.open` link. |
+| Upload retry is available | Offer retry only for the permitted file/post action. Do not expose force cleanup, orphan repair, storage recovery, or integrity operations. |
+| Delivery is partial or retrying | Show a bounded post-level outcome only when available and link to M10 delivery details if authorized. Do not render a provider queue, recipient email, device log, or replay control inside the normal M5 workflow. |
+
+### Contract and verification boundaries
+
+No new M5 endpoint, permission, enum, database field, storage action, or notification-provider action is approved by this visual slice. Mark the following as `needs backend verification` or `needs OpenAPI confirmation` before implementation when they are not already present in the current codebase:
+
+- A bounded activity overview summary containing only official M5 counts needed for staff decisions.
+- Exact composer payload and supported post/activity/visibility/comment/notification states.
+- Audience-preview fields for class, section, selected student, active-student, guardian, and consent counts.
+- Draft persistence, approval workflow, scheduled publishing, edit/version restore, archive, restore, and rejection-reason behavior.
+- Per-file upload/media processing statuses, retry conditions, compression/variant metadata, and safe thumbnail payloads.
+- Post-level notification delivery summary and authorized M10 drill-down link behavior.
+- Moderation checklist payload, reason requirements, and permitted review/restore/archive actions.
+- Milestone template stage/domain filters, assigned-class usage, progress values, and parent publication behavior.
+- Parent feed pagination/filtering, active-child selection, direct post deep-link behaviour, comments/reactions, and protected-media permission details.
+- Any share-link, watermark, download restriction, secure-preview, or access-log representation beyond the existing protected helper contracts.
+
+When a contract is absent, retain the existing safe M5 workflow, omit the reference control, or add a backend slice first with tenant scoping, RBAC, entitlement checks, File Registry boundaries, audit behavior, tests, OpenAPI, and consent/guardian access regression coverage as applicable.
+
+### M5 focused verification plan
+
+Before marking an M5 reference screen complete, verify:
+
+1. A teacher can create, edit, submit, or publish only for the assigned and backend-permitted tenant/class/section/subject context.
+2. The audience preview excludes inactive students, removed guardian links, and media that is not visible under the actual consent outcome.
+3. Every growing feed, moderation, gallery, milestone, and parent list is server-paginated and server-filtered where the underlying data can grow.
+4. The overview uses bounded backend counts or unavailable states; no count comes from browser-side list length, a local filter, or illustrative screenshot data.
+5. Parent deep links and protected-media actions re-check current guardian-child linkage, tenant scope, post state, tagged-student consent, and file permission before displaying any protected content.
+6. Removed guardians, cross-tenant users, unlinked parents, and direct access to archived/rejected/soft-deleted posts or assets fail closed without revealing thumbnail, filename, object key, or permanent URL.
+7. Moderation rejection, archive, restore, and other sensitive changes show required confirmation/reason/pending/success/error states and create the supported audit event.
+8. Media upload and retry paths show an honest per-file state and do not expose cleanup, storage repair, provider credential, or integrity controls to teachers or parents.
+9. The parent feed is child-scoped, non-admin-shaped, and communicates consent restrictions respectfully without exposing other children or internal moderation details.
+10. Authenticated browser QA covers populated, empty, error, forbidden, module-locked, upload-processing, upload-failure, consent-restricted, protected-file-unavailable, post-pending, post-rejected, partial-delivery, and responsive right-rail/drawer states.
+
 ## Permissions and route safety
 
 Permissions are defined in `packages/core/src/permissions/catalog/*` and enforced by backend guards. The dashboard route gate and sidebar already cover the canonical M1-M10 route families. New `/dashboard/operations` and `/dashboard/communications` composition routes need explicit any-of permission gates and matching module entitlement mapping before they can be navigable. Frontend hiding remains UX only.
@@ -150,11 +264,12 @@ Protected PDFs and files must continue through `openProtectedFile`, `downloadPro
 1. Standardize the authenticated shell and shared module primitives against the reference geometry while preserving session, RBAC, entitlements, support override, mobile navigation, and current routes.
 2. M1, then M2, then M3, then M4, using existing real route contracts and explicit unavailable KPI states where a summary contract is absent.
 3. Implement the M3 cashier-first collection workbench, invoice/receipt contextual details, due follow-up, adjustment/approval, cashier close, and report states in the screen order described above without changing backend contracts solely for visual parity.
-4. M6 and M7, composing their existing paired workspaces without merging backend domains.
-5. Add the M8 operations composition route only after its route gates and bounded submodule summaries are confirmed or added.
-6. Refine M9 using its existing accounting dashboard and job/reconciliation contracts.
-7. M5, then M10; add `/dashboard/communications` only as a composition route over notices/delivery/chat contracts with a safe provider-status gap state.
-8. For every slice, update focused contract tests, run web lint/typecheck/tests, and perform authenticated browser visual QA at the reference desktop size plus tablet/mobile fallbacks.
+4. Implement the M5 P0 screen group in the documented order: activity overview, teacher composer, post detail, moderation queue, parent child-scoped feed, and protected media action states.
+5. M6 and M7, composing their existing paired workspaces without merging backend domains.
+6. Add the M8 operations composition route only after its route gates and bounded submodule summaries are confirmed or added.
+7. Refine M9 using its existing accounting dashboard and job/reconciliation contracts.
+8. Refine M10 after the M5 handoff boundary is preserved; add `/dashboard/communications` only as a composition route over notices/delivery/chat contracts with a safe provider-status gap state.
+9. For every slice, update focused contract tests, run web lint/typecheck/tests, and perform authenticated browser visual QA at the reference desktop size plus tablet/mobile fallbacks.
 
 ## Current risks and deliberate deferrals
 
@@ -164,6 +279,7 @@ Protected PDFs and files must continue through `openProtectedFile`, `downloadPro
 - Authenticated browser fidelity evidence requires a running API, seeded tenant, and credentials. Public-only Playwright results do not satisfy that gate.
 - No backend, Prisma, permission, or OpenAPI change is justified by the shared-foundation audit alone.
 - M3 visual parity must not cause a second finance domain, browser-owned money calculations, unaudited financial actions, raw private-file links, or premature gateway enablement.
+- M5 visual parity must not turn activity work into an M10 delivery console or M0 storage console, imply AI/media scanning, leak consent-restricted thumbnails, create a public share-link path, or expose global audit/provider/storage data to teachers or parents.
 
 ## Implementation checkpoint
 
@@ -184,7 +300,7 @@ The source implementation completed the shared shell and the M1-M10 overview ali
 | M2 | `/dashboard/attendance` | Existing analytics, anomaly, correction, and conflict contracts remain wired; parent-alert totals remain unavailable. |
 | M3 | `/dashboard/finance` | Defaulter count and outstanding value use the backend report; collected-today, total-due, close-status, reversal, and receipt totals remain unavailable where no overview contract exists. The reference-screen slice above defines the required cashier-first and contract-safe refinement, but does not claim its implementation. |
 | M4 | `/dashboard/academics` | Existing exam, marks, CAS, report-card, result, and protected-file workflows remain linked; all six overview totals remain unavailable pending a bounded summary. |
-| M5 | `/dashboard/activity`, `/dashboard/activity/reports` | Existing feed workflows remain real; misleading list-length KPI calculations were removed, and reporting is a friendly unavailable state pending a safe report API. |
+| M5 | `/dashboard/activity`, `/dashboard/activity/reports` | Existing feed workflows remain real; misleading list-length KPI calculations were removed, and reporting is a friendly unavailable state pending a safe report API. The M5 reference-screen slice above defines a contract-safe P0 screen group but does not claim its implementation. |
 | M6 | `/dashboard/homework` | Homework report rows back assigned and pending values; due-soon and timetable overview values remain unavailable while canonical timetable routes stay linked. |
 | M7 | `/dashboard/hr` | Pending leave and expiring-contract summaries use backend responses; broader staff/payroll totals remain unavailable or permission-restricted. |
 | M8 | `/dashboard/operations` | New permission-scoped composition route uses library overdue, transport reports/stale GPS, and canteen meal/low-balance APIs. No allergy details are exposed. |
@@ -222,6 +338,8 @@ For each route, capture loading, empty, populated, permission-denied, module-loc
 
 For M3, also exercise `/dashboard/finance/collections`, `/dashboard/finance/invoices`, `/dashboard/finance/receipts`, `/dashboard/finance/reversals-refunds`, `/dashboard/finance/cashier-close`, and `/dashboard/finance/reports` with permission-varied seeded accounts. Validate the selected-record rail or detail route at the reference desktop viewport, then validate the compact/drawer behavior at tablet and narrow widths.
 
+For M5, also exercise `/dashboard/activity/new`, `/dashboard/activity/[postId]`, `/dashboard/activity/moderation`, `/dashboard/activity/gallery`, `/dashboard/activity/milestones`, and `/dashboard/activity/parent` with teacher, moderator/admin, and linked-guardian accounts. Validate the audience preview, consent restriction, pending/rejected/archived states, and protected-media action at the reference desktop viewport, then validate the compact/drawer behavior at tablet and narrow widths.
+
 ## Follow-up plan
 
 ### P1 — required before this slice can be called visually complete
@@ -229,13 +347,15 @@ For M3, also exercise `/dashboard/finance/collections`, `/dashboard/finance/invo
 1. Run authenticated browser QA against a seeded local or staging tenant when the browser policy permits the target URL.
 2. Compare all ten overview routes against their supplied references at the reference viewport, then correct verified spacing, overflow, focus, keyboard, and responsive defects.
 3. Implement the M3 screen groups in the documented order while preserving canonical routes and real contracts: overview, collection counter, invoices/invoice detail, receipts, defaulters/reminders, adjustments/approvals, reversals/refunds, cashier close, and reports.
-4. Add bounded, module-owned overview APIs only for recurring operational decisions that cannot be represented honestly with existing responses; update OpenAPI, shared contracts, permissions, query tests, and tenant-scoped index review together.
-5. Add focused authenticated browser coverage for M3 payment idempotency, protected receipt/document actions, permission denial, module lock, cashier-close overlap, and unavailable-gateway states.
-6. Add focused authenticated browser coverage for the two new composition routes and their permission/module-lock states.
+4. Implement the M5 P0 screen group while preserving M5/M10/M0 boundaries: overview, composer, detail, moderation queue, parent child-scoped feed, and protected media states.
+5. Add bounded, module-owned overview APIs only for recurring operational decisions that cannot be represented honestly with existing responses; update OpenAPI, shared contracts, permissions, query tests, and tenant-scoped index review together.
+6. Add focused authenticated browser coverage for M3 payment idempotency, protected receipt/document actions, permission denial, module lock, cashier-close overlap, and unavailable-gateway states.
+7. Add focused authenticated browser coverage for M5 audience/consent scope, removed-guardian denial, post status denial, protected media actions, upload retry state, moderation reasons, and M10 delivery handoff.
+8. Add focused authenticated browser coverage for the two new composition routes and their permission/module-lock states.
 
 ### P2 — refinement after P1 evidence
 
 1. Move growing-list filter state to URL search parameters where the current canonical workspace still keeps it locally.
-2. Add persisted backend job-state presentation for report-card, accounting-export, M3 reports, and other long-running work only after those job contracts are confirmed.
+2. Add persisted backend job-state presentation for report-card, accounting-export, M3 reports, M5 media processing where supported, and other long-running work only after those job contracts are confirmed.
 3. Consolidate remaining duplicated dashboard primitives into the shared system without rewriting stable module workflows.
 4. Capture staging provider, protected-download, device-width, observability, rollback, and controlled-pilot evidence under the GA release policy; local source checks do not satisfy those gates.
