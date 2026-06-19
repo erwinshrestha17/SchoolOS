@@ -1,45 +1,52 @@
-**Design QA**
+**Source visual truth**
 
-- Source visual truth: `/Users/erwin/Downloads/ParentAppScreens/More-ReportCards.png`
-- Implementation screenshot: `/private/tmp/schoolos_report_cards_final.png`
-- Viewport: Android emulator, 920 x 2048 physical pixels (approximately 418 x 930 logical pixels)
-- State: Aarav Shrestha, First Terminal Examination published, Second Terminal Examination upcoming, More tab active
+- `/Users/erwin/Downloads/WebAllScreens/M1-screens/ChatGPT Image Jun 19, 2026, 04_53_06 PM (1).png`
+- `/Users/erwin/Downloads/WebAllScreens/M1-screens/ChatGPT Image Jun 19, 2026, 04_53_15 PM (10).png`
+
+**Implementation evidence**
+
+- `/private/tmp/m1-students.png`
+- `/private/tmp/m1-iemis.png`
+- `/private/tmp/m1-students-comparison.png`
+- `/private/tmp/m1-iemis-comparison.png`
+
+**Viewport and state**
+
+- 1536 x 1086 desktop viewport.
+- Authenticated school administrator using the seeded `default-school` tenant.
+- Student directory and iEMIS validation workspaces with real seeded API data.
 
 **Full-view comparison evidence**
 
-The source and emulator capture were opened together in the same comparison input. The implementation preserves the reference hierarchy: title and account actions, child selector, published report summary, result and attendance metrics, subject grades, two report actions, upcoming examination state, and fixed five-tab navigation. The emulator viewport is materially narrower than the framed source, so grades responsively use a 2 x 2 grid rather than four columns and the teacher note remains below the first viewport.
+- The implementation preserves the reference hierarchy: persistent SchoolOS shell, white/soft-blue workspace, six KPI cards, module tabs, compact filters, operational rows, and contextual work areas.
+- The iEMIS implementation closely follows the source composition with validation KPIs, issue table, export checklist, protected export actions, and persisted import sections.
+- The student directory currently uses compact roster rows rather than the reference's denser multi-column table and opens its contextual inspector after row selection rather than selecting a row by default.
 
 **Focused region comparison evidence**
 
-A separate crop was not required because the source and implementation full views kept typography, badges, grade cards, action buttons, and navigation labels readable at original resolution.
+- KPI typography was reduced for unsupported values by replacing long `Unavailable` values with an em dash while retaining explanatory copy.
+- Secondary readiness and duplicate panels were collapsed so the main student roster appears directly after filters, matching the source task hierarchy.
+- Status colors, border radii, control sizing, protected-file actions, and module blue tokens follow the supplied reference and existing SchoolOS design system.
 
 **Findings**
 
-- No actionable P0, P1, or P2 findings remain.
-- Expected responsive difference: the 418 logical-pixel implementation uses two grade columns to preserve readable labels and tap targets; the wider mock uses four.
-- Expected preview-harness difference: the back button is absent because the screenshot was captured from a temporary root preview entrypoint. The production GoRouter route supplies normal back navigation.
-- Expected token difference: the primary report action uses the portal purple action token, consistent with the supplied SchoolOS color rules for report cards, rather than the mock's green button.
-
-**Required fidelity surfaces**
-
-- Fonts and typography: existing SchoolOS Outfit/system fallback, strong navy hierarchy, readable status and metric weights; no clipping after compact fixes.
-- Spacing and layout rhythm: 16-20 px cards, soft borders, consistent section gaps, safe scrolling, and fixed bottom navigation match the reference system.
-- Colors and visual tokens: off-white page, white cards, navy headings, green success, purple academic actions, and muted upcoming state are consistent.
-- Image quality and assets: no screenshot backgrounds or external imagery are used; UI is built from Flutter widgets and Material icons as requested.
-- Copy and content: published date, overall Pass, 94% attendance, four grades, report actions, upcoming state, and teacher note match the supplied brief.
+- [P2] Student roster density differs from the reference table.
+  - Location: `apps/web/components/forms/student-directory.tsx`.
+  - Evidence: the reference exposes persistent column headers and more records per viewport; the implementation uses responsive roster rows with the same core data and actions.
+  - Impact: desktop scanning is less compact than the supplied visual target.
+  - Fix: convert the roster row grid to a semantic table while retaining the current mobile row layout and URL-backed inspector selection.
 
 **Patches made during QA**
 
-- Reduced grade-card density and button label wrapping on narrow phones.
-- Fixed compact overflows in Calendar, Report Cards, Transport, Canteen Wallet, and Library.
-- Added compact-device widget regression coverage for all new More screens.
+- Replaced invalid pending-admission status calls with an honest unavailable KPI.
+- Moved readiness and duplicate attention content behind a collapsed disclosure so the roster remains the main task.
+- Added persisted CSV import history and import-review queue.
+- Added document expiry policy visibility and audited guardian-access revocation.
+- Added focused M1 contract tests.
 
-**Implementation Checklist**
+**Blocking condition**
 
-- [x] Reference hierarchy and content preserved.
-- [x] More tab remains active.
-- [x] Small-screen layout has no tested overflows.
-- [x] Actions remain interactive.
-- [x] Emulator build installs and renders without crash-buffer entries.
+- Further browser comparison was stopped after the in-app browser security policy rejected continued localhost use.
+- The final production build rerun was also blocked by the execution approval usage limit; the preceding production build passed before the final workflow-coverage additions, and the final TypeScript, ESLint, and unit/contract gates pass.
 
-final result: passed
+final result: blocked

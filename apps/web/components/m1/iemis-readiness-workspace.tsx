@@ -33,6 +33,14 @@ export function IemisReadinessWorkspace() {
     queryKey: ['student-iemis-readiness-list', 'workspace', status],
     queryFn: () => api.listIemisReadiness({ status }),
   });
+  const importBatchesQuery = useQuery({
+    queryKey: ['admission-import-batches', 1],
+    queryFn: () => api.listAdmissionImportBatches({ page: 1, limit: 10 }),
+  });
+  const importReviewQuery = useQuery({
+    queryKey: ['admission-import-review-queue'],
+    queryFn: () => api.listAdmissionImportReviewQueue({ limit: 25 }),
+  });
 
   const exportMutation = useMutation({
     mutationFn: api.exportIemisStudents,
@@ -50,6 +58,8 @@ export function IemisReadinessWorkspace() {
       setToast({ title: 'Import processed', description: `${result.created} created, ${result.failed} failed, ${result.validated} validated.`, tone: result.failed ? 'info' : 'success' });
       void queryClient.invalidateQueries({ queryKey: ['students'] });
       void queryClient.invalidateQueries({ queryKey: ['student-iemis-readiness-list'] });
+      void queryClient.invalidateQueries({ queryKey: ['admission-import-batches'] });
+      void queryClient.invalidateQueries({ queryKey: ['admission-import-review-queue'] });
     },
     onError: (error) => setToast({ title: 'Import failed', description: error instanceof Error ? error.message : 'The import could not be processed.', tone: 'danger' }),
   });
@@ -87,9 +97,9 @@ export function IemisReadinessWorkspace() {
         <KpiCard title="Ready Records" value={readyCount} icon={<CheckCircle2 size={19} />} tone="success" description="Current validation result" />
         <KpiCard title="Validation Errors" value={issueRows.length} icon={<AlertTriangle size={19} />} tone={issueRows.length ? 'danger' : 'success'} description="Returned by backend rules" />
         <KpiCard title="Missing Fields" value={missingFields} icon={<FileSpreadsheet size={19} />} tone={missingFields ? 'warning' : 'success'} description="From validation messages" />
-        <KpiCard title="Duplicate Rows" value="Unavailable" icon={<FileSpreadsheet size={19} />} tone="neutral" description="No iEMIS duplicate summary API" />
-        <KpiCard title="Last Export" value={exportResult ? new Date(exportResult.exportedAt).toLocaleDateString() : 'Not in session'} icon={<Download size={19} />} tone="info" description="Latest export requested here" />
-        <KpiCard title="Import Jobs" value={importMutation.isPending ? 'Running' : importResult ? '1 processed' : 'No session jobs'} icon={<Upload size={19} />} tone={importMutation.isPending ? 'warning' : 'neutral'} description="Current API processes synchronously" />
+        <KpiCard title="Duplicate Rows" value="—" icon={<FileSpreadsheet size={19} />} tone="neutral" description="No iEMIS duplicate summary API" />
+        <KpiCard title="Last Export" value={exportResult ? new Date(exportResult.exportedAt).toLocaleDateString() : '—'} icon={<Download size={19} />} tone="info" description="Latest export requested here" />
+        <KpiCard title="Import Jobs" value={importMutation.isPending ? 'Running' : importBatchesQuery.data?.total ?? 'Unavailable'} icon={<Upload size={19} />} tone={importMutation.isPending ? 'warning' : 'info'} description="Persisted admission import batches" />
       </KpiGrid>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -136,7 +146,17 @@ export function IemisReadinessWorkspace() {
               <div className="mt-3 grid gap-3 sm:grid-cols-4">
                 {[['Rows', importResult.totalRows], ['Created', importResult.created], ['Validated', importResult.validated], ['Failed', importResult.failed]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-100 bg-slate-50 p-3"><p className="text-xs font-bold text-slate-500">{label}</p><p className="mt-1 text-xl font-black text-slate-900">{value}</p></div>)}
               </div>
-            ) : <p className="mt-2 text-sm text-slate-500">No import has been run in this browser session. The current backend does not expose durable async import-job history.</p>}
+            ) : <p className="mt-2 text-sm text-slate-500">No import has been run in this browser session. Persisted batch history is listed below.</p>}
+          </div>
+
+          <div className="border-t border-slate-100 p-4">
+            <div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-black text-slate-900">CSV Import History</h3><p className="mt-1 text-xs text-slate-500">Tenant-scoped persisted batches from the admissions backend.</p></div><StatusBadge status={`${importBatchesQuery.data?.total ?? 0} JOBS`} tone="info" /></div>
+            {importBatchesQuery.isError ? <p className="mt-3 rounded-xl bg-danger-50 p-3 text-xs font-bold text-danger-700">Import history could not be loaded.</p> : (importBatchesQuery.data?.items.length ?? 0) === 0 ? <p className="mt-3 text-sm text-slate-500">No persisted import batches.</p> : <div className="mt-3 overflow-x-auto"><table className="min-w-[720px] w-full text-left text-xs"><thead className="bg-slate-50 font-black uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">File</th><th className="px-3 py-2">Started</th><th className="px-3 py-2">Rows</th><th className="px-3 py-2">Created</th><th className="px-3 py-2">Failed</th><th className="px-3 py-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{importBatchesQuery.data?.items.map((batch) => <tr key={batch.id}><td className="max-w-56 truncate px-3 py-3 font-bold text-slate-800">{batch.sourceFileName}</td><td className="px-3 py-3 text-slate-600">{new Date(batch.startedAt).toLocaleString()}</td><td className="px-3 py-3 font-bold">{batch.totalRows}</td><td className="px-3 py-3 font-bold text-success-700">{batch.createdRows}</td><td className="px-3 py-3 font-bold text-danger-700">{batch.failedRows}</td><td className="px-3 py-3"><StatusBadge status={batch.status} /></td></tr>)}</tbody></table></div>}
+          </div>
+
+          <div className="border-t border-slate-100 p-4">
+            <div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-black text-slate-900">Import Review Queue</h3><p className="mt-1 text-xs text-slate-500">Failed or duplicate-matched rows that require operator review.</p></div><StatusBadge status={`${importReviewQuery.data?.total ?? 0} ROWS`} tone={(importReviewQuery.data?.total ?? 0) > 0 ? 'pending' : 'approved'} /></div>
+            {(importReviewQuery.data?.items.length ?? 0) === 0 ? <p className="mt-3 text-sm text-slate-500">No import rows currently require review.</p> : <div className="mt-3 space-y-2">{importReviewQuery.data?.items.slice(0, 8).map((row) => <div key={row.id} className="flex flex-col gap-2 rounded-xl border border-warning-100 bg-warning-50/50 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-bold text-slate-900">{row.sourceFileName} · row {row.rowNumber}</p><p className="mt-1 text-xs text-slate-600">{row.workflowLabel} · {row.errors.length} errors · {row.duplicates.length} duplicate candidates</p></div><StatusBadge status={row.status} /></div>)}</div>}
           </div>
         </section>
 

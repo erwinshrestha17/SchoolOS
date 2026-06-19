@@ -298,6 +298,41 @@ export const studentsApi = {
     }),
   recoverAdmissionDrafts: (params?: { draftKey?: string; guardianPhone?: string; limit?: number }) =>
     request<any[]>(withQuery('/admissions/m1/drafts/recover', params ?? {})),
+  listAdmissionImportBatches: (params?: { page?: number; limit?: number; status?: string }) =>
+    request<PaginatedResponse<AdmissionImportBatchSummary>>(
+      withQuery('/admissions/bulk-import/batches', params ?? {}),
+    ),
+  getAdmissionImportBatch: (batchId: string) =>
+    request<AdmissionImportBatchDetail>(
+      `/admissions/bulk-import/batches/${encodeURIComponent(batchId)}`,
+    ),
+  listAdmissionImportReviewQueue: (params?: { status?: string; limit?: number }) =>
+    request<{ items: AdmissionImportReviewRow[]; total: number; policy: string }>(
+      withQuery('/admissions/m1/import-review/queue', params ?? {}),
+    ),
+  listDocumentExpiryTemplates: () =>
+    request<DocumentExpiryTemplate[]>('/students/document-expiry/templates'),
+  upsertDocumentExpiryTemplate: (body: {
+    channel: 'email' | 'sms';
+    reminderStatus: 'expired' | 'expiring';
+    subjectTemplate?: string;
+    messageTemplate: string;
+    daysBeforeExpiry?: number;
+    isActive?: boolean;
+  }) =>
+    request<DocumentExpiryTemplate>('/students/document-expiry/templates', {
+      method: 'POST',
+      json: body,
+    }),
+  removeStudentGuardianAccess: (
+    studentId: string,
+    guardianId: string,
+    body: { reason: string; confirmFileAccessReview: true },
+  ) =>
+    request<{ removed: true }>(
+      `/admissions/m1/students/${encodeURIComponent(studentId)}/guardians/${encodeURIComponent(guardianId)}`,
+      { method: 'DELETE', json: body },
+    ),
 
   uploadStudentDocument: (body: UploadStudentDocumentPayload) =>
     request('/student-documents', {
@@ -381,4 +416,61 @@ export type StudentQrScanAudit = {
   failureCode: string | null;
   reason: string | null;
   timestamp: string;
+};
+
+export type AdmissionImportBatchSummary = {
+  id: string;
+  sourceFileName: string;
+  dryRun: boolean;
+  confirmDuplicates: boolean;
+  status: string;
+  totalRows: number;
+  createdRows: number;
+  validatedRows: number;
+  failedRows: number;
+  createdById: string;
+  startedAt: string;
+  completedAt: string | null;
+  createdAt: string;
+};
+
+export type AdmissionImportBatchDetail = AdmissionImportBatchSummary & {
+  created: number;
+  validated: number;
+  failed: number;
+  errorReportCsv: string;
+  rows: Array<{
+    rowNumber: number;
+    status: string;
+    studentId?: string;
+    studentSystemId?: string;
+    errors: unknown[];
+    duplicates: unknown[];
+    rawData: unknown;
+  }>;
+};
+
+export type AdmissionImportReviewRow = {
+  id: string;
+  batchId: string;
+  sourceFileName: string;
+  rowNumber: number;
+  status: string;
+  workflowLabel: string;
+  errors: unknown[];
+  duplicates: unknown[];
+  rawData: unknown;
+  createdAt: string;
+};
+
+export type DocumentExpiryTemplate = {
+  id: string;
+  channel: 'email' | 'sms';
+  reminderStatus: 'expired' | 'expiring';
+  subjectTemplate: string | null;
+  messageTemplate: string;
+  daysBeforeExpiry: number | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 };

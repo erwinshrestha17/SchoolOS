@@ -10,6 +10,7 @@ import { api } from '../../lib/api';
 import { fileToBase64Payload } from '../../lib/files';
 import { Avatar } from '../ui/avatar';
 import { Button } from '../ui/button';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 import { EmptyState } from '../ui/empty-state';
 import { ErrorState } from '../ui/error-state';
 import { KpiCard, KpiGrid } from '../ui/kpi-card';
@@ -27,6 +28,8 @@ export function StudentDocumentsWorkspace() {
   const [selectedDocument, setSelectedDocument] = useState<StudentDocument | null>(null);
   const [documentKind, setDocumentKind] = useState('BIRTH_CERTIFICATE');
   const [toast, setToast] = useState<{ tone: 'success' | 'danger'; title: string; description: string } | null>(null);
+  const [guardianToRemove, setGuardianToRemove] = useState<{ id: string; name: string } | null>(null);
+  const [guardianRemovalReason, setGuardianRemovalReason] = useState('');
   const searchParams = useSearchParams();
 
   const studentsQuery = useQuery({
@@ -42,6 +45,10 @@ export function StudentDocumentsWorkspace() {
     queryKey: ['student-document-history', selectedStudent?.id],
     queryFn: () => api.listStudentDocumentHistory(selectedStudent!.id),
     enabled: Boolean(selectedStudent),
+  });
+  const expiryTemplatesQuery = useQuery({
+    queryKey: ['student-document-expiry-templates'],
+    queryFn: api.listDocumentExpiryTemplates,
   });
 
   useEffect(() => {
@@ -81,6 +88,23 @@ export function StudentDocumentsWorkspace() {
     },
     onError: (error) => setToast({ tone: 'danger', title: 'Verification failed', description: error instanceof Error ? error.message : 'The review could not be saved.' }),
   });
+  const removeGuardianMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedStudent || !guardianToRemove) throw new Error('Select a guardian link to remove.');
+      return api.removeStudentGuardianAccess(selectedStudent.id, guardianToRemove.id, {
+        reason: guardianRemovalReason,
+        confirmFileAccessReview: true,
+      });
+    },
+    onSuccess: () => {
+      setToast({ tone: 'success', title: 'Guardian access revoked', description: 'The relationship was removed and protected-file access review was recorded.' });
+      setGuardianToRemove(null);
+      setGuardianRemovalReason('');
+      void queryClient.invalidateQueries({ queryKey: ['student-profile', selectedStudent?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['student-document-history', selectedStudent?.id] });
+    },
+    onError: (error) => setToast({ tone: 'danger', title: 'Guardian access was not changed', description: error instanceof Error ? error.message : 'The backend rejected this request.' }),
+  });
 
   if (studentsQuery.isLoading) return <LoadingState variant="page" label="Loading student documents…" />;
   if (studentsQuery.isError) return <ErrorState title="Student records could not load" message="No files were changed." onRetry={() => void studentsQuery.refetch()} />;
@@ -118,6 +142,11 @@ export function StudentDocumentsWorkspace() {
                 </div>
               </section>
 
+              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3"><div><h2 className="text-base font-black text-slate-950">Linked Guardians</h2><p className="mt-1 text-xs text-slate-500">Removing a guardian immediately revokes the student relationship and triggers a protected-file access review.</p></div><StatusBadge status={`${profileQuery.data.guardians.length} LINKED`} tone="info" /></div>
+                {profileQuery.data.guardians.length === 0 ? <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No guardians are linked.</p> : <div className="mt-4 grid gap-3 md:grid-cols-2">{profileQuery.data.guardians.map((guardian) => <article key={guardian.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4"><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-black text-slate-900">{guardian.fullName}</h3>{guardian.isPrimary ? <StatusBadge status="PRIMARY" tone="info" /> : null}</div><p className="mt-1 text-xs font-semibold text-slate-500">{guardian.relation} · {guardian.primaryPhone}</p><p className="mt-1 text-xs text-slate-500">{guardian.email ?? 'Email not recorded'}</p></div><Button type="button" size="sm" variant="outline" onClick={() => setGuardianToRemove({ id: guardian.id, name: guardian.fullName })}>Revoke access</Button></div></article>)}</div>}
+              </section>
+
               <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
                 <KpiCard title="Total" value={documents.length} icon={<FileCheck2 size={18} />} tone="info" />
                 <KpiCard title="Verified" value={verified} icon={<CheckCircle2 size={18} />} tone="success" />
@@ -137,6 +166,7 @@ export function StudentDocumentsWorkspace() {
 
         <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:sticky xl:top-24" aria-label="Document inspector">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-4"><ShieldCheck className="h-5 w-5 text-primary-600" /><h2 className="text-base font-black text-slate-950">Document Inspector</h2></div>
+          <div className="border-b border-slate-100 py-4"><div className="flex items-center justify-between"><h3 className="text-xs font-black uppercase tracking-wide text-slate-500">Expiry reminders</h3><StatusBadge status={`${expiryTemplatesQuery.data?.filter((item) => item.isActive).length ?? 0} ACTIVE`} tone="info" /></div>{expiryTemplatesQuery.isError ? <p className="mt-2 text-xs font-bold text-danger-700">Expiry policies could not load.</p> : (expiryTemplatesQuery.data?.length ?? 0) === 0 ? <p className="mt-2 text-xs text-slate-500">No document-expiry reminder templates configured.</p> : <div className="mt-2 space-y-2">{expiryTemplatesQuery.data?.slice(0, 4).map((template) => <div key={template.id} className="rounded-lg bg-slate-50 p-2 text-xs"><p className="font-bold text-slate-800">{template.reminderStatus} · {template.channel}</p><p className="mt-0.5 text-slate-500">{template.daysBeforeExpiry ? `${template.daysBeforeExpiry} days before expiry` : 'At expiry'} · {template.isActive ? 'Active' : 'Inactive'}</p></div>)}</div>}</div>
           {!selectedDocument ? <p className="py-10 text-center text-sm text-slate-500">Select a document to view protected file controls, metadata, verification, and audit history.</p> : <div className="space-y-4 pt-4">
             <div><p className="text-xs font-black uppercase tracking-wide text-slate-500">{selectedDocument.kind.replace(/_/g, ' ')}</p><p className="mt-1 break-all text-sm font-bold text-slate-900">{selectedDocument.fileName}</p></div>
             <dl className="space-y-2 rounded-xl bg-slate-50 p-3 text-xs"><div className="flex justify-between gap-3"><dt className="text-slate-500">Status</dt><dd><StatusBadge status={selectedDocument.status ?? 'PENDING'} /></dd></div><div className="flex justify-between gap-3"><dt className="text-slate-500">Size</dt><dd className="font-bold">{Math.ceil(selectedDocument.sizeBytes / 1024)} KB</dd></div><div className="flex justify-between gap-3"><dt className="text-slate-500">Uploaded</dt><dd className="font-bold">{new Date(selectedDocument.uploadedAt).toLocaleString()}</dd></div></dl>
@@ -145,6 +175,20 @@ export function StudentDocumentsWorkspace() {
           </div>}
         </aside>
       </div>
+
+      <ConfirmDialog
+        isOpen={Boolean(guardianToRemove)}
+        title="Revoke guardian access?"
+        description={`Remove ${guardianToRemove?.name ?? 'this guardian'} from the selected student and record the required protected-file access review.`}
+        confirmLabel="Revoke guardian access"
+        destructive
+        isConfirming={removeGuardianMutation.isPending}
+        confirmDisabled={guardianRemovalReason.trim().length < 5}
+        onClose={() => { setGuardianToRemove(null); setGuardianRemovalReason(''); }}
+        onConfirm={() => removeGuardianMutation.mutate()}
+      >
+        <label className="block text-sm font-bold text-slate-700">Audit reason<textarea rows={3} value={guardianRemovalReason} onChange={(event) => setGuardianRemovalReason(event.target.value)} placeholder="Why should this guardian relationship and access be removed?" className="mt-2 font-normal" /></label>
+      </ConfirmDialog>
     </div>
   );
 }

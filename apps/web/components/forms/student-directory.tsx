@@ -219,8 +219,8 @@ export function StudentDirectory({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <KpiGrid className="flex-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+      <div className="space-y-3">
+        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           <KpiCard
             title="Active Students"
             value={activeStudentsTotal ?? 'Unavailable'}
@@ -230,24 +230,24 @@ export function StudentDirectory({
           />
           <KpiCard
             title="Pending Applications"
-            value={pendingAdmissionsTotal ?? 'Unavailable'}
+            value={pendingAdmissionsTotal ?? '—'}
             icon={<ClipboardCheck size={20} />}
             tone="warning"
             description="Server total awaiting review."
           />
           <KpiCard
             title="Missing Documents"
-            value="Unavailable"
+            value="—"
             icon={<FolderOpen size={20} />}
             tone="neutral"
             description="Summary is not available yet."
           />
           <KpiCard
             title="Duplicate Candidates"
-            value="Unavailable"
+            value={isLoadingDuplicateCandidates ? '…' : duplicateCandidates.length}
             icon={<UserCheck size={20} />}
             tone="neutral"
-            description="Candidate review is available below."
+            description="Current backend review window."
           />
           <KpiCard
             title="iEMIS Issues"
@@ -258,13 +258,13 @@ export function StudentDirectory({
           />
           <KpiCard
             title="QR Active"
-            value="Unavailable"
+            value="—"
             icon={<ContactRound size={20} />}
             tone="neutral"
             description="QR controls remain available per student."
           />
         </KpiGrid>
-        <div className="flex flex-wrap items-center gap-2 lg:justify-end shrink-0">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <ActionMenu
             label="Open student directory actions"
             items={[
@@ -394,6 +394,12 @@ export function StudentDirectory({
         </div>
       </FilterBar>
 
+      <details className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <summary className="cursor-pointer list-none px-5 py-4 text-sm font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--color-mod-admissions-border)]">
+          Readiness & duplicate attention panels
+          <span className="ml-2 text-xs font-semibold text-slate-500">{iemisIssueRows.length} iEMIS issues · {duplicateCandidates.length} duplicate candidates</span>
+        </summary>
+        <div className="space-y-5 border-t border-slate-100 p-4">
       <SectionCard
         title="Class iEMIS Readiness"
         description={
@@ -548,6 +554,8 @@ export function StudentDirectory({
           )}
         </SectionCard>
       ) : null}
+        </div>
+      </details>
 
       <SectionCard
         title="Student Roster"

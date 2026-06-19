@@ -1,0 +1,47 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import test from 'node:test';
+
+const webRoot = new URL('..', import.meta.url).pathname;
+const read = (path) => readFileSync(join(webRoot, path), 'utf8');
+
+test('M1 workspaces expose real route-backed operations', () => {
+  const api = read('lib/api/students.ts');
+  const routes = [
+    'app/dashboard/admissions/documents/page.tsx',
+    'app/dashboard/admissions/duplicates/page.tsx',
+    'app/dashboard/admissions/iemis/page.tsx',
+    'app/dashboard/admissions/qr/page.tsx',
+    'app/dashboard/admissions/review/page.tsx',
+  ].map(read).join('\n');
+
+  assert.match(routes, /StudentDocumentsWorkspace/);
+  assert.match(routes, /DuplicateCandidatesWorkspace/);
+  assert.match(routes, /IemisReadinessWorkspace/);
+  assert.match(routes, /QrIdWorkspace/);
+  assert.match(routes, /ApplicationReviewWorkspace/);
+  assert.match(api, /\/students\/duplicates\/merge/);
+  assert.match(api, /\/admissions\/bulk-import\/batches/);
+  assert.match(api, /\/admissions\/m1\/import-review\/queue/);
+  assert.match(api, /\/students\/document-expiry\/templates/);
+  assert.match(api, /confirmFileAccessReview: true/);
+});
+
+test('M1 high-risk workflows remain server controlled and protected', () => {
+  const duplicates = read('components/m1/duplicate-candidates-workspace.tsx');
+  const documents = read('components/m1/student-documents-workspace.tsx');
+  const qr = read('components/m1/qr-id-workspace.tsx');
+  const iemis = read('components/m1/iemis-readiness-workspace.tsx');
+
+  assert.match(duplicates, /previewDuplicateStudentMerge/);
+  assert.match(duplicates, /mergeDuplicateStudent/);
+  assert.match(duplicates, /Mark Not Duplicate — unavailable/);
+  assert.match(documents, /ProtectedFileButton/);
+  assert.match(documents, /removeStudentGuardianAccess/);
+  assert.match(documents, /Expiry reminders/);
+  assert.match(qr, /StudentQrCard/);
+  assert.match(iemis, /CSV Import History/);
+  assert.match(iemis, /Import Review Queue/);
+  assert.doesNotMatch(duplicates + documents + qr + iemis, /publicUrl|objectKey/);
+});
