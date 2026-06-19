@@ -9,12 +9,31 @@ This folder contains focused module design references derived from SchoolOS visu
 docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
 ```
 
+---
+
+## Active module numbering
+
+| Module | Name |
+|---|---|
+| M8 | Library |
+| M9 | Transport |
+| M10 | Canteen |
+| M12 | Notifications, Notices, Communication, Chat |
+| M13 | Learning Layer |
+
+`M8A`, `M8B`, and `M8C` are obsolete labels. Library, Transport, and Canteen are standalone modules.
+
+Inventory & Asset Management is scrapped from active design scope.
+
+---
+
 ## Available references
 
 | Module | Reference |
 |---|---|
-| M8A Library | `M8A_LIBRARY_FRONTEND_REFERENCE.md` |
-| M13 Inventory & Asset Management | `M13_INVENTORY_ASSET_FRONTEND_REFERENCE.md` |
+| M8 Library | `M8_LIBRARY_FRONTEND_REFERENCE.md` |
+
+---
 
 ## Usage rules
 
@@ -22,5 +41,5 @@ docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
 - Confirm API names, DTOs, permissions, route guards, and protected-file behavior against backend/OpenAPI before coding.
 - Do not use fake frontend data to match visual references.
 - Keep parent, student, staff self-service, driver, and mobile companion surfaces purpose-limited.
-- For M13, never calculate official stock, valuation, depreciation, or accounting truth in the browser.
-- For M13, protected bills, warranty cards, quotations, stocktake sheets, write-off documents, labels, and exports must use File Registry-backed authenticated helpers.
+- Use active module numbers in new docs and UI copy.
+- Do not create Inventory & Asset Management references unless that module is explicitly re-approved.
