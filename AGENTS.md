@@ -7,13 +7,39 @@ Token-light global rules for agents. Detailed behavior lives in the active docs 
 Start with `README.md`, `docs/README.md`, `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`, `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`, and `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`. Then read the focused source for the touched area:
 
 - Product/function: `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`
-- M13 Inventory & Asset Management: `docs/product/M13_INVENTORY_ASSET_MANAGEMENT.md`, `docs/design/modules/M13_INVENTORY_ASSET_FRONTEND_REFERENCE.md`, `docs/implementation/M13_INVENTORY_ASSET_IMPLEMENTATION_PLAN.md`
 - Architecture/security/platform: `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md`
+- Notification module: `docs/architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md`
 - Web: `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `apps/web/e2e/README.md`
 - Mobile: `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`, `apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md`
 - Deploy/staging: `docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md`
 
 Do not recreate old split plans or duplicate docs. Update the smallest active source of truth only when docs truly need changes.
+
+## Active module taxonomy
+
+Use this numbering in new docs, UI copy, comments, tickets, and implementation notes:
+
+| Module | Name |
+|---|---|
+| M0 | Platform Core |
+| M1 | Admissions and Student Profiles |
+| M2 | Smart Attendance |
+| M3 | Fees and Receipts |
+| M4 | Academics, Exams, CAS, Report Cards |
+| M5 | Activity Feed and Milestones |
+| M6 | Homework and Timetable |
+| M7 | HR and Payroll |
+| M8 | Library |
+| M9 | Transport |
+| M10 | Canteen |
+| M11 | Accounting and Finance |
+| M12 | Notifications, Notices, Communication, Chat |
+| M13 | Learning Layer |
+| M14 | Intelligence / AI |
+
+`M8A`, `M8B`, and `M8C` are obsolete. Library, Transport, and Canteen are independent modules.
+
+Inventory & Asset Management is scrapped from the active module plan. Do not add Inventory docs, APIs, routes, migrations, entitlements, seed data, or UI unless explicitly re-approved by the project owner.
 
 ## Product stance and release target
 
@@ -32,7 +58,7 @@ GA / Production release
 
 Report readiness honestly. The documented current stage is Internal QA ready; SchoolOS is not GA until staging migration and provider checks, authenticated browser E2E, device QA, backup/restore proof, controlled-pilot workflows, monitoring, rollback, and release evidence pass. Passing local tests, showing a demo, or completing backend code does not establish production or GA readiness.
 
-Current priorities: security/RBAC/tenant-isolation evidence; staging deployment and operational proof; browser E2E; real-API web workspaces; pilot workflows; mobile device QA; performance/backup/observability/release automation. M11 AI remains roadmap only unless explicitly approved. M13 Inventory & Asset Management is currently documented planned scope; do not claim code readiness until migrations, contracts, APIs, web screens, tests, seed data, and smoke evidence exist.
+Current priorities: security/RBAC/tenant-isolation evidence; staging deployment and operational proof; browser E2E; real-API web workspaces; pilot workflows; mobile device QA; performance/backup/observability/release automation. M14 AI remains roadmap only unless explicitly approved.
 
 ## Architecture: never break
 
@@ -41,26 +67,26 @@ Current priorities: security/RBAC/tenant-isolation evidence; staging deployment 
 - Do not rename `tenantId`.
 - Keep planes separate: `/platform/*` operator SaaS, `/dashboard/settings/*` school config, `/dashboard/*` school operations.
 - Do not mix SaaS billing with school fee collection/accounting.
-- Keep M12 Learning separate and reuse core students/staff/classes/subjects/timetable/files/RBAC/audit/communication.
-- Keep M13 Inventory & Asset Management separate from M9 Accounting, M8A Library, M8B Transport, and M8C Canteen ownership. M13 may emit safe handoff events; official ledger posting remains M9-owned.
+- Keep M13 Learning separate and reuse core students/staff/classes/subjects/timetable/files/RBAC/audit/communication.
+- Keep M12 Notification/Communication delivery separate from feature modules. Source modules emit events; the Notification module owns recipient resolution, templates, channel routing, delivery jobs, retries, read state, provider diagnostics, and audit.
 
 ## Security and data rules
 
-- `tenantId` is the strict boundary for API, jobs, files, cache, exports, reports, web, mobile, inventory, assets, and learning.
+- `tenantId` is the strict boundary for API, jobs, files, cache, exports, reports, web, mobile, learning, notifications, and school operations.
 - Backend authorization is truth; frontend hiding is UX only.
 - Disabled modules and suspended tenants fail closed everywhere.
 - Parent = linked children only. Student = own/session-scoped only. Teacher = assigned class/section/subject only unless permitted. Driver = assigned trip only. Staff self-service = own data only.
 - Platform support override needs reason, audit, and expiry where supported.
 - Never expose unsafe internals, private payloads, provider/storage internals, raw stack traces, or private staff/finance data.
-- M13 vendor details, bills, purchase records, asset documents, stocktake records, write-off evidence, and accounting handoff state must be permission-filtered.
+- Notifications must not leak private message bodies, provider credentials, callback secrets, raw object keys, private URLs, salary/bank data, or unrelated student details.
 
-## Files, money, inventory, web, mobile
+## Files, money, notifications, web, mobile
 
 Files: always use `Feature module -> FileRegistryService -> StorageService -> StorageAdapter`. No provider SDKs in feature modules, no base64 files in DB, no raw private-file browser opens. Web/mobile use protected authenticated helpers.
 
 Money: backend/database totals only. Money writes are idempotent and audited. Confirmed finance/accounting/payroll records use reversal/correction, not silent mutation. No offline financial writes unless explicitly approved with backend reconciliation.
 
-Inventory: stock quantities, valuation, purchase receive, issue/return, transfer, adjustment, stocktake variance, maintenance completion, asset write-off/disposal, depreciation, and accounting handoff are backend-owned. The browser must not calculate official stock or accounting truth. M13 must never directly post official M9 ledger entries from frontend code.
+Notifications: source modules emit normalized events and never call SMS/email/push providers directly. M12 owns recipient resolution, templates, preferences, channel routing, delivery attempts, retries, provider callbacks, read state, and notification-center behavior.
 
 Web: one screen = one main job; real APIs only; no fake production data; server-side pagination for growing lists; states for loading/empty/error/success/permission/module locked/validation/file unavailable/queued/partial failure; high-risk actions need confirmation and reason where required.
 
@@ -81,7 +107,6 @@ If any web/mobile/platform surface needs data and no safe backend API exists, ma
 - Query performance: new list/summary APIs use aggregate/select queries, pagination where needed, no unbounded `findMany`, and tenant-scoped index review for common filters.
 - Error shape: backend returns safe bounded error envelopes; web/mobile parse shared errors and never show raw technical/provider/storage/Prisma messages.
 - Stop on unknowns: do not guess contracts, permissions, DTOs, idempotency, file access, or offline behavior; mark the exact `needs ... confirmation` item.
-- M13 implementation must start with contracts/models/permissions/tests before broad UI wiring.
 
 ## Before coding
 
@@ -94,7 +119,7 @@ If any web/mobile/platform surface needs data and no safe backend API exists, ma
 
 ## Done means
 
-Development complete means real persistence; no fake production data; tenant/RBAC/entitlement enforced; persona scopes fail closed; sensitive writes audited; money idempotent; inventory movement idempotent where relevant; files through File Registry/StorageService; paginated growing lists; complete UI states; protected downloads; and focused regression updated where appropriate.
+Development complete means real persistence; no fake production data; tenant/RBAC/entitlement enforced; persona scopes fail closed; sensitive writes audited; money idempotent; notification delivery state honest; files through File Registry/StorageService; paginated growing lists; complete UI states; protected downloads; and focused regression updated where appropriate.
 
 A staging, release-candidate, production, or GA claim additionally requires the exact applicable evidence in `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`: staging migration and configuration validation, provider/storage checks, seeded authenticated browser E2E, device QA, backup/restore proof, monitoring/alerts, rollback readiness, and controlled-pilot workflow evidence. Do not substitute local checks for these gates.
 
