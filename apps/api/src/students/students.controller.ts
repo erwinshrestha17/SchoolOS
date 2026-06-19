@@ -50,6 +50,15 @@ export class StudentsController {
     return this.studentsService.listStudents(query, auth);
   }
 
+  @Get('summary')
+  @Permissions('students:read')
+  getStudentModuleSummary(
+    @Query() query: ListStudentsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.getStudentModuleSummary(query, auth);
+  }
+
   @Get('duplicates/candidates')
   @Permissions('students:manage_lifecycle')
   listDuplicateStudentCandidates(

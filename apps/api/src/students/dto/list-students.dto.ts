@@ -22,6 +22,10 @@ export class ListStudentsDto {
 
   @IsOptional()
   @IsString()
+  academicYearId?: string;
+
+  @IsOptional()
+  @IsString()
   classId?: string;
 
   @IsOptional()

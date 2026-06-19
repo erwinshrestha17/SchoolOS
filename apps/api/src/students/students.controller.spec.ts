@@ -16,6 +16,7 @@ const actor: AuthContext = {
 function createController() {
   const service = {
     listStudents: jest.fn(),
+    getStudentModuleSummary: jest.fn(),
     getStudentProfile: jest.fn(),
     createStudent: jest.fn(),
     updateStudent: jest.fn(),
@@ -48,6 +49,22 @@ function createController() {
 }
 
 describe('StudentsController M1 contracts', () => {
+  it('delegates student module summary filters to the backend service', () => {
+    const { controller, service } = createController();
+    const query = {
+      academicYearId: 'academic-year-1',
+      classId: 'class-1',
+      sectionId: 'section-1',
+      search: 'Maya',
+    };
+    service.getStudentModuleSummary.mockReturnValue({ activeStudents: 2 });
+
+    const result = controller.getStudentModuleSummary(query as never, actor);
+
+    expect(service.getStudentModuleSummary).toHaveBeenCalledWith(query, actor);
+    expect(result).toEqual({ activeStudents: 2 });
+  });
+
   it('sanitizes student profile response before returning it', async () => {
     const { controller, service } = createController();
     service.getStudentProfile.mockResolvedValue({

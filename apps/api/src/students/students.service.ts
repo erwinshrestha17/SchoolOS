@@ -12,12 +12,12 @@ import {
   NotificationChannel,
   Prisma,
   StudentLifecycleStatus,
-  StudentDocumentKind,
+  StudentQrStatus,
 } from '@prisma/client';
 import {
   StudentAttendanceHistory,
-  StudentAttendanceHistoryRow,
   StudentAttendanceHistorySummary,
+  StudentModuleSummary,
 } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
@@ -101,10 +101,16 @@ export class StudentsService {
         throw new NotFoundException('Student role not found for this tenant');
       }
 
+      if (!dto.email || !dto.password) {
+        throw new BadRequestException(
+          'Email and password are required when creating a student login',
+        );
+      }
+
       const managedUser = await this.usersService.createManagedUser({
         tenantId: actor.tenantId,
-        email: dto.email!,
-        password: dto.password!,
+        email: dto.email,
+        password: dto.password,
         phone: dto.phone,
         roleIds: [studentRole.id],
         assignedById: actor.userId,
@@ -182,24 +188,26 @@ export class StudentsService {
   }
 
   async listStudents(query: ListStudentsDto, actor: AuthContext) {
-    const { page = 1, limit = 50, search, classId, sectionId, status } = query;
+    const {
+      page = 1,
+      limit = 50,
+      search,
+      academicYearId,
+      classId,
+      sectionId,
+      status,
+    } = query;
     const skip = (page - 1) * limit;
-
-    const where: Prisma.StudentWhereInput = {
-      tenantId: actor.tenantId,
-      ...(status ? { lifecycleStatus: status } : {}),
-      ...(classId ? { classId } : {}),
-      ...(sectionId ? { sectionId } : {}),
-      ...(search
-        ? {
-            OR: [
-              { firstNameEn: { contains: search, mode: 'insensitive' } },
-              { lastNameEn: { contains: search, mode: 'insensitive' } },
-              { studentSystemId: { contains: search, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
-    };
+    const where = this.buildStudentDirectoryWhere(
+      {
+        search,
+        academicYearId,
+        classId,
+        sectionId,
+        status,
+      },
+      actor,
+    );
 
     const [total, students] = await Promise.all([
       this.prisma.student.count({ where }),
@@ -207,7 +215,24 @@ export class StudentsService {
         where,
         include: {
           class: true,
+          sectionRef: true,
           user: true,
+          guardianLinks: {
+            include: { guardian: true },
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          },
+          qrCredentials: {
+            where: { status: StudentQrStatus.ACTIVE },
+            orderBy: [{ createdAt: 'desc' }],
+            take: 1,
+          },
+          _count: {
+            select: {
+              documents: {
+                where: { status: { not: 'ARCHIVED' } },
+              },
+            },
+          },
         },
         orderBy: [{ createdAt: 'desc' }, { firstNameEn: 'asc' }],
         skip,
@@ -221,21 +246,308 @@ export class StudentsService {
         studentSystemId: student.studentSystemId,
         firstNameEn: student.firstNameEn,
         lastNameEn: student.lastNameEn,
+        fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+        fullNameNp:
+          student.firstNameNp || student.lastNameNp
+            ? `${student.firstNameNp ?? ''} ${student.lastNameNp ?? ''}`.trim()
+            : null,
+        gender: student.gender,
+        dateOfBirth: student.dateOfBirth.toISOString().slice(0, 10),
+        admissionNumber: student.admissionNumber,
+        admissionDate: student.admissionDate.toISOString().slice(0, 10),
         class: {
           id: student.class.id,
           name: student.class.name,
         },
+        className: student.class.name,
         section: student.section,
+        sectionName: student.sectionRef?.name ?? student.section ?? null,
         rollNumber: student.rollNumber,
+        guardians: student.guardianLinks.map((link) => ({
+          id: link.guardian.id,
+          fullName: link.guardian.fullName,
+          relation: link.relation,
+          primaryPhone: link.guardian.primaryPhone,
+          secondaryPhone: link.guardian.secondaryPhone ?? null,
+          email: link.guardian.email ?? null,
+          occupation: link.guardian.occupation ?? null,
+          wardNumber: link.guardian.wardNumber ?? null,
+          isPrimary: link.isPrimary,
+          consentedAt:
+            link.guardian.privacyConsentAt?.toISOString?.() ??
+            link.guardian.privacyConsentAt ??
+            null,
+        })),
+        documentCount: student._count.documents,
         email: student.user?.email ?? null,
         hasLogin: Boolean(student.userId),
         lifecycleStatus: student.lifecycleStatus,
+        qrCredential: student.qrCredentials[0]
+          ? {
+              id: student.qrCredentials[0].id,
+              status: student.qrCredentials[0].status,
+              createdById: student.qrCredentials[0].createdById,
+              updatedById: student.qrCredentials[0].updatedById,
+              expiresAt:
+                student.qrCredentials[0].expiresAt?.toISOString() ?? null,
+              createdAt: student.qrCredentials[0].createdAt.toISOString(),
+              rotatedAt:
+                student.qrCredentials[0].rotatedAt?.toISOString() ?? null,
+              revokedAt:
+                student.qrCredentials[0].revokedAt?.toISOString() ?? null,
+              rotateReason: student.qrCredentials[0].rotateReason ?? null,
+              revokeReason: student.qrCredentials[0].revokeReason ?? null,
+              lastScannedAt:
+                student.qrCredentials[0].lastScannedAt?.toISOString() ?? null,
+            }
+          : null,
       })),
       total,
       page,
       limit,
       hasNextPage: total > skip + students.length,
     };
+  }
+
+  async getStudentModuleSummary(
+    query: ListStudentsDto,
+    actor: AuthContext,
+  ): Promise<StudentModuleSummary> {
+    const { search, academicYearId, classId, sectionId, status } = query;
+    const where = this.buildStudentDirectoryWhere(
+      {
+        search,
+        academicYearId,
+        classId,
+        sectionId,
+        status,
+      },
+      actor,
+    );
+
+    const [
+      totalStudents,
+      statusGroups,
+      newAdmissions,
+      pendingApplications,
+      missingDocuments,
+      qrActive,
+      iemisStudents,
+      duplicateCandidates,
+    ] = await Promise.all([
+      this.prisma.student.count({ where }),
+      this.prisma.student.groupBy({
+        by: ['lifecycleStatus'],
+        where,
+        _count: { _all: true },
+      }),
+      this.prisma.student.count({
+        where: {
+          ...where,
+          createdAt: { gte: startOfCurrentNepalMonth() },
+        },
+      }),
+      this.prisma.admissionApplication.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: {
+            in: [
+              'INQUIRY',
+              'APPLICATION',
+              'DOCUMENT_PENDING',
+              'ENTRANCE_INTERVIEW',
+              'ACCEPTED',
+            ],
+          },
+          ...(classId ? { classId } : {}),
+          ...(academicYearId ? { academicYearId } : {}),
+          ...(search
+            ? {
+                OR: [
+                  { firstNameEn: { contains: search, mode: 'insensitive' } },
+                  { lastNameEn: { contains: search, mode: 'insensitive' } },
+                  {
+                    guardianFullName: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                  {
+                    guardianPhone: { contains: search, mode: 'insensitive' },
+                  },
+                ],
+              }
+            : {}),
+        },
+      }),
+      this.prisma.student.count({
+        where: {
+          ...where,
+          documents: {
+            none: { status: { not: 'ARCHIVED' } },
+          },
+        },
+      }),
+      this.prisma.studentQrCredential.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: StudentQrStatus.ACTIVE,
+          student: where,
+        },
+      }),
+      this.prisma.student.findMany({
+        where,
+        include: {
+          tenant: true,
+          class: true,
+          sectionRef: true,
+          guardianLinks: {
+            include: { guardian: true },
+          },
+          enrollments: {
+            include: {
+              academicYear: true,
+              section: true,
+            },
+            orderBy: [{ createdAt: 'desc' }],
+          },
+        },
+      }),
+      this.countDuplicateCandidatePairs(where),
+    ]);
+
+    const counts = new Map(
+      statusGroups.map((group) => [group.lifecycleStatus, group._count._all]),
+    );
+    const iemisIssues = iemisStudents.reduce((sum, student) => {
+      return sum + (validateIemisStudent(student).length > 0 ? 1 : 0);
+    }, 0);
+
+    return {
+      totalStudents,
+      activeStudents: counts.get(StudentLifecycleStatus.ACTIVE) ?? 0,
+      transferredStudents: counts.get(StudentLifecycleStatus.TRANSFERRED) ?? 0,
+      exitedStudents: counts.get(StudentLifecycleStatus.EXITED) ?? 0,
+      alumniStudents: counts.get(StudentLifecycleStatus.ALUMNI) ?? 0,
+      archivedStudents: counts.get(StudentLifecycleStatus.ARCHIVED) ?? 0,
+      mergedStudents: counts.get(StudentLifecycleStatus.MERGED) ?? 0,
+      deletedStudents: counts.get(StudentLifecycleStatus.DELETED) ?? 0,
+      newAdmissions,
+      pendingApplications,
+      missingDocuments,
+      duplicateCandidates,
+      iemisReady: iemisStudents.length - iemisIssues,
+      iemisIssues,
+      qrActive,
+      qrMissing: Math.max(0, totalStudents - qrActive),
+      byStatus: statusGroups.map((group) => ({
+        status: group.lifecycleStatus,
+        count: group._count._all,
+      })),
+      filters: {
+        academicYearId: academicYearId ?? null,
+        classId: classId ?? null,
+        sectionId: sectionId ?? null,
+        status: status ?? null,
+        search: search?.trim() || null,
+      },
+    };
+  }
+
+  private buildStudentDirectoryWhere(
+    filters: Pick<
+      ListStudentsDto,
+      'academicYearId' | 'classId' | 'sectionId' | 'status' | 'search'
+    >,
+    actor: AuthContext,
+  ): Prisma.StudentWhereInput {
+    const search = filters.search?.trim();
+
+    return {
+      tenantId: actor.tenantId,
+      ...(filters.status ? { lifecycleStatus: filters.status } : {}),
+      ...(filters.classId ? { classId: filters.classId } : {}),
+      ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+      ...(filters.academicYearId
+        ? {
+            enrollments: {
+              some: {
+                tenantId: actor.tenantId,
+                academicYearId: filters.academicYearId,
+                ...(filters.classId ? { classId: filters.classId } : {}),
+                ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+              },
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { firstNameEn: { contains: search, mode: 'insensitive' } },
+              { lastNameEn: { contains: search, mode: 'insensitive' } },
+              { firstNameNp: { contains: search, mode: 'insensitive' } },
+              { lastNameNp: { contains: search, mode: 'insensitive' } },
+              { studentSystemId: { contains: search, mode: 'insensitive' } },
+              { admissionNumber: { contains: search, mode: 'insensitive' } },
+              {
+                guardianLinks: {
+                  some: {
+                    guardian: {
+                      OR: [
+                        {
+                          fullName: {
+                            contains: search,
+                            mode: 'insensitive',
+                          },
+                        },
+                        {
+                          primaryPhone: {
+                            contains: search,
+                            mode: 'insensitive',
+                          },
+                        },
+                        {
+                          secondaryPhone: {
+                            contains: search,
+                            mode: 'insensitive',
+                          },
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+  }
+
+  private async countDuplicateCandidatePairs(where: Prisma.StudentWhereInput) {
+    const students = await this.prisma.student.findMany({
+      where: {
+        AND: [
+          where,
+          { lifecycleStatus: { notIn: [StudentLifecycleStatus.DELETED] } },
+        ],
+      },
+      include: {
+        class: true,
+        sectionRef: true,
+        guardianLinks: { include: { guardian: true } },
+        siblingMemberships: true,
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      take: 200,
+    });
+
+    const pairs = buildDuplicateCandidatePairs(
+      students,
+      students,
+      Math.min(50, Math.max(1, students.length * 2)),
+    );
+
+    return pairs.filter((pair) => !pair.blockedReason).length;
   }
 
   async getStudentProfile(studentId: string, actor: AuthContext) {
@@ -364,7 +676,7 @@ export class StudentsService {
           photoUrl,
         );
         photoUrl = signed;
-      } catch (e) {
+      } catch {
         photoUrl = null;
       }
     }
@@ -2212,12 +2524,13 @@ export class StudentsService {
         },
       },
     });
+    const iemisCodeValue = iemisCodeSetting?.value;
     const iemisSchoolCode =
-      typeof iemisCodeSetting?.value === 'string'
-        ? iemisCodeSetting.value
-        : iemisCodeSetting?.value
-          ? String(iemisCodeSetting.value)
-          : '';
+      typeof iemisCodeValue === 'string' ||
+      typeof iemisCodeValue === 'number' ||
+      typeof iemisCodeValue === 'boolean'
+        ? String(iemisCodeValue)
+        : '';
 
     const headers = buildIemisHeaders();
     const rows = validationResults
@@ -2381,7 +2694,7 @@ export class StudentsService {
         title: dto.title,
         fileName: dto.fileName,
         contentType: dto.contentType || 'application/octet-stream',
-        sizeBytes: Number(stored.sizeBytes),
+        sizeBytes: stored.sizeBytes,
         objectKey: stored.objectKey,
         uploadedById: actor.userId,
         notes: dto.notes,
@@ -4158,7 +4471,16 @@ function buildCsv(headers: string[], rows: Array<Record<string, unknown>>) {
 
 function escapeCsvValue(value: unknown) {
   const text =
-    value === null || typeof value === 'undefined' ? '' : String(value);
+    value === null || typeof value === 'undefined'
+      ? ''
+      : value instanceof Date
+        ? value.toISOString()
+        : typeof value === 'string' ||
+            typeof value === 'number' ||
+            typeof value === 'boolean' ||
+            typeof value === 'bigint'
+          ? String(value)
+          : JSON.stringify(value);
 
   if (/[",\n\r]/.test(text)) {
     return `"${text.replace(/"/g, '""')}"`;
@@ -4482,6 +4804,23 @@ function calculateNameSimilarity(a: string, b: string) {
   const union = new Set([...left, ...right]).size;
 
   return union === 0 ? 0 : intersection / union;
+}
+
+function startOfCurrentNepalMonth() {
+  const now = new Date();
+  const nepalOffsetMinutes = 5 * 60 + 45;
+  const nepalNow = new Date(now.getTime() + nepalOffsetMinutes * 60 * 1000);
+  const utcStart = Date.UTC(
+    nepalNow.getUTCFullYear(),
+    nepalNow.getUTCMonth(),
+    1,
+    0,
+    0,
+    0,
+    0,
+  );
+
+  return new Date(utcStart - nepalOffsetMinutes * 60 * 1000);
 }
 
 function normalizeStudentIdentityName(value: string) {

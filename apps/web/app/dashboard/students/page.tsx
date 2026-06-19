@@ -11,6 +11,8 @@ import { ModuleHeader } from '../../../components/ui/module-header';
 import Link from 'next/link';
 import { M1ModuleNav } from '../../../components/m1/m1-module-nav';
 
+const STUDENT_ROSTER_PAGE_SIZE = 25;
+
 export default function StudentsPage() {
   const [pdfError, setPdfError] = useState('');
   const [isExportingIemis, setIsExportingIemis] = useState(false);
@@ -46,13 +48,15 @@ export default function StudentsPage() {
   const studentsQuery = useQuery({ 
     queryKey: ['students', filters], 
     queryFn: () => {
-      const { academicYearId, ...studentFilters } = filters;
-      return api.listStudents(studentFilters);
+      return api.listStudents({
+        ...filters,
+        limit: STUDENT_ROSTER_PAGE_SIZE,
+      });
     } 
   });
-  const activeStudentsQuery = useQuery({
-    queryKey: ['students', 'summary', 'active'],
-    queryFn: () => api.listStudents({ status: 'ACTIVE', page: 1, limit: 1 }),
+  const studentSummaryQuery = useQuery({
+    queryKey: ['students', 'module-summary', filters],
+    queryFn: () => api.getStudentModuleSummary(filters),
   });
   const duplicateCandidatesQuery = useQuery({
     queryKey: ['student-duplicate-candidates'],
@@ -141,8 +145,7 @@ export default function StudentsPage() {
       <StudentDirectory
         academicYears={academicYearsQuery.data ?? []}
         admissions={admissionsQuery.data?.items ?? []}
-        activeStudentsTotal={activeStudentsQuery.data?.total}
-        pendingAdmissionsTotal={undefined}
+        summary={studentSummaryQuery.data}
         classes={classesQuery.data ?? []}
         isError={
           academicYearsQuery.isError ||
@@ -150,7 +153,7 @@ export default function StudentsPage() {
           sectionsQuery.isError ||
           studentsQuery.isError ||
           admissionsQuery.isError ||
-          activeStudentsQuery.isError
+          studentSummaryQuery.isError
         }
         isLoading={
           academicYearsQuery.isLoading ||
@@ -158,7 +161,7 @@ export default function StudentsPage() {
           sectionsQuery.isLoading ||
           studentsQuery.isLoading ||
           admissionsQuery.isLoading ||
-          activeStudentsQuery.isLoading
+          studentSummaryQuery.isLoading
         }
         pdfError={pdfError}
         onRetry={() => {
@@ -167,7 +170,7 @@ export default function StudentsPage() {
           void sectionsQuery.refetch();
           void studentsQuery.refetch();
           void admissionsQuery.refetch();
-          void activeStudentsQuery.refetch();
+          void studentSummaryQuery.refetch();
           void duplicateCandidatesQuery.refetch();
           void iemisReadinessQuery.refetch();
         }}

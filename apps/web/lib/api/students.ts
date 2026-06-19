@@ -18,6 +18,7 @@ import type {
   StudentLifecycleActionResult,
   StudentProfile,
   StudentProfileDetail,
+  StudentModuleSummary,
   StudentQrStatusHistory,
   StudentTransferPayload,
   UpdateStudentGuardianPayload,
@@ -38,12 +39,23 @@ export const studentsApi = {
     classId?: string;
     sectionId?: string;
     status?: string;
+    academicYearId?: string;
     page?: number;
     limit?: number;
     search?: string;
   }) =>
     request<PaginatedResponse<StudentProfile>>(
       withQuery('/students', params ?? {}),
+    ),
+  getStudentModuleSummary: (params?: {
+    classId?: string;
+    sectionId?: string;
+    status?: string;
+    academicYearId?: string;
+    search?: string;
+  }) =>
+    request<StudentModuleSummary>(
+      withQuery('/students/summary', params ?? {}),
     ),
   getStudentProfile: (studentId: string) =>
     request<StudentProfileDetail>(`/students/${encodeURIComponent(studentId)}`),

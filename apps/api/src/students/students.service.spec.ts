@@ -31,6 +31,202 @@ const actor = {
 };
 
 describe('students lifecycle hardening', () => {
+  it('lists students with academic-year, guardian, and admission filters without dropping pagination', async () => {
+    const student = {
+      ...buildStudent(),
+      guardianLinks: [
+        {
+          guardian: {
+            id: 'guardian-1',
+            fullName: 'Maya Shrestha',
+            primaryPhone: '9800000000',
+            secondaryPhone: null,
+            email: 'maya@example.com',
+            occupation: 'Engineer',
+            wardNumber: '5',
+            privacyConsentAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+          relation: 'mother',
+          isPrimary: true,
+        },
+      ],
+      qrCredentials: [
+        {
+          id: 'qr-1',
+          status: 'ACTIVE',
+          createdById: actor.userId,
+          updatedById: null,
+          expiresAt: null,
+          createdAt: new Date('2026-02-01T00:00:00.000Z'),
+          rotatedAt: null,
+          revokedAt: null,
+          rotateReason: null,
+          revokeReason: null,
+          lastScannedAt: null,
+        },
+      ],
+      _count: { documents: 2 },
+      user: { email: 'student@example.com' },
+    };
+    const prisma = buildPrisma({
+      studentFindManyResult: [student],
+      studentCountQueue: [1],
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.listStudents(
+      {
+        academicYearId: 'academic-year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        search: 'Maya',
+        page: 2,
+        limit: 25,
+      },
+      actor,
+    );
+
+    expect(prisma.student.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        tenantId: actor.tenantId,
+        classId: 'class-1',
+        sectionId: 'section-1',
+        enrollments: {
+          some: expect.objectContaining({
+            tenantId: actor.tenantId,
+            academicYearId: 'academic-year-1',
+          }),
+        },
+        OR: expect.arrayContaining([
+          { admissionNumber: { contains: 'Maya', mode: 'insensitive' } },
+          expect.objectContaining({
+            guardianLinks: expect.any(Object),
+          }),
+        ]),
+      }),
+    });
+    expect(prisma.student.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 25,
+        take: 25,
+      }),
+    );
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        studentSystemId: 'SCH-2026-0001',
+        fullNameEn: 'Erwin Shrestha',
+        sectionName: 'A',
+        documentCount: 2,
+        guardians: [
+          expect.objectContaining({
+            fullName: 'Maya Shrestha',
+            primaryPhone: '9800000000',
+          }),
+        ],
+        qrCredential: expect.objectContaining({ id: 'qr-1' }),
+      }),
+    );
+  });
+
+  it('returns module-owned M1 summary counts from tenant-scoped backend queries', async () => {
+    const duplicateA = buildStudent({
+      id: 'student-a',
+      studentSystemId: 'SCH-2026-0001',
+      firstNameEn: 'Erwin',
+      lastNameEn: 'Shrestha',
+      guardianLinks: [
+        {
+          guardian: {
+            fullName: 'Maya Shrestha',
+            primaryPhone: '9800000000',
+            email: 'maya@example.com',
+            wardNumber: '5',
+          },
+          relation: 'mother',
+          isPrimary: true,
+        },
+      ],
+    });
+    const duplicateB = buildStudent({
+      id: 'student-b',
+      studentSystemId: 'SCH-2026-0002',
+      firstNameEn: 'Erwin',
+      lastNameEn: 'Shrestha',
+      guardianLinks: [
+        {
+          guardian: {
+            fullName: 'Maya Shrestha',
+            primaryPhone: '9800000000',
+            email: 'maya@example.com',
+            wardNumber: '5',
+          },
+          relation: 'mother',
+          isPrimary: true,
+        },
+      ],
+    });
+    const prisma = buildPrisma({
+      studentCountQueue: [4, 2, 1],
+      studentGroupByResult: [
+        { lifecycleStatus: StudentLifecycleStatus.ACTIVE, _count: { _all: 3 } },
+        {
+          lifecycleStatus: StudentLifecycleStatus.TRANSFERRED,
+          _count: { _all: 1 },
+        },
+      ],
+      studentFindManyResult: [duplicateA, duplicateB],
+      admissionApplicationCountResult: 5,
+      studentQrCredentialCountResult: 3,
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.getStudentModuleSummary(
+      {
+        academicYearId: 'academic-year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        search: 'Erwin',
+      },
+      actor,
+    );
+
+    expect(prisma.student.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        by: ['lifecycleStatus'],
+        where: expect.objectContaining({
+          tenantId: actor.tenantId,
+          classId: 'class-1',
+          sectionId: 'section-1',
+        }),
+      }),
+    );
+    expect(prisma.admissionApplication.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        tenantId: actor.tenantId,
+        academicYearId: 'academic-year-1',
+        classId: 'class-1',
+      }),
+    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        totalStudents: 4,
+        activeStudents: 3,
+        transferredStudents: 1,
+        pendingApplications: 5,
+        missingDocuments: 1,
+        qrActive: 3,
+        qrMissing: 1,
+        duplicateCandidates: 1,
+        filters: expect.objectContaining({
+          academicYearId: 'academic-year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          search: 'Erwin',
+        }),
+      }),
+    );
+  });
+
   it('transfers an active student and records an immutable transition', async () => {
     const student = buildStudent({
       lifecycleStatus: StudentLifecycleStatus.ACTIVE,
@@ -1720,6 +1916,10 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
 function buildPrisma(options: {
   studentFindFirstQueue?: unknown[];
   studentFindManyResult?: unknown[];
+  studentCountQueue?: number[];
+  studentGroupByResult?: unknown[];
+  admissionApplicationCountResult?: number;
+  studentQrCredentialCountResult?: number;
   studentDocumentFindManyResult?: unknown[];
   studentDocumentHistoryFindManyResult?: unknown[];
   guardianFindFirstQueue?: unknown[];
@@ -1852,6 +2052,22 @@ function buildPrisma(options: {
         const queue = options.studentFindFirstQueue ?? [];
         return queue.length > 0 ? queue[0] : null;
       }),
+      count: jest
+        .fn()
+        .mockImplementation(
+          async () => options.studentCountQueue?.shift() ?? 0,
+        ),
+      groupBy: jest.fn().mockResolvedValue(options.studentGroupByResult ?? []),
+    },
+    admissionApplication: {
+      count: jest
+        .fn()
+        .mockResolvedValue(options.admissionApplicationCountResult ?? 0),
+    },
+    studentQrCredential: {
+      count: jest
+        .fn()
+        .mockResolvedValue(options.studentQrCredentialCountResult ?? 0),
     },
     class: {
       findFirst: jest

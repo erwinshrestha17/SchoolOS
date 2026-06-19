@@ -22,6 +22,7 @@ test('M1 workspaces expose real route-backed operations', () => {
   assert.match(routes, /QrIdWorkspace/);
   assert.match(routes, /ApplicationReviewWorkspace/);
   assert.match(api, /\/students\/duplicates\/merge/);
+  assert.match(api, /\/students\/summary/);
   assert.match(api, /\/admissions\/bulk-import\/batches/);
   assert.match(api, /\/admissions\/m1\/import-review\/queue/);
   assert.match(api, /\/students\/document-expiry\/templates/);
@@ -44,4 +45,19 @@ test('M1 high-risk workflows remain server controlled and protected', () => {
   assert.match(iemis, /CSV Import History/);
   assert.match(iemis, /Import Review Queue/);
   assert.doesNotMatch(duplicates + documents + qr + iemis, /publicUrl|objectKey/);
+});
+
+test('M1 student roster uses backend summary, safe filters, and paginated roster contract', () => {
+  const page = read('app/dashboard/students/page.tsx');
+  const directory = read('components/forms/student-directory.tsx');
+
+  assert.match(page, /api\.getStudentModuleSummary\(filters\)/);
+  assert.match(page, /limit: STUDENT_ROSTER_PAGE_SIZE/);
+  assert.match(directory, /summary\?\.pendingApplications/);
+  assert.match(directory, /summary\?\.missingDocuments/);
+  assert.match(directory, /summary\?\.qrActive/);
+  assert.match(directory, /Page \{currentPage\} of \{totalPages\}/);
+  assert.match(directory, /value="ARCHIVED"/);
+  assert.match(directory, /value="MERGED"/);
+  assert.doesNotMatch(directory, /value="INACTIVE"|value="WITHDRAWN"|value="DEACTIVATED"|value="GRADUATED"/);
 });

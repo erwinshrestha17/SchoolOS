@@ -8,6 +8,7 @@ import type {
   StudentProfile,
   StudentDuplicateCandidate,
   StudentIemisReadinessSummary,
+  StudentModuleSummary,
   PaginatedResponse,
 } from '@schoolos/core';
 import Link from 'next/link';
@@ -48,8 +49,7 @@ import { StatusBadge } from '../ui/status-badge';
 type StudentDirectoryProps = {
   academicYears: AcademicYearSummary[];
   admissions: AdmissionSummary[];
-  activeStudentsTotal?: number;
-  pendingAdmissionsTotal?: number;
+  summary?: StudentModuleSummary;
   classes: ClassSummary[];
   isError: boolean;
   isLoading: boolean;
@@ -89,8 +89,7 @@ type StudentDirectoryProps = {
 export function StudentDirectory({
   academicYears,
   admissions,
-  activeStudentsTotal,
-  pendingAdmissionsTotal,
+  summary,
   classes,
   isError,
   isLoading,
@@ -115,7 +114,9 @@ export function StudentDirectory({
   const students = studentsResponse?.items ?? [];
   const totalStudents = studentsResponse?.total ?? 0;
   const currentPage = studentsResponse?.page ?? 1;
+  const pageSize = studentsResponse?.limit ?? 25;
   const hasNextPage = studentsResponse?.hasNextPage ?? false;
+  const totalPages = Math.max(1, Math.ceil(totalStudents / pageSize));
   const [academicYearId, setAcademicYearId] = useState('');
   const [classId, setClassId] = useState('');
   const [sectionId, setSectionId] = useState('');
@@ -223,45 +224,45 @@ export function StudentDirectory({
         <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           <KpiCard
             title="Active Students"
-            value={activeStudentsTotal ?? 'Unavailable'}
+            value={summary?.activeStudents ?? 0}
             icon={<Users size={20} />}
             tone="info"
             description="Server total for active records."
           />
           <KpiCard
             title="Pending Applications"
-            value={pendingAdmissionsTotal ?? '—'}
+            value={summary?.pendingApplications ?? 0}
             icon={<ClipboardCheck size={20} />}
             tone="warning"
             description="Server total awaiting review."
           />
           <KpiCard
             title="Missing Documents"
-            value="—"
+            value={summary?.missingDocuments ?? 0}
             icon={<FolderOpen size={20} />}
-            tone="neutral"
-            description="Summary is not available yet."
+            tone={(summary?.missingDocuments ?? 0) > 0 ? 'warning' : 'success'}
+            description="Students with no active document."
           />
           <KpiCard
             title="Duplicate Candidates"
-            value={isLoadingDuplicateCandidates ? '…' : duplicateCandidates.length}
+            value={summary?.duplicateCandidates ?? 0}
             icon={<UserCheck size={20} />}
-            tone="neutral"
-            description="Current backend review window."
+            tone={(summary?.duplicateCandidates ?? 0) > 0 ? 'warning' : 'success'}
+            description="Server-scored high-confidence pairs."
           />
           <KpiCard
             title="iEMIS Issues"
-            value={isLoadingIemisReadiness ? 'Loading' : iemisIssueRows.length}
+            value={summary?.iemisIssues ?? 0}
             icon={<AlertTriangle size={20} />}
-            tone={iemisIssueRows.length > 0 ? 'warning' : 'success'}
+            tone={(summary?.iemisIssues ?? 0) > 0 ? 'warning' : 'success'}
             description="From backend readiness validation."
           />
           <KpiCard
             title="QR Active"
-            value="—"
+            value={summary?.qrActive ?? 0}
             icon={<ContactRound size={20} />}
-            tone="neutral"
-            description="QR controls remain available per student."
+            tone="info"
+            description={`${summary?.qrMissing ?? 0} students still need QR setup.`}
           />
         </KpiGrid>
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -370,12 +371,12 @@ export function StudentDirectory({
             >
               <option value="">All Statuses</option>
               <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
               <option value="TRANSFERRED">Transferred</option>
-              <option value="ALUMNI">Graduated</option>
-              <option value="GRADUATED">Graduated</option>
-              <option value="WITHDRAWN">Withdrawn</option>
-              <option value="DEACTIVATED">Deactivated</option>
+              <option value="EXITED">Exited</option>
+              <option value="ALUMNI">Alumni</option>
+              <option value="ARCHIVED">Archived</option>
+              <option value="MERGED">Merged</option>
+              <option value="DELETED">Deleted</option>
             </select>
           </div>
           <div className="space-y-1.5">
@@ -688,7 +689,7 @@ export function StudentDirectory({
             {totalStudents > students.length && (
               <div className="flex items-center justify-between border-t border-slate-100 p-4">
                 <p className="text-xs font-bold text-slate-500">
-                  Showing {students.length} of {totalStudents} records
+                  Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, totalStudents)} of {totalStudents} records
                 </p>
                 <div className="flex items-center gap-2">
                   <button
@@ -701,7 +702,9 @@ export function StudentDirectory({
                   >
                     Previous
                   </button>
-                  <span className="text-xs font-bold text-slate-900">{currentPage}</span>
+                  <span className="min-w-20 text-center text-xs font-bold text-slate-900">
+                    Page {currentPage} of {totalPages}
+                  </span>
                   <button
                     disabled={!hasNextPage}
                     onClick={() => onFilterChange({ 

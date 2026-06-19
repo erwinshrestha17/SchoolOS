@@ -2555,6 +2555,8 @@ export type StudentProfile = {
   fullNameNp?: string | null;
   gender?: string;
   dateOfBirth?: string;
+  admissionNumber?: string | null;
+  admissionDate?: string;
   motherTongue?: string | null;
   disabilityFlag?: string | null;
   nationalStudentId?: string | null;
@@ -2567,6 +2569,7 @@ export type StudentProfile = {
   section?: string | null;
   rollNumber?: number | null;
   guardians?: GuardianProfile[];
+  documentCount?: number;
   medicalConditions?: string | null;
   severeAllergies?: string | null;
   medications?: string | null;
@@ -2594,6 +2597,33 @@ export type StudentProfile = {
     revokeReason?: string | null;
     lastScannedAt: string | null;
   } | null;
+};
+
+export type StudentModuleSummary = {
+  totalStudents: number;
+  activeStudents: number;
+  transferredStudents: number;
+  exitedStudents: number;
+  alumniStudents: number;
+  archivedStudents: number;
+  mergedStudents: number;
+  deletedStudents: number;
+  newAdmissions: number;
+  pendingApplications: number;
+  missingDocuments: number;
+  duplicateCandidates: number;
+  iemisReady: number;
+  iemisIssues: number;
+  qrActive: number;
+  qrMissing: number;
+  byStatus: Array<{ status: StudentLifecycleStatus; count: number }>;
+  filters: {
+    academicYearId: string | null;
+    classId: string | null;
+    sectionId: string | null;
+    status: StudentLifecycleStatus | null;
+    search: string | null;
+  };
 };
 
 export enum StudentQrResolvePurpose {
@@ -2728,6 +2758,8 @@ export type StudentLifecycleStatus =
   | 'TRANSFERRED'
   | 'EXITED'
   | 'ALUMNI'
+  | 'ARCHIVED'
+  | 'MERGED'
   | 'DELETED';
 
 export type StudentLifecycleTransition = {
