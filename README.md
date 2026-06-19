@@ -2,9 +2,9 @@
 
 SchoolOS is a production-grade, multi-tenant SaaS School Operating System for Nepal, with a staged product direction from Kindergarten / Montessori to Grade 12.
 
-It is designed as a modular school operating platform covering admissions, student records, attendance, fees, notices, activity feed, academics, homework, timetable, HR/payroll, accounting, library, transport, canteen, classroom learning, parent engagement, and future intelligence/analytics.
+It is designed as a modular school operating platform covering admissions, student records, attendance, fees, notices, activity feed, academics, homework, timetable, HR/payroll, accounting, library, transport, canteen, classroom learning, inventory and asset management, parent engagement, and future intelligence/analytics.
 
-SchoolOS is now governed by a **Production / General Availability (GA)** release target, not an MVP target. Current work is focused on evidence-led internal QA, realistic seeded school workflows, authenticated browser/mobile verification, staging validation, controlled-pilot proof, and the operational gates required for a public production release. M12 Learning Layer has a broad backend/web/mobile foundation; KG-12 breadth and deeper learning experiences remain staged expansion goals, not a claim that every KG-12 feature is already implemented.
+SchoolOS is now governed by a **Production / General Availability (GA)** release target, not an MVP target. Current work is focused on evidence-led internal QA, realistic seeded school workflows, authenticated browser/mobile verification, staging validation, controlled-pilot proof, and the operational gates required for a public production release. M12 Learning Layer has a broad backend/web/mobile foundation; M13 Inventory & Asset Management is documented as a planned Nepal-focused operations module; KG-12 breadth and deeper learning experiences remain staged expansion goals, not a claim that every KG-12 feature is already implemented.
 
 ---
 
@@ -19,11 +19,14 @@ docs/README.md
 
 docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
 docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
+docs/product/M13_INVENTORY_ASSET_MANAGEMENT.md
 
 docs/project/SCHOOLOS_PROJECT_STATUS.md
 docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
 docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md
 docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md
+
+docs/implementation/M13_INVENTORY_ASSET_IMPLEMENTATION_PLAN.md
 
 docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
 docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
@@ -31,6 +34,7 @@ docs/architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md
 
 docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
 docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
+docs/design/modules/M13_INVENTORY_ASSET_FRONTEND_REFERENCE.md
 
 docs/production/SCHOOLOS_GA_RELEASE_POLICY.md
 docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md
@@ -51,6 +55,7 @@ SchoolOS Academics = manages classes, subjects, timetable, homework, exams, repo
 SchoolOS Advanced Operations = pre-AI automation, approvals, analytics, mobile/offline reliability, document templates, and Nepal-specific operational depth
 SchoolOS Notification Layer = central event intake, recipient resolution, templates, delivery routing, retries, preferences, audit, and notification-center foundation for all modules
 SchoolOS Learning Layer = improves classroom teaching and student learning inside school
+SchoolOS Inventory & Assets = manages school stock, purchase requests, fixed assets, maintenance, stocktake, and accounting handoff
 SchoolOS Intelligence = future teacher-reviewed analytics and safe AI after reliable production data exists
 ```
 
@@ -65,7 +70,7 @@ Stage E: Grade 9-10
 Stage F: Grade 11-12
 ```
 
-The current management modules remain the foundation. The Learning Layer is implemented as a separate M12 domain that reuses existing students, teachers, classes, subjects, timetable, communication, File Registry, audit, RBAC, and tenant isolation. The Notification Layer is a core platform/M10-adjacent architecture layer, not M11 Intelligence/AI.
+The current management modules remain the foundation. The Learning Layer is implemented as a separate M12 domain that reuses existing students, teachers, classes, subjects, timetable, communication, File Registry, audit, RBAC, and tenant isolation. The Notification Layer is a core platform/M10-adjacent architecture layer, not M11 Intelligence/AI. The M13 Inventory & Asset Management module is a planned school-operations module for stock, purchase, fixed asset, maintenance, stocktake, and M9 accounting handoff workflows.
 
 ---
 
@@ -92,6 +97,7 @@ Staging/provider/storage/backup/restore verification: Blocked until staging envi
 Notification Layer: Cross-module architecture documented; implementation/readiness claims still require code, provider, queue, browser, mobile, and staging evidence
 M11 Intelligence/AI: Roadmap only
 M12 Learning Layer: Implemented foundation; staging/browser/device depth remains staged
+M13 Inventory & Asset Management: Product/design/implementation docs added; code/contracts/migrations/tests/staging proof not yet implemented
 KG-12 Expansion: Product direction added; Grade 11-12 and advanced learning features are staged future scope
 ```
 
@@ -140,18 +146,19 @@ The detailed source of truth for edge cases remains the PRD and FRS module secti
 ### Global edge cases
 
 - Every tenant-owned database query, file lookup, export, report, queue job, cache read, and background retry must be scoped by authenticated `tenantId`.
-- School A must never access School B students, guardians, staff, fees, receipts, payroll, files, reports, notices, transport, canteen, library, learning, notifications, delivery logs, provider diagnostics, or analytics data.
-- Same names, phone numbers, admission numbers, receipt numbers, file names, payment references, QR identifiers, activity codes, notification idempotency keys, or session codes across tenants must never cause cross-tenant leakage.
-- Suspended tenants must be blocked across dashboard, API, mobile, background jobs, file downloads, report generation, exports, provider actions, notification delivery, and learning sessions.
+- School A must never access School B students, guardians, staff, fees, receipts, payroll, files, reports, notices, transport, canteen, library, learning, inventory, assets, purchase records, stocktake records, notifications, delivery logs, provider diagnostics, or analytics data.
+- Same names, phone numbers, admission numbers, receipt numbers, file names, payment references, QR identifiers, activity codes, asset tags, item codes, notification idempotency keys, or session codes across tenants must never cause cross-tenant leakage.
+- Suspended tenants must be blocked across dashboard, API, mobile, background jobs, file downloads, report generation, exports, provider actions, notification delivery, inventory/asset workflows, and learning sessions.
 - Disabled feature routes must fail closed even if opened directly by URL.
 - Parent, student, driver, and mobile APIs must be purpose-limited and must not expose admin-shaped responses.
 - Expired sessions, slow network retries, refreshes, and double-clicks must not duplicate writes.
 - Long forms should preserve drafts where practical and recover safely after login/session renewal.
 - Offline or reconnect sync must show deterministic conflict handling instead of silently overwriting server data.
 - Background jobs must re-check tenant status, feature status, entity status, permission state, and provider state before executing.
-- Retried jobs must not duplicate payments, receipts, messages, notices, notifications, reports, exports, payroll postings, accounting entries, canteen/library transactions, or learning attempts.
+- Retried jobs must not duplicate payments, receipts, messages, notices, notifications, reports, exports, payroll postings, accounting entries, inventory stock movements, asset write-offs, canteen/library transactions, or learning attempts.
 - Failed jobs, failed exports, failed storage operations, and failed provider actions must expose safe diagnostics without secrets.
 - Sensitive actions must be audited with actor, tenant, timestamp, reason, and before/after context where practical.
+- M13 stock movement, purchase receive, issue, return, transfer, adjustment, stocktake approval, maintenance completion, and asset write-off/disposal must be backend-owned, idempotent, permission-gated, and audit-visible.
 
 ### Authentication, role, and access edge cases
 
