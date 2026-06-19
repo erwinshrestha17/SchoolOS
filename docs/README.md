@@ -23,14 +23,15 @@ SchoolOS is now governed by a Production / General Availability (GA) release tar
 | 8 | `project/SCHOOLOS_PROJECT_STATUS.md` | Current implementation status snapshot; should summarize, not replace, the audit. |
 | 9 | `project/SCHOOLOS_IMPLEMENTATION_PLAN.md` | Longer implementation backlog and module detail; execution priority is governed by the next-phase plan and GA policy. |
 | 10 | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Storage, File Registry, tenant isolation, scaling, performance, and security architecture. |
-| 11 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, provider/queue operations, and platform notification-provider governance. |
-| 12 | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | Canonical cross-module notification event, recipient-resolution, delivery, preference, retry, audit, and notification-center architecture. |
-| 13 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, wireframes, components, API usage, and web persona smoke plan. |
-| 14 | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Approved supporting visual-reference appendix for the supplied principal dashboard and M1 desktop screens. Canonical web-plan rules take precedence. |
-| 15 | `design/M8B_TRANSPORT_WEB_REFERENCE_ANALYSIS.md` | Approved supporting visual-reference appendix for the supplied M8B Transport desktop, parent, and driver/mobile screens. Canonical web-plan and backend contracts take precedence. |
-| 16 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit, including contract-safe M3 Fees & Receipts and M5 Activity Feed & Milestones reference-screen implementation slices. |
-| 17 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
-| 18 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
+| 11 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, and provider/queue operations. |
+| 12 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, wireframes, components, API usage, and web persona smoke plan. |
+| 13 | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Approved supporting visual-reference appendix for the supplied principal dashboard and M1 desktop screens. Canonical web-plan rules take precedence. |
+| 14 | `design/M8B_TRANSPORT_WEB_REFERENCE_ANALYSIS.md` | Approved supporting visual-reference appendix for the supplied M8B Transport desktop, parent, and driver/mobile screens. Canonical web-plan and backend contracts take precedence. |
+| 15 | `design/M8B_HOSTEL_WEB_REFERENCE_ANALYSIS.md` | Approved supporting visual-reference appendix for the supplied M8B Hostel direction derived from the campus-operations references. Canonical web-plan and backend contracts take precedence. |
+| 16 | `design/M10_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md` | Approved supporting visual-reference appendix for the supplied M10 notices, communication, chat, delivery, provider, and moderation desktop screens. Canonical web-plan and backend/OpenAPI contracts take precedence. |
+| 17 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit, including contract-safe M3 Fees & Receipts and M5 Activity Feed & Milestones reference-screen implementation slices. |
+| 18 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
+| 19 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
 
 ---
 
@@ -50,6 +51,8 @@ architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md
 design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
 design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md
 design/M8B_TRANSPORT_WEB_REFERENCE_ANALYSIS.md
+design/M8B_HOSTEL_WEB_REFERENCE_ANALYSIS.md
+design/M10_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md
 implementation/WEB_UI_API_ALIGNMENT_AUDIT.md
 design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
 production/SCHOOLOS_GA_RELEASE_POLICY.md
@@ -78,6 +81,8 @@ apps/web/e2e/README.md
 | Web UI and state rules | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Web engineers |
 | Dashboard and M1 visual-reference detail | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` (supporting appendix; canonical web plan takes precedence) | Product, design, web engineers |
 | M8B Transport visual-reference detail | `design/M8B_TRANSPORT_WEB_REFERENCE_ANALYSIS.md` (supporting appendix; canonical web plan and backend/OpenAPI contracts take precedence) | Product, design, web engineers, QA |
+| M8B Hostel visual-reference detail | `design/M8B_HOSTEL_WEB_REFERENCE_ANALYSIS.md` (supporting appendix; canonical web plan and backend/OpenAPI contracts take precedence; product taxonomy still requires contract reconciliation if it conflicts with existing implemented M8 numbering) | Product, design, web engineers, QA |
+| M10 Notices / Communication / Chat visual-reference detail | `design/M10_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md` (supporting appendix; canonical web plan and backend/OpenAPI contracts take precedence) | Product, design, web engineers, QA |
 | M3 and M5 reference-to-contract implementation guidance | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` (implementation audit; canonical web plan and backend/OpenAPI contracts take precedence) | Web engineers, QA |
 | Mobile companion app rules | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Mobile engineers |
 | Deployment and recovery procedure | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment/operator team |
@@ -103,6 +108,8 @@ It also contains owner-approved **supporting visual-reference appendices**:
 ```text
 design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md
 design/M8B_TRANSPORT_WEB_REFERENCE_ANALYSIS.md
+design/M8B_HOSTEL_WEB_REFERENCE_ANALYSIS.md
+design/M10_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md
 ```
 
 The visual appendices are not competing product, architecture, release, API-contract, or frontend source-of-truth documents. They document supplied reference screens and defer to the canonical web plan for shared UI rules, route boundaries, tenant/RBAC/module entitlement rules, protected files, data truth, and acceptance criteria.
@@ -114,6 +121,10 @@ Use the web plan for `apps/web`, school dashboard, platform control plane, setti
 Use the dashboard/M1 appendix when implementing or reviewing the referenced principal dashboard and M1 Admissions / Student Profiles workspaces.
 
 Use the M8B Transport appendix when implementing or reviewing the referenced Transport admin workspaces, parent assigned-bus status, and driver/conductor assigned-trip flow. Live map, WebSocket, SSE, ETA, route deviation, geofence, and overspeed UI remain deferred unless backend/provider/load/privacy decisions are confirmed.
+
+Use the M8B Hostel appendix when implementing or reviewing the referenced Hostel design direction: hostel overview, rooms/beds, residents, roll call, leave/gate pass, visitors, fee handoff, maintenance, parent hostel portal, and warden/gate scanner flows. If this conflicts with current implemented M8 numbering, reconcile product taxonomy, route ownership, module entitlements, permissions, API contracts, seed data, and migration/backward-compatibility before changing code.
+
+Use the M10 appendix when implementing or reviewing the referenced Notices, Notification Center, Communication Inbox, Parent-Teacher Chat, Delivery Logs, Provider Callback Monitor, Approvals, Templates, and Escalation/Moderation workspaces. Delivery lifecycle, recipient eligibility, provider state, approval policy, chat scope, protected attachments, and audit visibility must defer to the canonical web plan and backend/OpenAPI contracts.
 
 Use the M3 and M5 sections of the UI/API alignment audit when implementing or reviewing the supplied desktop references against existing real routes and backend contracts. The M5 section explicitly preserves the boundary between M5 classroom activity work, M10 delivery operations, and M0/File Registry or platform storage operations.
 
