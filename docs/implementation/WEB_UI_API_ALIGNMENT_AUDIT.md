@@ -7,6 +7,17 @@
 
 This audit records repository truth before and during reference-dashboard alignment. The supplied reference images are visual specifications only; their sample names, counts, dates, money, progress, provider states, uploads, and audit entries are not production data.
 
+## M4 reference follow-up
+
+The M4 desktop reference set has been translated into the following planning artifacts. They refine visual composition and implementation sequencing only; they do not add or claim backend, Prisma, OpenAPI, permission, route, test, or browser-verification changes.
+
+```text
+docs/design/M4_ACADEMICS_WEB_REFERENCE_SPEC.md
+docs/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md
+```
+
+These M4 documents must be used with this alignment audit. They preserve the current contract gaps: no invented overview KPI values, no unverified CAS rubric/evidence/moderation payloads, no simulated report-card job progress, no raw protected-file URLs, and no uncontrolled mark-unlock interaction.
+
 ## Shared foundation
 
 The web app already has an authenticated Next.js App Router shell at `components/layout/dashboard-shell.tsx`, permission and entitlement route gates in `app/dashboard/layout.tsx`, role-filtered navigation in `components/layout/sidebar.tsx`, a cookie-first API client in `lib/api/client.ts`, React Query providers, File Registry-backed protected-file actions, and shared loading, empty, error, permission, locked, status, table, filter, header, action-menu, and pagination primitives.
@@ -352,6 +363,14 @@ For M5, also exercise `/dashboard/activity/new`, `/dashboard/activity/[postId]`,
 6. Add focused authenticated browser coverage for M3 payment idempotency, protected receipt/document actions, permission denial, module lock, cashier-close overlap, and unavailable-gateway states.
 7. Add focused authenticated browser coverage for M5 audience/consent scope, removed-guardian denial, post status denial, protected media actions, upload retry state, moderation reasons, and M10 delivery handoff.
 8. Add focused authenticated browser coverage for the two new composition routes and their permission/module-lock states.
+
+### P1a — M4 reference implementation prerequisites
+
+1. Complete M4-W0 in `docs/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md` before changing M4 workflow composition.
+2. Keep all six M4 overview metrics unavailable until a bounded module-owned summary contract exists.
+3. Confirm CAS rubric/evidence/moderation, report-card persisted job state, promotion, and Grade 11-12 contracts before adding write paths or official progress displays.
+4. Preserve backend-assigned teacher scope, correction auditability, finance-safe withholding visibility, and File Registry-backed report-card access in every M4 slice.
+5. Add focused browser coverage for teacher scope, autosave failure, locked marks, correction review, published-only result access, partial report-card failure, and protected file denial.
 
 ### P2 — refinement after P1 evidence
 
