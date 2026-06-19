@@ -1,7 +1,7 @@
 # SchoolOS Web Frontend Design Plan
 
 **Status:** Active source of truth for SchoolOS web frontend design, UI/UX, wireframes, component planning, route behavior, API usage, and web persona smoke expectations.  
-**Updated:** 2026-06-16  
+**Updated:** 2026-06-19  
 **Scope:** `apps/web`, Next.js App Router, school dashboard, platform control plane, settings, reports, protected files, and dense school operation workspaces.
 
 This document is planning and design guidance only. It does not implement backend, frontend, mobile, database, migration, package, or test code.
@@ -274,6 +274,32 @@ Module accents should identify location, not replace semantic colors.
 | Reports | `#0891B2` |
 | Settings | `#475569` |
 
+### 6.4 Reference-screen visual cadence
+
+The 2026-06-19 desktop references establish the visual baseline for SchoolOS workspaces:
+
+- Use a bright, calm operational surface: soft blue-grey app canvas, white work cards, thin blue-grey borders, restrained shadows, and readable navy headings.
+- Keep the shell stable across modules: compact topbar, disciplined left navigation, page title/purpose/action row, KPI strip, tab row, filter bar, primary workspace, and an optional contextual right rail.
+- Prefer precise density over empty decoration. Desktop tables, marks grids, cash counter flows, and operational queues may be information-dense, but each must retain a clear current context, readable row hierarchy, and one obvious next action.
+- Use rounded cards consistently, normally 12-16px for work cards and 8-10px for controls. Do not use oversized card radii, heavy gradients, glass effects, or dashboard-style decoration that obscures operational content.
+- Use icon colour as a module/location cue, not as the sole meaning of a status. Status remains explicit through text, badge label, shape, and accessible semantic colour.
+- Keep the primary action visually strong in deep blue. Use outline/quiet buttons for `More Actions`, exports, links, and non-destructive secondary work.
+- Preserve the reference typography hierarchy: page heading -> short operational purpose -> KPI label/value/context -> work-area heading -> row data and helper text.
+- Use real names, counts, amounts, statuses, and timestamps only. The visual references show illustrative data; implementation must use backend responses or an honest unavailable state.
+
+### 6.5 Reference-screen density and responsive rule
+
+The reference layouts are desktop operating-desk designs, not a mandate to squeeze all content into a narrow screen.
+
+| Viewport / condition | Required behaviour |
+|---|---|
+| Desktop >= 1440px | Persistent sidebar, full module workspace, and optional 280-360px right rail are allowed where the rail has an active job. |
+| Desktop 1180-1439px | Keep the page context and main work visible; collapse the right rail into a dismissible panel/drawer only after preserving the primary workflow. |
+| Tablet / compact laptop < 1180px | Stack summary cards; move long filter rows into expandable filters; open record detail, composer, preview, and reconciliation panels on demand. |
+| Narrow routes / high zoom | Do not force dense tables to compress unreadably. Use horizontal table containment, column priority, or a dedicated detail page. |
+
+The side rail is not decorative. It must have a job, a query/mutation state, a permission state, and a clear collapse behaviour.
+
 ---
 
 ## 7. Global Layout System
@@ -403,6 +429,20 @@ Header rules:
 - Do not put five equal buttons in the header.
 - Destructive actions must not be primary header actions.
 - High-risk actions need confirmation and reason.
+
+### 7.5 Right-rail modes
+
+The references use several distinct right-rail patterns. SchoolOS must choose the rail by workflow rather than reuse one generic drawer.
+
+| Rail mode | Use when | Examples | Must include |
+|---|---|---|---|
+| Record context rail | The selected row needs quick context while the list remains primary. | Student profile/checklist, selected exam term, staff/payslip preview. | Record identity, status, relevant next action, protected file action where applicable, and safe close/back behaviour. |
+| Operational status rail | The module needs live exceptions and lock/readiness information. | Attendance summary, lock window, recent corrections, anomalies; homework conflicts/substitutions/workload. | Severity, affected scope, timestamp, drill-through action, and no unverified aggregate. |
+| Transaction workbench rail | A counter/reconciliation action is performed beside selected records. | Fee collection/payment breakdown, bank reconciliation. | Backend-authoritative total, pending/confirmed state, validation, idempotent submit state, and audited high-risk actions. |
+| Composer rail | The user creates an object while retaining feed/list context. | Activity post composer, notice composer. | Draft/publish state, audience preview, consent/provider/quiet-hour status, attachment protection, validation, and safe discard behaviour. |
+| Preview rail | A protected artifact can be safely previewed in context. | Receipt, report card, payslip, generated document. | Authenticated preview state, file unavailable state, refresh/retry, and an explicit protected download/print action. |
+
+A right rail must not duplicate a full page merely because a reference used a rail. Use a full route for long forms, multi-step workflows, payroll runs, reconciliation, timetable building, student/staff profiles, and learning activity builders.
 
 ---
 
@@ -737,86 +777,177 @@ Filter rules:
 
 ## 14. Main Dashboard Deep Design
 
-The dashboard is not a place to show every module in depth. It is the school command center.
+The dashboard is a role-aware school command center. It is not a report warehouse, a generic tile wall, or a duplicate of every module workspace.
 
 It answers:
 
 ```text
-What is happening today?
-What needs attention?
-Which module needs action?
-What can this user do quickly?
+What needs attention now?
+Which daily operation is at risk?
+What decision or approval is waiting for me?
+Where should I go next?
 ```
 
-### 14.1 Dashboard layout
+### 14.1 Dashboard family
+
+The reference screens define one principal-facing dashboard family with a stable shell and focused sub-workspaces. Other staff roles use the same data-truth/security rules but receive a smaller role-specific home.
+
+| Surface | Primary job | Primary users | Primary CTA |
+|---|---|---|---|
+| `/dashboard` | See school health, priority work, quick actions, and current module state. | Principal, owner, authorized school admin. | Resolve top alert / open highest-priority item. |
+| `/dashboard/attention` | Review approvals, operational risks, escalations, and recent decisions. | Principal, authorized approvers. | Review next approval. |
+| `/dashboard/operations/today` | Run and monitor today's cross-module school operations. | Principal, operations lead, school admin. | Open daily workflow / open a failing operation. |
+| `/dashboard/academics/overview` | Review academic readiness, teaching workload, homework, exams, and learning sessions. | Principal, academic coordinator. | Open academic overview. |
+| `/dashboard/fees/overview` | Review collection health, finance approvals, overdue follow-up, and cashier status. | Principal, accountant, finance manager. | Open fee operations. |
+| `/dashboard/activity-overview` | Review recent activity, upcoming work, quick actions, enabled-module state, and user shortcuts. | Principal, school admin. | Open school dashboard / selected module. |
+
+Exact route names need backend and existing-app route confirmation. The named screens are information architecture targets; they must not create duplicate data sources or invented API contracts.
+
+### 14.2 Principal home — required composition
 
 ```text
-Welcome / School Status Header
-School-wide KPI Strip
-Today's Operations
-Pending Approvals and Alerts
-Module Summary Grid
-Recent Activity Timeline
-Role-Based Quick Actions
-Optional decision charts
+School greeting + school/academic-year/open-day context + one top alert CTA
+-> 4-6 permission-filtered school KPIs
+-> Today’s Operations
+-> Pending Approvals & Alerts
+-> Academic & Learning Snapshot
+-> Recent Activity
+-> Role-safe Quick Actions
+-> Enabled Module Summary
 ```
 
-### 14.2 Dashboard wireframe
+Recommended principal home cards:
+
+| Section | Required content | Guardrails |
+|---|---|---|
+| Context header | School name, academic year, school-day state, concise greeting. | Do not render a “school open” state from browser clock alone; use configured/calendar-backed context where available. |
+| KPI strip | Active students, present today, fees collected today, pending approvals, staff present, overdue fees. | Show only summary fields permitted to the actor. Financial amounts come from backend. |
+| Today’s Operations | Attendance completion, fees collected, transport activity, canteen service, each with a drill-through. | Module locked/unavailable states must be explicit; no fake zero. |
+| Pending Approvals & Alerts | Attendance corrections, leave requests, discount/refund/reversal reviews, payroll sign-off, delayed routes, publish blockers. | Do not surface internal payroll/finance detail to a principal without matching permission. |
+| Academic & Learning Snapshot | Marks pending, upcoming exams, homework due, live learning sessions, supportive learning distribution. | Use non-comparative learning labels only. No M11/AI insight claims. |
+| Recent Activity | Audited, permission-safe events with time and source module. | Do not expose private message content, protected file names, or sensitive actor details. |
+| Quick Actions | New admission, collect fee, create notice, review approvals, add staff, generate report. | Render only actions whose backend permission + entitlement are present. |
+| Module Summary | Enabled modules only, each with one meaningful current status and drill-through. | Locked modules show a subtle lock/availability state, never fabricated status. |
+
+### 14.3 Attention & Approvals workspace
+
+The references establish this as a dedicated principal workbench, not a dashboard modal.
 
 ```text
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ Good Morning, Principal                                                      │
-│ Holyland Kids' Academy | Academic Year 2082/83 | School Open Today           │
-│                                                        [Resolve Top Alert]   │
-└──────────────────────────────────────────────────────────────────────────────┘
-
-┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-│ Students     │ │ Present Today│ │ Fees Today   │ │ Pending Tasks│
-│ 1,250        │ │ 1,086 / 1250 │ │ Rs. 85,000   │ │ 17           │
-└──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘
-
-┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-│ Staff Present│ │ Notices Sent │ │ Active Trips │ │ Overdue Fees │
-│ 72 / 80      │ │ 4            │ │ 5            │ │ Rs. 2,40,000 │
-└──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘
-
-┌──────────────────────────────────────┐ ┌─────────────────────────────────────┐
-│ Today's Operations                    │ │ Pending Approvals & Alerts          │
-│ Attendance     86% marked     [Open] │ │ Attendance corrections       5       │
-│ Fees           Rs.85,000      [Open] │ │ Leave requests               3       │
-│ Transport      5 active trips [Open] │ │ Fee discount requests        4       │
-│ Canteen        145 served     [Open] │ │ Payroll run pending          1       │
-└──────────────────────────────────────┘ └─────────────────────────────────────┘
-
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ Module Summary                                                               │
-│ Admissions | Attendance | Fees | Academics | HR | Library | Transport | ...  │
-└──────────────────────────────────────────────────────────────────────────────┘
-
-┌──────────────────────────────────────┐ ┌─────────────────────────────────────┐
-│ Recent Activity                       │ │ Quick Actions                       │
-│ Payment received                      │ │ New Admission                        │
-│ Attendance submitted                  │ │ Collect Fee                          │
-│ Notice sent                           │ │ Create Notice                        │
-└──────────────────────────────────────┘ └─────────────────────────────────────┘
+Priority alert strip
+-> Approval / risk KPI strip
+-> Pending approvals queue
+-> Operational alerts list
+-> Approval trend (only with meaningful backend series)
+-> Recent decisions
+-> Escalations
 ```
 
-### 14.3 Dashboard API expectations
+Requirements:
 
-Dashboard must not deep-fetch every module. It should use:
+- The top alert strip contains only current, actionable items such as attendance not marked, transport delay, or final payroll sign-off.
+- The pending queue shows request type, safe summary, requester, amount/duration only when permitted, status, and one `Review` action.
+- Review opens a dedicated drawer or full route with before/after context, reason requirement, approval state, and audit trace.
+- Charts are optional. A trend chart appears only when the backend returns a valid time-series and it informs a decision; otherwise replace it with a concise queue/status summary.
+- Escalations may show category and safe summary, but must not expose private chat bodies unless the actor has explicit scope.
 
-- Dedicated summary APIs.
-- Safe module summary metadata.
-- Permission-filtered response shapes.
-- Unavailable summary state when the summary endpoint is missing.
+### 14.4 Today’s Operations workspace
 
-Dashboard must not show:
+This screen turns cross-module status into a daily checklist.
 
-- Private payroll details.
-- Private chat contents.
-- Raw student-sensitive data.
-- Locked module fake values.
-- Finance totals if the user lacks permission.
+```text
+Operational KPI strip
+-> Attendance operations
+-> Transport operations
+-> Fee collection counter
+-> Canteen operations
+-> Admissions desk
+-> Communication desk
+-> Operational timeline
+-> Team on duty
+-> Quick daily actions
+```
+
+Each operational card must state one live status, one main action, and one safe drill-through. Example statuses include classes submitted/pending, active/delayed trips, transactions/parent queries, meals/low-stock warnings, incomplete applications, or unread follow-ups.
+
+The timeline is an audit-friendly operational feed, not a raw event stream. It must be tenant-scoped, permission-filtered, ordered by backend timestamp, and link only to records the actor may open.
+
+### 14.5 Academic & Learning Snapshot
+
+```text
+Academic KPI strip
+-> Academic readiness progress rows
+-> Learning progress distribution and subject summaries
+-> Today’s teaching / workload snapshot
+-> Homework and assignment status
+-> Exam and report-card status
+-> Live learning sessions
+-> Recent academic activity
+```
+
+Requirements:
+
+- Progress rows must have explicit numerator/denominator or a clear unavailable state.
+- Use supportive learning labels: `Needs Practice`, `Improving`, `Ready`, `Strong`.
+- Do not display rankings, class comparisons to parents/students, or AI predictions.
+- Teaching workload must remain a planning signal, not a staff-performance verdict.
+- Marks, CAS, report-card publishing, and learning session counts are permission-filtered; a principal sees summary, while teachers use their assigned-scope workspaces.
+
+### 14.6 Finance & Collections Snapshot
+
+```text
+Collection KPI strip
+-> Daily collection trend and payment-method breakdown
+-> Pending finance actions
+-> Recent receipts
+-> Overdue follow-up segments
+-> Cashier / counter status
+-> Quick finance actions
+-> Finance alerts
+```
+
+Requirements:
+
+- This is a read/triage dashboard for principals unless finance permissions allow deeper actions.
+- Fee collection, invoices, payment status, reversals/refunds, cashier close, and reconciliation remain separate workflows.
+- A chart or payment-method card must use backend totals; no browser aggregation.
+- Quick actions must never bypass the cashier/payment idempotency flow.
+- Do not expose bank account/salary data or accounting journals solely because a finance summary exists.
+
+### 14.7 School Activity & Module Summary
+
+```text
+School activity KPI strip
+-> Recent activity timeline
+-> Quick actions
+-> Upcoming and scheduled work
+-> Enabled module summary grid
+-> Recently opened workspaces
+-> User shortcuts
+```
+
+Use this surface when the principal needs orientation rather than urgent triage. The module grid is an enabled-module map, not a product marketing grid. Each tile has one current, non-sensitive status, a state label, and a route to the relevant workspace.
+
+### 14.8 Dashboard loading and failure behaviour
+
+- Render the shell/header immediately, then load independent summary sections with local skeletons.
+- One failed summary must not blank the full dashboard. Show section-level error/retry and preserve any safe successful data.
+- Missing or unsupported summaries show `Not available yet` or a module-locked state, not zero-value cards.
+- Respect permission changes during session refresh; remove or replace now-forbidden sections without leaking the previous data.
+- Dashboard actions must route into actual module workspaces with preserved context where a filter can be represented safely.
+
+### 14.9 Dashboard acceptance checks
+
+```text
+[ ] Principal home renders only permission-filtered, enabled-module summaries.
+[ ] Top alert opens an actual safe workflow, not a browser-only modal.
+[ ] Financial totals, attendance completion, and report readiness are backend-owned.
+[ ] One failed summary section does not break the full dashboard.
+[ ] Module-locked/unavailable data is explicit and never represented as zero.
+[ ] Recent activity and escalations do not expose private message bodies or protected-file metadata.
+[ ] Quick actions are permission/entitlement-gated and deep-link to real routes.
+[ ] Dashboard does not claim AI/risk scoring; it shows deterministic operational status only.
+```
 
 ---
 
@@ -1920,3 +2051,364 @@ I can trust the numbers and files shown here.
 ```
 
 That is the standard for SchoolOS web frontend design.
+
+---
+
+## 40. 2026-06-19 Desktop Reference-Screen Alignment
+
+### 40.1 Scope and interpretation
+
+The supplied desktop screens are now the visual and information-architecture reference for the SchoolOS web dashboard and main module workspaces. They establish **layout patterns, content hierarchy, interaction density, and role-aware workbenches**. They do not prove that a metric, route, provider, endpoint, background job, or permission already exists.
+
+Implementation must continue to follow the actual NestJS API, OpenAPI, shared contracts, tenant/RBAC/entitlement guards, File Registry, and audited workflow rules. Any referenced data point without a confirmed contract must be marked:
+
+```text
+needs backend verification
+needs OpenAPI confirmation
+needs shared-contract confirmation
+needs summary API
+needs idempotency confirmation
+needs File Registry confirmation
+```
+
+### 40.2 Shared desktop frame
+
+The following frame is common across the references and is the standard for authenticated school workspaces:
+
+```text
+Compact global topbar
++ persistent role/module sidebar
++ page title/purpose/action row
++ 3-6 context-aware KPI cards
++ tab strip for sub-workspaces
++ filter/search bar
++ main operational work area
++ optional right rail with an explicit job
+```
+
+#### Global topbar requirements
+
+- School switcher only when the authenticated actor has multiple school access.
+- Academic-year selector only when the route/query supports an academic-year context. Do not let a client-side selection silently change accounting/fiscal data.
+- Global search uses role-, tenant-, and permission-filtered results. Search hints may show student/staff/class/transaction terms but cannot reveal forbidden records.
+- Notifications show a count and safe navigation; a count is not proof that every user may open the related item.
+- User menu shows active role/context and logout. Any support override remains visible in the shell.
+
+#### Sidebar requirements
+
+- Group routes by school task, not by database model.
+- Use one active item with a calm blue selected state.
+- Preserve a compact collapse control.
+- A role-limited principal navigation may expose attention, operations, academics, finance, and activity summaries without exposing platform, broad settings, or sensitive specialist workflows.
+- Do not add reference-only navigation labels such as `Behaviour & Notes`, `Hostel`, `Inventory`, or `Assets` until ownership, module entitlement, and API contracts are confirmed. Existing enabled modules remain the source of truth.
+- Every locked route renders `ModuleLockedState`; hiding it in the sidebar is only an affordance.
+
+### 40.3 Module workspace reference matrix
+
+| Reference workspace | Required composition | Primary right rail / split mode | Non-negotiable design rules |
+|---|---|---|---|
+| Admissions & Student Profiles | KPI strip; tabs for Students, Admissions, Documents, Duplicates, iEMIS, QR/ID; server-filtered student list; selected student quick context. | Record context rail: student identity, guardian summary, document checklist, QR state. | Student document/ID/QR actions stay protected and tenant-scoped; teachers see assigned scope only; duplicate/guardian/lifecycle actions remain audited. |
+| Smart Attendance | KPI strip; Daily, Register, Corrections, Offline Drafts, Anomalies, Reports; date/class/section/teacher/status context; attendance grid. | Operational rail: attendance summary, lock window, corrections, anomalies. | Bulk present has partial-session guard; locked date is read-only; correction before/after/reason is visible; exports use protected helper. |
+| Fees & Receipts | KPI strip; Dues/Invoices/Payments/Receipts/Discounts/Reversals/Cashier Close/Reports; selected student due summary; invoice list; payment form. | Transaction workbench + receipt preview rail. | Back-end totals and idempotency only; receipt appears after confirmed payment; refunds/reversals and close require reason/permission/audit; protected receipt preview only. |
+| Academics / Marks Entry | KPI strip; Subjects/Terms/Marks/CAS/Report Cards/Results; marks grid with state badges and pagination. | Record context rail: selected term, components, report-card readiness, protected preview. | Assigned teacher scope; absent/withheld/retest/draft visible; lock/correction/publish flows are explicit; no unpublished parent data. |
+| Activity Feed & Milestones | Feed/approval/gallery/milestones/report tabs; filters; feed table/gallery; milestone cards. | Composer rail with audience/consent/visibility/delivery. | Consent preview before publish; File Registry upload/preview; blocked/removed/failed state is visible; draft/publish/moderation must not rely on browser-only state. |
+| Homework & Timetable | Homework list and weekly timetable split; filters; conflict states. | Operational rail: timetable conflicts, substitutions, teacher workload. | Conflict severity and drill-through; attachments protected; only backend-confirmed scheduling/workload claims; no silent timetable overwrite. |
+| HR & Payroll | Staff directory plus leave approval queue. | Payroll summary plus protected payslip preview rail. | Salary/bank data permission-gated and masked; payroll cannot be silently edited after posting; leave approval actions show state/reason. |
+| Operations Hub (Library / Transport / Canteen) | One overview that routes to specialist workspaces; compact three-column operations cards. | No mandatory rail; each card owns one main action. | Show operational statuses, not fake maps; scanner/POS/trip actions have dedicated pages; live location stays deferred until confirmed. |
+| Accounting & Finance | Journal list; fiscal filters; chart-of-accounts snapshot; export job list. | Reconciliation workbench rail: bank statement/match/unmatched/difference. | Posted records are correction/reversal only; matching needs explicit confirmation; exports are queued/protected; no raw ledger total calculation in browser. |
+| Notices & Communication | Notice list + chat inbox; channel/audience/status filters; delivery progress. | Composer rail with template, audience preview, provider status, message preview, send/schedule. | Provider mode must be clear; high-impact/scheduled delivery needs review where configured; quiet hours/escalation locks remain visible; attachments protected. |
+
+### 40.4 Module-specific reference details
+
+#### Admissions and student profile list
+
+Use an information-dense but readable table. The reference pattern supports a selected row state and an in-context profile rail rather than forcing staff to open a new route for every quick check.
+
+Required table hierarchy:
+
+```text
+Photo / Student
+Admission number
+Class / Section
+Guardian + relationship
+Phone
+Document state
+QR state
+Row actions
+```
+
+The detail rail may show a compact document checklist and QR card state. It must not expose raw document links, QR token material, unrelated guardian details, or broad cross-module records that the actor cannot access.
+
+#### Smart attendance register
+
+The daily register should prioritize one class/date session at a time:
+
+```text
+Date + class + section + teacher/session context
+-> roster
+-> per-student attendance state
+-> optional remark
+-> last updated / actor
+-> submit state
+```
+
+Use a visible `Bulk Actions` area only for safe, server-supported operations. `Mark all present`, `Mark all absent`, `Mark all late`, or `Mark leave` must show a pending state and must not overwrite already finalized records without backend-confirmed correction rules.
+
+#### Fee collection counter
+
+The fee screen reference is a true cashier workbench:
+
+```text
+Find student
+-> inspect due / invoice context
+-> enter amount/method/reference/date
+-> show backend-provided allocation/breakdown
+-> collect once
+-> show confirmed receipt preview
+```
+
+The selected student, invoice allocations, payment amount, and receipt preview must remain coherent after refetch. A payment form cannot fabricate allocation or payment state locally. `Save draft` is allowed only when a server-backed draft contract exists.
+
+#### Marks entry and reporting readiness
+
+Use spreadsheet-like entry only where it improves teacher speed. The right rail should communicate the selected exam term, its components/weights, report-card generation state, and publish blockers.
+
+The grid must preserve row-level states:
+
+```text
+Draft
+Submitted
+Absent
+Withheld
+Retest / Make-up
+Validation error
+Locked
+```
+
+The UI must not interpret a blank cell as zero, absent, or withheld unless the backend contract makes that state explicit.
+
+#### Activity composer
+
+The reference composer rail is the standard for post composition:
+
+```text
+Post type
+Title/body
+Protected media attachments
+Audience
+Consent summary
+Visibility
+Delivery/scheduling
+Save draft / publish
+```
+
+Do not pre-render or auto-send audience counts without a backend audience-preview result. Consent-blocked or unavailable media must be called out before publish. Provider delivery outcomes are delivery states, not publish states.
+
+#### Homework, timetable, conflicts, and substitutions
+
+The side-by-side homework + weekly timetable reference is valid only on desktop. Each timetable slot must surface a stable period, class/section, subject, room, teacher, and status from the backend.
+
+Conflict cards must include:
+
+```text
+Conflict type
+Affected entities
+Severity
+Reason
+Safe action / drill-through
+```
+
+Substitution summaries are operational guidance, not proof of a staffing decision until confirmed in the substitution workflow.
+
+#### HR and payroll
+
+The HR workspace can combine a staff list and leave approval queue because both are daily HR work. Payroll summary and protected payslip preview belong in a right rail only for authorized staff. In every other role, replace sensitive salary/bank fields with a safe unavailable/permission state.
+
+#### Operations hub
+
+The library, transport, and canteen reference is a compact “operations hub” pattern. It is useful as an overview or principal surface, but it does not replace:
+
+```text
+Library issue/return counter
+Transport routes/trips/assignment workspace
+Canteen POS/serving/inventory workspace
+```
+
+Use low-cost current states such as books pending issue/return, trip status/stale-GPS warning, meals served/low-wallet/stock alert. Do not introduce a live map just to mirror a dashboard tile.
+
+#### Accounting reconciliation
+
+The reference reconciliation rail is a split-workbench pattern, not an automatic matching engine. It must show the selected bank account/statement context, matchable items, unmatched items, variance, and the current action state.
+
+`Confirm matches` is high risk. It requires backend authorisation, idempotent/retry-safe handling, audit support, and a clear partial-failure response. `Auto match` is a deterministic backend-assisted suggestion only; it never silently posts or finalizes accounting records.
+
+#### Notices, delivery, and chat
+
+The composer rail is also valid for notices. The screen must separate:
+
+```text
+Notice saved/published
+Delivery queued
+Delivery sent
+Delivery failed
+Retry pending
+Read / acknowledged where supported
+```
+
+Show provider health in a safe, non-secret form. Delivery counts/progress require a backend source and cannot be derived from filtered browser rows. Chat inbox previews remain scope-filtered and must not bypass quiet hours, escalation locks, or parent-teacher eligibility.
+
+### 40.5 Shared component inventory required by the references
+
+The following components should be standardized before duplicating module-specific implementations:
+
+```text
+SchoolTopbar
+AcademicYearContextSwitcher
+GlobalSearchCommand
+RoleAwareSidebar
+ModuleNavGroup
+PageHeader
+PrimaryActionButton
+MoreActionsMenu
+KpiCard
+KpiStrip
+WorkspaceTabs
+FilterToolbar
+ActiveFilterChips
+PaginatedDataTable
+TableRowActionMenu
+RightRail
+RecordContextRail
+OperationalStatusRail
+TransactionWorkbenchRail
+ComposerRail
+ProtectedPreviewRail
+SectionCard
+StatusBadge
+MetricTrend
+ProgressRow
+OperationalAlertStrip
+ApprovalQueue
+ActivityTimeline
+QuickActionGrid
+ModuleSummaryGrid
+UpcomingScheduleList
+WorkloadSummary
+ConflictCard
+DeliveryProgress
+QueuedJobState
+ModuleLockedState
+PermissionState
+EmptyState
+ErrorState
+LoadingState
+PartialFailureState
+ProtectedFileButton
+ProtectedFileLink
+ProtectedFilePreview
+ReasonConfirmationDialog
+```
+
+Component rules:
+
+- A shared primitive owns visual states, accessible semantics, and safe empty/error/permission/locked behaviour.
+- Feature components own real API integration and exact domain vocabulary.
+- No primitive may invent financial totals, access state, delivery state, or a protected file URL.
+- Avoid generic `StatsCard` or `DashboardWidget` components that accept arbitrary browser-computed values without a typed backend-backed state contract.
+
+### 40.6 Required dashboard and workspace data contracts
+
+The design work must not invent endpoints. Before implementation, confirm or add purpose-limited contracts for:
+
+| Surface | Minimum data needed | Confirmation status |
+|---|---|---|
+| Principal home | Permission-filtered KPIs, attention items, operations summary, quick actions, enabled-module summary, safe activity timeline. | needs summary API / OpenAPI confirmation |
+| Attention & approvals | Approval queue, safe request summary, operational alerts, recent decisions, escalation categories. | needs advanced-operations API confirmation |
+| Today’s operations | Attendance, fees, transport, canteen, admissions, communications operational counters and current state. | needs cross-module aggregation confirmation |
+| Academic snapshot | Marks/report-card readiness, homework status, timetable/workload, live learning session summary, supportive learning progress. | needs academics/learning summary confirmation |
+| Finance snapshot | Collection summary, payment-method breakdown, pending finance actions, overdue segments, cashier status, safe alerts. | needs finance summary confirmation |
+| Activity/module summary | Recent activity, upcoming/scheduled work, enabled module statuses, safe shortcuts/workspace history. | needs audit/activity/module summary confirmation |
+| Right-rail previews | Selected record context, protected preview/download availability, relevant history. | needs per-module DTO / File Registry confirmation |
+| Delivery composer rail | Audience preview, consent/provider state, schedule/delivery validation, saved draft/publish state. | needs communications/activity contract confirmation |
+
+All aggregation must remain server-owned and role-filtered. The frontend may compose independently fetched safe summaries only when each contract is explicitly approved and no cross-module calculation becomes an official truth source.
+
+### 40.7 Interaction rules derived from the references
+
+1. A KPI card must drill into a real filtered workspace or record list. Static cards with no destination are not allowed unless explicitly informational.
+2. Tabs are work areas, not navigation replacements. Deep-linkable module routes remain available for meaningful workflows.
+3. Filter bars must preserve active filters in URL state where the existing route structure supports it.
+4. A selected table row must maintain visual selection and a screen-reader-accessible relationship to its detail rail.
+5. Open/close side panels must not discard an in-progress form. Composer/form state needs backend draft support or clearly labelled local unsaved state that is never mistaken for server persistence.
+6. Use `View all`, `Review`, `Open`, `Monitor`, `Preview`, `Resolve`, and `Continue` only when the target action is available to the current role.
+7. Use `Send now`, `Publish now`, `Collect payment`, `Confirm matches`, `Submit attendance`, and `Run payroll` only after confirmation/pending/error treatment appropriate to risk.
+8. Every chart has a text summary, labelled scale, and drill-through or is omitted.
+9. The visual reference uses green/red/orange/blue status signals; implementation must not rely on colour alone.
+10. All record counts, completion percentages, trend comparisons, and progress values come from server responses with a defined time/date context.
+
+### 40.8 Screenshot-driven browser E2E priorities
+
+When the matching web workspaces exist, prioritize browser E2E for the visual/workflow patterns, not pixel-perfect screenshots:
+
+```text
+Principal home:
+- permission-filtered cards
+- one unavailable/locked module state
+- top-alert drill-through
+- safe quick-action visibility
+
+Admissions:
+- server filter + selected record rail
+- protected student document state
+- duplicate/guardian scope denial
+
+Attendance:
+- assigned-class register
+- bulk action pending/submit state
+- locked window and correction rail
+- anomaly drill-through
+
+Fees:
+- student search -> invoice -> idempotent payment -> protected receipt preview
+- reversal/refund permission denial
+- cashier close state
+
+Academics:
+- assigned-subject marks grid
+- draft/absent/withheld/retest rendering
+- report-card protected preview and publish blocker
+
+Activity / Notices:
+- composer rail draft/validation
+- consent/audience/provider state
+- delivery/protected attachment failure state
+
+Homework / Timetable:
+- conflict rail and substitution drill-through
+- protected attachment state
+
+HR / Payroll:
+- leave queue
+- masked payslip preview for unauthorized user
+
+Accounting:
+- reconciliation match confirmation with partial failure handling
+- queued export state
+```
+
+### 40.9 Implementation boundary
+
+This reference update is design documentation only.
+
+It does **not**:
+
+```text
+claim a production-ready dashboard
+claim any missing API is implemented
+authorize a new module or route
+approve a live transport map
+approve AI/ML/LLM runtime
+replace backend RBAC, tenant guards, entitlement checks, File Registry, financial idempotency, audit, OpenAPI, or E2E verification
+```
+
+The next implementation work must inspect current `apps/web` routes/components, API client helpers, backend controllers/DTOs/OpenAPI, shared contracts, permissions/entitlements, and tests before changing code.
