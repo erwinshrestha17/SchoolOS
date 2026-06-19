@@ -9,6 +9,8 @@ import { AttendanceController } from './attendance.controller';
 import { AttendanceService } from './attendance.service';
 import { HrAttendanceController } from './hr-attendance.controller';
 import { HrLeaveQueueController } from './hr-leave-queue.controller';
+import { M2AttendanceHardeningController } from './m2-attendance-hardening.controller';
+import { M2AttendanceHardeningService } from './m2-attendance-hardening.service';
 import { StaffLeaveQueueService } from './staff-leave-queue.service';
 import { StaffSelfServiceController } from './staff-self-service.controller';
 import { StaffSelfServiceService } from './staff-self-service.service';
@@ -26,11 +28,13 @@ import { StaffTimeClockService } from './staff-time-clock.service';
     AttendanceController,
     HrAttendanceController,
     HrLeaveQueueController,
+    M2AttendanceHardeningController,
     StaffSelfServiceController,
   ],
   providers: [
     AttendanceService,
     AttendanceCron,
+    M2AttendanceHardeningService,
     StaffLeaveQueueService,
     StaffSelfServiceService,
     StaffTimeClockService,

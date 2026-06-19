@@ -167,29 +167,41 @@ export function AttendanceForm() {
 
   useEffect(() => {
     if (!rosterQuery.data) return;
-    const localDraft = readAttendanceDraft(draftKey);
-    if (localDraft) {
-      setExceptions(localDraft.exceptions as Record<string, AttendanceStatus>);
-      setRemarks(localDraft.remarks);
-      setDraftSavedAt(localDraft.savedAt);
-      setDraftSyncState('saved_local');
-      setHasDraftChanges(true);
-      setSubmitMessage('Recovered a locally saved attendance draft.');
-      return;
+    let cancelled = false;
+
+    async function loadDraftOrRoster() {
+      const localDraft = await readAttendanceDraft(draftKey);
+      if (cancelled) return;
+
+      if (localDraft) {
+        setExceptions(localDraft.exceptions as Record<string, AttendanceStatus>);
+        setRemarks(localDraft.remarks);
+        setDraftSavedAt(localDraft.savedAt);
+        setDraftSyncState('saved_local');
+        setHasDraftChanges(true);
+        setSubmitMessage('Recovered a locally saved attendance draft.');
+        return;
+      }
+
+      const nextExceptions: Record<string, AttendanceStatus> = {};
+      const nextRemarks: Record<string, string> = {};
+      rosterQuery.data?.students.forEach((student) => {
+        const normalized = normalizeStatus(student.status);
+        if (normalized !== 'PRESENT') nextExceptions[student.id] = normalized;
+        if (student.remark) nextRemarks[student.id] = student.remark;
+      });
+      setExceptions(nextExceptions);
+      setRemarks(nextRemarks);
+      setHasDraftChanges(false);
+      setSubmitMessage('');
+      setConflictMessage('');
     }
 
-    const nextExceptions: Record<string, AttendanceStatus> = {};
-    const nextRemarks: Record<string, string> = {};
-    rosterQuery.data.students.forEach((student) => {
-      const normalized = normalizeStatus(student.status);
-      if (normalized !== 'PRESENT') nextExceptions[student.id] = normalized;
-      if (student.remark) nextRemarks[student.id] = student.remark;
-    });
-    setExceptions(nextExceptions);
-    setRemarks(nextRemarks);
-    setHasDraftChanges(false);
-    setSubmitMessage('');
-    setConflictMessage('');
+    void loadDraftOrRoster();
+
+    return () => {
+      cancelled = true;
+    };
   }, [draftKey, rosterQuery.data]);
 
   useEffect(() => {
@@ -217,7 +229,7 @@ export function AttendanceForm() {
       serverSubmittedAt: rosterQuery.data?.existingSession?.submittedAt ?? null,
     };
 
-    storeAttendanceDraft(draftKey, draft);
+    void storeAttendanceDraft(draftKey, draft);
     setDraftSavedAt(savedAt);
     if (draftSyncState !== 'conflict') {
       setDraftSyncState('saved_local');
@@ -250,7 +262,7 @@ export function AttendanceForm() {
     mutationFn: api.submitAttendance,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['attendance-roster'] });
-      clearAttendanceDraft(draftKey);
+      void clearAttendanceDraft(draftKey);
       setDraftSyncState('synced');
       setHasDraftChanges(false);
       setSubmitMessage(
@@ -277,7 +289,7 @@ export function AttendanceForm() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['attendance-analytics'] });
       void queryClient.invalidateQueries({ queryKey: ['attendance-conflicts'] });
-      clearAttendanceDraft(draftKey);
+      void clearAttendanceDraft(draftKey);
       setDraftSyncState('synced');
       setHasDraftChanges(false);
       setSubmitMessage(
@@ -378,7 +390,7 @@ export function AttendanceForm() {
   };
 
   const keepServerVersion = () => {
-    clearAttendanceDraft(draftKey);
+    void clearAttendanceDraft(draftKey);
     setDraftSyncState('synced');
     setConflictMessage('');
     void queryClient.invalidateQueries({ queryKey: ['attendance-roster'] });

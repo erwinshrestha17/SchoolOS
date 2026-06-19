@@ -23,7 +23,7 @@ import {
 
 const POLICY_KEY = 'attendance.m2.hardeningPolicy';
 
-type M2AttendancePolicy = {
+interface M2AttendancePolicy {
   lockOverrideMinReasonLength: number;
   correctionReviewMinReasonLength: number;
   repeatedAbsenceThreshold: number;
@@ -35,7 +35,7 @@ type M2AttendancePolicy = {
   notifyParentsForAbsence: boolean;
   absenceMessageTemplate: string;
   lateMessageTemplate: string;
-};
+}
 
 @Injectable()
 export class M2AttendanceHardeningService {

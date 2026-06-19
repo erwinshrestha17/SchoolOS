@@ -301,6 +301,15 @@ export class AttendanceController {
     return this.attendanceService.listCorrectionRequests(auth, query);
   }
 
+  @Get('corrections/:id')
+  @Permissions('attendance:read')
+  getCorrectionRequest(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.getCorrectionRequest(id, auth);
+  }
+
   @Patch('corrections/:id/approve')
   @Permissions('attendance:review_conflicts')
   approveCorrectionRequest(

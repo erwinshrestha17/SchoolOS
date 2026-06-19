@@ -19,6 +19,10 @@ export type AttendanceDraftStorageValue = {
   serverSubmittedAt: string | null;
 };
 
+export type StoredAttendanceDraft = AttendanceDraftStorageValue & {
+  key: string;
+};
+
 export function toBrowserSession(session: AuthSession): BrowserSession {
   return {
     accessTokenExpiresAt: session.accessTokenExpiresAt,
@@ -84,32 +88,29 @@ export function clearStoredSession() {
   storeSession(null);
 }
 
-export function readAttendanceDraft(key: string | null) {
+export async function readAttendanceDraft(key: string | null) {
   if (typeof window === 'undefined' || !key) {
     return null;
   }
 
-  const rawDraft = window.localStorage.getItem(key);
-  if (!rawDraft) {
-    return null;
-  }
-
   try {
-    const parsed = JSON.parse(rawDraft) as AttendanceDraftStorageValue;
+    const parsed = await readIndexedDbDraft(key);
 
-    if (!parsed.academicYearId || !parsed.classId || !parsed.attendanceDate) {
-      window.localStorage.removeItem(key);
+    if (
+      parsed &&
+      (!parsed.academicYearId || !parsed.classId || !parsed.attendanceDate)
+    ) {
+      await clearAttendanceDraft(key);
       return null;
     }
 
     return parsed;
   } catch {
-    window.localStorage.removeItem(key);
     return null;
   }
 }
 
-export function storeAttendanceDraft(
+export async function storeAttendanceDraft(
   key: string | null,
   draft: AttendanceDraftStorageValue,
 ) {
@@ -117,15 +118,24 @@ export function storeAttendanceDraft(
     return;
   }
 
-  window.localStorage.setItem(key, JSON.stringify(draft));
+  await writeIndexedDbDraft(key, draft);
 }
 
-export function clearAttendanceDraft(key: string | null) {
+export async function clearAttendanceDraft(key: string | null) {
   if (typeof window === 'undefined' || !key) {
     return;
   }
 
+  await deleteIndexedDbDraft(key);
   window.localStorage.removeItem(key);
+}
+
+export async function listAttendanceDraftsForCurrentBrowser() {
+  if (typeof window === 'undefined') {
+    return [] as StoredAttendanceDraft[];
+  }
+
+  return listIndexedDbDrafts();
 }
 
 export function hasPermission(
@@ -162,4 +172,87 @@ export function clearSupportOverride() {
   if (typeof window === 'undefined') return;
   window.sessionStorage.removeItem('x-schoolos-tenant-id');
   window.sessionStorage.removeItem('x-schoolos-tenant-override-reason');
+}
+
+const ATTENDANCE_DRAFT_DB_NAME = 'schoolos-attendance-drafts';
+const ATTENDANCE_DRAFT_STORE_NAME = 'drafts';
+const ATTENDANCE_DRAFT_DB_VERSION = 1;
+
+function openAttendanceDraftDb() {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = window.indexedDB.open(
+      ATTENDANCE_DRAFT_DB_NAME,
+      ATTENDANCE_DRAFT_DB_VERSION,
+    );
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(ATTENDANCE_DRAFT_STORE_NAME)) {
+        db.createObjectStore(ATTENDANCE_DRAFT_STORE_NAME, { keyPath: 'key' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function withDraftStore<T>(
+  mode: IDBTransactionMode,
+  callback: (store: IDBObjectStore) => IDBRequest<T>,
+) {
+  const db = await openAttendanceDraftDb();
+  return new Promise<T>((resolve, reject) => {
+    const transaction = db.transaction(ATTENDANCE_DRAFT_STORE_NAME, mode);
+    const request = callback(transaction.objectStore(ATTENDANCE_DRAFT_STORE_NAME));
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => db.close();
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error);
+    };
+  });
+}
+
+async function readIndexedDbDraft(key: string) {
+  const stored = await withDraftStore<StoredAttendanceDraft | undefined>(
+    'readonly',
+    (store) => store.get(key),
+  );
+
+  if (stored) {
+    return stored;
+  }
+
+  const legacyRaw = window.localStorage.getItem(key);
+  if (!legacyRaw) {
+    return null;
+  }
+
+  try {
+    const legacy = JSON.parse(legacyRaw) as AttendanceDraftStorageValue;
+    await writeIndexedDbDraft(key, legacy);
+    window.localStorage.removeItem(key);
+    return { ...legacy, key };
+  } catch {
+    window.localStorage.removeItem(key);
+    return null;
+  }
+}
+
+function writeIndexedDbDraft(key: string, draft: AttendanceDraftStorageValue) {
+  return withDraftStore<IDBValidKey>('readwrite', (store) =>
+    store.put({ ...draft, key }),
+  );
+}
+
+function deleteIndexedDbDraft(key: string) {
+  return withDraftStore<undefined>('readwrite', (store) => store.delete(key));
+}
+
+function listIndexedDbDrafts() {
+  return withDraftStore<StoredAttendanceDraft[]>('readonly', (store) =>
+    store.getAll(),
+  );
 }

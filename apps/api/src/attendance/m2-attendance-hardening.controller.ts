@@ -7,6 +7,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
@@ -24,6 +25,8 @@ import {
 } from './dto/m2-attendance-hardening.dto';
 import { M2AttendanceHardeningService } from './m2-attendance-hardening.service';
 
+@ApiTags('M2 Smart Attendance')
+@ApiBearerAuth()
 @Controller('attendance/m2')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.attendance')
@@ -32,12 +35,14 @@ export class M2AttendanceHardeningController {
 
   @Get('policy')
   @Permissions('attendance:read')
+  @ApiOperation({ summary: 'Get tenant M2 attendance hardening policy' })
   getPolicy(@CurrentAuth() auth: AuthContext) {
     return this.service.getPolicy(auth);
   }
 
   @Patch('policy')
   @Permissions('attendance:manage_all')
+  @ApiOperation({ summary: 'Update tenant M2 attendance hardening policy' })
   updatePolicy(
     @Body() dto: UpdateM2AttendancePolicyDto,
     @CurrentAuth() auth: AuthContext,
@@ -47,12 +52,14 @@ export class M2AttendanceHardeningController {
 
   @Get('states')
   @Permissions('attendance:read')
+  @ApiOperation({ summary: 'List backend-supported attendance states' })
   getSupportedStates() {
     return this.service.getSupportedStates();
   }
 
   @Get('anomalies/hardened')
   @Permissions('attendance:read')
+  @ApiOperation({ summary: 'List hardened attendance anomaly checks' })
   getHardeningAnomalies(
     @Query() query: M2AttendanceWindowDto,
     @CurrentAuth() auth: AuthContext,
@@ -62,6 +69,7 @@ export class M2AttendanceHardeningController {
 
   @Get('conflicts/audit')
   @Permissions('attendance:review_conflicts')
+  @ApiOperation({ summary: 'List audited attendance sync conflicts' })
   getConflictAudit(
     @Query() query: M2AttendanceWindowDto,
     @CurrentAuth() auth: AuthContext,
@@ -71,6 +79,7 @@ export class M2AttendanceHardeningController {
 
   @Get('corrections/audit')
   @Permissions('attendance:review_conflicts')
+  @ApiOperation({ summary: 'List audited attendance correction reviews' })
   getCorrectionAudit(
     @Query() query: M2AttendanceWindowDto,
     @CurrentAuth() auth: AuthContext,
@@ -80,6 +89,7 @@ export class M2AttendanceHardeningController {
 
   @Get('calendar-policy')
   @Permissions('attendance:read')
+  @ApiOperation({ summary: 'Get attendance calendar policy window' })
   getCalendarPolicy(
     @Query() query: M2AttendanceWindowDto,
     @CurrentAuth() auth: AuthContext,
@@ -89,6 +99,7 @@ export class M2AttendanceHardeningController {
 
   @Post('calendar-policy/day')
   @Permissions('attendance:manage_all')
+  @ApiOperation({ summary: 'Upsert one attendance calendar policy day' })
   upsertCalendarPolicyDay(
     @Body() dto: UpsertM2CalendarPolicyDayDto,
     @CurrentAuth() auth: AuthContext,
@@ -98,6 +109,7 @@ export class M2AttendanceHardeningController {
 
   @Post('cutoff/run')
   @Permissions('attendance:manage_all')
+  @ApiOperation({ summary: 'Preview or run attendance cutoff hardening' })
   runAttendanceCutoff(
     @Body() dto: RunAttendanceCutoffDto,
     @CurrentAuth() auth: AuthContext,
@@ -107,6 +119,7 @@ export class M2AttendanceHardeningController {
 
   @Get('follow-ups/queue')
   @Permissions('attendance:read')
+  @ApiOperation({ summary: 'List repeated absence and late follow-up queue' })
   getFollowUpQueue(
     @Query() query: RepeatedAbsenceFollowUpDto,
     @CurrentAuth() auth: AuthContext,
@@ -116,6 +129,7 @@ export class M2AttendanceHardeningController {
 
   @Post('follow-ups/run')
   @Permissions('attendance:manage_all')
+  @ApiOperation({ summary: 'Preview or dispatch attendance follow-ups' })
   runFollowUpAutomation(
     @Body() dto: RepeatedAbsenceFollowUpDto,
     @CurrentAuth() auth: AuthContext,
@@ -125,6 +139,9 @@ export class M2AttendanceHardeningController {
 
   @Get('offline-sync/conflicts')
   @Permissions('attendance:review_conflicts')
+  @ApiOperation({
+    summary: 'List offline attendance sync conflicts and replays',
+  })
   listOfflineSyncConflicts(
     @Query() query: OfflineSyncConflictRulesDto,
     @CurrentAuth() auth: AuthContext,

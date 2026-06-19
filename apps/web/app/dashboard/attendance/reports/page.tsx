@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { AttendanceReportsWorkspace } from '@/components/attendance/attendance-m2-workspaces';
 
-export default function AttendanceReportsRedirect() {
-  redirect('/dashboard/attendance');
+export default function AttendanceReportsPage() {
+  return <AttendanceReportsWorkspace />;
 }

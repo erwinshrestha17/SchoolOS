@@ -671,7 +671,7 @@ export class AttendanceService {
       };
     } catch (error) {
       const err = error as Record<string, unknown>;
-      if (err && err.code === 'P2002') {
+      if (err?.code === 'P2002') {
         // Fetch concurrently created session
         const concSession = await this.prisma.attendanceSession.findFirst({
           where: {
@@ -1544,6 +1544,99 @@ export class AttendanceService {
       page,
       limit,
       hasNextPage: page * limit < total,
+    };
+  }
+
+  async getCorrectionRequest(id: string, actor: AuthContext) {
+    const request = await this.prisma.attendanceCorrectionRequest.findFirst({
+      where: { id, tenantId: actor.tenantId },
+      select: {
+        ...attendanceCorrectionRequestSelect,
+        student: {
+          select: {
+            id: true,
+            studentSystemId: true,
+            firstNameEn: true,
+            lastNameEn: true,
+            rollNumber: true,
+            class: { select: { id: true, name: true } },
+            sectionRef: { select: { id: true, name: true } },
+          },
+        },
+        requestedBy: {
+          select: { id: true, email: true },
+        },
+        reviewedBy: {
+          select: { id: true, email: true },
+        },
+        record: {
+          select: {
+            id: true,
+            status: true,
+            remark: true,
+            lateAt: true,
+            createdAt: true,
+          },
+        },
+        session: {
+          select: {
+            id: true,
+            attendanceDate: true,
+            submittedAt: true,
+            lockAt: true,
+            class: { select: { id: true, name: true } },
+            section: { select: { id: true, name: true } },
+            submittedBy: { select: { id: true, email: true } },
+          },
+        },
+      },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Correction request not found');
+    }
+
+    await this.ensureStudentAttendanceAccess(request.studentId, actor);
+
+    const lockState = getAttendanceCorrectionLockState(
+      request.session?.lockAt ?? null,
+      request.status,
+    );
+
+    return {
+      ...request,
+      lockState,
+      lockPolicy: {
+        requiresReasonForDecision: true,
+        explanation: describeAttendanceCorrectionLockState(lockState),
+      },
+      comparison: {
+        original: {
+          attendanceStatus:
+            request.previousStatus ?? request.record?.status ?? null,
+          checkInTime: request.record?.lateAt?.toISOString() ?? null,
+          remarks: request.record?.remark ?? null,
+          markedBy: request.session?.submittedBy?.email ?? null,
+          markedOn:
+            request.session?.submittedAt?.toISOString() ??
+            request.record?.createdAt.toISOString() ??
+            null,
+        },
+        requested: {
+          attendanceStatus: request.requestedStatus,
+          checkInTime: null,
+          remarks: request.reason,
+          requestedBy: request.requestedBy.email,
+          requestedOn: request.requestedAt.toISOString(),
+        },
+      },
+      evidence: {
+        supported: false,
+        items: [] as never[],
+        message:
+          'Correction evidence is not associated with File Registry metadata yet. No raw storage URLs or object keys are exposed.',
+      },
+      discussionSupported: false,
     };
   }
 
@@ -4635,6 +4728,64 @@ function getCorrectionReviewReason(dto: ReviewAttendanceCorrectionDto) {
   }
 
   return reviewReason;
+}
+
+type AttendanceCorrectionLockState =
+  | 'OPEN'
+  | 'LOCKED'
+  | 'OVERRIDE_REQUIRED'
+  | 'CORRECTION_WINDOW'
+  | 'EXPIRED';
+
+function getAttendanceCorrectionLockState(
+  lockAt: Date | null,
+  status: string,
+): AttendanceCorrectionLockState {
+  if (!lockAt) {
+    return 'OPEN';
+  }
+
+  const now = new Date();
+  if (lockAt > now) {
+    return 'OPEN';
+  }
+
+  const daysSinceLock =
+    (stripTime(now).getTime() - stripTime(lockAt).getTime()) /
+    (24 * 60 * 60 * 1000);
+
+  if (status === 'PENDING' && daysSinceLock <= 7) {
+    return 'CORRECTION_WINDOW';
+  }
+
+  if (status === 'PENDING') {
+    return 'OVERRIDE_REQUIRED';
+  }
+
+  if (daysSinceLock > 30) {
+    return 'EXPIRED';
+  }
+
+  return 'LOCKED';
+}
+
+function describeAttendanceCorrectionLockState(
+  state: AttendanceCorrectionLockState,
+) {
+  if (state === 'OPEN') {
+    return 'Attendance can be reviewed under the normal correction policy.';
+  }
+  if (state === 'CORRECTION_WINDOW') {
+    return 'This correction is inside the configured correction review window.';
+  }
+  if (state === 'OVERRIDE_REQUIRED') {
+    return 'This record is locked and requires reviewer authority plus an audit reason.';
+  }
+  if (state === 'EXPIRED') {
+    return 'This record is outside the normal correction window and should only be changed through an approved override.';
+  }
+
+  return 'This attendance record is locked. Decisions remain audited and require a reason.';
 }
 
 function readM2ReasonPolicyNumber(value: unknown, fallback: number) {

@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { AttendanceCorrectionsQueueWorkspace } from '@/components/attendance/attendance-m2-workspaces';
 
-export default function AttendanceCorrectionsRedirect() {
-  redirect('/dashboard/attendance');
+export default function AttendanceCorrectionsPage() {
+  return <AttendanceCorrectionsQueueWorkspace />;
 }
