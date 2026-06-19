@@ -47,6 +47,7 @@ project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md
 project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md
 architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
 architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
+architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md
 design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
 design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md
 design/M8B_TRANSPORT_WEB_REFERENCE_ANALYSIS.md
@@ -76,6 +77,7 @@ apps/web/e2e/README.md
 | Functional behavior | `product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` | Engineering, QA |
 | Architecture/security rules | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Engineering, security |
 | Platform operations boundary | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform/admin engineers |
+| Cross-module notification events, delivery, preferences, retry, audit, and notification center | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | Product, engineering, QA, platform/admin engineers |
 | Web UI and state rules | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Web engineers |
 | Dashboard and M1 visual-reference detail | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` (supporting appendix; canonical web plan takes precedence) | Product, design, web engineers |
 | M8B Transport visual-reference detail | `design/M8B_TRANSPORT_WEB_REFERENCE_ANALYSIS.md` (supporting appendix; canonical web plan and backend/OpenAPI contracts take precedence) | Product, design, web engineers, QA |
@@ -132,7 +134,7 @@ Use the mobile plan for `apps/schoolos_mobile`, parent, teacher, principal, driv
 
 ## Cleanup Rules
 
-1. Do not add a new `.md` file if the content belongs inside an active source-of-truth doc, unless the owner explicitly approves a supporting visual-reference appendix and its relationship to the canonical doc is recorded here.
+1. Do not add a new `.md` file if the content belongs inside an active source-of-truth doc, unless the owner explicitly approves a supporting visual-reference appendix or architecture companion and its relationship to the canonical doc is recorded here.
 2. `production/SCHOOLOS_GA_RELEASE_POLICY.md` is an approved canonical release-governance document; do not duplicate or fork its stage definitions in new docs.
 3. Do not recreate planning-only docs that conflict with current implementation status.
 4. Keep old duplicated planning content in git history rather than active repo docs.

@@ -1,7 +1,7 @@
 # SchoolOS Platform Operations
 
-**Last updated:** 2026-06-07  
-**Status:** Consolidated source of truth for platform control plane, tenant configuration boundaries, settings, and real-time operations readiness.  
+**Last updated:** 2026-06-19  
+**Status:** Consolidated source of truth for platform control plane, tenant configuration boundaries, settings, provider operations, notification-provider governance, and real-time operations readiness.  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ.
 
 ---
@@ -9,16 +9,16 @@
 ## 1. Platform Operations and Settings Governance
 
 ### Purpose
-SchoolOS has separate platform and school settings surfaces. This separation is required for tenant isolation, SaaS billing correctness, school finance correctness, security, auditability, and maintainability.
+SchoolOS has separate platform and school settings surfaces. This separation is required for tenant isolation, SaaS billing correctness, school finance correctness, security, auditability, notification-provider correctness, and maintainability.
 
 Core rule:
 - If the setting changes one school's daily operation, it belongs in School Settings (`/dashboard/settings/*`).
 - If the setting changes SaaS ownership, billing, infrastructure, provider credentials, tenant access, feature flags, or global defaults, it belongs in Platform Settings (`/platform/settings/*`).
 
 ### Three-Plane SaaS Architecture
-- **Platform Control Plane:** Gated for SchoolOS owner/operator. Access via `/platform/*`. Handles school/tenant setup, SaaS billing, provider setups, and global audits.
-- **Tenant Configuration Plane:** Gated for School Principal or Admin. Access via `/dashboard/settings/*`. Handles school branding, academic calendars, localized fee heads, and localized role mappings.
-- **School Operations Plane:** Gated for daily school workflows (staff, parents, students). Access via `/dashboard/*`. Handles core modules like admissions, attendance, homework, exams, canteen, and library.
+- **Platform Control Plane:** Gated for SchoolOS owner/operator. Access via `/platform/*`. Handles school/tenant setup, SaaS billing, provider setups, global audits, platform notification-provider health, and queue operations.
+- **Tenant Configuration Plane:** Gated for School Principal or Admin. Access via `/dashboard/settings/*`. Handles school branding, academic calendars, localized fee heads, localized role mappings, school notification preferences, and template overrides.
+- **School Operations Plane:** Gated for daily school workflows (staff, parents, students). Access via `/dashboard/*`. Handles core modules like admissions, attendance, homework, exams, canteen, library, notifications, and communication.
 
 Rules:
 - School users must not access `/platform/*` routes.
@@ -48,7 +48,10 @@ M0 SaaS billing records must not post directly into school tenant fee ledgers.
 | Subscription plan | No | Yes |
 | Enable/disable modules | Limited visibility | Yes |
 | SMS/provider API key | No | Yes |
-| School SMS preference | Yes | Quota/policy/provider control |
+| Email/push provider credential | No | Yes |
+| School SMS/email/push preference | Yes | Quota/policy/provider control |
+| Notification templates | Customize own copy where allowed | Define global defaults and protected emergency templates |
+| Notification delivery logs | Own school only | Platform-wide provider diagnostics where authorized |
 | Database/Redis health | No | Yes |
 | Tenant creation/suspension | No | Yes |
 | Super-admin tenant override | No | Yes |
@@ -62,7 +65,7 @@ M0 SaaS billing records must not post directly into school tenant fee ledgers.
 ## 2. Platform Core Implementation Status & Priorities
 
 ### Current M0 Platform Core Status
-M0 Platform Core Foundation is completed. Current focus is staging verification, browser coverage, entitlement enforcement, provider readiness, queue/File Registry hardening, and pilot reliability.
+M0 Platform Core Foundation is completed. Current focus is staging verification, browser coverage, entitlement enforcement, provider readiness, queue/File Registry hardening, notification-provider diagnostics, and pilot reliability.
 M0 remains inside the existing NestJS modular monolith. It is not a separate microservice and should not be split unless scale or compliance requires it.
 For current pilot backend closure, tenant onboarding is modeled as a computed readiness checklist with audited platform overrides. A separate onboarding state machine is deferred unless product requirements add approval, rollback, or multi-status transition needs.
 
@@ -93,8 +96,9 @@ Implemented M0 foundation areas:
 6. Expand async report/export generation module by module.
 7. Expand demo Nepal pilot tenant seed data.
 8. Polish platform audit/usage visibility.
-9. Add API-key management UI only when integrations require it.
-10. Add webhook system only when external integrations require it.
+9. Add notification-provider health/callback/delivery diagnostics where not already covered by M10.
+10. Add API-key management UI only when integrations require it.
+11. Add webhook system only when external integrations require it.
 
 ---
 
@@ -136,14 +140,50 @@ Keep the next pass admin-only:
 
 ---
 
-## 4. Non-Negotiable Rules
+## 4. Notification Delivery and Provider Operations
+
+The cross-module notification layer is governed by `SCHOOLOS_NOTIFICATION_ARCHITECTURE.md`. Platform operations owns provider readiness, secret masking, callback verification diagnostics, delivery queue visibility, provider-disabled behavior, and platform-wide failure visibility. School operations owns school-level notification preferences, template overrides where allowed, and recipient-facing notification-center workflows.
+
+### Platform-owned notification controls
+
+- SMS/email/push provider credential setup and masking.
+- Provider readiness checks and callback verification status.
+- Disabled/mock/dev-log provider mode labels.
+- Platform-wide failed-delivery diagnostics where permission allows.
+- Queue health and retry/discard operations for notification jobs.
+- Provider quota/limit visibility where exposed by provider integrations.
+- Protected default templates for emergency/security/high-impact message families.
+
+### Tenant-owned notification controls
+
+- School notification preferences by category/channel where policy allows.
+- Tenant-specific template wording where override is allowed.
+- Quiet-hours policy for non-critical notifications.
+- Own-school delivery logs and retry requests where permission allows.
+- Notification center read/archive state for users.
+
+### Required boundaries
+
+1. Feature modules emit notification events; they do not call provider adapters directly.
+2. Notification delivery must re-check tenant status, feature entitlement, recipient status, guardian link state, provider state, and quiet-hours policy at send time.
+3. Provider-disabled mode must fail closed or mark delivery as skipped; it must not claim that SMS/email/push was sent.
+4. High-impact manual retries require reason and audit.
+5. Emergency, security, transport-safety, and payment-security alerts cannot be silently dropped by preferences or quiet hours.
+6. Callback processing must verify provider signatures and ignore duplicate or out-of-order state regressions.
+7. Safe diagnostics may show bounded error category and provider status, but must not expose API keys, tokens, callback secrets, private file paths, or raw PII-heavy payloads.
+
+---
+
+## 5. Non-Negotiable Rules
 
 - Keep M0 Platform Core inside the NestJS modular monolith.
+- Keep the Notification Layer inside the modular monolith unless scale/compliance later justifies a separate service.
 - Every school setting must be tenant-scoped by `tenantId`.
-- Every platform action affecting tenants, plans, billing, support access, providers, queues, reports, onboarding, or limits must be audited.
+- Every platform action affecting tenants, plans, billing, support access, providers, queues, reports, onboarding, notification delivery, callback verification, or limits must be audited.
 - School users must not access platform settings.
 - Platform users must not enter tenant data silently; support override requires explicit reason and audit.
 - Do not mix school fee collection with SchoolOS SaaS billing.
 - Provider secrets must never be returned raw.
 - Queue retry actions must be permission-guarded and audited.
+- Notification retry actions must be idempotent and must re-check recipient/provider/tenant state at execution time.
 - Frontend gating is display only; backend entitlement and permission checks must enforce access.

@@ -27,6 +27,7 @@ docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md
 
 docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
 docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
+docs/architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md
 
 docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
 docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
@@ -48,6 +49,7 @@ Historical/duplicate docs should not be recreated unless the project owner expli
 SchoolOS Core Management = runs daily school operations
 SchoolOS Academics = manages classes, subjects, timetable, homework, exams, reports, streams, projects, and practicals
 SchoolOS Advanced Operations = pre-AI automation, approvals, analytics, mobile/offline reliability, document templates, and Nepal-specific operational depth
+SchoolOS Notification Layer = central event intake, recipient resolution, templates, delivery routing, retries, preferences, audit, and notification-center foundation for all modules
 SchoolOS Learning Layer = improves classroom teaching and student learning inside school
 SchoolOS Intelligence = future teacher-reviewed analytics and safe AI after reliable production data exists
 ```
@@ -63,7 +65,7 @@ Stage E: Grade 9-10
 Stage F: Grade 11-12
 ```
 
-The current management modules remain the foundation. The Learning Layer is implemented as a separate M12 domain that reuses existing students, teachers, classes, subjects, timetable, communication, File Registry, audit, RBAC, and tenant isolation.
+The current management modules remain the foundation. The Learning Layer is implemented as a separate M12 domain that reuses existing students, teachers, classes, subjects, timetable, communication, File Registry, audit, RBAC, and tenant isolation. The Notification Layer is a core platform/M10-adjacent architecture layer, not M11 Intelligence/AI.
 
 ---
 
@@ -87,6 +89,7 @@ Default seeded tenant and role-assignment proof: In progress; current seed workt
 Authenticated browser E2E: Partially implemented; latest audited run passed public checks but skipped authenticated checks
 Mobile role flows: Partially implemented; Flutter analyze/tests/APK build pass, but Android emulator role-flow QA against seeded backend is pending
 Staging/provider/storage/backup/restore verification: Blocked until staging environment and real credentials/procedures are executed
+Notification Layer: Cross-module architecture documented; implementation/readiness claims still require code, provider, queue, browser, mobile, and staging evidence
 M11 Intelligence/AI: Roadmap only
 M12 Learning Layer: Implemented foundation; staging/browser/device depth remains staged
 KG-12 Expansion: Product direction added; Grade 11-12 and advanced learning features are staged future scope
@@ -137,23 +140,23 @@ The detailed source of truth for edge cases remains the PRD and FRS module secti
 ### Global edge cases
 
 - Every tenant-owned database query, file lookup, export, report, queue job, cache read, and background retry must be scoped by authenticated `tenantId`.
-- School A must never access School B students, guardians, staff, fees, receipts, payroll, files, reports, notices, transport, canteen, library, learning, or analytics data.
-- Same names, phone numbers, admission numbers, receipt numbers, file names, payment references, QR identifiers, activity codes, or session codes across tenants must never cause cross-tenant leakage.
-- Suspended tenants must be blocked across dashboard, API, mobile, background jobs, file downloads, report generation, exports, provider actions, and learning sessions.
+- School A must never access School B students, guardians, staff, fees, receipts, payroll, files, reports, notices, transport, canteen, library, learning, notifications, delivery logs, provider diagnostics, or analytics data.
+- Same names, phone numbers, admission numbers, receipt numbers, file names, payment references, QR identifiers, activity codes, notification idempotency keys, or session codes across tenants must never cause cross-tenant leakage.
+- Suspended tenants must be blocked across dashboard, API, mobile, background jobs, file downloads, report generation, exports, provider actions, notification delivery, and learning sessions.
 - Disabled feature routes must fail closed even if opened directly by URL.
 - Parent, student, driver, and mobile APIs must be purpose-limited and must not expose admin-shaped responses.
 - Expired sessions, slow network retries, refreshes, and double-clicks must not duplicate writes.
 - Long forms should preserve drafts where practical and recover safely after login/session renewal.
 - Offline or reconnect sync must show deterministic conflict handling instead of silently overwriting server data.
 - Background jobs must re-check tenant status, feature status, entity status, permission state, and provider state before executing.
-- Retried jobs must not duplicate payments, receipts, messages, notices, reports, exports, payroll postings, accounting entries, canteen/library transactions, or learning attempts.
+- Retried jobs must not duplicate payments, receipts, messages, notices, notifications, reports, exports, payroll postings, accounting entries, canteen/library transactions, or learning attempts.
 - Failed jobs, failed exports, failed storage operations, and failed provider actions must expose safe diagnostics without secrets.
 - Sensitive actions must be audited with actor, tenant, timestamp, reason, and before/after context where practical.
 
 ### Authentication, role, and access edge cases
 
 - Parent can only access currently linked children.
-- Guardian removal or replacement must immediately revoke old parent access to child data, messages, files, notices, receipts, report cards, media, and learning summaries.
+- Guardian removal or replacement must immediately revoke old parent access to child data, messages, files, notices, notifications, receipts, report cards, media, and learning summaries.
 - Student can only access their own allowed records.
 - Teachers can access only assigned classes/subjects/students unless explicit permissions allow broader access.
 - Drivers can access only assigned trips.
