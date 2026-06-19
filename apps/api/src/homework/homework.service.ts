@@ -143,6 +143,148 @@ export class HomeworkService {
     return { items, total };
   }
 
+  async listTeacherMobileHomework(actor: AuthContext, query: HomeworkQueryDto) {
+    const staffId = await this.resolveActorStaffId(actor);
+    if (!staffId) {
+      throw new ForbiddenException('Active teacher profile is required');
+    }
+    const scope = await this.getTeacherHomeworkScopeWhere(actor, staffId);
+    if (scope.length === 0) {
+      return {
+        items: [],
+        total: 0,
+        page: query.page ?? 1,
+        limit: query.limit ?? 20,
+      };
+    }
+
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 20, 50);
+    const where: Prisma.HomeworkAssignmentWhereInput = {
+      tenantId: actor.tenantId,
+      OR: scope,
+      ...(query.classId ? { classId: query.classId } : {}),
+      ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+      ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+      ...(query.status ? { status: query.status } : {}),
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.homeworkAssignment.findMany({
+        where,
+        include: homeworkAssignmentInclude(),
+        orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.homeworkAssignment.count({ where }),
+    ]);
+
+    return {
+      items: items.map((item) => this.mapTeacherMobileHomework(item)),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async getTeacherMobileHomework(actor: AuthContext, id: string) {
+    const assignment = await this.findAssignmentOrThrow(actor, id);
+    await this.ensureSubjectTeacherScope(
+      actor,
+      assignment,
+      await this.resolveActorStaffId(actor),
+    );
+    return this.mapTeacherMobileHomework(assignment);
+  }
+
+  async createTeacherMobileHomework(
+    dto: CreateHomeworkDto,
+    actor: AuthContext,
+  ) {
+    const result = await this.createAssignment(dto, actor);
+    if (isRecurringHomeworkCreateResult(result)) {
+      return {
+        recurrenceSeriesId: result.recurrenceSeriesId,
+        occurrenceCount: result.occurrenceCount,
+        items: result.items.map((item) => this.mapTeacherMobileHomework(item)),
+      };
+    }
+    return this.mapTeacherMobileHomework(result);
+  }
+
+  async updateTeacherMobileHomework(
+    id: string,
+    dto: UpdateHomeworkDto,
+    actor: AuthContext,
+  ) {
+    const assignment = await this.findAssignmentOrThrow(actor, id);
+    await this.ensureSubjectTeacherScope(
+      actor,
+      assignment,
+      await this.resolveActorStaffId(actor),
+    );
+    const updated = await this.updateAssignment(id, dto, actor);
+    const full = await this.findAssignmentOrThrow(actor, updated.id);
+    return this.mapTeacherMobileHomework(full);
+  }
+
+  async publishTeacherMobileHomework(id: string, actor: AuthContext) {
+    const assignment = await this.findAssignmentOrThrow(actor, id);
+    await this.ensureSubjectTeacherScope(
+      actor,
+      assignment,
+      await this.resolveActorStaffId(actor),
+    );
+    const updated = await this.assignHomework(id, actor);
+    return this.mapTeacherMobileHomework(updated);
+  }
+
+  async listTeacherMobileHomeworkSubmissions(
+    actor: AuthContext,
+    assignmentId: string,
+    query: HomeworkSubmissionQueryDto,
+  ) {
+    const assignment = await this.findAssignmentOrThrow(actor, assignmentId);
+    await this.ensureSubjectTeacherScope(
+      actor,
+      assignment,
+      await this.resolveActorStaffId(actor),
+    );
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 20, 50);
+    const where: Prisma.HomeworkSubmissionWhereInput = {
+      tenantId: actor.tenantId,
+      homeworkId: assignment.id,
+      ...(query.status ? { status: query.status } : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.homeworkSubmission.findMany({
+        where,
+        include: homeworkSubmissionInclude(),
+        orderBy: [{ submittedAt: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.homeworkSubmission.count({ where }),
+    ]);
+    return {
+      items: items.map((item) => this.mapTeacherMobileSubmission(item)),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async reviewTeacherMobileHomeworkSubmission(
+    actor: AuthContext,
+    submissionId: string,
+    dto: ReviewHomeworkSubmissionDto,
+  ) {
+    const updated = await this.reviewSubmission(submissionId, dto, actor);
+    return this.mapTeacherMobileSubmission(updated);
+  }
+
   async markAsReviewed(
     actor: AuthContext,
     submissionId: string,
@@ -1509,6 +1651,116 @@ export class HomeworkService {
     return staff?.id ?? null;
   }
 
+  private async getTeacherHomeworkScopeWhere(
+    actor: AuthContext,
+    staffId: string,
+  ): Promise<Prisma.HomeworkAssignmentWhereInput[]> {
+    const assignments = await this.prisma.subjectTeacherAssignment.findMany({
+      where: { tenantId: actor.tenantId, staffId },
+      select: {
+        academicYearId: true,
+        classId: true,
+        sectionId: true,
+        subjectId: true,
+      },
+      take: 200,
+    });
+
+    return assignments.map((assignment) => ({
+      academicYearId: assignment.academicYearId,
+      classId: assignment.classId,
+      subjectId: assignment.subjectId,
+      OR: assignment.sectionId
+        ? [{ sectionId: assignment.sectionId }, { sectionId: null }]
+        : [{ sectionId: null }],
+    }));
+  }
+
+  private mapTeacherMobileHomework(
+    assignment: Prisma.HomeworkAssignmentGetPayload<{
+      include: ReturnType<typeof homeworkAssignmentInclude>;
+    }>,
+  ) {
+    const submittedStatuses = new Set<HomeworkSubmissionStatus>([
+      HomeworkSubmissionStatus.SUBMITTED,
+      HomeworkSubmissionStatus.LATE,
+      HomeworkSubmissionStatus.REVIEWED,
+      HomeworkSubmissionStatus.NEEDS_CORRECTION,
+    ]);
+    const toReviewStatuses = new Set<HomeworkSubmissionStatus>([
+      HomeworkSubmissionStatus.SUBMITTED,
+      HomeworkSubmissionStatus.LATE,
+    ]);
+    const submittedCount = assignment.submissions.filter((submission) =>
+      submittedStatuses.has(submission.status),
+    ).length;
+    const reviewedCount = assignment.submissions.filter(
+      (submission) => submission.status === HomeworkSubmissionStatus.REVIEWED,
+    ).length;
+    const toReviewCount = assignment.submissions.filter((submission) =>
+      toReviewStatuses.has(submission.status),
+    ).length;
+
+    return {
+      id: assignment.id,
+      academicYearId: assignment.academicYearId,
+      classId: assignment.classId,
+      sectionId: assignment.sectionId,
+      subjectId: assignment.subjectId,
+      title: assignment.title,
+      instructions: assignment.instructions,
+      description: assignment.description,
+      className: assignment.class.name,
+      sectionName: assignment.section?.name ?? null,
+      subjectName: assignment.subject.name,
+      dueDate: assignment.dueDate,
+      dueAt: assignment.dueAt,
+      status: assignment.status,
+      submissionRequired: assignment.submissionRequired,
+      attachmentCount: assignment.attachments.length,
+      submissions: {
+        total: assignment.submissions.length,
+        submitted: submittedCount,
+        reviewed: reviewedCount,
+        toReview: toReviewCount,
+        notSubmitted: Math.max(
+          assignment.submissions.length - submittedCount,
+          0,
+        ),
+      },
+      assignedBy: assignment.assignedByStaff
+        ? {
+            id: assignment.assignedByStaff.id,
+            name: `${assignment.assignedByStaff.firstName} ${assignment.assignedByStaff.lastName}`.trim(),
+          }
+        : null,
+      createdAt: assignment.createdAt,
+      updatedAt: assignment.updatedAt,
+    };
+  }
+
+  private mapTeacherMobileSubmission(
+    submission: Prisma.HomeworkSubmissionGetPayload<{
+      include: ReturnType<typeof homeworkSubmissionInclude>;
+    }>,
+  ) {
+    return {
+      id: submission.id,
+      homeworkId: submission.homeworkId,
+      studentId: submission.studentId,
+      studentName:
+        `${submission.student.firstNameEn} ${submission.student.lastNameEn}`.trim(),
+      rollNumber: submission.student.rollNumber,
+      status: submission.status,
+      submittedAt: submission.submittedAt,
+      reviewedAt: submission.reviewedAt,
+      score: submission.score == null ? null : Number(submission.score),
+      teacherRemarks: submission.teacherRemarks,
+      correctionRemarks: submission.correctionRemarks,
+      attachmentCount: submission.attachments.length,
+    };
+  }
+
   private async resolveVisibleStudentId(
     actor: AuthContext,
     requestedStudentId?: string,
@@ -1895,6 +2147,20 @@ function parseRequiredDate(value: string, fieldName: string) {
     throw new ConflictException(`${fieldName} must be provided`);
   }
   return parsed;
+}
+
+function isRecurringHomeworkCreateResult(value: unknown): value is {
+  recurrenceSeriesId: string | null;
+  occurrenceCount: number;
+  items: Prisma.HomeworkAssignmentGetPayload<{
+    include: ReturnType<typeof homeworkAssignmentInclude>;
+  }>[];
+} {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Array.isArray((value as { items?: unknown }).items)
+  );
 }
 
 function homeworkAssignmentInclude() {

@@ -175,7 +175,7 @@ void main() {
 
       expect(staffUser.role, 'STAFF');
       expect(teacherUser.role, 'TEACHER');
-      expect(principalUser.role, 'ADMIN');
+      expect(principalUser.role, 'PRINCIPAL');
     });
 
     test('reads tenant metadata from nested auth profile responses', () {
@@ -186,7 +186,7 @@ void main() {
         'tenant': {'id': 'tenant-1', 'slug': 'default-school'},
       });
 
-      expect(user.role, 'ADMIN');
+      expect(user.role, 'PRINCIPAL');
       expect(user.tenantId, 'tenant-1');
       expect(user.tenantSlug, 'default-school');
     });

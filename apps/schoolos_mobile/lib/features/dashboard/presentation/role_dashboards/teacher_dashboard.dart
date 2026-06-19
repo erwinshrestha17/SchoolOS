@@ -9,17 +9,13 @@ import '../../../../core/auth/auth_provider.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
-import '../../../../shared/widgets/app_gradient_card.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
-import '../../../../shared/widgets/dashboard_card.dart';
-import '../../../../shared/widgets/quick_action_card.dart';
-import '../../../../shared/widgets/role_badge.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
-import '../../../../shared/widgets/section_header.dart';
 import '../../../../shared/widgets/status_chip.dart';
-import '../../../../shared/widgets/user_avatar.dart';
 import '../../../attendance/application/attendance_providers.dart';
 import '../../../attendance/domain/attendance_models.dart';
+import '../../../teacher/application/teacher_providers.dart';
+import '../../../teacher/presentation/widgets/teacher_app_widgets.dart';
 
 class TeacherDashboard extends ConsumerWidget {
   const TeacherDashboard({super.key});
@@ -29,222 +25,143 @@ class TeacherDashboard extends ConsumerWidget {
     final user = ref.watch(authProvider).user;
     final state = ref.watch(teacherAttendanceControllerProvider);
     final controller = ref.read(teacherAttendanceControllerProvider.notifier);
-    final displayName = user?.name ?? 'Teacher';
-    final email = user?.email ?? 'teacher@schoolos.com';
-    final currentOrNextPeriod = _currentOrNextPeriod(state.todayPeriods);
+    final noticeSummary = ref.watch(teacherNoticeSummaryProvider);
+    final messages = ref.watch(teacherMessagesProvider);
+    final teacherName = _firstName(user?.name ?? 'Teacher');
+    final roleLabel = _roleLabel(user?.roles ?? const [], user?.role);
 
     return RoleShellScaffold(
       role: 'TEACHER',
       selectedIndex: 0,
+      title: 'Today',
       body: RefreshIndicator(
-        onRefresh: controller.load,
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Today, $displayName',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Daily classroom work - $email',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.slate500,
-                          fontWeight: FontWeight.w600,
+        onRefresh: () async {
+          await Future.wait([
+            controller.load(),
+            ref.refresh(teacherMessagesProvider.future),
+            ref.refresh(teacherNoticeSummaryProvider.future),
+          ]);
+        },
+        child: TeacherScreenFrame(
+          title: 'Today',
+          header: TeacherPersonaHeader(
+            schoolName: _schoolName(user?.tenantSlug),
+            teacherName: teacherName,
+            roleLabel: roleLabel,
+            unreadCount: noticeSummary.valueOrNull?.unreadCount,
+            onNotifications: () => context.go(AppRoutes.notifications),
+          ),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  if (state.isLoading)
+                    const _TeacherTodayLoading()
+                  else if (state.error != null)
+                    AppExceptionView(
+                      error: state.error!,
+                      onRetry: controller.load,
+                    )
+                  else if (state.classes.isEmpty)
+                    AppEmptyState(
+                      title: 'No classes are assigned',
+                      message:
+                          'No classes are assigned to you yet. Your school administrator can update your teaching assignments.',
+                      icon: Icons.school_outlined,
+                      actionLabel: 'Retry',
+                      onActionPressed: controller.load,
+                    )
+                  else ...[
+                    _CurrentPeriodCard(
+                      periods: state.todayPeriods,
+                      onOpenAttendance: () {
+                        final current = _currentOrNextPeriod(
+                          state.todayPeriods,
+                        );
+                        if (current == null) {
+                          context.go(AppRoutes.teacherAttendance);
+                        } else {
+                          context.go(
+                            AppRoutes.teacherAttendanceFor(
+                              current.classSectionId,
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    if (state.pendingAttendanceCount > 0) ...[
+                      TeacherTaskCard(
+                        title: 'Attendance pending',
+                        subtitle:
+                            '${state.pendingAttendanceCount} assigned class(es) still need attendance.',
+                        icon: Icons.groups_rounded,
+                        iconColor: AppColors.primary,
+                        status: const StatusChip(
+                          status: AppStatusType.pending,
+                          label: 'To mark',
                         ),
+                        onTap: () => context.go(AppRoutes.teacherAttendance),
                       ),
+                      const SizedBox(height: AppSpacing.md),
                     ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                const RoleBadge(role: 'TEACHER'),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            if (state.isOffline && state.lastUpdated != null) ...[
-              Text(
-                'Offline data • Last updated ${_lastUpdatedLabel(context, state.lastUpdated!)}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.warning,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-            ],
-            AppGradientCard(
-              gradient: const LinearGradient(
-                colors: AppColors.teacherGradient,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    Row(
                       children: [
-                        Text(
-                          displayName,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                              ),
+                        Expanded(
+                          child: TeacherTaskCard(
+                            title: 'Homework',
+                            subtitle:
+                                'Create/review is waiting for mobile DTO confirmation.',
+                            icon: Icons.menu_book_rounded,
+                            iconColor: AppColors.teacherAccent,
+                            onTap: () => context.go(AppRoutes.teacherHomework),
+                          ),
                         ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          state.isLoading
-                              ? 'Loading assigned classes'
-                              : '${state.classes.length} assigned class(es)',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Colors.white70,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        Text(
-                          _selectedClassLabel(state),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Colors.white60,
-                                fontWeight: FontWeight.w600,
-                              ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: TeacherTaskCard(
+                            title: 'Messages',
+                            subtitle: messages.when(
+                              data: (value) =>
+                                  '${value.threads.length} parent thread(s)',
+                              error: (_, _) => 'Unavailable',
+                              loading: () => 'Loading',
+                            ),
+                            icon: Icons.chat_bubble_rounded,
+                            iconColor: AppColors.info,
+                            onTap: () => context.go(AppRoutes.teacherMessages),
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  UserAvatar(
-                    name: displayName,
-                    radius: 36,
-                    borderColor: Colors.white,
-                    borderWidth: 2,
-                  ),
-                ],
+                    const SizedBox(height: AppSpacing.md),
+                    TeacherTaskCard(
+                      title: 'Assigned classes',
+                      subtitle:
+                          '${state.classes.length} active class/subject assignment(s)',
+                      icon: Icons.school_rounded,
+                      iconColor: AppColors.success,
+                      onTap: () => context.go(AppRoutes.teacherClasses),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    Text(
+                      'Today\'s timetable',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _TodayTimetableCard(periods: state.todayPeriods),
+                    if (state.lastUpdated != null)
+                      TeacherLastUpdatedLabel(
+                        value: state.lastUpdated!,
+                        cached: state.isOffline,
+                      ),
+                  ],
+                ]),
               ),
             ),
-            const SizedBox(height: AppSpacing.xl),
-            if (state.isLoading)
-              const _TeacherDashboardLoading()
-            else if (state.error != null)
-              AppExceptionView(error: state.error!, onRetry: controller.load)
-            else ...[
-              const SectionHeader(title: 'Assigned classes'),
-              const SizedBox(height: AppSpacing.sm),
-              if (state.classes.isEmpty)
-                AppEmptyState(
-                  title: 'No assigned class',
-                  message:
-                      state.message ??
-                      'Assigned class sections will appear after the school maps this teacher account.',
-                  icon: Icons.calendar_today_rounded,
-                  actionLabel: 'Retry',
-                  onActionPressed: controller.load,
-                )
-              else
-                AppCard(
-                  child: Column(
-                    children: [
-                      for (final item in state.classes.take(4)) ...[
-                        _ClassRow(
-                          classSection: item,
-                          isSelected: item.id == state.selectedClassId,
-                        ),
-                        if (item != state.classes.take(4).last) const Divider(),
-                      ],
-                    ],
-                  ),
-                ),
-              const SizedBox(height: AppSpacing.xl),
-              const SectionHeader(title: 'Classroom focus'),
-              const SizedBox(height: AppSpacing.sm),
-              DashboardCard(
-                title: 'Attendance pending',
-                value: '${state.pendingAttendanceCount} class(es)',
-                icon: Icons.fact_check_rounded,
-                iconColor: _attendanceColor(state),
-                badge: StatusChip(
-                  status: _attendanceStatusType(state),
-                  label: _attendanceStatusLabel(state),
-                ),
-                subtitle: _attendanceSubtitle(state),
-                onTap: () => context.go(AppRoutes.teacherAttendance),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              DashboardCard(
-                title: 'Current / next period',
-                value: currentOrNextPeriod == null
-                    ? 'No period today'
-                    : currentOrNextPeriod.className,
-                icon: Icons.schedule_rounded,
-                iconColor: AppColors.teacherAccent,
-                subtitle: currentOrNextPeriod == null
-                    ? 'Your published timetable has no assigned period today.'
-                    : '${currentOrNextPeriod.startsAt}-${currentOrNextPeriod.endsAt} • ${currentOrNextPeriod.subjectName}',
-              ),
-              const SizedBox(height: AppSpacing.md),
-              DashboardCard(
-                title: 'Sync status',
-                value: _syncLabel(state.syncStatus),
-                icon: Icons.cloud_done_rounded,
-                iconColor: state.syncStatus == AttendanceSyncStatus.failed
-                    ? AppColors.danger
-                    : AppColors.success,
-                subtitle:
-                    state.message ??
-                    (state.isOffline
-                        ? 'Offline mode is active.'
-                        : 'Attendance data is synced with SchoolOS.'),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              const SectionHeader(title: 'Quick teacher tools'),
-              const SizedBox(height: AppSpacing.sm),
-              GridView.count(
-                crossAxisCount: 3,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: AppSpacing.md,
-                mainAxisSpacing: AppSpacing.md,
-                childAspectRatio: 1.0,
-                children: [
-                  QuickActionCard(
-                    title: 'Attendance',
-                    icon: Icons.fact_check_rounded,
-                    color: AppColors.primary,
-                    onTap: () => context.go(AppRoutes.teacherAttendance),
-                  ),
-                  QuickActionCard(
-                    title: 'Refresh',
-                    icon: Icons.sync_rounded,
-                    color: AppColors.success,
-                    onTap: controller.load,
-                  ),
-                  QuickActionCard(
-                    title: 'Classes',
-                    icon: Icons.school_rounded,
-                    color: AppColors.info,
-                    onTap: () => context.go(AppRoutes.teacherClasses),
-                  ),
-                ],
-              ),
-            ],
           ],
         ),
       ),
@@ -252,147 +169,178 @@ class TeacherDashboard extends ConsumerWidget {
   }
 }
 
-class _TeacherDashboardLoading extends StatelessWidget {
-  const _TeacherDashboardLoading();
+class _CurrentPeriodCard extends StatelessWidget {
+  const _CurrentPeriodCard({
+    required this.periods,
+    required this.onOpenAttendance,
+  });
+
+  final List<TeacherTodayPeriod> periods;
+  final VoidCallback onOpenAttendance;
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
-      children: [
-        AppSkeleton(width: double.infinity, height: 112),
-        SizedBox(height: AppSpacing.md),
-        AppSkeleton(width: double.infinity, height: 94),
-        SizedBox(height: AppSpacing.md),
-        AppSkeleton(width: double.infinity, height: 94),
-      ],
-    );
-  }
-}
+    final current = _currentOrNextPeriod(periods);
+    final next = _nextPeriod(periods, current);
 
-class _ClassRow extends StatelessWidget {
-  const _ClassRow({required this.classSection, required this.isSelected});
-
-  final TeacherClassSection classSection;
-  final bool isSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  classSection.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  classSection.subject,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: AppColors.slate500),
-                ),
-              ],
+    if (current == null) {
+      return AppCard(
+        child: Row(
+          children: [
+            const Icon(Icons.event_available_rounded, color: AppColors.success),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text(
+                'No assigned class period is scheduled for today.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
             ),
+          ],
+        ),
+      );
+    }
+
+    return AppCard(
+      onTap: onOpenAttendance,
+      child: Column(
+        children: [
+          _PeriodRow(
+            period: current,
+            label: _periodStatus(current),
+            highlighted: true,
           ),
-          StatusChip(
-            status: isSelected ? AppStatusType.approved : AppStatusType.draft,
-            label: isSelected ? 'Selected' : 'Assigned',
-          ),
+          if (next != null) ...[
+            const Divider(height: 28),
+            _PeriodRow(period: next, label: 'Next', highlighted: false),
+          ],
         ],
       ),
     );
   }
 }
 
-String _selectedClassLabel(TeacherAttendanceState state) {
-  final selected = state.selectedClass;
-  if (selected == null) {
-    return 'Attendance roster will load after class assignment.';
-  }
-  return '${selected.name} - ${selected.subject}';
-}
+class _TodayTimetableCard extends StatelessWidget {
+  const _TodayTimetableCard({required this.periods});
 
-String _attendanceSubtitle(TeacherAttendanceState state) {
-  if (state.entries.isEmpty) {
-    return 'Open attendance after the roster is available.';
-  }
-  if (state.hasUnsavedChanges) {
-    return 'Review and submit pending attendance changes.';
-  }
-  if (state.attendance.isSubmitted) {
-    return 'Attendance was submitted and is now read-only.';
-  }
-  return 'Attendance has not been submitted for this class yet.';
-}
+  final List<TeacherTodayPeriod> periods;
 
-String _attendanceStatusLabel(TeacherAttendanceState state) {
-  if (state.hasUnsavedChanges) {
-    return state.syncStatus == AttendanceSyncStatus.queued ? 'Queued' : 'Draft';
-  }
-  if (state.syncStatus == AttendanceSyncStatus.failed) {
-    return 'Failed';
-  }
-  if (state.attendance.hasConflict) {
-    return 'Conflict';
-  }
-  if (state.attendance.isSubmitted) {
-    return 'Submitted';
-  }
-  return 'Pending';
-}
+  @override
+  Widget build(BuildContext context) {
+    if (periods.isEmpty) {
+      return const AppCard(
+        child: Text('No timetable periods are published for today.'),
+      );
+    }
 
-AppStatusType _attendanceStatusType(TeacherAttendanceState state) {
-  if (state.attendance.hasConflict ||
-      state.syncStatus == AttendanceSyncStatus.failed) {
-    return AppStatusType.rejected;
-  }
-  if (state.hasUnsavedChanges || !state.attendance.isSubmitted) {
-    return AppStatusType.pending;
-  }
-  return AppStatusType.completed;
-}
-
-Color _attendanceColor(TeacherAttendanceState state) {
-  if (state.syncStatus == AttendanceSyncStatus.failed ||
-      state.attendance.hasConflict) {
-    return AppColors.danger;
-  }
-  if (state.hasUnsavedChanges || state.entries.isEmpty) {
-    return AppColors.warning;
-  }
-  return AppColors.success;
-}
-
-String _syncLabel(AttendanceSyncStatus status) {
-  switch (status) {
-    case AttendanceSyncStatus.draft:
-      return 'Draft';
-    case AttendanceSyncStatus.queued:
-      return 'Queued';
-    case AttendanceSyncStatus.syncing:
-      return 'Syncing';
-    case AttendanceSyncStatus.synced:
-      return 'Synced';
-    case AttendanceSyncStatus.failed:
-      return 'Failed';
-    case AttendanceSyncStatus.conflict:
-      return 'Conflict';
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (final period in periods) ...[
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: _PeriodRow(
+                period: period,
+                label: _periodStatus(period),
+                highlighted: _periodStatus(period) == 'Current',
+              ),
+            ),
+            if (period != periods.last) const Divider(height: 1),
+          ],
+        ],
+      ),
+    );
   }
 }
 
-String _lastUpdatedLabel(BuildContext context, DateTime value) {
-  return TimeOfDay.fromDateTime(value.toLocal()).format(context);
+class _PeriodRow extends StatelessWidget {
+  const _PeriodRow({
+    required this.period,
+    required this.label,
+    required this.highlighted,
+  });
+
+  final TeacherTodayPeriod period;
+  final String label;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: highlighted ? AppColors.primary : AppColors.slate100,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Icon(
+            highlighted
+                ? Icons.calendar_month_rounded
+                : Icons.event_note_rounded,
+            color: highlighted ? Colors.white : AppColors.slate600,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label.toUpperCase(),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                period.className,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+              ),
+              Text(
+                '${period.startsAt} - ${period.endsAt} • ${period.subjectName}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.slate500),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        StatusChip(
+          status: highlighted ? AppStatusType.present : AppStatusType.pending,
+          label: label,
+        ),
+      ],
+    );
+  }
+}
+
+class _TeacherTodayLoading extends StatelessWidget {
+  const _TeacherTodayLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      children: [
+        AppSkeleton(width: double.infinity, height: 116),
+        SizedBox(height: AppSpacing.md),
+        AppSkeleton(width: double.infinity, height: 88),
+        SizedBox(height: AppSpacing.md),
+        AppSkeleton(width: double.infinity, height: 180),
+      ],
+    );
+  }
 }
 
 TeacherTodayPeriod? _currentOrNextPeriod(List<TeacherTodayPeriod> periods) {
@@ -400,12 +348,64 @@ TeacherTodayPeriod? _currentOrNextPeriod(List<TeacherTodayPeriod> periods) {
   final now = TimeOfDay.now();
   final nowMinutes = now.hour * 60 + now.minute;
   for (final period in periods) {
-    final parts = period.endsAt.split(':');
-    if (parts.length < 2) continue;
-    final hour = int.tryParse(parts[0]);
-    final minute = int.tryParse(parts[1]);
-    if (hour == null || minute == null) continue;
-    if (hour * 60 + minute >= nowMinutes) return period;
+    final end = _minutes(period.endsAt);
+    if (end != null && end >= nowMinutes) return period;
   }
-  return null;
+  return periods.last;
+}
+
+TeacherTodayPeriod? _nextPeriod(
+  List<TeacherTodayPeriod> periods,
+  TeacherTodayPeriod? current,
+) {
+  if (current == null) return null;
+  final index = periods.indexWhere((period) => period.id == current.id);
+  if (index < 0 || index + 1 >= periods.length) return null;
+  return periods[index + 1];
+}
+
+String _periodStatus(TeacherTodayPeriod period) {
+  final now = TimeOfDay.now();
+  final nowMinutes = now.hour * 60 + now.minute;
+  final start = _minutes(period.startsAt);
+  final end = _minutes(period.endsAt);
+  if (start == null || end == null) return 'Upcoming';
+  if (nowMinutes >= start && nowMinutes <= end) return 'Current';
+  if (nowMinutes < start) return 'Upcoming';
+  return 'Done';
+}
+
+int? _minutes(String value) {
+  final parts = value.split(':');
+  if (parts.length < 2) return null;
+  final hour = int.tryParse(parts[0]);
+  final minute = int.tryParse(parts[1]);
+  if (hour == null || minute == null) return null;
+  return hour * 60 + minute;
+}
+
+String _firstName(String name) {
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) return 'Teacher';
+  return trimmed.split(RegExp(r'\s+')).first;
+}
+
+String _roleLabel(List<String> roles, String? role) {
+  final joined = roles.isEmpty ? role : roles.join(', ');
+  final normalized = (joined ?? 'Teacher').replaceAll('_', ' ').toLowerCase();
+  return normalized
+      .split(' ')
+      .where((part) => part.isNotEmpty)
+      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+      .join(' ');
+}
+
+String _schoolName(String? tenantSlug) {
+  final slug = tenantSlug?.trim();
+  if (slug == null || slug.isEmpty) return 'SchoolOS';
+  return slug
+      .split(RegExp(r'[-_]'))
+      .where((part) => part.isNotEmpty)
+      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+      .join(' ');
 }

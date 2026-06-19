@@ -15,6 +15,11 @@ import '../features/dashboard/presentation/role_dashboards/teacher_dashboard.dar
 import '../features/attendance/presentation/screens/parent_attendance_screen.dart';
 import '../features/attendance/presentation/screens/teacher_classes_screen.dart';
 import '../features/attendance/presentation/screens/teacher_attendance_screen.dart';
+import '../features/teacher/presentation/screens/teacher_class_hub_screen.dart';
+import '../features/teacher/presentation/screens/teacher_homework_screen.dart';
+import '../features/teacher/presentation/screens/teacher_messages_screen.dart';
+import '../features/teacher/presentation/screens/teacher_profile_screen.dart';
+import '../features/teacher/presentation/screens/teacher_timetable_screen.dart';
 import '../features/learning/presentation/screens/learning_summary_screen.dart';
 import '../features/notices/presentation/screens/notice_detail_screen.dart';
 import '../features/notices/presentation/screens/notice_list_screen.dart';
@@ -32,6 +37,7 @@ import '../features/parent/presentation/screens/parent_portal_detail_screens.dar
 import '../features/parent/presentation/screens/parent_report_cards_screen.dart';
 import '../features/parent/presentation/screens/parent_timetable_screen.dart';
 import '../features/parent/presentation/screens/parent_transport_screen.dart';
+import '../features/principal/presentation/screens/principal_screens.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/splash/splash_screen.dart';
@@ -223,6 +229,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const TeacherClassesScreen(),
       ),
       GoRoute(
+        path: AppRoutes.teacherClass,
+        builder: (context, state) => TeacherClassHubScreen(
+          classSectionId: state.pathParameters['classSectionId'] ?? '',
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.teacherAttendance,
         builder: (context, state) => const TeacherAttendanceScreen(),
       ),
@@ -231,6 +243,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => TeacherAttendanceScreen(
           classSectionId: state.pathParameters['classSectionId'],
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.teacherHomework,
+        builder: (context, state) => const TeacherHomeworkScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.teacherMessages,
+        builder: (context, state) => const TeacherMessagesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.teacherMessageThread,
+        builder: (context, state) => TeacherMessageThreadScreen(
+          threadId: state.pathParameters['threadId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.teacherTimetable,
+        builder: (context, state) => const TeacherTimetableScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.teacherProfile,
+        builder: (context, state) => const TeacherProfileScreen(),
       ),
       GoRoute(
         path: AppRoutes.driverHome,
@@ -263,6 +297,126 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.staffPayslips,
         builder: (context, state) => const StaffPayslipsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.principalToday,
+        builder: (context, state) => const PrincipalTodayScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.principalAttention,
+        builder: (context, state) => const PrincipalAttentionScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.principalApprovals,
+        builder: (context, state) => const PrincipalApprovalsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.principalNotices,
+        builder: (context, state) => const PrincipalSnapshotScreen(
+          snapshotKey: 'notice',
+          title: 'Emergency Notice',
+          subtitle: 'Review and send urgent school communication',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.principalMore,
+        builder: (context, state) => const PrincipalMoreScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.principalAttendanceRisk,
+        builder: (context, state) => const PrincipalSnapshotScreen(
+          snapshotKey: 'attendance',
+          title: 'Attendance Risk',
+          subtitle: 'Classes and students needing attendance follow-up',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.principalStaffAbsence,
+        builder: (context, state) => const PrincipalSnapshotScreen(
+          snapshotKey: 'staff',
+          title: 'Staff Absence',
+          subtitle: 'Track teacher absence and substitution coverage',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.principalFees,
+        builder: (context, state) => const PrincipalSnapshotScreen(
+          snapshotKey: 'fees',
+          title: 'Fees Snapshot',
+          subtitle: 'Read-only school finance overview',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.principalAcademics,
+        builder: (context, state) => const PrincipalSnapshotScreen(
+          snapshotKey: 'academics',
+          title: 'Academics Readiness',
+          subtitle: 'Assessment and report-card readiness overview',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.principalTransport,
+        builder: (context, state) => const PrincipalSnapshotScreen(
+          snapshotKey: 'transport',
+          title: 'Transport Alerts',
+          subtitle: 'Live route status and operational alerts',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.principalEscalations,
+        builder: (context, state) => const PrincipalSnapshotScreen(
+          snapshotKey: 'escalations',
+          title: 'Escalations',
+          subtitle: 'Parent concerns and school issues needing follow-up',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.principalStudents,
+        builder: (context, state) => const PrincipalSnapshotScreen(
+          snapshotKey: 'students',
+          title: 'Students',
+          subtitle: 'Quick student lookup and safe snapshot',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.principalReports,
+        builder: (context, state) => const PrincipalSnapshotScreen(
+          snapshotKey: 'reports',
+          title: 'Reports Snapshot',
+          subtitle: 'Read-only school performance summary',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.principalTasks,
+        builder: (context, state) => const PrincipalSnapshotScreen(
+          snapshotKey: 'tasks',
+          title: 'Tasks',
+          subtitle: 'Follow-ups, owners, and due dates',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.principalWalkthroughs,
+        builder: (context, state) => const PrincipalSnapshotScreen(
+          snapshotKey: 'walkthroughs',
+          title: 'Classroom Walkthroughs',
+          subtitle: 'Observations, follow-up, and classroom visits',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.principalCanteen,
+        builder: (context, state) => const PrincipalSnapshotScreen(
+          snapshotKey: 'canteen',
+          title: 'Canteen Snapshot',
+          subtitle: 'Canteen leadership snapshot',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.principalLibrary,
+        builder: (context, state) => const PrincipalSnapshotScreen(
+          snapshotKey: 'library',
+          title: 'Library Snapshot',
+          subtitle: 'Library leadership snapshot',
+        ),
       ),
       GoRoute(
         path: AppRoutes.adminHome,
@@ -314,6 +468,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         if (_isStaffRoute(location) && role != MobileRole.staff) {
           return AppRoutes.home;
         }
+        if (_isPrincipalRoute(location) && role != MobileRole.principal) {
+          return AppRoutes.home;
+        }
         if (location == AppRoutes.adminHome && role != MobileRole.admin) {
           return AppRoutes.home;
         }
@@ -351,6 +508,26 @@ bool _isStaffRoute(String location) {
       location == AppRoutes.staffPayslips;
 }
 
+bool _isPrincipalRoute(String location) {
+  return location == AppRoutes.principalToday ||
+      location == AppRoutes.principalAttention ||
+      location == AppRoutes.principalApprovals ||
+      location == AppRoutes.principalNotices ||
+      location == AppRoutes.principalMore ||
+      location == AppRoutes.principalAttendanceRisk ||
+      location == AppRoutes.principalStaffAbsence ||
+      location == AppRoutes.principalFees ||
+      location == AppRoutes.principalAcademics ||
+      location == AppRoutes.principalTransport ||
+      location == AppRoutes.principalEscalations ||
+      location == AppRoutes.principalStudents ||
+      location == AppRoutes.principalReports ||
+      location == AppRoutes.principalTasks ||
+      location == AppRoutes.principalWalkthroughs ||
+      location == AppRoutes.principalCanteen ||
+      location == AppRoutes.principalLibrary;
+}
+
 bool _isDriverRoute(String location) {
   return location == AppRoutes.driverHome ||
       location == AppRoutes.driverRoute ||
@@ -361,8 +538,17 @@ bool _isDriverRoute(String location) {
 bool _isTeacherRoute(String location) {
   return location == AppRoutes.teacherHome ||
       location == AppRoutes.teacherClasses ||
+      location.startsWith('/teacher/class/') ||
       location == AppRoutes.teacherAttendance ||
-      location.startsWith('${AppRoutes.teacherAttendance}/');
+      location.startsWith('${AppRoutes.teacherAttendance}/') ||
+      location == AppRoutes.teacherHomework ||
+      location == AppRoutes.teacherHomeworkCreate ||
+      location == AppRoutes.teacherMessages ||
+      location.startsWith('/teacher/messages/') ||
+      location == AppRoutes.teacherTimetable ||
+      location == AppRoutes.teacherProfile ||
+      location == AppRoutes.teacherLeave ||
+      location == AppRoutes.teacherPayslips;
 }
 
 bool _isParentRoute(String location) {

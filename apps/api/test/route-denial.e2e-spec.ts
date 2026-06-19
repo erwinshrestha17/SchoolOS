@@ -16,6 +16,8 @@ import { StudentDocumentsController } from '../src/student-records/student-docum
 import { HomeworkController } from '../src/homework/homework.controller';
 import { LibraryController } from '../src/library/library.controller';
 import { MobileTeacherAttendanceController } from '../src/mobile/mobile-teacher-attendance.controller';
+import { MobileTeacherHomeworkController } from '../src/mobile/mobile-teacher-homework.controller';
+import { MobileTeacherTimetableController } from '../src/mobile/mobile-teacher-timetable.controller';
 import { MobileController } from '../src/mobile/mobile.controller';
 import { PlatformGuard } from '../src/auth/guards/platform.guard';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -436,6 +438,20 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
       controller: MobileTeacherAttendanceController,
       handler: MobileTeacherAttendanceController.prototype.listClasses,
       permissions: ['attendance:read'],
+    },
+    {
+      label: 'mobile teacher homework',
+      featureKey: 'module.homework',
+      controller: MobileTeacherHomeworkController,
+      handler: MobileTeacherHomeworkController.prototype.listHomework,
+      permissions: ['homework:read'],
+    },
+    {
+      label: 'mobile teacher timetable',
+      featureKey: 'module.timetable',
+      controller: MobileTeacherTimetableController,
+      handler: MobileTeacherTimetableController.prototype.getTimetable,
+      permissions: ['timetable:read'],
     },
     {
       label: 'library',

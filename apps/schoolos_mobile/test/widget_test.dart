@@ -174,6 +174,31 @@ void main() {
     expect(find.text('More'), findsOneWidget);
   });
 
+  testWidgets('RoleShellScaffold renders exact teacher bottom navigation', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: RoleShellScaffold(
+            role: 'TEACHER',
+            selectedIndex: 0,
+            body: Center(child: Text('Teacher Today Body')),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Teacher Today Body'), findsOneWidget);
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('Attendance'), findsOneWidget);
+    expect(find.text('Homework'), findsOneWidget);
+    expect(find.text('Messages'), findsOneWidget);
+    expect(find.text('Profile'), findsOneWidget);
+    expect(find.text('Classes'), findsNothing);
+    expect(find.text('More'), findsNothing);
+  });
+
   testWidgets('parent portal tabs render on a compact phone viewport', (
     WidgetTester tester,
   ) async {

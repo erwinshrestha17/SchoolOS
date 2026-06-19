@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -20,6 +21,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
+import { toTimetableDayOfWeek } from './timetable-calendar';
 import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto';
 import {
   AssignSubstitutionDto,
@@ -1144,6 +1146,110 @@ export class TimetableService {
     });
   }
 
+  async getTeacherMobileTimetable(
+    actor: AuthContext,
+    query: { date?: string; weekStart?: string; days?: number },
+  ) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+      select: { id: true },
+    });
+    if (!staff) {
+      throw new ForbiddenException('Active teacher profile is required');
+    }
+
+    const baseDate = stripTime(
+      query.weekStart
+        ? parseDate(query.weekStart, 'weekStart')
+        : query.date
+          ? parseDate(query.date, 'date')
+          : new Date(),
+    );
+    const days = Math.min(query.days ?? 7, 7);
+    const dates = Array.from({ length: days }, (_, index) => {
+      const date = new Date(baseDate);
+      date.setDate(baseDate.getDate() + index);
+      return stripTime(date);
+    });
+    const dayOfWeeks = Array.from(
+      new Set(dates.map((date) => toTimetableDayOfWeek(date))),
+    );
+
+    const [slots, substitutions] = await Promise.all([
+      this.prisma.timetableSlot.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: staff.id,
+          dayOfWeek: { in: dayOfWeeks },
+          version: {
+            status: {
+              in: [
+                TimetableVersionStatus.PUBLISHED,
+                TimetableVersionStatus.LOCKED,
+              ],
+            },
+            effectiveFrom: { lte: dates[dates.length - 1] },
+            OR: [{ effectiveTo: null }, { effectiveTo: { gte: dates[0] } }],
+          },
+        },
+        include: timetableSlotInclude(),
+        orderBy: [{ dayOfWeek: 'asc' }, { startsAt: 'asc' }],
+      }),
+      this.prisma.timetableSubstitution.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          date: { gte: dates[0], lte: dates[dates.length - 1] },
+          status: { not: TimetableSubstitutionStatus.CANCELLED },
+          OR: [
+            { absentTeacherId: staff.id },
+            { substituteTeacherId: staff.id },
+          ],
+        },
+        include: substitutionInclude(),
+        orderBy: [{ date: 'asc' }, { createdAt: 'desc' }],
+      }),
+    ]);
+
+    const substitutionBySlotDate = new Map(
+      substitutions.map((substitution) => [
+        `${substitution.timetableSlotId}:${toDateKey(substitution.date)}`,
+        substitution,
+      ]),
+    );
+
+    return {
+      range: {
+        startsOn: dates[0],
+        endsOn: dates[dates.length - 1],
+      },
+      items: dates.flatMap((date) => {
+        const dayOfWeek = toTimetableDayOfWeek(date);
+        return slots
+          .filter((slot) => slot.dayOfWeek === dayOfWeek)
+          .filter(
+            (slot) =>
+              slot.version !== null &&
+              slot.version.effectiveFrom <= date &&
+              (!slot.version.effectiveTo || slot.version.effectiveTo >= date),
+          )
+          .map((slot) => {
+            const substitution = substitutionBySlotDate.get(
+              `${slot.id}:${toDateKey(date)}`,
+            );
+            return this.mapTeacherMobileTimetableSlot(
+              slot,
+              date,
+              staff.id,
+              substitution ?? null,
+            );
+          });
+      }),
+      substitutions: substitutions.map((substitution) =>
+        this.mapTeacherMobileSubstitution(substitution, staff.id),
+      ),
+    };
+  }
+
   async exportClassTimetable(
     classId: string,
     sectionId: string | null,
@@ -1186,6 +1292,72 @@ export class TimetableService {
         effectiveFrom: version.effectiveFrom,
       },
       schedule,
+    };
+  }
+
+  private mapTeacherMobileTimetableSlot(
+    slot: Prisma.TimetableSlotGetPayload<{
+      include: ReturnType<typeof timetableSlotInclude>;
+    }>,
+    date: Date,
+    staffId: string,
+    substitution: Prisma.TimetableSubstitutionGetPayload<{
+      include: ReturnType<typeof substitutionInclude>;
+    }> | null,
+  ) {
+    return {
+      id: slot.id,
+      date,
+      dayOfWeek: slot.dayOfWeek,
+      academicYearId: slot.academicYearId,
+      classId: slot.classId,
+      sectionId: slot.sectionId,
+      subjectId: slot.subjectId,
+      className: slot.class.name,
+      sectionName: slot.section?.name ?? null,
+      subjectName: slot.subject.name,
+      room: slot.roomRef?.name ?? null,
+      startsAt: slot.startsAt,
+      endsAt: slot.endsAt,
+      status: substitution
+        ? substitution.status === TimetableSubstitutionStatus.ASSIGNED
+          ? 'SUBSTITUTED'
+          : 'CHANGED'
+        : 'SCHEDULED',
+      substitution: substitution
+        ? this.mapTeacherMobileSubstitution(substitution, staffId)
+        : null,
+    };
+  }
+
+  private mapTeacherMobileSubstitution(
+    substitution: Prisma.TimetableSubstitutionGetPayload<{
+      include: ReturnType<typeof substitutionInclude>;
+    }>,
+    staffId: string,
+  ) {
+    return {
+      id: substitution.id,
+      date: substitution.date,
+      status: substitution.status,
+      reason: substitution.reason,
+      timetableSlotId: substitution.timetableSlotId,
+      role:
+        substitution.substituteTeacherId === staffId
+          ? 'SUBSTITUTE'
+          : 'ABSENT_TEACHER',
+      className: substitution.timetableSlot.class.name,
+      sectionName: substitution.timetableSlot.section?.name ?? null,
+      subjectName: substitution.timetableSlot.subject.name,
+      startsAt: substitution.timetableSlot.startsAt,
+      endsAt: substitution.timetableSlot.endsAt,
+      room: substitution.timetableSlot.roomRef?.name ?? null,
+      absentTeacherName: substitution.absentTeacher
+        ? `${substitution.absentTeacher.firstName} ${substitution.absentTeacher.lastName}`.trim()
+        : null,
+      substituteTeacherName: substitution.substituteTeacher
+        ? `${substitution.substituteTeacher.firstName} ${substitution.substituteTeacher.lastName}`.trim()
+        : null,
     };
   }
 
@@ -1534,6 +1706,10 @@ function parseDate(value: string, fieldName: string) {
     throw new ConflictException(`${fieldName} must be a valid date`);
   }
   return parsed;
+}
+
+function toDateKey(value: Date) {
+  return value.toISOString().slice(0, 10);
 }
 
 function _sectionsConflict(a: string | null, b: string | null) {

@@ -26,8 +26,8 @@ class TeacherClassesScreen extends ConsumerWidget {
 
     return RoleShellScaffold(
       role: 'TEACHER',
-      selectedIndex: 1,
-      title: 'Classes',
+      selectedIndex: 0,
+      title: 'Assigned Classes',
       body: RefreshIndicator(
         onRefresh: controller.load,
         child: state.isLoading
@@ -63,35 +63,55 @@ class TeacherClassesScreen extends ConsumerWidget {
                       title: 'No assigned class',
                       message:
                           state.message ??
-                          'Class sections appear after school admins map this teacher account.',
+                          'No classes are assigned to you yet. Your school administrator can update your teaching assignments.',
                       icon: Icons.calendar_today_rounded,
                       actionLabel: 'Retry',
                       onActionPressed: controller.load,
                     )
                   else ...[
+                    Text(
+                      '${state.classes.length} active class/subject assignment(s)',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.slate600,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    for (final classSection in state.classes) ...[
+                      _TeacherClassTile(
+                        classSection: classSection,
+                        isSelected: classSection.id == state.selectedClassId,
+                        onOpen: () async {
+                          await controller.selectClass(classSection.id);
+                          if (context.mounted) {
+                            context.go(
+                              AppRoutes.teacherClassDetail(classSection.id),
+                            );
+                          }
+                        },
+                        onAttendance: () async {
+                          await controller.selectClass(classSection.id);
+                          if (context.mounted) {
+                            context.go(
+                              AppRoutes.teacherAttendanceFor(classSection.id),
+                            );
+                          }
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
                     AppCard(
-                      child: Column(
-                        children: [
-                          for (final classSection in state.classes) ...[
-                            _TeacherClassTile(
-                              classSection: classSection,
-                              isSelected:
-                                  classSection.id == state.selectedClassId,
-                              onSelect: () async {
-                                await controller.selectClass(classSection.id);
-                                if (context.mounted) {
-                                  context.go(
-                                    AppRoutes.teacherAttendanceFor(
-                                      classSection.id,
-                                    ),
-                                  );
-                                }
-                              },
-                            ),
-                            if (classSection != state.classes.last)
-                              const Divider(),
-                          ],
-                        ],
+                      color: AppColors.primaryLight,
+                      hasShadow: false,
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.18),
+                      ),
+                      child: Text(
+                        'You can open only class sections returned by the teacher mobile API. Direct unassigned class routes are denied by the backend.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.primaryDark,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
@@ -152,59 +172,81 @@ class _TeacherClassTile extends StatelessWidget {
   const _TeacherClassTile({
     required this.classSection,
     required this.isSelected,
-    required this.onSelect,
+    required this.onOpen,
+    required this.onAttendance,
   });
 
   final TeacherClassSection classSection;
   final bool isSelected;
-  final VoidCallback onSelect;
+  final VoidCallback onOpen;
+  final VoidCallback onAttendance;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: onSelect,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: AppColors.teacherAccent.withValues(alpha: 0.12),
-              foregroundColor: AppColors.teacherAccent,
-              child: const Icon(Icons.school_rounded),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    classSection.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
+    return AppCard(
+      onTap: onOpen,
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: AppColors.teacherAccent.withValues(alpha: 0.12),
+            foregroundColor: AppColors.teacherAccent,
+            child: const Icon(Icons.school_rounded),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  classSection.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  classSection.subject,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.slate500),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  children: [
+                    StatusChip(
+                      status: isSelected
+                          ? AppStatusType.approved
+                          : AppStatusType.draft,
+                      label: isSelected ? 'Selected' : 'Assigned',
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    classSection.subject,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: AppColors.slate500),
-                  ),
-                ],
-              ),
+                    StatusChip(
+                      status: classSection.attendance?.isSubmitted == true
+                          ? AppStatusType.completed
+                          : AppStatusType.pending,
+                      label: classSection.attendance?.isSubmitted == true
+                          ? 'Submitted'
+                          : classSection.attendance?.isLocked == true
+                          ? 'Locked'
+                          : 'To mark',
+                    ),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(width: AppSpacing.sm),
-            StatusChip(
-              status: isSelected ? AppStatusType.approved : AppStatusType.draft,
-              label: isSelected ? 'Selected' : 'Assigned',
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          IconButton(
+            tooltip: 'Take attendance',
+            onPressed: onAttendance,
+            icon: const Icon(Icons.fact_check_rounded),
+          ),
+        ],
       ),
     );
   }

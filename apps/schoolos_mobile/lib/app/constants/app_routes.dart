@@ -38,7 +38,16 @@ class AppRoutes {
   static const studentLearning = '/student/learning';
   static const teacherHome = '/teacher/home';
   static const teacherClasses = '/teacher/classes';
+  static const teacherClass = '/teacher/class/:classSectionId';
   static const teacherAttendance = '/teacher/attendance';
+  static const teacherHomework = '/teacher/homework';
+  static const teacherHomeworkCreate = '/teacher/homework/create';
+  static const teacherMessages = '/teacher/messages';
+  static const teacherMessageThread = '/teacher/messages/:threadId';
+  static const teacherTimetable = '/teacher/timetable';
+  static const teacherProfile = '/teacher/profile';
+  static const teacherLeave = '/teacher/leave';
+  static const teacherPayslips = '/teacher/payslips';
   static const driverHome = '/driver/home';
   static const driverRoute = '/driver/route';
   static const driverStudents = '/driver/students';
@@ -47,6 +56,23 @@ class AppRoutes {
   static const staffAttendance = '/staff/attendance';
   static const staffLeave = '/staff/leave';
   static const staffPayslips = '/staff/payslips';
+  static const principalToday = '/principal/today';
+  static const principalAttention = '/principal/attention';
+  static const principalApprovals = '/principal/approvals';
+  static const principalNotices = '/principal/notices';
+  static const principalMore = '/principal/more';
+  static const principalAttendanceRisk = '/principal/attendance-risk';
+  static const principalStaffAbsence = '/principal/staff-absence';
+  static const principalFees = '/principal/fees-snapshot';
+  static const principalAcademics = '/principal/academics-readiness';
+  static const principalTransport = '/principal/transport-alerts';
+  static const principalEscalations = '/principal/escalations';
+  static const principalStudents = '/principal/students';
+  static const principalReports = '/principal/reports-snapshot';
+  static const principalTasks = '/principal/tasks';
+  static const principalWalkthroughs = '/principal/classroom-walkthroughs';
+  static const principalCanteen = '/principal/canteen-snapshot';
+  static const principalLibrary = '/principal/library-snapshot';
   static const adminHome = '/admin/home';
 
   static String parentChildDetail(String id) => '/parent/child/$id';
@@ -54,6 +80,10 @@ class AppRoutes {
       '/parent/children/$id/attendance';
   static String parentHomeworkDetail(String id) => '/parent/homework/$id';
   static String noticeDetail(String id) => '/notices/$id';
+  static String teacherClassDetail(String classSectionId) =>
+      '/teacher/class/${Uri.encodeComponent(classSectionId)}';
   static String teacherAttendanceFor(String classSectionId) =>
       '/teacher/attendance/${Uri.encodeComponent(classSectionId)}';
+  static String teacherMessageThreadDetail(String threadId) =>
+      '/teacher/messages/${Uri.encodeComponent(threadId)}';
 }

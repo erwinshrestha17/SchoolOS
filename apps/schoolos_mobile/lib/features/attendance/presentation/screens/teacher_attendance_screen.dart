@@ -29,6 +29,8 @@ class TeacherAttendanceScreen extends ConsumerStatefulWidget {
 
 class _TeacherAttendanceScreenState
     extends ConsumerState<TeacherAttendanceScreen> {
+  String _studentSearch = '';
+
   @override
   void initState() {
     super.initState();
@@ -45,11 +47,17 @@ class _TeacherAttendanceScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(teacherAttendanceControllerProvider);
     final controller = ref.read(teacherAttendanceControllerProvider.notifier);
+    final filteredEntries = state.entries.where((entry) {
+      final query = _studentSearch.trim().toLowerCase();
+      if (query.isEmpty) return true;
+      return entry.studentName.toLowerCase().contains(query) ||
+          entry.rollNumber.toLowerCase().contains(query);
+    }).toList();
 
     return RoleShellScaffold(
       role: 'TEACHER',
-      selectedIndex: 2,
-      title: 'Mark Attendance',
+      selectedIndex: 1,
+      title: 'Attendance',
       body: state.isLoading
           ? const Padding(
               padding: EdgeInsets.all(AppSpacing.lg),
@@ -81,6 +89,33 @@ class _TeacherAttendanceScreenState
               children: [
                 _TeacherAttendanceHeader(state: state, controller: controller),
                 const SizedBox(height: AppSpacing.md),
+                AppCard(
+                  color: AppColors.primaryLight,
+                  hasShadow: false,
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.18),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.verified_user_outlined,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Text(
+                          'You can take attendance only for your assigned class.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: AppColors.primaryDark,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
                 _AttendanceSummary(state: state),
                 if (state.message != null) ...[
                   const SizedBox(height: AppSpacing.md),
@@ -89,15 +124,30 @@ class _TeacherAttendanceScreenState
                 const SizedBox(height: AppSpacing.xl),
                 const SectionHeader(title: 'Students'),
                 const SizedBox(height: AppSpacing.sm),
-                for (final entry in state.entries) ...[
-                  _AttendanceStudentRow(
-                    entry: entry,
-                    isReadOnly: state.isReadOnly || state.isSubmitting,
-                    onChanged: (status) =>
-                        controller.markStudent(entry.studentId, status),
+                TextField(
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search_rounded),
+                    hintText: 'Search students',
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                ],
+                  onChanged: (value) => setState(() => _studentSearch = value),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                if (filteredEntries.isEmpty)
+                  AppEmptyState(
+                    title: 'No matching students',
+                    message: 'Try another student name or roll number.',
+                    icon: Icons.search_off_rounded,
+                  )
+                else
+                  for (final entry in filteredEntries) ...[
+                    _AttendanceStudentRow(
+                      entry: entry,
+                      isReadOnly: state.isReadOnly || state.isSubmitting,
+                      onChanged: (status) =>
+                          controller.markStudent(entry.studentId, status),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
               ],
             ),
       floatingActionButton: state.hasUnsavedChanges && !state.isReadOnly

@@ -52,6 +52,9 @@ class _HomeRedirectScreenState extends ConsumerState<HomeRedirectScreen> {
         case MobileRole.staff:
           context.go(AppRoutes.staffHome);
           break;
+        case MobileRole.principal:
+          context.go(AppRoutes.principalToday);
+          break;
         case MobileRole.admin:
           context.go(AppRoutes.adminHome);
           break;

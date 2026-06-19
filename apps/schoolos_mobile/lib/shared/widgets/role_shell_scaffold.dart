@@ -38,7 +38,11 @@ class RoleShellScaffold extends StatelessWidget {
           ),
           IconButton(
             tooltip: 'Profile',
-            onPressed: () => context.go(AppRoutes.profile),
+            onPressed: () => context.go(
+              role.toUpperCase() == 'TEACHER'
+                  ? AppRoutes.teacherProfile
+                  : AppRoutes.profile,
+            ),
             icon: const Icon(Icons.account_circle_rounded),
           ),
           IconButton(
@@ -152,32 +156,34 @@ class RoleShellScaffold extends StatelessWidget {
       case 'TEACHER':
         return const [
           _RoleNavItem(
-            label: 'Home',
+            label: 'Today',
             icon: Icons.home_outlined,
             selectedIcon: Icons.home_rounded,
             route: AppRoutes.teacherHome,
           ),
           _RoleNavItem(
-            label: 'Classes',
+            label: 'Attendance',
             icon: Icons.calendar_today_outlined,
             selectedIcon: Icons.calendar_today_rounded,
-            route: AppRoutes.teacherClasses,
-          ),
-          _RoleNavItem(
-            label: 'Attendance',
-            icon: Icons.fact_check_outlined,
-            selectedIcon: Icons.fact_check_rounded,
             route: AppRoutes.teacherAttendance,
           ),
           _RoleNavItem(
             label: 'Homework',
             icon: Icons.assignment_outlined,
             selectedIcon: Icons.assignment_rounded,
+            route: AppRoutes.teacherHomework,
           ),
           _RoleNavItem(
-            label: 'More',
-            icon: Icons.grid_view_outlined,
-            selectedIcon: Icons.grid_view_rounded,
+            label: 'Messages',
+            icon: Icons.chat_bubble_outline_rounded,
+            selectedIcon: Icons.chat_bubble_rounded,
+            route: AppRoutes.teacherMessages,
+          ),
+          _RoleNavItem(
+            label: 'Profile',
+            icon: Icons.account_circle_outlined,
+            selectedIcon: Icons.account_circle_rounded,
+            route: AppRoutes.teacherProfile,
           ),
         ];
       case 'STUDENT':

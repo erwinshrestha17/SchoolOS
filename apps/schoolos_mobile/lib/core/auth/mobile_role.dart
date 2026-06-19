@@ -4,6 +4,7 @@ class MobileRole {
   static const parent = 'PARENT';
   static const teacher = 'TEACHER';
   static const staff = 'STAFF';
+  static const principal = 'PRINCIPAL';
   static const admin = 'ADMIN';
   static const student = 'STUDENT';
   static const driver = 'DRIVER';
@@ -15,6 +16,7 @@ class MobileRole {
     ].map(_clean).where((value) => value.isNotEmpty).toList();
 
     if (candidates.any(_isAdmin)) return admin;
+    if (candidates.any(_isPrincipal)) return principal;
     if (candidates.any(_isTeacher)) return teacher;
     if (candidates.any(_isStaff)) return staff;
     if (candidates.any((value) => value == 'PARENT' || value == 'GUARDIAN')) {
@@ -31,6 +33,7 @@ class MobileRole {
   static bool isParent(String? role) => normalize(role) == parent;
   static bool isTeacher(String? role) => normalize(role) == teacher;
   static bool isStaff(String? role) => normalize(role) == staff;
+  static bool isPrincipal(String? role) => normalize(role) == principal;
   static bool isAdmin(String? role) => normalize(role) == admin;
   static bool isStudent(String? role) => normalize(role) == student;
   static bool isDriver(String? role) => normalize(role) == driver;
@@ -40,9 +43,12 @@ class MobileRole {
 
   static bool _isAdmin(String value) {
     return value == 'ADMIN' ||
-        value == 'PRINCIPAL' ||
         value == 'SUPER_ADMIN' ||
         value == 'PLATFORM_SUPER_ADMIN';
+  }
+
+  static bool _isPrincipal(String value) {
+    return value == 'PRINCIPAL' || value == 'HEAD_TEACHER';
   }
 
   static bool _isTeacher(String value) {
