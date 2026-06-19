@@ -14,10 +14,13 @@ docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
 | Module | Reference |
 |---|---|
 | M8A Library | `M8A_LIBRARY_FRONTEND_REFERENCE.md` |
+| M13 Inventory & Asset Management | `M13_INVENTORY_ASSET_FRONTEND_REFERENCE.md` |
 
 ## Usage rules
 
 - Treat these files as implementation guidance, not backend contract truth.
 - Confirm API names, DTOs, permissions, route guards, and protected-file behavior against backend/OpenAPI before coding.
 - Do not use fake frontend data to match visual references.
-- Keep parent, student, staff self-service, and mobile companion surfaces purpose-limited.
+- Keep parent, student, staff self-service, driver, and mobile companion surfaces purpose-limited.
+- For M13, never calculate official stock, valuation, depreciation, or accounting truth in the browser.
+- For M13, protected bills, warranty cards, quotations, stocktake sheets, write-off documents, labels, and exports must use File Registry-backed authenticated helpers.
