@@ -1,0 +1,386 @@
+name: Apply M6 web documentation update
+
+on:
+  push:
+    branches:
+      - m6-web-docs-20260619
+
+permissions:
+  contents: write
+
+jobs:
+  apply-doc-update:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply focused M6 documentation updates
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          design_path = Path('docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md')
+          plan_path = Path('docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md')
+
+          design_section = '''## 21. M6 Homework and Timetable
+
+### 21.1 Purpose
+
+M6 is the academic-operations workspace for assigning, reviewing, and following up homework, while also building, validating, publishing, and maintaining class timetables. It must support a teacher's daily work, an academic coordinator's school-wide control, and parent/student read-only visibility without exposing unrelated classes, students, staff, or operational data.
+
+The desktop reference set establishes a task-first operating-desk direction for M6: dense but readable weekly grids and work queues, a stable header/KPI/tab/filter hierarchy, and right-side panels that explain the selected record, conflict, or action. Every screen still follows the SchoolOS rule: one screen has one primary job.
+
+### 21.2 Primary users and scope
+
+| Persona | M6 job | Visibility boundary |
+|---|---|---|
+| Academic coordinator / school admin | Build, validate, publish, lock, compare, archive, and restore timetables; manage school-wide conflicts and substitutions. | Tenant-scoped academic structure, rooms, teacher availability, and permitted workload detail only. |
+| Class / subject teacher | Create and review assigned homework; see own timetable and assigned substitution tasks. | Assigned class, section, subject, homework, and substitution scope only unless broader permission exists. |
+| Principal | Review alerts, readiness, workload risks, substitutions, and published timetable status. | Decision-level summaries; no staff-private or unneeded detail without permission. |
+| Parent / guardian | See assigned, published homework and the published class timetable for linked children. | Linked child only; no class ranking, internal review queue, or other children. |
+| Student | See own assigned homework, own submission state, teacher feedback, and published class timetable. | Own records only; no other student submissions, internal operations, or unpublished work. |
+
+### 21.3 Recommended routes
+
+```text
+/dashboard/homework
+/dashboard/homework/new
+/dashboard/homework/[homeworkId]
+/dashboard/homework/templates
+/dashboard/homework/submissions
+/dashboard/homework/reminders
+/dashboard/homework/reports
+
+/dashboard/timetable
+/dashboard/timetable/builder
+/dashboard/timetable/conflicts
+/dashboard/timetable/versions
+/dashboard/timetable/substitutions
+/dashboard/timetable/workload
+/dashboard/timetable/reports
+```
+
+Parent/student and teacher-personal routes must use purpose-limited APIs rather than reusing the admin workspace response shapes.
+
+### 21.4 Workspace pattern
+
+```text
+Header: Homework & Timetable
+Purpose: Assign work, monitor completion, and maintain conflict-safe schedules.
+Primary action: Contextual to the screen, such as Create Homework, Open Builder, or Assign Substitute.
+Secondary actions: More Actions menu.
+
+KPI strip: Backend-provided module summaries only.
+Tabs: Homework | Submissions | Templates | Reminders | Timetable | Conflicts | Versions | Substitutions | Workload | Reports
+Filters: Class | Section | Subject | Teacher | Date range | Status, with server-side filtering and pagination.
+Main area: One task-first list, composer, weekly grid, review queue, or comparison surface.
+Right rail: Selected record, conflict center, validation/publish readiness, or substitute candidate panel; never decorative.
+```
+
+KPI cards, charts, completion percentages, room utilisation, teacher load, delivery rates, and conflict counts must come from backend summaries or show an honest unavailable state. The browser must not invent operational truth.
+
+### 21.5 M6 delivery order
+
+| Priority | Screens | Main outcome |
+|---|---|---|
+| P0 | Homework Dashboard; Homework Composer & Publish; Submission Review; Timetable Overview; Timetable Builder & Conflict Center; Timetable Versions/Publish/Lock; Substitution Queue & Candidate Selection | Teachers and academic coordinators can complete the core daily workflow safely. |
+| P1 | Homework Template Library; Reminder Delivery & Batch History; Homework Completion Report; Teacher Workload/Availability; Timetable Conflict Report | Reuse, follow-up, reporting, and operational tuning. |
+| P2 | Parent Homework Detail; Student Homework Detail; Teacher Personal Timetable; Parent/Student Published Timetable | Purpose-limited persona read views and mobile parity direction. |
+
+### 21.6 Homework dashboard
+
+**Main job:** understand homework activity, items due soon, pending review, and follow-up needs.
+
+```text
+Header: Homework Dashboard & Overview
+Primary action: Create Homework
+Tabs: Overview | Homework | Templates | Submissions | Reminders | Reports
+Filters: Class | Section | Subject | Teacher | Date range | Status
+Main: Server-paginated recent assignments table
+Right rail: Quick actions and upcoming due work
+Bottom: Completion, pending review, reminder delivery, and protected-attachment summaries where APIs provide them
+```
+
+Recommended summary signals:
+
+- Draft homework.
+- Published within the selected period.
+- Due today / due soon.
+- Awaiting review.
+- Overdue or needs follow-up submissions.
+- Reminder delivery state only where provider/batch data is available.
+
+Teachers see their own assignments by default. Coordinators may widen scope through backend-authorized filters. Principals receive decision summaries, not a full teacher work queue.
+
+### 21.7 Homework composer and publish workflow
+
+**Main job:** create a clear, correctly scoped assignment and publish it safely.
+
+```text
+Top context: Class | Section | Subject | Assignment type | Due date/time | Parent notification setting
+Main form: Title | Instructions | Learning objective | Tags | Submission / resubmission rules | Audience
+Attachments: File Registry-backed resources with upload, processing, ready, failed, restricted, and removed states
+Right rail: Student-facing preview and publish safety checks
+Sticky actions: Cancel | Save Draft | Preview | Publish
+```
+
+Rules:
+
+- Class, section, subject, and selected students must be limited to the teacher's backend-validated assignment scope.
+- `Save Draft`, scheduled publish, recurring homework, and resubmission controls appear only where the confirmed API contract supports them.
+- Publish confirmation shows recipient count, due context, attachment readiness, and notification/provider readiness.
+- Attachments use Homework -> FileRegistryService -> StorageService. Never render raw object keys, permanent URLs, or generic unauthenticated file actions.
+- Preserve form content after recoverable validation, upload, or network failure.
+- A published assignment must use the backend publish lifecycle; client-only publishing is not valid.
+
+### 21.8 Homework template library
+
+**Main job:** create, find, reuse, share, clone, or archive safe reusable assignment structures.
+
+```text
+Tabs: All Templates | My Templates | School Shared | Subject | Class | Recurring | Archived
+Filters: Grade/class | Subject | Homework type | Submission required | Owner | Status
+Main: Template table with title, subject, level, recurrence, last updated, usage, and status
+Right rail: Selected template description, objectives, instructions, protected resources, recurrence, and applicable class scope
+Primary action: Create Template
+Quick actions: Create Homework from Template | Clone | Edit | Archive
+```
+
+Templates that have been used by published homework are archived rather than silently deleted. Applying a template still re-validates teacher, subject, class, audience, and protected-file access against the current tenant scope.
+
+### 21.9 Submission review and return for correction
+
+**Main job:** review a selected assignment's submissions and give clear, actionable feedback.
+
+```text
+Assignment summary: class, section, subject, due date, submission window, requirement, status
+KPI strip: Submitted | Pending | Late | Marked | Returned for Correction | Average only where permitted
+Main: Server-paginated submission list with student, status, submitted time, attachment count, score/review state, and comment state
+Right rail: Selected student's protected attachments, marks/grade where supported, rubric, feedback editor, submission history, and audit summary
+Actions: Mark Complete | Return for Correction | Request Resubmission | View Submission History
+```
+
+Rules:
+
+- Teachers can review only assignments within their scope or an explicitly granted review role.
+- Return-for-correction requires a teacher comment/reason and keeps the existing attempt history intact.
+- Bulk download/export must remain permission-aware and queue-backed when the backend classifies it as a large artifact.
+- Homework scoring must not silently become official academic marks without an explicit Academics contract.
+- Parent/student screens expose only their own submission state, evidence, and teacher feedback, never internal queue/audit details or other students.
+
+### 21.10 Homework reminders, delivery, and completion reporting
+
+**Main job:** monitor reminder jobs, delivery outcomes, retries, and completion follow-up without misrepresenting provider state.
+
+```text
+Tabs: Reminder Queue | Batch History | Completion Reports | Delivery Logs | Templates
+Filters: Channel | Status | Class | Section | Date range
+Main: Reminder batch table with assignment, audience, channel, recipient count, delivered/failed count, retry count, triggered time, and status
+Right rail: Selected batch summary, safe recipient failure diagnostics, replay history, and allowed actions
+Bottom: Completion by class/section and retry/reporting notes where summary APIs exist
+```
+
+Rules:
+
+- Provider state is explicit: `disabled`, `log/dev`, `mock`, or `configured`; disabled/mock modes never appear as real delivery success.
+- Retry/replay uses backend idempotency and a reason when the API requires one. The UI states how many recipients are eligible before the action is confirmed.
+- Recipient data is minimised; avoid exposing contact details or message bodies in broad operational tables.
+- Completion is calculated from assignment/submission data, not notification delivery state.
+- Failed, delayed, duplicate, and out-of-order provider events must render as safe status information, not client guesses.
+
+### 21.11 Parent and student homework detail
+
+**Main job:** help a linked child or student understand one assigned task, its deadline, resources, submission state, reminders, and teacher feedback.
+
+```text
+Child / student context
+Assignment title, subject, class/section, teacher, assigned date, due date, remaining time
+Instructions and submission requirement
+Protected attached resources
+Upcoming reminders and notification status
+Own submission evidence and status
+Own comment thread and teacher feedback
+```
+
+Parent access is linked-child only. Student access is self-only. These screens do not show class averages, rankings, internal moderation/audit data, or another student's work. Offline visibility is limited to allowed cached reads and previously authorised resources, with a clear last-updated or unavailable state.
+
+### 21.12 Timetable overview
+
+**Main job:** read the selected published/draft timetable and identify operational attention items before editing.
+
+```text
+Header: Weekly Timetable Workspace Overview
+Primary action: Open Builder
+Tabs: Overview | Weekly View | Builder | Conflicts | Versions | Substitutions
+KPI strip: Published timetables | Draft timetables | Conflict alerts | Available rooms | Teacher load balance | Substitutions this week
+Filters: Class | Section | Teacher | Room | Week
+Main: Weekly period grid
+Right rail: Quick actions and timetable status
+Bottom: Room utilisation, teacher availability snapshot, upcoming changes, and weekly alerts where backend summaries exist
+```
+
+Role depth varies: teachers see their own published timetable and assigned substitutions; parents/students see only their linked/published class timetable; coordinators have full permitted controls; principals see operational summaries and alerts.
+
+### 21.13 Timetable builder and conflict center
+
+**Main job:** create or adjust one timetable version while making server-validated conflicts and requirements visible.
+
+```text
+Top context: Class | Section | Stream where enabled | Version | Builder mode
+Left rail: Unassigned subjects and weekly required-period tracker
+Main: Weekly draggable period grid
+Right rail: Conflict Center with teacher, room, period, workload, and requirement warnings
+Bottom: Teacher availability | Room capacity/suitability | Workload balance | Validation summary
+Primary action: Contextual Save Draft / Review Conflicts / Validate & Prepare for Publish
+Secondary actions: More Actions for preview, compare, and allowed deterministic helpers
+```
+
+Rules:
+
+- A move/create/update is not accepted merely because the browser grid permits it. The backend remains the source of truth for teacher, room, period, workload, and version-state validation.
+- Teacher conflict, room conflict, period collision, assignment requirement, and workload warnings identify affected class/section, period, and safe drill-through action.
+- Only draft versions are editable. Locked and archived versions are read-only.
+- `Auto Arrange`, AI optimisation, and AI conflict suggestions are not M6 scope. Any future helper must be deterministic, explainable, and backed by a confirmed API contract.
+- Unsaved changes, failed validation, race/conflict response, permission denial, and module lock have clear in-context states.
+
+### 21.14 Timetable versions, publish, lock, archive, and restore
+
+**Main job:** govern timetable change safely through version comparison and audited lifecycle actions.
+
+```text
+KPI strip: Current live version | Draft versions | Archived versions | Pending changes | Locked timetables | Last publish
+Tabs: Compare Versions | Publish Queue | Archive | Restore History | Audit
+Main: Side-by-side week/day comparison for old/new version
+Right rail: Change summary and publish controls
+Bottom: Restore history and audit log
+Primary action: Publish New Version
+Secondary actions: Lock | Archive | Restore | Download Snapshot in More Actions
+```
+
+Publish, lock, archive, and restore require backend permission, impact preview, confirmation, and audit support. The publish preview should identify affected classes, teachers, rooms, effective date, and any impacted substitution tasks. Restoring a version must follow the backend's controlled version behavior and must never silently overwrite a live timetable.
+
+### 21.15 Teacher absence and substitute selection
+
+**Main job:** cover an affected lesson safely when a teacher is absent or leave creates a draft substitution task.
+
+```text
+Tabs: Today | Calendar | Availability | Substitute Queue | Alerts
+KPI strip: Absent teachers | Open tasks | Assigned substitutions | Availability match rate | Leave-linked requests | Urgent coverage gaps
+Main: Time/period task table with class/section, subject, absent teacher, reason category, recommended candidates, and status
+Right rail: Selected task, safe absence context, substitute candidates, workload/availability, and assignment history
+Primary action: Assign Substitute
+Secondary actions: Reassign | Mark Covered | Notify Staff | View Leave Details where permitted
+```
+
+Candidate ranking is deterministic and explainable, for example: available in the affected period, qualified/assigned for the subject, no timetable conflict, and workload within the configured limit. The server re-checks availability at assignment time. Leave-linked tasks never expose medical or other private leave detail beyond the allowed operational category. Notification actions respect M10 provider state and recipient scope.
+
+### 21.16 Shared components and required states
+
+Shared M6 components:
+
+```text
+HomeworkKpiStrip
+HomeworkFilters
+HomeworkStatusBadge
+HomeworkAttachmentList
+ProtectedHomeworkFileButton
+HomeworkComposer
+HomeworkAudienceSelector
+HomeworkPublishSafetyPanel
+HomeworkTemplateTable
+SubmissionReviewPanel
+ReminderBatchTable
+ReminderDeliveryStatusBadge
+
+TimetableWeekGrid
+TimetablePeriodCell
+TimetableConflictPanel
+ConflictSeverityBadge
+UnassignedSubjectQueue
+WeeklyRequirementTracker
+TimetableVersionPicker
+TimetableCompareView
+PublishImpactDialog
+TeacherAvailabilityMatrix
+SubstitutionTaskPanel
+SubstituteCandidateList
+WorkloadIndicator
+```
+
+Every M6 route must handle loading, empty, error, permission denied, module locked, validation failure, queued/processing, partial failure, protected file unavailable, conflict found/no conflict, draft saved, publish pending/published, locked, and archived states.
+
+### 21.17 M6 security, file, and contract boundaries
+
+- Tenant scope, RBAC, module entitlement, teacher assignment scope, guardian-child link, student self-scope, and substitute assignment rules are enforced by the backend.
+- Homework resources, student submissions, timetable exports, comparison snapshots, and substitution reports use File Registry-backed authenticated preview/download helpers. Never use raw `window.open`, provider URLs, object keys, or permanent signed URLs.
+- Growing tables use server-side pagination and filtering. Frontend counts and charts consume backend summaries only.
+- High-risk lifecycle actions require confirmation, pending/success/error state, and an audit reason where policy requires it: publish/lock/archive/restore timetable, assign/reassign substitute, return for correction, and replay reminders.
+- Unknowns remain explicit: `needs OpenAPI confirmation`, `needs backend verification`, `needs idempotency confirmation`, or `needs offline sync confirmation`. Do not invent drag/drop, auto-arrange, recurring, scheduled publish, workload scoring, calendar, or replay contracts.
+
+### 21.18 M6 web persona smoke expectations
+
+```text
+Teacher can create, publish, review, and open attachments only for assigned class/section/subject scope.
+Parent cannot open another child's homework or submission via a direct route.
+Student cannot open another student's submission or an unpublished assignment.
+Protected homework file preview/download uses authenticated helpers and fails safely after scope changes.
+Timetable builder rejects stale, locked, cross-tenant, teacher-conflict, room-conflict, and permission-denied changes through backend responses.
+Publish/lock/archive/restore show confirmation, audit-aware state, and post-mutation refresh.
+Substitute assignment re-checks availability and prevents duplicate coverage.
+Reminder retry clearly handles configured/disabled/mock provider states and does not duplicate delivery.
+Module-locked and suspended-tenant routes fail closed with safe SchoolOS copy.
+```
+
+---
+'''
+
+          plan_section = '''### M6 Homework & Timetable (98-100%)
+* **Current Status:** Reminders, reminder batch history/retry routes, homework-specific attachment access helpers, filtered metadata-backed homework template APIs, timetable conflicts, substitutions, staff-leave-approved draft substitution task linkage, slot selection, absence recording, and homework create/publish UI payload alignment with backend `dueDate`, `submissionRequired`, and publish endpoint contracts. The 2026-06-19 M6 web reference analysis now defines the task-first desktop workspace direction and delivery order; this is documentation-only and does not claim new runtime implementation.
+* **Staging / Verification Remaining:**
+  - Attachment and conflict lifecycle tests.
+  - Dashboard route smoke, timetable lifecycle smoke, and substitution mutation smoke.
+  - Browser E2E for teacher assignment scope, parent/student own-record scope, protected attachment access, conflict responses, timetable lifecycle, reminder retry/provider state, and substitution race handling.
+* **Backend Backlog:**
+  - Continue pilot tuning for homework templates, recurring homework, and scheduled reminders.
+  - Attachment lifecycle and reminder re-check tests.
+  - Timetable workload balancing and deterministic/explainable conflict scoring.
+  - Continue pilot tuning for substitution calendar behavior and leave/absence mutation smoke.
+  - Confirm any drag-and-drop slot mutation, auto-arrange, recurring assignment, scheduled publish, workload score, room-suitability, and timetable comparison contracts through OpenAPI/shared types before frontend work.
+* **Web Frontend Backlog:**
+  - **P0:** Homework dashboard; composer/publish flow with File Registry attachment states and publish safety checks; submission review/return-for-correction; timetable overview; drag-and-drop builder with server-backed conflict center; timetable version compare/publish/lock/archive/restore; substitution queue and deterministic candidate selection.
+  - **P1:** Homework template library using the filtered template endpoint; reminder delivery/batch history/replay UI; homework completion reporting; teacher workload/availability; substitution calendar; conflict and timetable reporting.
+  - **P2:** Purpose-limited parent/student homework detail and published timetable; teacher personal timetable; safe low-bandwidth/offline-read states where contracts permit.
+  - All M6 tables require server-side pagination/filtering; all KPIs/charts require backend summaries or an unavailable state; no fake operational counts or AI wording.
+* **Mobile Frontend Backlog:**
+  - Teacher homework creation with attachments after mobile DTO and upload-flow confirmation.
+  - Parent/student homework detail, offline viewing, due reminders, and submission status using purpose-limited APIs and authenticated file helpers.
+  - Weekly timetable and substitution alerts; show only the user's assigned/published scope.
+'''
+
+          design = design_path.read_text(encoding='utf-8')
+          start = design.index('## 21. M6 Homework and Timetable')
+          end = design.index('## 22. M7 HR and Payroll', start)
+          design_path.write_text(design[:start] + design_section + '\n' + design[end:], encoding='utf-8')
+
+          plan = plan_path.read_text(encoding='utf-8')
+          start = plan.index('### M6 Homework & Timetable (98-100%)')
+          end = plan.index('### M7 HR & Payroll', start)
+          plan_path.write_text(plan[:start] + plan_section + '\n' + plan[end:], encoding='utf-8')
+          PY
+
+          git diff --check
+          git diff -- docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
+
+      - name: Commit focused documentation changes
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
+          git rm .github/workflows/_apply_m6_web_docs.yml
+          git commit -m 'docs: define M6 homework and timetable web workspaces'
+          git push origin HEAD:m6-web-docs-20260619
