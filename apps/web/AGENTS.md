@@ -21,6 +21,7 @@ Also read where relevant:
 
 ```text
 SchoolOS web frontend design plan docs
+docs/design/SCHOOLOS_M7_HR_PAYROLL_WEB_DESIGN_REFERENCE.md when touching M7 HR & Payroll
 Project status/plan docs
 Architecture/security docs
 Platform operations docs
@@ -544,12 +545,29 @@ Filter rules:
 
 ### 14.7 M7 HR and Payroll
 
-- Salary and bank fields permission-gated.
-- Staff self-service sees own masked data only.
-- Payslip downloads use protected helper.
-- Payroll posting/reversal audited.
-- Payroll run has preview before post.
-- Reversal/correction preferred over silent mutation.
+Before touching M7 web UI, read:
+
+```text
+docs/design/SCHOOLOS_M7_HR_PAYROLL_WEB_DESIGN_REFERENCE.md
+```
+
+Core rules:
+
+- Keep admin HR/payroll routes separate from staff self-service routes.
+- Use one consistent M7 navigation model across overview, staff, contracts, attendance, leave, salary, payroll, payslips, reports, and settings.
+- Staff directory uses server-side pagination/filtering and a permission-safe selected-staff rail.
+- Staff profile is a full protected route, not only a drawer.
+- Salary, bank, PAN, payslip, and staff document fields are permission-gated and masked by default.
+- Staff self-service sees only purpose-limited own-profile, own-attendance, own-leave, own-payslip, and own-notice data.
+- Payslip and staff-document previews/downloads use protected helpers only.
+- Leave approval actions show balance, payroll impact, pending state, and audit history where backend supports it.
+- Payroll totals, worked hours, overtime, leave balances, salary previews, statutory deductions, and journal previews are backend-owned.
+- Payroll run has a visible state machine: `Draft -> Review -> Approved -> Posted -> Reversed`.
+- Posted payroll is immutable in UI; changes happen through reversal/correction workflows only.
+- Payroll posting/reversal/approval/recalculation/locking requires confirmation, reason where policy requires it, and audit support.
+- `Post Payroll` is disabled when exceptions, period lock, posting lock, or accounting integration state is unsafe.
+- Salary structures are versioned and effective-dated; do not silently mutate an active structure.
+- Large HR/payroll exports use queued/protected job flow where backend supports it.
 
 ### 14.8 M8A Library
 
