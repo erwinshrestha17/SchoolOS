@@ -7,6 +7,17 @@
 
 This audit records repository truth before the reference-dashboard implementation. The ten supplied reference images are visual specifications only; their sample names, counts, dates, money, progress, and provider states are not production data.
 
+## M4 reference follow-up
+
+The M4 desktop reference set has been translated into the following planning artifacts. They refine visual composition and implementation sequencing only; they do not add or claim backend, Prisma, OpenAPI, permission, route, test, or browser-verification changes.
+
+```text
+docs/design/M4_ACADEMICS_WEB_REFERENCE_SPEC.md
+docs/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md
+```
+
+These M4 documents must be used with this alignment audit. They preserve the current contract gaps: no invented overview KPI values, no unverified CAS rubric/evidence/moderation payloads, no simulated report-card job progress, no raw protected-file URLs, and no uncontrolled mark-unlock interaction.
+
 ## Shared foundation
 
 The web app already has an authenticated Next.js App Router shell at `components/layout/dashboard-shell.tsx`, permission and entitlement route gates in `app/dashboard/layout.tsx`, role-filtered navigation in `components/layout/sidebar.tsx`, a cookie-first API client in `lib/api/client.ts`, React Query providers, File Registry-backed protected-file actions, and shared loading, empty, error, permission, locked, status, table, filter, header, action-menu, and pagination primitives.
@@ -20,7 +31,7 @@ The main foundation gaps are visual alignment and duplication: shared primitives
 | M1 Admissions & Students | `/dashboard/students`, `/dashboard/students/[studentId]`, `/dashboard/admissions`, `/dashboard/admissions/new`, `/dashboard/admissions/review` | Students/admissions lists and writes; profile/guardian/lifecycle; documents and history; protected preview/download; duplicate review/merge; iEMIS readiness/export; QR generate/status/history/rotate/revoke | No module-owned six-metric overview response. Directory/admissions remain separate primary routes; tabs for Documents, Duplicates, iEMIS, and QR need route/query-state composition. Do not infer missing-document or QR totals from paginated rows. |
 | M2 Attendance | `/dashboard/attendance`, `/register`, `/corrections`, `/reports` | Roster, official summary/register/analytics/anomalies, conflicts, corrections, submit/sync/draft, protected register export, staff attendance/leave | Current workspace has five KPIs and three local tabs. Parent-alert count and a purpose-limited offline-draft/conflict summary are not exposed as one overview contract. Teacher selector/scope must remain backend-owned. |
 | M3 Fees & Receipts | `/dashboard/finance`, `/collections`, `/invoices`, `/receipts`, `/reversals-refunds`, `/cashier-close`, `/reports`; canonical `/dashboard/fees` compatibility route | Fee heads/plans/invoices/ledger/billing; defaulters/reminders; idempotent collection; refund/reversal; cashier close; receipts/reprints/verification/protected PDF; report snapshots | No single overview contract for all six reference KPIs. Payment screen can use selected real invoice/ledger responses, but total due, overdue, close status, and receipt counts must not be recomputed from partial lists. |
-| M4 Academics | `/dashboard/academics` plus exam terms, assessment components, exams, marks, CAS, report cards, results, publishing, locks, promotion | Years/classes/sections/subjects/assignments; exam terms/components/grading policy; marks/batch marks; CAS; report-card generation/correction/history/protected PDF; result readiness/preview/publish | No single overview contract for the six KPI cards. Existing report-card lifecycle is real, but the reference job-progress rail needs confirmed persisted job-state fields before it is represented as asynchronous progress. |
+| M4 Academics | `/dashboard/academics` plus exam terms, assessment components, exams, marks, CAS, report cards, results, publishing, locks, promotion | Years/classes/sections/subjects/assignments; exam terms/components/grading policy; marks/batch marks; CAS; report-card generation/correction/history/protected PDF; result readiness/preview/publish | No single overview contract for the six KPI cards. Existing report-card lifecycle is real, but the reference job-progress rail needs confirmed persisted job-state fields before it is represented as asynchronous progress. Detailed M4 visual and delivery rules are now documented in `docs/design/M4_ACADEMICS_WEB_REFERENCE_SPEC.md` and `docs/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md`; CAS rubric/evidence/moderation and promotion/Grade 11-12 contract depth remain confirmation gates. |
 | M5 Activity Feed | `/dashboard/activity`, `/new`, `/moderation`, `/gallery`, `/milestones`, `/[postId]`, `/parent` | Activity posts, moderation, media/file access, consent/audience checks, milestones and parent-scoped feed through `activity-feed` APIs | The reference overview metrics and compose rail need a bounded summary/audience-preview contract. Unsupported post types must stay unavailable; do not render poll/video controls solely from the reference. |
 | M6 Homework & Timetable | `/dashboard/homework`, `/new`, `/review`, `/[homeworkId]`; `/dashboard/timetable`, `/builder`, `/conflicts`, `/substitutions`, `/versions`, `/workload` | Homework CRUD/submissions/reminders/attachments; timetable periods/rooms/versions/slots/validation/publish/lock/archive; teacher availability/workload; substitutions | Homework and timetable are separate real workspaces. A combined six-metric overview contract is absent. The combined reference route can compose module APIs, but official totals and conflicts must come from bounded backend summaries. |
 | M7 HR & Payroll | `/dashboard/hr`, `/staff`, `/contracts`, `/leave`, `/attendance`; `/dashboard/payroll`, `/runs`, `/payslips`, `/salary-structures`, `/reports` | Staff/lifecycle/contracts/documents; leave/attendance/balances; payroll run lifecycle, preview, summary reports, posting/locking; protected payslips | HR and payroll are separate route layouts. Payroll summary exists, but the complete six-card HR overview and masked selected-payslip rail require composition without exposing salary/bank fields to unauthorized roles. |
@@ -76,7 +87,7 @@ The source implementation completed the shared shell and the M1-M10 overview ali
 | M1 | `/dashboard/students` | Active students, pending applications, and iEMIS issues use existing bounded responses; missing-document, duplicate-candidate, and QR-active totals remain unavailable. |
 | M2 | `/dashboard/attendance` | Existing analytics, anomaly, correction, and conflict contracts remain wired; parent-alert totals remain unavailable. |
 | M3 | `/dashboard/finance` | Defaulter count and outstanding value use the backend report; collected-today, total-due, close-status, reversal, and receipt totals remain unavailable where no overview contract exists. |
-| M4 | `/dashboard/academics` | Existing exam, marks, CAS, report-card, result, and protected-file workflows remain linked; all six overview totals remain unavailable pending a bounded summary. |
+| M4 | `/dashboard/academics` | Existing exam, marks, CAS, report-card, result, and protected-file workflows remain linked; all six overview totals remain unavailable pending a bounded summary. M4 reference implementation details are in `docs/design/M4_ACADEMICS_WEB_REFERENCE_SPEC.md` and `docs/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md`. |
 | M5 | `/dashboard/activity`, `/dashboard/activity/reports` | Existing feed workflows remain real; misleading list-length KPI calculations were removed, and reporting is a friendly unavailable state pending a safe report API. |
 | M6 | `/dashboard/homework` | Homework report rows back assigned and pending values; due-soon and timetable overview values remain unavailable while canonical timetable routes stay linked. |
 | M7 | `/dashboard/hr` | Pending leave and expiring-contract summaries use backend responses; broader staff/payroll totals remain unavailable or permission-restricted. |
@@ -121,6 +132,14 @@ For each route, capture loading, empty, populated, permission-denied, module-loc
 2. Compare all ten overview routes against their supplied references at the reference viewport, then correct verified spacing, overflow, focus, keyboard, and responsive defects.
 3. Add bounded, module-owned overview APIs only for recurring operational decisions that cannot be represented honestly with existing responses; update OpenAPI, shared contracts, permissions, query tests, and tenant-scoped index review together.
 4. Add focused authenticated browser coverage for the two new composition routes and their permission/module-lock states.
+
+### P1a — M4 reference implementation prerequisites
+
+1. Complete M4-W0 in `docs/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md` before changing M4 workflow composition.
+2. Keep all six M4 overview metrics unavailable until a bounded module-owned summary contract exists.
+3. Confirm CAS rubric/evidence/moderation, report-card persisted job state, promotion, and Grade 11-12 contracts before adding write paths or official progress displays.
+4. Preserve backend-assigned teacher scope, correction auditability, finance-safe withholding visibility, and File Registry-backed report-card access in every M4 slice.
+5. Add focused browser coverage for teacher scope, autosave failure, locked marks, correction review, published-only result access, partial report-card failure, and protected file denial.
 
 ### P2 — refinement after P1 evidence
 
