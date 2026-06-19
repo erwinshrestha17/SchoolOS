@@ -4,7 +4,7 @@
 **Market:** Nepal-focused school operating SaaS  
 **Target schools:** Kindergarten / Montessori to Grade 12 as the long-term product direction; current implementation remains staged around controlled pilot readiness for existing core modules  
 **Document type:** Functional Requirements Specification  
-**Status:** Active FRS aligned with KG-12 product direction and M12 Learning Layer implementation foundation  
+**Status:** Active FRS aligned with KG-12 product direction, M12 Learning Layer implementation foundation, and planned M13 Inventory & Asset Management  
 **Last updated:** 2026-06-19
 
 ---
@@ -21,6 +21,7 @@ Important distinction:
 Current core = broad implemented management foundation with remaining seed, browser, mobile, staging, provider, and pilot verification gates
 KG-12 expansion = staged product direction
 M12 Learning Layer = backend, web runtime, parent/student web summary, and Flutter summary foundation implemented locally; AI/adaptive/simulation depth remains staged
+M13 Inventory & Asset Management = planned module; detailed product/design/implementation docs exist but code/contracts/migrations/tests are not yet proven
 ```
 
 The dashboard and M1 desktop reference screens are documented in the supporting design appendix:
@@ -29,7 +30,15 @@ The dashboard and M1 desktop reference screens are documented in the supporting 
 docs/design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md
 ```
 
-That appendix does not override this FRS, the canonical web design plan, backend contracts, OpenAPI, tenant isolation, RBAC, module entitlement, File Registry, audit, or financial/idempotency rules.
+M13 Inventory & Asset Management details are documented in:
+
+```text
+docs/product/M13_INVENTORY_ASSET_MANAGEMENT.md
+docs/design/modules/M13_INVENTORY_ASSET_FRONTEND_REFERENCE.md
+docs/implementation/M13_INVENTORY_ASSET_IMPLEMENTATION_PLAN.md
+```
+
+These appendices and module-specific references do not override this FRS, the canonical web design plan, backend contracts, OpenAPI, tenant isolation, RBAC, module entitlement, File Registry, audit, or financial/idempotency rules.
 
 ---
 
@@ -65,10 +74,12 @@ These rules apply to every module:
 12. Teacher-created learning content must be limited to assigned class/section/subject unless an explicit admin permission allows broader curriculum management.
 13. Student learning session access must fail closed when session, class, section, tenant, feature, or school-only policy validation fails.
 14. Parent learning summaries must be child-scoped, non-comparative, and free from public ranking.
-15. Dashboard and summary surfaces must use permission-filtered backend responses; a browser must not calculate official attendance, financial, payroll, accounting, readiness, or delivery totals.
+15. Dashboard and summary surfaces must use permission-filtered backend responses; a browser must not calculate official attendance, financial, payroll, accounting, inventory, asset, readiness, or delivery totals.
 16. A missing, locked, unauthorized, queued, failed, partial-failure, or unavailable summary must remain distinct from a genuine zero state.
 17. Screen actions must resolve into a real permitted workflow. A dashboard card, right rail, quick action, or contextual button must not simulate a backend state in browser-only production state.
 18. Any user-visible aggregate that spans modules must be explicitly approved as a server-owned summary or consist only of separately authorized, non-official safe summaries.
+19. Inventory stock movement, purchase receive, issue/return, transfer, adjustment, stocktake adjustment, maintenance completion, and asset write-off/disposal must be idempotent, permission-gated, tenant-scoped, and audited.
+20. Inventory/accounting handoff must not bypass M9 Accounting posting, reversal, fiscal locks, or snapshots.
 
 ### 3.1 Principal dashboard and operating-desk requirements
 
@@ -78,20 +89,21 @@ Principal/authorized-admin dashboard functions may include:
 
 1. View permission-filtered school health summary.
 2. View attention items and pending approvals.
-3. Drill into daily operations: attendance, fees, transport, canteen, admissions, and communication where enabled.
+3. Drill into daily operations: attendance, fees, transport, canteen, admissions, communication, and inventory where enabled.
 4. View safe academic readiness, homework, report-card, and controlled-learning summaries.
 5. View safe collection/overdue/cashier summaries where finance permissions allow.
-6. View permission-filtered recent activity and upcoming/scheduled work.
-7. Use role-safe quick actions that open existing workflows.
-8. View module state only for enabled/entitled modules.
+6. View safe inventory/asset summaries where M13 permissions allow.
+7. View permission-filtered recent activity and upcoming/scheduled work.
+8. Use role-safe quick actions that open existing workflows.
+9. View module state only for enabled/entitled modules.
 
 Dashboard validation rules:
 
-1. The dashboard must not expose private message bodies, raw protected-file details, salary/bank data, accounting journals, or unavailable module data solely because a principal summary exists.
+1. The dashboard must not expose private message bodies, raw protected-file details, salary/bank data, accounting journals, vendor bill details, asset write-off documents, or unavailable module data solely because a principal summary exists.
 2. The school-day/open status must come from configured/calendar-backed backend context where it is shown; it must not depend only on browser time.
 3. Charts render only when the backend returns valid, meaningful time-series data. A text summary replaces an absent series.
 4. A dashboard alert, KPI, queue item, or quick action must check current role, permission, tenant, module entitlement, and record scope again when opened.
-5. Financial cards and payment-method breakdowns use backend Decimal/numeric values. The UI must not calculate authoritative totals.
+5. Financial cards, inventory valuation, stock totals, and payment-method breakdowns use backend Decimal/numeric values. The UI must not calculate authoritative totals.
 6. Dashboard failure of one section must not blank independent successful sections.
 
 ---
@@ -121,6 +133,7 @@ Grade 9-10 enabled
 Grade 11-12 enabled
 Streams/programs enabled where applicable
 Learning Layer enabled where applicable
+Inventory & Asset Management enabled where applicable
 ```
 
 ### 4.2 Grade 11-12 extension
@@ -148,6 +161,8 @@ Lower secondary dashboard: timetable, homework, subject practice, projects, lab 
 Secondary dashboard: exams, report cards, SEE prep, topic mastery
 Higher secondary dashboard: streams, subject combinations, practicals, projects, advanced labs
 ```
+
+Inventory and asset screens should also adapt to school size and plan. A small school may start with item catalogue, purchases, stock, and asset register. A larger school may need stores, departments, stocktake, maintenance, vendor comparison, and M9 accounting handoff.
 
 ---
 
@@ -188,6 +203,7 @@ Manage tenants, platform administration, feature controls, provider readiness, q
 21. Configure school level coverage: ECD, primary, lower secondary, secondary, Grade 11-12.
 22. Enable/disable M12 Learning Layer per tenant/plan.
 23. Configure school-only learning policies and later learning usage limits.
+24. Enable/disable M13 Inventory & Asset Management per tenant/plan when implemented.
 
 ### 5.4 Key states
 
@@ -198,6 +214,7 @@ Manage tenants, platform administration, feature controls, provider readiness, q
 - Queue job: waiting, active, completed, failed, retried.
 - File registry entry: available, missing, failed, archived.
 - Learning feature: disabled, enabled, pilot, suspended.
+- Inventory feature: disabled, enabled, pilot, suspended.
 
 ### 5.5 Validation rules
 
@@ -208,13 +225,14 @@ Manage tenants, platform administration, feature controls, provider readiness, q
 5. Queue retry must be blocked for archived tenant or disabled feature.
 6. Disabled feature routes must fail closed.
 7. Learning routes must fail closed when M12 is disabled or plan-locked.
-8. School-level/stream configuration changes must be audited.
+8. Inventory routes must fail closed when M13 is disabled or plan-locked.
+9. School-level/stream/module configuration changes must be audited.
 
 ### 5.6 Acceptance criteria
 
 1. Every platform override action is audited.
-2. Suspended tenants are blocked across dashboard, API, mobile, jobs, downloads, reports, and learning sessions.
-3. Disabled provider mode never pretends to send real notifications, payments, storage actions, or learning delivery actions.
+2. Suspended tenants are blocked across dashboard, API, mobile, jobs, downloads, reports, inventory, and learning sessions.
+3. Disabled provider mode never pretends to send real notifications, payments, storage actions, inventory jobs, or learning delivery actions.
 4. API keys are stored hashed and only shown once during creation.
 5. File and queue failure screens show safe, non-secret diagnostics.
 
@@ -462,29 +480,148 @@ Implementation note: the code foundation for this section exists under `apps/api
 
 ---
 
-## 9. M10 Communication Integration for Learning
+## 9. M13 Inventory & Asset Management
 
 ### 9.1 Purpose
 
-Use the existing communication system to send learning-related summaries and notices without creating a separate notification system.
+Manage school-owned consumables, fixed assets, purchase requests, vendor/quotation records, goods received notes, stock movement, stocktake, maintenance, write-off/disposal, protected documents, reports, and accounting handoff.
 
-### 9.2 Core functions
+M13 is planned. Implementation must not be claimed until code/contracts/migrations/tests/seed/smoke evidence exists.
+
+### 9.2 Primary actors
+
+- Storekeeper / Inventory Officer.
+- School Admin.
+- Principal / Owner.
+- Accountant / Finance Staff.
+- Department Head / Lab In-charge.
+- Teacher / Staff requester.
+- Auditor / SMC reviewer.
+- Platform Operator for entitlement/support diagnostics only.
+
+### 9.3 Core functions
+
+1. Create and manage inventory categories/subcategories.
+2. Create and manage item masters with unit, reorder level, controlled-item flag, category-specific fields, and status.
+3. Configure stores and physical locations: main store, office store, science lab, computer lab, sports room, exam room, transport store, hostel store, building, floor, room, rack, shelf, cupboard, or bin.
+4. View stock on hand by item, store, lot, batch, expiry, and status.
+5. Raise purchase request with item, quantity, purpose, expected date, department/class/lab, estimated cost, and attachments.
+6. Approve, reject, hold, or request changes for purchase requests according to amount/category/fiscal policy.
+7. Maintain vendor records with contact, address, PAN/VAT metadata, category, status, and notes.
+8. Attach and compare quotations.
+9. Create purchase order from approved request or direct purchase where permission allows.
+10. Receive goods through GRN with ordered, received, accepted, rejected quantity, bill number, bill date, VAT/PAN metadata, condition, and protected attachments.
+11. Issue stock to staff, department, class, lab, office, hostel, event, or store.
+12. Return reusable items and record condition.
+13. Transfer stock between stores/locations.
+14. Adjust stock with permission, reason, confirmation, and audit.
+15. Register fixed assets from purchase, donation, transfer, opening balance, or grant.
+16. Assign asset to staff, department, room, lab, bus, hostel, or admin unit.
+17. Track asset lifecycle, condition, location, custodian, warranty, documents, photos, and maintenance history.
+18. Create and complete maintenance/repair tickets.
+19. Run stocktake sessions, enter counts, review variance, approve adjustment, and close session.
+20. Manage lost, damaged, write-off, disposal, archive, and donation/grant asset workflows.
+21. Generate and print barcode/QR labels where backend supports protected artifacts.
+22. Produce inventory, stock movement, purchase, vendor, asset, warranty, maintenance, stocktake, write-off, donation/grant, and accounting handoff reports.
+23. Emit safe accounting handoff events for M9; do not directly write official ledger entries from frontend/M13 browser code.
+
+### 9.4 Key states
+
+- Item: draft, active, inactive, archived.
+- Purchase request: draft, submitted, under_review, approved, rejected, changes_requested, cancelled.
+- Quotation: pending, received, selected, rejected, expired.
+- Purchase order: draft, issued, partially_received, received, cancelled, closed.
+- GRN: draft, posted, partially_accepted, rejected, cancelled.
+- Stock lot: available, reserved, issued, depleted, expired, damaged, lost, adjusted.
+- Stock movement: pending, posted, reversed, failed.
+- Asset: active, assigned, in_store, under_repair, damaged, lost, written_off, disposed, archived.
+- Maintenance: reported, approved, in_progress, completed, rejected, cancelled.
+- Stocktake: planned, counting, review, approved, adjusted, closed, cancelled.
+- Accounting handoff: pending, queued, posted, failed, reversed, ignored.
+
+### 9.5 Validation rules
+
+1. All M13 records must be tenant-scoped.
+2. Disabled/locked M13 routes and APIs fail closed.
+3. Parent, student, and driver routes must not expose M13 admin data.
+4. Stock quantity changes only through backend movement records.
+5. Receive, issue, return, transfer, adjustment, stocktake adjustment, maintenance completion, and write-off/disposal must be idempotent and audited.
+6. Official stock quantity, inventory valuation, depreciation, and accounting handoff state must be backend-owned.
+7. Browser UI must not calculate official stock, valuation, depreciation, or accounting truth.
+8. High-risk actions require permission, reason, confirmation, and audit: adjustment, write-off, disposal, archive, accounting handoff retry, high-value purchase approval, and stocktake adjustment.
+9. File attachments for bills, quotations, POs, GRNs, warranty cards, asset photos, repair invoices, stocktake sheets, write-off approvals, labels, and exports must use File Registry-backed access.
+10. Vendor PAN/VAT and bill metadata must be permission-filtered.
+11. Asset tag and item code uniqueness must be tenant-scoped.
+12. Stocktake variance must not auto-adjust without reviewer approval.
+13. Category-specific sensitive items such as chemicals, exam materials, or controlled equipment require restricted visibility and controlled issue.
+14. M13 must not directly post official M9 ledger entries; M9 owns official journal posting, reversal, fiscal locks, and snapshots.
+15. Canteen edible stock, Library book-copy lifecycle, Transport trip/GPS operations, and HR staff records remain owned by their respective modules unless an explicit contract integration exists.
+
+### 9.6 Edge cases
+
+1. Same purchase request is submitted twice due to slow network.
+2. GRN is saved after purchase order is cancelled or already fully received.
+3. Stock issue is attempted while available quantity changed in another tab.
+4. Asset tag or serial number duplicates within tenant.
+5. Same asset tag exists in another tenant.
+6. Asset is assigned to a staff member who has been archived or left school.
+7. Bill attachment upload succeeds but File Registry association fails.
+8. Vendor becomes inactive while purchase order is still open.
+9. Stocktake count conflicts with movement posted after count started.
+10. Low-stock alert fires while purchase order is already approved but not received.
+11. Asset is under repair when transfer/disposal is attempted.
+12. Category policy changes after item was created.
+13. Fiscal year closes before accounting handoff is posted.
+14. User loses permission while adjustment/write-off drawer is open.
+15. Parent/student deep link attempts to open inventory document.
+16. Donation/grant item has no vendor bill but still needs ownership, source, and audit evidence.
+
+### 9.7 Acceptance criteria
+
+1. Catalogue, stock, asset, purchase, vendor, movement, maintenance, stocktake, and attachment queries/mutations are tenant-scoped.
+2. Storekeeper can receive goods through GRN and stock increases exactly once.
+3. Staff can request items only where permission allows.
+4. Principal/owner can approve/reject high-value request with reason and audit.
+5. Storekeeper can issue/return/transfer stock with idempotent movement records.
+6. Fixed assets show lifecycle, location, custodian, condition, warranty, maintenance, and protected documents.
+7. Stocktake variance requires approval before adjustment.
+8. Accounting handoff queues safely for M9 and never writes ledger directly from browser.
+9. Unauthorized parent/student/driver/staff routes cannot access inventory admin data.
+10. Protected bills, warranties, labels, reports, and write-off documents use File Registry helpers.
+11. Reports use backend filters, pagination, and queued export state where needed.
+12. Module disabled and permission-denied states are clear and fail closed.
+13. Backend tests cover tenant denial, permission denial, movement idempotency, stocktake approval, protected file access, inactive vendor, stale asset state, and accounting handoff boundary.
+14. Web tests/contracts cover API helpers, states, protected file actions, no fake data, and report export states.
+
+---
+
+## 10. M10 Communication Integration for Learning and Inventory
+
+### 10.1 Purpose
+
+Use the existing communication system to send learning-related and inventory-related summaries/notices without creating separate notification systems.
+
+### 10.2 Core functions
 
 1. Send parent weekly learning summary.
 2. Send teacher reminders for scheduled learning activity.
 3. Send lab-session completion summary where enabled.
 4. Send offline home practice suggestion where approved by teacher.
+5. Send inventory low-stock alert to configured roles where M13 is enabled.
+6. Send purchase approval reminder to approvers.
+7. Send maintenance due or warranty expiry notice.
+8. Send stocktake task/reminder to assigned reviewers.
 
-### 9.3 Validation rules
+### 10.3 Validation rules
 
 1. Parent messages must be child-scoped.
-2. Learning messages must respect quiet hours/provider status where configured.
-3. Failed delivery must not mark a learning summary as viewed.
-4. Notifications must not reveal other students or class rankings.
+2. Learning and inventory messages must respect quiet hours/provider status where configured.
+3. Failed delivery must not mark a learning summary as viewed or an inventory approval as completed.
+4. Notifications must not reveal other students, class rankings, sensitive vendor bill details, restricted item details, or asset write-off evidence to unauthorized recipients.
 
 ---
 
-## 10. Non-Negotiable Functional Boundaries
+## 11. Non-Negotiable Functional Boundaries
 
 1. Do not duplicate core SchoolOS student, teacher, class, subject, parent, file, notification, or audit systems inside Learning.
 2. Do not block learning access based on fee status by default.
@@ -495,6 +632,9 @@ Use the existing communication system to send learning-related summaries and not
 7. Parent learning access is own-child only.
 8. Student learning access is school lab/session only unless a future school-controlled device policy is explicitly approved.
 9. Do not implement open-ended student AI in MVP.
-10. Do not expose admin-shaped APIs to student, parent, board, or lab routes.
+10. Do not expose admin-shaped APIs to student, parent, board, lab, driver, or staff self-service routes.
 11. Do not claim KG-12 completion until the matching code, tests, data models, and workflows exist.
 12. Do not claim the dashboard, M1 workflow states, saved views, score formulas, e-sign, calendar scheduling, print queues, or iEMIS job flows are implemented until confirmed by backend/OpenAPI and verified in browser/staging/pilot workflows.
+13. Do not claim M13 Inventory & Asset Management is implemented until the matching backend models, contracts, APIs, web screens, protected-file flows, seed data, tests, and smoke evidence exist.
+14. Do not calculate official inventory stock, valuation, depreciation, or accounting truth in browser/mobile code.
+15. Do not allow M13 to bypass M9 Accounting for official ledger posting, reversal, fiscal locks, or report snapshots.
