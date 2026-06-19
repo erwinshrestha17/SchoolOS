@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { admissionFormSchema, type AdmissionFormInput } from "@schoolos/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { api } from "../../lib/api";
 import { fileToBase64Payload } from "../../lib/files";
@@ -53,10 +53,10 @@ const workspaceTabs = [
   ["bulk", "Bulk Import"],
 ] as const;
 
-export function AdmissionForm() {
+export function AdmissionForm({ defaultWorkspaceTab = "pipeline" }: { defaultWorkspaceTab?: (typeof workspaceTabs)[number][0] }) {
   const queryClient = useQueryClient();
   const [activeWorkspaceTab, setActiveWorkspaceTab] =
-    useState<(typeof workspaceTabs)[number][0]>("pipeline");
+    useState<(typeof workspaceTabs)[number][0]>(defaultWorkspaceTab);
   const [activeStep, setActiveStep] = useState(0);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [documentKind, setDocumentKind] = useState("BIRTH_CERTIFICATE");
@@ -68,6 +68,7 @@ export function AdmissionForm() {
     "" | "NO_KNOWN_DISABILITY" | "DISABILITY_PRESENT"
   >("");
   const [pdfError, setPdfError] = useState("");
+  const draftKey = `admission-${useId().replace(/:/g, "")}`;
 
   const admissionsQuery = useQuery({
     queryKey: ["admissions"],
@@ -175,6 +176,27 @@ export function AdmissionForm() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admissions"] });
       void queryClient.invalidateQueries({ queryKey: ["students"] });
+    },
+  });
+
+  const draftMutation = useMutation({
+    mutationFn: () => {
+      const values = form.getValues();
+      const guardian = values.guardians?.[0];
+      return api.saveAdmissionDraft({
+        draftKey,
+        firstNameEn: values.firstNameEn || undefined,
+        lastNameEn: values.lastNameEn || undefined,
+        dateOfBirth: values.dateOfBirth
+          ? new Date(values.dateOfBirth).toISOString()
+          : undefined,
+        guardianFullName: guardian?.fullName || undefined,
+        guardianPhone: guardian?.primaryPhone || undefined,
+        academicYearId: values.academicYearId || undefined,
+        classId: values.classId || undefined,
+        sectionId: values.sectionId || undefined,
+        payload: values as unknown as Record<string, unknown>,
+      });
     },
   });
 
@@ -902,6 +924,7 @@ export function AdmissionForm() {
 
                   <button
                     type="button"
+                    onClick={() => void api.openStudentDocumentPdf(latestAdmission!.student.id, 'id-card')}
                     className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
                   >
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-[var(--color-mod-admissions-accent)] group-hover:text-white transition-colors">
@@ -917,7 +940,7 @@ export function AdmissionForm() {
           </div>
 
           {activeStep < 4 && (
-            <div className="flex items-center justify-between pt-6 border-t border-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-6 border-t border-slate-200">
               <button
                 type="button"
                 className="flex items-center gap-2 px-6 py-3 text-sm font-bold text-slate-500 transition hover:text-slate-900 disabled:opacity-30"
@@ -926,6 +949,15 @@ export function AdmissionForm() {
               >
                 <ChevronLeft size={20} />
                 Back
+              </button>
+
+              <button
+                type="button"
+                disabled={draftMutation.isPending}
+                onClick={() => draftMutation.mutate()}
+                className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                {draftMutation.isPending ? "Saving Draft…" : "Save Draft"}
               </button>
 
               {activeStep === 3 ? (
@@ -949,6 +981,8 @@ export function AdmissionForm() {
               )}
             </div>
           )}
+          {draftMutation.isSuccess ? <p className="text-right text-xs font-bold text-success-700" role="status">Draft saved securely.</p> : null}
+          {draftMutation.isError ? <p className="text-right text-xs font-bold text-danger-700" role="alert">{draftMutation.error instanceof Error ? draftMutation.error.message : 'Draft could not be saved.'}</p> : null}
         </form>
       )}
 

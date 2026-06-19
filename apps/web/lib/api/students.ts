@@ -12,6 +12,7 @@ import type {
   StudentDeletePayload,
   StudentDocumentHistory,
   StudentDuplicateCandidatesResult,
+  DuplicateStudentMergeResult,
   StudentFeeClearance,
   StudentIemisReadinessSummary,
   StudentLifecycleActionResult,
@@ -167,6 +168,8 @@ export const studentsApi = {
     limit?: number;
     search?: string;
     status?: string;
+    academicYearId?: string;
+    classId?: string;
   }) =>
     request<PaginatedResponse<AdmissionSummary>>(
       withQuery('/admissions', params ?? {}),
@@ -257,6 +260,44 @@ export const studentsApi = {
     request<StudentDuplicateCandidatesResult>(
       withQuery('/students/duplicates/candidates', params ?? {}),
     ),
+  previewDuplicateStudentMerge: (body: {
+    sourceStudentId: string;
+    targetStudentId: string;
+  }) =>
+    request<{
+      sourceStudent: { id: string; studentSystemId: string; fullNameEn: string; lifecycleStatus: string };
+      targetStudent: { id: string; studentSystemId: string; fullNameEn: string; lifecycleStatus: string };
+      mergeCounts: Record<string, number>;
+      isProbableDuplicate: boolean;
+    }>('/students/duplicates/merge/preview', { method: 'POST', json: body }),
+  mergeDuplicateStudent: (body: {
+    sourceStudentId: string;
+    targetStudentId: string;
+    reason: string;
+  }) =>
+    request<DuplicateStudentMergeResult>('/students/duplicates/merge', {
+      method: 'POST',
+      json: body,
+    }),
+  saveAdmissionDraft: (body: {
+    draftKey: string;
+    firstNameEn?: string;
+    lastNameEn?: string;
+    dateOfBirth?: string;
+    guardianFullName?: string;
+    guardianPhone?: string;
+    academicYearId?: string;
+    classId?: string;
+    sectionId?: string;
+    previousSchool?: string;
+    payload?: Record<string, unknown>;
+  }) =>
+    request('/admissions/m1/drafts/autosave', {
+      method: 'POST',
+      json: body,
+    }),
+  recoverAdmissionDrafts: (params?: { draftKey?: string; guardianPhone?: string; limit?: number }) =>
+    request<any[]>(withQuery('/admissions/m1/drafts/recover', params ?? {})),
 
   uploadStudentDocument: (body: UploadStudentDocumentPayload) =>
     request('/student-documents', {

@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { Toast, ToastTone } from '../ui/toast';
+import type { AdmissionSummary } from '@schoolos/core';
 
 type AdmissionNotice = {
   title: string;
@@ -37,12 +38,11 @@ type AdmissionNotice = {
   tone: ToastTone;
 };
 
-// Pipeline Stages
 const STAGES = [
-  { key: 'Inquiry', label: 'Inquiry', desc: 'Basic info registered' },
-  { key: 'Applied', label: 'Applied', desc: 'Guardians registered' },
-  { key: 'DocumentReview', label: 'Doc Review', desc: 'Reviewing certificates' },
-  { key: 'Admitted', label: 'Admitted', desc: 'Active student record' }
+  { key: 'ACTIVE', label: 'Active' },
+  { key: 'PROMOTED', label: 'Promoted' },
+  { key: 'TRANSFERRED', label: 'Transferred' },
+  { key: 'EXITED', label: 'Exited' },
 ] as const;
 
 // Documents to verify
@@ -69,10 +69,12 @@ export function AdmissionsPipeline() {
   // Queries
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const admissionsQuery = useQuery({ 
-    queryKey: ['admissions', search, selectedClassId], 
+    queryKey: ['admissions', search, selectedClassId, selectedStage], 
     queryFn: () => api.listAdmissions({ 
       search: search || undefined, 
-      limit: 100 
+      classId: selectedClassId || undefined,
+      status: selectedStage === 'all' ? undefined : selectedStage,
+      limit: 30,
     }) 
   });
 
@@ -124,31 +126,15 @@ export function AdmissionsPipeline() {
     }
   });
 
-  // Calculate current stage helper
-  const getAdmissionStage = (admission: any) => {
-    if (admission.latestEnrollment?.status === 'ACTIVE') {
-      return 'Admitted';
-    } else if (admission.documentCount > 0) {
-      return 'DocumentReview';
-    } else if (admission.guardians && admission.guardians.length > 0) {
-      return 'Applied';
-    } else {
-      return 'Inquiry';
-    }
-  };
+  const getAdmissionStage = (admission: AdmissionSummary) =>
+    admission.latestEnrollment?.status ?? 'NO_ENROLLMENT';
 
   // Calculate stage index
   const getStageIndex = (stage: string) => {
     return STAGES.findIndex((s) => s.key === stage);
   };
 
-  // Filter admissions by search, class, and stage tab
-  const filteredAdmissions = (admissionsQuery.data?.items ?? []).filter((item) => {
-    const classMatch = !selectedClassId || item.className === classesQuery.data?.find(c => c.id === selectedClassId)?.name;
-    const stage = getAdmissionStage(item);
-    const stageMatch = selectedStage === 'all' || stage === selectedStage;
-    return classMatch && stageMatch;
-  });
+  const filteredAdmissions = admissionsQuery.data?.items ?? [];
 
   // Handle document upload
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>, kind: string) => {
@@ -214,12 +200,9 @@ export function AdmissionsPipeline() {
                 selectedStage === 'all' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
               )}
             >
-              All ({admissionsQuery.data?.items.length ?? 0})
+              All ({selectedStage === 'all' ? admissionsQuery.data?.total ?? 0 : 'server'})
             </button>
             {STAGES.map((stg) => {
-              const count = (admissionsQuery.data?.items ?? []).filter(
-                (item) => getAdmissionStage(item) === stg.key
-              ).length;
               return (
                 <button
                   key={stg.key}
@@ -229,7 +212,7 @@ export function AdmissionsPipeline() {
                     selectedStage === stg.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
                   )}
                 >
-                  {stg.label} ({count})
+                  {stg.label}
                 </button>
               );
             })}
@@ -281,7 +264,7 @@ export function AdmissionsPipeline() {
                     )}
                   </div>
                   <div className="flex flex-col items-end gap-2">
-                    <Badge variant={stage === 'Admitted' ? 'success' : stage === 'DocumentReview' ? 'phase2' : 'info'}>
+                    <Badge variant={stage === 'ACTIVE' ? 'success' : stage === 'TRANSFERRED' || stage === 'EXITED' ? 'warning' : 'info'}>
                       {STAGES.find((s) => s.key === stage)?.label ?? stage}
                     </Badge>
                     <span className="text-[0.65rem] text-slate-400 font-medium">
@@ -323,13 +306,13 @@ export function AdmissionsPipeline() {
             {/* Visual Stepper */}
             <div className="p-6 border-b border-slate-100 bg-white">
               <div className="flex justify-between items-center relative">
-                {/* Background connector line */}
+                {/* Enrollment states are backend-owned; this is a status legend, not a derived workflow. */}
                 <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 -z-10" />
                 
                 {STAGES.map((stg, idx) => {
                   const currentStage = getAdmissionStage(selectedAdmission);
                   const currentIdx = getStageIndex(currentStage);
-                  const isCompleted = idx < currentIdx;
+                  const isCompleted = false;
                   const isActive = idx === currentIdx;
 
                   return (

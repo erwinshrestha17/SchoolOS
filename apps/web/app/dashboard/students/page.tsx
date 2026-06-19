@@ -3,13 +3,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
 import { StudentDirectory } from '../../../components/forms/student-directory';
-import { ClipboardList, UserPlus, Users } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useSession } from '../../../components/session-provider';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
 import { ModuleHeader } from '../../../components/ui/module-header';
-import { ModuleTabs } from '../../../components/ui/module-tabs';
 import Link from 'next/link';
+import { M1ModuleNav } from '../../../components/m1/m1-module-nav';
 
 export default function StudentsPage() {
   const [pdfError, setPdfError] = useState('');
@@ -30,10 +30,6 @@ export default function StudentsPage() {
   const admissionsQuery = useQuery({
     queryKey: ['admissions'],
     queryFn: () => api.listAdmissions({ limit: 100 }),
-  });
-  const pendingAdmissionsQuery = useQuery({
-    queryKey: ['admissions', 'summary', 'pending'],
-    queryFn: () => api.listAdmissions({ status: 'PENDING', page: 1, limit: 1 }),
   });
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
@@ -131,7 +127,7 @@ export default function StudentsPage() {
         description="Manage admissions, student records, guardians, documents, QR, and iEMIS readiness."
         primaryAction={
           <Link
-            href="/dashboard/admissions"
+            href="/dashboard/admissions/new"
             className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
           >
             <UserPlus size={18} />
@@ -139,29 +135,14 @@ export default function StudentsPage() {
           </Link>
         }
       >
-        <ModuleTabs
-          items={[
-            {
-              href: '/dashboard/students',
-              label: 'Students',
-              icon: Users,
-            },
-            {
-              href: '/dashboard/admissions',
-              label: 'Admissions',
-              icon: ClipboardList,
-            },
-          ]}
-          accentColor="blue"
-          variant="light"
-        />
+        <M1ModuleNav />
       </ModuleHeader>
 
       <StudentDirectory
         academicYears={academicYearsQuery.data ?? []}
         admissions={admissionsQuery.data?.items ?? []}
         activeStudentsTotal={activeStudentsQuery.data?.total}
-        pendingAdmissionsTotal={pendingAdmissionsQuery.data?.total}
+        pendingAdmissionsTotal={undefined}
         classes={classesQuery.data ?? []}
         isError={
           academicYearsQuery.isError ||
@@ -169,8 +150,7 @@ export default function StudentsPage() {
           sectionsQuery.isError ||
           studentsQuery.isError ||
           admissionsQuery.isError ||
-          activeStudentsQuery.isError ||
-          pendingAdmissionsQuery.isError
+          activeStudentsQuery.isError
         }
         isLoading={
           academicYearsQuery.isLoading ||
@@ -178,8 +158,7 @@ export default function StudentsPage() {
           sectionsQuery.isLoading ||
           studentsQuery.isLoading ||
           admissionsQuery.isLoading ||
-          activeStudentsQuery.isLoading ||
-          pendingAdmissionsQuery.isLoading
+          activeStudentsQuery.isLoading
         }
         pdfError={pdfError}
         onRetry={() => {
@@ -189,7 +168,6 @@ export default function StudentsPage() {
           void studentsQuery.refetch();
           void admissionsQuery.refetch();
           void activeStudentsQuery.refetch();
-          void pendingAdmissionsQuery.refetch();
           void duplicateCandidatesQuery.refetch();
           void iemisReadinessQuery.refetch();
         }}

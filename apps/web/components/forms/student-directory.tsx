@@ -11,6 +11,7 @@ import type {
   PaginatedResponse,
 } from '@schoolos/core';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { SectionCard } from '../ui/section-card';
 import { Badge } from '../ui/badge';
@@ -38,8 +39,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   ClipboardCheck,
+  X,
+  QrCode,
 } from 'lucide-react';
 import { StatusChip } from '../dashboard/status-chip';
+import { StatusBadge } from '../ui/status-badge';
 
 type StudentDirectoryProps = {
   academicYears: AcademicYearSummary[];
@@ -118,6 +122,10 @@ export function StudentDirectory({
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const selectedStudentId = searchParams.get('student');
 
   const currentAcademicYear = academicYears.find((year) => year.isCurrent);
   const selectedAcademicYear =
@@ -173,6 +181,14 @@ export function StudentDirectory({
   }, [academicYearId, classId, sectionId, status, deferredSearch, onFilterChange]);
 
   const filteredStudents = students;
+  const selectedStudent = students.find((student) => student.id === selectedStudentId) ?? null;
+
+  function updateSelectedStudent(studentId?: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (studentId) params.set('student', studentId);
+    else params.delete('student');
+    router.replace(`${pathname}${params.size ? `?${params.toString()}` : ''}`, { scroll: false });
+  }
 
   if (isLoading) return <LoadingState label="Loading student directory..." />;
 
@@ -549,7 +565,15 @@ export function StudentDirectory({
               const primaryGuardian = (student.guardians ?? admission?.guardians ?? []).find(g => g.isPrimary) ?? (student.guardians ?? admission?.guardians ?? [])[0];
 
               return (
-                <div key={student.id} className="group flex flex-col gap-4 p-5 transition hover:bg-slate-50/50 lg:flex-row lg:items-center lg:justify-between">
+                <div
+                  key={student.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Inspect ${studentName}`}
+                  onClick={() => updateSelectedStudent(student.id)}
+                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') updateSelectedStudent(student.id); }}
+                  className={`group flex flex-col gap-4 p-5 transition hover:bg-slate-50/50 lg:flex-row lg:items-center lg:justify-between ${selectedStudentId === student.id ? 'bg-[var(--color-mod-admissions-soft)] ring-1 ring-inset ring-[var(--color-mod-admissions-border)]' : ''}`}
+                >
                   <div className="flex items-center gap-4 min-w-0">
                     <Avatar 
                       src={student.photoUrl ?? undefined} 
@@ -559,7 +583,8 @@ export function StudentDirectory({
                     />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <Link 
+                        <Link
+                          onClick={(event) => event.stopPropagation()}
                           href={`/dashboard/students/${encodeURIComponent(student.id)}`}
                           className="font-bold text-slate-900 truncate hover:text-[var(--color-mod-admissions-text)] transition"
                         >
@@ -586,6 +611,7 @@ export function StudentDirectory({
 
                   <div className="flex flex-wrap items-center gap-2">
                     <Link
+                      onClick={(event) => event.stopPropagation()}
                       href={`/dashboard/students/${encodeURIComponent(student.id)}`}
                       className="inline-flex h-9 items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-[0.7rem] font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
                     >
@@ -593,6 +619,7 @@ export function StudentDirectory({
                       <ChevronRight size={14} />
                     </Link>
                     <Link
+                      onClick={(event) => event.stopPropagation()}
                       href={`/dashboard/finance?studentId=${encodeURIComponent(student.id)}`}
                       className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[0.7rem] font-bold text-slate-700 transition hover:bg-slate-50"
                     >
@@ -625,7 +652,7 @@ export function StudentDirectory({
                         <button
                           type="button"
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
-                          onClick={() => onOpenPdf(student.id, 'id-card')}
+                        onClick={(event) => { event.stopPropagation(); onOpenPdf(student.id, 'id-card'); }}
                         >
                           <FileText size={14} className="text-slate-400" />
                           ID Card
@@ -703,6 +730,37 @@ export function StudentDirectory({
           {pdfError}
         </div>
       )}
+
+      {selectedStudent ? (
+        <aside className="fixed inset-y-0 right-0 z-40 w-full max-w-[360px] overflow-y-auto border-l border-slate-200 bg-white p-5 shadow-lg xl:top-16" aria-label="Selected student inspector">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <h2 className="text-sm font-black text-slate-950">Student Inspector</h2>
+            <button type="button" aria-label="Close student inspector" onClick={() => updateSelectedStudent()} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"><X className="h-4 w-4" /></button>
+          </div>
+          <StudentInspector student={selectedStudent} admission={admissionBySystemId.get(selectedStudent.studentSystemId)} onOpenPdf={onOpenPdf} />
+        </aside>
+      ) : null}
+    </div>
+  );
+}
+
+function StudentInspector({ student, admission, onOpenPdf }: { student: StudentProfile; admission?: AdmissionSummary; onOpenPdf: (studentId: string, kind: string) => void }) {
+  const name = getStudentName(student, admission);
+  const guardians = student.guardians ?? admission?.guardians ?? [];
+  const primaryGuardian = guardians.find((guardian) => guardian.isPrimary) ?? guardians[0];
+  const guardianEmail =
+    primaryGuardian &&
+    'email' in primaryGuardian &&
+    typeof primaryGuardian.email === 'string'
+      ? primaryGuardian.email
+      : 'Email not included in directory data';
+  return (
+    <div className="space-y-5 pt-5">
+      <div className="text-center"><Avatar src={student.photoUrl} initials={initials(name)} size="xl" className="mx-auto" /><div className="mt-3 flex items-center justify-center gap-2"><h3 className="text-lg font-black text-slate-950">{name}</h3><StatusChip status={student.lifecycleStatus ?? 'ACTIVE'} /></div><p className="mt-1 text-xs font-bold text-[var(--color-mod-admissions-text)]">{student.studentSystemId}</p><p className="mt-2 text-xs text-slate-500">{student.className ?? student.class?.name ?? admission?.className ?? 'No class'} / {student.sectionName ?? student.section ?? admission?.sectionName ?? 'No section'} · Roll {student.rollNumber ?? admission?.rollNumber ?? '—'}</p></div>
+      <Link href={`/dashboard/students/${encodeURIComponent(student.id)}`} className="flex min-h-10 w-full items-center justify-center rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-sm font-bold text-white shadow-sm hover:bg-[var(--color-mod-admissions-text)]">View Full Profile</Link>
+      <section className="border-t border-slate-100 pt-4"><h4 className="text-xs font-black uppercase tracking-wide text-slate-500">Guardian</h4>{primaryGuardian ? <div className="mt-3 space-y-1 text-sm"><p className="font-bold text-slate-900">{primaryGuardian.fullName} <span className="font-medium text-slate-500">({primaryGuardian.relation})</span></p><p className="text-xs text-slate-600">{primaryGuardian.primaryPhone}</p><p className="text-xs text-slate-600">{guardianEmail}</p></div> : <p className="mt-3 text-sm text-slate-500">No guardian linked.</p>}</section>
+      <section className="border-t border-slate-100 pt-4"><div className="flex items-center justify-between"><h4 className="text-xs font-black uppercase tracking-wide text-slate-500">Document Checklist</h4><span className="text-xs font-bold text-slate-400">Open profile</span></div><p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">Document counts are not included in the paginated directory contract. Open the protected document workspace for the authoritative checklist.</p><Link href={`/dashboard/admissions/documents?student=${encodeURIComponent(student.id)}`} className="mt-3 inline-flex text-xs font-bold text-[var(--color-mod-admissions-text)]">Review documents</Link></section>
+      <section className="border-t border-slate-100 pt-4"><div className="flex items-center justify-between"><h4 className="text-xs font-black uppercase tracking-wide text-slate-500">QR / ID Card</h4><StatusBadge status={student.qrCredential?.status ?? 'NOT_GENERATED'} tone={student.qrCredential?.status === 'ACTIVE' ? 'active' : 'inactive'} /></div><div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3"><QrCode className="h-12 w-12 text-slate-400" /><div><p className="text-xs font-bold text-slate-800">Secure QR credential</p><p className="mt-1 text-[0.68rem] text-slate-500">Raw QR values are never shown from directory data.</p></div></div><button type="button" onClick={() => onOpenPdf(student.id, 'id-card')} className="mt-3 flex min-h-10 w-full items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50">View / Print ID Card</button></section>
     </div>
   );
 }
