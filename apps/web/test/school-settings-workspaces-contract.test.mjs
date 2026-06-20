@@ -14,12 +14,24 @@ describe('School Settings workspaces', () => {
     assert.match(api, /getSchoolSettingsOverview/);
     assert.match(api, /getSchoolProfile/);
     assert.match(api, /updateSchoolProfile/);
+    assert.match(api, /getBrandingDocuments/);
+    assert.match(api, /updateBrandingDocuments/);
   });
 
-  it('renders the overview and school profile through dedicated workspaces', () => {
+  it('renders overview, profile, and branding through dedicated workspaces', () => {
     const overview = read('app/dashboard/settings/overview/page.tsx');
     const profile = read('app/dashboard/settings/school-profile/page.tsx');
+    const branding = read('app/dashboard/settings/branding-documents/page.tsx');
     assert.match(overview, /SettingsOverviewWorkspace/);
     assert.match(profile, /SchoolProfileWorkspace/);
+    assert.match(branding, /BrandingDocumentsWorkspace/);
+  });
+
+  it('uses protected file actions instead of raw logo urls', () => {
+    const workspace = read('components/settings/branding-documents-workspace.tsx');
+    assert.match(workspace, /ProtectedFileButton/);
+    assert.match(workspace, /uploadSchoolLogo/);
+    assert.match(workspace, /removeSchoolLogo/);
+    assert.doesNotMatch(workspace, /window\.open/);
   });
 });
