@@ -29,6 +29,7 @@ export type CreateAcademicCalendarYearPayload = {
 };
 
 export type UpsertSchoolCalendarDayPayload = {
+  academicYearId: string;
   calendarDateBs: string;
   isWorkingDay: boolean;
   label?: string | null;
