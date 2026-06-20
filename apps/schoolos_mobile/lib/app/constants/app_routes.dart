@@ -59,6 +59,7 @@ class AppRoutes {
   static const principalToday = '/principal/today';
   static const principalAttention = '/principal/attention';
   static const principalApprovals = '/principal/approvals';
+  static const principalAdmissions = '/principal/admissions';
   static const principalNotices = '/principal/notices';
   static const principalMore = '/principal/more';
   static const principalAttendanceRisk = '/principal/attendance-risk';
