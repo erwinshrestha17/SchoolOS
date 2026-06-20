@@ -16,6 +16,7 @@ const workspaceItems = [
 
 const migratedLegacySections: Record<string, string> = {
   overview: '/dashboard/settings',
+  subscription: '/dashboard/settings',
   profile: '/dashboard/settings/school-profile',
   branding: '/dashboard/settings/branding-documents',
   'school-setup': '/dashboard/settings/academic-structure',
