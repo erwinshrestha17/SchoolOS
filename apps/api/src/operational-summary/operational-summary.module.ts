@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
 import { PlansModule } from '../plans/plans.module';
+import { PlatformModule } from '../platform/platform.module';
+import { PrismaModule } from '../prisma/prisma.module';
+import { OperationalPlatformSummaryController } from './operational-platform-summary.controller';
 import {
   OperationalDashboardSummaryController,
   OperationalMobileSummaryController,
@@ -8,8 +10,9 @@ import {
 import { OperationalSummaryService } from './operational-summary.service';
 
 @Module({
-  imports: [PrismaModule, PlansModule],
+  imports: [PrismaModule, PlansModule, PlatformModule],
   controllers: [
+    OperationalPlatformSummaryController,
     OperationalDashboardSummaryController,
     OperationalMobileSummaryController,
   ],
