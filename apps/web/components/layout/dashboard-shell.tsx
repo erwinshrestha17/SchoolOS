@@ -1,18 +1,43 @@
 'use client';
 
-import { ReactNode, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useState } from 'react';
+import { usePathname } from 'next/navigation';
+import type { OperationalSummaryRouteModule } from '@schoolos/core';
 import { GlobalAside } from './global-aside';
 import { TopBar } from './top-bar';
 import { useSession } from '../session-provider';
-import { cn } from '../../lib/utils';
 import { LoadingState } from '../ui/loading-state';
 import { ErrorBoundary } from '../ui/error-boundary';
+import { ModuleOperationalSummary } from '../ui/module-operational-summary';
 import { SupportOverrideBanner } from '../platform/SupportOverrideBanner';
+
+const MODULE_LANDING_SUMMARIES: Record<string, OperationalSummaryRouteModule> = {
+  '/dashboard/students': 'students',
+  '/dashboard/admissions': 'students',
+  '/dashboard/attendance': 'attendance',
+  '/dashboard/fees': 'fees',
+  '/dashboard/academics': 'academics',
+  '/dashboard/activity': 'activity',
+  '/dashboard/homework': 'homework-timetable',
+  '/dashboard/timetable': 'homework-timetable',
+  '/dashboard/hr': 'hr-payroll',
+  '/dashboard/payroll': 'hr-payroll',
+  '/dashboard/library': 'library',
+  '/dashboard/transport': 'transport',
+  '/dashboard/canteen': 'canteen',
+  '/dashboard/accounting': 'accounting',
+  '/dashboard/notices': 'communications',
+  '/dashboard/messages': 'communications',
+  '/dashboard/learning': 'learning',
+};
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { session, status } = useSession();
+  const pathname = usePathname();
+  const summaryModule = MODULE_LANDING_SUMMARIES[pathname];
 
   function closeMobileNavigation() {
     setMobileOpen(false);
@@ -57,6 +82,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-7 xl:px-8">
             <div className="animate-fade-in transition-all duration-300">
               <ErrorBoundary>
+                {summaryModule ? <ModuleOperationalSummary module={summaryModule} /> : null}
                 {children}
               </ErrorBoundary>
             </div>
