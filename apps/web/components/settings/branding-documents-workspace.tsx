@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, ChevronLeft, ImageUp, Save, ShieldCheck, Trash2 } from 'lucide-react';
@@ -70,6 +70,7 @@ export function BrandingDocumentsWorkspace() {
       setNotice('Official school logo uploaded securely.');
       setLogoError(null);
     },
+    onError: () => setLogoError('The logo could not be uploaded. Please try again.'),
   });
 
   const removeMutation = useMutation({
@@ -115,13 +116,10 @@ export function BrandingDocumentsWorkspace() {
       description="Manage the protected school logo and the official wording used on school documents."
       actions={<Link href="/dashboard/settings/overview" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-slate-950"><ChevronLeft className="h-4 w-4" /> Settings overview</Link>}
     />
-
-    <section className="rounded-2xl border border-sky-100 bg-sky-50 p-5 text-sm text-sky-900">
-      <div className="flex gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-bold">Protected official files</p><p className="mt-1">School logos are stored through File Registry. Open or download them only through authenticated protected-file actions.</p></div></div>
-    </section>
-
+    <section className="rounded-2xl border border-sky-100 bg-sky-50 p-5 text-sm text-sky-900"><div className="flex gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-bold">Protected official files</p><p className="mt-1">School logos are stored through File Registry. Open or download them only through authenticated protected-file actions.</p></div></div></section>
     {notice ? <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"><CheckCircle2 className="h-4 w-4" />{notice}</div> : null}
     {saveMutation.isError ? <ErrorState title="Could not save branding defaults" error={saveMutation.error} onRetry={save} className="min-h-[180px]" /> : null}
+    {removeMutation.isError ? <ErrorState title="Could not remove the school logo" error={removeMutation.error} onRetry={() => removeMutation.mutate()} className="min-h-[180px]" /> : null}
 
     <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 p-6"><h2 className="font-bold text-slate-950">Official school logo</h2><p className="mt-1 text-sm text-slate-600">Used only where the approved document template supports a school logo.</p></div>
@@ -162,7 +160,7 @@ export function BrandingDocumentsWorkspace() {
 
 function withoutFile(branding: BrandingDocumentsSettings): BrandingForm { const { logoFileAssetId: _file, updatedAt: _updated, ...form } = branding; return form; }
 function changedPayload(next: BrandingForm, previous: BrandingForm): UpdateBrandingDocumentsPayload { return Object.fromEntries(Object.entries(next).filter(([key, value]) => value !== previous[key as keyof BrandingForm])) as UpdateBrandingDocumentsPayload; }
-function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) { return <div className="border-b border-slate-100 p-6 last:border-b-0"><h2 className="font-bold text-slate-950">{title}</h2><p className="mt-1 text-sm text-slate-600">{description}</p><div className="mt-5 grid gap-4 md:grid-cols-2">{children}</div></div>; }
+function Section({ title, description, children }: { title: string; description: string; children: ReactNode }) { return <div className="border-b border-slate-100 p-6 last:border-b-0"><h2 className="font-bold text-slate-950">{title}</h2><p className="mt-1 text-sm text-slate-600">{description}</p><div className="mt-5 grid gap-4 md:grid-cols-2">{children}</div></div>; }
 function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label><span className="text-sm font-semibold text-slate-700">{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} maxLength={500} className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm" /></label>; }
 function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label><span className="text-sm font-semibold text-slate-700">{label}</span><textarea value={value} onChange={(event) => onChange(event.target.value)} maxLength={1000} rows={4} className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" /></label>; }
 function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<[string, string]> }) { return <label><span className="text-sm font-semibold text-slate-700">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm">{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select></label>; }
