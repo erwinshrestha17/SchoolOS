@@ -8,12 +8,12 @@ import type {
   BrandingDocumentsSettings,
   UpdateBrandingDocumentsPayload,
 } from '@schoolos/core';
+import { formatBsDateTime } from '@schoolos/core';
 import { PageHeader } from '../ui/page-header';
 import { Button } from '../ui/button';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { ErrorState } from '../ui/error-state';
 import { ProtectedFileButton } from '../ui/protected-file';
-import { formatBsDateTime } from '../../lib/utils';
 import { schoolSettingsApi } from '../../lib/api/school-settings';
 import { ApiRequestError } from '../../lib/api/client';
 

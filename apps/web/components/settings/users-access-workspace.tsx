@@ -40,7 +40,7 @@ export function UsersAccessWorkspace() {
     onError: () => setNotice({ kind: 'error', text: 'Could not update this user account status.' }),
   });
 
-  const users = usersQuery.data ?? [];
+  const users = useMemo(() => usersQuery.data ?? [], [usersQuery.data]);
   const roles = rolesQuery.data ?? [];
   const counts = useMemo(() => ({ active: users.filter((user) => user.status === 'ACTIVE').length, pending: users.filter((user) => user.status === 'PENDING').length, suspended: users.filter((user) => user.status === 'SUSPENDED').length }), [users]);
 

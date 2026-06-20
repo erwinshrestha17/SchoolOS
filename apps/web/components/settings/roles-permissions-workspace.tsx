@@ -12,14 +12,14 @@ export function RolesPermissionsWorkspace() {
   const [query, setQuery] = useState('');
   const rolesQuery = useQuery({ queryKey: ['settings', 'roles'], queryFn: api.listRoleCatalog });
   const permissionsQuery = useQuery({ queryKey: ['settings', 'permissions'], queryFn: api.listPermissionCatalog });
+  const searchable = query.trim().toLowerCase();
+  const filteredRoles = useMemo(() => (rolesQuery.data ?? []).filter((role) => !searchable || `${role.name} ${role.permissions.map((permission) => permission.key).join(' ')}`.toLowerCase().includes(searchable)), [rolesQuery.data, searchable]);
 
   if (rolesQuery.isLoading || permissionsQuery.isLoading) return <div className="space-y-5 p-6"><div className="h-28 animate-pulse rounded-2xl bg-slate-100" /><div className="h-[520px] animate-pulse rounded-2xl bg-slate-100" /></div>;
   if (rolesQuery.isError || permissionsQuery.isError) return <div className="p-6"><ErrorState title="Could not load roles and permissions" message="Please retry to load this school’s role catalog and permission coverage." error={rolesQuery.error ?? permissionsQuery.error} onRetry={() => { void rolesQuery.refetch(); void permissionsQuery.refetch(); }} /></div>;
 
   const roles = rolesQuery.data ?? [];
   const permissions = permissionsQuery.data ?? [];
-  const searchable = query.trim().toLowerCase();
-  const filteredRoles = useMemo(() => roles.filter((role) => !searchable || `${role.name} ${role.permissions.map((permission) => permission.key).join(' ')}`.toLowerCase().includes(searchable)), [roles, searchable]);
   const resources = new Set(permissions.map((permission) => permission.resource)).size;
 
   return <div className="space-y-6 p-6 pb-24">

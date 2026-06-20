@@ -835,7 +835,7 @@ export function AttendanceSettingsWorkspace() {
       <ModuleHeader
         title="Attendance Settings"
         description="Configure attendance rules, lock windows, calendar policy, notifications, and role summaries from backend policy APIs."
-        primaryAction={<Button onClick={() => updateMutation.mutate()} disabled={!lateThreshold}><Save className="h-4 w-4" />Save Settings</Button>}
+        primaryAction={lateThreshold ? <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}><Save className="h-4 w-4" />{updateMutation.isPending ? 'Saving…' : 'Save Settings'}</Button> : undefined}
       />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="grid gap-6 lg:grid-cols-2">

@@ -15,7 +15,7 @@ import { ErrorState } from './error-state';
 import { LoadingState } from './loading-state';
 import { ModuleLockedState } from './module-locked-state';
 import { SectionCard } from './section-card';
-import { StatusBadge } from './status-badge';
+import { StatusBadge, type StatusTone } from './status-badge';
 
 const moduleLabels: Record<OperationalSummaryRouteModule, string> = {
   students: 'Students',
@@ -99,13 +99,14 @@ export function SummaryStatusBadge({
     permissionDenied: 'Access limited',
   }[status];
 
-  const tone = {
+  const tones: Record<OperationalSummaryStatus, StatusTone> = {
     ready: 'active',
     empty: 'info',
     partial: 'partial',
     locked: 'locked',
     permissionDenied: 'inactive',
-  }[status] as const;
+  };
+  const tone = tones[status];
 
   return <StatusBadge status={status} label={label} tone={tone} />;
 }

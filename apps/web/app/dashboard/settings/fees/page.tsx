@@ -1,5 +1,3 @@
-import { redirect } from 'next/navigation';
+import { SettingsPolicyWorkspace } from '@/components/settings/settings-policy-workspace';
 
-export default function FeesSettingsRedirect() {
-  redirect('/dashboard/settings?section=fees');
-}
+export default function FeesSettingsPage() { return <SettingsPolicyWorkspace policyId="fees" />; }

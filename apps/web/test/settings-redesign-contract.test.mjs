@@ -14,22 +14,30 @@ describe('School Settings redesign', () => {
     const hub = read('components/settings/settings-control-center.tsx');
     assert.match(layout, /SettingsRouteFrame/);
     assert.match(frame, /SettingsControlCenter/);
-    assert.match(hub, /School foundation/);
-    assert.match(hub, /People & access/);
-    assert.match(hub, /Operational policies/);
-    assert.match(hub, /Data & governance/);
+    assert.match(hub, /SCHOOL_SETTINGS_CATEGORIES/);
+    assert.match(hub, /School only/);
+    assert.match(hub, /Configuration status is intentionally conservative/);
     assert.doesNotMatch(hub, /Upgrade Plan/);
   });
 
-  it('routes core legacy settings links to focused workspaces', () => {
+  it('routes legacy settings links into the canonical school-settings information architecture', () => {
     const frame = read('components/settings/settings-route-frame.tsx');
-    assert.match(frame, /school-profile/);
-    assert.match(frame, /branding-documents/);
-    assert.match(frame, /academic-calendar/);
-    assert.match(frame, /users-access/);
-    assert.match(frame, /roles-permissions/);
-    assert.match(frame, /policies\/attendance/);
-    assert.match(frame, /audit-log/);
+    assert.match(frame, /settings\/profile/);
+    assert.match(frame, /settings\/academic/);
+    assert.match(frame, /settings\/users-roles/);
+    assert.match(frame, /settings\/attendance/);
+    assert.match(frame, /settings\/audit-export/);
+    assert.match(frame, /SCHOOL_SETTINGS_CATEGORIES/);
+  });
+
+  it('provides all fourteen stable school settings routes', () => {
+    const catalog = read('components/settings/school-settings-catalog.ts');
+    for (const route of [
+      'profile', 'academic', 'users-roles', 'modules', 'admissions', 'attendance',
+      'fees', 'exams-report-cards', 'homework-timetable-learning', 'communication',
+      'documents-templates', 'security', 'integrations', 'audit-export',
+    ]) assert.match(catalog, new RegExp(`/dashboard/settings/${route}`));
+    assert.doesNotMatch(catalog, /platform\//);
   });
 
   it('uses real settings APIs for policy configuration rather than browser-only state', () => {

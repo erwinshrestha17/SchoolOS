@@ -47,8 +47,8 @@ export function AcademicStructureWorkspace() {
     onError: () => setFormError('Could not create the section. Check the selected class and try again.'),
   });
 
-  const classes = classesQuery.data ?? [];
-  const sections = sectionsQuery.data ?? [];
+  const classes = useMemo(() => classesQuery.data ?? [], [classesQuery.data]);
+  const sections = useMemo(() => sectionsQuery.data ?? [], [sectionsQuery.data]);
   const sectionsByClass = useMemo(() => new Map(classes.map((item) => [item.id, sections.filter((section) => section.classId === item.id)])), [classes, sections]);
 
   if (classesQuery.isLoading || sectionsQuery.isLoading) return <div className="space-y-5 p-6"><div className="h-28 animate-pulse rounded-2xl bg-slate-100" /><div className="h-96 animate-pulse rounded-2xl bg-slate-100" /></div>;
