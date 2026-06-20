@@ -12,6 +12,7 @@ export class SchoolSettingsNavigationV1Service {
     if (canManage) items.push(
       { id: 'school-profile', groupId: 'school-foundation', label: 'School Profile', description: 'Official identity and contact configuration.', href: '/dashboard/settings/school-profile', access: 'manage' },
       { id: 'branding-documents', groupId: 'school-foundation', label: 'Branding & Documents', description: 'Official logo, document text, and paper defaults.', href: '/dashboard/settings/branding-documents', access: 'manage' },
+      { id: 'academic-calendar', groupId: 'school-foundation', label: 'Calendar, Academic Year & Holidays', description: 'Bikram Sambat years, Nepal school days, and holidays.', href: '/dashboard/settings/academic-calendar', access: 'manage' },
     );
     return { generatedAt: new Date().toISOString(), groups: items.length ? [{ id: 'school-foundation', label: 'School Foundation', items }] : [] };
   }
