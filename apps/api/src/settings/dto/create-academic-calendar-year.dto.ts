@@ -1,4 +1,10 @@
-import { IsBoolean, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateAcademicCalendarYearDto {
   @IsString()

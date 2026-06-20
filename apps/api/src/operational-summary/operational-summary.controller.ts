@@ -65,7 +65,9 @@ export class OperationalDashboardSummaryController {
   constructor(private readonly service: OperationalSummaryService) {}
 
   @Get('summary')
-  @ApiOperation({ summary: 'Get the safe, lightweight school operations summary' })
+  @ApiOperation({
+    summary: 'Get the safe, lightweight school operations summary',
+  })
   @ApiOkResponse({
     description:
       'A bounded, permission-filtered dashboard summary. Module failures are returned as partial module states.',
@@ -103,7 +105,12 @@ export class OperationalDashboardSummaryController {
 
 @ApiTags('mobile-summary')
 @Controller('mobile')
-@UseGuards(JwtAuthGuard, TenantActiveGuard, RolesPermissionsGuard, EntitlementGuard)
+@UseGuards(
+  JwtAuthGuard,
+  TenantActiveGuard,
+  RolesPermissionsGuard,
+  EntitlementGuard,
+)
 export class OperationalMobileSummaryController {
   constructor(private readonly service: OperationalSummaryService) {}
 
@@ -144,7 +151,9 @@ export class OperationalMobileSummaryController {
   @Get('staff/summary')
   @Roles('staff', 'teacher', 'subject_teacher')
   @Entitlement(FEATURE_KEYS.MOBILE_FULL_ROLE)
-  @ApiOperation({ summary: 'Get an own-staff-only self-service mobile summary' })
+  @ApiOperation({
+    summary: 'Get an own-staff-only self-service mobile summary',
+  })
   staffSummary(@CurrentAuth() auth: AuthContext) {
     return this.service.getMobileSummary('staff', auth);
   }

@@ -50,7 +50,9 @@ describe('SchoolOS Nepal BS date-time policy', () => {
     const beforeMidnight = '2026-06-19T18:14:59.999Z';
     const atMidnight = '2026-06-19T18:15:00.000Z';
 
-    expect(formatBsDate(beforeMidnight, { preset: 'short' })).toBe('2083-03-05');
+    expect(formatBsDate(beforeMidnight, { preset: 'short' })).toBe(
+      '2083-03-05',
+    );
     expect(formatBsDate(atMidnight, { preset: 'short' })).toBe('2083-03-06');
     expect(isSameNepalSchoolDay(beforeMidnight, atMidnight)).toBe(false);
 

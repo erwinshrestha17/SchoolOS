@@ -1,4 +1,11 @@
-import { IsBoolean, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 
 export class UpsertSchoolCalendarDaySettingsDto {
   @IsUUID()

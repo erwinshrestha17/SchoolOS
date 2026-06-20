@@ -26,14 +26,24 @@ export class StudentPhotoController {
 
   @Post(':id/photo')
   @Permissions('students:update')
-  uploadStudentPhoto(@Param('id') studentId: string, @Body() dto: UploadStudentPhotoDto, @CurrentAuth() auth: AuthContext) {
+  uploadStudentPhoto(
+    @Param('id') studentId: string,
+    @Body() dto: UploadStudentPhotoDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.studentPhotoService.uploadPhoto(studentId, dto, auth);
   }
 
   @Get(':id/photo/content')
   @Permissions('students:read')
-  async getStudentPhotoContent(@Param('id') studentId: string, @CurrentAuth() auth: AuthContext) {
-    const photo = await this.studentPhotoService.getPhotoContent(studentId, auth);
+  async getStudentPhotoContent(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    const photo = await this.studentPhotoService.getPhotoContent(
+      studentId,
+      auth,
+    );
     return new StreamableFile(photo.content, {
       type: photo.mimeType,
       disposition: `inline; filename="${safePhotoFileName(photo.fileName)}"`,
@@ -42,19 +52,28 @@ export class StudentPhotoController {
 
   @Get(':id/photo/preview')
   @Permissions('students:read')
-  getStudentPhotoPreview(@Param('id') studentId: string, @CurrentAuth() auth: AuthContext) {
+  getStudentPhotoPreview(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.studentPhotoService.getPhotoAccess(studentId, auth, 'preview');
   }
 
   @Get(':id/photo/download')
   @Permissions('students:read')
-  getStudentPhotoDownload(@Param('id') studentId: string, @CurrentAuth() auth: AuthContext) {
+  getStudentPhotoDownload(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.studentPhotoService.getPhotoAccess(studentId, auth, 'download');
   }
 
   @Delete(':id/photo')
   @Permissions('students:update')
-  deleteStudentPhoto(@Param('id') studentId: string, @CurrentAuth() auth: AuthContext) {
+  deleteStudentPhoto(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.studentPhotoService.deletePhoto(studentId, auth);
   }
 }

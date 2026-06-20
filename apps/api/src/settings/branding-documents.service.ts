@@ -12,7 +12,8 @@ import {
   brandingDocumentsSettingKeys,
 } from './branding-documents.keys';
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class BrandingDocumentsService {
@@ -28,7 +29,8 @@ export class BrandingDocumentsService {
     });
     const values = new Map(settings.map((item) => [item.key, item.value]));
     const latest = settings.reduce<Date | null>(
-      (current, item) => !current || item.updatedAt > current ? item.updatedAt : current,
+      (current, item) =>
+        !current || item.updatedAt > current ? item.updatedAt : current,
       null,
     );
     const read = (field: keyof typeof brandingDocumentsKeyMap) =>
@@ -54,7 +56,10 @@ export class BrandingDocumentsService {
     userId: string,
   ): Promise<BrandingDocumentsSettings> {
     const updates = Object.entries(brandingDocumentsKeyMap)
-      .filter(([field]) => dto[field as keyof UpdateBrandingDocumentsDto] !== undefined)
+      .filter(
+        ([field]) =>
+          dto[field as keyof UpdateBrandingDocumentsDto] !== undefined,
+      )
       .map(([field, key]) => ({
         key: key as TenantSettingKey,
         value: normalize(dto[field as keyof UpdateBrandingDocumentsDto]),
@@ -62,13 +67,15 @@ export class BrandingDocumentsService {
 
     if (updates.length === 0) return this.getBranding(tenantId);
 
-    await this.prisma.$transaction(updates.map(({ key, value }) =>
-      this.prisma.tenantSetting.upsert({
-        where: { tenantId_key: { tenantId, key } },
-        create: { tenantId, key, value },
-        update: { value },
-      }),
-    ));
+    await this.prisma.$transaction(
+      updates.map(({ key, value }) =>
+        this.prisma.tenantSetting.upsert({
+          where: { tenantId_key: { tenantId, key } },
+          create: { tenantId, key, value },
+          update: { value },
+        }),
+      ),
+    );
 
     await this.auditService.record({
       action: 'branding_documents_updated',
@@ -85,7 +92,9 @@ export class BrandingDocumentsService {
 
 function normalize(value: unknown): Prisma.InputJsonValue {
   if (value === null) return '';
-  return typeof value === 'string' ? value.trim() : value as Prisma.InputJsonValue;
+  return typeof value === 'string'
+    ? value.trim()
+    : (value as Prisma.InputJsonValue);
 }
 function stringValue(value: unknown) {
   return typeof value === 'string' && value.trim() ? value : null;
@@ -94,8 +103,12 @@ function fileAssetIdValue(value: unknown) {
   return typeof value === 'string' && UUID_PATTERN.test(value) ? value : null;
 }
 function colorValue(value: unknown) {
-  return typeof value === 'string' && /^#[0-9A-Fa-f]{6}$/.test(value) ? value : null;
+  return typeof value === 'string' && /^#[0-9A-Fa-f]{6}$/.test(value)
+    ? value
+    : null;
 }
-function paperSizeValue(value: unknown): BrandingDocumentsSettings['defaultPaperSize'] {
+function paperSizeValue(
+  value: unknown,
+): BrandingDocumentsSettings['defaultPaperSize'] {
   return value === 'A4' || value === 'LEGAL' || value === '80MM' ? value : null;
 }

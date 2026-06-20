@@ -161,9 +161,15 @@ export class OperationalSummaryService {
     const modules = all.filter((module) => module.permissions.canView);
     const attentionItems = modules
       .flatMap((module) =>
-        module.attentionItems.map((item) => ({ ...item, module: module.module })),
+        module.attentionItems.map((item) => ({
+          ...item,
+          module: module.module,
+        })),
       )
-      .sort((left, right) => severityOrder(left.severity) - severityOrder(right.severity))
+      .sort(
+        (left, right) =>
+          severityOrder(left.severity) - severityOrder(right.severity),
+      )
       .slice(0, 10);
     const recentItems = modules
       .flatMap((module) =>
@@ -200,11 +206,22 @@ export class OperationalSummaryService {
         roadmapOnly: 'M11 Intelligence is roadmap-only.',
       });
     }
-    return this.getModuleSummaryInternal(module, actor, day, entitlements.modules);
+    return this.getModuleSummaryInternal(
+      module,
+      actor,
+      day,
+      entitlements.modules,
+    );
   }
 
   async getMobileSummary(
-    persona: 'parent' | 'teacher' | 'principal' | 'driver' | 'staff' | 'student',
+    persona:
+      | 'parent'
+      | 'teacher'
+      | 'principal'
+      | 'driver'
+      | 'staff'
+      | 'student',
     actor: AuthContext,
   ) {
     const day = getNepalSchoolDay();
@@ -258,11 +275,12 @@ export class OperationalSummaryService {
       this.recentWhere(module, actor, teacherScope),
       config.label,
     );
-    const status = metrics.some((metric) => metric.failed) || recent.failed
-      ? 'partial'
-      : metrics.length > 0 && metrics.every((metric) => metric.value === 0)
-        ? 'empty'
-        : 'ready';
+    const status =
+      metrics.some((metric) => metric.failed) || recent.failed
+        ? 'partial'
+        : metrics.length > 0 && metrics.every((metric) => metric.value === 0)
+          ? 'empty'
+          : 'ready';
 
     return {
       generatedAt: new Date().toISOString(),
@@ -296,7 +314,9 @@ export class OperationalSummaryService {
   ): Promise<Metric[]> {
     const tenantId = actor.tenantId;
     const now = new Date();
-    const thirtyDays = new Date(day.endExclusiveUtc.getTime() + 30 * 86_400_000);
+    const thirtyDays = new Date(
+      day.endExclusiveUtc.getTime() + 30 * 86_400_000,
+    );
     const staleGpsAt = new Date(now.getTime() - 15 * 60_000);
     const teacherOnly = this.isTeachingOnly(actor);
 
@@ -308,7 +328,13 @@ export class OperationalSummaryService {
           {
             tenantId,
             status: {
-              in: ['INQUIRY', 'APPLICATION', 'DOCUMENT_PENDING', 'INTERVIEW', 'ACCEPTED'],
+              in: [
+                'INQUIRY',
+                'APPLICATION',
+                'DOCUMENT_PENDING',
+                'INTERVIEW',
+                'ACCEPTED',
+              ],
             },
           },
           'Review pending admissions',
@@ -335,7 +361,10 @@ export class OperationalSummaryService {
         this.def(
           'qrCredentialIssues',
           'studentQrCredential',
-          { tenantId, OR: [{ expiresAt: { lte: now } }, { revokedAt: { not: null } }] },
+          {
+            tenantId,
+            OR: [{ expiresAt: { lte: now } }, { revokedAt: { not: null } }],
+          },
           'Review student QR credentials',
           '/dashboard/students/qr',
         ),
@@ -348,7 +377,11 @@ export class OperationalSummaryService {
         ),
       ],
       m2_attendance: teacherOnly
-        ? this.teacherAttendanceDefinitions(actor, day, teacherScope as TeacherScope)
+        ? this.teacherAttendanceDefinitions(
+            actor,
+            day,
+            teacherScope as TeacherScope,
+          )
         : [
             this.def('expectedStudents', 'student', {
               tenantId,
@@ -372,7 +405,10 @@ export class OperationalSummaryService {
                 tenantId,
                 status: 'ABSENT',
                 attendanceSession: {
-                  attendanceDate: { gte: day.startUtc, lt: day.endExclusiveUtc },
+                  attendanceDate: {
+                    gte: day.startUtc,
+                    lt: day.endExclusiveUtc,
+                  },
                 },
               },
               'Review absent students',
@@ -385,7 +421,10 @@ export class OperationalSummaryService {
                 tenantId,
                 status: 'LATE',
                 attendanceSession: {
-                  attendanceDate: { gte: day.startUtc, lt: day.endExclusiveUtc },
+                  attendanceDate: {
+                    gte: day.startUtc,
+                    lt: day.endExclusiveUtc,
+                  },
                 },
               },
               'Review late arrivals',
@@ -435,7 +474,10 @@ export class OperationalSummaryService {
         this.def(
           'refundsToday',
           'paymentRefund',
-          { tenantId, refundDate: { gte: day.startUtc, lt: day.endExclusiveUtc } },
+          {
+            tenantId,
+            refundDate: { gte: day.startUtc, lt: day.endExclusiveUtc },
+          },
           'Review refunds',
           '/dashboard/fees/reversals',
         ),
@@ -517,7 +559,11 @@ export class OperationalSummaryService {
             this.def(
               'myPostsAwaitingModeration',
               'activityPost',
-              { tenantId, createdById: actor.userId, status: 'PENDING_APPROVAL' },
+              {
+                tenantId,
+                createdById: actor.userId,
+                status: 'PENDING_APPROVAL',
+              },
               'Review your pending activity posts',
               '/dashboard/activity/pending',
             ),
@@ -858,7 +904,10 @@ export class OperationalSummaryService {
             this.def(
               'sessionRisks',
               'learningSession',
-              { tenantId, OR: [{ expiresAt: { lte: now } }, { status: 'PAUSED' }] },
+              {
+                tenantId,
+                OR: [{ expiresAt: { lte: now } }, { status: 'PAUSED' }],
+              },
               'Review live session health',
               '/dashboard/learning/sessions',
             ),
@@ -943,7 +992,9 @@ export class OperationalSummaryService {
     ];
   }
 
-  private async getTeacherScope(actor: AuthContext): Promise<TeacherScope | null> {
+  private async getTeacherScope(
+    actor: AuthContext,
+  ): Promise<TeacherScope | null> {
     const staff = await this.prisma.staff.findFirst({
       where: { tenantId: actor.tenantId, userId: actor.userId },
       select: { id: true },
@@ -957,7 +1008,9 @@ export class OperationalSummaryService {
     });
     return {
       staffId: staff.id,
-      subjectIds: [...new Set(assignments.map((assignment) => assignment.subjectId))],
+      subjectIds: [
+        ...new Set(assignments.map((assignment) => assignment.subjectId)),
+      ],
       classSectionScopes: assignments.map((assignment) => ({
         classId: assignment.classId,
         sectionId: assignment.sectionId ?? null,
@@ -971,65 +1024,66 @@ export class OperationalSummaryService {
     modules: Set<string>,
   ) {
     const studentIds = (await getParentStudentIds(this.prisma, actor)) ?? [];
-    if (studentIds.length === 0) return this.mobileSummary('parent', day, 'empty');
+    if (studentIds.length === 0)
+      return this.mobileSummary('parent', day, 'empty');
 
-    const [attendance, invoices, reports, libraryLoans, notices] = await Promise.all([
-      modules.has('attendance')
-        ? this.safeCount('attendanceRecord', {
-            tenantId: actor.tenantId,
-            studentId: { in: studentIds },
-            attendanceSession: {
-              attendanceDate: { gte: day.startUtc, lt: day.endExclusiveUtc },
-            },
-          })
-        : noMetric(),
-      modules.has('fees')
-        ? this.safeCount('invoice', {
-            tenantId: actor.tenantId,
-            studentId: { in: studentIds },
-            status: { in: ['ISSUED', 'PARTIAL'] },
-          })
-        : noMetric(),
-      modules.has('exams')
-        ? this.safeCount('reportCard', {
-            tenantId: actor.tenantId,
-            studentId: { in: studentIds },
-            publishedAt: { not: null },
-          })
-        : noMetric(),
-      modules.has('library')
-        ? this.safeCount('libraryIssue', {
-            tenantId: actor.tenantId,
-            borrowerStudentId: { in: studentIds },
-            status: { in: ['ISSUED', 'OVERDUE'] },
-          })
-        : noMetric(),
-      modules.has('notices')
-        ? this.safeCount('notificationDelivery', {
-            tenantId: actor.tenantId,
-            OR: [
-              { recipientUserId: actor.userId },
-              { studentId: { in: studentIds } },
-            ],
-            readReceipts: { none: { userId: actor.userId } },
-          })
-        : noMetric(),
-    ]);
+    const [attendance, invoices, reports, libraryLoans, notices] =
+      await Promise.all([
+        modules.has('attendance')
+          ? this.safeCount('attendanceRecord', {
+              tenantId: actor.tenantId,
+              studentId: { in: studentIds },
+              attendanceSession: {
+                attendanceDate: { gte: day.startUtc, lt: day.endExclusiveUtc },
+              },
+            })
+          : noMetric(),
+        modules.has('fees')
+          ? this.safeCount('invoice', {
+              tenantId: actor.tenantId,
+              studentId: { in: studentIds },
+              status: { in: ['ISSUED', 'PARTIAL'] },
+            })
+          : noMetric(),
+        modules.has('exams')
+          ? this.safeCount('reportCard', {
+              tenantId: actor.tenantId,
+              studentId: { in: studentIds },
+              publishedAt: { not: null },
+            })
+          : noMetric(),
+        modules.has('library')
+          ? this.safeCount('libraryIssue', {
+              tenantId: actor.tenantId,
+              borrowerStudentId: { in: studentIds },
+              status: { in: ['ISSUED', 'OVERDUE'] },
+            })
+          : noMetric(),
+        modules.has('notices')
+          ? this.safeCount('notificationDelivery', {
+              tenantId: actor.tenantId,
+              OR: [
+                { recipientUserId: actor.userId },
+                { studentId: { in: studentIds } },
+              ],
+              readReceipts: { none: { userId: actor.userId } },
+            })
+          : noMetric(),
+      ]);
 
-    return this.mobileSummary('parent', day, mobileStatus([
-      attendance,
-      invoices,
-      reports,
-      libraryLoans,
-      notices,
-    ]), {
-      linkedChildren: studentIds.length,
-      attendanceRecordsToday: attendance.value,
-      unpaidInvoices: invoices.value,
-      publishedReportCards: reports.value,
-      activeLibraryLoans: libraryLoans.value,
-      unreadNotices: notices.value,
-    });
+    return this.mobileSummary(
+      'parent',
+      day,
+      mobileStatus([attendance, invoices, reports, libraryLoans, notices]),
+      {
+        linkedChildren: studentIds.length,
+        attendanceRecordsToday: attendance.value,
+        unpaidInvoices: invoices.value,
+        publishedReportCards: reports.value,
+        activeLibraryLoans: libraryLoans.value,
+        unreadNotices: notices.value,
+      },
+    );
   }
 
   private async studentMobileSummary(
@@ -1064,15 +1118,16 @@ export class OperationalSummaryService {
         : noMetric(),
     ]);
 
-    return this.mobileSummary('student', day, mobileStatus([
-      attempts,
-      reports,
-      loans,
-    ]), {
-      activeLearningAttempts: attempts.value,
-      publishedReportCards: reports.value,
-      activeLibraryLoans: loans.value,
-    });
+    return this.mobileSummary(
+      'student',
+      day,
+      mobileStatus([attempts, reports, loans]),
+      {
+        activeLearningAttempts: attempts.value,
+        publishedReportCards: reports.value,
+        activeLibraryLoans: loans.value,
+      },
+    );
   }
 
   private async teacherMobileSummary(
@@ -1080,7 +1135,8 @@ export class OperationalSummaryService {
     day: Day,
     modules: Set<string>,
   ) {
-    if (!modules.has('attendance')) return this.mobileSummary('teacher', day, 'locked');
+    if (!modules.has('attendance'))
+      return this.mobileSummary('teacher', day, 'locked');
     const scope = await this.getTeacherScope(actor);
     if (!scope) return this.mobileSummary('teacher', day, 'empty');
     const definitions = this.teacherAttendanceDefinitions(actor, day, scope);
@@ -1100,7 +1156,8 @@ export class OperationalSummaryService {
     day: Day,
     modules: Set<string>,
   ) {
-    if (!modules.has('transport')) return this.mobileSummary('driver', day, 'locked');
+    if (!modules.has('transport'))
+      return this.mobileSummary('driver', day, 'locked');
     const staff = await this.prisma.staff.findFirst({
       where: { tenantId: actor.tenantId, userId: actor.userId },
       select: { id: true },
@@ -1119,7 +1176,9 @@ export class OperationalSummaryService {
     });
     const trips = await this.safeCount('transportTrip', {
       tenantId: actor.tenantId,
-      driverAssignmentId: { in: assignments.map((assignment) => assignment.id) },
+      driverAssignmentId: {
+        in: assignments.map((assignment) => assignment.id),
+      },
       startedAt: { gte: day.startUtc, lt: day.endExclusiveUtc },
     });
 
@@ -1165,15 +1224,16 @@ export class OperationalSummaryService {
         : noMetric(),
     ]);
 
-    return this.mobileSummary('staff', day, mobileStatus([
-      attendance,
-      leave,
-      payslips,
-    ]), {
-      attendanceRecordsToday: attendance.value,
-      activeLeaveRequests: leave.value,
-      issuedPayslips: payslips.value,
-    });
+    return this.mobileSummary(
+      'staff',
+      day,
+      mobileStatus([attendance, leave, payslips]),
+      {
+        attendanceRecordsToday: attendance.value,
+        activeLeaveRequests: leave.value,
+        issuedPayslips: payslips.value,
+      },
+    );
   }
 
   private async principalMobileSummary(actor: AuthContext, day: Day) {
@@ -1199,9 +1259,7 @@ export class OperationalSummaryService {
       model,
       where,
       attention:
-        label && action
-          ? { label, action, severity: 'warning' }
-          : undefined,
+        label && action ? { label, action, severity: 'warning' } : undefined,
     };
   }
 
@@ -1212,7 +1270,9 @@ export class OperationalSummaryService {
       value: result.value,
       failed: result.failed,
       attention:
-        definition.attention && typeof result.value === 'number' && result.value > 0
+        definition.attention &&
+        typeof result.value === 'number' &&
+        result.value > 0
           ? {
               key: definition.key,
               label: definition.attention.label,
@@ -1318,7 +1378,10 @@ export class OperationalSummaryService {
           OR: teacherScope?.classSectionScopes ?? [],
         };
       case 'm4_academics':
-        return { tenantId: actor.tenantId, subjectId: { in: teacherScope?.subjectIds ?? [] } };
+        return {
+          tenantId: actor.tenantId,
+          subjectId: { in: teacherScope?.subjectIds ?? [] },
+        };
       case 'm5_activity':
         return { tenantId: actor.tenantId, createdById: actor.userId };
       case 'm6_homework_timetable':
@@ -1372,7 +1435,9 @@ export class OperationalSummaryService {
   }
 
   private delegate(model: string): ModelDelegate | null {
-    const candidate = (this.prisma as unknown as Record<string, unknown>)[model];
+    const candidate = (this.prisma as unknown as Record<string, unknown>)[
+      model
+    ];
     return candidate && typeof candidate === 'object'
       ? (candidate as ModelDelegate)
       : null;
@@ -1385,17 +1450,24 @@ export class OperationalSummaryService {
   ) {
     const roles = new Set(actor.roles.map((role) => role.toLowerCase()));
     if (this.isTeachingOnly(actor)) {
-      return TEACHER_MODULES.has(module) && permissions.some((permission) => actor.permissions.includes(permission));
+      return (
+        TEACHER_MODULES.has(module) &&
+        permissions.some((permission) => actor.permissions.includes(permission))
+      );
     }
-    return permissions.some((permission) => actor.permissions.includes(permission));
+    return permissions.some((permission) =>
+      actor.permissions.includes(permission),
+    );
   }
 
   private isTeachingOnly(actor: AuthContext) {
     const roles = new Set(actor.roles.map((role) => role.toLowerCase()));
-    return [...TEACHING_ROLES].some((role) => roles.has(role)) &&
+    return (
+      [...TEACHING_ROLES].some((role) => roles.has(role)) &&
       !roles.has('principal') &&
       !roles.has('admin') &&
-      !roles.has('school_admin');
+      !roles.has('school_admin')
+    );
   }
 }
 
@@ -1411,7 +1483,8 @@ function dashboardStatus(
   summaries: OperationalModuleSummary[],
 ): OperationalSummaryStatus {
   if (summaries.length === 0) return 'empty';
-  if (summaries.some((summary) => summary.status === 'partial')) return 'partial';
+  if (summaries.some((summary) => summary.status === 'partial'))
+    return 'partial';
   if (
     summaries.every(
       (summary) => summary.status === 'empty' || summary.status === 'locked',

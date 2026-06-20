@@ -50,20 +50,32 @@ describe('Operational summary controllers', () => {
   });
 
   it('maps route-aligned summary paths to their internal module summary keys', async () => {
-    service.getModuleSummary.mockResolvedValue({ module: 'm2_attendance' } as never);
+    service.getModuleSummary.mockResolvedValue({
+      module: 'm2_attendance',
+    } as never);
 
-    await expect(dashboard.getModuleSummary('attendance', actor)).resolves.toEqual({
+    await expect(
+      dashboard.getModuleSummary('attendance', actor),
+    ).resolves.toEqual({
       module: 'm2_attendance',
     });
-    expect(service.getModuleSummary).toHaveBeenCalledWith('m2_attendance', actor);
+    expect(service.getModuleSummary).toHaveBeenCalledWith(
+      'm2_attendance',
+      actor,
+    );
   });
 
   it('keeps the internal module key accepted for compatibility', async () => {
-    service.getModuleSummary.mockResolvedValue({ module: 'm12_learning' } as never);
+    service.getModuleSummary.mockResolvedValue({
+      module: 'm12_learning',
+    } as never);
 
     await dashboard.getModuleSummary('m12_learning', actor);
 
-    expect(service.getModuleSummary).toHaveBeenCalledWith('m12_learning', actor);
+    expect(service.getModuleSummary).toHaveBeenCalledWith(
+      'm12_learning',
+      actor,
+    );
   });
 
   it('rejects unknown module paths before dispatching to the service', () => {
@@ -83,11 +95,31 @@ describe('Operational summary controllers', () => {
     await mobile.staffSummary(actor);
     await mobile.studentSummary(actor);
 
-    expect(service.getMobileSummary).toHaveBeenNthCalledWith(1, 'parent', actor);
-    expect(service.getMobileSummary).toHaveBeenNthCalledWith(2, 'teacher', actor);
-    expect(service.getMobileSummary).toHaveBeenNthCalledWith(3, 'principal', actor);
-    expect(service.getMobileSummary).toHaveBeenNthCalledWith(4, 'driver', actor);
+    expect(service.getMobileSummary).toHaveBeenNthCalledWith(
+      1,
+      'parent',
+      actor,
+    );
+    expect(service.getMobileSummary).toHaveBeenNthCalledWith(
+      2,
+      'teacher',
+      actor,
+    );
+    expect(service.getMobileSummary).toHaveBeenNthCalledWith(
+      3,
+      'principal',
+      actor,
+    );
+    expect(service.getMobileSummary).toHaveBeenNthCalledWith(
+      4,
+      'driver',
+      actor,
+    );
     expect(service.getMobileSummary).toHaveBeenNthCalledWith(5, 'staff', actor);
-    expect(service.getMobileSummary).toHaveBeenNthCalledWith(6, 'student', actor);
+    expect(service.getMobileSummary).toHaveBeenNthCalledWith(
+      6,
+      'student',
+      actor,
+    );
   });
 });

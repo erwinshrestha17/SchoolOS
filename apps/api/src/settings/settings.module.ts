@@ -13,7 +13,13 @@ import { StorageModule } from '../storage/storage.module';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
 
 @Module({
-  imports: [PrismaModule, AuditModule, PlatformModule, StorageModule, FileRegistryModule],
+  imports: [
+    PrismaModule,
+    AuditModule,
+    PlatformModule,
+    StorageModule,
+    FileRegistryModule,
+  ],
   controllers: [SettingsController, SchoolSettingsWorkspaceController],
   providers: [
     SettingsService,

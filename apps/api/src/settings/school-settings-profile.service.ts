@@ -4,7 +4,10 @@ import type { SchoolProfileSettings, TenantSettingKey } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateSchoolProfileDto } from './dto/update-school-profile.dto';
-import { schoolProfileKeyMap, schoolProfileSettingKeys } from './school-profile.keys';
+import {
+  schoolProfileKeyMap,
+  schoolProfileSettingKeys,
+} from './school-profile.keys';
 
 @Injectable()
 export class SchoolSettingsProfileService {
@@ -20,7 +23,8 @@ export class SchoolSettingsProfileService {
     });
     const values = new Map(settings.map((item) => [item.key, item.value]));
     const latest = settings.reduce<Date | null>(
-      (current, item) => !current || item.updatedAt > current ? item.updatedAt : current,
+      (current, item) =>
+        !current || item.updatedAt > current ? item.updatedAt : current,
       null,
     );
     const read = (field: keyof typeof schoolProfileKeyMap) =>
@@ -43,9 +47,15 @@ export class SchoolSettingsProfileService {
     };
   }
 
-  async updateProfile(tenantId: string, dto: UpdateSchoolProfileDto, userId: string) {
+  async updateProfile(
+    tenantId: string,
+    dto: UpdateSchoolProfileDto,
+    userId: string,
+  ) {
     const updates = Object.entries(schoolProfileKeyMap)
-      .filter(([field]) => dto[field as keyof UpdateSchoolProfileDto] !== undefined)
+      .filter(
+        ([field]) => dto[field as keyof UpdateSchoolProfileDto] !== undefined,
+      )
       .map(([field, key]) => ({
         key: key as TenantSettingKey,
         value: normalize(dto[field as keyof UpdateSchoolProfileDto]),
@@ -53,13 +63,15 @@ export class SchoolSettingsProfileService {
 
     if (updates.length === 0) return this.getProfile(tenantId);
 
-    await this.prisma.$transaction(updates.map(({ key, value }) =>
-      this.prisma.tenantSetting.upsert({
-        where: { tenantId_key: { tenantId, key } },
-        create: { tenantId, key, value },
-        update: { value },
-      }),
-    ));
+    await this.prisma.$transaction(
+      updates.map(({ key, value }) =>
+        this.prisma.tenantSetting.upsert({
+          where: { tenantId_key: { tenantId, key } },
+          create: { tenantId, key, value },
+          update: { value },
+        }),
+      ),
+    );
 
     await this.auditService.record({
       action: 'school_profile_updated',
@@ -76,7 +88,9 @@ export class SchoolSettingsProfileService {
 
 function normalize(value: unknown): Prisma.InputJsonValue {
   if (value === null) return '';
-  return typeof value === 'string' ? value.trim() : value as Prisma.InputJsonValue;
+  return typeof value === 'string'
+    ? value.trim()
+    : (value as Prisma.InputJsonValue);
 }
 function stringValue(value: unknown) {
   return typeof value === 'string' && value.trim() ? value : null;
@@ -85,5 +99,7 @@ function numberValue(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 function schoolTypeValue(value: unknown): SchoolProfileSettings['schoolType'] {
-  return value === 'PRIVATE' || value === 'COMMUNITY' || value === 'TRUST' ? value : null;
+  return value === 'PRIVATE' || value === 'COMMUNITY' || value === 'TRUST'
+    ? value
+    : null;
 }
