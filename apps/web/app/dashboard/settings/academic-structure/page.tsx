@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { AcademicStructureWorkspace } from '../../../../components/settings/academic-structure-workspace';
 
-export default function AcademicStructureSettingsRedirect() {
-  redirect('/dashboard/settings?section=academic');
+export default function AcademicStructurePage() {
+  return <AcademicStructureWorkspace />;
 }
