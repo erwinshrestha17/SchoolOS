@@ -25,6 +25,11 @@ class PrincipalRepository {
         queryParameters: {'status': status},
       );
 
+  Future<Map<String, dynamic>> getAdmissionsSummary() => _getCached(
+    'principal_admissions_summary',
+    '/mobile/principal/admissions-summary',
+  );
+
   Future<Map<String, dynamic>> getAttendanceSummary() => _getCached(
     'principal_attendance_summary',
     '/mobile/principal/attendance-summary',
