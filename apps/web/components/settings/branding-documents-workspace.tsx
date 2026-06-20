@@ -15,6 +15,7 @@ import { ErrorState } from '../ui/error-state';
 import { ProtectedFileButton } from '../ui/protected-file';
 import { formatBsDateTime } from '../../lib/utils';
 import { schoolSettingsApi } from '../../lib/api/school-settings';
+import { ApiRequestError } from '../../lib/api/client';
 
 type BrandingForm = Omit<BrandingDocumentsSettings, 'logoFileAssetId' | 'updatedAt'>;
 
@@ -87,7 +88,13 @@ export function BrandingDocumentsWorkspace() {
     return <div className="space-y-4 p-6"><div className="h-24 animate-pulse rounded-2xl bg-slate-100" /><div className="h-[620px] animate-pulse rounded-2xl bg-slate-100" /></div>;
   }
   if (brandingQuery.isError || !brandingQuery.data) {
-    return <ErrorState error={brandingQuery.error} onRetry={() => void brandingQuery.refetch()} />;
+    const denied = brandingQuery.error instanceof ApiRequestError && brandingQuery.error.statusCode === 403;
+    return <ErrorState
+      title={denied ? 'Permission denied' : 'Could not load Branding & Documents'}
+      message={denied ? 'You do not have permission to manage school branding and official document defaults.' : undefined}
+      error={brandingQuery.error}
+      onRetry={denied ? undefined : () => void brandingQuery.refetch()}
+    />;
   }
 
   const branding = brandingQuery.data;
