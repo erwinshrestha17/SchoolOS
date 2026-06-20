@@ -20,6 +20,23 @@ export type UpdateSchoolProfilePayload = Partial<
   Omit<SchoolProfileSettings, 'updatedAt'>
 >;
 
+export type BrandingDocumentsSettings = {
+  logoFileAssetId: string | null;
+  primaryColor: string | null;
+  receiptHeaderText: string | null;
+  receiptFooterText: string | null;
+  idCardFooterText: string | null;
+  payslipFooterText: string | null;
+  certificateFooterText: string | null;
+  reportCardFooterText: string | null;
+  defaultPaperSize: 'A4' | 'LEGAL' | '80MM' | null;
+  updatedAt: string | null;
+};
+
+export type UpdateBrandingDocumentsPayload = Partial<
+  Omit<BrandingDocumentsSettings, 'logoFileAssetId' | 'updatedAt'>
+>;
+
 export type SchoolSettingsReadinessItem = {
   id: string;
   label: string;
