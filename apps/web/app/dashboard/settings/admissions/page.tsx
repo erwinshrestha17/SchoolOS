@@ -1,8 +1,24 @@
-import { SettingsDirectoryWorkspace } from '@/components/settings/settings-directory-workspace';
+import Link from 'next/link';
+import { DashboardPageShell } from '../../../../../components/dashboard/dashboard-page-shell';
+import { M1PageHeader } from '../../../../../components/m1/m1-page-header';
+import { AdmissionPolicySettings } from '../../../../../components/settings/admission-policy-settings';
 
-export default function AdmissionsSettingsPage() { return <SettingsDirectoryWorkspace title="Admission & Student Rules" description="Review admission and student configuration boundaries for this school." areas={[
-  { title: 'Admission workflow', description: 'Applications, duplicate review, student documents, and enrolment lifecycle remain in Admissions.', href: '/dashboard/admissions', status: 'module-owned' },
-  { title: 'Admission number format', description: 'A validated tenant-scoped settings contract is required before changing numbering rules.', status: 'contract-needed' },
-  { title: 'Required documents & photo policy', description: 'Document requirements and student-photo rules need a File Registry-aware contract.', status: 'contract-needed' },
-  { title: 'Student ID & QR rules', description: 'Identity and QR lifecycle rules need backend verification before they can be configured here.', status: 'contract-needed' },
-]} note="Admission numbering, guardian relationship types, required documents, photo rules, ID-card rules, and duplicate policy need API contract confirmation. Existing Admissions workflows remain available and unchanged." />; }
+export default function AdmissionSettingsPage() {
+  return (
+    <DashboardPageShell>
+      <M1PageHeader
+        title="Admission settings"
+        description="Choose when the school can admit a student directly and when admission review is needed."
+        secondaryActions={
+          <Link
+            href="/dashboard/settings"
+            className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+          >
+            Back to settings
+          </Link>
+        }
+      />
+      <AdmissionPolicySettings />
+    </DashboardPageShell>
+  );
+}
