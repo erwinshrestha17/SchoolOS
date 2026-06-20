@@ -1,8 +1,10 @@
 'use client';
 
 import { StudentProfileDetail } from '@schoolos/core';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
 import { SectionCard } from '@/components/ui/section-card';
@@ -46,9 +48,36 @@ export function ProfileHeader({
   const primaryGuardian = profile.guardians.find((guardian) => guardian.isPrimary) ?? profile.guardians[0];
   const className = student.className ?? student.class?.name ?? 'Class not assigned';
   const sectionName = student.sectionName ?? student.section ?? 'Section not assigned';
+  const [photoObjectUrl, setPhotoObjectUrl] = useState<string | null>(null);
   const supportNoteExists = Boolean(
     student.medicalConditions || student.severeAllergies || student.medications || student.specialNeeds,
   );
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    let cancelled = false;
+
+    if (!student.photoUrl) {
+      setPhotoObjectUrl(null);
+      return undefined;
+    }
+
+    void api
+      .getStudentPhotoBlob(student.id)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPhotoObjectUrl(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setPhotoObjectUrl(null);
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [student.id, student.photoUrl]);
 
   return (
     <SectionCard className="overflow-hidden border-[var(--color-mod-admissions-border)] bg-white shadow-sm">
@@ -58,7 +87,7 @@ export function ProfileHeader({
           className="inline-flex min-h-10 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-950"
         >
           <ChevronLeft size={17} aria-hidden="true" />
-          Students / Directory
+          Students / Directory / {studentName}
         </Link>
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
           <span>Student profile</span>
@@ -70,6 +99,8 @@ export function ProfileHeader({
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(18rem,0.9fr)_auto] xl:items-start">
         <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-center">
           <Avatar
+            src={photoObjectUrl}
+            alt={`${studentName} profile photo`}
             initials={initials(studentName)}
             size="xl"
             className="h-24 w-24 border-4 border-white text-2xl shadow-md ring-1 ring-slate-200"

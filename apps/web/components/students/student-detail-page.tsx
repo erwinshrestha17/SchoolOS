@@ -30,6 +30,7 @@ type LifecycleRequest =
 
 const detailTabs = [
   'Overview',
+  'Profile',
   'Attendance',
   'Fees',
   'Health',
@@ -44,6 +45,7 @@ type DetailTab = (typeof detailTabs)[number];
 
 const primaryTabs: Array<{ value: DetailTab; label: string }> = [
   { value: 'Overview', label: 'Overview' },
+  { value: 'Profile', label: 'Profile' },
   { value: 'Academics', label: 'Academic' },
   { value: 'Attendance', label: 'Attendance' },
   { value: 'Fees', label: 'Fees' },
@@ -58,10 +60,11 @@ const overflowTabs: Array<{ value: DetailTab; label: string }> = [
 ];
 
 const requestedTabAliases: Record<string, DetailTab> = {
-  Profile: 'Overview',
+  Profile: 'Profile',
   Academic: 'Academics',
   Timeline: 'History',
   'Support & Safety': 'Health',
+  'Support & safety': 'Health',
 };
 
 export function StudentDetailPage({ studentId }: { studentId: string }) {
@@ -152,8 +155,8 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     setPdfError('');
     try {
       await api.openStudentDocumentPdf(studentId, kind, token);
-    } catch (err: any) {
-      setPdfError(err.message || 'Failed to generate document');
+    } catch (err: unknown) {
+      setPdfError(err instanceof Error ? err.message : 'Failed to generate document');
     }
   }
 
@@ -213,7 +216,9 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
             setLifecycleAction(null);
             setIsLifecycleOpen(false);
           }}
+          onSubmit={(request) => lifecycleMutation.mutate(request)}
           isSaving={lifecycleMutation.isPending}
+          error={lifecycleMutation.error}
           message={lifecycleMessage}
         />
       ) : null}
@@ -257,7 +262,10 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
 
         <div className="min-h-[400px]">
           <TabsContent value="Overview" className="mt-0">
-            <ProfileTabs.OverviewTab profile={profile} onOpenPdf={openStudentPdf} onSelectTab={setActiveDetailTab} />
+            <ProfileTabs.OverviewTab profile={profile} onOpenPdf={openStudentPdf} onSelectTab={(tab) => setActiveDetailTab(tab)} />
+          </TabsContent>
+          <TabsContent value="Profile" className="mt-0">
+            <ProfileTabs.ProfileTab profile={profile} />
           </TabsContent>
           <TabsContent value="Guardians" className="mt-0">
             <ProfileTabs.GuardiansTab

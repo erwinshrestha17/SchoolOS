@@ -1,171 +1,404 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import type { StudentDocument, StudentProfileDetail } from '@schoolos/core';
 import { api } from '@/lib/api';
-import { StudentProfileDetail } from '@schoolos/core';
-import { SectionCard } from '@/components/ui/section-card';
-import { StatCard } from '@/components/ui/stat-card';
-import { Users, Wallet, CalendarCheck, TrendingUp, User, MapPin, Hash, Phone, ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { StudentQrCard } from '../student-qr-card';
 import { Badge } from '@/components/ui/badge';
+import { ErrorState } from '@/components/ui/error-state';
+import { LoadingState } from '@/components/ui/loading-state';
+import { SectionCard } from '@/components/ui/section-card';
+import { StudentQrCard } from '../student-qr-card';
+import {
+  AlertTriangle,
+  CalendarCheck,
+  CheckCircle2,
+  Clock,
+  FileText,
+  GraduationCap,
+  Users,
+  Wallet,
+} from 'lucide-react';
 
-const formatMoney = (amount: number) => {
-  return new Intl.NumberFormat('en-NP', {
-    style: 'currency',
-    currency: 'NPR',
-    maximumFractionDigits: 0,
-  }).format(amount);
+type OverviewTabProps = {
+  profile: StudentProfileDetail;
+  onOpenPdf: (kind: string, token?: string) => void;
+  onSelectTab: (tab: 'Profile' | 'Attendance' | 'Fees' | 'Documents' | 'Guardians' | 'Activity') => void;
 };
 
-const formatDate = (date: string | Date) => {
-  return new Intl.DateTimeFormat('en-NP', {
-    dateStyle: 'medium',
-  }).format(new Date(date));
-};
+export function OverviewTab({ profile, onOpenPdf, onSelectTab }: OverviewTabProps) {
+  const studentId = profile.student.id;
+  const primaryGuardian = profile.guardians.find((guardian) => guardian.isPrimary) ?? profile.guardians[0];
+  const currentEnrollment =
+    profile.enrollments.find((enrollment) => enrollment.status.toUpperCase() === 'ACTIVE') ??
+    profile.enrollments[0] ??
+    null;
+  const documentIssues = getDocumentAttention(profile.documents);
 
-export function OverviewTab({ profile, onOpenPdf }: { profile: StudentProfileDetail; onOpenPdf: (kind: string, token?: string) => void }) {
-  const primaryGuardian = profile.guardians.find((g) => g.isPrimary) ?? profile.guardians[0];
-  const outstanding = profile.invoices.reduce((sum, invoice) => sum + invoice.outstandingAmount, 0);
-  const presentCount = profile.attendanceRecords.filter((r) => r.status === 'PRESENT').length;
-  const className = profile.student.className ?? profile.student.class?.name ?? 'Class not assigned';
-  const sectionName = profile.student.sectionName ?? profile.student.section ?? 'Section not assigned';
-
-  const { data: iemisReadiness, isLoading: isIemisLoading } = useQuery({
-    queryKey: ['student-iemis-readiness', profile.student.id],
-    queryFn: () => api.getIemisReadiness(profile.student.id),
-    enabled: Boolean(profile.student.id),
+  const attendanceQuery = useQuery({
+    queryKey: ['student-attendance-history', studentId],
+    queryFn: () => api.getStudentAttendanceHistory(studentId),
+    enabled: Boolean(studentId),
   });
 
-  return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Outstanding Fees" value={formatMoney(outstanding)} icon={<Wallet size={20} />} />
-        <StatCard title="Attendance Rate" value={`${Math.round((presentCount / Math.max(1, profile.attendanceRecords.length)) * 100)}%`} icon={<CalendarCheck size={20} />} />
-        <StatCard title="Guardians" value={profile.guardians.length} icon={<Users size={20} />} />
-        <StatCard title="Invoices" value={profile.invoices.length} icon={<TrendingUp size={20} />} />
-      </div>
+  const feeClearanceQuery = useQuery({
+    queryKey: ['student-fee-clearance', studentId],
+    queryFn: () => api.getStudentFeeClearance(studentId),
+    enabled: Boolean(studentId),
+  });
 
-      <div className="grid gap-8 lg:grid-cols-3">
-        <SectionCard title="Core Identity" className="lg:col-span-2">
-          <div className="grid gap-6 sm:grid-cols-2">
-            <DetailItem icon={<User size={18} />} label="Full Name" value={profile.student.fullNameEn || `${profile.student.firstNameEn} ${profile.student.lastNameEn}`} />
-            <DetailItem icon={<Hash size={18} />} label="Student ID" value={profile.student.studentSystemId} />
-            <DetailItem icon={<CalendarCheck size={18} />} label="Date of Birth" value={profile.student.dateOfBirth ? formatDate(profile.student.dateOfBirth) : 'Not recorded'} />
-            <DetailItem icon={<TrendingUp size={18} />} label="Lifecycle Status" value={profile.student.lifecycleStatus ?? 'ACTIVE'} />
-            <DetailItem icon={<MapPin size={18} />} label="Class / Section" value={`${className} • ${sectionName}`} />
-            <DetailItem icon={<Hash size={18} />} label="Roll Number" value={profile.student.rollNumber ?? 'Not assigned'} />
+  const iemisQuery = useQuery({
+    queryKey: ['student-iemis-readiness', studentId],
+    queryFn: () => api.getIemisReadiness(studentId),
+    enabled: Boolean(studentId),
+  });
+
+  const attentionItems = [
+    feeClearanceQuery.data && !feeClearanceQuery.data.cleared
+      ? {
+          key: 'fees',
+          tone: 'danger' as const,
+          title: 'Outstanding fees need clearance',
+          description: `${formatMoney(feeClearanceQuery.data.outstandingAmount)} is outstanding according to the fee-clearance API.`,
+          action: 'Review fees',
+          onClick: () => onSelectTab('Fees'),
+        }
+      : null,
+    iemisQuery.data && iemisQuery.data.issues.length > 0
+      ? {
+          key: 'iemis',
+          tone: 'warning' as const,
+          title: 'iEMIS readiness has issues',
+          description: `${iemisQuery.data.issues.length} reporting field${iemisQuery.data.issues.length === 1 ? '' : 's'} need review.`,
+          action: 'Open profile',
+          onClick: () => onSelectTab('Profile'),
+        }
+      : null,
+    documentIssues.length > 0
+      ? {
+          key: 'documents',
+          tone: 'warning' as const,
+          title: 'Document record needs review',
+          description: `${documentIssues.length} uploaded document${documentIssues.length === 1 ? '' : 's'} are rejected, expired, or close to expiry.`,
+          action: 'Review documents',
+          onClick: () => onSelectTab('Documents'),
+        }
+      : null,
+  ].filter((item): item is AttentionItem => item !== null);
+
+  return (
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.38fr)]">
+      <div className="space-y-6">
+        <SectionCard title="Attention needed" description="Only real backend or profile-contract signals are shown here.">
+          {feeClearanceQuery.isLoading || iemisQuery.isLoading ? (
+            <LoadingState label="Checking profile attention items..." />
+          ) : feeClearanceQuery.isError || iemisQuery.isError ? (
+            <div className="grid gap-3">
+              {feeClearanceQuery.isError ? (
+                <InlineError
+                  title="Fee clearance could not be checked"
+                  onRetry={() => void feeClearanceQuery.refetch()}
+                />
+              ) : null}
+              {iemisQuery.isError ? (
+                <InlineError title="iEMIS readiness could not be checked" onRetry={() => void iemisQuery.refetch()} />
+              ) : null}
+            </div>
+          ) : attentionItems.length > 0 ? (
+            <div className="grid gap-3">
+              {attentionItems.map((item) => (
+                <AttentionCard key={item.key} item={item} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-start gap-3 rounded-2xl border border-success-100 bg-success-50 p-4 text-success-800">
+              <CheckCircle2 size={21} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <div>
+                <p className="text-sm font-bold">No profile issues need attention right now.</p>
+                <p className="mt-1 text-xs font-medium leading-5">
+                  Fee clearance, iEMIS readiness, and uploaded document status do not currently show blockers.
+                </p>
+              </div>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard title="At a glance" description="Backend-owned summary values and scoped profile counts.">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <GlanceCard
+              icon={<CalendarCheck size={18} />}
+              label="Attendance"
+              value={
+                attendanceQuery.data
+                  ? `${attendanceQuery.data.summary.attendancePercentage}%`
+                  : attendanceQuery.isLoading
+                    ? 'Checking'
+                    : 'Unavailable'
+              }
+              detail={
+                attendanceQuery.data
+                  ? `${attendanceQuery.data.summary.totalRecords} recorded day${attendanceQuery.data.summary.totalRecords === 1 ? '' : 's'}`
+                  : 'From attendance history API'
+              }
+              onClick={() => onSelectTab('Attendance')}
+            />
+            <GlanceCard
+              icon={<Wallet size={18} />}
+              label="Fee clearance"
+              value={
+                feeClearanceQuery.data
+                  ? feeClearanceQuery.data.cleared
+                    ? 'Cleared'
+                    : formatMoney(feeClearanceQuery.data.outstandingAmount)
+                  : feeClearanceQuery.isLoading
+                    ? 'Checking'
+                    : 'Unavailable'
+              }
+              detail="From fee-clearance API"
+              onClick={() => onSelectTab('Fees')}
+            />
+            <GlanceCard
+              icon={<Users size={18} />}
+              label="Guardians"
+              value={profile.guardians.length.toString()}
+              detail={primaryGuardian ? `Primary: ${primaryGuardian.fullName}` : 'No guardian linked'}
+              onClick={() => onSelectTab('Guardians')}
+            />
+            <GlanceCard
+              icon={<FileText size={18} />}
+              label="Documents"
+              value={profile.documents.length.toString()}
+              detail={documentIssues.length > 0 ? `${documentIssues.length} need review` : 'Uploaded documents'}
+              onClick={() => onSelectTab('Documents')}
+            />
           </div>
         </SectionCard>
 
-        <div className="space-y-6">
-          <StudentQrCard 
-            studentId={profile.student.id} 
-            studentSystemId={profile.student.studentSystemId}
-            // @ts-ignore
-            qrCredential={profile.student.qrCredential ?? null}
-            onOpenIdCard={(token) => onOpenPdf('id-card', token)}
-          />
-
-          <SectionCard title="Government iEMIS Readiness">
-            {isIemisLoading ? (
-              <p className="text-xs text-slate-400">Loading readiness score...</p>
-            ) : iemisReadiness ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {iemisReadiness.eligible ? (
-                      <CheckCircle2 size={18} className="text-success-600" />
-                    ) : (
-                      <AlertTriangle size={18} className="text-warning-600" />
-                    )}
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">iEMIS Status</span>
-                  </div>
-                  <Badge variant={iemisReadiness.eligible ? 'success' : 'warning'} className="text-[10px] font-extrabold uppercase">
-                    {iemisReadiness.eligible ? 'Ready' : 'Incomplete'}
+        <SectionCard title="Related records" description="Recent activity and current enrollment context from this profile response.">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+              <div className="mb-3 flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-widest text-slate-400">
+                <GraduationCap size={15} aria-hidden="true" />
+                Current enrollment
+              </div>
+              {currentEnrollment ? (
+                <div>
+                  <p className="text-lg font-black text-slate-950">
+                    Class {currentEnrollment.className}
+                    {currentEnrollment.sectionName ? ` • Section ${currentEnrollment.sectionName}` : ''}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-600">
+                    {currentEnrollment.academicYear}
+                    {currentEnrollment.rollNumber ? ` • Roll ${currentEnrollment.rollNumber}` : ''}
+                  </p>
+                  <Badge className="mt-3 border-[var(--color-mod-admissions-border)] bg-white text-[var(--color-mod-admissions-text)]">
+                    {formatStatus(currentEnrollment.status)}
                   </Badge>
                 </div>
+              ) : (
+                <p className="text-sm font-semibold text-slate-500">No enrollment record is available.</p>
+              )}
+            </div>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between items-end">
-                    <span className="text-2xl font-black text-slate-900">{iemisReadiness.score}%</span>
-                    <span className="text-xs font-bold text-slate-400">readiness score</span>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2">
-                    <div 
-                      className={`h-2 rounded-full transition-all duration-500 ${
-                        iemisReadiness.score === 100 
-                          ? 'bg-success-500' 
-                          : iemisReadiness.score > 50 
-                            ? 'bg-warning-500' 
-                            : 'bg-danger-500'
-                      }`}
-                      style={{ width: `${iemisReadiness.score}%` }}
-                    />
-                  </div>
-                </div>
-
-                {iemisReadiness.issues.length > 0 ? (
-                  <div className="pt-3 border-t border-slate-100 space-y-2">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Validation Issues</p>
-                    <ul className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
-                      {iemisReadiness.issues.map((issue, idx) => (
-                        <li key={idx} className="text-xs text-slate-600 flex gap-2 font-medium">
-                          <span className="text-warning-600 font-bold">•</span>
-                          <span>{issue.message}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-500 font-medium">This profile matches all government iEMIS census reporting fields.</p>
-                )}
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+              <div className="mb-3 flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-widest text-slate-400">
+                <Clock size={15} aria-hidden="true" />
+                Recent student activity
               </div>
-            ) : null}
-          </SectionCard>
+              {profile.activityPosts.length > 0 ? (
+                <div className="space-y-3">
+                  {profile.activityPosts.slice(0, 3).map((post) => (
+                    <div key={post.id} className="rounded-xl bg-white p-3">
+                      <p className="line-clamp-1 text-sm font-bold text-slate-900">{post.title}</p>
+                      <p className="mt-1 line-clamp-2 text-xs font-medium leading-5 text-slate-500">
+                        {post.body || post.caption || 'Activity details are not recorded.'}
+                      </p>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => onSelectTab('Activity')}
+                    className="text-xs font-bold text-[var(--color-mod-admissions-text)] hover:underline"
+                  >
+                    View activity
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm font-semibold text-slate-500">No recent student activity is available in this profile.</p>
+              )}
+            </div>
+          </div>
+        </SectionCard>
+      </div>
 
-          <SectionCard title="Primary Guardian">
-             {primaryGuardian ? (
-               <div className="space-y-6">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-admissions-soft)] text-[var(--color-mod-admissions-text)] font-bold text-lg">
-                      {primaryGuardian.fullName[0]}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-900 leading-tight">{primaryGuardian.fullName}</p>
-                      <p className="text-[0.65rem] text-slate-500 uppercase font-bold tracking-wider mt-1">{primaryGuardian.relation}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-3 pt-4 border-t border-slate-100">
-                    <div className="flex items-center gap-3 text-sm text-slate-600">
-                      <Phone size={16} className="text-slate-400" />
-                      <span className="font-medium">{primaryGuardian.primaryPhone || 'No phone'}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-slate-600">
-                      <User size={16} className="text-slate-400" />
-                      <span className="font-medium">{primaryGuardian.email || 'No email'}</span>
-                    </div>
-                  </div>
-               </div>
-             ) : (
-               <p className="text-sm text-slate-400">No guardian information recorded.</p>
-             )}
-          </SectionCard>
-        </div>
+      <div className="space-y-6">
+        <SectionCard title="Quick summary">
+          <div className="space-y-3">
+            <SummaryRow label="Student ID" value={profile.student.studentSystemId} />
+            <SummaryRow label="Lifecycle" value={formatStatus(profile.student.lifecycleStatus ?? 'ACTIVE')} />
+            <SummaryRow
+              label="Class"
+              value={
+                currentEnrollment
+                  ? `${currentEnrollment.className}${currentEnrollment.sectionName ? ` / ${currentEnrollment.sectionName}` : ''}`
+                  : profile.student.className ?? profile.student.class?.name ?? 'Not assigned'
+              }
+            />
+            <SummaryRow
+              label="Roll"
+              value={(currentEnrollment?.rollNumber ?? profile.student.rollNumber)?.toString() ?? 'Not assigned'}
+            />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="iEMIS readiness">
+          {iemisQuery.isLoading ? (
+            <p className="text-sm font-semibold text-slate-500">Checking iEMIS readiness...</p>
+          ) : iemisQuery.isError ? (
+            <ErrorState
+              title="iEMIS unavailable"
+              message="Readiness could not be checked right now."
+              onRetry={() => void iemisQuery.refetch()}
+              className="min-h-0 p-5"
+            />
+          ) : iemisQuery.data ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <Badge variant={iemisQuery.data.eligible ? 'success' : 'warning'}>
+                  {iemisQuery.data.eligible ? 'Ready' : 'Incomplete'}
+                </Badge>
+                <span className="text-2xl font-black text-slate-950">{iemisQuery.data.score}%</span>
+              </div>
+              {iemisQuery.data.issues.length > 0 ? (
+                <ul className="space-y-2">
+                  {iemisQuery.data.issues.slice(0, 4).map((issue) => (
+                    <li key={`${issue.field}-${issue.message}`} className="flex gap-2 text-xs font-medium leading-5 text-slate-600">
+                      <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning-600" aria-hidden="true" />
+                      <span>{issue.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs font-semibold leading-5 text-slate-500">
+                  No iEMIS issues are currently reported by the readiness API.
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm font-semibold text-slate-500">iEMIS readiness is unavailable.</p>
+          )}
+        </SectionCard>
+
+        <StudentQrCard
+          studentId={profile.student.id}
+          studentSystemId={profile.student.studentSystemId}
+          qrCredential={profile.student.qrCredential ?? null}
+          onOpenIdCard={(token) => onOpenPdf('id-card', token)}
+        />
       </div>
     </div>
   );
 }
 
-function DetailItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
+type AttentionItem = {
+  key: string;
+  tone: 'danger' | 'warning';
+  title: string;
+  description: string;
+  action: string;
+  onClick: () => void;
+};
+
+function AttentionCard({ item }: { item: AttentionItem }) {
+  const danger = item.tone === 'danger';
   return (
-    <div className="flex items-start gap-3">
-      <div className="mt-0.5 text-slate-400">
-        {icon}
-      </div>
-      <div>
-        <p className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">{label}</p>
-        <p className="mt-0.5 font-bold text-slate-900">{value}</p>
+    <div className={`rounded-2xl border p-4 ${danger ? 'border-danger-100 bg-danger-50' : 'border-warning-100 bg-warning-50'}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex gap-3">
+          <AlertTriangle className={`mt-0.5 h-5 w-5 shrink-0 ${danger ? 'text-danger-600' : 'text-warning-600'}`} aria-hidden="true" />
+          <div>
+            <p className={`text-sm font-bold ${danger ? 'text-danger-800' : 'text-warning-800'}`}>{item.title}</p>
+            <p className={`mt-1 text-xs font-medium leading-5 ${danger ? 'text-danger-700' : 'text-warning-700'}`}>{item.description}</p>
+          </div>
+        </div>
+        <button type="button" onClick={item.onClick} className="shrink-0 text-xs font-bold text-slate-800 underline underline-offset-4">
+          {item.action}
+        </button>
       </div>
     </div>
   );
+}
+
+function InlineError({ title, onRetry }: { title: string; onRetry: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-danger-100 bg-danger-50 p-4 text-danger-800">
+      <p className="text-sm font-bold">{title}</p>
+      <button type="button" onClick={onRetry} className="text-xs font-bold underline underline-offset-4">
+        Retry
+      </button>
+    </div>
+  );
+}
+
+function GlanceCard({
+  icon,
+  label,
+  value,
+  detail,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  detail: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-left transition hover:border-[var(--color-mod-admissions-border)] hover:bg-white"
+    >
+      <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[var(--color-mod-admissions-accent)] shadow-sm">
+        {icon}
+      </div>
+      <p className="text-[0.68rem] font-black uppercase tracking-widest text-slate-400">{label}</p>
+      <p className="mt-1 text-xl font-black text-slate-950">{value}</p>
+      <p className="mt-1 text-xs font-medium leading-5 text-slate-500">{detail}</p>
+    </button>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+      <span className="text-xs font-black uppercase tracking-widest text-slate-400">{label}</span>
+      <span className="text-right text-sm font-bold text-slate-800">{value}</span>
+    </div>
+  );
+}
+
+function getDocumentAttention(documents: StudentDocument[]) {
+  return documents.filter((document) => {
+    if (document.status === 'REJECTED' || document.status === 'ARCHIVED') return true;
+    const expiry = document.expiryDate ? new Date(document.expiryDate) : null;
+    if (!expiry || Number.isNaN(expiry.getTime())) return false;
+    const daysUntilExpiry = Math.ceil((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    return daysUntilExpiry <= 30;
+  });
+}
+
+function formatMoney(amount: number) {
+  return new Intl.NumberFormat('en-NP', {
+    style: 'currency',
+    currency: 'NPR',
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function formatStatus(value: string) {
+  return value
+    .toLowerCase()
+    .split('_')
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ');
 }

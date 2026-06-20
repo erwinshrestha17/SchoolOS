@@ -40,6 +40,7 @@ type LifecyclePanelProps = {
   onClose: () => void;
   onSubmit: (request: LifecycleRequest) => void;
   isSaving: boolean;
+  error?: unknown;
   message: string;
 };
 
@@ -62,6 +63,7 @@ export function LifecyclePanel({
   onClose,
   onSubmit,
   isSaving,
+  error,
   message,
 }: LifecyclePanelProps) {
   const status = profile.student.lifecycleStatus ?? 'ACTIVE';
@@ -220,23 +222,38 @@ export function LifecyclePanel({
               </div>
             </div>
           ) : action ? (
-            <LifecycleReviewForm
-              action={action}
-              reason={reason}
-              effectiveDate={effectiveDate}
-              destinationSchool={destinationSchool}
-              conductRemark={conductRemark}
-              deleteAcknowledged={deleteAcknowledged}
-              isSaving={isSaving}
-              blocked={!clearance?.cleared || hasOutstanding}
-              onReasonChange={setReason}
-              onEffectiveDateChange={setEffectiveDate}
-              onDestinationSchoolChange={setDestinationSchool}
-              onConductRemarkChange={setConductRemark}
-              onDeleteAcknowledgedChange={setDeleteAcknowledged}
-              onCancel={onCancelAction}
-              onSubmit={submitLifecycleAction}
-            />
+            <div className="space-y-4">
+              {error ? (
+                <div className="flex gap-3 rounded-xl border border-danger-200 bg-danger-50 p-4 text-danger-800" role="alert">
+                  <AlertTriangle size={21} className="mt-0.5 shrink-0" aria-hidden="true" />
+                  <div>
+                    <p className="font-bold">Lifecycle action could not be completed</p>
+                    <p className="mt-1 text-sm">
+                      {error instanceof Error
+                        ? error.message
+                        : 'Please review the details and try again.'}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+              <LifecycleReviewForm
+                action={action}
+                reason={reason}
+                effectiveDate={effectiveDate}
+                destinationSchool={destinationSchool}
+                conductRemark={conductRemark}
+                deleteAcknowledged={deleteAcknowledged}
+                isSaving={isSaving}
+                blocked={!clearance?.cleared || hasOutstanding}
+                onReasonChange={setReason}
+                onEffectiveDateChange={setEffectiveDate}
+                onDestinationSchoolChange={setDestinationSchool}
+                onConductRemarkChange={setConductRemark}
+                onDeleteAcknowledgedChange={setDeleteAcknowledged}
+                onCancel={onCancelAction}
+                onSubmit={submitLifecycleAction}
+              />
+            </div>
           ) : (
             <div className="flex min-h-[18rem] flex-col items-center justify-center px-6 text-center">
               <ShieldAlert size={34} className="text-slate-300" aria-hidden="true" />

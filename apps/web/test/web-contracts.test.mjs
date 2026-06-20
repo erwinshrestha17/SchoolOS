@@ -1172,13 +1172,18 @@ describe("SchoolOS web production contracts", () => {
     ]);
 
     assert.match(studentProfileEntry, /color-mod-admissions-accent/);
-    assert.match(studentProfileEntry, /Gender not recorded/);
+    assert.match(studentProfileEntry, /Support note on file/);
+    assert.match(studentProfileEntry, /api\.getStudentFeeClearance\(studentId\)/);
+    assert.match(studentProfileEntry, /api\.getStudentAttendanceHistory\(studentId\)/);
+    assert.match(studentProfileEntry, /api\.getIemisReadiness\(studentId\)/);
+    assert.match(studentProfileEntry, /No profile issues need attention right now/);
     assert.match(studentProfileEntry, /Class not assigned/);
     assert.match(studentProfileEntry, /Section not assigned/);
     assert.match(
       studentProfileEntry,
       /api\.openStudentDocumentPdf\(studentId, kind, token\)/,
     );
+    assert.doesNotMatch(studentProfileEntry, /No known disability/);
     assert.doesNotMatch(
       studentProfileEntry,
       /bg-slate-900|rounded-\[2rem\]|rounded-\[2\.5rem\]|rounded-\[3rem\]|shadow-slate-900|shadow-2xl|shadow-xl|N\/A|Unknown|primary-500|primary-50|primary-600|primary-700/,
@@ -1222,7 +1227,9 @@ describe("SchoolOS web production contracts", () => {
     );
     assert.match(lifecycleSurface, /api\.softDeleteStudent\(studentId, body\)/);
     assert.match(lifecycleSurface, /color-mod-admissions-text/);
-    assert.match(lifecycleSurface, /Outstanding fees must be cleared/);
+    assert.match(lifecycleSurface, /Outstanding fees must be resolved/);
+    assert.match(lifecycleSurface, /Remove accidental record/);
+    assert.doesNotMatch(lifecycleSurface, /waiveFeeClearance/);
     assert.doesNotMatch(
       lifecycleSurface,
       /bg-slate-900|rounded-\[2rem\]|rounded-\[2\.5rem\]|rounded-\[3rem\]|shadow-slate-900|shadow-2xl|shadow-xl|N\/A|Unknown|primary-500|primary-50|primary-600|primary-700|primary-100|primary-200/,
@@ -1379,11 +1386,11 @@ describe("SchoolOS web production contracts", () => {
     assert.match(apiClient, /updateStudent:/);
     assert.match(apiClient, /method: 'PATCH'/);
     assert.match(apiClient, /updateStudentGuardian:/);
-    assert.match(detailPage, /Edit Profile/);
+    assert.match(detailPage, /Edit profile|Edit Profile/);
     assert.match(detailPage, /Save Changes/);
     assert.match(detailPage, /System ID|studentSystemId/);
     assert.match(detailPage, /confirmNoDisability/);
-    assert.match(detailPage, /Disability Status/);
+    assert.match(detailPage, /Disability status/);
     assert.match(detailPage, /onEditGuardian/);
     assert.match(detailPage, /onSaveGuardian/);
     assert.match(detailPage, /Primary Guardian|isPrimary/);
@@ -1410,17 +1417,17 @@ describe("SchoolOS web production contracts", () => {
       assert.match(apiClient, new RegExp(`${helper}:`));
     }
 
-    assert.match(detailPage, /Lifecycle Management/);
-    assert.match(detailPage, /Check Fee Clearance/);
+    assert.match(detailPage, /Manage student lifecycle|Lifecycle review/);
+    assert.match(detailPage, /Check fee clearance/);
     assert.match(detailPage, /Transfer/);
     assert.match(detailPage, /Archive/);
-    assert.match(detailPage, /Alumni/);
-    assert.match(detailPage, /Soft Delete|delete/);
+    assert.match(detailPage, /Mark as alumni/);
+    assert.match(detailPage, /Remove accidental record/);
     assert.match(detailPage, /Transfer Certificate/);
     assert.match(detailPage, /Leaving Certificate/);
-    assert.match(detailPage, /Outstanding fees must be cleared/);
+    assert.match(detailPage, /Outstanding fees must be resolved/);
     assert.match(detailPage, /softDeleteStudent|delete/);
-    assert.doesNotMatch(detailPage, /hard delete|demo-lifecycle|student-123/i);
+    assert.doesNotMatch(detailPage, /hard delete|waiveFeeClearance|demo-lifecycle|student-123/i);
   });
 
   it("adds a dedicated student document manager without exposing storage internals", () => {
@@ -1462,8 +1469,9 @@ describe("SchoolOS web production contracts", () => {
       detailPage,
       /api\.downloadStudentDocument\(studentId, documentId\)/,
     );
+    assert.match(detailPage, /openProtectedFile\(access\.fileAssetId/);
     assert.match(detailPage, /openUploadedDocument\(doc\.id\)/);
-    assert.match(detailPage, /window\.open\(access\.url/);
+    assert.doesNotMatch(detailPage, /window\.open\(access\.url/);
     assert.match(detailPage, /formatDocumentStatus\(doc\.status\)/);
     assert.match(detailPage, /ProtectedFileButton/);
     assert.match(detailPage, /fileAssetId=\{selectedDocument\.fileId\}/);

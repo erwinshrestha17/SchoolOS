@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { StudentProfile } from '@schoolos/core';
 import { api } from '@/lib/api';
 import type { StudentQrScanAudit } from '@/lib/api/students';
 import { SectionCard } from '@/components/ui/section-card';
@@ -19,18 +20,10 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type QrCredentialInfo = {
-  id: string;
-  status: string;
-  createdAt: string;
-  rotatedAt: string | null;
-  lastScannedAt: string | null;
-};
-
 type StudentQrCardProps = {
   studentId: string;
   studentSystemId: string;
-  qrCredential?: QrCredentialInfo | null;
+  qrCredential?: StudentProfile['qrCredential'];
   onOpenIdCard: (token?: string) => void;
 };
 

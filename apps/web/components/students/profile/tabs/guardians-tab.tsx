@@ -139,7 +139,7 @@ function GuardianEditForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       {!!error && (
         <div className="rounded-xl border border-rose-100 bg-rose-50 p-3 text-xs font-bold text-rose-700">
-          {(error as any).message || 'Failed to save guardian'}
+          {error instanceof Error ? error.message : 'Failed to save guardian'}
         </div>
       )}
       <div className="space-y-2">

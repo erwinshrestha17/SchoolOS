@@ -19,6 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { openProtectedFile } from '@/lib/api/client';
 
 type DocumentsTabProps = {
   studentId: string;
@@ -74,7 +75,7 @@ export function DocumentsTab({
     setOpeningDocumentId(documentId);
     try {
       const access = await api.downloadStudentDocument(studentId, documentId);
-      window.open(access.url, '_blank', 'noopener,noreferrer');
+      await openProtectedFile(access.fileAssetId, { fileName: access.fileName });
     } catch (error: unknown) {
       setDocumentAccessError(
         error instanceof Error

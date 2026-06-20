@@ -1,4 +1,5 @@
 export * from './overview-tab';
+export * from './profile-tab';
 export * from './guardians-tab';
 export * from './health-tab';
 export * from './documents-tab';

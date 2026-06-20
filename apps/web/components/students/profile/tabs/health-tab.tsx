@@ -15,26 +15,26 @@ export function HealthTab({ profile }: { profile: StudentProfileDetail }) {
           <HealthItem 
             icon={<AlertCircle size={18} />} 
             label="Medical Conditions" 
-            value={(student as any).medicalConditions || 'No conditions recorded'} 
-            tone={(student as any).medicalConditions ? 'danger' : 'neutral'}
+            value={student.medicalConditions || 'No conditions recorded'}
+            tone={student.medicalConditions ? 'danger' : 'neutral'}
           />
           <HealthItem 
             icon={<ShieldAlert size={18} />} 
             label="Severe Allergies" 
-            value={(student as any).severeAllergies || 'No known allergies'} 
-            tone={(student as any).severeAllergies ? 'danger' : 'neutral'}
+            value={student.severeAllergies || 'No known allergies'}
+            tone={student.severeAllergies ? 'danger' : 'neutral'}
           />
           <HealthItem 
             icon={<Pill size={18} />} 
             label="Regular Medications" 
-            value={(student as any).medications || 'No regular medications'} 
-            tone={(student as any).medications ? 'warning' : 'neutral'}
+            value={student.medications || 'No regular medications'}
+            tone={student.medications ? 'warning' : 'neutral'}
           />
           <HealthItem 
             icon={<Heart size={18} />} 
             label="Special Needs" 
-            value={(student as any).specialNeeds || 'No special needs recorded'} 
-            tone={(student as any).specialNeeds ? 'admissions' : 'neutral'}
+            value={student.specialNeeds || 'No special needs recorded'}
+            tone={student.specialNeeds ? 'admissions' : 'neutral'}
           />
         </div>
       </SectionCard>
