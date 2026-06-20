@@ -8,10 +8,18 @@ import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { StudentRecordsModule } from '../student-records/student-records.module';
 import { StudentsModule } from '../students/students.module';
 import { UsersModule } from '../users/users.module';
+import { AdmissionCaseFollowUpsController } from './admission-case-follow-ups.controller';
+import { AdmissionCaseFollowUpsService } from './admission-case-follow-ups.service';
+import { AdmissionCaseQueuesController } from './admission-case-queues.controller';
+import { AdmissionCaseQueuesService } from './admission-case-queues.service';
+import { AdmissionCasesController } from './admission-cases.controller';
+import { AdmissionCasesService } from './admission-cases.service';
 import { AdmissionsController } from './admissions.controller';
 import { AdmissionsService } from './admissions.service';
 import { M1AdmissionsHardeningController } from './m1-admissions-hardening.controller';
 import { M1AdmissionsHardeningService } from './m1-admissions-hardening.service';
+import { MobileAdmissionsSummaryController } from './mobile-admissions-summary.controller';
+import { MobileAdmissionsSummaryService } from './mobile-admissions-summary.service';
 import { UsageModule } from '../usage/usage.module';
 
 @Module({
@@ -27,7 +35,21 @@ import { UsageModule } from '../usage/usage.module';
     FileRegistryModule,
     UsageModule,
   ],
-  controllers: [AdmissionsController, M1AdmissionsHardeningController],
-  providers: [AdmissionsService, M1AdmissionsHardeningService],
+  controllers: [
+    AdmissionsController,
+    AdmissionCasesController,
+    AdmissionCaseQueuesController,
+    AdmissionCaseFollowUpsController,
+    MobileAdmissionsSummaryController,
+    M1AdmissionsHardeningController,
+  ],
+  providers: [
+    AdmissionsService,
+    AdmissionCasesService,
+    AdmissionCaseQueuesService,
+    AdmissionCaseFollowUpsService,
+    MobileAdmissionsSummaryService,
+    M1AdmissionsHardeningService,
+  ],
 })
 export class AdmissionsModule {}

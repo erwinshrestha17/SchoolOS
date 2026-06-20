@@ -1,7 +1,6 @@
 import Link from 'next/link';
-import { AdmissionForm } from '../../../../components/forms/admission-form';
-import { AdmissionApplicationForm } from '../../../../components/m1/admission-application-form';
 import { DashboardPageShell } from '../../../../components/dashboard/dashboard-page-shell';
+import { AdmissionEntry } from '../../../../components/m1/admission-entry';
 import { M1PageHeader } from '../../../../components/m1/m1-page-header';
 
 export default async function NewAdmissionPage({
@@ -10,23 +9,20 @@ export default async function NewAdmissionPage({
   searchParams: Promise<{ mode?: string }>;
 }) {
   const { mode } = await searchParams;
-  const directEnrollment = mode === 'enrollment' || mode === 'bulk';
+  const initialMode = mode === 'review' ? 'review' : mode === 'enrollment' || mode === 'direct' ? 'direct' : undefined;
+
   return (
     <DashboardPageShell>
       <M1PageHeader
-        title={directEnrollment ? 'Direct Enrollment' : 'New Application'}
-        description={
-          directEnrollment
-            ? 'Create a student and enrollment atomically after completing the required review.'
-            : 'Capture an inquiry/application for review before the separate enrollment transition.'
+        title="New admission"
+        description="Add a student through the school’s configured admission policy. Normal office admissions stay simple; review is used only when needed."
+        secondaryActions={
+          <Link href="/dashboard/admissions" className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+            Cancel
+          </Link>
         }
-        secondaryActions={<Link href="/dashboard/admissions" className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50">Cancel</Link>}
       />
-      {directEnrollment ? (
-        <AdmissionForm defaultWorkspaceTab={mode === 'bulk' ? 'bulk' : 'enrollment'} />
-      ) : (
-        <AdmissionApplicationForm />
-      )}
+      <AdmissionEntry initialMode={initialMode} />
     </DashboardPageShell>
   );
 }

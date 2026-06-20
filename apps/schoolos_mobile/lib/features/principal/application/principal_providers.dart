@@ -46,6 +46,7 @@ final principalSnapshotProvider = FutureProvider.autoDispose
       final repository = ref.watch(principalRepositoryProvider);
       final isOnline = ref.watch(connectivityProvider);
       final data = switch (key) {
+        'admissions' => await repository.getAdmissionsSummary(),
         'attendance' => await repository.getAttendanceSummary(),
         'staff' => await repository.getStaffAbsence(),
         'fees' => await repository.getFeesSummary(),
