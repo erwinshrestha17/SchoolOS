@@ -275,7 +275,7 @@ export function SummaryUnavailableState({ status }: { status: OperationalSummary
 }
 
 export function OperationalSummaryLoading() {
-  return <LoadingState variant="section" label="Loading operational summary..." />;
+  return <LoadingState variant="skeleton" label="Loading operational summary..." />;
 }
 
 export function OperationalSummaryError({ onRetry }: { onRetry: () => void }) {
