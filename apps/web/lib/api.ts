@@ -18,6 +18,7 @@ export * from './api/library';
 export * from './api/transport';
 export * from './api/learning';
 export * from './api/operational-summary';
+export * from './api/school-settings';
 
 import { authApi } from './api/auth';
 import { academicsApi } from './api/academics';
@@ -37,6 +38,7 @@ import { libraryApi } from './api/library';
 import { transportApi } from './api/transport';
 import { learningApi } from './api/learning';
 import { operationalSummaryApi } from './api/operational-summary';
+import { schoolSettingsApi } from './api/school-settings';
 import { filesApi } from './api/client';
 
 export const api = {
@@ -58,5 +60,6 @@ export const api = {
   ...transportApi,
   ...learningApi,
   ...operationalSummaryApi,
+  ...schoolSettingsApi,
   ...filesApi,
 };
