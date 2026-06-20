@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { RolesPermissionsWorkspace } from '../../../../components/settings/roles-permissions-workspace';
 
-export default function RolesPermissionsSettingsRedirect() {
-  redirect('/dashboard/settings?section=roles-permissions');
+export default function RolesPermissionsPage() {
+  return <RolesPermissionsWorkspace />;
 }
