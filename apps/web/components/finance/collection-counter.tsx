@@ -3,21 +3,29 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { Wallet, Search, CreditCard, Banknote, History, ChevronRight, User, GraduationCap, MapPin, Phone, Receipt, Printer, AlertCircle, Loader2 } from 'lucide-react';
+import { Wallet, Search, CreditCard, Banknote, History, User, GraduationCap, MapPin, Phone, Receipt, Printer, AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '../ui/input';
-import { LoadingState } from '../ui/loading-state';
 import { EmptyState } from '../ui/empty-state';
 import { api } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
+import type {
+  InvoiceDetailLine,
+  InvoiceSummary,
+  StudentCollectionContext,
+} from '@schoolos/core';
 
 interface CollectionCounterProps {
   onSearch: (query: string) => void;
-  invoices: any[];
+  invoices: InvoiceSummary[];
   onCollect: (invoiceId: string, amount: number, method: string, reference?: string, remarks?: string) => void;
   isLoading?: boolean;
   isSubmitting?: boolean;
   initialInvoiceId?: string | null;
+  studentContext?: StudentCollectionContext['student'] | null;
+  isStudentProfileSource?: boolean;
+  onChangeStudent?: () => void;
+  disableSearch?: boolean;
 }
 
 const formatCurrency = (amount: number) => {
@@ -35,7 +43,18 @@ const formatDate = (value: string) =>
     year: 'numeric',
   }).format(new Date(value));
 
-export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, isSubmitting, initialInvoiceId }: CollectionCounterProps) {
+export function CollectionCounter({
+  onSearch,
+  invoices,
+  onCollect,
+  isLoading,
+  isSubmitting,
+  initialInvoiceId,
+  studentContext,
+  isStudentProfileSource,
+  onChangeStudent,
+  disableSearch,
+}: CollectionCounterProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [amount, setAmount] = useState<number>(0);
@@ -53,12 +72,19 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, is
     enabled: !!selectedInvoiceId,
   });
 
-  const handleSelectInvoice = (inv: any) => {
+  const handleSelectInvoice = (inv: InvoiceSummary) => {
     setSelectedInvoiceId(inv.id);
     setAmount(0);
     setReference('');
     setRemarks('');
   };
+
+  useEffect(() => {
+    setSelectedInvoiceId(null);
+    setAmount(0);
+    setReference('');
+    setRemarks('');
+  }, [studentContext?.id]);
 
   useEffect(() => {
     if (!initialInvoiceId || selectedInvoiceId === initialInvoiceId) return;
@@ -74,27 +100,85 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, is
   }, [initialInvoiceId, invoices, selectedInvoiceId]);
 
   useEffect(() => {
+    if (!studentContext) return;
+
+    if (invoices.length === 1 && selectedInvoiceId !== invoices[0].id) {
+      setSelectedInvoiceId(invoices[0].id);
+      setAmount(0);
+      setReference('');
+      setRemarks('');
+      return;
+    }
+
+    if (
+      invoices.length !== 1 &&
+      selectedInvoiceId &&
+      !invoices.some((invoice) => invoice.id === selectedInvoiceId)
+    ) {
+      setSelectedInvoiceId(null);
+      setAmount(0);
+      setReference('');
+      setRemarks('');
+    }
+  }, [invoices, selectedInvoiceId, studentContext]);
+
+  useEffect(() => {
     if (!invoiceDetailQuery.data) return;
     setAmount(invoiceDetailQuery.data.outstandingAmount);
   }, [invoiceDetailQuery.data]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
-      <SectionCard title="Student Discovery" description="Search by name, ID or invoice number">
-        <div className="space-y-6">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <Input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                onSearch(e.target.value);
-              }}
-              placeholder="Find student or invoice..."
-              className="pl-12 h-14 rounded-2xl border-slate-100 bg-slate-50/50 focus:bg-white transition-all shadow-sm"
-            />
+    <div className="space-y-4">
+      {isStudentProfileSource && studentContext ? (
+        <div className="flex flex-col gap-3 rounded-2xl border border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)] px-5 py-4 text-[var(--color-mod-fees-text)] shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[0.65rem] font-black uppercase tracking-widest opacity-70">
+              Student profile handoff
+            </p>
+            <p className="text-sm font-black">
+              Collecting fees for: {studentContext.name} · {studentContext.studentSystemId}
+            </p>
           </div>
+          {onChangeStudent ? (
+            <button
+              type="button"
+              onClick={onChangeStudent}
+              className="inline-flex min-h-10 items-center justify-center rounded-xl border border-[var(--color-mod-fees-border)] bg-white px-4 text-xs font-black uppercase tracking-widest text-[var(--color-mod-fees-text)] shadow-sm transition hover:bg-slate-50"
+            >
+              Change student
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
+      <SectionCard
+        title={studentContext ? 'Selected Student' : 'Student Discovery'}
+        description={studentContext ? 'Outstanding invoices for this student only' : 'Search by name, ID or invoice number'}
+      >
+        <div className="space-y-6">
+          {studentContext ? (
+            <StudentContextSummary
+              student={studentContext}
+              onChangeStudent={onChangeStudent}
+            />
+          ) : null}
+
+          {!disableSearch ? (
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <Input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  onSearch(e.target.value);
+                }}
+                placeholder="Find student or invoice..."
+                className="pl-12 h-14 rounded-2xl border-slate-100 bg-slate-50/50 focus:bg-white transition-all shadow-sm"
+              />
+            </div>
+          ) : null}
 
           <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
             {invoices.map((inv) => (
@@ -116,13 +200,18 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, is
                     <User size={20} />
                   </div>
                   <div className="text-left">
-                    <p className="text-sm font-black truncate max-w-[160px] tracking-tight">{inv.student?.name || 'Student name not set'}</p>
+                    <p className="text-sm font-black truncate max-w-[160px] tracking-tight">{studentContext?.name || inv.student?.name || 'Student name not set'}</p>
                     <p className={cn(
                       "text-[0.65rem] font-bold uppercase tracking-widest mt-1",
                       selectedInvoiceId === inv.id ? "text-[var(--color-mod-fees-text)]/70" : "text-slate-500"
                     )}>
                       {inv.invoiceNumber}
                     </p>
+                    {typeof inv.outstandingAmount === 'number' ? (
+                      <p className="mt-2 text-xs font-black text-danger-600">
+                        {formatCurrency(inv.outstandingAmount)} outstanding
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 <div className="text-right flex flex-col items-end">
@@ -137,9 +226,20 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, is
               </div>
             )}
             {invoices.length === 0 && !isLoading && (
-              <EmptyState 
-                title="No Records Found" 
-                description="Try searching with a different student ID or name."
+              <EmptyState
+                title={studentContext ? 'This student has no outstanding invoices.' : 'No Records Found'}
+                description={studentContext ? 'Fee collection is not needed right now.' : 'Try searching with a different student ID or name.'}
+                action={
+                  studentContext && onChangeStudent ? (
+                    <button
+                      type="button"
+                      onClick={onChangeStudent}
+                      className="rounded-xl bg-[var(--color-mod-fees-accent)] px-4 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-[var(--color-mod-fees-text)]"
+                    >
+                      Change student
+                    </button>
+                  ) : undefined
+                }
                 className="py-12"
               />
             )}
@@ -155,8 +255,8 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, is
                <SummaryCard 
                 icon={<GraduationCap size={18} />} 
                 label="Student Detail" 
-                value={invoiceDetailQuery.data?.student.name || selectedInvoice.student?.name || 'Student name not set'}
-                sub={invoiceDetailQuery.data?.student.studentSystemId || 'Student ID loading'}
+                value={invoiceDetailQuery.data?.student.name || studentContext?.name || selectedInvoice.student?.name || 'Student name not set'}
+                sub={invoiceDetailQuery.data?.student.studentSystemId || studentContext?.studentSystemId || 'Student ID loading'}
                />
                <SummaryCard 
                 icon={<MapPin size={18} />} 
@@ -202,7 +302,7 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, is
                   <div className="space-y-3">
                     <h5 className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-1">Fee Breakdown</h5>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {invoiceDetailQuery.data.lines?.map((item: any) => (
+                      {invoiceDetailQuery.data.lines?.map((item: InvoiceDetailLine) => (
                         <div key={item.id} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl">
                           <span className="text-xs font-bold text-slate-700">{item.feeHeadName || 'Fee head not set'}</span>
                           <span className="text-xs font-black text-slate-900">{formatCurrency(item.netAmount)}</span>
@@ -318,7 +418,13 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, is
               <Wallet size={48} />
             </div>
             <h4 className="text-2xl font-black text-slate-900 tracking-tight">Fee Collection Counter</h4>
-            <p className="text-sm text-slate-500 mt-3 max-w-[320px] leading-relaxed">Select an outstanding invoice from the search results to load student details and process payment.</p>
+            <p className="text-sm text-slate-500 mt-3 max-w-[320px] leading-relaxed">
+              {studentContext && invoices.length > 1
+                ? 'Choose an invoice to collect payment.'
+                : studentContext && invoices.length === 0
+                  ? 'This student has no outstanding invoices.'
+                  : 'Select an outstanding invoice from the search results to load student details and process payment.'}
+            </p>
             
             <div className="mt-12 grid grid-cols-3 gap-6 opacity-30 grayscale">
                <div className="flex flex-col items-center gap-2">
@@ -336,6 +442,7 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, is
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
@@ -361,6 +468,55 @@ function StatItem({ label, value, color = "text-slate-900" }: { label: string; v
     <div className="flex flex-col">
       <span className="text-[0.6rem] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{label}</span>
       <span className={cn("text-lg font-black tracking-tight", color)}>{value}</span>
+    </div>
+  );
+}
+
+function StudentContextSummary({
+  student,
+  onChangeStudent,
+}: {
+  student: StudentCollectionContext['student'];
+  onChangeStudent?: () => void;
+}) {
+  const classSection = [student.className, student.sectionName]
+    .filter(Boolean)
+    .join(' / ');
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-black text-slate-900">
+            {student.name}
+          </p>
+          <p className="mt-1 text-[0.65rem] font-black uppercase tracking-widest text-slate-500">
+            {student.studentSystemId}
+          </p>
+        </div>
+        {onChangeStudent ? (
+          <button
+            type="button"
+            onClick={onChangeStudent}
+            className="shrink-0 text-[0.65rem] font-black uppercase tracking-widest text-[var(--color-mod-fees-accent)] hover:text-[var(--color-mod-fees-text)]"
+          >
+            Change
+          </button>
+        ) : null}
+      </div>
+      <div className="mt-4 grid gap-3 text-xs font-bold text-slate-600">
+        <div className="flex items-center gap-2">
+          <GraduationCap size={14} className="text-slate-400" />
+          <span>{classSection || 'Class not set'}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Phone size={14} className="text-slate-400" />
+          <span>
+            {student.guardianName || 'Guardian not recorded'}
+            {student.guardianPhone ? ` · ${student.guardianPhone}` : ''}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

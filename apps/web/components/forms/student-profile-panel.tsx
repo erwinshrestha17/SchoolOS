@@ -173,7 +173,7 @@ export function StudentProfilePanel({
                     Rs. {formatMoney(invoice.totalAmount)} / paid Rs.{' '}
                     {formatMoney(invoice.paidAmount ?? 0)}
                   </p>
-                  {'outstandingAmount' in invoice ? (
+                  {typeof invoice.outstandingAmount === 'number' ? (
                     <p className="mt-1 text-gray-500">
                       Outstanding Rs. {formatMoney(invoice.outstandingAmount)}
                     </p>

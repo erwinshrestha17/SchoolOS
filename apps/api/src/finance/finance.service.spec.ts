@@ -605,6 +605,108 @@ describe('finance production controls', () => {
     );
   });
 
+  it('returns cashier-scoped student collection context with open outstanding invoices only', async () => {
+    const cashierActor = {
+      ...actor,
+      permissions: ['payments:collect'],
+    };
+    const student = {
+      id: 'student-1',
+      studentSystemId: 'SCH-2026-0001',
+      firstNameEn: 'Erwin',
+      lastNameEn: 'Shrestha',
+      class: { name: 'Class 1' },
+      sectionRef: { name: 'A' },
+      guardianLinks: [
+        {
+          isPrimary: true,
+          guardian: {
+            fullName: 'Primary Guardian',
+            primaryPhone: '9800000000',
+          },
+        },
+      ],
+    };
+    const openInvoice = buildInvoice({
+      id: 'invoice-open-1',
+      invoiceNumber: 'INV-2026-00010',
+      dueDate: new Date('2026-05-15T00:00:00.000Z'),
+      issuedAt: new Date('2026-04-27T00:00:00.000Z'),
+      totalAmount: new Prisma.Decimal(1000),
+      payments: [
+        {
+          id: 'payment-1',
+          amount: new Prisma.Decimal(250),
+          status: 'SUCCESS',
+          refunds: [],
+        },
+      ],
+    });
+    const fullySettledPartialInvoice = buildInvoice({
+      id: 'invoice-partial-settled',
+      invoiceNumber: 'INV-2026-00011',
+      status: InvoiceStatus.PARTIAL,
+      totalAmount: new Prisma.Decimal(500),
+      payments: [
+        {
+          id: 'payment-2',
+          amount: new Prisma.Decimal(500),
+          status: 'SUCCESS',
+          refunds: [],
+        },
+      ],
+    });
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: null,
+      student,
+      invoices: [openInvoice, fullySettledPartialInvoice],
+    });
+
+    const result = await service.getStudentCollectionContext(
+      student.id,
+      cashierActor,
+    );
+
+    expect(prisma.student.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: student.id,
+          tenantId: actor.tenantId,
+        },
+      }),
+    );
+    expect(prisma.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: actor.tenantId,
+          studentId: student.id,
+          status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
+        },
+      }),
+    );
+    expect(result.student).toEqual({
+      id: 'student-1',
+      studentSystemId: 'SCH-2026-0001',
+      name: 'Erwin Shrestha',
+      className: 'Class 1',
+      sectionName: 'A',
+      guardianName: 'Primary Guardian',
+      guardianPhone: '9800000000',
+    });
+    expect(result.invoices).toEqual([
+      {
+        id: 'invoice-open-1',
+        invoiceNumber: 'INV-2026-00010',
+        status: InvoiceStatus.ISSUED,
+        dueDate: '2026-05-15T00:00:00.000Z',
+        totalAmount: 1000,
+        paidAmount: 250,
+        outstandingAmount: 750,
+      },
+    ]);
+  });
+
   it('builds a tenant-scoped student fee ledger with running balance', async () => {
     const invoice = buildInvoice({
       id: 'invoice-ledger-1',

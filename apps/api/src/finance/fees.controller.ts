@@ -79,6 +79,15 @@ export class FeesController {
     return this.financeService.getInvoiceDetail(invoiceId, auth);
   }
 
+  @Get('students/:studentId/collection-context')
+  @Permissions('payments:collect')
+  getStudentCollectionContext(
+    @Param('studentId') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.getStudentCollectionContext(studentId, auth);
+  }
+
   @Get('students/:studentId/ledger')
   @Permissions('fees:manage')
   getStudentFeeLedger(

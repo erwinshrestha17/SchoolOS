@@ -77,6 +77,7 @@ import {
   PARENT_SANDBOX_PAYMENT_PROVIDERS,
   type ParentSandboxPaymentProvider,
 } from './sandbox-payment-provider';
+import type { StudentCollectionContext } from '@schoolos/core';
 
 interface CollectedPaymentWithReceipt {
   id: string;
@@ -1881,6 +1882,82 @@ export class FinanceService {
         billingRunId: invoice.billingRunId,
         enrollmentId: invoice.enrollmentId,
       },
+    };
+  }
+
+  async getStudentCollectionContext(
+    studentId: string,
+    actor: AuthContext,
+  ): Promise<StudentCollectionContext> {
+    assertFinancePermission(actor, 'payments:collect');
+
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: studentId,
+        tenantId: actor.tenantId,
+      },
+      include: {
+        class: true,
+        sectionRef: true,
+        guardianLinks: {
+          include: {
+            guardian: true,
+          },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
+      },
+      include: {
+        payments: {
+          include: {
+            refunds: true,
+          },
+        },
+      },
+      orderBy: [{ dueDate: 'asc' }, { issuedAt: 'asc' }],
+    });
+
+    const primaryGuardian =
+      student.guardianLinks.find((link) => link.isPrimary) ??
+      student.guardianLinks[0];
+
+    return {
+      student: {
+        id: student.id,
+        studentSystemId: student.studentSystemId,
+        name: formatStudentName(student),
+        className: student.class?.name ?? null,
+        sectionName: student.sectionRef?.name ?? null,
+        guardianName: primaryGuardian?.guardian.fullName ?? null,
+        guardianPhone: primaryGuardian?.guardian.primaryPhone ?? null,
+      },
+      invoices: invoices
+        .map((invoice) => {
+          const paidAmount = sumNetPaidAmount(invoice.payments);
+          const outstandingAmount = invoice.totalAmount.sub(paidAmount);
+
+          return {
+            id: invoice.id,
+            invoiceNumber: invoice.invoiceNumber,
+            status: invoice.status,
+            dueDate: invoice.dueDate.toISOString(),
+            totalAmount: Number(invoice.totalAmount),
+            paidAmount: Number(paidAmount),
+            outstandingAmount: Math.max(0, Number(outstandingAmount)),
+          };
+        })
+        .filter((invoice) => invoice.outstandingAmount > 0),
     };
   }
 

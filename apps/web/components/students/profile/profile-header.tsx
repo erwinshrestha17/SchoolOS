@@ -179,7 +179,10 @@ export function ProfileHeader({
               {
                 label: 'Collect fees',
                 icon: <Wallet size={16} />,
-                onClick: () => router.push(`/dashboard/finance?studentId=${encodeURIComponent(student.id)}`),
+                onClick: () =>
+                  router.push(
+                    `/dashboard/finance?studentId=${encodeURIComponent(student.id)}&source=student-profile`,
+                  ),
               },
               {
                 label: 'View attendance',

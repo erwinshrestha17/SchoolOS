@@ -4,25 +4,56 @@ import React, { useRef, useState } from 'react';
 import { CollectionCounter } from './collection-counter';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import type { CollectedPaymentResult } from '@/lib/api/finance';
+import type { InvoiceSummary, StudentCollectionContext } from '@schoolos/core';
 import { CheckCircle2, AlertCircle, Printer, X } from 'lucide-react';
 import { ErrorState } from '@/components/ui/error-state';
 
 interface CollectionSectionProps {
-  invoices: any[];
+  invoices: InvoiceSummary[];
   isLoading?: boolean;
   isError?: boolean;
   onRetry?: () => void;
   initialInvoiceId?: string | null;
+  studentCollectionContext?: StudentCollectionContext | null;
+  hasStudentCollectionContextRequest?: boolean;
+  isStudentProfileSource?: boolean;
+  onChangeStudent?: () => void;
 }
 
-export function CollectionSection({ invoices, isLoading, isError, onRetry, initialInvoiceId }: CollectionSectionProps) {
+type CollectionPaymentPayload = {
+  invoiceId: string;
+  amount: number;
+  method: string;
+  referenceNumber?: string;
+  narration: string;
+};
+
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error
+    ? error.message
+    : 'Payment could not be recorded. Please retry.';
+
+export function CollectionSection({
+  invoices,
+  isLoading,
+  isError,
+  onRetry,
+  initialInvoiceId,
+  studentCollectionContext,
+  hasStudentCollectionContextRequest,
+  isStudentProfileSource,
+  onChangeStudent,
+}: CollectionSectionProps) {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
-  const [lastReceipt, setLastReceipt] = useState<any>(null);
+  const [lastReceipt, setLastReceipt] = useState<CollectedPaymentResult | null>(null);
   const paymentAttemptRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  const isStudentContextMode =
+    Boolean(studentCollectionContext) || Boolean(hasStudentCollectionContextRequest);
 
   const paymentMutation = useMutation({
-    mutationFn: async (payload: any) => {
+    mutationFn: async (payload: CollectionPaymentPayload) => {
       const fingerprint = JSON.stringify(payload);
       if (paymentAttemptRef.current?.fingerprint !== fingerprint) {
         paymentAttemptRef.current = {
@@ -39,13 +70,21 @@ export function CollectionSection({ invoices, isLoading, isError, onRetry, initi
       paymentAttemptRef.current = null;
       setLastReceipt(result);
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      if (studentCollectionContext?.student.id) {
+        void queryClient.invalidateQueries({
+          queryKey: [
+            'student-collection-context',
+            studentCollectionContext.student.id,
+          ],
+        });
+      }
       void queryClient.invalidateQueries({ queryKey: ['receipts'] });
       void queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
   });
 
-  const filteredInvoices = invoices.filter(inv => {
+  const filteredInvoices = isStudentContextMode ? studentCollectionContext?.invoices ?? [] : invoices.filter(inv => {
     if (!searchQuery) return inv.status !== 'PAID';
     const q = searchQuery.toLowerCase();
     return (
@@ -107,7 +146,7 @@ export function CollectionSection({ invoices, isLoading, isError, onRetry, initi
           <AlertCircle size={24} className="text-danger-500" />
           <div className="flex flex-col">
              <span className="text-[0.65rem] uppercase tracking-widest text-danger-600 mb-1">Payment Failed</span>
-             {(paymentMutation.error as any).message}
+             {getErrorMessage(paymentMutation.error)}
           </div>
         </div>
       )}
@@ -118,13 +157,17 @@ export function CollectionSection({ invoices, isLoading, isError, onRetry, initi
         isLoading={isLoading}
         isSubmitting={paymentMutation.isPending}
         initialInvoiceId={initialInvoiceId}
+        studentContext={studentCollectionContext?.student ?? null}
+        isStudentProfileSource={isStudentProfileSource}
+        onChangeStudent={onChangeStudent}
+        disableSearch={isStudentContextMode}
         onCollect={(invoiceId, amount, method, reference, remarks) => {
           setLastReceipt(null);
           paymentMutation.mutate({
             invoiceId,
             amount,
             method,
-            reference,
+            referenceNumber: reference || undefined,
             narration: remarks || `Counter collection via Finance Dashboard`
           });
         }}

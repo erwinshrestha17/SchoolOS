@@ -15,6 +15,7 @@ import type {
   ReceiptView,
   ReportDefinition,
   ReportExportRequest,
+  StudentCollectionContext,
   StudentFeeLedger,
   WaiverRecord,
 } from '@schoolos/core';
@@ -112,6 +113,16 @@ export type ReceiptVerificationResult = {
   };
 };
 
+export type CollectedPaymentResult = {
+  paymentId: string;
+  invoiceId: string;
+  amount: number;
+  method: string;
+  paidAt: string;
+  receiptNumber: string | null;
+  receiptPdfUrl: string | null;
+};
+
 export type DefaultersResponse = {
   filters: {
     classId: string | null;
@@ -139,6 +150,10 @@ export const financeApi = {
   getStudentFeeLedger: (studentId: string) =>
     request<StudentFeeLedger>(
       `/fees/students/${encodeURIComponent(studentId)}/ledger`,
+    ),
+  getStudentCollectionContext: (studentId: string) =>
+    request<StudentCollectionContext>(
+      `/fees/students/${encodeURIComponent(studentId)}/collection-context`,
     ),
   listBillingRuns: () => request<FeeBillingRun[]>('/fees/billing-runs'),
   generateBillingRun: (body: JsonBody) =>
@@ -182,7 +197,7 @@ export const financeApi = {
   createFeePlan: (body: JsonBody) =>
     request('/fees/plans', { method: 'POST', json: body }),
   collectPayment: (body: JsonBody) =>
-    request('/payments', { method: 'POST', json: body }),
+    request<CollectedPaymentResult>('/payments', { method: 'POST', json: body }),
   getPaymentGatewayReadiness: () =>
     request<PaymentGatewayReadiness>('/payments/gateway-readiness'),
   refundPayment: (paymentId: string, body: PaymentRefundPayload) =>

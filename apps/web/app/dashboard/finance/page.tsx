@@ -11,8 +11,8 @@ import {
   ShieldAlert,
   Wallet,
 } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { CashierCloseSection } from '@/components/finance/cashier-close-section';
 import { CollectionSection } from '@/components/finance/collection-section';
 import { DefaulterAgingSummary } from '@/components/finance/defaulter-aging-summary';
@@ -47,8 +47,12 @@ const formatCurrency = (amount: number) =>
 
 export default function FinancePage() {
   const { hasPermissions, session } = useSession();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialInvoiceId = searchParams.get('invoiceId');
+  const studentId = searchParams.get('studentId');
+  const source = searchParams.get('source');
+  const isStudentProfileSource = source === 'student-profile' && Boolean(studentId);
 
   const canCollectPayments = hasPermissions(['payments:collect']);
   const canManageFees = hasPermissions(['fees:manage']);
@@ -67,7 +71,18 @@ export default function FinancePage() {
   const invoicesQuery = useQuery({
     queryKey: ['invoices'],
     queryFn: () => api.listInvoices(),
-    enabled: canCollectPayments,
+    enabled: canCollectPayments && !studentId,
+  });
+  const studentCollectionContextQuery = useQuery({
+    queryKey: ['student-collection-context', studentId],
+    queryFn: () => {
+      if (!studentId) {
+        throw new Error('Student context is unavailable.');
+      }
+
+      return api.getStudentCollectionContext(studentId);
+    },
+    enabled: canCollectPayments && Boolean(studentId),
   });
   const defaultersQuery = useQuery({
     queryKey: ['defaulters', 'workspace-summary'],
@@ -83,6 +98,23 @@ export default function FinancePage() {
         block: 'start',
       });
     });
+  };
+
+  useEffect(() => {
+    if (studentId && canCollectPayments) {
+      setActiveTab('collection');
+    }
+  }, [canCollectPayments, studentId]);
+
+  const handleChangeStudent = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('studentId');
+    params.delete('source');
+    const query = params.toString();
+    router.replace(query ? `/dashboard/finance?${query}` : '/dashboard/finance', {
+      scroll: false,
+    });
+    setActiveTab('collection');
   };
 
   const tabs = [
@@ -219,10 +251,30 @@ export default function FinancePage() {
             canCollectPayments ? (
               <CollectionSection
                 invoices={invoicesQuery.data ?? []}
-                isLoading={invoicesQuery.isLoading}
-                isError={invoicesQuery.isError}
-                onRetry={() => void invoicesQuery.refetch()}
+                isLoading={
+                  studentId
+                    ? studentCollectionContextQuery.isLoading
+                    : invoicesQuery.isLoading
+                }
+                isError={
+                  studentId
+                    ? studentCollectionContextQuery.isError
+                    : invoicesQuery.isError
+                }
+                onRetry={() => {
+                  if (studentId) {
+                    void studentCollectionContextQuery.refetch();
+                    return;
+                  }
+                  void invoicesQuery.refetch();
+                }}
                 initialInvoiceId={initialInvoiceId}
+                studentCollectionContext={
+                  studentCollectionContextQuery.data ?? null
+                }
+                hasStudentCollectionContextRequest={Boolean(studentId)}
+                isStudentProfileSource={isStudentProfileSource}
+                onChangeStudent={handleChangeStudent}
               />
             ) : (
               <PermissionState title="Fee collection is restricted" description="You do not have permission to collect payments. Contact the school administrator if you need cashier access." />

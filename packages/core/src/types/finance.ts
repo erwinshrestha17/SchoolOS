@@ -6,10 +6,33 @@ export type InvoiceSummary = {
   totalAmount: number;
   studentId?: string;
   paidAmount?: number;
+  outstandingAmount?: number;
   student?: {
     id: string;
     name: string;
+    studentSystemId?: string;
   };
+};
+
+export type StudentCollectionContext = {
+  student: {
+    id: string;
+    studentSystemId: string;
+    name: string;
+    className: string | null;
+    sectionName: string | null;
+    guardianName: string | null;
+    guardianPhone: string | null;
+  };
+  invoices: Array<{
+    id: string;
+    invoiceNumber: string;
+    status: string;
+    dueDate: string;
+    totalAmount: number;
+    paidAmount: number;
+    outstandingAmount: number;
+  }>;
 };
 
 export type InvoiceDetailLine = {
