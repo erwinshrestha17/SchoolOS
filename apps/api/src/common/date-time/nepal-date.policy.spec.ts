@@ -57,12 +57,15 @@ describe('SchoolOS Nepal BS date-time policy', () => {
     const schoolDay = getNepalSchoolDay(atMidnight);
     expect(schoolDay.gregorianDate).toBe('2026-06-20');
     expect(schoolDay.startUtc.toISOString()).toBe('2026-06-19T18:15:00.000Z');
-    expect(schoolDay.endExclusiveUtc.toISOString()).toBe('2026-06-20T18:15:00.000Z');
+    expect(schoolDay.endExclusiveUtc.toISOString()).toBe(
+      '2026-06-20T18:15:00.000Z',
+    );
   });
 
   it('validates malformed and impossible BS dates', () => {
     expect(() => parseBsDateInput('2083-3-06')).toThrow();
-    expect(() => parseBsDateInput('2083-03-32')).toThrow();
+    // Asar 2083 has 32 days in the canonical BS dataset; day 33 is impossible.
+    expect(() => parseBsDateInput('2083-03-33')).toThrow();
     expect(() => parseBsDateInput('2084-13-01')).toThrow();
   });
 });
