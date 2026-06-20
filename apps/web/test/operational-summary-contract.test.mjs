@@ -32,6 +32,15 @@ describe('operational summary web contracts', () => {
     assert.match(component, /return APPROVED_DASHBOARD_ROUTES\.has\(action\.route\) \? action\.route : null/);
   });
 
+  it('uses native links for summary navigation instead of unsupported Button slot props', () => {
+    const component = read('components/ui/operational-summary.tsx');
+    const button = read('components/ui/button.tsx');
+
+    assert.doesNotMatch(component, /<Button\s+asChild/);
+    assert.match(component, /<Link\s+[\s\S]*?href=\{href\}/);
+    assert.doesNotMatch(button, /asChild\??:/);
+  });
+
   it('mounts summaries only at dashboard and module landing surfaces', () => {
     const dashboard = read('app/dashboard/page.tsx');
     const shell = read('components/layout/dashboard-shell.tsx');
