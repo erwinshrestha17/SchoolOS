@@ -6,6 +6,8 @@
 
 This plan is dependency-driven. It does not replace the product requirements, functional requirements, architecture/security guide, design plans, or production runbook. It is the focused execution path for moving from local internal QA evidence to controlled pilot and then production readiness.
 
+Cross-surface scope is governed by `docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`. Its feature inventory is a boundary reference, not an automatic backlog: create implementation work only for repository-verified gaps that fit the current release phase and its exit gates.
+
 ## Current Verified Baseline
 
 - Root local gates pass: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:e2e`, `pnpm build`.
@@ -35,7 +37,7 @@ This plan is dependency-driven. It does not replace the product requirements, fu
 
 ## Explicitly Deferred Scope
 
-- M11 School Intelligence / AI.
+- M14 Intelligence / AI.
 - Broad student-owned mobile app beyond approved learning/session flows.
 - Architecture rewrites, microservices, Kubernetes, search clusters, GPU workloads, or unrelated infrastructure.
 - Production provider integrations without sandbox/staging credentials and verification.
@@ -229,7 +231,7 @@ Plus staging-specific migration, backup, restore, provider, and alert verificati
 - Single-school production-ready decision can be upgraded only after pilot exit.
 - Multi-school production-ready decision requires multi-tenant staging and operational proof.
 
-## Phase 7 - Deferred Expansion and M11 Intelligence/AI
+## Phase 7 - Deferred Expansion and M14 Intelligence/AI
 
 **Goal:** Reopen roadmap expansion only after production-critical gates are stable.
 
@@ -248,7 +250,7 @@ Plus staging-specific migration, backup, restore, provider, and alert verificati
 - Cost and provider failure modes are documented.
 
 **Exit gate:**
-- Separate M11 implementation plan approved after Phase 6 evidence.
+- Separate M14 implementation plan approved after Phase 6 evidence.
 
 ## Immediate Next Phase
 

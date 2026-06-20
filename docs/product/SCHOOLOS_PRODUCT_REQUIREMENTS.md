@@ -5,13 +5,15 @@
 **Target schools:** Kindergarten / Montessori to Grade 12 as the long-term product direction; current implementation remains staged around controlled pilot readiness for existing core modules  
 **Document type:** Combined master PRD  
 **Status:** Active product requirements document for controlled pilot hardening, KG-12 product planning, notification module alignment, and M13 Learning Layer alignment  
-**Last updated:** 2026-06-19
+**Last updated:** 2026-06-20
 
 ---
 
 ## 0. Maintainer Note
 
 This document is the active PRD for SchoolOS. It keeps the existing pilot-hardening direction while expanding the product vision from a school-management system into a full KG-12 school operating platform.
+
+The canonical allocation of backend ownership, SchoolOS Web responsibilities, mobile companion responsibilities, allowed roles, and explicit surface exclusions is [`SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`](SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md). This PRD owns product intent; it does not duplicate the module-by-module allocation.
 
 Important distinction:
 
@@ -121,6 +123,8 @@ Future school intelligence
 ```
 
 SchoolOS should not feel like a generic CRUD dashboard. It must match real school-office and classroom workflows in Nepal: front-desk fee collection, principal oversight, teacher attendance/marks entry, guardian communication, smart-board teaching, computer-lab practice, transport tracking, library/canteen counters, and periodic reporting pressure.
+
+SchoolOS Web is the school operating desk and system of record for detailed setup, operation, approval, reconciliation, reporting, and control. Mobile apps are focused companions for immediate, role-scoped action and visibility. Neither surface owns business truth; backend rules and persisted records remain authoritative.
 
 The product should first prioritize pilot reliability, financial correctness, tenant isolation, parent/student access boundaries, protected files, auditability, notification reliability, and operational stability before expanding into advanced AI, mobile, payment, biometric, live-map, or advanced learning workflows.
 

@@ -1,8 +1,10 @@
 # SchoolOS Implementation Plan
 
-**Last updated:** 2026-06-18
+**Last updated:** 2026-06-20
 **Status:** Consolidated implementation backlog and module history. Current readiness evidence lives in `SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`; active execution sequencing lives in `SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`.  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard, Flutter companion app
+
+Backend/web/mobile scope allocation is defined in `docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`. That reference prevents cross-surface duplication but does not turn every listed capability into an active task; sequencing remains governed by `SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` and current repository evidence.
 
 ---
 
@@ -19,7 +21,7 @@ Current recommended target: Internal QA
 Next execution phase: Phase 1 - Realistic Seeded Tenant, Role Assignment, and Smokeable Demo Flows
 ```
 
-The repository has broad implemented foundations across M0-M12, web, mobile, File Registry, RBAC, entitlement, finance/accounting/payroll, learning, and platform operations. The blocking issue is not lack of source code; it is missing proof for realistic seeded flows, authenticated browser E2E, mobile device QA, staging deployment, provider/storage checks, backup restore, and pilot operation.
+The repository has broad implemented foundations across M0-M13, web, mobile, File Registry, RBAC, entitlement, finance/accounting/payroll, learning, and platform operations. The blocking issue is not lack of source code; it is missing proof for realistic seeded flows, authenticated browser E2E, mobile device QA, staging deployment, provider/storage checks, backup restore, and pilot operation.
 
 ### Overall Product Readiness
 * **Demo-ready:** Conditional
@@ -31,7 +33,7 @@ The repository has broad implemented foundations across M0-M12, web, mobile, Fil
 
 **Verification snapshot:** On 2026-06-18, root lint/typecheck/test/E2E/build and local `pnpm verify:production` passed with caveats. `pnpm smoke:pilot` failed because Postgres, Redis, and the API were not running. `pnpm test:web:e2e` passed with 5 public checks and 12 authenticated checks skipped. See `SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` for exact command results.
 
-**Remaining work categories:** realistic demo seed and role assignment, pilot smoke, authenticated browser E2E, mobile role/device QA, provider/staging verification, backup/restore, monitoring, pilot feedback, and future AI. M11 remains roadmap/deferred.
+**Remaining work categories:** realistic demo seed and role assignment, pilot smoke, authenticated browser E2E, mobile role/device QA, provider/staging verification, backup/restore, monitoring, pilot feedback, and future AI. M14 remains roadmap/deferred.
 
 ---
 
@@ -55,12 +57,12 @@ Do not start a later next-phase delivery item until the corresponding exit crite
   7. No stale docs claim a module is next when it is already implemented.
 
 ### Phase 1 — Frontend Implementation for Existing Core
-* **Scope:** Auth/Security, M0, M1, M2, M3, M5, M10, settings, reports, File Registry, notifications, public demo intake, and the pre-AI Advanced Operations frontend shell.
+* **Scope:** Auth/Security, M0, M1, M2, M3, M5, M12, settings, reports, File Registry, notifications, public demo intake, and the pre-AI Advanced Operations frontend shell.
 * **Focus:** Real API-backed web workspaces, loading/empty/error/success/permission-denied/module-locked states, server-side pagination/filtering, app-controlled confirmations, seeded browser E2E, and staging secrets/session/provider review.
 * **Exit criteria:** One real school can run daily admissions, attendance, fees, notices, activity, settings, and platform operations without engineering handholding, and public demo intake can persist leads safely.
 
 ### Phase 2 — High-Value Academic and Finance Polish
-* **Scope:** M4 Academics and M9 Accounting.
+* **Scope:** M4 Academics and M11 Accounting.
 * **Focus:** staging object-storage/browser smoke, large-report threshold tuning, browser E2E execution, bank statement import/reconciliation browser smoke.
 * **Exit criteria:** Academics and accounting can be sold as production-grade admin modules for the current Nepal school scope.
 
@@ -70,7 +72,7 @@ Do not start a later next-phase delivery item until the corresponding exit crite
 * **Exit criteria:** Academic coordinators, teachers, HR admins, and accountants can run these modules without direct database/admin intervention.
 
 ### Phase 4 — Harden Extended Operations Verticals
-* **Scope:** M8A Library, M8B Transport, M8C Canteen.
+* **Scope:** M8 Library, M9 Transport, M10 Canteen.
 * **Focus:** Library barcode/QR scan QA, transport driver device GPS runtime QA, canteen QR/POS speed polish, inventory/vendor edge-case staging coverage, and operation-specific Playwright tests.
 * **Exit criteria:** Operations modules are reliable admin products, not just demos.
 
@@ -79,13 +81,13 @@ Do not start a later next-phase delivery item until the corresponding exit crite
 * **Focus:** Secure storage, refresh token flow, role routing, error mapper, offline banner, network retry, push notifications.
 * **Rules:** Use purpose-limited APIs, do not reuse admin-shaped responses directly, add ownership tests before release, and keep parent/student/driver data fail-closed.
 
-### Phase 6 — M12 Learning Runtime Hardening
+### Phase 6 — M13 Learning Runtime Hardening
 * **Scope:** Staging smoke, seeded browser E2E depth, UX polish, protected file upload picker integration, and school-only policy hardening for the implemented Learning foundation.
-* **Current state:** M12 backend, web Learning workspace/runtime routes, parent/student web summary, and Flutter parent/student summary foundation are implemented and verified. Do not re-scatter learning logic into academics/students/homework.
+* **Current state:** M13 backend, web Learning workspace/runtime routes, parent/student web summary, and Flutter parent/student summary foundation are implemented and verified. Do not re-scatter learning logic into academics/students/homework.
 * **Focus:** Validate real school fixtures, add end-to-end browser scenarios for activity create/edit/archive, matching/order creation, resource attach/archive, session launch/list/control, participant monitor, board heartbeat, student join/autosave/submit, parent child-scoped summary, and permission/module-denied states.
 * **Exit criteria:** Staging proves one teacher can create/launch/monitor an activity, one student can join/autosave/submit, progress updates, and parent/student summaries remain non-comparative and child/self scoped.
 
-### Phase 7 — M11 Intelligence / AI Readiness
+### Phase 7 — M14 Intelligence / AI Readiness
 * **Scope:** Roadmap only.
 * **Rules:** No AI/ML runtime or LLM calls until approved, no automated punishment/risk action, human review is mandatory for recommendations, and tenant isolation + audit logging are mandatory.
 
@@ -103,7 +105,7 @@ Before adding or expanding visible features:
 7. Do not mix SchoolOS SaaS billing with school fee collection.
 8. Keep money flows idempotent and auditable.
 9. Keep private files behind FileRegistryService and StorageService.
-10. Keep AI/ML roadmap-only until reliable production data exists and M11 is approved.
+10. Keep AI/ML roadmap-only until reliable production data exists and M14 is approved.
 11. Follow `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` and `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` before broad web/mobile visual redesign work.
 12. Each school module should have dedicated web screens/workspaces for its real workflow.
 
@@ -144,7 +146,7 @@ Before adding or expanding visible features:
 * **Backend Backlog:**
   - Continue provider-specific staging verification for SMS, email, FCM, object storage, and payment gateways using real provider/env setup.
   - Continue deployed queue-topology smoke for the implemented queue health, failure grouping, detail diagnostics, and retry/discard workflows.
-  - Continue platform SaaS billing lifecycle staging verification; implemented lifecycle paths must remain separate from school fee collection and M9 accounting posting.
+  - Continue platform SaaS billing lifecycle staging verification; implemented lifecycle paths must remain separate from school fee collection and M11 accounting posting.
   - Continue real-environment storage smoke for the implemented local, S3, R2, and MinIO-compatible readiness surfaces.
   - Formal tenant onboarding state transitions are not required for current backend closure; the accepted pilot model is computed checklist state plus audited platform overrides. Reopen only if product requires additional onboarding statuses, approvals, or rollback transitions.
 * **Web Frontend Backlog:**
@@ -281,7 +283,7 @@ Before adding or expanding visible features:
   - Leave request creation, leave approval, payslip detail/download, attendance/check-in, staff notices.
   - Salary/bank fields masked unless permission allows.
 
-### M8A Library (93-96%)
+### M8 Library (93-96%)
 * **Current Status:** CRUD, book copies, fines, QR lookup, staff borrowers, fine-to-fees/accounting boundary, scanner-first UI, copy archive workflow with audit reason, reports/export polish, and required audited reasons for lost/damaged copy status changes.
 * **Staging / Verification Remaining:**
   - Lost/damaged/fine posting tests.
@@ -300,7 +302,7 @@ Before adding or expanding visible features:
   - Borrowed books, due dates, fine warnings, book search, book detail.
   - Librarian scanner workflows after device QA.
 
-### M8B Transport (91-95%)
+### M9 Transport (91-95%)
 * **Current Status:** Routes, stops, vehicles, assignments, trips, Redis GPS latest-location cache with persisted-history fallback metadata, driver/parent scoped trip surfaces, and trip-history exports.
 * **Staging / Verification Remaining:**
   - Route and end-to-end GPS retention smoke.
@@ -318,13 +320,13 @@ Before adding or expanding visible features:
   - Background GPS permission flow, location sync status, retry queue.
   - Parent bus status: not started, en route, delayed, arrived, stale GPS.
 
-### M8C Canteen (93-97%)
+### M10 Canteen (93-97%)
 * **Current Status:** Menu, plans, POS, wallets, inventory, vendors, receipt JSON/PDF, stock hardening with atomic manual decrement guards, wallet guards, linked invoice handoff, parent mobile views, serving allergy acknowledgement, and workspace polish.
 * **Staging / Verification Remaining:**
   - POS reversal/wallet guard smoke.
   - POS/report smoke.
 * **Backend Backlog:**
-  - No current-code M8C backend closure blocker remains after monthly spending controls, low-balance events, stock close, wastage reports, supplier purchase reports, vendor bill edit locks, serving warning acknowledgement, POS/wallet guards, and local backend/root/smoke gates.
+  - No current-code M10 backend closure blocker remains after monthly spending controls, low-balance events, stock close, wastage reports, supplier purchase reports, vendor bill edit locks, serving warning acknowledgement, POS/wallet guards, and local backend/root/smoke gates.
   - Continue regression depth for POS double-submit, receipt reprint idempotency, and allergy/medical warning enforcement after pilot serving rules are finalized.
 * **Web Frontend Backlog:**
   - POS speed polish with QR/student search, wallet balance, allergy warning, and receipt after device/browser QA.
@@ -336,13 +338,13 @@ Before adding or expanding visible features:
   - Student meal QR.
   - Canteen scanner and serve meal flow after device QA.
 
-### M9 Accounting & Finance (98-100%)
+### M11 Accounting & Finance (98-100%)
 * **Current Status:** Accounts, Nepal school-friendly chart template preview/import, journals, source-record drilldown, source-mapping health checks for fees/payroll/canteen/library/transport, reports, reconciliation, PDFs, retry-safe File Registry report snapshot reuse, synchronous export row thresholds plus queued background General Ledger/Cash Book exports through File Registry, platform-visible `accounting-reports` queue health/failure diagnostics, audit, bank statement DTO/import validation, and reconciliation DTOs.
 * **Staging / Verification Remaining:**
   - Fiscal lock/reversal/export failure and bank reconciliation browser tests.
   - Report/export/import/reconciliation smoke.
 * **Backend Backlog:**
-  - No current-code M9 backend backlog remains; fiscal close/reopen, period-lock posting denial, and posted-record reversal/correction-only enforcement are covered by backend service/E2E tests.
+  - No current-code M11 backend backlog remains; fiscal close/reopen, period-lock posting denial, and posted-record reversal/correction-only enforcement are covered by backend service/E2E tests.
 * **Web Frontend Backlog:**
   - Accountant dashboard for fiscal status, unreconciled items, pending postings, export history.
   - Bank reconciliation review with manual confirmation polish.
@@ -350,14 +352,14 @@ Before adding or expanding visible features:
 * **Mobile Frontend Backlog:**
   - Principal read-only finance snapshot only; no full COA/journal editing on mobile.
 
-### M10 Notices / Communication / Chat (94-97%)
+### M12 Notifications / Notices / Communication / Chat (94-97%)
 * **Current Status:** Notices, deliveries, events, consents, high-impact recipient preview, notice-detail, notification-center, parent-teacher chat, messaging-hardening, HMAC-signed SMS/email/FCM provider callback verification, sanitized provider callback failures, duplicate/out-of-order provider status guards, provider-disabled retry fail-closed behavior, role-aware chat quiet-hours, escalation write locks with reopen-on-resolve, File Registry-backed notice attachment signing with raw object-key suppression, legacy messaging parent/guardian live-link scoping with unsafe attachment suppression and tenant-only SSE change signals, and audited delivery retry reasons. Delivery retry now preserves existing tenant-scoped/idempotent backend claims, records operator reasons for single and bulk retry attempts, skips lost retry races with per-row diagnostics, blocks disabled providers without enqueueing sends, and the web retry panel requires those reasons while showing backend `RETRY_PENDING` state.
 * **Staging / Verification Remaining:**
   - Provider failure, retry, moderation, attachment tests against staging fixtures.
   - Provider-specific signed callback staging smoke against real SMS/email/FCM fixtures.
   - Provider-mode browser smoke.
 * **Backend Backlog:**
-  - No current-code M10 backend backlog remains. Add attachment access tests when a future parent-teacher chat attachment schema/workflow is introduced.
+  - No current-code M12 backend backlog remains. Add attachment access tests when a future parent-teacher chat attachment schema/workflow is introduced.
 * **Web Frontend Backlog:**
   - Notice templates (holiday, fee reminder, emergency, exam, transport delay, event).
   - Unread follow-up UI polish.
@@ -366,8 +368,8 @@ Before adding or expanding visible features:
   - Push notifications, notification center polish, notice attachment preview.
   - Chat read receipts, quiet-hours banner, report/block/escalation flow.
 
-### M12 Learning Layer (Production Foundation Implemented)
-* **Current Status:** M12 foundation implemented on 2026-06-12. Dedicated `LearningModule` is registered in the API and owns activities, questions, sessions, participants, attempts, answers, progress, resources, and parent summaries. Web and Flutter summary/runtime surfaces consume real APIs.
+### M13 Learning Layer (Production Foundation Implemented)
+* **Current Status:** M13 foundation implemented on 2026-06-12. Dedicated `LearningModule` is registered in the API and owns activities, questions, sessions, participants, attempts, answers, progress, resources, and parent summaries. Web and Flutter summary/runtime surfaces consume real APIs.
 * **Implemented Backend/API:**
   - Activity CRUD/archive with Easy / Medium / Hard difficulty, activity modes, language modes, question attachment, pagination/filtering, and teacher assignment validation.
   - School-only session launch/list/detail/control with generated session codes, QR token hashes, pause/resume/end, heartbeat, participant monitor, expiry fail-closed behavior, and safe student/teacher payloads.
@@ -398,7 +400,7 @@ Before adding or expanding visible features:
 * **Mobile Frontend Backlog:**
   - Continue parent/student summary polish only; do not build full lab or smart-board runtime first.
 
-### M11 School Intelligence & AI (Roadmap Only - 0%)
+### M14 Intelligence / AI (Roadmap Only - 0%)
 * **Current Status:** No active implementation.
 * **Backend Backlog:**
   - Analytics data mart or reporting-safe aggregation layer only after production data quality is proven.
@@ -417,7 +419,7 @@ Before adding or expanding visible features:
 ## 5. Advanced Operations Consolidated Plan
 
 **Status:** Active pre-AI implementation blueprint merged from the former advanced operations plan.
-**Scope:** Nepal-first advanced school operations before M11 School Intelligence / AI.
+**Scope:** Nepal-first advanced school operations before M14 Intelligence / AI.
 
 Advanced Operations deepens production workflows without introducing AI/ML/LLM runtime. It uses deterministic workflows, explicit business rules, human approvals, audit trails, tenant-scoped access, queued work, and File Registry-backed documents/exports.
 
@@ -428,7 +430,7 @@ Backend foundation: Implemented for approval workflows, deterministic automation
 Migration: apps/api/prisma/migrations/20260615090000_advanced_operations_foundation adds advanced-operations enums, tenant-scoped tables, indexes, and foreign keys.
 Local verification: root gates passed on 2026-06-18 with caveats; pilot smoke failed because local services were not running. See `SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
 Still pending: staging migration apply/deploy, seeded browser E2E, frontend workspaces, mobile/offline workflow depth, provider/staging checks, and pilot feedback.
-M11 AI: Deferred/roadmap only.
+M14 AI: Deferred/roadmap only.
 ```
 
 ### Advanced Operations Purpose
@@ -481,7 +483,7 @@ Nepal-school operating context to preserve:
 |---|---|
 | Phase A - Pre-AI Pilot Depth | Frontend workspaces for implemented approval, automation, analytics, document-template, and export foundations; tenant onboarding wizard; student lifecycle/IEMIS readiness; fee workflows; attendance automation/offline polish; parent mobile self-service; controlled student lab/session access; communication read receipts/follow-ups; exam/report-card/certificate generation; seeded browser E2E and staging smoke. |
 | Phase B - Premium Private-School Operations | Timetable conflict/substitution engine; transport GPS/driver/parent hardening; canteen POS/wallet controls; scanner-first library; HR leave/payroll self-service; accounting reconciliation polish; Grade 11-12 streams/practicals/projects; export center and document template system. |
-| Phase C - SaaS Maturity Before AI | Usage-based plan limits; add-on entitlements; provider health center; queue operations center; advanced audit/security dashboard; multi-branch support if needed; backup/export/recovery; reporting-safe aggregation for future M11. |
+| Phase C - SaaS Maturity Before AI | Usage-based plan limits; add-on entitlements; provider health center; queue operations center; advanced audit/security dashboard; multi-branch support if needed; backup/export/recovery; reporting-safe aggregation for future M14. |
 
 ### Cross-Cutting Advanced Features
 
@@ -529,16 +531,16 @@ Document/template acceptance criteria:
 | M5 Activity Feed | Audience preview, Montessori/ECD milestones, class/section/student posts, consent-aware media, compression/retry/previews, moderation queue, parent child feed, gallery, retry idempotency | `activity-feed`, `media-access`, `consents` | `/dashboard/activity/*`, parent activity, teacher composer | Parent sees linked child-safe media only, removed guardians lose access, failed upload cleanup, moderation audited |
 | M6 Homework and Timetable | Templates, recurring homework, reminders, submission states, review/comments/marks, offline viewing, builder, conflict scoring, workload, room/lab allocation, leave-substitution linkage, substitution alerts | `homework`, `timetable`, `substitutions` | `/dashboard/homework/*`, `/dashboard/timetable/*`, teacher/parent mobile | Attachments protected, students/parents see assigned/published homework, conflicts blocked/acknowledged, substitutions notify where enabled |
 | M7 HR and Payroll | Staff lifecycle, documents, contract reminders, attendance/check-in/out, leave balances/approvals, LWP payroll impact, salary versioning, payroll review/approve/post/reverse, payslip polish, staff self-service | `hr`, `payroll`, `staff-attendance`, `leave` | `/dashboard/hr/*`, `/dashboard/payroll/*`, staff mobile | Salary/bank masked unless allowed, posted payroll uses reversal, accounting linked where enabled, staff self-service own-data only |
-| M8A Library | Metadata/barcode/shelf, copy QR/barcode, scanner issue/return, borrower policies, holiday-aware fines, lost/damaged lifecycle, fine-to-fees/accounting, reservations, reports, parent/student due views | `library`, `library-fines` | `/dashboard/library/*`, optional parent/student library views | Copies with history archived, fine posting idempotent, scoped views, scanner device QA before production claims |
-| M8B Transport | Vehicles/doc expiry, driver/conductor assignment, routes/stops, student assignments, driver trip operations, boarding/deboarding/absent, GPS stale warnings, parent bus status, trip history/GPS quality, emergency, maintenance, fee mapping | `transport`, `transport-gps`, `transport-trips` | `/dashboard/transport/*`, driver mobile, parent transport | Parent sees assigned child route only, stale GPS labeled, overlapping trips blocked unless allowed, live maps deferred until policy/load test |
-| M8C Canteen | Fast POS, wallets/top-up/adjustment, spending controls, low balance, allergy warnings, menu planner, inventory, stock close/wastage, vendors/bill locks, receipt idempotency, parent wallet/menu/spending, student meal QR | `canteen`, `canteen-pos`, `canteen-wallets`, `canteen-inventory`, `canteen-vendors` | `/dashboard/canteen/*`, parent canteen, POS tablet/mobile | POS double-submit safe, wallet debit atomic, allergy warning before serving, parent child-scoped |
-| M9 Accounting and Finance | Chart templates, journal/voucher approval, source mappings from fees/payroll/canteen/library/transport, bank import/reconciliation, fiscal lock/close/reopen, reversal-only posted records, reports, large export progress, principal read-only snapshot | `accounting`, `accounting-reconciliation`, `accounting-reports` | `/dashboard/accounting/*`, principal read-only summary later | Posted records not silently edited, source drilldown works, fiscal lock blocks unsafe backdated changes, mobile finance read-only unless approved |
-| M10 Notices / Communication / Chat | Notice templates, recipient preview, targeting, scheduling, read receipts/follow-up, provider callback verification, provider-disabled behavior, quiet hours, report/block/escalation, high-impact audit, attachment preview, notification center | `communications`, `notices`, `messaging`, `notification-providers` | `/dashboard/notices/*`, `/dashboard/messages/*`, parent/teacher mobile | Attachments remain protected after guardian/role changes, high-impact messages audited, diagnostics safe, teacher communication scoped |
-| M12 Learning Layer | Curriculum topic map, manual question bank, template worksheet generator, smart-board/lab polish, session replay/summary, resource library folders, protected file picker, printable fallback, parent/student summaries, browser E2E | `learning`, `learning-resources`, `learning-progress` | `/dashboard/learning/*`, `/classroom/board/*`, `/student/learning/*`, `/parent/learning/*` | Learning does not duplicate core systems, parent summaries child-scoped/non-comparative, public leaderboards out of scope, AI/adaptive/simulations/open chat deferred |
+| M8 Library | Metadata/barcode/shelf, copy QR/barcode, scanner issue/return, borrower policies, holiday-aware fines, lost/damaged lifecycle, fine-to-fees/accounting, reservations, reports, parent/student due views | `library`, `library-fines` | `/dashboard/library/*`, optional parent/student library views | Copies with history archived, fine posting idempotent, scoped views, scanner device QA before production claims |
+| M9 Transport | Vehicles/doc expiry, driver/conductor assignment, routes/stops, student assignments, driver trip operations, boarding/deboarding/absent, GPS stale warnings, parent bus status, trip history/GPS quality, emergency, maintenance, fee mapping | `transport`, `transport-gps`, `transport-trips` | `/dashboard/transport/*`, driver mobile, parent transport | Parent sees assigned child route only, stale GPS labeled, overlapping trips blocked unless allowed, live maps deferred until policy/load test |
+| M10 Canteen | Fast POS, wallets/top-up/adjustment, spending controls, low balance, allergy warnings, menu planner, inventory, stock close/wastage, vendors/bill locks, receipt idempotency, parent wallet/menu/spending, student meal QR | `canteen`, `canteen-pos`, `canteen-wallets`, `canteen-inventory`, `canteen-vendors` | `/dashboard/canteen/*`, parent canteen, POS tablet/mobile | POS double-submit safe, wallet debit atomic, allergy warning before serving, parent child-scoped |
+| M11 Accounting and Finance | Chart templates, journal/voucher approval, source mappings from fees/payroll/canteen/library/transport, bank import/reconciliation, fiscal lock/close/reopen, reversal-only posted records, reports, large export progress, principal read-only snapshot | `accounting`, `accounting-reconciliation`, `accounting-reports` | `/dashboard/accounting/*`, principal read-only summary later | Posted records not silently edited, source drilldown works, fiscal lock blocks unsafe backdated changes, mobile finance read-only unless approved |
+| M12 Notifications, Notices, Communication, Chat | Notice templates, recipient preview, targeting, scheduling, read receipts/follow-up, provider callback verification, provider-disabled behavior, quiet hours, report/block/escalation, high-impact audit, attachment preview, notification center | `communications`, `notices`, `messaging`, `notification-providers` | `/dashboard/notices/*`, `/dashboard/messages/*`, parent/teacher mobile | Attachments remain protected after guardian/role changes, high-impact messages audited, diagnostics safe, teacher communication scoped |
+| M13 Learning Layer | Curriculum topic map, manual question bank, template worksheet generator, smart-board/lab polish, session replay/summary, resource library folders, protected file picker, printable fallback, parent/student summaries, browser E2E | `learning`, `learning-resources`, `learning-progress` | `/dashboard/learning/*`, `/classroom/board/*`, `/student/learning/*`, `/parent/learning/*` | Learning does not duplicate core systems, parent summaries child-scoped/non-comparative, public leaderboards out of scope, AI/adaptive/simulations/open chat deferred |
 
-### M11 AI Deferred Rule
+### M14 AI Deferred Rule
 
-M11 remains roadmap-only until:
+M14 remains roadmap-only until:
 
 1. Reliable production data exists across attendance, fees, academics, communication, and learning.
 2. Tenant-safe analytics/aggregation exists.

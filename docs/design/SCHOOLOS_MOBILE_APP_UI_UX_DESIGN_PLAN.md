@@ -1,7 +1,7 @@
 # SchoolOS Mobile App UI/UX Design Plan
 
 **Status:** Active source of truth for SchoolOS Flutter mobile app UI/UX, persona flows, mobile wireframes, API rules, offline rules, protected files, and mobile smoke expectations.  
-**Updated:** 2026-06-16  
+**Updated:** 2026-06-20
 **Scope:** `apps/schoolos_mobile`, Flutter companion app, role-scoped mobile workflows for parents, teachers, principals, drivers, staff self-service, and controlled student lab/session access.
 
 This document is planning and design guidance only. It does not implement mobile screens, APIs, backend code, database, migrations, package changes, or tests.
@@ -35,6 +35,14 @@ The web frontend design source of truth is separate:
 ```text
 docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
 ```
+
+The canonical module-by-module surface allocation is also separate:
+
+```text
+docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md
+```
+
+If this mobile plan appears to expose broader capability than that allocation, the allocation's purpose-limited persona boundary wins until the project owner explicitly approves and documents a change.
 
 ---
 

@@ -21,6 +21,7 @@ docs/README.md
 
 docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
 docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
+docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md
 
 docs/project/SCHOOLOS_PROJECT_STATUS.md
 docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
@@ -58,6 +59,8 @@ SchoolOS Communication = notices, parent-teacher communication, chat, delivery l
 SchoolOS Learning Layer = improves classroom teaching and student learning inside school
 SchoolOS Intelligence = future teacher-reviewed analytics and safe AI after reliable production data exists
 ```
+
+Cross-surface product allocation is defined in `docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`: backend owns official truth and workflow rules, web is the school operating desk, and mobile remains purpose-limited and persona-first.
 
 KG-12 expansion must be staged:
 

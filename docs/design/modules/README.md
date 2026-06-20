@@ -1,7 +1,7 @@
 # SchoolOS Module Design References
 
 **Status:** Module-level frontend design reference index.  
-**Updated:** 2026-06-19
+**Updated:** 2026-06-20
 
 This folder contains the implementation-ready M1-M13 frontend web design references. Each file owns its module's feature explanations, personas, route plan, screen specifications, one simple wireframe per screen, component plan, backend/API needs, state matrix, security boundaries, Nepal-specific requirements, implementation checklist, and done definition.
 
@@ -9,6 +9,7 @@ These files complement and must follow the main web design sources:
 
 ```text
 docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
+docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md
 apps/web/docs/DESIGN_SYSTEM.md
 apps/web/AGENTS.md
 ```
@@ -49,12 +50,13 @@ For module-specific frontend implementation, read in this order:
 
 ```text
 1. docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
-2. apps/web/docs/DESIGN_SYSTEM.md
-3. apps/web/AGENTS.md
-4. docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
-5. docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
-6. The matching module reference in this folder
-7. Existing routes/components/API clients/OpenAPI/contracts/tests for the touched module
+2. docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md
+3. apps/web/docs/DESIGN_SYSTEM.md
+4. apps/web/AGENTS.md
+5. docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
+6. docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
+7. The matching module reference in this folder
+8. Existing routes/components/API clients/OpenAPI/contracts/tests for the touched module
 ```
 
 ---

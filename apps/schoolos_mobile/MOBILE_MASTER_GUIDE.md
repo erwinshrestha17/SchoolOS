@@ -1,8 +1,9 @@
 # SchoolOS Mobile Master Guide
 
 **Status:** App-local pointer and guardrail  
-**Updated:** 2026-06-18  
+**Updated:** 2026-06-20
 **Authoritative mobile plan:** `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`  
+**Authoritative surface allocation:** `docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`
 **Authoritative release policy:** `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`
 
 This file stays in the Flutter app so mobile contributors can find the active mobile plan and release target quickly. Detailed persona, API, offline, state, and feature structure decisions live in the dedicated mobile app UI/UX design plan. Mobile work is evaluated against the Production / General Availability (GA) release policy, not MVP completion language.
@@ -10,11 +11,12 @@ This file stays in the Flutter app so mobile contributors can find the active mo
 ## Required Read Order
 
 1. `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`
-2. `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`
-3. `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` when a mobile flow depends on a web-owned admin workflow
-4. `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`
-5. `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`
-6. `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` for current release evidence and blockers
+2. `docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`
+3. `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`
+4. `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` when a mobile flow depends on a web-owned admin workflow
+5. `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`
+6. `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`
+7. `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` for current release evidence and blockers
 
 ## Mobile Product Rules
 

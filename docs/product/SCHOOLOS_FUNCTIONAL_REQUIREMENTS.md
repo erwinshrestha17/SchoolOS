@@ -5,7 +5,7 @@
 **Target schools:** Kindergarten / Montessori to Grade 12 as the long-term product direction; current implementation remains staged around controlled pilot readiness for existing core modules  
 **Document type:** Functional Requirements Specification  
 **Status:** Active FRS aligned with the current module taxonomy, M12 Notification/Communication, and M13 Learning Layer  
-**Last updated:** 2026-06-19
+**Last updated:** 2026-06-20
 
 ---
 
@@ -14,6 +14,8 @@
 This FRS breaks SchoolOS into feature-level functional behavior. It describes what each module must allow users to do, what validations must happen, what states must be supported, and what acceptance criteria must be satisfied.
 
 The PRD remains the product master document. This FRS is meant for developers, QA, designers, and implementation agents who need detailed feature behavior.
+
+Use [`SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`](SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md) for module-by-module backend ownership, web/mobile exposure, allowed roles, and explicit surface exclusions. This FRS remains authoritative for functional rules, validation, states, edge cases, and acceptance criteria.
 
 Important distinction:
 
@@ -67,7 +69,8 @@ These rules apply to every module:
 17. Screen actions must resolve into a real permitted workflow. A dashboard card, right rail, quick action, or contextual button must not simulate a backend state in browser-only production state.
 18. Any user-visible aggregate that spans modules must be explicitly approved as a server-owned summary or consist only of separately authorized, non-official safe summaries.
 19. Notification delivery must be backend-owned. Source modules emit events; M12 owns recipient resolution, templates, routing, provider state, retries, delivery logs, read state, and audit.
-20. Inventory & Asset Management is not active scope; do not add requirements for it unless re-approved.
+20. Web is the detailed school operating surface; mobile is persona-first and purpose-limited. Surface allocation must follow `SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md` and must not weaken backend authorization or ownership checks.
+21. Inventory & Asset Management is not active scope; do not add requirements for it unless re-approved.
 
 ---
 

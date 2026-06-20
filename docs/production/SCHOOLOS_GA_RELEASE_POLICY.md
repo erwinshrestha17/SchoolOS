@@ -54,10 +54,10 @@ SchoolOS remains a Nepal-first, multi-tenant KG-12 school operating SaaS. The GA
 - Keep the NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js App Router, Flutter companion app, and shared contracts where available.
 - Keep `tenantId` as the strict tenant boundary.
 - Keep `/platform/*` for SchoolOS operator controls, `/dashboard/settings/*` for one school configuration, and `/dashboard/*` for daily school operations.
-- Keep SchoolOS SaaS billing separate from school fee collection and M9 school accounting.
+- Keep SchoolOS SaaS billing separate from school fee collection and M11 school accounting.
 - Keep backend authorization, RBAC, tenant scope, and module entitlement as the source of truth.
-- Keep M12 Learning as a separate domain that reuses core student, staff, class, subject, timetable, communication, file, RBAC, and audit systems.
-- Keep M11 Intelligence / AI as roadmap-only until explicitly approved after the required data, review, safety, and cost controls exist.
+- Keep M13 Learning as a separate domain that reuses core student, staff, class, subject, timetable, communication, file, RBAC, and audit systems.
+- Keep M14 Intelligence / AI as roadmap-only until explicitly approved after the required data, review, safety, and cost controls exist.
 - Do not introduce microservices, Angular migration, broad public student mobile, unsafe offline financial operations, or unverified live-map/provider scope as a shortcut to release.
 
 ---

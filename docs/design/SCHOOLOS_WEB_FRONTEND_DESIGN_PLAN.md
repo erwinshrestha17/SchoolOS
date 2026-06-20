@@ -1,16 +1,18 @@
 # SchoolOS Web Frontend Design Plan
 
 **Status:** Active global source of truth for SchoolOS web design rules.
-**Updated:** 2026-06-19
+**Updated:** 2026-06-20
 **Scope:** `apps/web`, Next.js App Router, school operations, school settings, platform control plane, shared states, protected files, and contract-safe frontend behavior.
 
-This document contains global web rules only. Feature lists, module workflows, expected screens, wireframes, role projections, and module backend needs live in [`docs/design/modules/`](modules/README.md). This is design guidance, not evidence that a route or API exists.
+This document contains global web rules only. Feature lists, module workflows, expected screens, wireframes, role projections, and module backend needs live in [`docs/design/modules/`](modules/README.md). Backend/web/mobile allocation and explicit surface boundaries live in [`SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`](../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md). This is design guidance, not evidence that a route or API exists.
 
 ---
 
 ## 1. Product and Release Stance
 
 SchoolOS web is the daily operating desk for Nepal schools. It is not a decorative dashboard, generic ERP skin, shortcut wall, or fake demo.
+
+It is the primary surface for official setup, detailed records, high-volume work, approvals, reconciliation, publishing, reporting, audits, and operational control. Mobile companions may accelerate bounded daily actions, but they do not replace the web operating workspace or broaden a persona's authority.
 
 The governing interaction rule is:
 
