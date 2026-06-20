@@ -13,7 +13,7 @@ import { MobileTeacherTimetableQueryDto } from './dto/mobile-teacher-timetable.d
 @Controller('mobile/teacher/timetable')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.timetable')
-@Roles('teacher')
+@Roles('teacher', 'subject_teacher')
 export class MobileTeacherTimetableController {
   constructor(private readonly timetableService: TimetableService) {}
 

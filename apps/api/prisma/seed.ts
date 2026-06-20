@@ -99,46 +99,74 @@ type CanonicalSubject = {
   code: string;
 };
 
+const localDemoPassword =
+  process.env.SCHOOLOS_DEMO_PASSWORD ?? 'schoolos-local-demo-only';
+const schoolAdminPassword =
+  process.env.SCHOOLOS_DEMO_ADMIN_PASSWORD ?? localDemoPassword;
+const principalPassword =
+  process.env.SCHOOLOS_DEMO_PRINCIPAL_PASSWORD ?? localDemoPassword;
+const accountantPassword =
+  process.env.SCHOOLOS_DEMO_ACCOUNTANT_PASSWORD ?? localDemoPassword;
+const canonicalGuardianPassword =
+  process.env.SCHOOLOS_DEMO_GUARDIAN_PASSWORD ?? localDemoPassword;
+const canonicalTeacherPassword =
+  process.env.SCHOOLOS_DEMO_TEACHER_PASSWORD ?? localDemoPassword;
+const canonicalDriverPassword =
+  process.env.SCHOOLOS_DEMO_DRIVER_PASSWORD ?? localDemoPassword;
+const canonicalStaffPassword =
+  process.env.SCHOOLOS_DEMO_STAFF_PASSWORD ?? localDemoPassword;
+const canonicalStudentPassword =
+  process.env.SCHOOLOS_DEMO_STUDENT_PASSWORD ?? localDemoPassword;
+const platformSeedPassword =
+  process.env.PLATFORM_SEED_PASSWORD ??
+  process.env.SCHOOLOS_DEMO_PLATFORM_PASSWORD ??
+  localDemoPassword;
+
 const seedUsers: SeedUser[] = [
   {
     roleName: 'principal',
     email: 'principal@schoolos.com',
-    password: 'principal123',
+    password: principalPassword,
   },
   {
     roleName: 'admin',
     email: 'admin@schoolos.com',
-    password: 'admin123',
+    password: schoolAdminPassword,
   },
   {
     roleName: 'accountant',
     email: 'accountant@schoolos.com',
-    password: 'accountant123',
+    password: accountantPassword,
   },
   {
     roleName: 'teacher',
     email: 'classteacher@schoolos.com',
-    password: 'classteacher123',
+    password: canonicalTeacherPassword,
   },
   {
     roleName: 'subject_teacher',
     email: 'subjectteacher@schoolos.com',
-    password: 'subjectteacher123',
+    password: canonicalTeacherPassword,
   },
   {
     roleName: 'parent',
     email: 'guardian@schoolos.com',
-    password: 'guardian123',
+    password: canonicalGuardianPassword,
   },
   {
     roleName: 'student',
     email: 'student@schoolos.com',
-    password: 'student123',
+    password: canonicalStudentPassword,
+  },
+  {
+    roleName: 'support_staff',
+    email: 'staff@schoolos.com',
+    password: canonicalStaffPassword,
   },
   {
     roleName: 'driver',
     email: 'driver@schoolos.com',
-    password: 'driver123',
+    password: canonicalDriverPassword,
   },
 ];
 
@@ -164,14 +192,6 @@ const canonicalSectionCounts: Record<string, Record<string, number>> = {
 
 const expectedCanonicalStudentCount = 601;
 const canonicalAdmissionPrefix = 'EA-2083';
-const canonicalGuardianPassword =
-  process.env.SCHOOLOS_DEMO_GUARDIAN_PASSWORD ?? 'guardian123';
-const canonicalTeacherPassword =
-  process.env.SCHOOLOS_DEMO_TEACHER_PASSWORD ?? 'teacher123';
-const canonicalDriverPassword =
-  process.env.SCHOOLOS_DEMO_DRIVER_PASSWORD ?? 'driver123';
-const canonicalStaffPassword =
-  process.env.SCHOOLOS_DEMO_STAFF_PASSWORD ?? 'staff123';
 
 const firstNames = [
   'Aarav',
@@ -244,6 +264,7 @@ async function main() {
   await seedFeeHeads(tenant.id);
 
   await seedUsersWithRoles(tenant.id);
+  await seedRepresentativeStaffProfiles(tenant.id);
   await seedClassesAndSections(tenant.id);
   await seedSubjects(tenant.id);
   await seedCanonicalSchoolDataset(tenant.id, academicYear.id);
@@ -670,6 +691,66 @@ async function seedUsersWithRoles(tenantId: string) {
   }
 }
 
+async function seedRepresentativeStaffProfiles(tenantId: string) {
+  console.log('Seeding representative staff profiles...');
+
+  const profileSeeds = [
+    {
+      email: 'principal@schoolos.com',
+      employeeId: 'EA-PRN-001',
+      firstName: 'Anup',
+      lastName: 'Shrestha',
+      gender: Gender.MALE,
+      designation: 'Principal',
+      department: 'Leadership',
+    },
+    {
+      email: 'accountant@schoolos.com',
+      employeeId: 'EA-ACC-001',
+      firstName: 'Sujata',
+      lastName: 'Karki',
+      gender: Gender.FEMALE,
+      designation: 'Accountant',
+      department: 'Finance',
+    },
+    {
+      email: 'staff@schoolos.com',
+      employeeId: 'EA-STF-001',
+      firstName: 'Rojina',
+      lastName: 'Maharjan',
+      gender: Gender.FEMALE,
+      designation: 'Front Desk Staff',
+      department: 'Administration',
+    },
+  ];
+
+  for (const staffSeed of profileSeeds) {
+    const user = await prisma.user.findUnique({
+      where: {
+        tenantId_email: {
+          tenantId,
+          email: staffSeed.email,
+        },
+      },
+    });
+    if (!user) {
+      throw new Error(
+        `Missing representative staff user for ${staffSeed.email}`,
+      );
+    }
+    await upsertStaffProfile({
+      tenantId,
+      userId: user.id,
+      employeeId: staffSeed.employeeId,
+      firstName: staffSeed.firstName,
+      lastName: staffSeed.lastName,
+      gender: staffSeed.gender,
+      designation: staffSeed.designation,
+      department: staffSeed.department,
+    });
+  }
+}
+
 async function seedClassesAndSections(tenantId: string) {
   console.log('Seeding classes and sections...');
 
@@ -946,6 +1027,10 @@ async function seedCanonicalSchoolDataset(
     where: { tenantId_email: { tenantId, email: 'accountant@schoolos.com' } },
     select: { id: true },
   });
+  const staffUser = await prisma.user.findUnique({
+    where: { tenantId_email: { tenantId, email: 'staff@schoolos.com' } },
+    select: { id: true },
+  });
 
   await retireCanonicalOverflowStudents(tenantId, academicYearId);
 
@@ -1007,7 +1092,7 @@ async function seedCanonicalSchoolDataset(
   );
   await seedCanonicalStaffSelfService(
     tenantId,
-    accountantUser?.id ?? null,
+    staffUser?.id ?? null,
     principalUser?.id ?? null,
   );
   await seedCanonicalTransport(
@@ -1023,11 +1108,19 @@ async function getRoleIds(tenantId: string) {
   const roles = await prisma.role.findMany({
     where: {
       tenantId,
-      name: { in: ['parent', 'teacher', 'subject_teacher', 'driver'] },
+      name: {
+        in: ['parent', 'teacher', 'subject_teacher', 'support_staff', 'driver'],
+      },
     },
   });
   const byName = new Map(roles.map((role) => [role.name, role.id]));
-  for (const name of ['parent', 'teacher', 'subject_teacher', 'driver']) {
+  for (const name of [
+    'parent',
+    'teacher',
+    'subject_teacher',
+    'support_staff',
+    'driver',
+  ]) {
     if (!byName.get(name))
       throw new Error(`Missing role for canonical seed: ${name}`);
   }
@@ -1035,6 +1128,7 @@ async function getRoleIds(tenantId: string) {
     parent: byName.get('parent')!,
     teacher: byName.get('teacher')!,
     subject_teacher: byName.get('subject_teacher')!,
+    support_staff: byName.get('support_staff')!,
     driver: byName.get('driver')!,
   };
 }
@@ -2049,14 +2143,21 @@ async function seedCanonicalFinance(
 
 async function seedCanonicalStaffSelfService(
   tenantId: string,
-  accountantUserId: string | null,
+  staffUserId: string | null,
   principalUserId: string | null,
 ) {
-  if (!accountantUserId) return;
-  const accountant = await prisma.staff.findFirst({
-    where: { tenantId, userId: accountantUserId },
+  if (!staffUserId) return;
+  const staff = await prisma.staff.findFirst({
+    where: { tenantId, userId: staffUserId },
+    select: {
+      id: true,
+      employeeId: true,
+      bankAccount: true,
+      bankName: true,
+      designation: true,
+    },
   });
-  if (!accountant) return;
+  if (!staff) return;
 
   for (const attendanceDate of lastSchoolDays(10)) {
     const day = attendanceDate.getUTCDate();
@@ -2070,7 +2171,7 @@ async function seedCanonicalStaffSelfService(
       where: {
         tenantId_staffId_attendanceDate: {
           tenantId,
-          staffId: accountant.id,
+          staffId: staff.id,
           attendanceDate,
         },
       },
@@ -2094,7 +2195,7 @@ async function seedCanonicalStaffSelfService(
       },
       create: {
         tenantId,
-        staffId: accountant.id,
+        staffId: staff.id,
         attendanceDate,
         status,
         leaveType: status === AttendanceStatus.EXCUSED_LEAVE ? 'CASUAL' : null,
@@ -2125,7 +2226,7 @@ async function seedCanonicalStaffSelfService(
       where: {
         tenantId_staffId_leaveType_year: {
           tenantId,
-          staffId: accountant.id,
+          staffId: staff.id,
           leaveType,
           year,
         },
@@ -2136,7 +2237,7 @@ async function seedCanonicalStaffSelfService(
       },
       create: {
         tenantId,
-        staffId: accountant.id,
+        staffId: staff.id,
         leaveType,
         year,
         allocated: new Prisma.Decimal(allocated),
@@ -2158,9 +2259,9 @@ async function seedCanonicalStaffSelfService(
       LeaveRequestStatus.PENDING,
       'Medical appointment',
     ],
-  ] as const) {
+    ] as const) {
     const existing = await prisma.staffLeaveRequest.findFirst({
-      where: { tenantId, staffId: accountant.id, leaveType, startsOn },
+      where: { tenantId, staffId: staff.id, leaveType, startsOn },
     });
     const data = {
       endsOn: startsOn,
@@ -2185,7 +2286,7 @@ async function seedCanonicalStaffSelfService(
       await prisma.staffLeaveRequest.create({
         data: {
           tenantId,
-          staffId: accountant.id,
+          staffId: staff.id,
           leaveType,
           startsOn,
           ...data,
@@ -2194,7 +2295,7 @@ async function seedCanonicalStaffSelfService(
     }
   }
 
-  await seedCanonicalPayslip(tenantId, accountant, principalUserId);
+  await seedCanonicalPayslip(tenantId, staff, principalUserId);
 }
 
 async function seedCanonicalPayslip(
@@ -2204,6 +2305,7 @@ async function seedCanonicalPayslip(
     employeeId: string;
     bankAccount: string | null;
     bankName: string | null;
+    designation: string | null;
   },
   principalUserId: string | null,
 ) {
@@ -2217,7 +2319,7 @@ async function seedCanonicalPayslip(
       },
     },
     update: {
-      position: 'Accountant',
+      position: staff.designation ?? 'Staff',
       startDate: date('2026-04-01'),
       baseSalary: new Prisma.Decimal(45000),
       allowances: new Prisma.Decimal(5000),
@@ -2228,7 +2330,7 @@ async function seedCanonicalPayslip(
       tenantId,
       staffId: staff.id,
       contractNumber: `CON-${staff.employeeId}`,
-      position: 'Accountant',
+      position: staff.designation ?? 'Staff',
       startDate: date('2026-04-01'),
       baseSalary: new Prisma.Decimal(45000),
       allowances: new Prisma.Decimal(5000),
@@ -2520,6 +2622,185 @@ async function seedCanonicalTransport(
       create: {
         tenantId,
         tripId: trip.id,
+        studentAssignmentId: assignment.id,
+        studentId: assignment.studentId,
+        stopId: assignment.stopId,
+        status: TransportStudentTripStatus.PENDING,
+      },
+    });
+  }
+
+  const secondDriverUser = await ensureSeedUserWithRole({
+    tenantId,
+    email: 'driver.south@schoolos.com',
+    password: canonicalDriverPassword,
+    roleId: driverRoleId,
+  });
+  const secondDriver = await upsertStaffProfile({
+    tenantId,
+    userId: secondDriverUser.id,
+    employeeId: 'EA-DRV-002',
+    firstName: 'Milan',
+    lastName: 'Rai',
+    gender: Gender.MALE,
+    designation: 'Driver',
+    department: 'Transport',
+  });
+  const secondVehicle = await prisma.transportVehicle.upsert({
+    where: {
+      tenantId_registrationNumber: {
+        tenantId,
+        registrationNumber: 'BA-2-KHA-2046',
+      },
+    },
+    update: { capacity: 32, status: 'ACTIVE', model: 'Eicher Skyline' },
+    create: {
+      tenantId,
+      registrationNumber: 'BA-2-KHA-2046',
+      capacity: 32,
+      status: 'ACTIVE',
+      model: 'Eicher Skyline',
+    },
+  });
+  const secondRoute = await prisma.transportRoute.upsert({
+    where: { tenantId_code: { tenantId, code: 'EA-R02' } },
+    update: {
+      name: 'Bhaktapur South Route',
+      vehicleId: secondVehicle.id,
+      isActive: true,
+    },
+    create: {
+      tenantId,
+      name: 'Bhaktapur South Route',
+      code: 'EA-R02',
+      vehicleId: secondVehicle.id,
+      isActive: true,
+    },
+  });
+  const secondStops: Array<{ id: string }> = [];
+  for (const [index, name] of [
+    'Lokanthali',
+    'Thimi',
+    'Sallaghari',
+    'Suryabinayak',
+  ].entries()) {
+    secondStops.push(
+      await prisma.transportStop.upsert({
+        where: {
+          tenantId_routeId_sequence: {
+            tenantId,
+            routeId: secondRoute.id,
+            sequence: index + 1,
+          },
+        },
+        update: {
+          name,
+          estimatedPickup: `07:${25 + index * 6}`,
+          estimatedDrop: `16:${5 + index * 6}`,
+        },
+        create: {
+          tenantId,
+          routeId: secondRoute.id,
+          name,
+          sequence: index + 1,
+          estimatedPickup: `07:${25 + index * 6}`,
+          estimatedDrop: `16:${5 + index * 6}`,
+        },
+      }),
+    );
+  }
+  const existingSecondDriverAssignment =
+    await prisma.transportDriverAssignment.findFirst({
+      where: {
+        tenantId,
+        staffId: secondDriver.id,
+        vehicleId: secondVehicle.id,
+        routeId: secondRoute.id,
+      },
+    });
+  const secondDriverAssignment = existingSecondDriverAssignment
+    ? await prisma.transportDriverAssignment.update({
+        where: { id: existingSecondDriverAssignment.id },
+        data: {
+          startsAt: date('2026-04-01'),
+          endsAt: null,
+          licenseNumber: 'DL-EA-002',
+          licenseExpires: date('2028-04-01'),
+        },
+      })
+    : await prisma.transportDriverAssignment.create({
+        data: {
+          tenantId,
+          staffId: secondDriver.id,
+          vehicleId: secondVehicle.id,
+          routeId: secondRoute.id,
+          startsAt: date('2026-04-01'),
+          licenseNumber: 'DL-EA-002',
+          licenseExpires: date('2028-04-01'),
+        },
+      });
+  const secondTransportStudents = students.filter(
+    (student) => student.rollNumber === 3,
+  );
+  for (const [index, student] of secondTransportStudents.entries()) {
+    const stop = secondStops[index % secondStops.length];
+    const existing = await prisma.transportStudentAssignment.findFirst({
+      where: {
+        tenantId,
+        studentId: student.id,
+        routeId: secondRoute.id,
+        stopId: stop.id,
+      },
+    });
+    if (existing) {
+      await prisma.transportStudentAssignment.update({
+        where: { id: existing.id },
+        data: {
+          status: 'ACTIVE',
+          endedAt: null,
+          pickupDirection: TransportTripDirection.PICKUP,
+        },
+      });
+    } else {
+      await prisma.transportStudentAssignment.create({
+        data: {
+          tenantId,
+          studentId: student.id,
+          routeId: secondRoute.id,
+          stopId: stop.id,
+          status: 'ACTIVE',
+          pickupDirection: TransportTripDirection.PICKUP,
+        },
+      });
+    }
+  }
+  const secondTrip = await upsertActiveTransportTrip(
+    tenantId,
+    secondRoute.id,
+    secondVehicle.id,
+    secondDriverAssignment.id,
+    createdById,
+  );
+  const secondTripStudents = await prisma.transportStudentAssignment.findMany({
+    where: { tenantId, routeId: secondRoute.id, status: 'ACTIVE' },
+    take: 40,
+  });
+  for (const assignment of secondTripStudents) {
+    await prisma.transportTripStudentStatus.upsert({
+      where: {
+        tripId_studentId: {
+          tripId: secondTrip.id,
+          studentId: assignment.studentId,
+        },
+      },
+      update: {
+        studentAssignmentId: assignment.id,
+        stopId: assignment.stopId,
+        status: TransportStudentTripStatus.PENDING,
+      },
+      create: {
+        tenantId,
+        tripId: secondTrip.id,
         studentAssignmentId: assignment.id,
         studentId: assignment.studentId,
         stopId: assignment.stopId,
@@ -3187,29 +3468,41 @@ async function validateNoTimetableConflicts(
 }
 
 function printRepresentativeCredentials() {
-  console.log('- principal@schoolos.com / principal123');
-  console.log('- admin@schoolos.com / admin123');
-  console.log('- accountant@schoolos.com / accountant123');
   console.log(
-    '- classteacher.1a@schoolos.com / teacher password from SCHOOLOS_DEMO_TEACHER_PASSWORD or local fallback teacher123',
+    '- admin@schoolos.com / password from SCHOOLOS_DEMO_ADMIN_PASSWORD or SCHOOLOS_DEMO_PASSWORD',
   );
   console.log(
-    '- classteacher.10b@schoolos.com / teacher password from SCHOOLOS_DEMO_TEACHER_PASSWORD or local fallback teacher123',
+    '- principal@schoolos.com / password from SCHOOLOS_DEMO_PRINCIPAL_PASSWORD or SCHOOLOS_DEMO_PASSWORD',
   );
   console.log(
-    '- subjectteacher.math@schoolos.com / teacher password from SCHOOLOS_DEMO_TEACHER_PASSWORD or local fallback teacher123',
+    '- accountant@schoolos.com / password from SCHOOLOS_DEMO_ACCOUNTANT_PASSWORD or SCHOOLOS_DEMO_PASSWORD',
   );
   console.log(
-    '- subjectteacher.english@schoolos.com / teacher password from SCHOOLOS_DEMO_TEACHER_PASSWORD or local fallback teacher123',
+    '- staff@schoolos.com / password from SCHOOLOS_DEMO_STAFF_PASSWORD or SCHOOLOS_DEMO_PASSWORD',
   );
   console.log(
-    '- guardian.c01a001@schoolos.test / guardian password from SCHOOLOS_DEMO_GUARDIAN_PASSWORD or local fallback guardian123',
+    '- classteacher.1a@schoolos.com / password from SCHOOLOS_DEMO_TEACHER_PASSWORD or SCHOOLOS_DEMO_PASSWORD',
   );
   console.log(
-    '- guardian.c10b032@schoolos.test / guardian password from SCHOOLOS_DEMO_GUARDIAN_PASSWORD or local fallback guardian123',
+    '- classteacher.10b@schoolos.com / password from SCHOOLOS_DEMO_TEACHER_PASSWORD or SCHOOLOS_DEMO_PASSWORD',
   );
   console.log(
-    '- driver@schoolos.com / driver password from SCHOOLOS_DEMO_DRIVER_PASSWORD or local fallback driver123',
+    '- subjectteacher.math@schoolos.com / password from SCHOOLOS_DEMO_TEACHER_PASSWORD or SCHOOLOS_DEMO_PASSWORD',
+  );
+  console.log(
+    '- subjectteacher.english@schoolos.com / password from SCHOOLOS_DEMO_TEACHER_PASSWORD or SCHOOLOS_DEMO_PASSWORD',
+  );
+  console.log(
+    '- guardian.c01a001@schoolos.test / password from SCHOOLOS_DEMO_GUARDIAN_PASSWORD or SCHOOLOS_DEMO_PASSWORD',
+  );
+  console.log(
+    '- guardian.c10b032@schoolos.test / password from SCHOOLOS_DEMO_GUARDIAN_PASSWORD or SCHOOLOS_DEMO_PASSWORD',
+  );
+  console.log(
+    '- driver@schoolos.com / password from SCHOOLOS_DEMO_DRIVER_PASSWORD or SCHOOLOS_DEMO_PASSWORD',
+  );
+  console.log(
+    '- driver.south@schoolos.com / password from SCHOOLOS_DEMO_DRIVER_PASSWORD or SCHOOLOS_DEMO_PASSWORD',
   );
 }
 
@@ -3349,7 +3642,6 @@ async function seedPlatformUser(tenantId: string) {
   console.log('Seeding platform operator user...');
   const platformEmail =
     process.env.PLATFORM_SEED_EMAIL ?? 'platform@schoolos.com';
-  const platformPassword = process.env.PLATFORM_SEED_PASSWORD ?? 'platform123';
   const roleName = 'platform_super_admin';
 
   const role = await prisma.role.findUnique({
@@ -3369,7 +3661,7 @@ async function seedPlatformUser(tenantId: string) {
   await ensureSeedUserWithRole({
     tenantId,
     email: platformEmail,
-    password: platformPassword,
+    password: platformSeedPassword,
     roleId: role.id,
   });
 }
@@ -3594,6 +3886,52 @@ async function seedCanteenData(tenantId: string) {
   });
 }
 
+async function seedDemoTenantFeatureOverrides(tenantId: string) {
+  const featureKeys = [
+    'module.students',
+    'module.attendance',
+    'module.fees',
+    'module.exams',
+    'module.activity',
+    'module.homework',
+    'module.timetable',
+    'module.hr',
+    'module.payroll',
+    'module.library',
+    'module.transport',
+    'module.canteen',
+    'module.accounting',
+    'module.notices',
+    'module.learning',
+    'feature.mobile.parent_basic',
+    'feature.mobile.teacher_parent',
+    'feature.mobile.full_role',
+    'feature.mobile.parent_teacher_chat',
+    'feature.transport.gps_live',
+  ];
+
+  for (const featureKey of featureKeys) {
+    await prisma.tenantFeatureOverride.upsert({
+      where: {
+        tenantId_featureKey: {
+          tenantId,
+          featureKey,
+        },
+      },
+      update: {
+        enabled: true,
+        reason: 'Local seeded Phase 1 smoke/demo tenant entitlement',
+      },
+      create: {
+        tenantId,
+        featureKey,
+        enabled: true,
+        reason: 'Local seeded Phase 1 smoke/demo tenant entitlement',
+      },
+    });
+  }
+}
+
 async function seedPlatformInfrastructure() {
   console.log('Seeding platform infrastructure...');
 
@@ -3745,22 +4083,25 @@ async function seedPlatformInfrastructure() {
     where: { slug: 'default-school' },
   });
   if (defaultTenant) {
-    const standardPlan = createdPlans.find((p) => p.key === 'standard');
-    if (standardPlan) {
+    const enterprisePlan = createdPlans.find((p) => p.key === 'enterprise');
+    if (enterprisePlan) {
       const subId = `sub-${defaultTenant.slug}`;
       await prisma.tenantSubscription.upsert({
         where: { id: subId },
         update: {
-          planId: standardPlan.id,
+          planId: enterprisePlan.id,
           status: TenantSubscriptionStatus.ACTIVE,
+          addOns: ['library', 'transport', 'canteen', 'payroll'],
         },
         create: {
           id: subId,
           tenantId: defaultTenant.id,
-          planId: standardPlan.id,
+          planId: enterprisePlan.id,
           status: TenantSubscriptionStatus.ACTIVE,
+          addOns: ['library', 'transport', 'canteen', 'payroll'],
         },
       });
+      await seedDemoTenantFeatureOverrides(defaultTenant.id);
 
       // Seed some usage counters
       await prisma.usageCounter.upsert({
@@ -3932,15 +4273,33 @@ async function seedPlatformInfrastructure() {
     ];
 
     for (const a of auditActions) {
-      await prisma.auditLog.create({
-        data: {
+      const requestId = `seed:platform:${a.action}:${a.resource}:${a.resourceId}`;
+      const existingAuditLog = await prisma.auditLog.findFirst({
+        where: {
           tenantId: defaultTenant.id,
           action: a.action,
           resource: a.resource,
           resourceId: a.resourceId,
-          after: { reason: a.reason },
+          requestId,
         },
       });
+      if (existingAuditLog) {
+        await prisma.auditLog.update({
+          where: { id: existingAuditLog.id },
+          data: { after: { reason: a.reason } },
+        });
+      } else {
+        await prisma.auditLog.create({
+          data: {
+            tenantId: defaultTenant.id,
+            action: a.action,
+            resource: a.resource,
+            resourceId: a.resourceId,
+            requestId,
+            after: { reason: a.reason },
+          },
+        });
+      }
     }
   }
 }

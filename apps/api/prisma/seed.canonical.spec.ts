@@ -40,13 +40,31 @@ describe('canonical development seed', () => {
     expect(source).toContain('prisma.staffAttendance.upsert');
     expect(source).toContain('prisma.payslip.upsert');
     expect(source).toContain('prisma.transportStudentAssignment.findFirst');
+    expect(source).toContain('prisma.tenantFeatureOverride.upsert');
+    expect(source).toContain('prisma.auditLog.findFirst');
   });
 
   it('has production and credential-output guardrails', () => {
     expect(source).toContain("process.env.NODE_ENV === 'production'");
     expect(source).toContain('Refusing to run development seed');
+    expect(source).toContain('schoolos-local-demo-only');
+    expect(source).toContain("roleName: 'support_staff'");
+    expect(source).toContain("'module.payroll'");
+    expect(source).toContain('driver.south@schoolos.com');
     expect(source).toContain('guardian.c01a001@schoolos.test');
     expect(source).toContain('guardian.c10b032@schoolos.test');
     expect(source).toContain('printRepresentativeCredentials');
+    for (const legacyPassword of [
+      'principal123',
+      'admin123',
+      'accountant123',
+      'guardian123',
+      'teacher123',
+      'driver123',
+      'staff123',
+      'platform123',
+    ]) {
+      expect(source).not.toContain(legacyPassword);
+    }
   });
 });
