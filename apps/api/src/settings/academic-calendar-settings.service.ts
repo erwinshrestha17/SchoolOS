@@ -151,6 +151,17 @@ export class AcademicCalendarSettingsService {
     userId: string,
   ) {
     const calendarDate = toNepalSchoolDateUtc(dto.calendarDateBs);
+    const academicYear = await this.prisma.academicYear.findFirst({
+      where: { id: dto.academicYearId, tenantId },
+      select: { startsOn: true, endsOn: true },
+    });
+    if (!academicYear) {
+      throw new NotFoundException('Academic year was not found in this school.');
+    }
+    if (calendarDate < academicYear.startsOn || calendarDate > academicYear.endsOn) {
+      throw new BadRequestException('Calendar day must fall within the selected academic year.');
+    }
+
     const day = await this.prisma.schoolCalendarDay.upsert({
       where: { tenantId_calendarDate: { tenantId, calendarDate } },
       update: {
@@ -174,6 +185,7 @@ export class AcademicCalendarSettingsService {
       tenantId,
       userId,
       after: {
+        academicYearId: dto.academicYearId,
         calendarDateBs: dto.calendarDateBs,
         isWorkingDay: day.isWorkingDay,
         holidayType: day.holidayType,
