@@ -53,6 +53,9 @@ export function StudentPhotoPreview({
   }, [photoVersion, studentId]);
 
   if (state === 'ready' && src) {
+    // Blob URLs are generated from an authenticated protected-file response.
+    // next/image cannot optimise this private in-memory URL safely.
+    // eslint-disable-next-line @next/next/no-img-element
     return <img src={src} alt={alt} className={`${className} rounded-2xl object-cover ring-4 ring-white`} />;
   }
 
