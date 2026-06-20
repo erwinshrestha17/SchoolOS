@@ -70,6 +70,9 @@ export type AdmissionCaseEligibility = {
     requireInterview: boolean;
     requirePrincipalApproval: boolean;
     allowAdmissionWithDocumentsPending: boolean;
+    enforceCapacityWhenAvailable: boolean;
+    requiredDocuments: string[];
+    requiredFields: string[];
   };
   canAdmitDirectly: boolean;
   requiresReview: boolean;
@@ -154,7 +157,9 @@ export type CreateAdmissionCasePayload = {
   documents?: AdmissionCaseDocumentReference[];
 };
 
-export type DirectAdmitAdmissionCasePayload = CreateAdmissionCasePayload & {
+export type UpdateAdmissionCasePayload = Partial<CreateAdmissionCasePayload>;
+
+export type DirectAdmitAdmissionCasePayload = UpdateAdmissionCasePayload & {
   overrideDuplicate?: boolean;
   overrideReason?: string;
 };
