@@ -1,6 +1,7 @@
 import { formatBsDate as coreFormatBsDate, toBsDateFromGregorian } from '@schoolos/core';
 
-export type DateDisplayMode = 'BS';
+/** Legacy values remain accepted for callers, but all school-facing output is BS. */
+export type DateDisplayMode = 'AD' | 'BS' | 'BOTH';
 
 const monthNames = [
   'Baisakh', 'Jestha', 'Asar', 'Shrawan', 'Bhadra', 'Ashwin',
