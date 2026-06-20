@@ -6,8 +6,8 @@ import { useEffect, useState } from 'react';
 import { admissionCasesApi } from '../../lib/api/admission-cases';
 import { Button } from '../ui/button';
 import { ErrorState } from '../ui/error-state';
-import { AdmissionApplicationForm } from './admission-application-form';
 import { AdmissionCaseWizard } from './admission-case-wizard';
+import { AdmissionReviewCaseForm } from './admission-review-case-form';
 
 export function AdmissionEntry({ initialMode }: { initialMode?: 'direct' | 'review' }) {
   const [mode, setMode] = useState<'choose' | 'direct' | 'review'>(initialMode ?? 'choose');
@@ -27,7 +27,7 @@ export function AdmissionEntry({ initialMode }: { initialMode?: 'direct' | 'revi
   }
 
   if (mode === 'direct') return <AdmissionCaseWizard />;
-  if (mode === 'review') return <AdmissionApplicationForm />;
+  if (mode === 'review') return <AdmissionReviewCaseForm />;
 
   return (
     <section className="grid gap-5 lg:grid-cols-2">
