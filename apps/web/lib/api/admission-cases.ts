@@ -7,6 +7,30 @@ import type {
 } from '@schoolos/core';
 import { request } from './client';
 
+export type AdmissionCaseQueue =
+  | 'NEEDS_INFORMATION'
+  | 'WAITING_FOR_REVIEW'
+  | 'READY_TO_ADMIT'
+  | 'APPROVED'
+  | 'NOT_ADMITTED'
+  | 'DOCUMENTS_PENDING'
+  | 'DUPLICATE_WARNINGS';
+
+export type AdmissionCaseQueueItem = {
+  id: string;
+  displayStatus: string;
+  fullNameEn: string;
+  guardianFullName: string | null;
+  guardianPhone: string | null;
+  source: string;
+  classId: string | null;
+  sectionId: string | null;
+  admittedStudentId: string | null;
+  hasDuplicateWarning: boolean;
+  hasDocumentsPending: boolean;
+  updatedAt: string;
+};
+
 export type ReviewAdmissionCasePayload = {
   action:
     | 'REQUEST_INFORMATION'
@@ -25,6 +49,21 @@ export const admissionCasesApi = {
   getPolicy: () => request<AdmissionPolicy>('/admissions/policy'),
   updatePolicy: (payload: AdmissionPolicy) =>
     request<AdmissionPolicy>('/admissions/policy', { method: 'PUT', json: payload }),
+  listQueues: (query: { queue?: AdmissionCaseQueue; page?: number; limit?: number; search?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (query.queue) searchParams.set('queue', query.queue);
+    if (query.page) searchParams.set('page', String(query.page));
+    if (query.limit) searchParams.set('limit', String(query.limit));
+    if (query.search?.trim()) searchParams.set('search', query.search.trim());
+    const suffix = searchParams.toString();
+    return request<{
+      items: AdmissionCaseQueueItem[];
+      total: number;
+      page: number;
+      limit: number;
+      hasNextPage: boolean;
+    }>(`/admissions/cases${suffix ? `?${suffix}` : ''}`);
+  },
   createCase: (payload: CreateAdmissionCasePayload) =>
     request<AdmissionCase>('/admissions/cases', { method: 'POST', json: payload }),
   getCase: (admissionCaseId: string) =>
