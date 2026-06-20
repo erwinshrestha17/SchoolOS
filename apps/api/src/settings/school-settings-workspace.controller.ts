@@ -33,14 +33,16 @@ export class SchoolSettingsWorkspaceController {
   @Get('overview')
   @Permissions('settings:read')
   async getOverview(@CurrentAuth() auth: AuthContext) {
-    const [settings, navigation] = await Promise.all([
+    const [settings, navigation, academicCalendar] = await Promise.all([
       this.settingsService.getSettings(auth.tenantId),
       Promise.resolve(this.navigationService.getNavigation(auth)),
+      this.academicCalendarService.getCalendar(auth.tenantId),
     ]);
     const configured = new Set(settings.filter((item) => hasValue(item.value)).map((item) => item.key));
     const profileKeys = ['school_name', 'school_address', 'school_phone', 'school_email', 'principal_name'];
     const profileReady = profileKeys.every((key) => configured.has(key as never));
     const brandingReady = configured.has('school_logo' as never) && configured.has('branding_primary_color' as never);
+    const calendarReady = academicCalendar.academicYears.some((year) => year.isCurrent);
 
     return {
       generatedAt: new Date().toISOString(),
@@ -48,6 +50,7 @@ export class SchoolSettingsWorkspaceController {
       readiness: [
         { id: 'school-profile', label: 'School Profile', description: profileReady ? 'Official school profile is configured.' : 'Add the required official school profile details.', href: '/dashboard/settings/school-profile', status: profileReady ? 'ready' : 'needs_attention' },
         { id: 'branding-documents', label: 'Branding & Documents', description: brandingReady ? 'Official logo and document defaults are configured.' : 'Add an official logo and document defaults.', href: '/dashboard/settings/branding-documents', status: brandingReady ? 'ready' : 'needs_attention' },
+        { id: 'academic-calendar', label: 'Calendar, Academic Year & Holidays', description: calendarReady ? 'A current Bikram Sambat academic year is configured.' : 'Create and set the current Bikram Sambat academic year.', href: '/dashboard/settings/academic-calendar', status: calendarReady ? 'ready' : 'needs_attention' },
       ],
     };
   }
