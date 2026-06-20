@@ -40,7 +40,7 @@ Inventory & Asset Management is not an active module. Do not recreate Inventory 
 | Order | Document | Purpose |
 |---:|---|---|
 | 1 | `../README.md` | Project summary, module taxonomy, release stage, readiness boundaries, and active source-of-truth set. |
-| 2 | `../AGENTS.md` | Agent/developer operating rules, GA-oriented delivery target, security rules, architecture rules, and verification commands. |
+| 2 | `../AGENTS.md` | Agent/developer operating rules, GA-oriented delivery target, security rules, architecture rules, naming rules, and verification commands. |
 | 3 | `production/SCHOOLOS_GA_RELEASE_POLICY.md` | Canonical release terminology, stage definitions, GA gates, non-goals, and required reporting format. |
 | 4 | `project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` | Canonical evidence-based readiness audit, scores, command results, blockers, and documentation inventory. |
 | 5 | `project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` | Focused dependency-driven execution plan from internal QA through staging, controlled pilot, release candidate, and production readiness. |
@@ -50,14 +50,15 @@ Inventory & Asset Management is not an active module. Do not recreate Inventory 
 | 9 | `project/SCHOOLOS_PROJECT_STATUS.md` | Current implementation status snapshot; should summarize, not replace, the audit. |
 | 10 | `project/SCHOOLOS_IMPLEMENTATION_PLAN.md` | Longer implementation backlog and module detail; execution priority is governed by the next-phase plan and GA policy. |
 | 11 | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Storage, File Registry, tenant isolation, scaling, performance, and security architecture. |
-| 12 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, and provider/queue operations. |
-| 13 | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | M12 notification events, delivery, preferences, retries, provider operations, notification center, notices, chat, and audit behavior. |
-| 14 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, components, route behavior, API usage, and web persona smoke plan. |
-| 15 | `design/modules/README.md` | M1-M13 module-level frontend design reference index. |
-| 16 | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Approved supporting visual-reference appendix for the supplied principal dashboard and M1 desktop screens. |
-| 17 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit and contract-safe reference-screen implementation guidance. |
-| 18 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
-| 19 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
+| 12 | `architecture/SCHOOLOS_NAMING_CONVENTIONS.md` | Canonical vocabulary plus naming for files, folders, routes, DTOs, schema values, contracts, web, and mobile. |
+| 13 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, and provider/queue operations. |
+| 14 | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | M12 notification events, delivery, preferences, retries, provider operations, notification center, notices, chat, and audit behavior. |
+| 15 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, components, route behavior, API usage, and web persona smoke plan. |
+| 16 | `design/modules/README.md` | M1-M13 module-level frontend design reference index. |
+| 17 | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Approved supporting visual-reference appendix for the supplied principal dashboard and M1 desktop screens. |
+| 18 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit and contract-safe reference-screen implementation guidance. |
+| 19 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
+| 20 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
 
 ---
 
@@ -91,6 +92,7 @@ project/SCHOOLOS_IMPLEMENTATION_PLAN.md
 project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md
 project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md
 architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
+architecture/SCHOOLOS_NAMING_CONVENTIONS.md
 architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
 architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md
 design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
@@ -149,6 +151,7 @@ design/HOSTEL_WEB_REFERENCE_ANALYSIS_RETIRED.md
 | Functional behavior | `product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` | Engineering, QA |
 | Backend/web/mobile feature allocation and role/surface boundaries | `product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md` | Product, engineering, design, QA |
 | Architecture/security rules | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Engineering, security |
+| Naming conventions and canonical vocabulary | `architecture/SCHOOLOS_NAMING_CONVENTIONS.md` | Engineering, QA, coding agents |
 | Platform operations boundary | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform/admin engineers |
 | M12 notification events, delivery, preferences, retry, audit, and notification center | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | Product, engineering, QA, platform/admin engineers |
 | Web UI and state rules | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Web engineers |
