@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/constants/app_routes.dart';
+import '../../features/operational_summary/domain/operational_summary_models.dart';
+import '../../features/operational_summary/presentation/operational_summary_card.dart';
 import '../../features/parent/application/parent_portal_providers.dart';
 import '../../features/parent/domain/parent_portal_models.dart';
 import '../../features/parent/presentation/screens/parent_portal_children_tab.dart';
@@ -11,7 +13,6 @@ import '../../features/parent/presentation/screens/parent_portal_homework_tab.da
 import '../../features/parent/presentation/screens/parent_portal_more_tab.dart';
 import '../../features/parent/presentation/screens/parent_portal_updates_tab.dart';
 import '../../features/parent/presentation/widgets/parent_portal_widgets.dart';
-import '../../features/notices/application/notices_providers.dart';
 
 class SchoolOsAppShell extends ConsumerStatefulWidget {
   const SchoolOsAppShell({
@@ -30,13 +31,7 @@ class SchoolOsAppShell extends ConsumerStatefulWidget {
 class _SchoolOsAppShellState extends ConsumerState<SchoolOsAppShell> {
   late int selectedIndex = widget.initialIndex.clamp(0, 4);
 
-  static const titles = [
-    'SchoolOS Mobile',
-    'Children',
-    'Homework',
-    'Updates',
-    'More',
-  ];
+  static const titles = ['SchoolOS Mobile', 'Children', 'Homework', 'Updates', 'More'];
 
   @override
   Widget build(BuildContext context) {
@@ -54,12 +49,9 @@ class _SchoolOsAppShellState extends ConsumerState<SchoolOsAppShell> {
           data: (portal) => IndexedStack(
             index: selectedIndex,
             children: [
-              ParentPortalHomeTab(data: portal),
+              _ParentHomeWithSummary(data: portal),
               ParentPortalChildrenTab(data: portal),
-              ParentPortalHomeworkTab(
-                data: portal,
-                initialChildId: widget.initialChildId,
-              ),
+              ParentPortalHomeworkTab(data: portal, initialChildId: widget.initialChildId),
               ParentPortalUpdatesTab(data: portal),
               ParentPortalMoreTab(data: portal),
             ],
@@ -70,6 +62,25 @@ class _SchoolOsAppShellState extends ConsumerState<SchoolOsAppShell> {
         selectedIndex: selectedIndex,
         onSelected: (index) => setState(() => selectedIndex = index),
       ),
+    );
+  }
+}
+
+class _ParentHomeWithSummary extends StatelessWidget {
+  const _ParentHomeWithSummary({required this.data});
+
+  final ParentPortalData data;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: OperationalSummaryCard(persona: OperationalMobilePersona.parent),
+        ),
+        Expanded(child: ParentPortalHomeTab(data: data)),
+      ],
     );
   }
 }
@@ -86,42 +97,18 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final portal = ref.watch(parentPortalDataProvider).valueOrNull;
     final parentName = portal?.parentName ?? 'Parent';
-    final unreadCount = portal?.unreadUpdates ?? 0;
     return AppBar(
       title: Text(
         title,
-        style: const TextStyle(
-          color: ParentPortalColors.navy,
-          fontWeight: FontWeight.w900,
-        ),
+        style: const TextStyle(color: ParentPortalColors.navy, fontWeight: FontWeight.w900),
       ),
       backgroundColor: ParentPortalColors.page,
       surfaceTintColor: Colors.transparent,
       actions: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            IconButton(
-              tooltip: 'Notifications',
-              onPressed: () => _showNotifications(context, ref, portal),
-              icon: const Icon(Icons.notifications_none_rounded),
-            ),
-            if (unreadCount > 0)
-              const Positioned(
-                right: 10,
-                top: 9,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: ParentPortalColors.green,
-                    shape: BoxShape.circle,
-                    border: Border.fromBorderSide(
-                      BorderSide(color: Colors.white, width: 1.5),
-                    ),
-                  ),
-                  child: SizedBox(width: 9, height: 9),
-                ),
-              ),
-          ],
+        IconButton(
+          tooltip: 'Notifications',
+          onPressed: () => context.push(AppRoutes.notifications),
+          icon: const Icon(Icons.notifications_none_rounded),
         ),
         Padding(
           padding: const EdgeInsets.only(right: 10),
@@ -137,145 +124,6 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
       ],
     );
   }
-
-  Future<void> _showNotifications(
-    BuildContext context,
-    WidgetRef ref,
-    ParentPortalData? portal,
-  ) async {
-    final updates = portal?.updates.take(5).toList() ?? const [];
-    await showGeneralDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Close notifications',
-      barrierColor: Colors.black26,
-      transitionDuration: const Duration(milliseconds: 220),
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        final offset = Tween(
-          begin: const Offset(0, -0.12),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut));
-        return FadeTransition(
-          opacity: animation,
-          child: SlideTransition(position: offset, child: child),
-        );
-      },
-      pageBuilder: (dialogContext, animation, secondaryAnimation) => SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 560, maxHeight: 560),
-              margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
-              decoration: BoxDecoration(
-                color: ParentPortalColors.page,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: ParentPortalColors.border),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x220F172A),
-                    blurRadius: 28,
-                    offset: Offset(0, 12),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Notifications',
-                        style: Theme.of(dialogContext).textTheme.titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w900),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        tooltip: 'Close',
-                        onPressed: () => Navigator.pop(dialogContext),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Flexible(
-                    child: updates.isEmpty
-                        ? const PortalCard(child: Text('No notifications yet.'))
-                        : ListView.separated(
-                            shrinkWrap: true,
-                            itemCount: updates.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (context, index) {
-                              final update = updates[index];
-                              return PortalCard(
-                                onTap: () async {
-                                  Navigator.pop(dialogContext);
-                                  if (update.unreadCount > 0) {
-                                    await ref
-                                        .read(noticesRepositoryProvider)
-                                        .markNoticeRead(update.id);
-                                    ref.invalidate(parentPortalDataProvider);
-                                  }
-                                  if (context.mounted &&
-                                      update.route?.isNotEmpty == true) {
-                                    context.push(update.route!);
-                                  }
-                                },
-                                child: ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: Icon(
-                                    _notificationIcon(update.category),
-                                    color: _notificationColor(update.category),
-                                  ),
-                                  title: Text(
-                                    update.title,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  subtitle: Text(update.metadata),
-                                  trailing: update.unreadCount > 0
-                                      ? const Icon(
-                                          Icons.circle,
-                                          size: 9,
-                                          color: ParentPortalColors.green,
-                                        )
-                                      : null,
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-IconData _notificationIcon(ParentUpdateCategory category) {
-  return switch (category) {
-    ParentUpdateCategory.message => Icons.chat_bubble_outline_rounded,
-    ParentUpdateCategory.event => Icons.event_outlined,
-    ParentUpdateCategory.gallery => Icons.photo_library_outlined,
-    ParentUpdateCategory.notice => Icons.campaign_outlined,
-  };
-}
-
-Color _notificationColor(ParentUpdateCategory category) {
-  return switch (category) {
-    ParentUpdateCategory.message => ParentPortalColors.purple,
-    ParentUpdateCategory.event => ParentPortalColors.blue,
-    ParentUpdateCategory.gallery => ParentPortalColors.green,
-    ParentUpdateCategory.notice => ParentPortalColors.orange,
-  };
 }
 
 class SchoolOsBottomNavigation extends StatelessWidget {
@@ -314,19 +162,13 @@ class SchoolOsBottomNavigation extends StatelessWidget {
                   onTap: () => onSelected(index),
                   borderRadius: BorderRadius.circular(16),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 2,
-                      vertical: 3,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 13,
-                            vertical: 5,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
                           decoration: BoxDecoration(
                             color: selectedIndex == index
                                 ? ParentPortalColors.greenSoft
@@ -334,9 +176,7 @@ class SchoolOsBottomNavigation extends StatelessWidget {
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Icon(
-                            selectedIndex == index
-                                ? items[index].$2
-                                : items[index].$1,
+                            selectedIndex == index ? items[index].$2 : items[index].$1,
                             size: 22,
                             color: selectedIndex == index
                                 ? ParentPortalColors.green
