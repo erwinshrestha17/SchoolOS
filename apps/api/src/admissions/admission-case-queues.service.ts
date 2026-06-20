@@ -21,7 +21,7 @@ const QUEUE_STORAGE_STATUSES: Record<string, string[]> = {
   APPROVED: ['APPROVED', 'ACCEPTED'],
   NOT_ADMITTED: ['NOT_ADMITTED', 'REJECTED'],
   DOCUMENTS_PENDING: ['ADMITTED'],
-  DUPLICATE_WARNINGS: ['DRAFT', 'NEEDS_INFORMATION', 'READY_TO_ADMIT', 'WAITING_FOR_REVIEW', 'APPROVED'],
+  DUPLICATE_WARNINGS: ['DRAFT', 'NEEDS_INFORMATION', 'READY_TO_ADMIT', 'WAITING_FOR_REVIEW', 'APPROVED', 'ACCEPTED'],
 };
 
 @Injectable()
@@ -36,13 +36,15 @@ export class AdmissionCaseQueuesService {
     const where: Prisma.AdmissionApplicationWhereInput = {
       tenantId: actor.tenantId,
       ...(storageStatuses ? { status: { in: storageStatuses } } : {}),
-      ...(query.search ? {
-        OR: [
-          { firstNameEn: { contains: query.search, mode: 'insensitive' } },
-          { lastNameEn: { contains: query.search, mode: 'insensitive' } },
-          { guardianPhone: { contains: query.search, mode: 'insensitive' } },
-        ],
-      } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { firstNameEn: { contains: query.search, mode: 'insensitive' } },
+              { lastNameEn: { contains: query.search, mode: 'insensitive' } },
+              { guardianPhone: { contains: query.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
     };
     const [total, records] = await Promise.all([
       this.prisma.admissionApplication.count({ where }),
@@ -89,14 +91,36 @@ export class AdmissionCaseQueuesService {
         return true;
       });
 
-    return { items, total, page, limit, hasNextPage: total > skip + records.length };
+    return {
+      items,
+      total: query.queue === 'DUPLICATE_WARNINGS' || query.queue === 'DOCUMENTS_PENDING' ? items.length : total,
+      page,
+      limit,
+      hasNextPage:
+        query.queue === 'DUPLICATE_WARNINGS' || query.queue === 'DOCUMENTS_PENDING'
+          ? records.length === limit && items.length > 0
+          : total > skip + records.length,
+    };
   }
 
   private hasDuplicateWarning(value: Prisma.JsonValue | null) {
-    return typeof value === 'object' && value !== null && !Array.isArray(value) && 'matches' in value;
+    const metadata = this.metadata(value);
+    return metadata.duplicateRisk === true || Array.isArray(metadata.duplicateCandidates) || 'matches' in metadata;
   }
 
   private hasDocumentsPending(value: Prisma.JsonValue | null) {
-    return typeof value === 'object' && value !== null && !Array.isArray(value) && 'followUps' in value;
+    const metadata = this.metadata(value);
+    const followUps = metadata.followUps;
+    return Array.isArray(followUps) && followUps.some((item) => this.isDocumentFollowUp(item));
+  }
+
+  private metadata(value: Prisma.JsonValue | null): Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  }
+
+  private isDocumentFollowUp(value: unknown) {
+    return typeof value === 'object' && value !== null && (value as { code?: unknown }).code === 'DOCUMENTS_PENDING';
   }
 }
