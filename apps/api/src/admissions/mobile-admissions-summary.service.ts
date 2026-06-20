@@ -42,6 +42,37 @@ export class MobileAdmissionsSummaryService {
         }),
       ]);
 
+    const items = [
+      {
+        id: 'waiting-review',
+        title: 'Admissions needing review',
+        detail: `${waitingReview.total} case${waitingReview.total === 1 ? '' : 's'} awaiting a school decision`,
+        status: waitingReview.total > 0 ? 'attention' : 'clear',
+        route: '/principal/admissions/review',
+      },
+      {
+        id: 'approved-ready',
+        title: 'Approved cases ready to admit',
+        detail: `${approved.total} case${approved.total === 1 ? '' : 's'} ready for final admission`,
+        status: approved.total > 0 ? 'attention' : 'clear',
+        route: '/principal/admissions/approved',
+      },
+      {
+        id: 'documents-pending',
+        title: 'Missing documents',
+        detail: `${documentsPending.total} admitted student${documentsPending.total === 1 ? '' : 's'} with document follow-up`,
+        status: documentsPending.total > 0 ? 'attention' : 'clear',
+        route: '/principal/admissions/documents',
+      },
+      {
+        id: 'duplicate-warnings',
+        title: 'Duplicate warnings',
+        detail: `${duplicateWarnings.total} case${duplicateWarnings.total === 1 ? '' : 's'} need duplicate review`,
+        status: duplicateWarnings.total > 0 ? 'attention' : 'clear',
+        route: '/principal/admissions/duplicates',
+      },
+    ];
+
     return {
       metrics: {
         waitingForReview: waitingReview.total,
@@ -50,28 +81,7 @@ export class MobileAdmissionsSummaryService {
         duplicateWarnings: duplicateWarnings.total,
         iemisFollowUp,
       },
-      actions: [
-        {
-          label: 'Admissions needing review',
-          count: waitingReview.total,
-          route: '/principal/admissions/review',
-        },
-        {
-          label: 'Approved cases ready to admit',
-          count: approved.total,
-          route: '/principal/admissions/approved',
-        },
-        {
-          label: 'Missing documents',
-          count: documentsPending.total,
-          route: '/principal/admissions/documents',
-        },
-        {
-          label: 'Duplicate warnings',
-          count: duplicateWarnings.total,
-          route: '/principal/admissions/duplicates',
-        },
-      ],
+      items,
       lastUpdated: new Date().toISOString(),
     };
   }
