@@ -14,14 +14,15 @@ const context = (permissions: string[]): AuthContext => ({
 
 describe('SchoolSettingsNavigationV1Service', () => {
   it('shows overview as view-only for settings readers', () => {
-    const item = service.getNavigation(context(['settings:read'])).groups[0]?.items[0];
-    expect(item).toMatchObject({ id: 'overview', access: 'view' });
+    const items = service.getNavigation(context(['settings:read'])).groups[0]?.items ?? [];
+    expect(items).toEqual([expect.objectContaining({ id: 'overview', access: 'view' })]);
   });
 
-  it('shows profile management for settings managers', () => {
+  it('shows profile and branding management for settings managers', () => {
     const items = service.getNavigation(context(['settings:manage'])).groups[0]?.items ?? [];
     expect(items).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'school-profile', access: 'manage' }),
+      expect.objectContaining({ id: 'branding-documents', access: 'manage' }),
     ]));
   });
 });
