@@ -1,5 +1,6 @@
 import type {
   AcademicCalendarSettings,
+  AcademicCalendarYearSettings,
   CreateAcademicCalendarYearPayload,
   SchoolCalendarDaySettings,
   UpsertSchoolCalendarDayPayload,
@@ -12,7 +13,7 @@ export const academicCalendarSettingsApi = {
   getCalendar: (academicYearId?: string) => request<AcademicCalendarSettings>(
     `${basePath}${academicYearId ? `?academicYearId=${encodeURIComponent(academicYearId)}` : ''}`,
   ),
-  createAcademicYear: (body: CreateAcademicCalendarYearPayload) => request(
+  createAcademicYear: (body: CreateAcademicCalendarYearPayload) => request<AcademicCalendarYearSettings>(
     `${basePath}/academic-years`,
     { method: 'POST', json: body },
   ),
