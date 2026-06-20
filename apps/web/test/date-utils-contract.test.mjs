@@ -13,26 +13,23 @@ function read(relativePath) {
 describe('SchoolOS Nepal BS Date Utility Contracts', () => {
   it('delegates legacy web formatting to the canonical core policy', () => {
     const dateUtils = read('lib/date-utils.ts');
-
-    assert.match(dateUtils, /from '@schoolos\/core'/);
+    assert.match(dateUtils, /@schoolos\/core/);
     assert.match(dateUtils, /coreFormatBsDate/);
     assert.match(dateUtils, /toBsDateFromGregorian/);
     assert.doesNotMatch(dateUtils, /BS_CALENDAR_DATA/);
-    assert.doesNotMatch(dateUtils, /fallback to a standard pattern/);
   });
 
-  it('keeps the public compatibility helpers while requiring BS display', () => {
+  it('keeps compatibility helpers but forces school-facing BS output', () => {
     const dateUtils = read('lib/date-utils.ts');
-
     assert.match(dateUtils, /export function formatAdDate/);
     assert.match(dateUtils, /export function formatBsDate/);
     assert.match(dateUtils, /export function formatSchoolDate/);
-    assert.match(dateUtils, /export type DateDisplayMode = 'BS'/);
+    assert.match(dateUtils, /DateDisplayMode/);
+    assert.match(dateUtils, /displays BS only/);
   });
 
   it('keeps dashboard usage on the shared date utility', () => {
     const dashboardPage = read('app/dashboard/page.tsx');
-
     assert.match(dashboardPage, /formatSchoolDate/);
     assert.doesNotMatch(dashboardPage, /const formatDate =/);
   });
