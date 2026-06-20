@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/design_system/app_spacing.dart';
-import '../../../shared/widgets/app_empty_state.dart';
 import '../application/operational_summary_providers.dart';
 import '../domain/operational_summary_models.dart';
 
