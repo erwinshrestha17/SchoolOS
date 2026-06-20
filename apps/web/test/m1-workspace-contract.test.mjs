@@ -32,36 +32,37 @@ test('M1 workspaces expose real route-backed operations', () => {
   assert.match(api, /confirmFileAccessReview: true/);
 });
 
-test('M1 admissions keeps legacy review workflow and adds unified direct admission', () => {
-  const pipeline = read('components/admissions/admissions-pipeline.tsx');
-  const applicationForm = read('components/m1/admission-application-form.tsx');
-  const page = read('app/dashboard/admissions/new/page.tsx');
+test('M1 entry creates one unified admission case for direct and review workflows', () => {
+  const legacyPipeline = read('components/admissions/admissions-pipeline.tsx');
+  const legacyApplicationForm = read('components/m1/admission-application-form.tsx');
+  const entryPage = read('app/dashboard/admissions/new/page.tsx');
   const entry = read('components/m1/admission-entry.tsx');
-  const wizard = read('components/m1/admission-case-wizard.tsx');
+  const directWizard = read('components/m1/admission-case-wizard.tsx');
+  const reviewForm = read('components/m1/admission-review-case-form.tsx');
+  const queues = read('components/m1/admission-case-queues.tsx');
   const caseApi = read('lib/api/admission-cases.ts');
   const admissionsPage = read('app/dashboard/admissions/page.tsx');
-  const nav = read('components/m1/m1-module-nav.tsx');
 
-  assert.match(pipeline, /listAdmissionApplications/);
-  assert.match(pipeline, /updateAdmissionApplicationStatus/);
-  assert.match(pipeline, /enrollAdmissionApplication/);
-  assert.match(pipeline, /PAGE_SIZE = 25/);
-  assert.match(applicationForm, /createAdmissionApplication/);
-  assert.match(applicationForm, /Creates an inquiry; it does not enroll a student/);
-  assert.match(page, /AdmissionEntry/);
-  assert.match(entry, /Direct admission/);
-  assert.match(entry, /Admission review/);
+  assert.match(legacyPipeline, /listAdmissionApplications/);
+  assert.match(legacyApplicationForm, /createAdmissionApplication/);
+  assert.match(entryPage, /AdmissionEntry/);
+  assert.match(entry, /AdmissionCaseWizard/);
+  assert.match(entry, /AdmissionReviewCaseForm/);
+  assert.doesNotMatch(entry, /AdmissionApplicationForm/);
   assert.match(entry, /admissionCasesApi\.getPolicy/);
-  assert.match(wizard, /SchoolOS checks placement, policy requirements, and possible duplicates/);
-  assert.match(wizard, /directAdmit/);
-  assert.match(wizard, /Admit student/);
+  assert.match(directWizard, /SchoolOS checks placement, policy requirements, and possible duplicates/);
+  assert.match(directWizard, /directAdmit/);
+  assert.match(directWizard, /Admit student/);
+  assert.match(reviewForm, /admissionCasesApi\.createCase/);
+  assert.match(reviewForm, /MARK_READY_FOR_REVIEW/);
+  assert.match(queues, /listQueues/);
+  assert.match(queues, /Ready to Admit/);
   assert.match(caseApi, /\/admissions\/cases/);
   assert.match(caseApi, /\/direct-admit/);
   assert.match(caseApi, /\/finalize/);
-  assert.match(admissionsPage, /moreActionItems/);
-  assert.match(admissionsPage, /\/dashboard\/admissions\/review/);
-  assert.match(nav, /\/dashboard\/admissions\/review/);
-  assert.doesNotMatch(pipeline + applicationForm + wizard + caseApi, /publicUrl|objectKey/);
+  assert.match(admissionsPage, /AdmissionCaseQueues/);
+  assert.match(admissionsPage, /New admission/);
+  assert.doesNotMatch(directWizard + reviewForm + caseApi, /publicUrl|objectKey/);
 });
 
 test('M1 high-risk workflows remain server controlled and protected', () => {
@@ -69,6 +70,7 @@ test('M1 high-risk workflows remain server controlled and protected', () => {
   const documents = read('components/m1/student-documents-workspace.tsx');
   const qr = read('components/m1/qr-id-workspace.tsx');
   const iemis = read('components/m1/iemis-readiness-workspace.tsx');
+  const admissionCase = read('components/m1/admission-case-detail.tsx');
 
   assert.match(duplicates, /previewDuplicateStudentMerge/);
   assert.match(duplicates, /mergeDuplicateStudent/);
@@ -79,7 +81,9 @@ test('M1 high-risk workflows remain server controlled and protected', () => {
   assert.match(qr, /StudentQrCard/);
   assert.match(iemis, /CSV Import History/);
   assert.match(iemis, /Import Review Queue/);
-  assert.doesNotMatch(duplicates + documents + qr + iemis, /publicUrl|objectKey/);
+  assert.match(admissionCase, /Finalize admission/);
+  assert.match(admissionCase, /Duplicate override/);
+  assert.doesNotMatch(duplicates + documents + qr + iemis + admissionCase, /publicUrl|objectKey/);
 });
 
 test('M1 student roster uses backend summary, safe filters, and paginated roster contract', () => {
