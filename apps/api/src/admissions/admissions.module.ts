@@ -8,6 +8,8 @@ import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { StudentRecordsModule } from '../student-records/student-records.module';
 import { StudentsModule } from '../students/students.module';
 import { UsersModule } from '../users/users.module';
+import { AdmissionCaseFollowUpsController } from './admission-case-follow-ups.controller';
+import { AdmissionCaseFollowUpsService } from './admission-case-follow-ups.service';
 import { AdmissionCaseQueuesController } from './admission-case-queues.controller';
 import { AdmissionCaseQueuesService } from './admission-case-queues.service';
 import { AdmissionCasesController } from './admission-cases.controller';
@@ -35,12 +37,14 @@ import { UsageModule } from '../usage/usage.module';
     AdmissionsController,
     AdmissionCasesController,
     AdmissionCaseQueuesController,
+    AdmissionCaseFollowUpsController,
     M1AdmissionsHardeningController,
   ],
   providers: [
     AdmissionsService,
     AdmissionCasesService,
     AdmissionCaseQueuesService,
+    AdmissionCaseFollowUpsService,
     M1AdmissionsHardeningService,
   ],
 })
