@@ -18,6 +18,8 @@ import { AdmissionsController } from './admissions.controller';
 import { AdmissionsService } from './admissions.service';
 import { M1AdmissionsHardeningController } from './m1-admissions-hardening.controller';
 import { M1AdmissionsHardeningService } from './m1-admissions-hardening.service';
+import { MobileAdmissionsSummaryController } from './mobile-admissions-summary.controller';
+import { MobileAdmissionsSummaryService } from './mobile-admissions-summary.service';
 import { UsageModule } from '../usage/usage.module';
 
 @Module({
@@ -38,6 +40,7 @@ import { UsageModule } from '../usage/usage.module';
     AdmissionCasesController,
     AdmissionCaseQueuesController,
     AdmissionCaseFollowUpsController,
+    MobileAdmissionsSummaryController,
     M1AdmissionsHardeningController,
   ],
   providers: [
@@ -45,6 +48,7 @@ import { UsageModule } from '../usage/usage.module';
     AdmissionCasesService,
     AdmissionCaseQueuesService,
     AdmissionCaseFollowUpsService,
+    MobileAdmissionsSummaryService,
     M1AdmissionsHardeningService,
   ],
 })
