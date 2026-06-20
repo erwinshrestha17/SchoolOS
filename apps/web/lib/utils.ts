@@ -35,4 +35,9 @@ export function formatDateForInput(value: string | Date | null | undefined) {
   return formatBsDateForInput(value);
 }
 
-export { formatBsAcademicYear, formatBsDateRange, formatNepalTime };
+export {
+  formatBsAcademicYear,
+  formatBsDateRange,
+  formatBsDateTime,
+  formatNepalTime,
+};
