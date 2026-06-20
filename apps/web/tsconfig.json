@@ -17,7 +17,6 @@
       "dom.iterable",
       "esnext"
     ],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
     },
