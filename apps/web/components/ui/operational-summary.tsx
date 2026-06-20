@@ -160,12 +160,14 @@ export function OperationalSummaryPanel({
         allowedActions.length ? (
           <div className="flex flex-wrap gap-2">
             {allowedActions.slice(0, compact ? 1 : 3).map(({ action, href }) => (
-              <Button asChild key={action.key} size="sm" variant="outline">
-                <Link href={href}>
-                  {action.label}
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
+              <Link
+                key={action.key}
+                href={href}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2"
+              >
+                {action.label}
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
             ))}
           </div>
         ) : undefined
