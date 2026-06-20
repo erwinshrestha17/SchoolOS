@@ -249,7 +249,7 @@ export default function PlatformChangePlanPage() {
             </div>
 
             <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
-              This changes SchoolOS subscription billing only. It does not create student fee invoices, post to school M3 Fees, or post to tenant M9 Accounting.
+              This changes SchoolOS subscription billing only. It does not create student fee invoices, post to school M3 Fees, or post to tenant M11 Accounting.
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">

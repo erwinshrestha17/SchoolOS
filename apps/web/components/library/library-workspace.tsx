@@ -32,6 +32,9 @@ import {
   type LibraryPaginationMeta,
   type LibraryPaginatedResult,
   type LibraryPopularBookReportItem,
+  type LibraryReservation,
+  type LibraryReservationPayload,
+  type FulfillLibraryReservationPayload,
   type ReturnLibraryIssuePayload,
 } from '../../lib/library-api';
 import { api } from '../../lib/api';
@@ -50,6 +53,7 @@ const tabs = [
   { key: 'books', label: 'Books', href: '/dashboard/library/books' },
   { key: 'copies', label: 'Copies', href: '/dashboard/library/copies' },
   { key: 'issues', label: 'Issues', href: '/dashboard/library/issues' },
+  { key: 'reservations', label: 'Reservations', href: '/dashboard/library/reservations' },
   { key: 'overdue', label: 'Overdue', href: '/dashboard/library/overdue' },
   { key: 'fines', label: 'Fines', href: '/dashboard/library/fines' },
   { key: 'reports', label: 'Reports', href: '/dashboard/library/reports' },
@@ -93,9 +97,19 @@ const emptyIssueForm: LibraryIssuePayload = {
   notes: '',
 };
 
+const emptyReservationForm: LibraryReservationPayload = {
+  bookId: '',
+  copyId: '',
+  borrowerStudentId: '',
+  borrowerStaffId: '',
+  expiresAt: '',
+  notes: '',
+};
+
 const emptyBooks: LibraryBook[] = [];
 const emptyCopies: LibraryCopy[] = [];
 const emptyIssues: LibraryIssue[] = [];
+const emptyReservations: LibraryReservation[] = [];
 const listPageSize = '25';
 
 type LibraryQrBorrower = {
@@ -124,9 +138,11 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
   const [copySearch, setCopySearch] = useState('');
   const [copyStatus, setCopyStatus] = useState('');
   const [issueStatus, setIssueStatus] = useState('');
+  const [reservationStatus, setReservationStatus] = useState('ACTIVE');
   const [bookPage, setBookPage] = useState(1);
   const [copyPage, setCopyPage] = useState(1);
   const [issuePage, setIssuePage] = useState(1);
+  const [reservationPage, setReservationPage] = useState(1);
   const [overduePage, setOverduePage] = useState(1);
   const [finePage, setFinePage] = useState(1);
   const [bookForm, setBookForm] = useState<LibraryBookPayload>(emptyBookForm);
@@ -134,6 +150,10 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
   const [copyForm, setCopyForm] = useState<LibraryCopyPayload>(emptyCopyForm);
   const [editingCopyId, setEditingCopyId] = useState<string | null>(null);
   const [issueForm, setIssueForm] = useState<LibraryIssuePayload>(emptyIssueForm);
+  const [reservationForm, setReservationForm] =
+    useState<LibraryReservationPayload>(emptyReservationForm);
+  const [reservationFulfillmentDrafts, setReservationFulfillmentDrafts] =
+    useState<Record<string, FulfillLibraryReservationPayload>>({});
   const [returnDrafts, setReturnDrafts] = useState<Record<string, ReturnLibraryIssuePayload>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [isConfirmingReturn, setIsConfirmingReturn] = useState<string | null>(null);
@@ -175,6 +195,15 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
     queryFn: () =>
       libraryApi.listOverdue({
         page: String(overduePage),
+        limit: listPageSize,
+      }),
+  });
+  const reservationsQuery = useQuery({
+    queryKey: ['library-reservations', reservationStatus, reservationPage],
+    queryFn: () =>
+      libraryApi.listReservations({
+        status: reservationStatus,
+        page: String(reservationPage),
         limit: listPageSize,
       }),
   });
@@ -357,6 +386,41 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
     },
   });
 
+  const createReservationMutation = useMutation({
+    mutationFn: libraryApi.createReservation,
+    onSuccess: () => {
+      setReservationForm(emptyReservationForm);
+      setNotice('Reservation queued successfully.');
+      void queryClient.invalidateQueries({ queryKey: ['library-reservations'] });
+      invalidateLibrary();
+    },
+  });
+
+  const cancelReservationMutation = useMutation({
+    mutationFn: libraryApi.cancelReservation,
+    onSuccess: () => {
+      setNotice('Reservation cancelled.');
+      void queryClient.invalidateQueries({ queryKey: ['library-reservations'] });
+      invalidateLibrary();
+    },
+  });
+
+  const fulfillReservationMutation = useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: FulfillLibraryReservationPayload;
+    }) => libraryApi.fulfillReservation(id, body),
+    onSuccess: () => {
+      setNotice('Reservation fulfilled and issue record created.');
+      setReservationFulfillmentDrafts({});
+      void queryClient.invalidateQueries({ queryKey: ['library-reservations'] });
+      invalidateLibrary();
+    },
+  });
+
   const remindersMutation = useMutation({
     mutationFn: libraryApi.sendOverdueReminders,
     onSuccess: (result) => {
@@ -382,6 +446,7 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
   const copies = copiesQuery.data?.items ?? emptyCopies;
   const issues = issuesQuery.data?.items ?? emptyIssues;
   const overdueIssues = overdueQuery.data?.items ?? emptyIssues;
+  const reservations = reservationsQuery.data?.items ?? emptyReservations;
 
   const stats = useMemo(() => {
     const totalBooks = booksQuery.data?.meta.total ?? books.length;
@@ -447,6 +512,12 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
     };
 
     issueMutation.mutate(payload);
+  }
+
+  function handleReservationSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const payload = cleanReservationPayload(reservationForm);
+    createReservationMutation.mutate(payload);
   }
 
   function editBook(book: LibraryBook) {
@@ -627,6 +698,44 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
           scanError={resolveCopyScanMutation.error}
           meta={issuesQuery.data?.meta}
           onPageChange={setIssuePage}
+        />
+      )}
+
+      {activeTab === 'reservations' && (
+        <ReservationsPanel
+          books={books}
+          copies={copies}
+          reservations={reservations}
+          students={schoolStudentsQuery.data?.items ?? []}
+          staff={staffQuery.data ?? []}
+          status={reservationStatus}
+          setStatus={(value) => {
+            setReservationStatus(value);
+            setReservationPage(1);
+          }}
+          form={reservationForm}
+          setForm={setReservationForm}
+          fulfillmentDrafts={reservationFulfillmentDrafts}
+          setFulfillmentDrafts={setReservationFulfillmentDrafts}
+          onSubmit={handleReservationSubmit}
+          onCancel={(reservation) => cancelReservationMutation.mutate(reservation.id)}
+          onFulfill={(reservation, body) =>
+            fulfillReservationMutation.mutate({ id: reservation.id, body })
+          }
+          isLoading={reservationsQuery.isLoading}
+          isSaving={
+            createReservationMutation.isPending ||
+            cancelReservationMutation.isPending ||
+            fulfillReservationMutation.isPending
+          }
+          error={
+            createReservationMutation.error ||
+            cancelReservationMutation.error ||
+            fulfillReservationMutation.error ||
+            reservationsQuery.error
+          }
+          meta={reservationsQuery.data?.meta}
+          onPageChange={setReservationPage}
         />
       )}
 
@@ -1359,6 +1468,273 @@ function IssuesPanel(props: {
   );
 }
 
+function ReservationsPanel(props: {
+  books: LibraryBook[];
+  copies: LibraryCopy[];
+  reservations: LibraryReservation[];
+  students: StudentProfile[];
+  staff: Array<{ id: string; firstName?: string; lastName?: string; employeeId?: string }>;
+  status: string;
+  setStatus: (value: string) => void;
+  form: LibraryReservationPayload;
+  setForm: (form: LibraryReservationPayload) => void;
+  fulfillmentDrafts: Record<string, FulfillLibraryReservationPayload>;
+  setFulfillmentDrafts: (drafts: Record<string, FulfillLibraryReservationPayload>) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  onCancel: (reservation: LibraryReservation) => void;
+  onFulfill: (reservation: LibraryReservation, body: FulfillLibraryReservationPayload) => void;
+  isLoading: boolean;
+  isSaving: boolean;
+  error: Error | null;
+  meta?: LibraryPaginationMeta;
+  onPageChange: (page: number) => void;
+}) {
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [confirmFulfillId, setConfirmFulfillId] = useState<string | null>(null);
+  const activeCopies = props.copies.filter((copy) =>
+    copy.status === 'AVAILABLE' || copy.status === 'RESERVED',
+  );
+
+  return (
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <PanelHeader
+          title="Reservation Queue"
+          description="Review queued holds and fulfill eligible reservations through the backend circulation policy."
+        />
+        <div className="mt-5 max-w-xs">
+          <select
+            value={props.status}
+            onChange={(event) => props.setStatus(event.target.value)}
+            className="input-control"
+          >
+            <option value="">All reservation states</option>
+            {['ACTIVE', 'FULFILLED', 'CANCELLED', 'EXPIRED'].map((status) => (
+              <option key={status} value={status}>
+                {formatStatus(status)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {props.error && <ErrorNotice message={props.error.message} />}
+
+        <div className="mt-5 space-y-3">
+          {props.isLoading && <LoadingState label="Loading reservations..." />}
+          {!props.isLoading && props.reservations.length === 0 && (
+            <EmptyState
+              title="No reservations found"
+              description="Create a reservation from the form or adjust the status filter."
+            />
+          )}
+          {props.reservations.map((reservation) => {
+            const active = reservation.status === 'ACTIVE';
+            const draft = props.fulfillmentDrafts[reservation.id] ?? {};
+            const defaultCopyId =
+              draft.copyId ?? reservation.copyId ?? availableCopyForBook(activeCopies, reservation.bookId)?.id ?? '';
+            const fulfillmentDraft = { ...draft, copyId: defaultCopyId };
+
+            return (
+              <div
+                key={reservation.id}
+                className={cn(
+                  'rounded-2xl border p-4',
+                  active ? 'border-slate-200 bg-white shadow-sm' : 'border-slate-100 bg-slate-50',
+                )}
+              >
+                <ReservationRow reservation={reservation} />
+                {active && (
+                  <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 md:grid-cols-4 lg:items-end">
+                    <label className="block text-sm font-semibold text-slate-700">
+                      Fulfillment copy
+                      <select
+                        value={defaultCopyId}
+                        onChange={(event) =>
+                          props.setFulfillmentDrafts({
+                            ...props.fulfillmentDrafts,
+                            [reservation.id]: {
+                              ...fulfillmentDraft,
+                              copyId: event.target.value,
+                            },
+                          })
+                        }
+                        className="input-control mt-1"
+                      >
+                        <option value="">Select copy</option>
+                        {activeCopies
+                          .filter((copy) => copy.bookId === reservation.bookId)
+                          .map((copy) => (
+                            <option key={copy.id} value={copy.id}>
+                              {copy.barcode} - {formatStatus(copy.status)}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                    <TextInput
+                      label="Due date"
+                      type="date"
+                      value={fulfillmentDraft.dueAt ?? ''}
+                      onChange={(dueAt) =>
+                        props.setFulfillmentDrafts({
+                          ...props.fulfillmentDrafts,
+                          [reservation.id]: { ...fulfillmentDraft, dueAt },
+                        })
+                      }
+                    />
+                    <TextInput
+                      label="Notes"
+                      value={fulfillmentDraft.notes ?? ''}
+                      onChange={(notes) =>
+                        props.setFulfillmentDrafts({
+                          ...props.fulfillmentDrafts,
+                          [reservation.id]: { ...fulfillmentDraft, notes },
+                        })
+                      }
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="btn-primary h-11"
+                        disabled={props.isSaving || !defaultCopyId}
+                        onClick={() => setConfirmFulfillId(reservation.id)}
+                      >
+                        Fulfill
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary h-11 text-red-600"
+                        disabled={props.isSaving}
+                        onClick={() => setConfirmCancelId(reservation.id)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <ConfirmDialog
+                  isOpen={confirmFulfillId === reservation.id}
+                  onClose={() => setConfirmFulfillId(null)}
+                  onConfirm={() => {
+                    props.onFulfill(reservation, cleanFulfillmentPayload(fulfillmentDraft));
+                    setConfirmFulfillId(null);
+                  }}
+                  title="Fulfill reservation"
+                  description="This creates an issue record and lets the backend validate borrower eligibility, queue order, and copy availability."
+                  confirmLabel="Fulfill reservation"
+                  isConfirming={props.isSaving}
+                />
+                <ConfirmDialog
+                  isOpen={confirmCancelId === reservation.id}
+                  onClose={() => setConfirmCancelId(null)}
+                  onConfirm={() => {
+                    props.onCancel(reservation);
+                    setConfirmCancelId(null);
+                  }}
+                  title="Cancel reservation"
+                  description="Cancel only after confirming the borrower no longer needs this hold or the reservation has been handled outside the queue."
+                  confirmLabel="Cancel reservation"
+                  variant="destructive"
+                  isConfirming={props.isSaving}
+                />
+              </div>
+            );
+          })}
+        </div>
+        <PaginationControls meta={props.meta} onPageChange={props.onPageChange} />
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <PanelHeader
+          title="Create Reservation"
+          description="Queue a borrower hold against a book, with optional copy and expiry metadata."
+        />
+        <form onSubmit={props.onSubmit} className="mt-5 space-y-4">
+          <BookSelector
+            mode="book"
+            books={props.books}
+            selectedId={props.form.bookId}
+            onSelect={(bookId) => props.setForm({ ...props.form, bookId, copyId: '' })}
+            label="Book"
+            placeholder="Search title, author, or ISBN"
+          />
+          <BookSelector
+            mode="copy"
+            copies={props.copies.filter((copy) => copy.bookId === props.form.bookId)}
+            selectedId={props.form.copyId ?? ''}
+            onSelect={(copyId) => props.setForm({ ...props.form, copyId })}
+            label="Optional copy"
+            placeholder="Reserve a specific barcode"
+          />
+          <StudentSelector
+            students={props.students}
+            selectedId={props.form.borrowerStudentId ?? ''}
+            onSelect={(borrowerStudentId) =>
+              props.setForm({
+                ...props.form,
+                borrowerStudentId,
+                borrowerStaffId: borrowerStudentId ? '' : props.form.borrowerStaffId,
+              })
+            }
+            label="Student borrower"
+            optional
+          />
+          <div className="relative py-2">
+            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+              <div className="w-full border-t border-slate-100" />
+            </div>
+            <div className="relative flex justify-center text-xs font-bold uppercase tracking-wider">
+              <span className="bg-white px-2 text-slate-400 italic">or</span>
+            </div>
+          </div>
+          <label className="block text-sm font-semibold text-slate-700">
+            Staff borrower
+            <select
+              value={props.form.borrowerStaffId ?? ''}
+              onChange={(event) =>
+                props.setForm({
+                  ...props.form,
+                  borrowerStaffId: event.target.value,
+                  borrowerStudentId: event.target.value ? '' : props.form.borrowerStudentId,
+                })
+              }
+              className="input-control mt-1"
+            >
+              <option value="">No staff borrower</option>
+              {props.staff.map((staff) => (
+                <option key={staff.id} value={staff.id}>
+                  {staffName(staff)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <TextInput
+            label="Hold expires"
+            type="date"
+            value={props.form.expiresAt ?? ''}
+            onChange={(expiresAt) => props.setForm({ ...props.form, expiresAt })}
+          />
+          <TextInput
+            label="Internal notes"
+            value={props.form.notes ?? ''}
+            onChange={(notes) => props.setForm({ ...props.form, notes })}
+          />
+          <button
+            type="submit"
+            className="btn-primary w-full"
+            disabled={
+              props.isSaving ||
+              !props.form.bookId ||
+              (!props.form.borrowerStudentId && !props.form.borrowerStaffId)
+            }
+          >
+            {props.isSaving ? 'Saving...' : 'Create reservation'}
+          </button>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 function LibraryCopyScanner({
   value,
   onChange,
@@ -1601,6 +1977,37 @@ function IssueRow({ issue, compact = false }: { issue: LibraryIssue; compact?: b
   );
 }
 
+function ReservationRow({ reservation }: { reservation: LibraryReservation }) {
+  const borrower = reservation.borrowerStudent
+    ? studentName(reservation.borrowerStudent)
+    : reservation.borrowerStaff
+      ? staffName(reservation.borrowerStaff)
+      : 'Borrower record unavailable';
+
+  return (
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="font-bold text-slate-900">
+            {reservation.book?.title?.trim() || 'Book title not set'}
+          </h3>
+          <LibraryStatusBadge status={reservation.status} />
+        </div>
+        <p className="mt-1 text-sm text-slate-500">
+          {borrower} • {reservation.copy?.barcode ?? 'Any available copy'}
+        </p>
+        {reservation.notes ? (
+          <p className="mt-2 text-xs text-slate-400">Notes: {reservation.notes}</p>
+        ) : null}
+      </div>
+      <div className="text-sm text-slate-500 lg:text-right">
+        <p>Reserved: {formatDate(reservation.reservedAt)}</p>
+        <p>Expires: {formatDate(reservation.expiresAt)}</p>
+      </div>
+    </div>
+  );
+}
+
 function BookMeta({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -1675,6 +2082,10 @@ function LibraryStatusBadge({ status }: { status: string }) {
     DAMAGED: { label: 'Damaged', tone: 'conflict' },
     OVERDUE: { label: 'Overdue', tone: 'overdue' },
     RETURNED: { label: 'Returned', tone: 'approved' },
+    ACTIVE: { label: 'Active', tone: 'pending' },
+    FULFILLED: { label: 'Fulfilled', tone: 'approved' },
+    CANCELLED: { label: 'Cancelled', tone: 'draft' },
+    EXPIRED: { label: 'Expired', tone: 'overdue' },
   };
   const config = badgeMap[normalized] ?? {
     label: formatStatus(normalized),
@@ -1760,6 +2171,37 @@ function cleanCopyPayload(form: LibraryCopyPayload): LibraryCopyPayload {
       : {}),
     ...(form.purchasedAt ? { purchasedAt: form.purchasedAt } : {}),
   };
+}
+
+function cleanReservationPayload(
+  form: LibraryReservationPayload,
+): LibraryReservationPayload {
+  return {
+    bookId: form.bookId,
+    ...(form.copyId ? { copyId: form.copyId } : {}),
+    ...(form.borrowerStudentId
+      ? { borrowerStudentId: form.borrowerStudentId }
+      : {}),
+    ...(form.borrowerStaffId ? { borrowerStaffId: form.borrowerStaffId } : {}),
+    ...(form.expiresAt ? { expiresAt: form.expiresAt } : {}),
+    ...(form.notes ? { notes: form.notes.trim() } : {}),
+  };
+}
+
+function cleanFulfillmentPayload(
+  form: FulfillLibraryReservationPayload,
+): FulfillLibraryReservationPayload {
+  return {
+    ...(form.copyId ? { copyId: form.copyId } : {}),
+    ...(form.dueAt ? { dueAt: form.dueAt } : {}),
+    ...(form.notes ? { notes: form.notes.trim() } : {}),
+  };
+}
+
+function availableCopyForBook(copies: LibraryCopy[], bookId: string) {
+  return copies.find(
+    (copy) => copy.bookId === bookId && copy.status === 'AVAILABLE',
+  );
 }
 
 function formatStatus(status: string) {

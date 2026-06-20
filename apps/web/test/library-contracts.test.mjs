@@ -17,6 +17,7 @@ describe('Phase 3B Library frontend contracts', () => {
       'app/dashboard/library/books/page.tsx',
       'app/dashboard/library/copies/page.tsx',
       'app/dashboard/library/issues/page.tsx',
+      'app/dashboard/library/reservations/page.tsx',
       'app/dashboard/library/overdue/page.tsx',
     ]) {
       assert.equal(existsSync(join(webRoot, route)), true, `Missing ${route}`);
@@ -48,6 +49,10 @@ describe('Phase 3B Library frontend contracts', () => {
       'listIssues',
       'issueCopy',
       'returnIssue',
+      'listReservations',
+      'createReservation',
+      'cancelReservation',
+      'fulfillReservation',
       'listOverdue',
       'getIssuedBooksReport',
       'getOverdueBooksReport',
@@ -64,6 +69,7 @@ describe('Phase 3B Library frontend contracts', () => {
       '/library/books',
       '/library/copies',
       '/library/issues',
+      '/library/reservations',
       '/library/overdue',
       '/library/overdue/reminders',
       '/library/reports/issued',
@@ -89,6 +95,7 @@ describe('Phase 3B Library frontend contracts', () => {
   it('builds Library UI sections with real API calls and production states', () => {
     const workspace = read('components/library/library-workspace.tsx');
     const page = read('app/dashboard/library/page.tsx');
+    const reservationsPage = read('app/dashboard/library/reservations/page.tsx');
 
     assert.match(page, /<ModuleHeader/);
     assert.match(page, /primaryAction=/);
@@ -96,6 +103,9 @@ describe('Phase 3B Library frontend contracts', () => {
     assert.match(page, /Issue \/ Return/);
     assert.match(page, /\/dashboard\/library\/catalog/);
     assert.match(page, /\/dashboard\/library\/copies/);
+    assert.match(page, /\/dashboard\/library\/reservations/);
+    assert.match(page, /eyebrow="M8 Library"/);
+    assert.doesNotMatch(page, /M8A/);
 
     for (const section of [
       'Total books',
@@ -107,6 +117,8 @@ describe('Phase 3B Library frontend contracts', () => {
       'Book Catalogue',
       'Copy Management',
       'Issue / Return',
+      'Reservation Queue',
+      'Create Reservation',
       'Overdue Issues',
       'Reports & Exports',
       'Export issued CSV',
@@ -143,6 +155,10 @@ describe('Phase 3B Library frontend contracts', () => {
       'libraryApi.listIssues',
       'libraryApi.issueCopy',
       'libraryApi.returnIssue',
+      'libraryApi.listReservations',
+      'libraryApi.createReservation',
+      'libraryApi.cancelReservation',
+      'libraryApi.fulfillReservation',
       'libraryApi.listOverdue',
       'libraryApi.getIssuedBooksReport',
       'libraryApi.getOverdueBooksReport',
@@ -160,6 +176,11 @@ describe('Phase 3B Library frontend contracts', () => {
     assert.match(workspace, /library-fine-open-invoice/);
     assert.match(workspace, /\/dashboard\/finance\?invoiceId=/);
     assert.match(workspace, /copyStatusReasons/);
+    assert.match(workspace, /cleanReservationPayload/);
+    assert.match(workspace, /cleanFulfillmentPayload/);
+    assert.match(workspace, /ReservationRow/);
+    assert.match(workspace, /library-reservations/);
+    assert.match(reservationsPage, /initialTab="reservations"/);
     assert.match(workspace, /Audit reason/);
     assert.match(workspace, /onArchiveCopy/);
     assert.match(workspace, /Archive library copy/);

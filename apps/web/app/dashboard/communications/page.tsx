@@ -86,7 +86,7 @@ export default function CommunicationsPage() {
         ]}
       >
         <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-          <KpiCard title="Sent Today" value="Unavailable" icon={<Send size={20} />} tone="neutral" description="Needs a date-bounded M10 summary." />
+          <KpiCard title="Sent Today" value="Unavailable" icon={<Send size={20} />} tone="neutral" description="Needs a date-bounded M12 summary." />
           <KpiCard title="Scheduled" value="Unavailable" icon={<CalendarClock size={20} />} tone="neutral" description="Needs a bounded scheduled-send summary." />
           <KpiCard title="Failed Deliveries" value={!canReadNotices ? 'Restricted' : failuresQuery.isLoading ? 'Loading' : failuresQuery.isError ? 'Unavailable' : failuresQuery.data?.total ?? 'Unavailable'} icon={<AlertTriangle size={20} />} tone={failuresQuery.data?.total ? 'danger' : 'neutral'} description="Backend retryable failure summary." />
           <KpiCard title="Unread High-Impact" value="Unavailable" icon={<Mail size={20} />} tone="neutral" description="Needs a priority-aware unread summary." />

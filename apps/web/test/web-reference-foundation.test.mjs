@@ -27,9 +27,11 @@ describe('reference dashboard foundation', () => {
       'M5 Activity Feed',
       'M6 Homework & Timetable',
       'M7 HR & Payroll',
-      'M8 Operations',
-      'M9 Accounting',
-      'M10 Notices & Communication',
+      'M8 Library',
+      'M9 Transport',
+      'M10 Canteen',
+      'M11 Accounting',
+      'M12 Notices & Communication',
       'Internal QA ready',
     ]) {
       assert.match(audit, new RegExp(marker.replace(/[&/]/g, '\\$&')));

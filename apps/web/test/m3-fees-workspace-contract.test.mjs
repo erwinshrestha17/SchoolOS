@@ -14,6 +14,12 @@ describe('M3 fees workspace contract', () => {
     assert.match(page, /<ModuleTabs/);
     assert.match(page, />\s*Record Payment\s*</);
     assert.match(page, /moreActionItems/);
+    assert.match(page, /value: 'collection'[\s\S]*label: 'Collection'/);
+    assert.match(page, /value: 'ledger'[\s\S]*label: 'Ledger & Receipts'/);
+    assert.match(page, /value: 'reversals'[\s\S]*label: 'Refunds \/ Reversals'/);
+    assert.match(page, /activeTab === 'ledger' \|\| activeTab === 'reversals'/);
+    assert.match(page, /value: 'close'[\s\S]*label: 'Cashier Close'/);
+    assert.match(page, /value: 'reports'[\s\S]*label: 'Reports'/);
     assert.match(page, /Receipt History & Reprint/);
     assert.match(page, /Cashier Close/);
   });

@@ -257,7 +257,7 @@ describe('Platform tenant subscription change workflow contracts', () => {
 
     assert.match(schoolsPage, /SchoolOS SaaS billing/);
     assert.match(schoolsPage, /not M3 student fee/);
-    assert.match(schoolsPage, /M9 school accounting/);
+    assert.match(schoolsPage, /M11 school accounting/);
   });
 
   it('keeps focused platform billing wrappers and redirect helper available', () => {
@@ -303,7 +303,7 @@ describe('Platform tenant subscription change workflow contracts', () => {
       'usage warning',
       'SaaS billing boundary',
       'M3 student fee collection',
-      'M9 school',
+      'M11 school',
       'PlatformDashboardSkeleton',
       'color-mod-platform-accent',
       'color-mod-platform-text',

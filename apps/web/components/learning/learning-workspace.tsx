@@ -38,6 +38,7 @@ type LearningTab =
   | 'overview'
   | 'activities'
   | 'builder'
+  | 'resources'
   | 'sessions'
   | 'board'
   | 'lab'
@@ -265,6 +266,7 @@ export function LearningWorkspace({
       { key: 'overview' as const, label: 'Overview' },
       { key: 'activities' as const, label: 'Activities' },
       { key: 'builder' as const, label: editingActivityId ? 'Edit activity' : 'Builder' },
+      { key: 'resources' as const, label: 'Resources' },
       { key: 'sessions' as const, label: 'Sessions' },
       { key: 'board' as const, label: 'Smart board' },
       { key: 'lab' as const, label: 'Computer lab' },
@@ -607,6 +609,10 @@ export function LearningWorkspace({
 
       {activeTab === 'sessions' && (
         <LearningSessionsPanel activities={activities} />
+      )}
+
+      {activeTab === 'resources' && (
+        <LearningResourcesPanel />
       )}
 
       {activeTab === 'board' && (

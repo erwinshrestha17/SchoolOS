@@ -9,6 +9,7 @@ const learningTabs = [
   { label: 'Overview', href: '/dashboard/learning' },
   { label: 'Activities', href: '/dashboard/learning/activities' },
   { label: 'Builder', href: '/dashboard/learning/activities/new' },
+  { label: 'Resources', href: '/dashboard/learning/resources' },
   { label: 'Sessions', href: '/dashboard/learning/sessions' },
   { label: 'Progress', href: '/dashboard/learning/progress' },
 ];

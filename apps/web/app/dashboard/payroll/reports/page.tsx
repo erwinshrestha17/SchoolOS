@@ -376,7 +376,7 @@ export default function PayrollReportsPage() {
             <div className="mt-5 flex flex-wrap gap-3">
               <div className="flex items-center gap-2 rounded-xl border border-[var(--color-mod-hr-border)] bg-white px-4 py-2 text-sm font-bold">
                 <ShieldCheck size={18} className="text-emerald-700" />
-                M9 posting boundary
+                M11 posting boundary
               </div>
               <div className="flex items-center gap-2 rounded-xl border border-[var(--color-mod-hr-border)] bg-white px-4 py-2 text-sm font-bold">
                 <BarChart3 size={18} className="text-[var(--color-mod-hr-text)]" />

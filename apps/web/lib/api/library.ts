@@ -161,6 +161,18 @@ export type LibraryReservation = {
   notes?: string | null;
   book?: LibraryBook;
   copy?: LibraryCopy | null;
+  borrowerStudent?: {
+    id: string;
+    studentSystemId?: string;
+    firstNameEn?: string;
+    lastNameEn?: string;
+  } | null;
+  borrowerStaff?: {
+    id: string;
+    employeeId?: string;
+    firstName?: string;
+    lastName?: string;
+  } | null;
   alreadyReserved?: boolean;
 };
 

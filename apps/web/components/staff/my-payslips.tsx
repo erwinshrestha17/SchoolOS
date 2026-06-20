@@ -35,7 +35,7 @@ export function MyPayslips() {
 
   const downloadPdf = async (payslipNumber: string) => {
     try {
-      await api.openPayslipPdf(payslipNumber);
+      await api.openMyPayslipPdf(payslipNumber);
     } catch (error) {
       console.error('Download failed', error);
       setDownloadError('Failed to download payslip. Please try again.');

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertTriangle,
   BarChart3,
@@ -21,6 +21,15 @@ import { ActivityFeedForm } from '../../../components/forms/activity-feed-form';
 
 export default function ActivityPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedSection = searchParams.get('section');
+  const initialSection =
+    requestedSection === 'Feed Preview' ||
+    requestedSection === 'Media Gallery' ||
+    requestedSection === 'Milestones' ||
+    requestedSection === 'Delivery Records'
+      ? requestedSection
+      : 'Create Post';
 
   return (
     <DashboardPageShell>
@@ -64,7 +73,7 @@ export default function ActivityPage() {
         variant="light"
       />
 
-      <ActivityFeedForm />
+      <ActivityFeedForm initialSection={initialSection} />
     </DashboardPageShell>
   );
 }

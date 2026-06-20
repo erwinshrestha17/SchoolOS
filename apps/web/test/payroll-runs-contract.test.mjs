@@ -50,7 +50,7 @@ describe('Payroll Runs UI contracts', () => {
     assert.match(payrollRuns, /openApprovedSalarySlipPdf/);
     assert.match(payrollRuns, /selectedRun\.status === 'APPROVED'/);
     assert.match(payrollRuns, /Open Salary Slip PDF/);
-    assert.match(payrollRuns, /Post to M9 Accounting/);
+    assert.match(payrollRuns, /Post to M11 Accounting/);
 
     assert.doesNotMatch(payrollRuns, /api\.listPayslips/);
     assert.doesNotMatch(payrollRuns, /api\.getPayslipPdf/);
@@ -67,7 +67,7 @@ describe('Payroll Runs UI contracts', () => {
 
     assert.match(payrollRuns, /Approval locks payroll calculations/i);
     assert.match(payrollRuns, /Posting is a separate APPROVED-to-POSTED action/i);
-    assert.match(payrollRuns, /creates the M9 payroll accrual journal/i);
+    assert.match(payrollRuns, /creates the M11 payroll accrual journal/i);
     assert.match(payrollRuns, /backend accounting posting boundary/i);
     assert.match(payrollRuns, /does not disburse salaries/i);
     assert.match(payrollRuns, /does not.*create reversal entries/i);
@@ -99,5 +99,18 @@ describe('Payroll Runs UI contracts', () => {
     assert.doesNotMatch(payrollRuns, /objectKey|storageObjectKey|database/i);
     assert.doesNotMatch(payrollRuns, /\{selectedRun\.journalEntryId\}|Journal ID|journalEntryId:/);
     assert.doesNotMatch(apiClient, /objectKey|storageObjectKey|database/i);
+  });
+
+  it('keeps staff self-service payslip downloads on the staff-scoped endpoint', () => {
+    const apiClient = read('lib/api/payroll.ts');
+    const myPayslips = read('components/staff/my-payslips.tsx');
+    const adminPayslips = read('components/hr/payslip-list.tsx');
+
+    assert.match(apiClient, /openMyPayslipPdf/);
+    assert.match(apiClient, /\/payroll\/me\/payslips\/\$\{encodeURIComponent\(payslipNumber\)\}\.pdf/);
+    assert.match(myPayslips, /api\.openMyPayslipPdf/);
+    assert.match(myPayslips, /api\.listMyPayslips/);
+    assert.doesNotMatch(myPayslips, /api\.openPayslipPdf/);
+    assert.match(adminPayslips, /api\.openPayslipPdf/);
   });
 });

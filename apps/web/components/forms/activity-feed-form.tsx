@@ -172,10 +172,14 @@ type ReactionMutation = ReturnType<
   >
 >;
 
-export function ActivityFeedForm() {
+export function ActivityFeedForm({
+  initialSection = 'Create Post',
+}: {
+  initialSection?: ActivitySection;
+}) {
   const queryClient = useQueryClient();
   const [activeSection, setActiveSection] =
-    useState<ActivitySection>('Create Post');
+    useState<ActivitySection>(initialSection);
   const [post, setPost] = useState<CreatePostState>({
     classId: '',
     sectionId: '',
@@ -215,6 +219,10 @@ export function ActivityFeedForm() {
     studentId: '',
     month: today.slice(0, 7),
   });
+
+  useEffect(() => {
+    setActiveSection(initialSection);
+  }, [initialSection]);
 
   const classesQuery = useQuery({
     queryKey: ['classes'],

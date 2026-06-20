@@ -190,7 +190,7 @@ export function ParentTeacherMessagingWorkspace({
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M10 Notices / Communication / Chat"
+        eyebrow="M12 Notices / Communication / Chat"
         title="Parent-Teacher Chat"
         description="Parent and class-teacher conversations with school moderation, reporting, escalation, and quiet-hours controls."
         moreActionItems={[

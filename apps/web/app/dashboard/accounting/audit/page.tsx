@@ -1,7 +1,7 @@
 import { AccountingAuditWorkspace } from '../../../../components/accounting/accounting-audit-workspace';
 
 export const metadata = {
-  title: 'Audit Trail | M9 Accounting | SchoolOS',
+  title: 'Audit Trail | M11 Accounting | SchoolOS',
 };
 
 export default function AccountingAuditPage() {

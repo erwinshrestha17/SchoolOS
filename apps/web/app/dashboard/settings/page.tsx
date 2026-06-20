@@ -3697,11 +3697,11 @@ function SubscriptionPanel() {
     activity: 'M5 Activity Feed & Milestones',
     homework: 'M6 Homework & Timetable',
     hr: 'M7 HR & Payroll',
-    library: 'M8A Library Management',
-    transport: 'M8B Transport Management',
-    canteen: 'M8C Canteen Management',
-    accounting: 'M9 Accounting & Finance',
-    notices: 'M10 Notices & Communication',
+    library: 'M8 Library Management',
+    transport: 'M9 Transport Management',
+    canteen: 'M10 Canteen Management',
+    accounting: 'M11 Accounting & Finance',
+    notices: 'M12 Notices & Communication',
   };
 
   const activeModules = (entitlements.modules ?? []).filter(

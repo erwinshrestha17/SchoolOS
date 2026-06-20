@@ -10,13 +10,14 @@ function read(relativePath) {
   return readFileSync(join(webRoot, relativePath), 'utf8');
 }
 
-describe('M12 Learning frontend contracts', () => {
+describe('M13 Learning frontend contracts', () => {
   it('adds dashboard, board, student, and parent Learning routes', () => {
     for (const route of [
       'app/dashboard/learning/page.tsx',
       'app/dashboard/learning/activities/page.tsx',
       'app/dashboard/learning/activities/new/page.tsx',
       'app/dashboard/learning/activities/[activityId]/page.tsx',
+      'app/dashboard/learning/resources/page.tsx',
       'app/dashboard/learning/sessions/page.tsx',
       'app/dashboard/learning/smart-board/launch/page.tsx',
       'app/dashboard/learning/lab/page.tsx',
@@ -115,6 +116,7 @@ describe('M12 Learning frontend contracts', () => {
     const runtime = read('components/learning/learning-runtime.tsx');
     const sessions = read('components/learning/learning-sessions-panel.tsx');
     const resources = read('components/learning/learning-resources-panel.tsx');
+    const resourcesPage = read('app/dashboard/learning/resources/page.tsx');
 
     for (const apiCall of [
       'learningApi.listActivities',
@@ -152,7 +154,9 @@ describe('M12 Learning frontend contracts', () => {
 
     for (const apiCall of [
       'learningApi.listActivityResources',
+      'learningApi.listResources',
       'learningApi.attachActivityResource',
+      'learningApi.createResource',
       'learningApi.archiveResource',
     ]) {
       assert.match(resources, new RegExp(apiCall.replace('.', '\\.')));
@@ -160,6 +164,10 @@ describe('M12 Learning frontend contracts', () => {
 
     assert.match(workspace, /EmptyState/);
     assert.match(workspace, /LoadingState/);
+    assert.match(resourcesPage, /initialTab="resources"/);
+    assert.match(resources, /ProtectedFileButton/);
+    assert.match(resources, /learning-resources/);
+    assert.match(resources, /Protected file metadata unavailable/);
     assert.match(runtime, /PermissionDenied/);
     assert.match(runtime, /module\.learning/);
     assert.match(workspace, /MATCHING/);

@@ -36,6 +36,8 @@ test('M1 admissions pipeline uses the persisted application workflow', () => {
   const pipeline = read('components/admissions/admissions-pipeline.tsx');
   const applicationForm = read('components/m1/admission-application-form.tsx');
   const page = read('app/dashboard/admissions/new/page.tsx');
+  const admissionsPage = read('app/dashboard/admissions/page.tsx');
+  const nav = read('components/m1/m1-module-nav.tsx');
 
   assert.match(pipeline, /listAdmissionApplications/);
   assert.match(pipeline, /updateAdmissionApplicationStatus/);
@@ -44,6 +46,9 @@ test('M1 admissions pipeline uses the persisted application workflow', () => {
   assert.match(applicationForm, /createAdmissionApplication/);
   assert.match(applicationForm, /Creates an inquiry; it does not enroll a student/);
   assert.match(page, /AdmissionApplicationForm/);
+  assert.match(admissionsPage, /moreActionItems/);
+  assert.match(admissionsPage, /\/dashboard\/admissions\/review/);
+  assert.match(nav, /\/dashboard\/admissions\/review/);
   assert.doesNotMatch(pipeline + applicationForm, /publicUrl|objectKey/);
 });
 

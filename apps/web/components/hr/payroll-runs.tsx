@@ -182,7 +182,7 @@ export function PayrollRuns() {
         periodYear: year,
         workingDays,
         notes:
-          'Draft payroll run created from Payroll Runs preview. M9 posting requires a separate approval-to-post action.',
+          'Draft payroll run created from Payroll Runs preview. M11 posting requires a separate approval-to-post action.',
       }),
     onSuccess: (run) => {
       const savedRun = normalizeRun(run);
@@ -240,7 +240,7 @@ export function PayrollRuns() {
           <div className="space-y-1">
             <p className="text-sm font-bold text-amber-900">Payroll Runs — Phase 2 accounting boundary</p>
             <p className="text-xs leading-relaxed text-amber-800">
-              Approval locks payroll calculations. Posting is a separate APPROVED-to-POSTED action that creates the M9 payroll accrual journal through the backend accounting posting boundary. It does not disburse salaries, pay staff, create reversal entries, or allow editing posted runs.
+              Approval locks payroll calculations. Posting is a separate APPROVED-to-POSTED action that creates the M11 payroll accrual journal through the backend accounting posting boundary. It does not disburse salaries, pay staff, create reversal entries, or allow editing posted runs.
             </p>
           </div>
         </div>
@@ -426,7 +426,7 @@ export function PayrollRuns() {
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="border-b border-gray-100 p-5">
             <h3 className="text-lg font-bold text-gray-900">Payroll Runs</h3>
-            <p className="text-xs text-gray-500">Draft, reviewed, approved, and posted payroll runs. Posting is a controlled M9 accrual action.</p>
+            <p className="text-xs text-gray-500">Draft, reviewed, approved, and posted payroll runs. Posting is a controlled M11 accrual action.</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left text-sm">
@@ -562,7 +562,7 @@ export function PayrollRuns() {
 
               <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-xs leading-relaxed text-slate-700 space-y-1">
                 <p><strong>Payroll Status:</strong> {selectedRun.status}</p>
-                {selectedRun.status === 'POSTED' && <p>Accruals have been posted to M9 General Ledger. Salary disbursement is handled outside this workspace.</p>}
+                {selectedRun.status === 'POSTED' && <p>Accruals have been posted to M11 General Ledger. Salary disbursement is handled outside this workspace.</p>}
                 {selectedRun.status === 'PAID' && <p>Payment status is read-only here; disbursement evidence remains in audited accounting controls.</p>}
                 {selectedRun.status === 'VOID' && <p className="text-red-600 font-semibold">This run has been voided/reversed.</p>}
               </div>
@@ -640,7 +640,7 @@ export function PayrollRuns() {
                     className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Landmark size={15} />
-                    Post to M9 Accounting
+                    Post to M11 Accounting
                   </button>
                 )}
 
@@ -680,7 +680,7 @@ export function PayrollRuns() {
               {selectedRun.status === 'POSTED' && selectedRun.journalEntryId && (
                 <div className="rounded-xl bg-purple-50 px-4 py-3 flex items-center justify-between">
                   <p className="text-xs font-semibold text-purple-700">
-                    Posted to M9 Accounting. Journal entry is recorded.
+                    Posted to M11 Accounting. Journal entry is recorded.
                   </p>
                   <button
                     className="h-7 px-3 border border-purple-200 text-purple-700 hover:bg-purple-100 rounded-full text-xs font-semibold transition-colors"

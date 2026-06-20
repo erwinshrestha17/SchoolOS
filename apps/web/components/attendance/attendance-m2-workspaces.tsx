@@ -63,6 +63,9 @@ const attendanceTabs = [
   { href: '/dashboard/attendance/mark', label: 'Today', icon: CalendarCheck },
   { href: '/dashboard/attendance/register', label: 'Class Register', icon: FileText },
   { href: '/dashboard/attendance/corrections', label: 'Corrections', icon: ClipboardCheck },
+  { href: '/dashboard/attendance/anomalies', label: 'Anomalies', icon: ShieldAlert },
+  { href: '/dashboard/attendance/follow-ups', label: 'Follow-ups', icon: MessageSquare },
+  { href: '/dashboard/attendance/offline-drafts', label: 'Offline Drafts', icon: Save },
   { href: '/dashboard/attendance/reports', label: 'Reports', icon: Download },
   { href: '/dashboard/settings/attendance', label: 'Settings', icon: Settings },
 ];

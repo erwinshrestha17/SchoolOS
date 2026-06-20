@@ -98,7 +98,7 @@ export default function PlatformTenantBillingPage() {
       </header>
 
       <PlatformBoundaryNote title="SaaS billing boundary">
-        This is SchoolOS-to-school subscription billing. It is not M3 student fee collection, and it does not post school ledger entries into M9 Accounting.
+        This is SchoolOS-to-school subscription billing. It is not M3 student fee collection, and it does not post school ledger entries into M11 Accounting.
       </PlatformBoundaryNote>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -115,7 +115,7 @@ export default function PlatformTenantBillingPage() {
           </div>
           <CardTitle className="text-2xl font-black">SaaS invoices</CardTitle>
           <CardDescription>
-            These invoices are SchoolOS platform billing records. Student fee invoices remain in M3 Fees, and school accounting reports remain in M9 Accounting.
+            These invoices are SchoolOS platform billing records. Student fee invoices remain in M3 Fees, and school accounting reports remain in M11 Accounting.
           </CardDescription>
         </CardHeader>
         <CardContent>

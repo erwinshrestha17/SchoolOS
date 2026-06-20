@@ -11,6 +11,7 @@ import type {
 } from '../../lib/api/learning';
 import { EmptyState } from '../ui/empty-state';
 import { LoadingState } from '../ui/loading-state';
+import { ProtectedFileButton } from '../ui/protected-file';
 import { StatusBadge } from '../ui/status-badge';
 
 const resourceTypes: LearningResourceType[] = ['LINK', 'NOTE', 'FILE'];
@@ -23,25 +24,36 @@ const emptyResourceForm: LearningResourcePayload = {
   metadata: {},
 };
 
-export function LearningResourcesPanel({ activityId }: { activityId: string }) {
+export function LearningResourcesPanel({ activityId }: { activityId?: string }) {
   const [form, setForm] = useState<LearningResourcePayload>(emptyResourceForm);
   const [notice, setNotice] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const scopedToActivity = Boolean(activityId);
 
   const resourcesQuery = useQuery({
-    queryKey: ['learning-activity-resources', activityId],
-    queryFn: () => learningApi.listActivityResources(activityId),
+    queryKey: scopedToActivity
+      ? ['learning-activity-resources', activityId]
+      : ['learning-resources'],
+    queryFn: () =>
+      scopedToActivity
+        ? learningApi.listActivityResources(activityId as string)
+        : learningApi.listResources({ limit: 50 }),
   });
 
   const attachMutation = useMutation({
     mutationFn: (body: LearningResourcePayload) =>
-      learningApi.attachActivityResource(activityId, body),
+      scopedToActivity
+        ? learningApi.attachActivityResource(activityId as string, body)
+        : learningApi.createResource(body),
     onSuccess: () => {
-      setNotice('Resource attached.');
+      setNotice(scopedToActivity ? 'Resource attached.' : 'Resource saved.');
       setForm(emptyResourceForm);
-      void queryClient.invalidateQueries({
-        queryKey: ['learning-activity-resources', activityId],
-      });
+      void queryClient.invalidateQueries({ queryKey: ['learning-resources'] });
+      if (scopedToActivity) {
+        void queryClient.invalidateQueries({
+          queryKey: ['learning-activity-resources', activityId],
+        });
+      }
     },
   });
 
@@ -49,9 +61,12 @@ export function LearningResourcesPanel({ activityId }: { activityId: string }) {
     mutationFn: learningApi.archiveResource,
     onSuccess: () => {
       setNotice('Resource archived.');
-      void queryClient.invalidateQueries({
-        queryKey: ['learning-activity-resources', activityId],
-      });
+      void queryClient.invalidateQueries({ queryKey: ['learning-resources'] });
+      if (scopedToActivity) {
+        void queryClient.invalidateQueries({
+          queryKey: ['learning-activity-resources', activityId],
+        });
+      }
     },
   });
 
@@ -68,7 +83,9 @@ export function LearningResourcesPanel({ activityId }: { activityId: string }) {
             Resource Library
           </h3>
           <p className="mt-1 text-sm text-slate-500">
-            Attach file metadata, safe links, or teacher notes to this activity.
+            {scopedToActivity
+              ? 'Attach file metadata, safe links, or teacher notes to this activity.'
+              : 'Manage protected classroom resources before linking them to teacher-led activities.'}
           </p>
         </div>
         {notice && (
@@ -137,7 +154,7 @@ export function LearningResourcesPanel({ activityId }: { activityId: string }) {
           className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60 md:mt-6"
         >
           <Plus size={16} />
-          Attach
+          {scopedToActivity ? 'Attach' : 'Save'}
         </button>
       </form>
 
@@ -146,8 +163,12 @@ export function LearningResourcesPanel({ activityId }: { activityId: string }) {
       ) : resourcesQuery.data?.items.length === 0 ? (
         <EmptyState
           icon={<FileText size={28} />}
-          title="No resources attached"
-          description="Attach resource metadata after files have been registered through the SchoolOS file pipeline."
+          title={scopedToActivity ? 'No resources attached' : 'No learning resources'}
+          description={
+            scopedToActivity
+              ? 'Attach resource metadata after files have been registered through the SchoolOS file pipeline.'
+              : 'Create a safe link, teacher note, or protected file reference from the SchoolOS file pipeline.'
+          }
           className="mt-5"
         />
       ) : (
@@ -210,7 +231,7 @@ function ResourceRow({
           </p>
           <p className="mt-1 truncate text-xs text-slate-500">
             {resource.type === 'FILE'
-              ? resource.fileAsset?.fileName ?? resource.fileAssetId
+              ? resource.fileAsset?.fileName ?? 'Protected file metadata unavailable'
               : resource.type === 'LINK'
                 ? resource.url
                 : String((resource.metadata as { note?: string })?.note ?? 'Teacher note')}
@@ -219,6 +240,17 @@ function ResourceRow({
       </div>
       <div className="flex items-center gap-2">
         <StatusBadge status={resource.status} />
+        {resource.type === 'FILE' && resource.fileAssetId ? (
+          <ProtectedFileButton
+            fileAssetId={resource.fileAssetId}
+            fileName={resource.fileAsset?.fileName ?? resource.title}
+            action="preview"
+            size="sm"
+            showStatus={false}
+          >
+            Preview
+          </ProtectedFileButton>
+        ) : null}
         <button
           type="button"
           onClick={onArchive}

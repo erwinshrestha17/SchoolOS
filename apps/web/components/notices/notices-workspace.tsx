@@ -41,7 +41,7 @@ export function NoticesWorkspace({
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M10 Notices / Communication / Chat"
+        eyebrow="M12 Notices / Communication / Chat"
         title="Notices & Communication"
         description="Publish official school communication, review delivery health, and manage controlled parent-teacher conversations. Delivery truth remains backend-owned."
         primaryAction={
@@ -77,7 +77,7 @@ export function NoticesWorkspace({
             value="Unavailable"
             icon={<Clock3 size={20} />}
             tone="neutral"
-            description="Needs a real M10 summary API."
+            description="Needs a real M12 summary API."
           />
           <KpiCard
             title="Failed Deliveries"
@@ -110,14 +110,14 @@ export function NoticesWorkspace({
             value="Unavailable"
             icon={<UsersRound size={20} />}
             tone="neutral"
-            description="Needs a real M10 summary API."
+            description="Needs a real M12 summary API."
           />
           <KpiCard
             title="Escalated Chats"
             value="Unavailable"
             icon={<MessageSquare size={20} />}
             tone="neutral"
-            description="Needs a real M10 summary API."
+            description="Needs a real M12 summary API."
           />
         </KpiGrid>
       </ModuleHeader>

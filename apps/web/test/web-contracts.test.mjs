@@ -233,6 +233,8 @@ describe("SchoolOS web production contracts", () => {
     assert.match(page, /api\.getHomeworkCompletionReport/);
     assert.match(page, /api\.getHomeworkMissingLateReport/);
     assert.match(page, /\/dashboard\/timetable\/workload/);
+    assert.match(page, /\/dashboard\/timetable\/conflicts/);
+    assert.match(page, /\/dashboard\/timetable\/versions/);
     assert.match(workloadRoute, /initialSection="Teacher Workload"/);
     assert.match(academicsApi, /\/homework\/\$\{encodeURIComponent\(id\)\}\/publish/);
     assert.match(academicsApi, /openProtectedFile\(access\.fileAssetId/);
@@ -1556,6 +1558,11 @@ describe("SchoolOS web production contracts", () => {
       "api.rejectAttendanceCorrection",
       "api.getAttendanceRegister",
       "api.exportAttendanceRegister",
+      "api.listM2HardenedAnomalies",
+      "api.listM2FollowUps",
+      "api.runM2FollowUps",
+      "api.listAttendanceDrafts",
+      "api.listM2OfflineConflicts",
     ];
 
     for (const apiCall of requiredApis) {
@@ -1566,6 +1573,9 @@ describe("SchoolOS web production contracts", () => {
     assert.match(attendanceForm, /Correction Review Queue/);
     assert.match(attendanceForm, /Required audit reason/);
     assert.match(attendanceForm, /export prepared by the attendance backend/);
+    assert.match(attendanceForm, /\/dashboard\/attendance\/anomalies/);
+    assert.match(attendanceForm, /\/dashboard\/attendance\/follow-ups/);
+    assert.match(attendanceForm, /\/dashboard\/attendance\/offline-drafts/);
     assert.doesNotMatch(attendanceForm, /window\.open\(url\.toString\(\)/);
     assert.match(attendanceForm, /color-mod-attendance-accent/);
     assert.doesNotMatch(
@@ -2010,7 +2020,7 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(activityPage, />\s*Transport\s*</);
   });
 
-  it("keeps activity screen wired to real M5 and M10 APIs", () => {
+  it("keeps activity screen wired to real M5 and M12 APIs", () => {
     const activityForm = read("components/forms/activity-feed-form.tsx");
     const requiredApis = [
       "api.listClasses",
@@ -2254,7 +2264,7 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("keeps M8B transport navigation on shared module primitives", () => {
+  it("keeps M9 transport navigation on shared module primitives", () => {
     const transportLayout = read("app/dashboard/transport/layout.tsx");
     const transportPage = read("app/dashboard/transport/page.tsx");
     const transportWorkspace = read(
@@ -2263,7 +2273,7 @@ describe("SchoolOS web production contracts", () => {
 
     for (const marker of [
       "ModuleHeader",
-      'eyebrow="M8B Transport"',
+      'eyebrow="M9 Transport"',
       "primaryAction",
       "moreActionItems",
       "ModuleTabs",
@@ -2282,7 +2292,7 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(transportLayout, /Live Status/);
   });
 
-  it("keeps M8B transport workspace aligned to transport UI tokens", () => {
+  it("keeps M9 transport workspace aligned to transport UI tokens", () => {
     const transportWorkspace = read(
       "components/transport/transport-workspace.tsx",
     );
@@ -2373,7 +2383,7 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps M8C canteen workspace and selector aligned to canteen UI tokens", () => {
+  it("keeps M10 canteen workspace and selector aligned to canteen UI tokens", () => {
     const canteenWorkspace = read("components/canteen/canteen-workspace.tsx");
     const menuSelector = read("components/canteen/menu-item-selector.tsx");
     const forbidden =
@@ -2438,6 +2448,24 @@ describe("SchoolOS web production contracts", () => {
     assert.match(activityForm, /SENT/);
     assert.match(activityForm, /FAILED/);
     assert.match(activityForm, /SKIPPED/);
+  });
+
+  it("preserves M5 redirected workflow intent in the in-page activity tabs", () => {
+    const activityPage = read("app/dashboard/activity/page.tsx");
+    const activityForm = read("components/forms/activity-feed-form.tsx");
+    const redirects = readMany([
+      "app/dashboard/activity/gallery/page.tsx",
+      "app/dashboard/activity/milestones/page.tsx",
+      "app/dashboard/activity/moderation/page.tsx",
+    ]);
+
+    assert.match(activityPage, /searchParams\.get\('section'\)/);
+    assert.match(activityPage, /<ActivityFeedForm initialSection=\{initialSection\}/);
+    assert.match(activityForm, /initialSection\?: ActivitySection/);
+    assert.match(activityForm, /useState<ActivitySection>\(initialSection\)/);
+    assert.match(redirects, /section=Media\+Gallery/);
+    assert.match(redirects, /section=Milestones/);
+    assert.match(redirects, /section=Feed\+Preview/);
   });
 
   it("does not implement AI captions or permanent public media URLs in activity feed", () => {
@@ -2506,7 +2534,7 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("keeps notices screen wired to real M10 APIs", () => {
+  it("keeps notices screen wired to real M12 APIs", () => {
     const communicationsForm = read("components/forms/communications-form.tsx");
     const noticeDetailPage = read("app/dashboard/notices/[noticeId]/page.tsx");
     const communicationsApi = read("lib/api/communications.ts");
@@ -2642,7 +2670,7 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("keeps M10 notices and chat workspaces tokenized and production-backed", () => {
+  it("keeps M12 notices and chat workspaces tokenized and production-backed", () => {
     const surfaces = [
       "components/notices/notices-workspace.tsx",
       "components/forms/communications-form.tsx",
@@ -2691,7 +2719,7 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("uses the shared M10 workspace shell without browser-derived official totals", () => {
+  it("uses the shared M12 workspace shell without browser-derived official totals", () => {
     const workspace = read("components/notices/notices-workspace.tsx");
     const communicationsForm = read("components/forms/communications-form.tsx");
     const messaging = read(
@@ -2705,7 +2733,7 @@ describe("SchoolOS web production contracts", () => {
       "<ModuleTabs",
       "New Notice",
       "moreActionItems",
-      "Needs a real M10 summary API",
+      "Needs a real M12 summary API",
       "getNotificationDeliveryAnalytics",
     ]) {
       assert.ok(workspace.includes(marker), `Missing marker: ${marker}`);
@@ -2838,7 +2866,7 @@ describe("SchoolOS web production contracts", () => {
 
     const payrollRuns = read("components/hr/payroll-runs.tsx");
     const payrollActionDialog = read("components/hr/payroll-action-dialog.tsx");
-    assert.match(payrollRuns, /Post to M9 Accounting/);
+    assert.match(payrollRuns, /Post to M11 Accounting/);
     assert.match(
       payrollRuns,
       /Salary disbursement is handled outside this workspace/,

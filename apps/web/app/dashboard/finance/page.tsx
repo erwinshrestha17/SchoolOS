@@ -30,7 +30,13 @@ import { PermissionState } from '@/components/ui/permission-state';
 import { api } from '@/lib/api';
 import { useSession } from '@/components/session-provider';
 
-type FinanceTab = 'collection' | 'ledger' | 'close' | 'reports' | 'setup';
+type FinanceTab =
+  | 'collection'
+  | 'ledger'
+  | 'reversals'
+  | 'close'
+  | 'reports'
+  | 'setup';
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('en-NP', {
@@ -83,36 +89,26 @@ export default function FinancePage() {
     ...(canCollectPayments
       ? [
           {
-            href: '/dashboard/finance',
-            label: 'Dues',
+            value: 'collection',
+            label: 'Collection',
             icon: Wallet,
-          },
-          {
-            href: '/dashboard/finance/invoices',
-            label: 'Invoices',
-            icon: FileText,
-          },
-          {
-            href: '/dashboard/finance/collections',
-            label: 'Payments',
-            icon: Calculator,
           },
         ]
       : []),
     ...(canManageFees && canReadReceipts
       ? [
           {
-            href: '/dashboard/finance/receipts',
-            label: 'Receipts',
+            value: 'ledger',
+            label: 'Ledger & Receipts',
             icon: Receipt,
           },
         ]
       : []),
     ...(canManageFees
       ? [
-          { value: 'setup', label: 'Discounts', icon: Settings },
+          { value: 'setup', label: 'Discounts & Setup', icon: Settings },
           {
-            href: '/dashboard/finance/reversals-refunds',
+            value: 'reversals',
             label: 'Refunds / Reversals',
             icon: ShieldAlert,
           },
@@ -121,7 +117,7 @@ export default function FinancePage() {
     ...(canCloseCashier
       ? [
           {
-            href: '/dashboard/finance/cashier-close',
+            value: 'close',
             label: 'Cashier Close',
             icon: History,
           },
@@ -130,7 +126,7 @@ export default function FinancePage() {
     ...(canManageFees
       ? [
           {
-            href: '/dashboard/finance/reports',
+            value: 'reports',
             label: 'Reports',
             icon: BarChart3,
           },
@@ -232,7 +228,7 @@ export default function FinancePage() {
               <PermissionState title="Fee collection is restricted" description="You do not have permission to collect payments. Contact the school administrator if you need cashier access." />
             )
           ) : null}
-          {activeTab === 'ledger' && canManageFees && canReadReceipts ? <LedgerSection /> : null}
+          {(activeTab === 'ledger' || activeTab === 'reversals') && canManageFees && canReadReceipts ? <LedgerSection /> : null}
           {activeTab === 'close' && canCloseCashier ? <CashierCloseSection /> : null}
           {activeTab === 'reports' && canManageFees ? <div className="space-y-8"><DefaulterAgingSummary /><DefaulterQueueTab /><DuesAnalysisSection /></div> : null}
           {activeTab === 'setup' && canManageFees ? <div className="space-y-8"><FeeSetupTab /><DiscountsWaiversTab /><BillingRunsTab /></div> : null}

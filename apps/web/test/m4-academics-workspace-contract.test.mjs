@@ -18,6 +18,9 @@ describe('M4 academics workspace contract', () => {
     assert.match(page, /Assessment Components/);
     assert.match(page, /Report Card Jobs & History/);
     assert.match(page, /Publish Results/);
+    assert.match(page, /label: 'Locks'/);
+    assert.match(page, /label: 'Promotion'/);
+    assert.match(page, /label: 'Publishing'/);
   });
 
   it('does not present browser-derived M4 totals or readiness as official', () => {

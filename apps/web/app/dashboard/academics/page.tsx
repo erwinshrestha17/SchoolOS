@@ -29,7 +29,10 @@ const workspaceTabs = [
   { href: '/dashboard/academics/exam-terms', label: 'Exam Terms', icon: ClipboardList },
   { href: '/dashboard/academics/marks', label: 'Marks Entry', icon: PencilLine },
   { href: '/dashboard/academics/cas', label: 'CAS', icon: Layers3 },
+  { href: '/dashboard/academics/locks', label: 'Locks', icon: Lock },
   { href: '/dashboard/academics/report-cards', label: 'Report Cards', icon: FileText },
+  { href: '/dashboard/academics/promotion', label: 'Promotion', icon: GraduationCap },
+  { href: '/dashboard/academics/publishing', label: 'Publishing', icon: Megaphone },
   { href: '/dashboard/academics/results', label: 'Results', icon: Megaphone },
 ];
 

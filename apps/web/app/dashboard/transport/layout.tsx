@@ -24,7 +24,7 @@ export default function TransportLayout({ children }: { children: ReactNode }) {
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M8B Transport"
+        eyebrow="M9 Transport"
         title="Transport"
         description="Manage route status, vehicles, student assignments, trips, and GPS freshness before exposing parent tracking."
         primaryAction={

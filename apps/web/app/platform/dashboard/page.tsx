@@ -277,7 +277,7 @@ export default function PlatformDashboard() {
             </div>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Platform billing is SchoolOS-to-school subscription billing. It is
-              intentionally separate from M3 student fee collection and M9 school
+              intentionally separate from M3 student fee collection and M11 school
               accounting ledgers.
             </p>
             <Link href="/platform/billing" className="mt-4 inline-flex text-sm font-bold text-indigo-600 hover:text-indigo-700">

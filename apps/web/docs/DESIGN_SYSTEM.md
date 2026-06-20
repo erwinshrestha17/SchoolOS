@@ -72,7 +72,7 @@ Rules:
 - School Settings must not become SaaS billing/platform configuration.
 - Platform must not expose tenant-private data unless explicit audited support override is active.
 - School fee collection is not SchoolOS SaaS billing.
-- M9 Accounting is a school accounting module, not a platform billing microservice.
+- M11 Accounting is a school accounting module, not a platform billing microservice.
 
 ---
 
@@ -321,7 +321,7 @@ Rules:
 
 ---
 
-## 7. M10 Notices / Communication / Chat Design Rules
+## 7. M12 Notices / Communication / Chat Design Rules
 
 Use `docs/design/M10_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md` as the supporting visual-reference appendix for Module 10 implementation detail. The canonical frontend guardrails in this design system still apply.
 

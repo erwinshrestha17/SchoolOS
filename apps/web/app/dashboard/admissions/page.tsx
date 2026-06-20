@@ -4,9 +4,12 @@ import { DashboardPageShell } from '../../../components/dashboard/dashboard-page
 import { AdmissionsPipeline } from '../../../components/admissions/admissions-pipeline';
 import { M1PageHeader } from '../../../components/m1/m1-page-header';
 import Link from 'next/link';
-import { Upload, UserPlus } from 'lucide-react';
+import { ClipboardCheck, Upload, UserPlus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function AdmissionsPage() {
+  const router = useRouter();
+
   return (
     <DashboardPageShell>
       <M1PageHeader
@@ -20,9 +23,18 @@ export default function AdmissionsPage() {
             <UserPlus className="h-4 w-4" /> New Application
           </Link>
         }
-        secondaryActions={
-          <Link href="/dashboard/admissions/new?mode=bulk" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"><Upload className="h-4 w-4" /> Import Enrollments</Link>
-        }
+        moreActionItems={[
+          {
+            label: 'Import enrollments',
+            icon: <Upload className="h-4 w-4" />,
+            onClick: () => router.push('/dashboard/admissions/new?mode=bulk'),
+          },
+          {
+            label: 'Open review workspace',
+            icon: <ClipboardCheck className="h-4 w-4" />,
+            onClick: () => router.push('/dashboard/admissions/review'),
+          },
+        ]}
       />
       <AdmissionsPipeline />
     </DashboardPageShell>

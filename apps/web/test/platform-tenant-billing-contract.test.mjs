@@ -40,14 +40,14 @@ describe('Platform tenant SaaS billing page contracts', () => {
     }
   });
 
-  it('keeps SaaS billing clearly separated from M3 and M9', () => {
+  it('keeps SaaS billing clearly separated from M3 and M11', () => {
     const page = read('app/platform/schools/[tenantId]/billing/page.tsx');
 
     for (const expected of [
       'SchoolOS SaaS Billing',
       'SchoolOS-to-school subscription billing',
       'not M3 student fee collection',
-      'M9 Accounting',
+      'M11 Accounting',
       'Student fee invoices remain in M3 Fees',
     ]) {
       assert.match(page, new RegExp(expected));

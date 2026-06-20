@@ -295,6 +295,16 @@ export default function HomeworkPage() {
             onClick: () => router.push('/dashboard/timetable/builder'),
           },
           {
+            label: 'Timetable Conflicts',
+            icon: <AlertCircle size={16} />,
+            onClick: () => router.push('/dashboard/timetable/conflicts'),
+          },
+          {
+            label: 'Timetable Versions',
+            icon: <ClipboardCheck size={16} />,
+            onClick: () => router.push('/dashboard/timetable/versions'),
+          },
+          {
             label: 'Substitutions',
             icon: <Users size={16} />,
             onClick: () => router.push('/dashboard/timetable/substitutions'),
@@ -311,6 +321,8 @@ export default function HomeworkPage() {
             { href: '/dashboard/homework', label: 'Homework', icon: BookOpen },
             { href: '/dashboard/homework/review', label: 'Submissions', icon: CheckCircle2 },
             { href: '/dashboard/timetable/builder', label: 'Timetable Builder', icon: Settings },
+            { href: '/dashboard/timetable/conflicts', label: 'Conflicts', icon: AlertCircle },
+            { href: '/dashboard/timetable/versions', label: 'Versions', icon: ClipboardCheck },
             { href: '/dashboard/timetable/substitutions', label: 'Substitution', icon: Users },
             { href: '/dashboard/timetable/workload', label: 'Teacher Workload', icon: BarChart3 },
             { href: '/dashboard/timetable', label: 'Reports', icon: ClipboardCheck },

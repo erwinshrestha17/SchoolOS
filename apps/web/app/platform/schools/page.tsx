@@ -242,7 +242,7 @@ export default function PlatformSchools() {
               <p className="mt-1 leading-6 text-cyan-800">
                 Select a school to manage SchoolOS SaaS billing for that tenant.
                 This is platform subscription billing only, not M3 student fee
-                collection or M9 school accounting.
+                collection or M11 school accounting.
               </p>
             </div>
           </div>

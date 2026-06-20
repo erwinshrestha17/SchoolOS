@@ -220,6 +220,16 @@ export const payrollApi = {
     ),
   getMyProfile: () => request<any>('/staff/me'),
   listMyPayslips: () => request<any[]>('/payroll/me/payslips'),
+  openMyPayslipPdf: async (payslipNumber: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/payroll/me/payslips/${encodeURIComponent(payslipNumber)}.pdf`,
+      {
+        credentials: 'include',
+      },
+    );
+
+    await openPdfBlob(response);
+  },
   openPayslipPdf: async (payslipNumber: string) => {
     const response = await fetch(
       `${API_BASE_URL}/payroll/payslips/${encodeURIComponent(payslipNumber)}.pdf`,

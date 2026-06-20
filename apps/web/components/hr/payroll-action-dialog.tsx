@@ -74,7 +74,7 @@ export function PayrollActionDialog({
           title: 'Approve Payroll',
           description: 'Approve this payroll run, finalising all earnings, deductions, and net payouts.',
           icon: <ShieldCheck size={20} className="text-emerald-500" />,
-          warning: 'Approve locks the calculations. Approved runs are ready for M9 posting and payslip downloads. This action is irreversible.',
+          warning: 'Approve locks the calculations. Approved runs are ready for M11 posting and payslip downloads. This action is irreversible.',
           requiresReason: false,
           confirmText: 'Approve',
           confirmVariant: 'default' as const,
@@ -92,11 +92,11 @@ export function PayrollActionDialog({
       case 'POST':
         return {
           title: 'Post to Accounting',
-          description: 'Post this approved payroll run to M9 General Ledger.',
+          description: 'Post this approved payroll run to M11 General Ledger.',
           icon: <Landmark size={20} className="text-purple-500" />,
-          warning: 'Posting generates the M9 payroll accrual journal entries. This action locks the run against deletions or changes.',
+          warning: 'Posting generates the M11 payroll accrual journal entries. This action locks the run against deletions or changes.',
           requiresReason: false,
-          confirmText: 'Post to M9',
+          confirmText: 'Post to M11',
           confirmVariant: 'default' as const,
         };
     }
