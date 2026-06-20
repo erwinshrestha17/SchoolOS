@@ -66,10 +66,10 @@ describe('Operational summary controllers', () => {
     expect(service.getModuleSummary).toHaveBeenCalledWith('m12_learning', actor);
   });
 
-  it('rejects unknown module paths before dispatching to the service', async () => {
-    await expect(
-      dashboard.getModuleSummary('not-a-module', actor),
-    ).rejects.toThrow('Unknown SchoolOS summary module.');
+  it('rejects unknown module paths before dispatching to the service', () => {
+    expect(() => dashboard.getModuleSummary('not-a-module', actor)).toThrow(
+      'Unknown SchoolOS summary module.',
+    );
     expect(service.getModuleSummary).not.toHaveBeenCalled();
   });
 
