@@ -2,6 +2,7 @@ import type {
   OperationalDashboardSummary,
   OperationalModuleSummary,
   OperationalSummaryRouteModule,
+  PlatformDashboardSummary,
 } from '@schoolos/core';
 import { request } from './client';
 
@@ -17,4 +18,6 @@ export const operationalSummaryApi = {
     request<OperationalModuleSummary>(
       `/dashboard/${encodeURIComponent(module)}/summary`,
     ),
+
+  getPlatformSummary: () => request<PlatformDashboardSummary>('/platform/summary'),
 };
