@@ -1,8 +1,12 @@
 # SchoolOS Backend, Web, and Mobile Feature Allocation
 
 **Status:** Active cross-surface product allocation reference
-**Last updated:** 2026-06-20
+**Owner/audience:** Product, backend, web, mobile, QA, security, support/operations
 **Scope:** M0-M14 backend ownership, SchoolOS Web responsibilities, mobile companion responsibilities, role boundaries, and explicit surface exclusions
+**Precedence:** Product intent remains in `SCHOOLOS_PRODUCT_REQUIREMENTS.md`; functional behavior remains in `SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`; software requirements remain in `../requirements/SCHOOLOS_SRS.md`; web and mobile UX rules remain in their design plans. This document owns cross-surface allocation and persona boundaries.
+**Inputs/source documents:** `SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `../requirements/SCHOOLOS_SRS.md`, `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`, `../design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `../design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`, repository code evidence recorded in the SRS/MDD.
+**Out-of-scope content:** Endpoint URL invention, DTO schemas, Prisma migrations, runtime implementation, staging proof, and GA readiness claims.
+**Last reviewed date:** 2026-06-20
 
 ---
 
@@ -25,6 +29,63 @@ This document allocates product capability. It does not prove that an endpoint, 
 ---
 
 ## 2. Product Surface Model
+
+SchoolOS has one shared tenant-aware core and three configurable experience packs:
+
+```text
+Shared core
++ PRESCHOOL experience pack
++ SCHOOL experience pack
++ HIGHER_SECONDARY experience pack
++ shared Web app
++ shared Flutter companion app
+```
+
+The experience packs change workspace composition, labels, allowed workflows, and capability visibility. They do not create separate products, apps, databases, student tables, guardian systems, ledgers, or mobile binaries.
+
+### 2.0 Shared Core Versus Stage-Specific Experience Packs
+
+| Layer | Owns | Must not do |
+|---|---|---|
+| Shared core | Tenant, users/RBAC, students, guardians, staff, admissions, academic years, classes, sections, enrollment history, attendance, fees, files, notices, transport, canteen, library, HR/payroll, accounting, audit, reports, module entitlement, school settings. | Split into `PreschoolStudent`, `SchoolStudent`, `PlusTwoStudent`, separate ledgers, or separate apps. |
+| `PRESCHOOL` pack | Montessori, Nursery, LKG, UKG child-safety composition: safe handover, activity diary, simple observations, supportive milestones, parent trust, admissions, fees, staff/classroom coverage. | Make heavy exams, marks grids, CAS, ranking, broad child app, or mandatory detailed care logs default. |
+| `SCHOOL` pack | Grade 1-10 academic/operations composition: attendance, classes/subjects, timetable, homework, exams, marks/CAS, report cards, library, transport, canteen, fees, notices. | Use "Primary" as the universal Grade 1-10 label in product UX unless an existing compatibility contract requires it. |
+| `HIGHER_SECONDARY` pack | Grade 11-12 / +2 composition: configurable streams/programs, subject combinations, theory/lab timetables, practicals, projects, internal assessment, mock exams, board-readiness workflows. | Hard-code streams or build a separate +2 academic platform. |
+
+### 2.0A Backend-Owned Experience Context
+
+The desired `ExperienceContext` is **PROPOSED / NEEDS_SCHEMA_DESIGN**. This document does not claim an endpoint, Prisma field, DTO, or Flutter model exists.
+
+The backend-owned context must eventually derive from:
+
+```text
+Tenant program offerings
++ platform module entitlement
++ school-level configuration
++ class/section stage or program
++ active enrollment
++ user role
++ permission
++ teacher assignment
++ guardian-child relationship
++ enabled capability
+```
+
+Conceptual output:
+
+```text
+role
+tenantId
+enabledPrograms
+assignedPrograms
+activeProgram
+activeClassOrChildContext
+enabledCapabilities
+permissionScope
+moduleEntitlements
+```
+
+Web and mobile may compose stage-specific navigation only from backend-provided context. They must never infer authorization from class names, local labels, hidden buttons, or hard-coded route lists.
 
 ### 2.1 SchoolOS Web — The School Operating Desk
 
@@ -74,6 +135,78 @@ Parents, broad student users, drivers, casual visitors, and public users are not
 | Driver and field workflow | Mobile first |
 | Student session activity | Controlled school device, tablet, or classroom runtime |
 | High-risk or irreversible action | Web with confirmation, reason where required, permission, and audit |
+
+### 2.4 Stage-Aware Context Switching Rules
+
+| User context | Required behavior | Evidence status |
+|---|---|---|
+| Parent with multiple children | Parent switches child; backend context changes active child, stage, enabled modules, files, notices, fees, activity, and published academic visibility. | Shared guardian-child foundation exists; stage-aware resolver is **PROPOSED / NEEDS_SCHEMA_DESIGN**. |
+| Teacher assigned across stages | Teacher switches assigned class/context; valid tools change by assignment, stage, subject, capability, and module entitlement. | Teacher assignment foundation exists; stage-aware tool projection needs backend/OpenAPI/mobile DTO design. |
+| Principal / owner | Principal sees combined attention across the school and can filter by Preschool, School (Grade 1-10), or +2 without bypassing permissions. | Principal summary surfaces exist broadly; combined stage filter needs backend summary/context design. |
+| Administrator / academic coordinator | Web workspaces filter by academic year, class/section, program/stage, stream, and enabled module where supported. | Class/section foundations exist; program/stage and +2 structures need schema design. |
+
+### 2.5 What Backend Owns
+
+Backend owns the official record and workflow rules for every stage:
+
+- Tenant, RBAC, entitlement, suspension, support override, and audit enforcement.
+- Stage/program offering and effective experience resolution after schema approval.
+- Student, guardian, enrollment, class/section, teacher assignment, and parent/child scope.
+- All official totals, financial values, attendance state, report-card state, notification recipient resolution, file authorization, and lifecycle transitions.
+- OpenAPI/shared DTO contracts for any web/mobile stage-aware projection.
+- Safe errors, pagination/filtering/sorting, idempotency, transaction boundaries, and job retries.
+
+### 2.6 What Web Owns
+
+Web owns the school operating desk in one Next.js app:
+
+- Setup, configuration, dense tables, bulk work, approvals, correction/reversal, reporting, protected exports, audit, and platform operations.
+- Stage-specific workspace composition for Preschool, School (Grade 1-10), and Higher Secondary / +2 after backend contracts exist.
+- Honest unavailable, locked, permission, partial-failure, and queued states when a safe API is absent.
+
+Web must not own authorization, official totals, lifecycle state, financial truth, file scope, notification recipient scope, or stage/program resolution.
+
+### 2.7 What Mobile Owns
+
+Mobile owns one Flutter companion app:
+
+- Parent linked-child visibility and action prompts.
+- Teacher assigned-class daily work.
+- Principal attention/approval snapshots.
+- Driver assigned-trip flow.
+- Staff self-service own-record flow.
+- Controlled student learning/session flow.
+
+Mobile may cache safe reads and may queue only explicitly idempotent, reconciled, visible sync writes. Stage-aware switching must come from backend contracts and must not be faked in Flutter.
+
+### 2.8 Not Appropriate For Mobile
+
+Mobile must not provide:
+
+- Broad admin settings, tenant/platform controls, provider settings, SaaS billing, role/permission administration, or module entitlement administration.
+- Fee reversals, refunds, cashier close, offline payments, wallet debits, top-ups without provider/reconciliation proof, payroll posting, accounting posting, fiscal close, journal edits, report-card publishing, or promotion decisions.
+- Bulk imports, large reports/exports, dense marks grids, CAS moderation administration, full timetable construction, stock/vendor administration, broad student directories, or unscoped private chat/moderation.
+- Any high-risk offline write unless backend idempotency, conflict resolution, and visible sync/retry/failure states are approved.
+
+### 2.9 Not Default Preschool Scope
+
+Preschool must not default to:
+
+- Heavy exams, marks grids, CAS workflows, complex report-card workflows, public child ranking, harsh child labels, open all-day parent-teacher chat, broad child-owned app, mandatory detailed meal/nap/toileting/medicine logs for every school, or screen-heavy independent learning.
+
+Preschool teacher mobile P0 remains limited to:
+
+```text
+Today
+Attendance
+My Children
+Pickup & Drop
+Permitted Care Alerts
+Activities
+Quick Observation
+Parent Updates
+Notices
+```
 
 ---
 
@@ -526,6 +659,25 @@ Backend authorization remains authoritative. A role listed for a surface still n
 - Parents and students must not receive predictive labels or comparative risk scores.
 
 ---
+
+## 5A. Stage-Aware Capability Allocation And Required Work
+
+This table is the contract discipline for new stage-aware scope. It identifies the verified foundation, the proposed design, and the required work before implementation claims are allowed.
+
+| Capability | Existing verified foundation | Proposed design | Required backend/OpenAPI/schema/mobile work |
+|---|---|---|---|
+| Backend-owned `ExperienceContext` | No verified endpoint, DTO, or Prisma model. Shared tenant/RBAC/module/student/class foundations exist. | Resolve active experience from tenant offerings, entitlement, school configuration, class/section profile, enrollment, role, permission, teacher assignment, guardian link, and capability. | **NEEDS_SCHEMA_DESIGN**, OpenAPI/shared DTO, backend resolver, web shell integration, Flutter context projection, tenant/stage/RBAC tests. |
+| Tenant program offerings | Tenant, plans, modules, entitlements, and settings exist. | Tenant can enable `PRESCHOOL`, `SCHOOL`, and/or `HIGHER_SECONDARY` offerings without separate products. | Schema/index design, platform settings, seed/backfill, entitlement checks, audit, OpenAPI, web settings, mobile projection. |
+| Class/section stage profile | Class/section/student enrollment foundations exist. | Class/section carries backend-owned stage/program classification used by rosters, dashboards, teacher scope, and parent child switching. | Schema/backfill, index review, M1/M4 ownership decision, OpenAPI, web academic settings, mobile teacher context DTO, tests. |
+| Preschool authorized pickup | Student/guardian/emergency foundations exist. | Authorized pickup contacts and temporary pickup changes are audit-bound, role-scoped, and parent-visible where policy allows. | New schema/workflow, DTOs, permission rules, idempotency for temporary changes, M12 events, web/admin screens, mobile parent/teacher DTOs, safety tests. |
+| Preschool arrival/checkout/pickup exception | M2 attendance and M9 transport foundations exist. | Preschool attendance extends to arrival/absence/late/checkout and exception review without confusing handover with transport trips. | Schema design, M1/M2/M12 ownership, idempotent mobile submit, OpenAPI, web safety dashboard, Flutter teacher/parent flows, audit tests. |
+| Preschool care/allergy alerts | Student care fields and canteen allergy warnings exist broadly. | Narrow authorized-staff care alerts for classroom/safety decisions only. | Authorization review, DTO minimization, web/mobile display rules, audit/access tests; no broad medical profile exposure. |
+| Preschool activity diary/observations/media | M5 activity/milestone/media foundations exist. | Consent-safe activity diary, quick observations, supportive milestones, parent updates. | Verify M5 contracts/media consent, preschool diary DTO, mobile quick observation contract, parent feed filters, File Registry/media tests. |
+| School Grade 1-10 composition | M1-M13 broad foundations exist. | One web workspace composition for attendance, subjects, timetable, homework, exams, marks/CAS, report cards, operations, fees, notices. | Authenticated browser E2E, role-denial tests, server summaries, module-locked states, mobile role QA, staging proof. |
+| +2 streams/programs | Subjects/exams/practical marks foundations exist partially. | School-configurable programs/streams, not hard-coded. | M4 schema design, uniqueness/index rules, OpenAPI/shared DTOs, web setup, teacher assignment scope, parent/student projection, tests. |
+| +2 subject combinations | No verified stream/combination model. | Configurable allowed subject combinations per tenant/program/intake. | Schema/migration/backfill plan, validation APIs, enrollment impact, web academic coordinator screens, mobile read projection, tests. |
+| +2 practicals/projects/lab timetable | Practical mark fields exist; no full lifecycle verified. | Practical components, lab timetable, project evidence, assessment, result/report-card impact. | M4/M6/File Registry ownership design, lifecycle DTOs, idempotency, protected evidence files, report-card integration, teacher/mobile DTOs, tests. |
+| Stage-aware principal dashboard | Principal/admin summaries exist broadly. | Combined attention with Preschool / School / +2 filters and permission-filtered drilldowns. | Backend stage summary contracts, no browser totals, web composition, Flutter principal filters, role/tenant/stage tests. |
 
 ## 6. Cross-Department Workflow Rule
 

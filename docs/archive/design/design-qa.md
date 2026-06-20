@@ -1,3 +1,5 @@
+> Archived 2026-06-20. Replaced by `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `docs/design/modules/`, and `docs/implementation/WEB_UI_API_ALIGNMENT_AUDIT.md`. Retained as historical M1 visual-QA evidence only.
+
 **Source visual truth**
 
 - `/Users/erwin/Downloads/WebAllScreens/M1-screens/ChatGPT Image Jun 19, 2026, 04_53_06 PM (1).png`

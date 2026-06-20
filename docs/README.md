@@ -123,7 +123,6 @@ design/M9_TRANSPORT_WEB_REFERENCE_ANALYSIS.md
 design/M10_CANTEEN_WEB_REFERENCE_ANALYSIS.md
 design/M11_ACCOUNTING_WEB_REFERENCE_ANALYSIS.md
 design/M12_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md
-project/M10_CANTEEN_FRONTEND_IMPLEMENTATION_CHECKLIST.md
 implementation/WEB_UI_API_ALIGNMENT_AUDIT.md
 design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
 production/SCHOOLOS_GA_RELEASE_POLICY.md
@@ -140,10 +139,16 @@ apps/web/docs/modules/README.md
 apps/web/docs/modules/M8_LIBRARY_FRONTEND_IMPLEMENTATION_GUIDE.md
 ```
 
-Retired supporting reference:
+Archived supporting references:
 
 ```text
-design/HOSTEL_WEB_REFERENCE_ANALYSIS_RETIRED.md
+archive/design/HOSTEL_WEB_REFERENCE_ANALYSIS_RETIRED.md
+archive/design/design-qa.md
+archive/design/decisions/2026-06-19-m2-attendance-web-reference.md
+archive/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md
+archive/project/M6_HOMEWORK_TIMETABLE_FRONTEND_IMPLEMENTATION_CHECKLIST.md
+archive/project/M10_CANTEEN_FRONTEND_IMPLEMENTATION_CHECKLIST.md
+archive/project/checklists/2026-06-19-m2-attendance-frontend-delivery-checklist.md
 ```
 
 ---

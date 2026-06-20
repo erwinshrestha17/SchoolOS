@@ -2,7 +2,9 @@
 
 **Date:** 2026-06-19  
 **Status:** Supplemental delivery checklist for the M2 reference-design decision. It does not replace the consolidated implementation plan, backend source, OpenAPI, or the web design master plan.  
-**Companion document:** `docs/design/decisions/2026-06-19-m2-attendance-web-reference.md`
+**Companion document:** `docs/archive/design/decisions/2026-06-19-m2-attendance-web-reference.md`
+
+> Archived 2026-06-20. Active M2 implementation guidance now lives in `docs/design/modules/M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md`, `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, and the current next-phase plan.
 
 ---
 

@@ -3,6 +3,8 @@
 **Status:** Retired design appendix.  
 **Updated:** 2026-06-19
 
+> Archived 2026-06-20. Hostel remains outside active SchoolOS scope. Use `docs/README.md`, `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, and `docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md` for the active M0-M14 taxonomy.
+
 This file replaces the obsolete `M8B_HOSTEL_WEB_REFERENCE_ANALYSIS.md` reference.
 
 Hostel is **not part of the active SchoolOS module taxonomy**. The current active module numbering is:

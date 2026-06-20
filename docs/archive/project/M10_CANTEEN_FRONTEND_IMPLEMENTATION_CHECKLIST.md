@@ -1,8 +1,10 @@
 # M10 Canteen — Frontend Implementation Checklist
 
-**Status:** Focused implementation companion for the M10 canteen web reference analysis.  
+**Status:** Archived implementation companion for the M10 canteen web reference analysis.
 **Updated:** 2026-06-19  
 **Master implementation source:** `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md` remains the active implementation plan.
+
+> Archived 2026-06-20. Active M10 web guidance now lives in `docs/design/modules/M10_CANTEEN_FRONTEND_REFERENCE.md`; current delivery sequencing lives in `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`.
 
 This file replaces the obsolete `M8C_CANTEEN_FRONTEND_IMPLEMENTATION_CHECKLIST.md` numbering. Canteen is now **M10**, not M8C.
 

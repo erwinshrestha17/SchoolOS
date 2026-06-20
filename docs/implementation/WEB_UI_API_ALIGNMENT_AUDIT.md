@@ -13,10 +13,10 @@ The M4 desktop reference set has been translated into the following planning art
 
 ```text
 docs/design/M4_ACADEMICS_WEB_REFERENCE_SPEC.md
-docs/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md
+docs/design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md
 ```
 
-These M4 documents must be used with this alignment audit. They preserve the current contract gaps: no invented overview KPI values, no unverified CAS rubric/evidence/moderation payloads, no simulated report-card job progress, no raw protected-file URLs, and no uncontrolled mark-unlock interaction.
+These M4 documents must be used with this alignment audit. They preserve the current contract gaps: no invented overview KPI values, no unverified CAS rubric/evidence/moderation payloads, no simulated report-card job progress, no raw protected-file URLs, and no uncontrolled mark-unlock interaction. The previous W0-W8 execution-slice note is archived at `docs/archive/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md` for historical detail only.
 
 ## Shared foundation
 
@@ -172,7 +172,7 @@ The canonical web design plan remains authoritative for shared visual rules, ten
 | Activity post detail | `/dashboard/activity/[postId]` | Inspect one post, its media, audience, consent outcome, status, and allowed actions. | Use a full route when media, tagged-student context, comments, audit, or protected files require detail. Do not expose cross-child visibility, internal review notes, or raw file data. |
 | Moderation queue | `/dashboard/activity/moderation` | Review pending posts and media. | Approve, reject, request changes, archive, or restore only through supported actions. Rejection, archive, and restore must capture a reason whenever backend policy requires it. |
 | Teacher media gallery | `/dashboard/activity/gallery` | Browse own or permitted activity albums and resolve upload issues. | Use server pagination/filtering and File Registry-backed thumbnails/previews. Teachers can retry permitted failed uploads; cleanup, storage repair, and integrity jobs stay outside this route. |
-| Milestone templates and progress | `/dashboard/activity/milestones` | Choose or apply Montessori/ECD/Primary milestone templates. | Use backend stage/domain filters and presets. Do not manufacture milestone completion or class progress totals in the browser. |
+| Milestone templates and progress | `/dashboard/activity/milestones` | Choose or apply Preschool and School (Grade 1-10) milestone templates where the backend supports them. | Use backend stage/domain filters and presets. Do not manufacture milestone completion or class progress totals in the browser. |
 | Parent child-scoped feed | `/dashboard/activity/parent` | Show a guardian only their linked child’s safe activity updates. | Re-check guardian-child linkage, active child scope, post state, media consent, and protected-file permission on every route and file action. |
 | Protected media preview | Selected media within M5 detail/gallery/parent surfaces | Preview or download a permitted activity asset. | Use authenticated preview/download helpers. A label such as `Protected preview` or `Download allowed` must be derived from backend permission, never from a client-held signed URL. |
 
@@ -368,7 +368,7 @@ For M5, also exercise `/dashboard/activity/new`, `/dashboard/activity/[postId]`,
 
 ### P1a — M4 reference implementation prerequisites
 
-1. Complete M4-W0 in `docs/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md` before changing M4 workflow composition.
+1. Complete the contract baseline described by `docs/design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md` before changing M4 workflow composition; the archived W0 checklist remains historical detail only.
 2. Keep all six M4 overview metrics unavailable until a bounded module-owned summary contract exists.
 3. Confirm CAS rubric/evidence/moderation, report-card persisted job state, promotion, and Grade 11-12 contracts before adding write paths or official progress displays.
 4. Preserve backend-assigned teacher scope, correction auditability, finance-safe withholding visibility, and File Registry-backed report-card access in every M4 slice.

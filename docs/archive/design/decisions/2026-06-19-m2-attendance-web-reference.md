@@ -4,6 +4,8 @@
 **Status:** Supplemental design-reference decision record. It supports, but does not replace, `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md`, the OpenAPI contract, and backend authorization rules.  
 **Scope:** `apps/web` attendance workspaces only. No backend, API, database, mobile, QR, biometric, or timetable-session implementation is approved by this document.
 
+> Archived 2026-06-20. Active M2 web guidance now lives in `docs/design/modules/M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md`, with global rules in `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`. Retained for historical reference-screen decisions.
+
 ---
 
 ## 1. Purpose

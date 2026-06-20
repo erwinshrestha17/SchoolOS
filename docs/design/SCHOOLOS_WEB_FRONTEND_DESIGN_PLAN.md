@@ -1,8 +1,12 @@
 # SchoolOS Web Frontend Design Plan
 
 **Status:** Active global source of truth for SchoolOS web design rules.
-**Updated:** 2026-06-20
+**Owner/audience:** Product, design, lead Next.js developer, QA, support/operations
 **Scope:** `apps/web`, Next.js App Router, school operations, school settings, platform control plane, shared states, protected files, and contract-safe frontend behavior.
+**Precedence:** Backend/OpenAPI/shared contracts and backend authorization remain authoritative. Cross-surface ownership lives in `../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`; module-specific web details live in `modules/`.
+**Inputs/source documents:** `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`, `../requirements/SCHOOLOS_SRS.md`, `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`, `apps/web/docs/DESIGN_SYSTEM.md`.
+**Out-of-scope content:** Endpoint invention, DTO schemas, mock production data, runtime implementation claims, staging proof, and GA readiness claims.
+**Last reviewed date:** 2026-06-20
 
 This document contains global web rules only. Feature lists, module workflows, expected screens, wireframes, role projections, and module backend needs live in [`docs/design/modules/`](modules/README.md). Backend/web/mobile allocation and explicit surface boundaries live in [`SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`](../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md). This is design guidance, not evidence that a route or API exists.
 
@@ -309,6 +313,77 @@ Rules:
 - One unavailable module summary must not block the rest of the dashboard.
 
 ---
+
+## 14A. Stage-Aware Workspace Compositions
+
+SchoolOS Web uses one shared Next.js App Router application. Preschool, School (Grade 1-10), and Higher Secondary / +2 are workspace compositions inside the same shell, data model, permission system, File Registry flow, and module taxonomy. They are not separate dashboards, codebases, databases, or student record systems.
+
+The stage-aware composition depends on backend-owned `ExperienceContext`, tenant program offerings, class/section stage profile, and +2 stream/practical/project structures. Current status: **PROPOSED / NEEDS_SCHEMA_DESIGN** unless a module-specific contract has already been verified. Do not infer stage from local labels or class names in the browser.
+
+### 14A.1 Preschool Web Admin
+
+Preschool web focuses on child safety, safe handover, parent trust, simple classroom visibility, admissions, fees, staff/classroom coverage, and exceptions.
+
+| Workspace | Main job | Evidence boundary |
+|---|---|---|
+| Admissions | Manage inquiry, waitlist, class capacity, guardian setup, and admission finalization. | M1 foundation exists; preschool capacity/stage filters need backend verification. |
+| Children & Guardians | Manage child profile, linked guardians, emergency contacts, documents, and authorized staff visibility. | Student/guardian foundation exists; authorized pickup contacts need schema design. |
+| Attendance | Track arrival, absence, late, and class attendance. | M2 foundation exists; preschool checkout/handover needs schema design. |
+| Pickup & Drop | Review authorized pickup, temporary pickup change, checkout, exceptions, and unresolved handover risk. | **Needs schema design**, OpenAPI confirmation, DTO design, RBAC, audit, and M12 event design. |
+| Activities & Milestones | Compose activity diary, observations, supportive milestones, and consent-safe media. | M5 foundation exists; preschool diary/media policy needs backend verification and OpenAPI confirmation. |
+| Fees & Receipts | Run invoices, payments, receipts, dues, cashier close, and parent receipt access. | M3 foundation exists; mobile/offline financial writes remain blocked. |
+| Notices | Send parent notices, events, consent requests, and high-priority updates through M12. | M12 foundation exists; provider/staging proof remains pending. |
+| Staff/Classroom Coverage | See teacher/staff coverage, absences, substitutions, and permitted care-alert needs. | M7/M6 foundations exist; preschool coverage summary needs backend verification. |
+| Events | Plan events and consent-aware parent communications where policy allows. | Needs backend verification before new routes/DTOs. |
+| Safety/exception dashboard | Show children not checked out, pending pickup exceptions, attendance gaps, care alerts, unresolved concerns, fee summary, admissions/capacity, and coverage. | Needs backend summaries and ExperienceContext; no browser-owned safety totals. |
+
+Preschool web must not default to heavy exams, marks grids, CAS workflows, complex report-card publishing, public ranking, broad child-owned app, mandatory detailed care logs, or unrestricted all-day chat.
+
+### 14A.2 School Grade 1-10 Web
+
+School (Grade 1-10) web is the academic and operational workspace for daily school running.
+
+| Workspace | Main job | Evidence boundary |
+|---|---|---|
+| Attendance | Class attendance, corrections, registers, anomalies, follow-ups, parent alerts. | M2 foundation exists; current design keeps official totals backend-owned. |
+| Classes/Subjects | Classes, sections, subjects, teacher assignments, academic-year setup. | M0/M4 foundation exists; stage profile needs schema design. |
+| Timetable | Timetable builder, versions, conflicts, substitutions, room/teacher workload. | M6 foundation exists; current contracts must be confirmed before new UI states. |
+| Homework | Assignment, draft/publish, attachments, submissions/review, reminders. | M6 foundation exists; mobile/parent projections stay purpose-limited. |
+| Exams | Terms, components, grading policy, schedules, readiness. | M4 foundation exists; new KPI cards need bounded summary contracts. |
+| Marks/CAS | Teacher-assigned marks, CAS, review, locks, corrections. | M4 foundation exists; CAS rubric/evidence/moderation needs OpenAPI confirmation before write UI. |
+| Report Cards | Generation, protected PDFs, partial failures, publish, corrections. | M4/File Registry foundation exists; job-progress must use persisted backend state only. |
+| Library/Transport/Canteen | Daily operations modules where enabled. | M8/M9/M10 foundations exist; module lock and role scope apply. |
+| Fees | Invoices, cashier, receipts, reversals, dues, reports. | M3 foundation exists; official values remain backend/database truth. |
+| Notices | Notices, notification center, parent-teacher communication, delivery/read state. | M12 foundation exists; provider/device/staging proof remains pending. |
+| Academic/operations dashboard | Attendance gaps, homework, timetable, exams, marks/report cards, dues, operations. | Needs module-owned summaries; no client aggregation from lists. |
+
+Grade-band UX should adjust labels and emphasis without changing the shared core:
+
+```text
+Grade 1-3: foundational learning and parent-heavy communication
+Grade 4-5: guided practice, reading, basic homework
+Grade 6-8: subjects, projects, stronger timetable/homework workflows
+Grade 9-10: exams, marks, SEE-oriented readiness, report-card workflows
+```
+
+### 14A.3 Higher Secondary / +2 Web
+
+Higher Secondary / +2 extends shared academics; it is not a separate academic platform.
+
+| Workspace | Main job | Evidence boundary |
+|---|---|---|
+| Programs/streams | Configure school-owned +2 programs/streams. | **Needs schema design**; no verified stream model. |
+| Subject combinations | Configure and assign valid subject combinations. | **Needs schema design**, OpenAPI confirmation, DTO design, tests. |
+| Theory/lab timetable | Compose theory and lab/practical schedules. | M6 timetable foundation exists; +2 lab/practical composition needs schema/API design. |
+| Practicals | Track practical components, lab work, evidence, assessment, and readiness. | Partial practical mark fields exist; full lifecycle needs schema design. |
+| Projects | Assign, collect, review, and assess protected project evidence. | **Needs schema design** and File Registry workflow design. |
+| Internal assessment | Manage internal components and publish rules. | M4 foundation exists; +2-specific policies need OpenAPI confirmation. |
+| Mock exams | Plan mock exams and board-preparation readiness. | Needs backend verification before workflow claims. |
+| Board readiness | Show completion blockers, internal/practical/project readiness, mock status, dues/readiness where authorized. | Needs server-owned summaries; no browser-derived readiness. |
+| Lab utilization | Rooms/labs, usage, conflicts, staff coverage. | Needs M6/M4 schema and reporting design. |
+| Academic coordinator dashboard | Stream enrollment, subject combinations, practicals, projects, labs, internal assessment, mock exams, workload, dues. | Needs ExperienceContext and bounded backend summaries. |
+
+Parent and controlled student web/mobile views for +2 must remain own-scope, published-only where relevant, and non-comparative.
 
 ## 15. Module Design References
 

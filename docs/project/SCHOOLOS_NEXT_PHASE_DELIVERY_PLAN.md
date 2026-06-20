@@ -46,6 +46,23 @@ The formal BRD/PRD/FRS/SRS/SDD/MDD set defines SchoolOS as one shared platform w
 
 Do not build UI-only stage switches or hard-code +2 streams before schema, OpenAPI/shared DTO, authorization, web/mobile, migration, seed, and test requirements are designed.
 
+## Stage-Aware Implementation Readiness Appendix
+
+Stage-aware runtime implementation comes after the current GA blockers remain under control. Do not move new Preschool/+2 feature work ahead of Phase 1 seed, smoke, authenticated browser, mobile-device, staging, provider, storage, backup/restore, monitoring, and pilot evidence priorities.
+
+Later runtime sequence:
+
+1. Preserve Phase 1 seed/smoke/browser/mobile/staging priorities.
+2. Design and approve program/stage schema and `ExperienceContext` contract.
+3. Implement tenant program offerings and class/section stage profile.
+4. Implement Preschool pickup/drop safety workflow.
+5. Implement stage-aware Web compositions.
+6. Implement stage-aware Flutter context switching.
+7. Implement +2 streams, combinations, practicals, projects, and lab workflows.
+8. Add role/tenant/stage scope tests before calling any stage experience complete.
+
+Readiness rule: a stage experience is not complete until backend schema/contracts, OpenAPI/shared DTOs, web/mobile projections, tenant/RBAC/stage tests, protected-file behavior where relevant, seed coverage, browser/mobile QA, and staging evidence prove the workflow. Documentation alone does not establish implementation status.
+
 ## Explicitly Deferred Scope
 
 - M14 Intelligence / AI.

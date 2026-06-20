@@ -1,8 +1,12 @@
 # SchoolOS Mobile App UI/UX Design Plan
 
 **Status:** Active source of truth for SchoolOS Flutter mobile app UI/UX, persona flows, mobile wireframes, API rules, offline rules, protected files, and mobile smoke expectations.  
-**Updated:** 2026-06-20
+**Owner/audience:** Product, design, senior Flutter developer, backend/mobile API owner, QA, support/operations
 **Scope:** `apps/schoolos_mobile`, Flutter companion app, role-scoped mobile workflows for parents, teachers, principals, drivers, staff self-service, and controlled student lab/session access.
+**Precedence:** Backend/OpenAPI/shared contracts and backend authorization remain authoritative. Cross-surface ownership lives in `../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`; mobile implementation guidance also lives in `../../apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md`.
+**Inputs/source documents:** `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`, `../requirements/SCHOOLOS_SRS.md`, `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`, `../../apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md`.
+**Out-of-scope content:** Endpoint invention, DTO schemas, Flutter runtime implementation, provider setup, staging/device proof, and GA readiness claims.
+**Last reviewed date:** 2026-06-20
 
 This document is planning and design guidance only. It does not implement mobile screens, APIs, backend code, database, migrations, package changes, or tests.
 
@@ -340,6 +344,148 @@ Navigation rules:
 - Deep links must re-check session, tenant, role, permission, module, and ownership before showing data.
 
 ---
+
+## 7A. Stage-Aware Mobile Context Model
+
+SchoolOS has one Flutter companion app. Preschool, School (Grade 1-10), and Higher Secondary / +2 appear as role- and task-specific experiences inside that app. They are not separate app binaries.
+
+The backend-owned `ExperienceContext` is **PROPOSED / NEEDS_SCHEMA_DESIGN**. Until backend schema, OpenAPI/shared DTOs, Flutter DTOs, and scope tests exist, Flutter must not fake stage switching from class names, local enum guesses, route labels, or hidden buttons.
+
+Required context behavior:
+
+| Persona | Context switch | Required rule |
+|---|---|---|
+| Parent with multiple children | Switch child -> active stage experience changes. | Child list, enabled modules, activity/attendance/fees/report-card visibility, and files come from linked-child backend scope. |
+| Teacher assigned across stages | Switch assigned class/context -> valid tools change. | Teacher tools are assignment-, class/section-, subject-, stage-, capability-, and entitlement-scoped by backend. |
+| Principal | Combined alerts -> Preschool / School / +2 filters. | Filtered attention summaries must come from backend summaries, not Flutter aggregation. |
+| Controlled +2 student session | Join active session -> show only approved session tools. | Student sees only own/session-scoped learning, timetable/homework/result details where a purpose-limited contract exists. |
+
+Mobile never replaces backend authorization. Hidden navigation is only UX.
+
+Stage-aware mobile must preserve these boundaries:
+
+- Preschool child does not receive a broad student app.
+- Preschool learning remains teacher-led and screen-light.
+- Teachers only see assigned children/classes/subjects unless permission explicitly allows more.
+- Parents only see linked children.
+- Parent/teacher chat remains policy-controlled, quiet-hour aware, and scoped; it is not an unrestricted WhatsApp replacement.
+- Mobile never performs offline financial, payroll, accounting, report-card publishing, platform, tenant-settings, or other high-risk actions.
+
+## 7B. Stage-Aware Persona Priorities
+
+Priority labels:
+
+```text
+P0 = required for first credible stage-aware companion flow after backend contracts exist
+P1 = useful after P0 proof
+P2 = later depth
+Deferred = wait for backend/product approval
+Not appropriate for mobile = web-only or unsafe mobile scope
+```
+
+### 7B.1 Preschool Parent
+
+| Priority | Navigation / workflow | Contract status |
+|---|---|---|
+| P0 | Today, attendance, pickup/drop status, activity updates, consent-safe photos, milestones, notices, events. | Needs ExperienceContext and preschool pickup/drop DTOs before full flow. |
+| P0 | Fees and confirmed receipts. | Existing finance foundation; no offline writes, no client totals. |
+| P1 | Transport where enabled, consent requests, parent update acknowledgement. | Needs backend/OpenAPI confirmation per workflow. |
+| P2 | Optional school-specific care summaries if policy allows. | Needs narrow authorization and DTO minimization. |
+| Not appropriate for mobile | Editing guardians/pickup policy, fee reversals, cashier close, admissions conversion. | Web-only. |
+
+### 7B.2 Preschool Teacher
+
+Preschool Teacher P0 includes only:
+
+```text
+Today
+Attendance
+My Children
+Pickup & Drop
+Permitted Care Alerts
+Activities
+Quick Observation
+Parent Updates
+Notices
+```
+
+| Priority | Navigation / workflow | Contract status |
+|---|---|---|
+| P0 | Today, Attendance, My Children, Activities, Quick Observation, Parent Updates, Notices. | Shared teacher/M2/M5/M12 foundations exist; preschool-specific DTOs need verification. |
+| P0 | Pickup & Drop and Permitted Care Alerts. | **Needs schema design**, authorization rule, OpenAPI, mobile DTO, idempotency confirmation. |
+| P1 | Event reminders and safe photo/media retry. | Needs media consent verification and upload retry contract. |
+| Not appropriate for mobile | Heavy marks, CAS, report-card publishing, broad class admin, guardian relationship editing. | Web-only or not default preschool scope. |
+
+### 7B.3 Preschool Principal
+
+| Priority | Navigation / workflow | Contract status |
+|---|---|---|
+| P0 | Today attention: children not checked out, pickup exceptions, attendance gaps, care alerts, unresolved parent concerns. | Needs preschool safety summary API and ExperienceContext. |
+| P0 | Fees/due snapshot, admissions/capacity, staff/classroom coverage. | Foundations exist broadly; stage-aware summaries need backend verification. |
+| P1 | Notice approval, event/consent attention, activity moderation. | Needs purpose-limited principal contracts. |
+| Not appropriate for mobile | Platform settings, provider settings, payroll posting, accounting journals, full student directory. | Web-only. |
+
+### 7B.4 Grade 1-10 Parent
+
+| Priority | Navigation / workflow | Contract status |
+|---|---|---|
+| P0 | Today, attendance, homework, notices, fees/receipts. | Existing foundations; linked-child proof and device QA still required. |
+| P1 | Report cards, timetable, activity, transport, canteen, library, learning summary where enabled. | Existing foundations vary by module; needs endpoint/OpenAPI confirmation before each screen. |
+| P2 | Parent-teacher chat, richer progress summaries, calendar/event depth. | M12 policy/quiet-hours and backend scope required. |
+| Not appropriate for mobile | Fee reversals, schoolwide reports, other-child data, unpublished marks/results. | Blocked. |
+
+### 7B.5 Grade 1-10 Teacher
+
+| Priority | Navigation / workflow | Contract status |
+|---|---|---|
+| P0 | Today, assigned classes, attendance, timetable, notices/messages. | Existing teacher/mobile foundations; live seeded/device proof pending. |
+| P1 | Homework create/review, activity updates, parent communication, learning sessions. | Needs purpose-limited contracts and tests per workflow. |
+| P2 | Small-assessment entry where approved. | Requires M4 OpenAPI and idempotency confirmation; no broad marks grid. |
+| Not appropriate for mobile | Grading policy setup, batch report-card generation, promotion, large marks grids. | Web-only. |
+
+### 7B.6 Grade 1-10 Principal
+
+| Priority | Navigation / workflow | Contract status |
+|---|---|---|
+| P0 | Attendance risk, staff absence, approvals, fees snapshot, high-impact notices. | Existing foundations; purpose-limited principal summaries need verification. |
+| P1 | Homework/timetable exceptions, report-card readiness, transport/canteen/library alerts. | Needs backend summaries and module-specific permission checks. |
+| P2 | Safe trend snapshots and pilot workflow alerts. | Needs backend-owned summaries and staging/browser/device proof. |
+| Not appropriate for mobile | Full admin settings, detailed accounting, payroll salary/bank data without permission, provider controls. | Web-only or permission-restricted. |
+
+### 7B.7 +2 Parent
+
+| Priority | Navigation / workflow | Contract status |
+|---|---|---|
+| P0 | Today, attendance, fees/receipts, notices, published results/report cards. | Shared foundations exist; +2 stage context needs backend design. |
+| P1 | Theory/lab timetable, practical/project readiness summaries, mock exam notices. | Needs +2 schema/OpenAPI/mobile DTO design. |
+| P2 | Board-readiness summary that is non-comparative and school-approved. | Needs backend summary and product policy. |
+| Not appropriate for mobile | Stream/subject combination administration, internal moderation, unpublished results, comparative ranking. | Web-only/blocked. |
+
+### 7B.8 +2 Teacher
+
+| Priority | Navigation / workflow | Contract status |
+|---|---|---|
+| P0 | Today, assigned theory/lab classes, attendance, notices/messages. | Assignment foundation exists; +2 class/lab context needs design. |
+| P1 | Homework/resources, practical/project task reminders, internal assessment status. | Needs +2 practical/project DTOs and authorization rules. |
+| P2 | Small approved assessment updates. | Needs M4 OpenAPI/idempotency confirmation. |
+| Not appropriate for mobile | Stream setup, subject-combination configuration, report publishing, promotion/progression decisions. | Web-only. |
+
+### 7B.9 +2 Principal
+
+| Priority | Navigation / workflow | Contract status |
+|---|---|---|
+| P0 | Combined attention filtered to +2: attendance gaps, dues, notices, internal assessment blockers. | Needs stage-aware principal summary. |
+| P1 | Stream enrollment, practical/project/lab readiness, mock exam readiness, workload alerts. | Needs +2 schema, summary APIs, web-first workflow proof. |
+| P2 | Board-readiness dashboard snapshot. | Needs backend-owned summary and non-comparative policy. |
+| Not appropriate for mobile | Full +2 configuration, marks grid, practical/project moderation depth, accounting/payroll/platform work. | Web-only. |
+
+### 7B.10 Controlled +2 Student Session
+
+| Priority | Navigation / workflow | Contract status |
+|---|---|---|
+| P0 | Join approved active learning/lab session, autosave, submit, view own session result. | M13 foundation exists; stage-specific +2 session proof pending. |
+| P1 | Own published timetable/homework/result where a purpose-limited student contract exists. | Needs backend verification; no broad app by default. |
+| Deferred | Broad independent student app, open chat, ranking, AI tutor/adaptive runtime. | Not approved. |
 
 ## 8. Mobile Screen States
 
