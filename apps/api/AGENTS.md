@@ -4,7 +4,7 @@ Scoped rules for `apps/api`. Root `AGENTS.md` applies first.
 
 ## Read
 
-Before API work, read relevant parts of root `AGENTS.md`, project status/plan, FRS, architecture/security, platform operations, Prisma schema, touched controller/service/DTO/tests, and OpenAPI/shared contracts.
+Before API work, read relevant parts of root `AGENTS.md`, `docs/architecture/SCHOOLOS_NAMING_CONVENTIONS.md`, project status/plan, FRS, architecture/security, platform operations, Prisma schema, touched controller/service/DTO/tests, and OpenAPI/shared contracts.
 
 ## Never break
 
@@ -19,6 +19,15 @@ Before API work, read relevant parts of root `AGENTS.md`, project status/plan, F
 - Money writes are idempotent/audited; confirmed records use reversal/correction.
 - Files go through FileRegistryService and StorageService only.
 - M12 Learning stays in the learning domain; M11 AI stays roadmap unless approved.
+
+## Naming and API contract rule
+
+- New TypeScript folders/files use kebab-case; Nest framework suffixes remain `<name>.controller.ts`, `<name>.service.ts`, `<name>.module.ts`, `<name>.guard.ts`, and `<name>.dto.ts`.
+- New API routes use lowercase kebab-case resource nouns, plural collections, explicit parameters such as `:studentId`, and domain-command routes only where CRUD is insufficient.
+- New query parameter names use camelCase and must be DTO-validated.
+- Use one canonical business term per concept; `tenantId` remains the only tenancy boundary name.
+- Persisted/API lifecycle values must flow from Prisma/domain value through DTO validation, service mapping, OpenAPI, shared contracts, and consumer clients. Do not use loose duplicated status strings or accept UI-invented statuses.
+- Keep stable legacy routes/identifiers unless a documented compatibility and migration plan protects all consumers.
 
 ## Missing API rule
 
