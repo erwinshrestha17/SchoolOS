@@ -9,7 +9,7 @@ import { SchoolSettingsNavigationV1Service } from './school-settings-navigation-
 import { SchoolSettingsProfileService } from './school-settings-profile.service';
 import { UpdateSchoolProfileDto } from './dto/update-school-profile.dto';
 
-@Controller('settings')
+@Controller('settings/workspaces')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class SchoolSettingsWorkspaceController {
   constructor(
@@ -37,15 +37,13 @@ export class SchoolSettingsWorkspaceController {
     return {
       generatedAt: new Date().toISOString(),
       navigation,
-      readiness: [
-        {
-          id: 'school-profile',
-          label: 'School Profile',
-          description: profileReady ? 'Official school profile is configured.' : 'Add the required official school profile details.',
-          href: '/dashboard/settings/school-profile',
-          status: profileReady ? 'ready' : 'needs_attention',
-        },
-      ],
+      readiness: [{
+        id: 'school-profile',
+        label: 'School Profile',
+        description: profileReady ? 'Official school profile is configured.' : 'Add the required official school profile details.',
+        href: '/dashboard/settings/school-profile',
+        status: profileReady ? 'ready' : 'needs_attention',
+      }],
     };
   }
 
@@ -57,10 +55,7 @@ export class SchoolSettingsWorkspaceController {
 
   @Patch('school-profile')
   @Permissions('settings:manage')
-  updateSchoolProfile(
-    @Body() dto: UpdateSchoolProfileDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  updateSchoolProfile(@Body() dto: UpdateSchoolProfileDto, @CurrentAuth() auth: AuthContext) {
     return this.profileService.updateProfile(auth.tenantId, dto, auth.userId);
   }
 }
