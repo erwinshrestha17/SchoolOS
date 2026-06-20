@@ -16,7 +16,9 @@ export type SchoolProfileSettings = {
   updatedAt: string | null;
 };
 
-export type UpdateSchoolProfilePayload = Omit<SchoolProfileSettings, 'updatedAt'>;
+export type UpdateSchoolProfilePayload = Partial<
+  Omit<SchoolProfileSettings, 'updatedAt'>
+>;
 
 export type SchoolSettingsReadinessItem = {
   id: string;
