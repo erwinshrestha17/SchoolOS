@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { ChevronLeft, Settings2 } from 'lucide-react';
 import { SettingsControlCenter } from './settings-control-center';
 
@@ -15,12 +15,16 @@ const workspaceItems = [
 
 export function SettingsRouteFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const legacySectionRequested = Boolean(searchParams.get('section') || searchParams.get('tab'));
 
-  // The existing root page is the former large query-parameter implementation.
-  // The current Settings entry point deliberately renders the new control centre instead.
-  if (pathname === '/dashboard/settings') {
+  // The root URL is now the redesigned control centre. Existing bookmarked query
+  // routes remain available while their individual workspaces are migrated.
+  if (pathname === '/dashboard/settings' && !legacySectionRequested) {
     return <SettingsControlCenter />;
   }
+
+  if (pathname === '/dashboard/settings') return <>{children}</>;
 
   return (
     <div className="min-h-full bg-slate-50/60">
