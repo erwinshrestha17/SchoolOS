@@ -6,15 +6,17 @@ import type {
 } from '@schoolos/core';
 import { request } from './client';
 
+const basePath = '/settings/workspaces';
+
 export const schoolSettingsApi = {
   getSchoolSettingsNavigation: () =>
-    request<SchoolSettingsNavigation>('/settings/navigation'),
+    request<SchoolSettingsNavigation>(`${basePath}/navigation`),
   getSchoolSettingsOverview: () =>
-    request<SchoolSettingsOverview>('/settings/overview'),
+    request<SchoolSettingsOverview>(`${basePath}/overview`),
   getSchoolProfile: () =>
-    request<SchoolProfileSettings>('/settings/school-profile'),
+    request<SchoolProfileSettings>(`${basePath}/school-profile`),
   updateSchoolProfile: (body: UpdateSchoolProfilePayload) =>
-    request<SchoolProfileSettings>('/settings/school-profile', {
+    request<SchoolProfileSettings>(`${basePath}/school-profile`, {
       method: 'PATCH',
       json: body,
     }),
