@@ -1,4 +1,5 @@
 import { AuthMethod } from '@prisma/client';
+import { ROLES_KEY } from '../auth/decorators/roles.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { TimetableService } from '../timetable/timetable.service';
 import { MobileTeacherTimetableController } from './mobile-teacher-timetable.controller';
@@ -51,5 +52,11 @@ describe('MobileTeacherTimetableController', () => {
       actor,
       query,
     );
+  });
+
+  it('allows subject teachers through the existing mobile timetable route contract', () => {
+    expect(
+      Reflect.getMetadata(ROLES_KEY, MobileTeacherTimetableController),
+    ).toEqual(['teacher', 'subject_teacher']);
   });
 });

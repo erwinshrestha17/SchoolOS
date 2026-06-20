@@ -28,7 +28,7 @@ import {
 @Controller('mobile/teacher/homework')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.homework')
-@Roles('teacher')
+@Roles('teacher', 'subject_teacher')
 export class MobileTeacherHomeworkController {
   constructor(private readonly homeworkService: HomeworkService) {}
 

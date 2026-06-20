@@ -1,4 +1,5 @@
 import { AuthMethod, HomeworkSubmissionStatus } from '@prisma/client';
+import { ROLES_KEY } from '../auth/decorators/roles.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { HomeworkService } from '../homework/homework.service';
 import { MobileTeacherHomeworkController } from './mobile-teacher-homework.controller';
@@ -56,6 +57,12 @@ describe('MobileTeacherHomeworkController', () => {
     expect(
       homeworkService.listTeacherMobileHomeworkScopes,
     ).toHaveBeenCalledWith(actor);
+  });
+
+  it('allows subject teachers through the existing mobile homework route contract', () => {
+    expect(
+      Reflect.getMetadata(ROLES_KEY, MobileTeacherHomeworkController),
+    ).toEqual(['teacher', 'subject_teacher']);
   });
 
   it('delegates list to teacher-scoped mobile homework service', async () => {
