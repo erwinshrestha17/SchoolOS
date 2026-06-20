@@ -12,6 +12,8 @@ import {
   brandingDocumentsSettingKeys,
 } from './branding-documents.keys';
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 @Injectable()
 export class BrandingDocumentsService {
   constructor(
@@ -33,7 +35,7 @@ export class BrandingDocumentsService {
       values.get(brandingDocumentsKeyMap[field]) ?? null;
 
     return {
-      logoFileAssetId: stringValue(values.get('school_logo')),
+      logoFileAssetId: fileAssetIdValue(values.get('school_logo')),
       primaryColor: colorValue(read('primaryColor')),
       receiptHeaderText: stringValue(read('receiptHeaderText')),
       receiptFooterText: stringValue(read('receiptFooterText')),
@@ -87,6 +89,9 @@ function normalize(value: unknown): Prisma.InputJsonValue {
 }
 function stringValue(value: unknown) {
   return typeof value === 'string' && value.trim() ? value : null;
+}
+function fileAssetIdValue(value: unknown) {
+  return typeof value === 'string' && UUID_PATTERN.test(value) ? value : null;
 }
 function colorValue(value: unknown) {
   return typeof value === 'string' && /^#[0-9A-Fa-f]{6}$/.test(value) ? value : null;
