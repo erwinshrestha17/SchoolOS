@@ -1792,7 +1792,7 @@ function buildStudent(
     enrollments: {
       id?: string;
       academicYearId?: string;
-      academicYear: { name: string };
+      academicYear: { name: string; startsOn?: Date };
       classId: string;
       sectionId?: string | null;
       rollNumber?: number | null;
@@ -1924,6 +1924,7 @@ function buildPrisma(options: {
   studentDocumentHistoryFindManyResult?: unknown[];
   guardianFindFirstQueue?: unknown[];
   studentGuardianFindFirstResult?: unknown;
+  studentGuardianFindManyResult?: unknown[];
   studentDocumentFindFirstQueue?: unknown[];
   invoiceFindManyQueue?: unknown[];
   classFindFirstResult?: unknown;
@@ -2103,6 +2104,9 @@ function buildPrisma(options: {
       findFirst: jest
         .fn()
         .mockResolvedValue(options.studentGuardianFindFirstResult ?? null),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.studentGuardianFindManyResult ?? []),
     },
     studentDocument: {
       findFirst: jest.fn().mockImplementation(async () => {

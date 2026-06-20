@@ -234,6 +234,7 @@ describe('M1AdmissionsHardeningService', () => {
       {
         confirmFileAccessReview: true,
         reason: 'Guardian changed after admission review',
+        newPrimaryGuardianId: 'guardian-2',
       },
       actor,
     );
@@ -253,6 +254,18 @@ describe('M1AdmissionsHardeningService', () => {
         studentId: 'student-1',
         guardianId: 'guardian-1',
       },
+    });
+    expect(tx.studentGuardian.updateMany).toHaveBeenCalledWith({
+      where: { tenantId: actor.tenantId, studentId: 'student-1' },
+      data: { isPrimary: false },
+    });
+    expect(tx.studentGuardian.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: 'student-1',
+        guardianId: 'guardian-2',
+      },
+      data: { isPrimary: true },
     });
     expect(tx.studentDocumentHistory.createMany).toHaveBeenCalledWith({
       data: [
@@ -517,9 +530,17 @@ function buildPrisma(overrides: Partial<PrismaMockOptions> = {}) {
       findMany: jest.fn().mockResolvedValue([
         {
           id: 'student-guardian-1',
+          guardianId: 'guardian-1',
           relation: 'mother',
           isPrimary: true,
           guardian: buildGuardian(),
+        },
+        {
+          id: 'student-guardian-2',
+          guardianId: 'guardian-2',
+          relation: 'father',
+          isPrimary: false,
+          guardian: { ...buildGuardian(), id: 'guardian-2' },
         },
       ]),
       findFirst: jest.fn().mockResolvedValue({
@@ -528,6 +549,7 @@ function buildPrisma(overrides: Partial<PrismaMockOptions> = {}) {
         studentId: 'student-1',
         guardianId: 'guardian-1',
         relation: 'mother',
+        isPrimary: true,
         guardian: buildGuardian(),
         student: buildStudent(),
       }),
@@ -596,6 +618,7 @@ function buildTransaction() {
   return {
     studentGuardian: {
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     studentDocumentHistory: {
       createMany: jest.fn().mockResolvedValue({ count: 1 }),

@@ -16,6 +16,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   UpdateStudentProfilePayload,
   UpdateStudentGuardianPayload,
+  CreateStudentGuardianPayload,
   StudentTransferPayload,
   StudentArchivePayload,
   StudentDeletePayload,
@@ -71,6 +72,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const [pdfError, setPdfError] = useState('');
   const [isEditingStudent, setIsEditingStudent] = useState(false);
   const [editingGuardianId, setEditingGuardianId] = useState<string | null>(null);
+  const [isAddingGuardian, setIsAddingGuardian] = useState(false);
   const [isLifecycleOpen, setIsLifecycleOpen] = useState(false);
   const [lifecycleAction, setLifecycleAction] = useState<LifecycleAction | null>(null);
   const [lifecycleMessage, setLifecycleMessage] = useState('');
@@ -119,6 +121,26 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     onSuccess: (profile) => {
       queryClient.setQueryData(['student-profile', studentId], profile);
       setEditingGuardianId(null);
+    },
+  });
+
+  const guardianCreateMutation = useMutation({
+    mutationFn: (body: CreateStudentGuardianPayload) => api.addStudentGuardian(studentId, body),
+    onSuccess: (profile) => {
+      queryClient.setQueryData(['student-profile', studentId], profile);
+      setIsAddingGuardian(false);
+    },
+  });
+
+  const guardianRemoveMutation = useMutation({
+    mutationFn: ({ guardianId, reason, newPrimaryGuardianId }: { guardianId: string; reason: string; newPrimaryGuardianId?: string | null }) =>
+      api.removeStudentGuardianAccess(studentId, guardianId, {
+        reason,
+        confirmFileAccessReview: true,
+        newPrimaryGuardianId,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
     },
   });
 
@@ -274,11 +296,18 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
             <ProfileTabs.GuardiansTab
               guardians={profile.guardians}
               editingGuardianId={editingGuardianId}
-              isSaving={guardianUpdateMutation.isPending}
-              error={guardianUpdateMutation.error}
+              isAddingGuardian={isAddingGuardian}
+              isSaving={guardianUpdateMutation.isPending || guardianCreateMutation.isPending || guardianRemoveMutation.isPending}
+              error={guardianUpdateMutation.error ?? guardianCreateMutation.error ?? guardianRemoveMutation.error}
               onCancelEdit={() => setEditingGuardianId(null)}
               onEditGuardian={setEditingGuardianId}
               onSaveGuardian={(id, body) => guardianUpdateMutation.mutate({ guardianId: id, body })}
+              onAddGuardian={() => setIsAddingGuardian(true)}
+              onCancelAdd={() => setIsAddingGuardian(false)}
+              onCreateGuardian={(body) => guardianCreateMutation.mutate(body)}
+              onRemoveGuardian={(guardianId, reason, newPrimaryGuardianId) =>
+                guardianRemoveMutation.mutate({ guardianId, reason, newPrimaryGuardianId })
+              }
             />
           </TabsContent>
           <TabsContent value="Academics" className="mt-0">

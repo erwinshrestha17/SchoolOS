@@ -379,7 +379,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 
 function getDocumentAttention(documents: StudentDocument[]) {
   return documents.filter((document) => {
-    if (document.status === 'REJECTED' || document.status === 'ARCHIVED') return true;
+    if (document.status === 'REJECTED' || document.status === 'ARCHIVED' || document.status === 'ACTIVE') return true;
     const expiry = document.expiryDate ? new Date(document.expiryDate) : null;
     if (!expiry || Number.isNaN(expiry.getTime())) return false;
     const daysUntilExpiry = Math.ceil((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
@@ -405,7 +405,8 @@ function formatStatus(value: string) {
 
 function formatClassLabel(value?: string | null) {
   if (!value) return 'Class not assigned';
-  return value.trim().toLowerCase().startsWith('class ')
-    ? value.trim()
-    : `Class ${value.trim()}`;
+  const normalized = value.trim().replace(/^class\s+class\s+/i, 'Class ');
+  return normalized.toLowerCase().startsWith('class ')
+    ? normalized
+    : `Class ${normalized}`;
 }

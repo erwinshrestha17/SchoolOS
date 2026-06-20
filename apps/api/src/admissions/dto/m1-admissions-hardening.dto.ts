@@ -7,6 +7,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -164,6 +165,10 @@ export class RemoveStudentGuardianAccessDto {
   @IsOptional()
   @IsBoolean()
   confirmFileAccessReview?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  newPrimaryGuardianId?: string;
 }
 
 export class GenerateTransferCertificateDto {

@@ -466,6 +466,31 @@ export class M1AdmissionsHardeningService {
       throw new NotFoundException('Guardian link not found in this tenant');
     }
 
+    const activeLinks = await this.prisma.studentGuardian.findMany({
+      where: { tenantId: actor.tenantId, studentId },
+      select: { id: true, guardianId: true, isPrimary: true },
+      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+    });
+    if (activeLinks.length <= 1) {
+      throw new BadRequestException(
+        'A student must have at least one guardian.',
+      );
+    }
+    if (link.isPrimary) {
+      const replacement = dto.newPrimaryGuardianId
+        ? activeLinks.find(
+            (candidate) =>
+              candidate.guardianId === dto.newPrimaryGuardianId &&
+              candidate.guardianId !== guardianId,
+          )
+        : null;
+      if (!replacement) {
+        throw new BadRequestException(
+          'Choose another primary guardian before removing this one.',
+        );
+      }
+    }
+
     const [documents, generatedDocuments, registryFiles] = await Promise.all([
       this.prisma.studentDocument.findMany({
         where: { tenantId: actor.tenantId, studentId },
@@ -485,6 +510,20 @@ export class M1AdmissionsHardeningService {
     ]);
 
     await this.prisma.$transaction(async (tx) => {
+      if (link.isPrimary && dto.newPrimaryGuardianId) {
+        await tx.studentGuardian.updateMany({
+          where: { tenantId: actor.tenantId, studentId },
+          data: { isPrimary: false },
+        });
+        await tx.studentGuardian.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId,
+            guardianId: dto.newPrimaryGuardianId,
+          },
+          data: { isPrimary: true },
+        });
+      }
       const removed = await tx.studentGuardian.deleteMany({
         where: {
           id: link.id,

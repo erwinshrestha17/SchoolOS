@@ -1,6 +1,7 @@
 'use client';
 
 import type { OperationalNextAction } from '@schoolos/core';
+import { formatBsDateTime } from '@schoolos/core';
 import type { ActionMenuItem } from '../../components/ui/action-menu';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
@@ -14,6 +15,7 @@ import {
   SummaryStatusBadge,
 } from '../../components/ui/operational-summary';
 import { api } from '../../lib/api';
+import { formatSchoolDate } from '../../lib/date-utils';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -42,11 +44,11 @@ export default function DashboardPage() {
           dashboardQuery.data ? (
             <>
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600">
-                School day: {formatSchoolDay(dashboardQuery.data.schoolDay)}
+                School day: {formatSchoolDate(dashboardQuery.data.schoolDay)}
               </span>
               <SummaryStatusBadge status={dashboardQuery.data.status} />
               <span className="text-xs font-medium text-slate-500">
-                Updated {formatUpdatedAt(dashboardQuery.data.generatedAt)}
+                Updated {formatBsDateTime(dashboardQuery.data.generatedAt)}
               </span>
             </>
           ) : undefined
@@ -62,23 +64,4 @@ export default function DashboardPage() {
       {dashboardQuery.data ? <DashboardCommandCenter dashboard={dashboardQuery.data} /> : null}
     </div>
   );
-}
-
-function formatSchoolDay(value: string) {
-  const date = new Date(`${value}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('en-NP', {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-  }).format(date);
-}
-
-function formatUpdatedAt(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'recently';
-  return new Intl.DateTimeFormat('en-NP', {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(date);
 }

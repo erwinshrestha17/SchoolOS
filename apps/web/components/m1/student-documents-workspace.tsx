@@ -1,6 +1,6 @@
 'use client';
 
-import type { StudentDocument, StudentProfile } from '@schoolos/core';
+import { formatBsDate, formatBsDateTime, type StudentDocument, type StudentProfile } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, FileCheck2, FileClock, FileWarning, Search, ShieldCheck, Upload } from 'lucide-react';
 import { useDeferredValue, useRef, useState } from 'react';
@@ -30,6 +30,7 @@ export function StudentDocumentsWorkspace() {
   const [toast, setToast] = useState<{ tone: 'success' | 'danger'; title: string; description: string } | null>(null);
   const [guardianToRemove, setGuardianToRemove] = useState<{ id: string; name: string } | null>(null);
   const [guardianRemovalReason, setGuardianRemovalReason] = useState('');
+  const [reviewReason, setReviewReason] = useState('');
   const searchParams = useSearchParams();
 
   const studentsQuery = useQuery({
@@ -52,7 +53,7 @@ export function StudentDocumentsWorkspace() {
   });
 
   useEffect(() => {
-    const requestedId = searchParams.get('student');
+    const requestedId = searchParams.get('studentId') ?? searchParams.get('student');
     if (!requestedId || selectedStudent?.id === requestedId) return;
     const requestedStudent = studentsQuery.data?.items.find((student) => student.id === requestedId);
     if (requestedStudent) setSelectedStudent(requestedStudent);
@@ -72,7 +73,7 @@ export function StudentDocumentsWorkspace() {
       });
     },
     onSuccess: () => {
-      setToast({ tone: 'success', title: 'Document uploaded', description: 'The file was stored through the protected student document flow.' });
+      setToast({ tone: 'success', title: 'Document uploaded', description: 'The file is pending school review and is not complete until verified.' });
       void queryClient.invalidateQueries({ queryKey: ['student-profile', selectedStudent?.id] });
       void queryClient.invalidateQueries({ queryKey: ['student-document-history', selectedStudent?.id] });
     },
@@ -80,8 +81,9 @@ export function StudentDocumentsWorkspace() {
   });
 
   const verifyMutation = useMutation({
-    mutationFn: ({ documentId, status }: { documentId: string; status: 'VERIFIED' | 'REJECTED' }) => api.verifyStudentDocument(documentId, { status, notes: status === 'VERIFIED' ? 'Verified from M1 document workspace' : 'Rejected during document review' }),
+    mutationFn: ({ documentId, status, notes }: { documentId: string; status: 'VERIFIED' | 'REJECTED'; notes: string }) => api.verifyStudentDocument(documentId, { status, notes }),
     onSuccess: () => {
+      setReviewReason('');
       setToast({ tone: 'success', title: 'Verification updated', description: 'The backend recorded the document review and audit metadata.' });
       void queryClient.invalidateQueries({ queryKey: ['student-profile', selectedStudent?.id] });
       void queryClient.invalidateQueries({ queryKey: ['student-document-history', selectedStudent?.id] });
@@ -94,6 +96,7 @@ export function StudentDocumentsWorkspace() {
       return api.removeStudentGuardianAccess(selectedStudent.id, guardianToRemove.id, {
         reason: guardianRemovalReason,
         confirmFileAccessReview: true,
+        newPrimaryGuardianId: profileQuery.data?.guardians.find((guardian) => guardian.id !== guardianToRemove.id)?.id ?? null,
       });
     },
     onSuccess: () => {
@@ -111,7 +114,7 @@ export function StudentDocumentsWorkspace() {
 
   const documents = profileQuery.data?.documents ?? [];
   const verified = documents.filter((document) => document.status === 'VERIFIED').length;
-  const pending = documents.filter((document) => !document.status || document.status === 'PENDING' || document.status === 'UPLOADED').length;
+  const pending = documents.filter((document) => !document.status || document.status === 'ACTIVE' || document.status === 'PENDING' || document.status === 'UPLOADED').length;
   const rejected = documents.filter((document) => document.status === 'REJECTED').length;
   const expiring = documents.filter((document) => document.expiryDate && new Date(document.expiryDate).getTime() < Date.now() + 30 * 86400000).length;
 
@@ -158,7 +161,7 @@ export function StudentDocumentsWorkspace() {
 
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="border-b border-slate-100 p-4"><h2 className="text-base font-black text-slate-950">Document Vault</h2><p className="mt-1 text-xs text-slate-500">Protected files linked to this student through File Registry.</p></div>
-                {documents.length === 0 ? <EmptyState title="No documents uploaded" description="Upload the first protected document for this student." /> : <div className="overflow-x-auto"><table className="min-w-[760px] w-full text-left text-sm"><thead className="bg-slate-50 text-[0.68rem] font-black uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Document Type</th><th className="px-4 py-3">File</th><th className="px-4 py-3">Uploaded On</th><th className="px-4 py-3">Expiry Date</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Actions</th></tr></thead><tbody className="divide-y divide-slate-100">{documents.map((document) => <tr key={document.id} onClick={() => setSelectedDocument(document)} className={`cursor-pointer ${selectedDocument?.id === document.id ? 'bg-primary-50' : 'hover:bg-slate-50'}`}><td className="px-4 py-3 font-bold text-slate-900">{document.kind.replace(/_/g, ' ')}</td><td className="max-w-52 truncate px-4 py-3 text-slate-600">{document.fileName}</td><td className="px-4 py-3 text-slate-600">{new Date(document.uploadedAt).toLocaleDateString()}</td><td className="px-4 py-3 text-slate-600">{document.expiryDate ? new Date(document.expiryDate).toLocaleDateString() : '—'}</td><td className="px-4 py-3"><StatusBadge status={document.status ?? 'PENDING'} /></td><td className="px-4 py-3"><ProtectedFileButton fileAssetId={document.fileId} fileName={document.fileName} action="preview" size="sm" showStatus={false}>Preview</ProtectedFileButton></td></tr>)}</tbody></table></div>}
+                {documents.length === 0 ? <EmptyState title="No documents uploaded" description="Upload the first protected document for this student." /> : <div className="overflow-x-auto"><table className="min-w-[760px] w-full text-left text-sm"><thead className="bg-slate-50 text-[0.68rem] font-black uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Document Type</th><th className="px-4 py-3">File</th><th className="px-4 py-3">Uploaded On</th><th className="px-4 py-3">Expiry Date</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Actions</th></tr></thead><tbody className="divide-y divide-slate-100">{documents.map((document) => <tr key={document.id} onClick={() => setSelectedDocument(document)} className={`cursor-pointer ${selectedDocument?.id === document.id ? 'bg-primary-50' : 'hover:bg-slate-50'}`}><td className="px-4 py-3 font-bold text-slate-900">{document.kind.replace(/_/g, ' ')}</td><td className="max-w-52 truncate px-4 py-3 text-slate-600">{document.fileName}</td><td className="px-4 py-3 text-slate-600">{formatBsDate(document.uploadedAt)}</td><td className="px-4 py-3 text-slate-600">{document.expiryDate ? formatBsDate(document.expiryDate) : '—'}</td><td className="px-4 py-3"><StatusBadge status={formatDocumentStatus(document.status)} /></td><td className="px-4 py-3"><ProtectedFileButton fileAssetId={document.fileId} fileName={document.fileName} action="preview" size="sm" showStatus={false}>View protected file</ProtectedFileButton></td></tr>)}</tbody></table></div>}
               </section>
             </>
           )}
@@ -169,9 +172,11 @@ export function StudentDocumentsWorkspace() {
           <div className="border-b border-slate-100 py-4"><div className="flex items-center justify-between"><h3 className="text-xs font-black uppercase tracking-wide text-slate-500">Expiry reminders</h3><StatusBadge status={`${expiryTemplatesQuery.data?.filter((item) => item.isActive).length ?? 0} ACTIVE`} tone="info" /></div>{expiryTemplatesQuery.isError ? <p className="mt-2 text-xs font-bold text-danger-700">Expiry policies could not load.</p> : (expiryTemplatesQuery.data?.length ?? 0) === 0 ? <p className="mt-2 text-xs text-slate-500">No document-expiry reminder templates configured.</p> : <div className="mt-2 space-y-2">{expiryTemplatesQuery.data?.slice(0, 4).map((template) => <div key={template.id} className="rounded-lg bg-slate-50 p-2 text-xs"><p className="font-bold text-slate-800">{template.reminderStatus} · {template.channel}</p><p className="mt-0.5 text-slate-500">{template.daysBeforeExpiry ? `${template.daysBeforeExpiry} days before expiry` : 'At expiry'} · {template.isActive ? 'Active' : 'Inactive'}</p></div>)}</div>}</div>
           {!selectedDocument ? <p className="py-10 text-center text-sm text-slate-500">Select a document to view protected file controls, metadata, verification, and audit history.</p> : <div className="space-y-4 pt-4">
             <div><p className="text-xs font-black uppercase tracking-wide text-slate-500">{selectedDocument.kind.replace(/_/g, ' ')}</p><p className="mt-1 break-all text-sm font-bold text-slate-900">{selectedDocument.fileName}</p></div>
-            <dl className="space-y-2 rounded-xl bg-slate-50 p-3 text-xs"><div className="flex justify-between gap-3"><dt className="text-slate-500">Status</dt><dd><StatusBadge status={selectedDocument.status ?? 'PENDING'} /></dd></div><div className="flex justify-between gap-3"><dt className="text-slate-500">Size</dt><dd className="font-bold">{Math.ceil(selectedDocument.sizeBytes / 1024)} KB</dd></div><div className="flex justify-between gap-3"><dt className="text-slate-500">Uploaded</dt><dd className="font-bold">{new Date(selectedDocument.uploadedAt).toLocaleString()}</dd></div></dl>
-            <div className="grid gap-2"><ProtectedFileButton fileAssetId={selectedDocument.fileId} fileName={selectedDocument.fileName} action="preview" className="w-full">Open protected preview</ProtectedFileButton><ProtectedFileButton fileAssetId={selectedDocument.fileId} fileName={selectedDocument.fileName} action="download" className="w-full">Download protected file</ProtectedFileButton><Button type="button" variant="outline" onClick={() => verifyMutation.mutate({ documentId: selectedDocument.id, status: 'VERIFIED' })} disabled={verifyMutation.isPending}>Verify document</Button><Button type="button" variant="outline" onClick={() => verifyMutation.mutate({ documentId: selectedDocument.id, status: 'REJECTED' })} disabled={verifyMutation.isPending}>Reject document</Button></div>
-            <div className="border-t border-slate-100 pt-4"><h3 className="text-xs font-black uppercase tracking-wide text-slate-500">Audit history</h3><div className="mt-3 space-y-3">{(historyQuery.data ?? []).filter((entry) => !entry.documentId || entry.documentId === selectedDocument.id).slice(0, 6).map((entry) => <div key={entry.id} className="border-l-2 border-primary-200 pl-3 text-xs"><p className="font-bold text-slate-800">{entry.action.replace(/_/g, ' ')}</p><p className="mt-0.5 text-slate-500">{new Date(entry.createdAt).toLocaleString()} · {entry.performedBy}</p></div>)}{historyQuery.data?.length === 0 ? <p className="text-xs text-slate-500">No audit events returned.</p> : null}</div></div>
+            <dl className="space-y-2 rounded-xl bg-slate-50 p-3 text-xs"><div className="flex justify-between gap-3"><dt className="text-slate-500">Status</dt><dd><StatusBadge status={formatDocumentStatus(selectedDocument.status)} /></dd></div><div className="flex justify-between gap-3"><dt className="text-slate-500">Size</dt><dd className="font-bold">{Math.ceil(selectedDocument.sizeBytes / 1024)} KB</dd></div><div className="flex justify-between gap-3"><dt className="text-slate-500">Uploaded</dt><dd className="font-bold">{formatBsDateTime(selectedDocument.uploadedAt)}</dd></div></dl>
+            {selectedDocument.status === 'REJECTED' && selectedDocument.notes ? <p className="rounded-xl border border-danger-100 bg-danger-50 p-3 text-xs font-semibold text-danger-700">Reviewer note: {latestReviewNote(selectedDocument.notes)}</p> : null}
+            <label className="block text-xs font-bold text-slate-700">Review note / rejection reason<textarea rows={3} value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} placeholder="Record review notes. Required when rejecting." className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
+            <div className="grid gap-2"><ProtectedFileButton fileAssetId={selectedDocument.fileId} fileName={selectedDocument.fileName} action="preview" className="w-full">Open protected preview</ProtectedFileButton><ProtectedFileButton fileAssetId={selectedDocument.fileId} fileName={selectedDocument.fileName} action="download" className="w-full">Download protected file</ProtectedFileButton><Button type="button" variant="outline" onClick={() => verifyMutation.mutate({ documentId: selectedDocument.id, status: 'VERIFIED', notes: reviewReason.trim() || 'Verified from M1 document workspace' })} disabled={verifyMutation.isPending}>Verify document</Button><Button type="button" variant="outline" onClick={() => verifyMutation.mutate({ documentId: selectedDocument.id, status: 'REJECTED', notes: reviewReason.trim() })} disabled={verifyMutation.isPending || reviewReason.trim().length < 5}>Reject document</Button></div>
+            <div className="border-t border-slate-100 pt-4"><h3 className="text-xs font-black uppercase tracking-wide text-slate-500">Audit history</h3><div className="mt-3 space-y-3">{(historyQuery.data ?? []).filter((entry) => !entry.documentId || entry.documentId === selectedDocument.id).slice(0, 6).map((entry) => <div key={entry.id} className="border-l-2 border-primary-200 pl-3 text-xs"><p className="font-bold text-slate-800">{entry.action.replace(/_/g, ' ')}</p><p className="mt-0.5 text-slate-500">{formatBsDateTime(entry.createdAt)} · {entry.performedBy}</p></div>)}{historyQuery.data?.length === 0 ? <p className="text-xs text-slate-500">No audit events returned.</p> : null}</div></div>
           </div>}
         </aside>
       </div>
@@ -191,4 +196,17 @@ export function StudentDocumentsWorkspace() {
       </ConfirmDialog>
     </div>
   );
+}
+
+function formatDocumentStatus(status?: string | null) {
+  if (!status || status === 'ACTIVE') return 'Pending school review';
+  return status.replace(/_/g, ' ');
+}
+
+function latestReviewNote(value: string) {
+  return value
+    .split('\n')
+    .map((line) => line.replace(/^Verification Note:\s*/i, '').trim())
+    .filter(Boolean)
+    .at(-1) ?? value;
 }

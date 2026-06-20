@@ -1,6 +1,6 @@
 'use client';
 
-import { StudentProfileInvoice } from '@schoolos/core';
+import { formatBsDate, type StudentProfileInvoice } from '@schoolos/core';
 import { SectionCard } from '@/components/ui/section-card';
 import { Wallet, Receipt, ChevronRight, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -22,9 +22,7 @@ const formatMoney = (amount: number) => {
 
 const formatDate = (date: string | Date) => {
   try {
-    return new Intl.DateTimeFormat('en-NP', {
-      dateStyle: 'medium',
-    }).format(new Date(date));
+    return formatBsDate(date);
   } catch {
     return 'Invoice date not recorded';
   }

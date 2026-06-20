@@ -41,6 +41,7 @@ export class StudentRecordsService {
         notes: true,
         expiryDate: true,
         verifiedAt: true,
+        verifiedById: true,
         uploadedById: true,
         createdAt: true,
       },
@@ -62,6 +63,7 @@ export class StudentRecordsService {
       notes: document.notes,
       expiryDate: document.expiryDate?.toISOString() ?? null,
       verifiedAt: document.verifiedAt?.toISOString() ?? null,
+      verifiedById: document.verifiedById,
       uploadedById: document.uploadedById,
       uploadedAt: document.createdAt.toISOString(),
     }));
@@ -137,6 +139,7 @@ export class StudentRecordsService {
         provider: stored.provider,
         objectKey: stored.objectKey,
         publicUrl: stored.publicUrl,
+        status: 'ACTIVE',
         uploadedById: actor.userId,
         notes: dto.notes,
         expiryDate,
@@ -172,7 +175,7 @@ export class StudentRecordsService {
       data: {
         tenantId: actor.tenantId,
         documentId: document.id,
-        action: 'UPLOAD',
+        action: 'UPLOAD_PENDING_REVIEW',
         documentTitle: document.title,
         documentKind: document.kind,
         performedBy: actor.userId,
@@ -195,6 +198,7 @@ export class StudentRecordsService {
         studentId: student.id,
         kind: document.kind,
         fileName: document.fileName,
+        status: 'ACTIVE',
         expiryDate: expiryDate?.toISOString() ?? null,
       },
     });
@@ -432,14 +436,18 @@ export class StudentRecordsService {
     if (!document) {
       throw new NotFoundException('Document not found');
     }
+    if (status === 'REJECTED' && !notes?.trim()) {
+      throw new BadRequestException('Rejection reason is required.');
+    }
+    const reviewedAt = new Date();
 
     await this.prisma.$transaction(async (tx) => {
       await tx.studentDocument.update({
         where: { id: documentId },
         data: {
           status,
-          verifiedAt: status === 'VERIFIED' ? new Date() : null,
-          verifiedById: status === 'VERIFIED' ? actor.userId : null,
+          verifiedAt: status === 'VERIFIED' ? reviewedAt : null,
+          verifiedById: actor.userId,
           notes: notes
             ? `${document.notes ?? ''}\nVerification Note: ${notes}`.trim()
             : document.notes,
@@ -455,6 +463,11 @@ export class StudentRecordsService {
           documentKind: document.kind,
           performedBy: actor.userId,
           reason: notes,
+          metadata: {
+            reviewedById: actor.userId,
+            reviewedAt: reviewedAt.toISOString(),
+            status,
+          },
         },
       });
     });

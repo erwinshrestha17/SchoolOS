@@ -1,6 +1,7 @@
 export type AcademicCalendarYearSettings = {
   id: string;
   name: string;
+  displayName?: string;
   startsOnBs: string;
   endsOnBs: string;
   isCurrent: boolean;
@@ -12,6 +13,7 @@ export type SchoolCalendarDaySettings = {
   isWorkingDay: boolean;
   label: string | null;
   holidayType: string | null;
+  category?: 'WORKING_DAY' | 'HOLIDAY' | 'WORKING_DAY_EXCEPTION' | 'SCHOOL_EVENT' | 'CLOSURE';
 };
 
 export type AcademicCalendarSettings = {

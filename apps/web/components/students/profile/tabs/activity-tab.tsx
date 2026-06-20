@@ -1,6 +1,6 @@
 'use client';
 
-import { ActivityPost } from '@schoolos/core';
+import { formatBsDate, type ActivityPost } from '@schoolos/core';
 import { SectionCard } from '@/components/ui/section-card';
 import { Images } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -11,9 +11,7 @@ type ActivityTabProps = {
 
 const formatDate = (date: string | Date) => {
   try {
-    return new Intl.DateTimeFormat('en-NP', {
-      dateStyle: 'medium',
-    }).format(new Date(date));
+    return formatBsDate(date);
   } catch {
     return 'Publish date not recorded';
   }

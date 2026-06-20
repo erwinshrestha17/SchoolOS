@@ -1,6 +1,6 @@
 'use client';
 
-import type { StudentProfileDetail } from '@schoolos/core';
+import { formatBsDate, type StudentProfileDetail } from '@schoolos/core';
 import { Badge } from '@/components/ui/badge';
 import { SectionCard } from '@/components/ui/section-card';
 import { CalendarCheck, GraduationCap, Hash, Languages, UserRound } from 'lucide-react';
@@ -72,6 +72,7 @@ export function ProfileTab({ profile }: { profile: StudentProfileDetail }) {
               {currentEnrollment.status ? (
                 <EnrollmentRow label="Enrollment status" value={formatStatus(currentEnrollment.status)} />
               ) : null}
+              <EnrollmentRow label="Class Teacher" value={currentEnrollment.classTeacher?.fullName || student.classTeacher?.fullName || 'Not assigned'} />
               <EnrollmentRow label="Admission date" value={formatDate(currentEnrollment.admissionDate)} />
               {currentEnrollment.rollNumber ? (
                 <EnrollmentRow label="Roll number" value={currentEnrollment.rollNumber.toString()} />
@@ -127,7 +128,7 @@ function EnrollmentRow({ label, value }: { label: string; value: string }) {
 
 function formatDate(value: string | Date) {
   try {
-    return new Intl.DateTimeFormat('en-NP', { dateStyle: 'medium' }).format(new Date(value));
+    return formatBsDate(value);
   } catch {
     return 'Date not recorded';
   }
@@ -143,7 +144,8 @@ function formatStatus(value: string) {
 
 function formatClassLabel(value?: string | null) {
   if (!value) return 'Class not assigned';
-  return value.trim().toLowerCase().startsWith('class ')
-    ? value.trim()
-    : `Class ${value.trim()}`;
+  const normalized = value.trim().replace(/^class\s+class\s+/i, 'Class ');
+  return normalized.toLowerCase().startsWith('class ')
+    ? normalized
+    : `Class ${normalized}`;
 }

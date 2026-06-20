@@ -17,6 +17,10 @@ export const academicCalendarSettingsApi = {
     `${basePath}/academic-years`,
     { method: 'POST', json: body },
   ),
+  setCurrentAcademicYear: (academicYearId: string) => request<AcademicCalendarYearSettings>(
+    `${basePath}/academic-years/${encodeURIComponent(academicYearId)}/set-current`,
+    { method: 'POST' },
+  ),
   upsertCalendarDay: (body: UpsertSchoolCalendarDayPayload) => request<SchoolCalendarDaySettings>(
     `${basePath}/days`,
     { method: 'POST', json: body },

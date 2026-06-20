@@ -15,9 +15,11 @@ import {
   StudentQrStatus,
 } from '@prisma/client';
 import {
+  formatBsAcademicYear,
   StudentAttendanceHistory,
   StudentAttendanceHistorySummary,
   StudentModuleSummary,
+  toBsDateFromGregorian,
 } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
@@ -34,6 +36,7 @@ import { StorageService } from '../storage/storage.service';
 import { UsageService } from '../usage/usage.service';
 import { UsersService } from '../users/users.service';
 import { ArchiveStudentDto } from './dto/archive-student.dto';
+import { CreateStudentGuardianDto } from './dto/create-student-guardian.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { ListStudentsDto } from './dto/list-students.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
@@ -533,7 +536,17 @@ export class StudentsService {
       },
       include: {
         class: true,
-        sectionRef: true,
+        sectionRef: {
+          include: {
+            classTeacher: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
         guardianLinks: { include: { guardian: true } },
         siblingMemberships: true,
       },
@@ -558,7 +571,17 @@ export class StudentsService {
       },
       include: {
         class: true,
-        sectionRef: true,
+        sectionRef: {
+          include: {
+            classTeacher: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
         guardianLinks: {
           include: {
             guardian: true,
@@ -667,6 +690,18 @@ export class StudentsService {
       )) || [];
 
     const latestEnrollment = (student.enrollments || [])[0] ?? null;
+    const classTeacher = student.sectionRef?.classTeacher
+      ? {
+          id: student.sectionRef.classTeacher.id,
+          fullName: [
+            student.sectionRef.classTeacher.firstName,
+            student.sectionRef.classTeacher.lastName,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .trim(),
+        }
+      : null;
 
     let photoUrl = student.photoUrl;
     if (photoUrl && !photoUrl.startsWith('http')) {
@@ -748,12 +783,17 @@ export class StudentsService {
                 student.qrCredentials[0].lastScannedAt?.toISOString() ?? null,
             }
           : null,
+        classTeacher,
       },
       guardians,
       enrollments: (student.enrollments || []).map((enrollment) => ({
         id: enrollment.id,
         academicYearId: enrollment.academicYearId,
-        academicYear: enrollment.academicYear.name,
+        academicYear: enrollment.academicYear?.startsOn
+          ? formatBsAcademicYear(
+              toBsDateFromGregorian(enrollment.academicYear.startsOn),
+            )
+          : enrollment.academicYear?.name,
         classId: enrollment.classId,
         className: enrollment.class.name,
         sectionId: enrollment.sectionId,
@@ -761,12 +801,15 @@ export class StudentsService {
         rollNumber: enrollment.rollNumber,
         status: enrollment.status,
         admissionDate: enrollment.admissionDate.toISOString(),
+        classTeacher:
+          enrollment.sectionId === student.sectionId ? classTeacher : null,
       })),
       documents: [
         ...(student.documents || []).map((document) => ({
           id: document.id,
           studentId: document.studentId,
           kind: document.kind,
+          status: document.status,
           title: document.title,
           fileName: document.fileName,
           contentType: document.contentType,
@@ -774,6 +817,11 @@ export class StudentsService {
           provider: document.provider,
           objectKey: document.objectKey,
           publicUrl: document.publicUrl,
+          notes: document.notes,
+          expiryDate: document.expiryDate?.toISOString() ?? null,
+          verifiedAt: document.verifiedAt?.toISOString() ?? null,
+          verifiedById: document.verifiedById,
+          uploadedById: document.uploadedById,
           uploadedAt: document.createdAt.toISOString(),
           isLegacy: true,
         })),
@@ -1272,6 +1320,15 @@ export class StudentsService {
       );
     }
 
+    const siblingLinks = await this.prisma.studentGuardian.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        studentId,
+      },
+      select: { id: true, guardianId: true, isPrimary: true },
+      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+    });
+
     if (dto.primaryPhone && dto.primaryPhone !== link.guardian.primaryPhone) {
       const phoneOwner = await this.prisma.guardian.findFirst({
         where: {
@@ -1286,6 +1343,12 @@ export class StudentsService {
           'Guardian phone number is already used in this tenant',
         );
       }
+    }
+
+    if (dto.isPrimary === false && link.isPrimary) {
+      throw new BadRequestException(
+        'Choose another primary guardian before removing this one.',
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -1305,9 +1368,6 @@ export class StudentsService {
         data: {
           ...(dto.fullName !== undefined
             ? { fullName: assertNonEmpty(dto.fullName, 'fullName') }
-            : {}),
-          ...(dto.relation !== undefined
-            ? { relation: assertNonEmpty(dto.relation, 'relation') }
             : {}),
           ...(dto.primaryPhone !== undefined
             ? { primaryPhone: assertNonEmpty(dto.primaryPhone, 'primaryPhone') }
@@ -1336,7 +1396,9 @@ export class StudentsService {
           ...(dto.relation !== undefined
             ? { relation: assertNonEmpty(dto.relation, 'relation') }
             : {}),
-          ...(dto.isPrimary !== undefined ? { isPrimary: dto.isPrimary } : {}),
+          ...(dto.isPrimary !== undefined
+            ? { isPrimary: dto.isPrimary || siblingLinks.length === 1 }
+            : {}),
         },
       });
     });
@@ -1360,6 +1422,135 @@ export class StudentsService {
         relation: dto.relation ?? link.relation ?? link.guardian.relation,
         primaryPhone: dto.primaryPhone ?? link.guardian.primaryPhone,
         isPrimary: dto.isPrimary ?? link.isPrimary,
+      },
+    });
+
+    return this.getStudentProfile(studentId, actor);
+  }
+
+  async addStudentGuardian(
+    studentId: string,
+    dto: CreateStudentGuardianDto,
+    actor: AuthContext,
+  ) {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId: actor.tenantId },
+      select: { id: true },
+    });
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const existingLinks = await this.prisma.studentGuardian.findMany({
+      where: { tenantId: actor.tenantId, studentId },
+      select: { id: true, guardianId: true, isPrimary: true },
+      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+    });
+    if (existingLinks.length >= 2) {
+      throw new BadRequestException('This student already has two guardians.');
+    }
+
+    const relation = assertNonEmpty(dto.relation, 'relation');
+    const shouldBePrimary =
+      existingLinks.length === 0 || dto.isPrimary === true;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      let guardian: {
+        id: string;
+        fullName: string;
+        primaryPhone: string;
+        relation: string;
+      } | null = null;
+
+      if (dto.guardianId) {
+        guardian = await tx.guardian.findFirst({
+          where: { id: dto.guardianId, tenantId: actor.tenantId },
+          select: {
+            id: true,
+            fullName: true,
+            primaryPhone: true,
+            relation: true,
+          },
+        });
+        if (!guardian) {
+          throw new NotFoundException('Guardian not found in this tenant');
+        }
+      } else if (dto.primaryPhone) {
+        guardian = await tx.guardian.findFirst({
+          where: { tenantId: actor.tenantId, primaryPhone: dto.primaryPhone },
+          select: {
+            id: true,
+            fullName: true,
+            primaryPhone: true,
+            relation: true,
+          },
+        });
+      }
+
+      if (!guardian) {
+        if (!dto.fullName || !dto.primaryPhone) {
+          throw new BadRequestException(
+            'Guardian full name and primary phone are required.',
+          );
+        }
+        guardian = await tx.guardian.create({
+          data: {
+            tenantId: actor.tenantId,
+            fullName: assertNonEmpty(dto.fullName, 'fullName'),
+            relation,
+            primaryPhone: assertNonEmpty(dto.primaryPhone, 'primaryPhone'),
+            secondaryPhone: normalizeNullableString(dto.secondaryPhone),
+            email: normalizeNullableString(dto.email),
+            occupation: normalizeNullableString(dto.occupation),
+            homeAddress: normalizeNullableString(dto.homeAddress),
+            wardNumber: normalizeNullableString(dto.wardNumber),
+          },
+          select: {
+            id: true,
+            fullName: true,
+            primaryPhone: true,
+            relation: true,
+          },
+        });
+      }
+
+      if (existingLinks.some((link) => link.guardianId === guardian!.id)) {
+        throw new ConflictException(
+          'This guardian is already linked to the student.',
+        );
+      }
+
+      if (shouldBePrimary) {
+        await tx.studentGuardian.updateMany({
+          where: { tenantId: actor.tenantId, studentId },
+          data: { isPrimary: false },
+        });
+      }
+
+      const link = await tx.studentGuardian.create({
+        data: {
+          tenantId: actor.tenantId,
+          studentId,
+          guardianId: guardian.id,
+          relation,
+          isPrimary: shouldBePrimary,
+        },
+      });
+
+      return { guardian, link };
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'student_guardian',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: result.link.id,
+      after: {
+        studentId,
+        guardianId: result.guardian.id,
+        relation,
+        isPrimary: result.link.isPrimary,
       },
     });
 

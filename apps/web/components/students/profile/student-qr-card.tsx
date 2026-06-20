@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { StudentProfile } from '@schoolos/core';
+import { formatBsDate, type StudentProfile } from '@schoolos/core';
 import { api } from '@/lib/api';
 import type { StudentQrScanAudit } from '@/lib/api/students';
 import { SectionCard } from '@/components/ui/section-card';
@@ -169,7 +169,7 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
             {currentCredential?.lastScannedAt && (
               <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/30 px-4 py-2.5 text-xs text-slate-500">
                 <ShieldCheck size={14} className="text-success-500" />
-                <span>Last scanned {new Date(currentCredential.lastScannedAt).toLocaleDateString('en-NP', { dateStyle: 'medium' })}</span>
+                <span>Last scanned {formatBsDate(currentCredential.lastScannedAt)}</span>
               </div>
             )}
             <div className="grid grid-cols-2 gap-3">
@@ -272,7 +272,7 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
                   <div>
                     <StatusBadge status={item.status} />
                     <p className="mt-1 text-[0.65rem] text-slate-500">
-                      Issued {new Date(item.createdAt).toLocaleDateString('en-NP', { dateStyle: 'medium' })}
+                      Issued {formatBsDate(item.createdAt)}
                     </p>
                   </div>
                   {(item.rotateReason || item.revokeReason) && (
@@ -363,9 +363,7 @@ function QrScanAuditRow({ entry }: { entry: StudentQrScanAudit }) {
         </p>
       </div>
       <span className="shrink-0 text-[0.62rem] font-bold text-slate-400">
-        {new Date(entry.timestamp).toLocaleDateString('en-NP', {
-          dateStyle: 'medium',
-        })}
+        {formatBsDate(entry.timestamp)}
       </span>
     </div>
   );

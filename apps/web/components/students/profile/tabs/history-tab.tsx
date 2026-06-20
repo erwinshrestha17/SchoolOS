@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { StudentProfileDetail } from '@schoolos/core';
+import { formatBsDateTime, type StudentProfileDetail } from '@schoolos/core';
 import { api } from '@/lib/api';
 import { SectionCard } from '@/components/ui/section-card';
 import { LoadingState } from '@/components/ui/loading-state';
@@ -19,10 +19,7 @@ import { Badge } from '@/components/ui/badge';
 
 const formatDate = (date: string | Date) => {
   try {
-    return new Intl.DateTimeFormat('en-NP', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(new Date(date));
+    return formatBsDateTime(date);
   } catch {
     return 'History date not recorded';
   }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import type { StudentProfileDetail } from '@schoolos/core';
+import { formatBsDate, type StudentProfileDetail } from '@schoolos/core';
 import { api } from '@/lib/api';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatCard } from '@/components/ui/stat-card';
@@ -15,9 +15,7 @@ type AttendanceTabProps = {
 };
 
 const formatDate = (date: string | Date) => {
-  return new Intl.DateTimeFormat('en-NP', {
-    dateStyle: 'medium',
-  }).format(new Date(date));
+  return formatBsDate(date);
 };
 
 export function AttendanceTab({ profile, onBackToProfile }: AttendanceTabProps) {

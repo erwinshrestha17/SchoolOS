@@ -6,7 +6,9 @@ import {
 } from '@nestjs/common';
 import {
   NEPAL_TIME_ZONE,
+  formatBsAcademicYear,
   formatBsDateForInput,
+  parseBsDateInput,
   toGregorianDateFromBs,
   zonedNepalDateTimeToUtc,
   type AcademicCalendarSettings,
@@ -34,10 +36,12 @@ export class AcademicCalendarSettingsService {
     });
     const selected = academicYearId
       ? academicYears.find((year) => year.id === academicYearId)
-      : academicYears.find((year) => year.isCurrent) ?? academicYears[0];
+      : (academicYears.find((year) => year.isCurrent) ?? academicYears[0]);
 
     if (academicYearId && !selected) {
-      throw new NotFoundException('Academic year was not found in this school.');
+      throw new NotFoundException(
+        'Academic year was not found in this school.',
+      );
     }
 
     const calendarDays = selected
@@ -56,6 +60,7 @@ export class AcademicCalendarSettingsService {
       academicYears: academicYears.map((year) => ({
         id: year.id,
         name: year.name,
+        displayName: computedBsAcademicYearLabel(year.startsOn),
         startsOnBs: formatBsDateForInput(year.startsOn),
         endsOnBs: formatBsDateForInput(year.endsOn),
         isCurrent: year.isCurrent,
@@ -67,6 +72,7 @@ export class AcademicCalendarSettingsService {
         isWorkingDay: day.isWorkingDay,
         label: day.label,
         holidayType: day.holidayType,
+        category: categorizeCalendarDay(day.isWorkingDay, day.holidayType),
       })),
     };
   }
@@ -76,13 +82,16 @@ export class AcademicCalendarSettingsService {
     dto: CreateAcademicCalendarYearDto,
     userId: string,
   ) {
-    const name = dto.name.trim();
+    const name =
+      dto.name.trim() || formatBsAcademicYear(parseBsDateInput(dto.startsOnBs));
     if (!name) throw new BadRequestException('Academic year name is required.');
 
     const startsOn = toNepalSchoolDateUtc(dto.startsOnBs);
     const endsOn = toNepalSchoolDateUtc(dto.endsOnBs);
     if (startsOn >= endsOn) {
-      throw new BadRequestException('Academic year end date must be after the start date.');
+      throw new BadRequestException(
+        'Academic year end date must be after the start date.',
+      );
     }
 
     const academicYear = await this.prisma.$transaction(async (tx) => {
@@ -90,7 +99,8 @@ export class AcademicCalendarSettingsService {
         where: { tenantId_name: { tenantId, name } },
         select: { id: true },
       });
-      if (existing) throw new ConflictException('This academic year already exists.');
+      if (existing)
+        throw new ConflictException('This academic year already exists.');
 
       const overlapping = await tx.academicYear.findFirst({
         where: {
@@ -101,7 +111,9 @@ export class AcademicCalendarSettingsService {
         select: { id: true, name: true },
       });
       if (overlapping) {
-        throw new ConflictException(`Academic year overlaps with ${overlapping.name}.`);
+        throw new ConflictException(
+          `Academic year overlaps with ${overlapping.name}.`,
+        );
       }
 
       if (dto.isCurrent) {
@@ -139,9 +151,66 @@ export class AcademicCalendarSettingsService {
     return {
       id: academicYear.id,
       name: academicYear.name,
+      displayName: computedBsAcademicYearLabel(academicYear.startsOn),
       startsOnBs: formatBsDateForInput(academicYear.startsOn),
       endsOnBs: formatBsDateForInput(academicYear.endsOn),
       isCurrent: academicYear.isCurrent,
+    };
+  }
+
+  async setCurrentAcademicYear(
+    tenantId: string,
+    academicYearId: string,
+    userId: string,
+  ) {
+    const academicYear = await this.prisma.academicYear.findFirst({
+      where: { id: academicYearId, tenantId },
+      select: {
+        id: true,
+        name: true,
+        startsOn: true,
+        endsOn: true,
+        isCurrent: true,
+      },
+    });
+    if (!academicYear) {
+      throw new NotFoundException(
+        'Academic year was not found in this school.',
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.academicYear.updateMany({
+        where: { tenantId, isCurrent: true, id: { not: academicYearId } },
+        data: { isCurrent: false },
+      });
+      await tx.academicYear.update({
+        where: { id: academicYearId },
+        data: { isCurrent: true },
+      });
+    });
+
+    await this.auditService.record({
+      action: 'academic_calendar_year_set_current',
+      resource: 'academic_year',
+      resourceId: academicYear.id,
+      tenantId,
+      userId,
+      after: {
+        name: academicYear.name,
+        startsOnBs: formatBsDateForInput(academicYear.startsOn),
+        endsOnBs: formatBsDateForInput(academicYear.endsOn),
+        isCurrent: true,
+      },
+    });
+
+    return {
+      id: academicYear.id,
+      name: academicYear.name,
+      displayName: computedBsAcademicYearLabel(academicYear.startsOn),
+      startsOnBs: formatBsDateForInput(academicYear.startsOn),
+      endsOnBs: formatBsDateForInput(academicYear.endsOn),
+      isCurrent: true,
     };
   }
 
@@ -156,10 +225,22 @@ export class AcademicCalendarSettingsService {
       select: { startsOn: true, endsOn: true },
     });
     if (!academicYear) {
-      throw new NotFoundException('Academic year was not found in this school.');
+      throw new NotFoundException(
+        'Academic year was not found in this school.',
+      );
     }
-    if (calendarDate < academicYear.startsOn || calendarDate > academicYear.endsOn) {
-      throw new BadRequestException('Calendar day must fall within the selected academic year.');
+    if (
+      calendarDate < academicYear.startsOn ||
+      calendarDate > academicYear.endsOn
+    ) {
+      throw new BadRequestException(
+        'Calendar day must fall within the selected academic year.',
+      );
+    }
+    if (!dto.isWorkingDay && !cleanOptional(dto.label)) {
+      throw new BadRequestException(
+        'Reason or label is required for non-working days.',
+      );
     }
 
     const day = await this.prisma.schoolCalendarDay.upsert({
@@ -198,6 +279,7 @@ export class AcademicCalendarSettingsService {
       isWorkingDay: day.isWorkingDay,
       label: day.label,
       holidayType: day.holidayType,
+      category: categorizeCalendarDay(day.isWorkingDay, day.holidayType),
     };
   }
 }
@@ -214,4 +296,26 @@ function toNepalSchoolDateUtc(bsDate: string): Date {
 
 function cleanOptional(value?: string | null): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function computedBsAcademicYearLabel(startsOn: Date): string {
+  return formatBsAcademicYear(parseBsDateInput(formatBsDateForInput(startsOn)));
+}
+
+function categorizeCalendarDay(
+  isWorkingDay: boolean,
+  holidayType?: string | null,
+):
+  | 'WORKING_DAY'
+  | 'HOLIDAY'
+  | 'WORKING_DAY_EXCEPTION'
+  | 'SCHOOL_EVENT'
+  | 'CLOSURE' {
+  const normalized = holidayType?.trim().toLowerCase() ?? '';
+  if (isWorkingDay && normalized) return 'WORKING_DAY_EXCEPTION';
+  if (normalized.includes('event')) return 'SCHOOL_EVENT';
+  if (normalized.includes('closure') || normalized.includes('closed'))
+    return 'CLOSURE';
+  if (!isWorkingDay) return 'HOLIDAY';
+  return 'WORKING_DAY';
 }

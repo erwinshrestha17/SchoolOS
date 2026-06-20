@@ -2628,6 +2628,11 @@ export type GuardianProfile = {
   consentedAt: string | null;
 };
 
+export type StudentClassTeacherSummary = {
+  id: string;
+  fullName: string;
+} | null;
+
 export type EnrollmentRecord = {
   id: string;
   academicYearId: string;
@@ -2759,6 +2764,7 @@ export type StudentProfileEnrollment = {
   rollNumber: number | null;
   status: string;
   admissionDate: string;
+  classTeacher?: StudentClassTeacherSummary;
 };
 
 export type StudentProfileInvoiceLine = {
@@ -2797,6 +2803,7 @@ export type StudentProfileAttendanceRecord = {
 export type StudentProfileDetail = {
   student: StudentProfile & {
     lifecycleStatus?: string;
+    classTeacher?: StudentClassTeacherSummary;
   };
   guardians: GuardianProfile[];
   enrollments: StudentProfileEnrollment[];
@@ -2845,6 +2852,25 @@ export type UpdateStudentGuardianPayload = {
   homeAddress?: string | null;
   wardNumber?: string | null;
   isPrimary?: boolean;
+};
+
+export type CreateStudentGuardianPayload = {
+  guardianId?: string;
+  fullName?: string;
+  relation: string;
+  primaryPhone?: string;
+  secondaryPhone?: string | null;
+  email?: string | null;
+  occupation?: string | null;
+  homeAddress?: string | null;
+  wardNumber?: string | null;
+  isPrimary?: boolean;
+};
+
+export type RemoveStudentGuardianPayload = {
+  reason: string;
+  confirmFileAccessReview: true;
+  newPrimaryGuardianId?: string | null;
 };
 
 export type StudentLifecycleStatus =
@@ -3087,6 +3113,7 @@ export type StudentDocument = {
   notes?: string | null;
   expiryDate?: string | null;
   verifiedAt?: string | null;
+  verifiedById?: string | null;
   uploadedById?: string | null;
   uploadedAt: string;
 };

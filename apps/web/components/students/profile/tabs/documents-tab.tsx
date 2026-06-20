@@ -1,6 +1,6 @@
 'use client';
 
-import { GeneratedStudentDocumentMeta, StudentDocument } from '@schoolos/core';
+import { formatBsDate, formatBsDateTime, type GeneratedStudentDocumentMeta, type StudentDocument } from '@schoolos/core';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -65,7 +65,7 @@ export function DocumentsTab({
       if (item.state === 'rejected') counts.rejected += 1;
       if (item.state === 'expired') counts.expired += 1;
       if (item.state === 'expiring') counts.expiring += 1;
-      if (item.state === 'unverified') counts.unverified += 1;
+      if (item.state === 'pending') counts.unverified += 1;
       return counts;
     },
     { missing: 0, rejected: 0, expired: 0, expiring: 0, unverified: 0 },
@@ -140,7 +140,7 @@ export function DocumentsTab({
 
       <SectionCard
         title="Uploaded Documents"
-        description="Scanned copies and attachments provided during enrollment."
+        description="Uploaded files remain incomplete until school staff verify them."
       >
         <div className="mb-5 rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -205,6 +205,9 @@ export function DocumentsTab({
                       </p>
                       <p className="mt-0.5 text-xs font-medium text-slate-500">
                         {item.message}
+                        {item.document?.status === 'REJECTED' && item.document.notes ? (
+                          <span className="mt-1 block text-rose-700">Reviewer note: {latestReviewNote(item.document.notes)}</span>
+                        ) : null}
                       </p>
                     </div>
                   </div>
@@ -220,7 +223,7 @@ export function DocumentsTab({
                         href={`/dashboard/admissions/documents?studentId=${encodeURIComponent(studentId)}&documentId=${encodeURIComponent(item.document.id)}`}
                         className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[0.65rem] font-black uppercase tracking-widest text-slate-600 transition hover:border-[var(--color-mod-admissions-border)] hover:text-[var(--color-mod-admissions-text)]"
                       >
-                        Replace
+                        Replace / re-upload
                       </Link>
                     </div>
                   ) : (
@@ -275,13 +278,13 @@ export function DocumentsTab({
                     className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-white px-3 text-xs font-black text-slate-600 shadow-sm transition hover:text-[var(--color-mod-admissions-accent)] disabled:cursor-wait disabled:opacity-60"
                   >
                     <Download size={16} />
-                    Open
+                    View protected file
                   </button>
                   <Link
                     href={`/dashboard/admissions/documents?studentId=${encodeURIComponent(studentId)}&documentId=${encodeURIComponent(doc.id)}`}
                     className="inline-flex min-h-10 items-center justify-center rounded-xl bg-white px-3 text-xs font-black text-slate-600 shadow-sm transition hover:text-[var(--color-mod-admissions-accent)]"
                   >
-                    Replace
+                    Replace / re-upload
                   </Link>
                 </div>
               </div>
@@ -375,7 +378,8 @@ function formatHistoryAction(action: string) {
 }
 
 function formatDocumentStatus(status?: string) {
-  return (status ?? 'PENDING').replace(/_/g, ' ');
+  if (!status || status === 'ACTIVE') return 'Pending school review';
+  return status.replace(/_/g, ' ');
 }
 
 function documentStatusVariant(
@@ -383,7 +387,7 @@ function documentStatusVariant(
 ): 'success' | 'warning' | 'destructive' | 'neutral' {
   if (status === 'VERIFIED') return 'success';
   if (status === 'REJECTED' || status === 'ARCHIVED') return 'destructive';
-  if (status === 'PENDING' || status === 'UPLOADED') return 'warning';
+  if (!status || status === 'PENDING' || status === 'UPLOADED' || status === 'ACTIVE') return 'warning';
   return 'neutral';
 }
 
@@ -393,7 +397,7 @@ type ChecklistState =
   | 'rejected'
   | 'expired'
   | 'expiring'
-  | 'unverified'
+  | 'pending'
   | 'optional';
 
 function buildDocumentChecklist(documents: StudentDocument[]) {
@@ -440,8 +444,8 @@ function buildDocumentChecklist(documents: StudentDocument[]) {
       return {
         ...spec,
         document,
-        state: 'unverified',
-        message: 'Uploaded and awaiting verification.',
+        state: 'pending',
+        message: 'Pending school review.',
       } as const;
     }
 
@@ -508,7 +512,7 @@ function checklistIcon(state: ChecklistState) {
     return XCircle;
   }
   if (state === 'expiring') return Clock;
-  if (state === 'unverified') return AlertTriangle;
+  if (state === 'pending') return AlertTriangle;
   return FileText;
 }
 
@@ -517,7 +521,7 @@ function checklistIconClass(state: ChecklistState) {
   if (state === 'missing' || state === 'rejected' || state === 'expired') {
     return 'bg-danger-50 text-danger-600';
   }
-  if (state === 'expiring' || state === 'unverified') {
+  if (state === 'expiring' || state === 'pending') {
     return 'bg-warning-50 text-warning-700';
   }
   return 'bg-slate-100 text-slate-500';
@@ -529,9 +533,7 @@ function formatDateOnly(value?: string | null) {
   }
 
   try {
-    return new Intl.DateTimeFormat('en-NP', {
-      dateStyle: 'medium',
-    }).format(new Date(value));
+    return formatBsDate(value);
   } catch {
     return 'date not recorded';
   }
@@ -539,11 +541,16 @@ function formatDateOnly(value?: string | null) {
 
 function formatDateTime(value: string) {
   try {
-    return new Intl.DateTimeFormat('en-NP', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(new Date(value));
+    return formatBsDateTime(value);
   } catch {
     return 'Audit date not recorded';
   }
+}
+
+function latestReviewNote(value: string) {
+  return value
+    .split('\n')
+    .map((line) => line.replace(/^Verification Note:\s*/i, '').trim())
+    .filter(Boolean)
+    .at(-1) ?? value;
 }

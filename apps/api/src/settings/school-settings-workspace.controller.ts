@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -38,19 +47,57 @@ export class SchoolSettingsWorkspaceController {
       Promise.resolve(this.navigationService.getNavigation(auth)),
       this.academicCalendarService.getCalendar(auth.tenantId),
     ]);
-    const configured = new Set(settings.filter((item) => hasValue(item.value)).map((item) => item.key));
-    const profileKeys = ['school_name', 'school_address', 'school_phone', 'school_email', 'principal_name'];
-    const profileReady = profileKeys.every((key) => configured.has(key as never));
-    const brandingReady = configured.has('school_logo' as never) && configured.has('branding_primary_color' as never);
-    const calendarReady = academicCalendar.academicYears.some((year) => year.isCurrent);
+    const configured = new Set(
+      settings.filter((item) => hasValue(item.value)).map((item) => item.key),
+    );
+    const profileKeys = [
+      'school_name',
+      'school_address',
+      'school_phone',
+      'school_email',
+      'principal_name',
+    ];
+    const profileReady = profileKeys.every((key) =>
+      configured.has(key as never),
+    );
+    const brandingReady =
+      configured.has('school_logo' as never) &&
+      configured.has('branding_primary_color' as never);
+    const calendarReady = academicCalendar.academicYears.some(
+      (year) => year.isCurrent,
+    );
 
     return {
       generatedAt: new Date().toISOString(),
       navigation,
       readiness: [
-        { id: 'school-profile', label: 'School Profile', description: profileReady ? 'Official school profile is configured.' : 'Add the required official school profile details.', href: '/dashboard/settings/school-profile', status: profileReady ? 'ready' : 'needs_attention' },
-        { id: 'branding-documents', label: 'Branding & Documents', description: brandingReady ? 'Official logo and document defaults are configured.' : 'Add an official logo and document defaults.', href: '/dashboard/settings/branding-documents', status: brandingReady ? 'ready' : 'needs_attention' },
-        { id: 'academic-calendar', label: 'Calendar, Academic Year & Holidays', description: calendarReady ? 'A current Bikram Sambat academic year is configured.' : 'Create and set the current Bikram Sambat academic year.', href: '/dashboard/settings/academic-calendar', status: calendarReady ? 'ready' : 'needs_attention' },
+        {
+          id: 'school-profile',
+          label: 'School Profile',
+          description: profileReady
+            ? 'Official school profile is configured.'
+            : 'Add the required official school profile details.',
+          href: '/dashboard/settings/school-profile',
+          status: profileReady ? 'ready' : 'needs_attention',
+        },
+        {
+          id: 'branding-documents',
+          label: 'Branding & Documents',
+          description: brandingReady
+            ? 'Official logo and document defaults are configured.'
+            : 'Add an official logo and document defaults.',
+          href: '/dashboard/settings/branding-documents',
+          status: brandingReady ? 'ready' : 'needs_attention',
+        },
+        {
+          id: 'academic-calendar',
+          label: 'Calendar, Academic Year & Holidays',
+          description: calendarReady
+            ? 'A current Bikram Sambat academic year is configured.'
+            : 'Create and set the current Bikram Sambat academic year.',
+          href: '/dashboard/settings/academic-calendar',
+          status: calendarReady ? 'ready' : 'needs_attention',
+        },
       ],
     };
   }
@@ -63,7 +110,10 @@ export class SchoolSettingsWorkspaceController {
 
   @Patch('school-profile')
   @Permissions('settings:manage')
-  updateSchoolProfile(@Body() dto: UpdateSchoolProfileDto, @CurrentAuth() auth: AuthContext) {
+  updateSchoolProfile(
+    @Body() dto: UpdateSchoolProfileDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.profileService.updateProfile(auth.tenantId, dto, auth.userId);
   }
 
@@ -75,29 +125,67 @@ export class SchoolSettingsWorkspaceController {
 
   @Patch('branding-documents')
   @Permissions('settings:manage')
-  updateBrandingDocuments(@Body() dto: UpdateBrandingDocumentsDto, @CurrentAuth() auth: AuthContext) {
+  updateBrandingDocuments(
+    @Body() dto: UpdateBrandingDocumentsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.brandingService.updateBranding(auth.tenantId, dto, auth.userId);
   }
 
   @Get('academic-calendar')
   @Permissions('settings:manage')
-  getAcademicCalendar(@CurrentAuth() auth: AuthContext, @Query('academicYearId') academicYearId?: string) {
-    return this.academicCalendarService.getCalendar(auth.tenantId, academicYearId);
+  getAcademicCalendar(
+    @CurrentAuth() auth: AuthContext,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.academicCalendarService.getCalendar(
+      auth.tenantId,
+      academicYearId,
+    );
   }
 
   @Post('academic-calendar/academic-years')
   @Permissions('settings:manage')
-  createAcademicCalendarYear(@Body() dto: CreateAcademicCalendarYearDto, @CurrentAuth() auth: AuthContext) {
-    return this.academicCalendarService.createAcademicYear(auth.tenantId, dto, auth.userId);
+  createAcademicCalendarYear(
+    @Body() dto: CreateAcademicCalendarYearDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicCalendarService.createAcademicYear(
+      auth.tenantId,
+      dto,
+      auth.userId,
+    );
+  }
+
+  @Post('academic-calendar/academic-years/:academicYearId/set-current')
+  @Permissions('settings:manage')
+  setCurrentAcademicCalendarYear(
+    @Param('academicYearId') academicYearId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicCalendarService.setCurrentAcademicYear(
+      auth.tenantId,
+      academicYearId,
+      auth.userId,
+    );
   }
 
   @Post('academic-calendar/days')
   @Permissions('settings:manage')
-  upsertAcademicCalendarDay(@Body() dto: UpsertSchoolCalendarDaySettingsDto, @CurrentAuth() auth: AuthContext) {
-    return this.academicCalendarService.upsertCalendarDay(auth.tenantId, dto, auth.userId);
+  upsertAcademicCalendarDay(
+    @Body() dto: UpsertSchoolCalendarDaySettingsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicCalendarService.upsertCalendarDay(
+      auth.tenantId,
+      dto,
+      auth.userId,
+    );
   }
 }
 
 function hasValue(value: unknown) {
-  return typeof value === 'string' ? value.trim().length > 0 : value !== null && value !== undefined;
+  return typeof value === 'string'
+    ? value.trim().length > 0
+    : value !== null && value !== undefined;
 }

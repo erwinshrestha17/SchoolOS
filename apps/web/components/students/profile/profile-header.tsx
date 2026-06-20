@@ -186,13 +186,6 @@ export function ProfileHeader({
           ) : (
             <p className="text-sm text-slate-500">No guardian is linked to this student yet.</p>
           )}
-          <button
-            type="button"
-            onClick={() => onSelectTab('Guardians')}
-            className="mt-5 text-sm font-bold text-[var(--color-mod-admissions-text)] hover:underline"
-          >
-            {profile.guardians.length > 0 ? `View guardians (${profile.guardians.length})` : 'Manage guardians'}
-          </button>
         </div>
 
         <div className="flex min-w-[12.5rem] flex-col gap-3">
@@ -278,9 +271,10 @@ function formatLifecycleStatus(status: string) {
 
 function formatClassLabel(value?: string | null) {
   if (!value) return 'Class not assigned';
-  return value.trim().toLowerCase().startsWith('class ')
-    ? value.trim()
-    : `Class ${value.trim()}`;
+  const normalized = value.trim().replace(/^class\s+class\s+/i, 'Class ');
+  return normalized.toLowerCase().startsWith('class ')
+    ? normalized
+    : `Class ${normalized}`;
 }
 
 function formatGuardianRelation(value?: string | null) {

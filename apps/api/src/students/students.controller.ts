@@ -18,6 +18,7 @@ import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { ArchiveStudentDto } from './dto/archive-student.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
+import { CreateStudentGuardianDto } from './dto/create-student-guardian.dto';
 import { ListStudentsDto } from './dto/list-students.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
@@ -114,6 +115,16 @@ export class StudentsController {
       dto,
       auth,
     );
+  }
+
+  @Post(':id/guardians')
+  @Permissions('guardians:create')
+  addStudentGuardian(
+    @Param('id') studentId: string,
+    @Body() dto: CreateStudentGuardianDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.addStudentGuardian(studentId, dto, auth);
   }
 
   @Get('iemis/validation')

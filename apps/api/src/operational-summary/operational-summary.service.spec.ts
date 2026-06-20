@@ -46,7 +46,10 @@ describe('OperationalSummaryService', () => {
     sumResult.mockResolvedValue({
       _sum: { amount: { toString: () => '125.50' } },
     });
-    service = new OperationalSummaryService(prisma, entitlements as EntitlementsService);
+    service = new OperationalSummaryService(
+      prisma,
+      entitlements as unknown as EntitlementsService,
+    );
   });
 
   it('returns locked without reading module records when the module is not entitled', async () => {
@@ -61,7 +64,9 @@ describe('OperationalSummaryService', () => {
   });
 
   it('uses tenant-scoped counts and Decimal-safe database aggregate values for fees', async () => {
-    entitlements.getEntitlements.mockResolvedValue({ modules: ['fees'] } as never);
+    entitlements.getEntitlements.mockResolvedValue({
+      modules: ['fees'],
+    } as never);
 
     const summary = await service.getModuleSummary('m3_fees', actor);
 
@@ -73,9 +78,12 @@ describe('OperationalSummaryService', () => {
     const allCountCalls = [
       countResult,
       (prisma as unknown as { invoice: { count: jest.Mock } }).invoice.count,
-      (prisma as unknown as { paymentRefund: { count: jest.Mock } }).paymentRefund.count,
-      (prisma as unknown as { feeBillingRun: { count: jest.Mock } }).feeBillingRun.count,
-      (prisma as unknown as { cashierClose: { count: jest.Mock } }).cashierClose.count,
+      (prisma as unknown as { paymentRefund: { count: jest.Mock } })
+        .paymentRefund.count,
+      (prisma as unknown as { feeBillingRun: { count: jest.Mock } })
+        .feeBillingRun.count,
+      (prisma as unknown as { cashierClose: { count: jest.Mock } }).cashierClose
+        .count,
     ].flatMap((mock) => mock.mock.calls);
 
     expect(allCountCalls.length).toBeGreaterThan(0);
