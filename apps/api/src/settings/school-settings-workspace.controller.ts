@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -8,8 +8,11 @@ import { SettingsService } from './settings.service';
 import { SchoolSettingsNavigationV1Service } from './school-settings-navigation-v1.service';
 import { SchoolSettingsProfileService } from './school-settings-profile.service';
 import { BrandingDocumentsService } from './branding-documents.service';
+import { AcademicCalendarSettingsService } from './academic-calendar-settings.service';
 import { UpdateSchoolProfileDto } from './dto/update-school-profile.dto';
 import { UpdateBrandingDocumentsDto } from './dto/update-branding-documents.dto';
+import { CreateAcademicCalendarYearDto } from './dto/create-academic-calendar-year.dto';
+import { UpsertSchoolCalendarDaySettingsDto } from './dto/upsert-school-calendar-day.dto';
 
 @Controller('settings/workspaces')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -19,6 +22,7 @@ export class SchoolSettingsWorkspaceController {
     private readonly navigationService: SchoolSettingsNavigationV1Service,
     private readonly profileService: SchoolSettingsProfileService,
     private readonly brandingService: BrandingDocumentsService,
+    private readonly academicCalendarService: AcademicCalendarSettingsService,
   ) {}
 
   @Get('navigation')
@@ -42,20 +46,8 @@ export class SchoolSettingsWorkspaceController {
       generatedAt: new Date().toISOString(),
       navigation,
       readiness: [
-        {
-          id: 'school-profile',
-          label: 'School Profile',
-          description: profileReady ? 'Official school profile is configured.' : 'Add the required official school profile details.',
-          href: '/dashboard/settings/school-profile',
-          status: profileReady ? 'ready' : 'needs_attention',
-        },
-        {
-          id: 'branding-documents',
-          label: 'Branding & Documents',
-          description: brandingReady ? 'Official logo and document defaults are configured.' : 'Add an official logo and document defaults.',
-          href: '/dashboard/settings/branding-documents',
-          status: brandingReady ? 'ready' : 'needs_attention',
-        },
+        { id: 'school-profile', label: 'School Profile', description: profileReady ? 'Official school profile is configured.' : 'Add the required official school profile details.', href: '/dashboard/settings/school-profile', status: profileReady ? 'ready' : 'needs_attention' },
+        { id: 'branding-documents', label: 'Branding & Documents', description: brandingReady ? 'Official logo and document defaults are configured.' : 'Add an official logo and document defaults.', href: '/dashboard/settings/branding-documents', status: brandingReady ? 'ready' : 'needs_attention' },
       ],
     };
   }
@@ -80,11 +72,26 @@ export class SchoolSettingsWorkspaceController {
 
   @Patch('branding-documents')
   @Permissions('settings:manage')
-  updateBrandingDocuments(
-    @Body() dto: UpdateBrandingDocumentsDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  updateBrandingDocuments(@Body() dto: UpdateBrandingDocumentsDto, @CurrentAuth() auth: AuthContext) {
     return this.brandingService.updateBranding(auth.tenantId, dto, auth.userId);
+  }
+
+  @Get('academic-calendar')
+  @Permissions('settings:manage')
+  getAcademicCalendar(@CurrentAuth() auth: AuthContext, @Query('academicYearId') academicYearId?: string) {
+    return this.academicCalendarService.getCalendar(auth.tenantId, academicYearId);
+  }
+
+  @Post('academic-calendar/academic-years')
+  @Permissions('settings:manage')
+  createAcademicCalendarYear(@Body() dto: CreateAcademicCalendarYearDto, @CurrentAuth() auth: AuthContext) {
+    return this.academicCalendarService.createAcademicYear(auth.tenantId, dto, auth.userId);
+  }
+
+  @Post('academic-calendar/days')
+  @Permissions('settings:manage')
+  upsertAcademicCalendarDay(@Body() dto: UpsertSchoolCalendarDaySettingsDto, @CurrentAuth() auth: AuthContext) {
+    return this.academicCalendarService.upsertCalendarDay(auth.tenantId, dto, auth.userId);
   }
 }
 
