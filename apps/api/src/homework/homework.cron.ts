@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { getNepalSchoolDay, NEPAL_TIME_ZONE } from '@schoolos/core';
 import { PrismaService } from '../prisma/prisma.service';
 import { HomeworkAssignmentStatus, UserStatus } from '@prisma/client';
 import { HomeworkReminderType } from './dto/reminder.dto';
@@ -24,7 +25,7 @@ export class HomeworkCron {
     @InjectQueue('homework') private readonly homeworkQueue: Queue,
   ) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_8AM) // Reminders at 8 AM daily
+  @Cron(CronExpression.EVERY_DAY_AT_8AM, { timeZone: NEPAL_TIME_ZONE })
   async processDailyReminders() {
     this.logger.log('Starting daily homework reminder processing...');
 
@@ -122,6 +123,7 @@ export class HomeworkCron {
       ),
     };
 
+    const schoolDay = getNepalSchoolDay();
     await this.homeworkQueue.add(
       'sendReminder',
       {
@@ -132,7 +134,8 @@ export class HomeworkCron {
         force: false,
       },
       {
-        jobId: `${homework.id}:${reminderType}:${new Date().toISOString().split('T')[0]}`,
+        // Daily idempotency belongs to the Nepal school day, not API host time.
+        jobId: `${homework.id}:${reminderType}:${schoolDay.gregorianDate}`,
         removeOnComplete: true,
       },
     );

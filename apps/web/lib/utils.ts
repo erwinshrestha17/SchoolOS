@@ -1,3 +1,12 @@
+import {
+  formatBsAcademicYear,
+  formatBsDate,
+  formatBsDateForInput,
+  formatBsDateRange,
+  formatBsDateTime,
+  formatNepalTime,
+} from '@schoolos/core';
+
 export function cn(...inputs: any[]) {
   return inputs
     .flat()
@@ -5,24 +14,25 @@ export function cn(...inputs: any[]) {
     .join(' ');
 }
 
+/**
+ * School-facing instant formatter. API timestamps must be ISO-8601 UTC values;
+ * this renders their Asia/Kathmandu civil date in English Bikram Sambat.
+ */
 export function formatDate(value: string | Date | null | undefined) {
   if (!value) return '';
-  const date = typeof value === 'string' ? new Date(value) : value;
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return formatBsDate(value);
 }
 
+/** School-facing timestamp formatter with explicit NPT time context. */
 export function formatDateTime(value: string | Date | null | undefined) {
   if (!value) return '';
-  const date = typeof value === 'string' ? new Date(value) : value;
-  return date.toLocaleTimeString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatBsDateTime(value);
 }
+
+/** Use for API date-only business values that use Gregorian YYYY-MM-DD transport semantics. */
+export function formatDateForInput(value: string | Date | null | undefined) {
+  if (!value) return '';
+  return formatBsDateForInput(value);
+}
+
+export { formatBsAcademicYear, formatBsDateRange, formatNepalTime };

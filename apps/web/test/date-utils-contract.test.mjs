@@ -10,32 +10,27 @@ function read(relativePath) {
   return readFileSync(join(webRoot, relativePath), 'utf8');
 }
 
-describe('SchoolOS Date Utility Contracts', () => {
-  it('implements the shared date utility in the correct location', () => {
+describe('SchoolOS Nepal BS Date Utility Contracts', () => {
+  it('delegates legacy web formatting to the canonical core policy', () => {
     const dateUtils = read('lib/date-utils.ts');
-    
+    assert.match(dateUtils, /@schoolos\/core/);
+    assert.match(dateUtils, /coreFormatBsDate/);
+    assert.match(dateUtils, /toBsDateFromGregorian/);
+    assert.doesNotMatch(dateUtils, /BS_CALENDAR_DATA/);
+  });
+
+  it('keeps compatibility helpers but forces school-facing BS output', () => {
+    const dateUtils = read('lib/date-utils.ts');
     assert.match(dateUtils, /export function formatAdDate/);
     assert.match(dateUtils, /export function formatBsDate/);
     assert.match(dateUtils, /export function formatSchoolDate/);
-    assert.match(dateUtils, /export function normalizeActivityDate/);
+    assert.match(dateUtils, /DateDisplayMode/);
+    assert.match(dateUtils, /displays BS only/);
   });
 
-  it('handles timezone Asia/Kathmandu for display', () => {
-    const dateUtils = read('lib/date-utils.ts');
-    assert.match(dateUtils, /timeZone:\s*'Asia\/Kathmandu'/);
-  });
-
-  it('contains the Bikram Sambat calendar data table', () => {
-    const dateUtils = read('lib/date-utils.ts');
-    assert.match(dateUtils, /const BS_CALENDAR_DATA/);
-    assert.match(dateUtils, /2081:\s*\[31,\s*32/); // Current year data
-  });
-
-  it('integrates shared date utilities into the dashboard page', () => {
+  it('keeps dashboard usage on the shared date utility', () => {
     const dashboardPage = read('app/dashboard/page.tsx');
-    
-    assert.match(dashboardPage, /import \{[\s\S]*formatSchoolDate[\s\S]*\} from '..\/..\/lib\/date-utils'/);
-    assert.match(dashboardPage, /formatSchoolDate\(item\.date,\s*'BOTH'\)/);
-    assert.doesNotMatch(dashboardPage, /const formatDate =/); // Local version should be gone
+    assert.match(dashboardPage, /formatSchoolDate/);
+    assert.doesNotMatch(dashboardPage, /const formatDate =/);
   });
 });
