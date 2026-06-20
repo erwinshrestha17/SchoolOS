@@ -1,5 +1,19 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import * as PrismaClient from '@prisma/client';
 import { AdmissionCasesService } from './admission-cases.service';
+
+Object.assign(PrismaClient.Prisma as Record<string, unknown>, {
+  TransactionIsolationLevel: { Serializable: 'Serializable' },
+});
+Object.assign(PrismaClient as Record<string, unknown>, {
+  StudentDocumentStatus: { ACTIVE: 'ACTIVE' },
+  StudentDocumentKind: {
+    BIRTH_CERTIFICATE: 'BIRTH_CERTIFICATE',
+    TRANSFER_CERTIFICATE: 'TRANSFER_CERTIFICATE',
+    PREVIOUS_REPORT_CARD: 'PREVIOUS_REPORT_CARD',
+    OTHER: 'OTHER',
+  },
+});
 
 const actor = {
   tenantId: 'tenant-a',
