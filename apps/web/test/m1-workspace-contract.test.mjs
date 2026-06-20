@@ -32,10 +32,13 @@ test('M1 workspaces expose real route-backed operations', () => {
   assert.match(api, /confirmFileAccessReview: true/);
 });
 
-test('M1 admissions pipeline uses the persisted application workflow', () => {
+test('M1 admissions keeps legacy review workflow and adds unified direct admission', () => {
   const pipeline = read('components/admissions/admissions-pipeline.tsx');
   const applicationForm = read('components/m1/admission-application-form.tsx');
   const page = read('app/dashboard/admissions/new/page.tsx');
+  const entry = read('components/m1/admission-entry.tsx');
+  const wizard = read('components/m1/admission-case-wizard.tsx');
+  const caseApi = read('lib/api/admission-cases.ts');
   const admissionsPage = read('app/dashboard/admissions/page.tsx');
   const nav = read('components/m1/m1-module-nav.tsx');
 
@@ -45,11 +48,20 @@ test('M1 admissions pipeline uses the persisted application workflow', () => {
   assert.match(pipeline, /PAGE_SIZE = 25/);
   assert.match(applicationForm, /createAdmissionApplication/);
   assert.match(applicationForm, /Creates an inquiry; it does not enroll a student/);
-  assert.match(page, /AdmissionApplicationForm/);
+  assert.match(page, /AdmissionEntry/);
+  assert.match(entry, /Direct admission/);
+  assert.match(entry, /Admission review/);
+  assert.match(entry, /admissionCasesApi\.getPolicy/);
+  assert.match(wizard, /SchoolOS checks placement, policy requirements, and possible duplicates/);
+  assert.match(wizard, /directAdmit/);
+  assert.match(wizard, /Admit student/);
+  assert.match(caseApi, /\/admissions\/cases/);
+  assert.match(caseApi, /\/direct-admit/);
+  assert.match(caseApi, /\/finalize/);
   assert.match(admissionsPage, /moreActionItems/);
   assert.match(admissionsPage, /\/dashboard\/admissions\/review/);
   assert.match(nav, /\/dashboard\/admissions\/review/);
-  assert.doesNotMatch(pipeline + applicationForm, /publicUrl|objectKey/);
+  assert.doesNotMatch(pipeline + applicationForm + wizard + caseApi, /publicUrl|objectKey/);
 });
 
 test('M1 high-risk workflows remain server controlled and protected', () => {
