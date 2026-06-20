@@ -6,7 +6,9 @@ void main() {
     test('converts an authoritative BS new-year fixture in both directions', () {
       final bs = NepaliBsCalendar.fromAd(DateTime.utc(2024, 4, 13));
 
-      expect(bs, const BsDate(year: 2081, month: 1, day: 1));
+      expect(bs.year, 2081);
+      expect(bs.month, 1);
+      expect(bs.day, 1);
       expect(NepaliBsCalendar.toAd(bs), DateTime.utc(2024, 4, 13));
     });
 
