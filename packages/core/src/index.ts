@@ -5,3 +5,4 @@ export * from './entitlements.js';
 export * from './nepal-date.js';
 export * from './operational-summary.js';
 export * from './school-settings-navigation.js';
+export * from './school-settings-overview.js';
