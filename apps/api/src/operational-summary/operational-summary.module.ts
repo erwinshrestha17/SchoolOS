@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
+import { PlansModule } from '../plans/plans.module';
 import {
   OperationalDashboardSummaryController,
   OperationalMobileSummaryController,
@@ -7,7 +8,7 @@ import {
 import { OperationalSummaryService } from './operational-summary.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, PlansModule],
   controllers: [
     OperationalDashboardSummaryController,
     OperationalMobileSummaryController,
