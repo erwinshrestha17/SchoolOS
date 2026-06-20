@@ -3,36 +3,33 @@
 import type { PermissionKey } from '@schoolos/core';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useSession } from '../session-provider';
-import { useEntitlements } from '../entitlements-provider';
 import {
-  LayoutDashboard,
-  Users,
-  UserPlus,
-  CalendarCheck,
-  Wallet,
-  Images,
-  UserCog,
-  Calculator,
   BookOpen,
   Bus,
-  Megaphone,
-  MessageSquare,
-  Settings,
+  Calculator,
+  CalendarCheck,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
-  Lock,
-  School,
-  Utensils,
+  CircleUserRound,
   ClipboardList,
   FileCheck2,
-  CalendarDays,
   GraduationCap,
-  FileText,
-  MonitorPlay,
+  Images,
+  LayoutDashboard,
+  MessageSquare,
+  School,
+  Settings,
+  UserCog,
+  UserPlus,
+  Users,
+  Utensils,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 
+import { useEntitlements } from '../entitlements-provider';
+import { useSession } from '../session-provider';
 import { cn } from '../../lib/utils';
 
 export type NavItem = {
@@ -40,9 +37,13 @@ export type NavItem = {
   label: string;
   icon: LucideIcon;
   permissions?: PermissionKey[];
-  platformRoles?: string[];
+  /**
+   * Frontend visibility only. The backend remains the authorization and
+   * entitlement authority for every route and request.
+   */
+  moduleKeys?: string[];
+  activeWhen?: string[];
   badge?: number | string;
-  disabled?: boolean;
 };
 
 export type NavGroup = {
@@ -51,8 +52,10 @@ export type NavGroup = {
 };
 
 const academicPermissions: PermissionKey[] = ['academics:read', 'academics:manage'];
-const timetablePermissions: PermissionKey[] = ['timetable:read'];
-const homeworkPermissions: PermissionKey[] = ['homework:read'];
+const homeworkAndTimetablePermissions: PermissionKey[] = [
+  'homework:read',
+  'timetable:read',
+];
 const learningPermissions: PermissionKey[] = [
   'learning:read',
   'learning:create',
@@ -60,10 +63,26 @@ const learningPermissions: PermissionKey[] = [
   'learning:launch',
   'learning:progress',
 ];
+const communicationsPermissions: PermissionKey[] = [
+  'notices:read',
+  'notices:create',
+  'messaging:create',
+  'messaging:manage',
+];
+const settingsPermissions: PermissionKey[] = [
+  'settings:read',
+  'roles:read',
+  'classes:read',
+  'academic_years:read',
+];
 
+/**
+ * This map mirrors the module entitlement gates in the dashboard layout.
+ * It is only used to avoid showing unavailable workspaces; direct routes are
+ * still protected by the route layout and the backend.
+ */
 function getRequiredModuleForHref(href: string): string | null {
   if (href.startsWith('/dashboard/communications')) return 'notices';
-  if (href.startsWith('/dashboard/operations')) return null;
   if (href.startsWith('/dashboard/students')) return 'students';
   if (href.startsWith('/dashboard/admissions')) return 'students';
   if (href.startsWith('/dashboard/attendance')) return 'attendance';
@@ -85,13 +104,17 @@ function getRequiredModuleForHref(href: string): string | null {
   return null;
 }
 
+/**
+ * School operations only. Platform navigation deliberately lives in the
+ * separate /platform shell and must never be rendered under /dashboard.
+ */
 export const dashboardNavGroups: NavGroup[] = [
   {
-    label: 'Home',
+    label: 'Overview',
     items: [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }],
   },
   {
-    label: 'Students',
+    label: 'People',
     items: [
       {
         href: '/dashboard/students',
@@ -108,40 +131,6 @@ export const dashboardNavGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Daily Operations',
-    items: [
-      {
-        href: '/dashboard/attendance',
-        label: 'Attendance',
-        icon: CalendarCheck,
-        permissions: ['attendance:read', 'attendance:mark'],
-      },
-      {
-        href: '/dashboard/communications',
-        label: 'Communication',
-        icon: MessageSquare,
-        permissions: [
-          'notices:read',
-          'notices:create',
-          'messaging:create',
-          'messaging:manage',
-        ],
-      },
-      {
-        href: '/dashboard/homework',
-        label: 'Homework',
-        icon: BookOpen,
-        permissions: homeworkPermissions,
-      },
-      {
-        href: '/dashboard/learning',
-        label: 'Learning',
-        icon: MonitorPlay,
-        permissions: learningPermissions,
-      },
-    ],
-  },
-  {
     label: 'Academics',
     items: [
       {
@@ -152,48 +141,74 @@ export const dashboardNavGroups: NavGroup[] = [
       },
       {
         href: '/dashboard/academics/exams',
-        label: 'Exams',
+        label: 'Exams & Results',
         icon: FileCheck2,
         permissions: academicPermissions,
+        activeWhen: [
+          '/dashboard/academics/exams',
+          '/dashboard/academics/cas',
+          '/dashboard/academics/report-cards',
+        ],
       },
       {
-        href: '/dashboard/academics/cas',
-        label: 'CAS Records',
-        icon: ClipboardList,
-        permissions: academicPermissions,
-      },
-      {
-        href: '/dashboard/academics/report-cards',
-        label: 'Report Cards',
-        icon: FileText,
-        permissions: academicPermissions,
-      },
-      {
-        href: '/dashboard/timetable',
-        label: 'Timetable',
+        href: '/dashboard/homework',
+        label: 'Homework & Timetable',
         icon: CalendarDays,
-        permissions: timetablePermissions,
+        permissions: homeworkAndTimetablePermissions,
+        moduleKeys: ['homework', 'timetable'],
+        activeWhen: ['/dashboard/homework', '/dashboard/timetable'],
+      },
+      {
+        href: '/dashboard/learning',
+        label: 'Learning',
+        icon: BookOpen,
+        permissions: learningPermissions,
       },
     ],
   },
   {
-    label: 'School Operations',
+    label: 'Daily Operations',
     items: [
       {
-        href: '/dashboard/operations',
-        label: 'Operations Hub',
-        icon: School,
+        href: '/dashboard/attendance',
+        label: 'Attendance',
+        icon: CalendarCheck,
+        permissions: ['attendance:read', 'attendance:mark'],
+      },
+      {
+        href: '/dashboard/fees',
+        label: 'Fees & Receipts',
+        icon: Wallet,
         permissions: [
-          'library:read',
-          'library:manage',
-          'transport:read',
-          'transport:manage',
-          'transport:operate',
-          'canteen:menu:read',
-          'canteen:plans:read',
-          'canteen:enrollments:read',
+          'fees:manage',
+          'fees:bill',
+          'payments:collect',
+          'receipts:read',
+        ],
+        activeWhen: ['/dashboard/fees', '/dashboard/finance'],
+      },
+      {
+        href: '/dashboard/communications',
+        label: 'Communications',
+        icon: MessageSquare,
+        permissions: communicationsPermissions,
+        activeWhen: [
+          '/dashboard/communications',
+          '/dashboard/notices',
+          '/dashboard/messages',
         ],
       },
+      {
+        href: '/dashboard/activity',
+        label: 'Activity Feed',
+        icon: Images,
+        permissions: ['activity_feed:read', 'activity_feed:create'],
+      },
+    ],
+  },
+  {
+    label: 'Campus Services',
+    items: [
       {
         href: '/dashboard/library',
         label: 'Library',
@@ -220,49 +235,17 @@ export const dashboardNavGroups: NavGroup[] = [
           'canteen:enrollments:read',
         ],
       },
-      {
-        href: '/dashboard/notices',
-        label: 'Notices',
-        icon: Megaphone,
-        permissions: ['notices:read', 'notices:create'],
-      },
-      {
-        href: '/dashboard/activity',
-        label: 'Activity Feed',
-        icon: Images,
-        permissions: ['activity_feed:read', 'activity_feed:create'],
-      },
-      {
-        href: '/dashboard/messages',
-        label: 'Messages',
-        icon: MessageSquare,
-      },
     ],
   },
   {
-    label: 'Staff & Finance',
+    label: 'Workforce & Finance',
     items: [
       {
-        href: '/dashboard/fees',
-        label: 'Fees',
-        icon: Wallet,
-        permissions: [
-          'fees:manage',
-          'fees:bill',
-          'payments:collect',
-          'receipts:read',
-        ],
-      },
-      {
         href: '/dashboard/hr',
-        label: 'HR / Staff',
+        label: 'HR & Payroll',
         icon: UserCog,
         permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
-      },
-      {
-        href: '/dashboard/payroll',
-        label: 'Payroll',
-        icon: CalendarDays,
+        activeWhen: ['/dashboard/hr', '/dashboard/payroll'],
       },
       {
         href: '/dashboard/accounting',
@@ -277,52 +260,24 @@ export const dashboardNavGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Reports',
+    label: 'Insights',
     items: [
       {
         href: '/dashboard/reports',
-        label: 'Reports',
+        label: 'Reports & Exports',
         icon: ClipboardList,
         permissions: ['accounting:reports:read', 'library:reports:read'],
       },
     ],
   },
-  {
-    label: 'System',
-    items: [
-      {
-        href: '/dashboard/settings',
-        label: 'Settings',
-        icon: Settings,
-        permissions: [
-          'settings:read',
-          'roles:read',
-          'classes:read',
-          'academic_years:read',
-        ],
-      },
-    ],
-  },
 ];
 
-export const platformNavItems: NavItem[] = [
-  {
-    href: '/platform/dashboard',
-    label: 'Platform Control',
-    icon: Lock,
-    platformRoles: [
-      'platform_super_admin',
-      'platform_support',
-      'platform_billing_admin',
-    ],
-  },
-  {
-    href: '/platform/schools',
-    label: 'Managed Schools',
-    icon: School,
-    platformRoles: ['platform_super_admin', 'platform_support'],
-  },
-];
+const settingsNavItem: NavItem = {
+  href: '/dashboard/settings',
+  label: 'Settings',
+  icon: Settings,
+  permissions: settingsPermissions,
+};
 
 export type SidebarProps = {
   collapsed: boolean;
@@ -344,30 +299,17 @@ export function Sidebar({
   const visibleGroups = dashboardNavGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => {
-        const canSee = canSeeNavItem(item, session);
-        if (!canSee) return false;
-
-        const requiredModule = getRequiredModuleForHref(item.href);
-        if (requiredModule && !hasModule(requiredModule)) {
-          return false;
-        }
-
-        if (
-          item.href === '/dashboard/operations' &&
-          !['library', 'transport', 'canteen'].some((module) => hasModule(module))
-        ) {
-          return false;
-        }
-
-        return true;
-      }),
+      items: group.items.filter((item) => canDisplayNavItem(item, session, hasModule)),
     }))
     .filter((group) => group.items.length > 0);
 
-  const visiblePlatformItems = platformNavItems.filter((item) =>
-    canSeeNavItem(item, session),
-  );
+  const visibleSettings = canDisplayNavItem(settingsNavItem, session, hasModule)
+    ? settingsNavItem
+    : null;
+
+  const schoolName = session?.tenant.name ?? 'School workspace';
+  const roleLabel = formatRole(session?.user.roles[0] ?? 'school_user');
+  const userLabel = session?.user.email ?? 'Signed-in school user';
 
   return (
     <>
@@ -396,17 +338,23 @@ export function Sidebar({
           collapsed={false}
           groups={visibleGroups}
           pathname={pathname}
-          platformItems={visiblePlatformItems}
+          schoolName={schoolName}
+          roleLabel={roleLabel}
+          settingsItem={visibleSettings}
+          userLabel={userLabel}
           onMobileClose={onMobileClose}
         />
       </aside>
 
-      <aside className="hidden h-screen sticky top-0 z-30 lg:flex">
+      <aside className="sticky top-0 z-30 hidden h-screen lg:flex">
         <SidebarContent
           collapsed={collapsed}
           groups={visibleGroups}
           pathname={pathname}
-          platformItems={visiblePlatformItems}
+          schoolName={schoolName}
+          roleLabel={roleLabel}
+          settingsItem={visibleSettings}
+          userLabel={userLabel}
           onMobileClose={onMobileClose}
           onToggle={onToggle}
         />
@@ -419,14 +367,20 @@ function SidebarContent({
   collapsed,
   groups,
   pathname,
-  platformItems,
+  schoolName,
+  roleLabel,
+  settingsItem,
+  userLabel,
   onMobileClose,
   onToggle,
 }: {
   collapsed: boolean;
   groups: NavGroup[];
   pathname: string | null;
-  platformItems: NavItem[];
+  schoolName: string;
+  roleLabel: string;
+  settingsItem: NavItem | null;
+  userLabel: string;
   onMobileClose: () => void;
   onToggle?: () => void;
 }) {
@@ -434,38 +388,55 @@ function SidebarContent({
     <div
       className={cn(
         'sidebar-transition flex h-full flex-col border-r border-slate-200 bg-white text-slate-700',
-        collapsed ? 'w-[72px]' : 'w-[232px]',
+        collapsed ? 'w-[72px]' : 'w-[264px]',
       )}
     >
-      <div className="flex h-16 items-center gap-3 border-b border-slate-200 px-4">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)] text-sm font-bold text-white shadow-sm">
-          <School size={18} aria-hidden="true" />
+      <header className="border-b border-slate-200 px-3 py-3">
+        <div className="flex h-10 items-center gap-3 px-1">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)] text-white shadow-sm">
+            <School size={18} aria-hidden="true" />
+          </div>
+          <div
+            className={cn(
+              'min-w-0 transition-all duration-200',
+              collapsed ? 'w-0 overflow-hidden opacity-0' : 'opacity-100',
+            )}
+          >
+            <span className="block truncate text-base font-extrabold tracking-tight text-[var(--primary)]">
+              School<span className="font-semibold">OS</span>
+            </span>
+            <span className="block truncate text-[0.7rem] font-medium text-slate-500">
+              School operating desk
+            </span>
+          </div>
         </div>
 
-        <div
-          className={cn(
-            'sidebar-label',
-            collapsed ? 'w-0 opacity-0' : 'opacity-100',
-          )}
-        >
-          <span className="block truncate text-lg font-extrabold tracking-tight text-[var(--primary)]">
-            School<span className="font-semibold">OS</span>
-          </span>
-        </div>
-      </div>
+        {!collapsed && (
+          <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--primary)] shadow-sm ring-1 ring-slate-200">
+              <School size={14} aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-bold text-slate-900">{schoolName}</p>
+              <p className="mt-0.5 text-[0.68rem] font-medium text-slate-500">
+                School workspace
+              </p>
+            </div>
+          </div>
+        )}
+      </header>
 
       <nav
-        className="flex-1 overflow-y-auto px-2.5 py-4 scrollbar-hide"
-        aria-label="Dashboard navigation"
+        className="flex-1 overflow-y-auto px-3 py-4 scrollbar-hide"
+        aria-label="School operations navigation"
       >
         {groups.map((group) => (
-          <div key={group.label} className="mb-4 last:mb-0">
+          <section key={group.label} className="mb-5 last:mb-0">
             {!collapsed && (
-              <p className="px-2.5 pb-1.5 text-[0.62rem] font-bold uppercase tracking-[0.08em] text-slate-500">
+              <p className="px-2.5 pb-2 text-[0.65rem] font-bold uppercase tracking-[0.08em] text-slate-500">
                 {group.label}
               </p>
             )}
-
             <div className="space-y-1">
               {group.items.map((item) => (
                 <NavEntry
@@ -477,51 +448,61 @@ function SidebarContent({
                 />
               ))}
             </div>
-          </div>
+          </section>
         ))}
-
-        {platformItems.length > 0 && (
-          <div className="mt-6 border-t border-slate-200 pt-4">
-            {!collapsed && (
-              <p className="px-2.5 pb-1.5 text-[0.62rem] font-bold uppercase tracking-[0.08em] text-slate-500">
-                Platform
-              </p>
-            )}
-
-            <div className="space-y-1">
-              {platformItems.map((item) => (
-                <NavEntry
-                  key={item.href}
-                  collapsed={collapsed}
-                  item={item}
-                  pathname={pathname}
-                  onMobileClose={onMobileClose}
-                />
-              ))}
-            </div>
-          </div>
-        )}
       </nav>
 
-      {onToggle && (
-        <div className="border-t border-slate-200 px-2.5 py-2.5 lg:block">
+      <footer className="border-t border-slate-200 px-3 py-3">
+        {settingsItem ? (
+          <NavEntry
+            collapsed={collapsed}
+            item={settingsItem}
+            pathname={pathname}
+            onMobileClose={onMobileClose}
+          />
+        ) : null}
+
+        <div
+          className={cn(
+            'mt-2 flex items-center gap-2.5 rounded-xl px-2.5 py-2',
+            collapsed ? 'justify-center' : 'bg-slate-50',
+          )}
+        >
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-600">
+            <CircleUserRound size={18} aria-hidden="true" />
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="truncate text-xs font-bold text-slate-800" title={userLabel}>
+                {userLabel}
+              </p>
+              <p className="truncate text-[0.68rem] font-medium text-slate-500">{roleLabel}</p>
+            </div>
+          )}
+        </div>
+
+        {onToggle && (
           <button
             type="button"
             onClick={onToggle}
-            className="flex min-h-10 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-sm text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+            className={cn(
+              'mt-2 flex min-h-10 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 focus:ring-offset-white',
+              collapsed && 'justify-center px-0',
+            )}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? (
-              <ChevronRight size={20} className="shrink-0" />
+              <ChevronRight size={20} className="shrink-0" aria-hidden="true" />
             ) : (
               <>
-                <ChevronLeft size={20} className="shrink-0" />
-                <span className="sidebar-label font-semibold">Collapse</span>
+                <ChevronLeft size={20} className="shrink-0" aria-hidden="true" />
+                <span>Collapse sidebar</span>
               </>
             )}
           </button>
-        </div>
-      )}
+        )}
+      </footer>
     </div>
   );
 }
@@ -538,104 +519,99 @@ function NavEntry({
   onMobileClose: () => void;
 }) {
   const Icon = item.icon;
-
-  const active =
-    (item.href === '/dashboard' && pathname === '/dashboard') ||
-    (item.href === '/dashboard/academics' && pathname === '/dashboard/academics') ||
-    (item.href !== '/dashboard' &&
-      item.href !== '/dashboard/academics' &&
-      pathname?.startsWith(item.href));
-
+  const active = isActiveNavItem(item, pathname);
   const content = (
     <>
-      {active && !item.disabled && (
-        <span className="absolute -left-2.5 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--primary)]" />
+      {active && (
+        <span
+          className="absolute -left-3 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--primary)]"
+          aria-hidden="true"
+        />
       )}
-
       <Icon
         size={18}
         className={cn(
           'shrink-0 transition-colors',
-          active && !item.disabled
-            ? 'text-[var(--primary)]'
-            : 'text-slate-500 group-hover:text-slate-800',
+          active ? 'text-[var(--primary)]' : 'text-slate-500 group-hover:text-slate-800',
         )}
+        aria-hidden="true"
       />
-
       <span
         className={cn(
-          'sidebar-label font-semibold',
-          collapsed ? 'w-0 opacity-0' : 'opacity-100',
+          'min-w-0 flex-1 truncate font-semibold transition-all duration-200',
+          collapsed ? 'w-0 overflow-hidden opacity-0' : 'opacity-100',
         )}
       >
         {item.label}
       </span>
-
-      {!collapsed && item.badge && (
+      {!collapsed && item.badge ? (
         <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--primary)] px-1.5 text-[0.65rem] font-bold text-white">
           {item.badge}
         </span>
-      )}
-
-      {collapsed && (
-        <div className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-          {item.label}
-        </div>
-      )}
+      ) : null}
     </>
   );
-
-  const className = cn(
-    'group relative flex min-h-9 items-center gap-3 rounded-lg px-2.5 py-2 text-[0.78rem] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 focus:ring-offset-white',
-    active && !item.disabled
-      ? 'bg-[var(--primary-soft)] font-semibold text-[var(--primary-dark)]'
-      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950',
-    item.disabled &&
-      'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-500',
-  );
-
-  if (item.disabled) {
-    return (
-      <button
-        type="button"
-        className={className}
-        disabled
-        aria-disabled="true"
-      >
-        {content}
-      </button>
-    );
-  }
 
   return (
     <Link
       href={item.href}
       onClick={onMobileClose}
-      className={className}
+      className={cn(
+        'group relative flex min-h-11 items-center gap-3 rounded-lg px-2.5 py-2 text-[0.8rem] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 focus:ring-offset-white',
+        collapsed && 'justify-center px-0',
+        active
+          ? 'bg-[var(--primary-soft)] text-[var(--primary-dark)]'
+          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950',
+      )}
       aria-current={active ? 'page' : undefined}
+      aria-label={collapsed ? item.label : undefined}
+      title={collapsed ? item.label : undefined}
     >
       {content}
     </Link>
   );
 }
 
-function canSeeNavItem(
+function canDisplayNavItem(
   item: NavItem,
   session: ReturnType<typeof useSession>['session'],
+  hasModule: (module: string) => boolean,
 ) {
-  const hasPlatformRole =
-    item.platformRoles?.some((role) => session?.user.roles.includes(role)) ??
-    false;
-
-  if (hasPlatformRole) {
-    return true;
+  if (item.permissions?.length) {
+    const permissionSet = new Set(session?.user.permissions ?? []);
+    if (!item.permissions.some((permission) => permissionSet.has(permission))) {
+      return false;
+    }
   }
 
-  if (!item.permissions?.length) {
-    return true;
+  const moduleKeys = item.moduleKeys ?? (() => {
+    const requiredModule = getRequiredModuleForHref(item.href);
+    return requiredModule ? [requiredModule] : [];
+  })();
+
+  return moduleKeys.length === 0 || moduleKeys.some((module) => hasModule(module));
+}
+
+function isActiveNavItem(item: NavItem, pathname: string | null) {
+  if (!pathname) return false;
+
+  if (item.activeWhen?.length) {
+    return item.activeWhen.some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`),
+    );
   }
 
-  const permissionSet = new Set(session?.user.permissions ?? []);
+  if (item.href === '/dashboard') {
+    return pathname === item.href;
+  }
 
-  return item.permissions.some((permission) => permissionSet.has(permission));
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
+
+function formatRole(role: string) {
+  return role
+    .split(/[_-]/)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ');
 }
