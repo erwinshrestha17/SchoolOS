@@ -33,6 +33,8 @@ const migratedLegacySections: Record<string, string> = {
   hr: '/dashboard/settings/policies/payroll',
   accounting: '/dashboard/settings/policies/accounting',
   security: '/dashboard/settings/policies/security',
+  data: '/dashboard/settings/data-operations',
+  audit: '/dashboard/settings/audit-log',
   'fee-setup': '/dashboard/fees',
   'fee-plans': '/dashboard/fees',
 };
