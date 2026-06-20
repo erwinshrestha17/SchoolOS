@@ -74,6 +74,10 @@ describe('FinanceService - Hardening', () => {
           .mockResolvedValue({ id: 't1', slug: 't1' }),
       },
       providerConfig: { findFirst: jest.fn() },
+      onlinePaymentIntent: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        update: jest.fn(),
+      },
       financeApprovalRequest: {
         findFirst: jest.fn(),
         findMany: jest.fn(),

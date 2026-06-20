@@ -29,6 +29,7 @@ import type {
 } from '@/lib/api/attendance';
 import { AttendanceForm } from '@/components/forms/attendance-form';
 import { AttendanceAnalytics } from './attendance-analytics';
+import { AttendanceConflictReview } from './attendance-conflict-review';
 import { AttendanceCorrectionReview } from './attendance-correction-review';
 import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -78,6 +79,10 @@ export function AttendanceOverviewWorkspace() {
   const correctionsQuery = useQuery({
     queryKey: ['attendance-corrections', 'PENDING', 1],
     queryFn: () => api.listAttendanceCorrections({ status: 'PENDING', limit: 10 }),
+  });
+  const conflictsQuery = useQuery({
+    queryKey: ['attendance-conflicts'],
+    queryFn: api.listAttendanceConflicts,
   });
   const followUpsQuery = useQuery({
     queryKey: ['attendance-m2-follow-ups', thirtyDaysAgo, today],
@@ -263,6 +268,16 @@ export function AttendanceOverviewWorkspace() {
             />
           </SectionCard>
           <AtRiskPanel queue={followUpsQuery.data} isLoading={followUpsQuery.isLoading} />
+          {conflictsQuery.isLoading ? (
+            <LoadingState label="Loading conflict review queue..." />
+          ) : conflictsQuery.isError ? (
+            <ErrorState
+              title="Conflict review queue unavailable"
+              onRetry={() => void conflictsQuery.refetch()}
+            />
+          ) : (
+            <AttendanceConflictReview conflicts={conflictsQuery.data ?? []} />
+          )}
         </div>
       </div>
     </DashboardPageShell>

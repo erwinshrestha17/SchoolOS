@@ -66,6 +66,7 @@ export function LoginForm() {
   return (
     <form
       className="grid gap-4"
+      method="post"
       onSubmit={handleSubmit((values) => mutation.mutate(values))}
     >
       <div>

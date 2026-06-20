@@ -778,6 +778,7 @@ describe("SchoolOS web production contracts", () => {
 
   it("keeps the login entry page tokenized and security focused", () => {
     const loginPage = read("app/login/page.tsx");
+    const loginForm = read("components/forms/login-form.tsx");
 
     for (const expected of [
       "LoginForm",
@@ -800,6 +801,7 @@ describe("SchoolOS web production contracts", () => {
       loginPage,
       /<svg|bg-slate-950|primary-(50|100|200|500|600|700|800|900)|blur-3xl|fake|mock|Coming soon/,
     );
+    assert.match(loginForm, /method="post"/);
   });
 
   it("uses cookie credentials instead of bearer tokens for browser API calls", () => {
@@ -1535,6 +1537,7 @@ describe("SchoolOS web production contracts", () => {
       "app/dashboard/attendance/page.tsx",
       "app/dashboard/attendance/register/page.tsx",
       "components/attendance/attendance-analytics.tsx",
+      "components/attendance/attendance-m2-workspaces.tsx",
       "components/attendance/attendance-conflict-review.tsx",
       "components/attendance/attendance-correction-review.tsx",
     ]);
@@ -1562,7 +1565,7 @@ describe("SchoolOS web production contracts", () => {
     assert.match(attendanceForm, /AttendanceCorrectionReview/);
     assert.match(attendanceForm, /Correction Review Queue/);
     assert.match(attendanceForm, /Required audit reason/);
-    assert.match(attendanceForm, /Attendance register export prepared/);
+    assert.match(attendanceForm, /export prepared by the attendance backend/);
     assert.doesNotMatch(attendanceForm, /window\.open\(url\.toString\(\)/);
     assert.match(attendanceForm, /color-mod-attendance-accent/);
     assert.doesNotMatch(
