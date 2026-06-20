@@ -1,6 +1,9 @@
-import { IsBoolean, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
 
 export class UpsertSchoolCalendarDaySettingsDto {
+  @IsUUID()
+  academicYearId!: string;
+
   @IsString()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   calendarDateBs!: string;
