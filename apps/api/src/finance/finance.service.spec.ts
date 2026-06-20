@@ -480,6 +480,10 @@ describe('finance production controls', () => {
   });
 
   it('returns tenant-scoped invoice detail with backend-owned totals', async () => {
+    const cashierActor = {
+      ...actor,
+      permissions: ['payments:collect'],
+    };
     const detailedInvoice = buildInvoice({
       invoiceNumber: 'INV-2026-00001',
       fiscalYear: '2026/2027',
@@ -570,7 +574,10 @@ describe('finance production controls', () => {
       ],
     });
 
-    const result = await service.getInvoiceDetail(detailedInvoice.id, actor);
+    const result = await service.getInvoiceDetail(
+      detailedInvoice.id,
+      cashierActor,
+    );
 
     expect(prisma.invoice.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -705,6 +712,32 @@ describe('finance production controls', () => {
         outstandingAmount: 750,
       },
     ]);
+  });
+
+  it('denies student collection context when the student is outside the actor tenant', async () => {
+    const cashierActor = {
+      ...actor,
+      permissions: ['payments:collect'],
+    };
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: null,
+      student: null,
+    });
+
+    await expect(
+      service.getStudentCollectionContext('cross-tenant-student', cashierActor),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(prisma.student.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'cross-tenant-student',
+          tenantId: actor.tenantId,
+        },
+      }),
+    );
+    expect(prisma.invoice.findMany).not.toHaveBeenCalled();
   });
 
   it('builds a tenant-scoped student fee ledger with running balance', async () => {

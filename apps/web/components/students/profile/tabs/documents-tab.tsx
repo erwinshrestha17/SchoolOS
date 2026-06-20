@@ -3,6 +3,7 @@
 import { GeneratedStudentDocumentMeta, StudentDocument } from '@schoolos/core';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 import { SectionCard } from '@/components/ui/section-card';
 import {
   FileText,
@@ -29,10 +30,10 @@ type DocumentsTabProps = {
 };
 
 const generatedTypes = [
-  ['id-card', 'Student ID Card'],
-  ['transfer-certificate', 'Transfer Certificate'],
-  ['leaving-certificate', 'Leaving Certificate'],
-  ['character-certificate', 'Character Certificate'],
+  ['id-card', 'Student ID Card', 'Generate ID card'],
+  ['transfer-certificate', 'Transfer Certificate', 'Generate transfer certificate'],
+  ['leaving-certificate', 'Leaving Certificate', 'Generate leaving certificate'],
+  ['character-certificate', 'Character Certificate', 'Generate character certificate'],
 ] as const;
 
 const requiredDocuments = [
@@ -94,7 +95,7 @@ export function DocumentsTab({
         description="Official school documents available for this student."
       >
         <div className="grid gap-3">
-          {generatedTypes.map(([kind, label]) => {
+          {generatedTypes.map(([kind, label, actionLabel]) => {
             const isGenerated = generatedDocuments.some(
               (doc) => doc.kind === kind,
             );
@@ -118,17 +119,18 @@ export function DocumentsTab({
                     <p className="font-bold text-slate-900">{label}</p>
                     <p className="text-[0.7rem] text-slate-500 font-medium">
                       {isGenerated
-                        ? 'Ready for Download'
-                        : 'Generation Required'}
+                        ? 'Protected PDF can be regenerated or opened'
+                        : 'Available when backend document rules pass'}
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => onOpenPdf(kind)}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition hover:bg-[var(--color-mod-admissions-accent)] hover:text-white"
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-white px-3 text-xs font-black text-slate-600 shadow-sm transition hover:bg-[var(--color-mod-admissions-accent)] hover:text-white"
                 >
-                  <ExternalLink size={18} />
+                  <ExternalLink size={16} />
+                  {actionLabel}
                 </button>
               </div>
             );
@@ -150,6 +152,12 @@ export function DocumentsTab({
                 {formatChecklistSummary(documentRiskCounts)}
               </p>
             </div>
+            <Link
+              href={`/dashboard/admissions/documents?studentId=${encodeURIComponent(studentId)}`}
+              className="inline-flex min-h-10 items-center justify-center rounded-xl border border-[var(--color-mod-admissions-border)] bg-white px-4 text-xs font-black uppercase tracking-widest text-[var(--color-mod-admissions-text)] shadow-sm transition hover:bg-slate-50"
+            >
+              Upload required documents
+            </Link>
             <Badge
               variant={
                 documentRiskCounts.missing ||
@@ -168,7 +176,7 @@ export function DocumentsTab({
                 ? 'Action needed'
                 : documentRiskCounts.expiring || documentRiskCounts.unverified
                   ? 'Review needed'
-                  : 'Ready'}
+                  : 'No visible issues'}
             </Badge>
           </div>
           <div className="mt-4 grid gap-2">
@@ -201,13 +209,28 @@ export function DocumentsTab({
                     </div>
                   </div>
                   {item.document ? (
-                    <Badge
-                      variant={documentStatusVariant(item.document.status)}
-                      className="shrink-0 uppercase tracking-wide"
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Badge
+                        variant={documentStatusVariant(item.document.status)}
+                        className="uppercase tracking-wide"
+                      >
+                        {formatDocumentStatus(item.document.status)}
+                      </Badge>
+                      <Link
+                        href={`/dashboard/admissions/documents?studentId=${encodeURIComponent(studentId)}&documentId=${encodeURIComponent(item.document.id)}`}
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[0.65rem] font-black uppercase tracking-widest text-slate-600 transition hover:border-[var(--color-mod-admissions-border)] hover:text-[var(--color-mod-admissions-text)]"
+                      >
+                        Replace
+                      </Link>
+                    </div>
+                  ) : (
+                    <Link
+                      href={`/dashboard/admissions/documents?studentId=${encodeURIComponent(studentId)}&kind=${encodeURIComponent(item.kind)}`}
+                      className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[0.65rem] font-black uppercase tracking-widest text-slate-600 transition hover:border-[var(--color-mod-admissions-border)] hover:text-[var(--color-mod-admissions-text)]"
                     >
-                      {formatDocumentStatus(item.document.status)}
-                    </Badge>
-                  ) : null}
+                      Upload
+                    </Link>
+                  )}
                 </div>
               );
             })}
@@ -249,11 +272,17 @@ export function DocumentsTab({
                     type="button"
                     disabled={openingDocumentId === doc.id}
                     onClick={() => void openUploadedDocument(doc.id)}
-                    aria-label={`Open ${doc.title || doc.fileName}`}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition hover:text-[var(--color-mod-admissions-accent)] disabled:cursor-wait disabled:opacity-60"
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-white px-3 text-xs font-black text-slate-600 shadow-sm transition hover:text-[var(--color-mod-admissions-accent)] disabled:cursor-wait disabled:opacity-60"
                   >
-                    <Download size={18} />
+                    <Download size={16} />
+                    Open
                   </button>
+                  <Link
+                    href={`/dashboard/admissions/documents?studentId=${encodeURIComponent(studentId)}&documentId=${encodeURIComponent(doc.id)}`}
+                    className="inline-flex min-h-10 items-center justify-center rounded-xl bg-white px-3 text-xs font-black text-slate-600 shadow-sm transition hover:text-[var(--color-mod-admissions-accent)]"
+                  >
+                    Replace
+                  </Link>
                 </div>
               </div>
             ))}
@@ -282,7 +311,7 @@ export function DocumentsTab({
           </div>
         ) : historyQuery.isError ? (
           <div className="rounded-2xl border border-danger-100 bg-danger-50 p-4 text-sm font-semibold text-danger-700">
-            {historyQuery.error.message}
+            Document history could not load. Please retry from the documents workspace.
           </div>
         ) : (historyQuery.data ?? []).length > 0 ? (
           <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1">
@@ -470,7 +499,7 @@ function formatChecklistSummary(counts: {
     return `${review} document${review === 1 ? '' : 's'} should be reviewed before clearance.`;
   }
 
-  return 'Required student documents are verified and current.';
+  return 'No required document issues are visible from uploaded records.';
 }
 
 function checklistIcon(state: ChecklistState) {

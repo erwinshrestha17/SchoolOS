@@ -225,21 +225,10 @@ export function CollectionCounter({
                 <Loader2 className="h-8 w-8 animate-spin text-[var(--color-mod-fees-accent)]" />
               </div>
             )}
-            {invoices.length === 0 && !isLoading && (
+            {invoices.length === 0 && !isLoading && !studentContext && (
               <EmptyState
-                title={studentContext ? 'This student has no outstanding invoices.' : 'No Records Found'}
-                description={studentContext ? 'Fee collection is not needed right now.' : 'Try searching with a different student ID or name.'}
-                action={
-                  studentContext && onChangeStudent ? (
-                    <button
-                      type="button"
-                      onClick={onChangeStudent}
-                      className="rounded-xl bg-[var(--color-mod-fees-accent)] px-4 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-[var(--color-mod-fees-text)]"
-                    >
-                      Change student
-                    </button>
-                  ) : undefined
-                }
+                title="No Records Found"
+                description="Try searching with a different student ID or name."
                 className="py-12"
               />
             )}
@@ -425,6 +414,15 @@ export function CollectionCounter({
                   ? 'This student has no outstanding invoices.'
                   : 'Select an outstanding invoice from the search results to load student details and process payment.'}
             </p>
+            {studentContext && invoices.length === 0 && onChangeStudent ? (
+              <button
+                type="button"
+                onClick={onChangeStudent}
+                className="mt-6 rounded-xl bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white transition hover:bg-[var(--color-mod-fees-text)]"
+              >
+                Change student
+              </button>
+            ) : null}
             
             <div className="mt-12 grid grid-cols-3 gap-6 opacity-30 grayscale">
                <div className="flex flex-col items-center gap-2">

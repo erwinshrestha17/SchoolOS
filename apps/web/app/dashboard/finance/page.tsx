@@ -51,8 +51,6 @@ export default function FinancePage() {
   const searchParams = useSearchParams();
   const initialInvoiceId = searchParams.get('invoiceId');
   const studentId = searchParams.get('studentId');
-  const source = searchParams.get('source');
-  const isStudentProfileSource = source === 'student-profile' && Boolean(studentId);
 
   const canCollectPayments = hasPermissions(['payments:collect']);
   const canManageFees = hasPermissions(['fees:manage']);
@@ -87,7 +85,7 @@ export default function FinancePage() {
   const defaultersQuery = useQuery({
     queryKey: ['defaulters', 'workspace-summary'],
     queryFn: () => api.listDefaulters(),
-    enabled: canManageFees,
+    enabled: canManageFees && !studentId,
   });
 
   const selectTab = (tab: FinanceTab) => {
@@ -110,6 +108,7 @@ export default function FinancePage() {
     const params = new URLSearchParams(searchParams.toString());
     params.delete('studentId');
     params.delete('source');
+    params.delete('invoiceId');
     const query = params.toString();
     router.replace(query ? `/dashboard/finance?${query}` : '/dashboard/finance', {
       scroll: false,
@@ -172,7 +171,7 @@ export default function FinancePage() {
         title="Fees & Receipts"
         description={`Collect fees, issue protected receipts, follow up dues, and close the cashier with an auditable trail${session?.tenant.name ? ` for ${session.tenant.name}` : ''}.`}
         primaryAction={
-          canCollectPayments ? (
+          canCollectPayments && !studentId ? (
             <button
               type="button"
               onClick={() => selectTab('collection')}
@@ -223,24 +222,26 @@ export default function FinancePage() {
             : []),
         ]}
       >
-        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-          <KpiCard title="Collected Today" value="Unavailable" icon={<Wallet size={20} />} tone="neutral" description="Needs a real M3 daily summary API." />
-          <KpiCard title="Total Due" value="Unavailable" icon={<Wallet size={20} />} tone="neutral" description="No whole-school summary contract is exposed." />
-          <KpiCard
-            title="Overdue Students"
-            value={!canManageFees ? 'Restricted' : defaultersQuery.isLoading ? 'Loading' : defaultersQuery.data?.total ?? 'Unavailable'}
-            icon={<FileText size={20} />}
-            tone={defaultersQuery.data?.total ? 'warning' : 'neutral'}
-            description={
-              defaultersQuery.data
-                ? `${formatCurrency(defaultersQuery.data.totalOutstanding)} outstanding.`
-                : 'Backend defaulter summary.'
-            }
-          />
-          <KpiCard title="Pending Reversals" value="Unavailable" icon={<ShieldAlert size={20} />} tone="neutral" description="Needs an approval-summary contract." />
-          <KpiCard title="Cashier Close Status" value={!canCloseCashier ? 'Restricted' : 'Unavailable'} icon={<History size={20} />} tone="neutral" description="Open the backend-backed close workspace." />
-          <KpiCard title="Receipts Issued" value={!canReadReceipts ? 'Restricted' : 'Unavailable'} icon={<Receipt size={20} />} tone="neutral" description="Needs a bounded daily receipt summary." />
-        </KpiGrid>
+        {studentId ? null : (
+          <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+            <KpiCard title="Collected Today" value="Unavailable" icon={<Wallet size={20} />} tone="neutral" description="Needs a real M3 daily summary API." />
+            <KpiCard title="Total Due" value="Unavailable" icon={<Wallet size={20} />} tone="neutral" description="No whole-school summary contract is exposed." />
+            <KpiCard
+              title="Overdue Students"
+              value={!canManageFees ? 'Restricted' : defaultersQuery.isLoading ? 'Loading' : defaultersQuery.data?.total ?? 'Unavailable'}
+              icon={<FileText size={20} />}
+              tone={defaultersQuery.data?.total ? 'warning' : 'neutral'}
+              description={
+                defaultersQuery.data
+                  ? `${formatCurrency(defaultersQuery.data.totalOutstanding)} outstanding.`
+                  : 'Backend defaulter summary.'
+              }
+            />
+            <KpiCard title="Pending Reversals" value="Unavailable" icon={<ShieldAlert size={20} />} tone="neutral" description="Needs an approval-summary contract." />
+            <KpiCard title="Cashier Close Status" value={!canCloseCashier ? 'Restricted' : 'Unavailable'} icon={<History size={20} />} tone="neutral" description="Open the backend-backed close workspace." />
+            <KpiCard title="Receipts Issued" value={!canReadReceipts ? 'Restricted' : 'Unavailable'} icon={<Receipt size={20} />} tone="neutral" description="Needs a bounded daily receipt summary." />
+          </KpiGrid>
+        )}
       </ModuleHeader>
 
       <div id="finance-workspace" className="scroll-mt-24 space-y-6">
@@ -250,6 +251,7 @@ export default function FinancePage() {
           {activeTab === 'collection' ? (
             canCollectPayments ? (
               <CollectionSection
+                key={studentId ? `student-${studentId}` : 'invoice-search'}
                 invoices={invoicesQuery.data ?? []}
                 isLoading={
                   studentId
@@ -273,7 +275,7 @@ export default function FinancePage() {
                   studentCollectionContextQuery.data ?? null
                 }
                 hasStudentCollectionContextRequest={Boolean(studentId)}
-                isStudentProfileSource={isStudentProfileSource}
+                isStudentProfileSource={Boolean(studentId)}
                 onChangeStudent={handleChangeStudent}
               />
             ) : (

@@ -65,13 +65,13 @@ export class FeesController {
   }
 
   @Get('invoices')
-  @Permissions('fees:manage')
+  @Permissions('payments:collect')
   listInvoices(@CurrentAuth() auth: AuthContext) {
     return this.financeService.listInvoices(auth);
   }
 
   @Get('invoices/:id')
-  @Permissions('fees:manage')
+  @Permissions('payments:collect')
   getInvoiceDetail(
     @Param('id') invoiceId: string,
     @CurrentAuth() auth: AuthContext,

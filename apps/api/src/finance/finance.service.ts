@@ -1638,6 +1638,8 @@ export class FinanceService {
   }
 
   async listInvoices(actor: AuthContext) {
+    assertFinancePermission(actor, 'payments:collect');
+
     const invoices = await this.prisma.invoice.findMany({
       where: { tenantId: actor.tenantId },
       include: {
@@ -1676,6 +1678,8 @@ export class FinanceService {
   }
 
   async getInvoiceDetail(invoiceId: string, actor: AuthContext) {
+    assertFinancePermission(actor, 'payments:collect');
+
     const invoice = await this.prisma.invoice.findFirst({
       where: {
         id: invoiceId,

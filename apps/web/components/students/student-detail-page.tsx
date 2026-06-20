@@ -102,7 +102,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const feeClearanceQuery = useQuery({
     queryKey: ['student-fee-clearance', studentId],
     queryFn: () => api.getStudentFeeClearance(studentId),
-    enabled: false,
+    enabled: Boolean(studentId),
   });
 
   const studentUpdateMutation = useMutation({
@@ -185,6 +185,9 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
           setLifecycleAction(null);
           setIsLifecycleOpen(true);
         }}
+        feeClearance={feeClearanceQuery.data ?? null}
+        isFeeClearanceLoading={feeClearanceQuery.isLoading || feeClearanceQuery.isFetching}
+        isFeeClearanceError={feeClearanceQuery.isError}
         pdfError={pdfError}
       />
 
@@ -296,7 +299,10 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
             <ProfileTabs.HealthTab profile={profile} />
           </TabsContent>
           <TabsContent value="Attendance" className="mt-0">
-            <ProfileTabs.AttendanceTab studentId={studentId} />
+            <ProfileTabs.AttendanceTab
+              profile={profile}
+              onBackToProfile={() => setActiveDetailTab('Overview')}
+            />
           </TabsContent>
           <TabsContent value="Activity" className="mt-0">
             <ProfileTabs.ActivityTab posts={profile.activityPosts} />

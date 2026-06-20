@@ -69,7 +69,7 @@ export function OverviewTab({ profile, onOpenPdf, onSelectTab }: OverviewTabProp
           tone: 'warning' as const,
           title: 'iEMIS readiness has issues',
           description: `${iemisQuery.data.issues.length} reporting field${iemisQuery.data.issues.length === 1 ? '' : 's'} need review.`,
-          action: 'Open profile',
+          action: 'Review iEMIS fields',
           onClick: () => onSelectTab('Profile'),
         }
       : null,
@@ -183,7 +183,7 @@ export function OverviewTab({ profile, onOpenPdf, onSelectTab }: OverviewTabProp
               {currentEnrollment ? (
                 <div>
                   <p className="text-lg font-black text-slate-950">
-                    Class {currentEnrollment.className}
+                    {formatClassLabel(currentEnrollment.className)}
                     {currentEnrollment.sectionName ? ` • Section ${currentEnrollment.sectionName}` : ''}
                   </p>
                   <p className="mt-1 text-sm font-semibold text-slate-600">
@@ -239,8 +239,8 @@ export function OverviewTab({ profile, onOpenPdf, onSelectTab }: OverviewTabProp
               label="Class"
               value={
                 currentEnrollment
-                  ? `${currentEnrollment.className}${currentEnrollment.sectionName ? ` / ${currentEnrollment.sectionName}` : ''}`
-                  : profile.student.className ?? profile.student.class?.name ?? 'Not assigned'
+                  ? `${formatClassLabel(currentEnrollment.className)}${currentEnrollment.sectionName ? ` / ${currentEnrollment.sectionName}` : ''}`
+                  : formatClassLabel(profile.student.className ?? profile.student.class?.name)
               }
             />
             <SummaryRow
@@ -401,4 +401,11 @@ function formatStatus(value: string) {
     .split('_')
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(' ');
+}
+
+function formatClassLabel(value?: string | null) {
+  if (!value) return 'Class not assigned';
+  return value.trim().toLowerCase().startsWith('class ')
+    ? value.trim()
+    : `Class ${value.trim()}`;
 }

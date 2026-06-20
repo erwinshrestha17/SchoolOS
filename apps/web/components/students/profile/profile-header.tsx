@@ -1,6 +1,6 @@
 'use client';
 
-import { StudentProfileDetail } from '@schoolos/core';
+import { StudentFeeClearance, StudentProfileDetail } from '@schoolos/core';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -31,6 +31,9 @@ type ProfileHeaderProps = {
   onOpenIdCard: () => void;
   onSelectTab: (tab: StudentProfileTabShortcut) => void;
   onManageLifecycle: () => void;
+  feeClearance: StudentFeeClearance | null;
+  isFeeClearanceLoading?: boolean;
+  isFeeClearanceError?: boolean;
   pdfError?: string;
 };
 
@@ -40,18 +43,51 @@ export function ProfileHeader({
   onOpenIdCard,
   onSelectTab,
   onManageLifecycle,
+  feeClearance,
+  isFeeClearanceLoading,
+  isFeeClearanceError,
   pdfError,
 }: ProfileHeaderProps) {
   const router = useRouter();
   const { student } = profile;
   const studentName = student.fullNameEn || `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''}`.trim() || 'Student';
   const primaryGuardian = profile.guardians.find((guardian) => guardian.isPrimary) ?? profile.guardians[0];
-  const className = student.className ?? student.class?.name ?? 'Class not assigned';
+  const className = formatClassLabel(student.className ?? student.class?.name);
   const sectionName = student.sectionName ?? student.section ?? 'Section not assigned';
   const [photoObjectUrl, setPhotoObjectUrl] = useState<string | null>(null);
   const supportNoteExists = Boolean(
     student.medicalConditions || student.severeAllergies || student.medications || student.specialNeeds,
   );
+  const hasOutstandingFees = Boolean(
+    feeClearance && !feeClearance.cleared && feeClearance.outstandingAmount > 0,
+  );
+  const collectFeeAction = hasOutstandingFees
+    ? {
+        label: 'Collect fees',
+        icon: <Wallet size={16} />,
+        onClick: () =>
+          router.push(
+            `/dashboard/finance?studentId=${encodeURIComponent(student.id)}&source=student-profile`,
+          ),
+      }
+    : isFeeClearanceLoading
+      ? {
+          label: 'Checking fee balance...',
+          icon: <Wallet size={16} />,
+          disabled: true,
+          onClick: () => undefined,
+        }
+      : isFeeClearanceError
+        ? {
+            label: 'View fee history',
+            icon: <Wallet size={16} />,
+            onClick: () => onSelectTab('Fees'),
+          }
+        : {
+            label: 'View fee history',
+            icon: <Wallet size={16} />,
+            onClick: () => onSelectTab('Fees'),
+          };
 
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -140,7 +176,9 @@ export function ProfileHeader({
             <div className="space-y-3">
               <div>
                 <p className="font-bold text-slate-950">{primaryGuardian.fullName}</p>
-                <p className="mt-1 text-xs font-semibold text-slate-500">{primaryGuardian.relation}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">
+                  {formatGuardianRelation(primaryGuardian.relation)}
+                </p>
               </div>
               <p className="text-sm font-medium text-slate-600">{primaryGuardian.primaryPhone || 'Phone not recorded'}</p>
               {primaryGuardian.email ? <p className="truncate text-sm text-slate-500">{primaryGuardian.email}</p> : null}
@@ -176,14 +214,7 @@ export function ProfileHeader({
               </button>
             }
             items={[
-              {
-                label: 'Collect fees',
-                icon: <Wallet size={16} />,
-                onClick: () =>
-                  router.push(
-                    `/dashboard/finance?studentId=${encodeURIComponent(student.id)}&source=student-profile`,
-                  ),
-              },
+              collectFeeAction,
               {
                 label: 'View attendance',
                 icon: <CalendarCheck size={16} />,
@@ -239,6 +270,22 @@ function initials(name: string) {
 
 function formatLifecycleStatus(status: string) {
   return status
+    .toLowerCase()
+    .split('_')
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ');
+}
+
+function formatClassLabel(value?: string | null) {
+  if (!value) return 'Class not assigned';
+  return value.trim().toLowerCase().startsWith('class ')
+    ? value.trim()
+    : `Class ${value.trim()}`;
+}
+
+function formatGuardianRelation(value?: string | null) {
+  if (!value) return 'Relation not recorded';
+  return value
     .toLowerCase()
     .split('_')
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)

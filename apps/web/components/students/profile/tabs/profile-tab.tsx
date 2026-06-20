@@ -59,7 +59,7 @@ export function ProfileTab({ profile }: { profile: StudentProfileDetail }) {
                 Placement
               </p>
               <p className="mt-2 text-2xl font-black text-slate-950">
-                {className ? `Class ${className}` : 'Class not assigned'}
+                {formatClassLabel(className)}
               </p>
               <p className="mt-1 text-sm font-semibold text-slate-600">
                 {sectionName ? `Section ${sectionName}` : 'Section not assigned'}
@@ -69,7 +69,9 @@ export function ProfileTab({ profile }: { profile: StudentProfileDetail }) {
 
             <div className="space-y-3">
               <EnrollmentRow label="Academic year" value={currentEnrollment.academicYear} />
-              <EnrollmentRow label="Enrollment status" value={formatStatus(currentEnrollment.status)} />
+              {currentEnrollment.status ? (
+                <EnrollmentRow label="Enrollment status" value={formatStatus(currentEnrollment.status)} />
+              ) : null}
               <EnrollmentRow label="Admission date" value={formatDate(currentEnrollment.admissionDate)} />
               {currentEnrollment.rollNumber ? (
                 <EnrollmentRow label="Roll number" value={currentEnrollment.rollNumber.toString()} />
@@ -137,4 +139,11 @@ function formatStatus(value: string) {
     .split('_')
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(' ');
+}
+
+function formatClassLabel(value?: string | null) {
+  if (!value) return 'Class not assigned';
+  return value.trim().toLowerCase().startsWith('class ')
+    ? value.trim()
+    : `Class ${value.trim()}`;
 }

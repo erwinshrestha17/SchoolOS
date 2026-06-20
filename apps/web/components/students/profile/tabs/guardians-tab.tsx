@@ -26,7 +26,7 @@ export function GuardiansTab({
   onSaveGuardian,
 }: GuardiansTabProps) {
   return (
-    <div className="grid gap-6 md:grid-cols-2 animate-fade-in">
+    <div className="grid gap-5 lg:grid-cols-2 animate-fade-in">
       {guardians.length > 0 ? (
         guardians.map((guardian) => {
           const isEditing = editingGuardianId === guardian.id;
@@ -35,7 +35,7 @@ export function GuardiansTab({
             <SectionCard 
               key={guardian.id}
               title={isEditing ? 'Edit Guardian Profile' : guardian.fullName}
-              description={isEditing ? undefined : guardian.relation}
+              description={isEditing ? undefined : formatGuardianRelation(guardian.relation)}
               headerAction={
                 isEditing ? null : (
                   <div className="flex items-center gap-2">
@@ -87,8 +87,11 @@ export function GuardiansTab({
           );
         })
       ) : (
-        <div className="col-span-2 rounded-2xl border border-[var(--color-mod-admissions-border)] bg-white py-12 text-center">
-          <p className="text-slate-400 font-medium">No guardian records found.</p>
+        <div className="rounded-2xl border border-[var(--color-mod-admissions-border)] bg-white px-6 py-10 text-center lg:col-span-2">
+          <p className="text-sm font-bold text-slate-900">No guardians linked</p>
+          <p className="mt-1 text-xs font-medium text-slate-500">
+            Guardian actions will appear here once a backend-supported guardian record is linked.
+          </p>
         </div>
       )}
     </div>
@@ -241,4 +244,13 @@ function GuardianEditForm({
       </div>
     </form>
   );
+}
+
+function formatGuardianRelation(value?: string | null) {
+  if (!value) return 'Relation not recorded';
+  return value
+    .toLowerCase()
+    .split('_')
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ');
 }
