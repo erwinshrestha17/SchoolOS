@@ -7,7 +7,7 @@ Token-light global rules for agents. Detailed behavior lives in the active docs 
 Start with `README.md`, `docs/README.md`, `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`, `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`, and `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`. Then read the focused source for the touched area:
 
 - Product/function: `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`
-- Architecture/security/platform: `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md`
+- Architecture/security/platform: `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `docs/architecture/SCHOOLOS_NAMING_CONVENTIONS.md`, `docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md`
 - Notification module: `docs/architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md`
 - Web: `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `apps/web/e2e/README.md`
 - Mobile: `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`, `apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md`
@@ -69,6 +69,15 @@ Current priorities: security/RBAC/tenant-isolation evidence; staging deployment 
 - Do not mix SaaS billing with school fee collection/accounting.
 - Keep M13 Learning separate and reuse core students/staff/classes/subjects/timetable/files/RBAC/audit/communication.
 - Keep M12 Notification/Communication delivery separate from feature modules. Source modules emit events; the Notification module owns recipient resolution, templates, channel routing, delivery jobs, retries, read state, provider diagnostics, and audit.
+
+## Naming and contract rules
+
+- Read `docs/architecture/SCHOOLOS_NAMING_CONVENTIONS.md` before adding or renaming files, folders, routes, DTOs, schema values, API clients, or web/mobile surfaces.
+- New TypeScript/web paths use kebab-case; Flutter/Dart paths use lower_snake_case; framework-required filenames remain exceptions.
+- New API paths use lowercase kebab-case resource nouns, explicit route parameters such as `:studentId`, and documented domain-command routes only when CRUD is insufficient.
+- Use one canonical business term per concept. `tenantId` is the only tenancy boundary name.
+- Persisted/API lifecycle values must follow one chain: Prisma/domain value -> DTO validation -> service -> OpenAPI -> shared contract -> web/mobile. Do not duplicate raw status strings or invent UI-only statuses.
+- Preserve stable legacy names unless a documented compatibility and migration plan protects API, database, web, mobile, integration, job, cache, and test consumers.
 
 ## Security and data rules
 
