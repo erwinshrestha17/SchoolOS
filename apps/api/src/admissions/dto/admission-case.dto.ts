@@ -1,3 +1,4 @@
+import { PartialType } from '@nestjs/mapped-types';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -6,9 +7,11 @@ import {
   IsEmail,
   IsEnum,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   MaxLength,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Gender } from '@prisma/client';
@@ -222,6 +225,9 @@ export class CreateAdmissionCaseDto {
   mediumOfInstruction?: string;
 
   @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
   rollNumber?: number;
 
   @IsOptional()
@@ -247,9 +253,9 @@ export class CreateAdmissionCaseDto {
   documents?: AdmissionDocumentReferenceDto[];
 }
 
-export class UpdateAdmissionCaseDto extends CreateAdmissionCaseDto {}
+export class UpdateAdmissionCaseDto extends PartialType(CreateAdmissionCaseDto) {}
 
-export class DirectAdmitAdmissionCaseDto extends CreateAdmissionCaseDto {
+export class DirectAdmitAdmissionCaseDto extends PartialType(CreateAdmissionCaseDto) {
   @IsOptional()
   @IsBoolean()
   overrideDuplicate?: boolean;
@@ -260,7 +266,7 @@ export class DirectAdmitAdmissionCaseDto extends CreateAdmissionCaseDto {
   overrideReason?: string;
 }
 
-export class FinalizeAdmissionCaseDto extends DirectAdmitAdmissionCaseDto {}
+export class FinalizeAdmissionCaseDto extends PartialType(DirectAdmitAdmissionCaseDto) {}
 
 export class ReviewAdmissionCaseDto {
   @IsIn(ADMISSION_REVIEW_ACTIONS)
