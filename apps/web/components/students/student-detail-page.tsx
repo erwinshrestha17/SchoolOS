@@ -3,22 +3,23 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
+import { MoreHorizontal, ShieldCheck } from 'lucide-react';
 import { api } from '@/lib/api';
 import { LoadingState } from '@/components/ui/loading-state';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ActionMenu } from '@/components/ui/action-menu';
 import { ProfileHeader } from './profile/profile-header';
 import { LifecyclePanel } from './profile/lifecycle-panel';
 import { StudentEditCard } from './profile/student-edit-card';
 import * as ProfileTabs from './profile/tabs';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { 
-  UpdateStudentProfilePayload, 
-  UpdateStudentGuardianPayload, 
-  StudentTransferPayload, 
-  StudentArchivePayload, 
-  StudentDeletePayload 
+import {
+  UpdateStudentProfilePayload,
+  UpdateStudentGuardianPayload,
+  StudentTransferPayload,
+  StudentArchivePayload,
+  StudentDeletePayload,
 } from '@schoolos/core';
-import { cn } from '@/lib/utils';
 
 type LifecycleAction = 'transfer' | 'archive' | 'alumni' | 'delete';
 type LifecycleRequest =
@@ -41,10 +42,33 @@ const detailTabs = [
 
 type DetailTab = (typeof detailTabs)[number];
 
+const primaryTabs: Array<{ value: DetailTab; label: string }> = [
+  { value: 'Overview', label: 'Overview' },
+  { value: 'Academics', label: 'Academic' },
+  { value: 'Attendance', label: 'Attendance' },
+  { value: 'Fees', label: 'Fees' },
+  { value: 'Documents', label: 'Documents' },
+  { value: 'Guardians', label: 'Guardians' },
+  { value: 'History', label: 'Timeline' },
+];
+
+const overflowTabs: Array<{ value: DetailTab; label: string }> = [
+  { value: 'Activity', label: 'Activity' },
+  { value: 'Health', label: 'Support & safety' },
+];
+
+const requestedTabAliases: Record<string, DetailTab> = {
+  Profile: 'Overview',
+  Academic: 'Academics',
+  Timeline: 'History',
+  'Support & Safety': 'Health',
+};
+
 export function StudentDetailPage({ studentId }: { studentId: string }) {
   const [pdfError, setPdfError] = useState('');
   const [isEditingStudent, setIsEditingStudent] = useState(false);
   const [editingGuardianId, setEditingGuardianId] = useState<string | null>(null);
+  const [isLifecycleOpen, setIsLifecycleOpen] = useState(false);
   const [lifecycleAction, setLifecycleAction] = useState<LifecycleAction | null>(null);
   const [lifecycleMessage, setLifecycleMessage] = useState('');
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>('Overview');
@@ -58,8 +82,11 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     }
 
     const requestedTab = searchParams.get('tab');
-    if (requestedTab && detailTabs.includes(requestedTab as DetailTab)) {
-      setActiveDetailTab(requestedTab as DetailTab);
+    if (!requestedTab) return;
+
+    const normalizedTab = requestedTabAliases[requestedTab] ?? requestedTab;
+    if (detailTabs.includes(normalizedTab as DetailTab)) {
+      setActiveDetailTab(normalizedTab as DetailTab);
     }
   }, [searchParams]);
 
@@ -133,26 +160,33 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   if (profileQuery.isLoading) return <LoadingState variant="page" label="Gathering student profile..." />;
   if (profileQuery.isError || !profileQuery.data) {
     return (
-      <EmptyState 
-        title="Student Profile Not Found" 
+      <EmptyState
+        title="Student Profile Not Found"
         description="The student record you are looking for does not exist or you do not have permission to view it."
       />
     );
   }
 
   const profile = profileQuery.data;
+  const activeOverflowTab = overflowTabs.find((tab) => tab.value === activeDetailTab);
 
   return (
     <div className="space-y-8 animate-fade-in pb-12">
-      <ProfileHeader 
-        profile={profile} 
-        onEdit={() => setIsEditingStudent(true)} 
+      <ProfileHeader
+        profile={profile}
+        onEdit={() => setIsEditingStudent(true)}
         onOpenIdCard={() => void openStudentPdf('id-card')}
+        onSelectTab={(tab) => setActiveDetailTab(tab)}
+        onManageLifecycle={() => {
+          setLifecycleMessage('');
+          setLifecycleAction(null);
+          setIsLifecycleOpen(true);
+        }}
         pdfError={pdfError}
       />
 
-      {isEditingStudent && (
-        <StudentEditCard 
+      {isEditingStudent ? (
+        <StudentEditCard
           profile={profile}
           isSaving={studentUpdateMutation.isPending}
           error={studentUpdateMutation.error}
@@ -164,39 +198,69 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
           onCancel={() => setIsEditingStudent(false)}
           onSave={(body) => studentUpdateMutation.mutate(body)}
         />
-      )}
+      ) : null}
 
-      <LifecyclePanel 
-        profile={profile}
-        clearance={feeClearanceQuery.data ?? null}
-        isCheckingClearance={feeClearanceQuery.isFetching}
-        onCheckClearance={() => void feeClearanceQuery.refetch()}
-        onSelectAction={setLifecycleAction}
-        action={lifecycleAction}
-        onCancelAction={() => setLifecycleAction(null)}
-        isSaving={lifecycleMutation.isPending}
-        message={lifecycleMessage}
-      />
+      {isLifecycleOpen ? (
+        <LifecyclePanel
+          profile={profile}
+          clearance={feeClearanceQuery.data ?? null}
+          isCheckingClearance={feeClearanceQuery.isFetching}
+          onCheckClearance={() => void feeClearanceQuery.refetch()}
+          onSelectAction={setLifecycleAction}
+          action={lifecycleAction}
+          onCancelAction={() => setLifecycleAction(null)}
+          onClose={() => {
+            setLifecycleAction(null);
+            setIsLifecycleOpen(false);
+          }}
+          isSaving={lifecycleMutation.isPending}
+          message={lifecycleMessage}
+        />
+      ) : null}
 
-      <Tabs value={activeDetailTab} onValueChange={(value) => setActiveDetailTab(value as DetailTab)} className="space-y-8">
-        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 rounded-2xl border border-[var(--color-mod-admissions-border)] bg-white p-2 shadow-sm">
-          {detailTabs.map((tab) => (
-            <TabsTrigger
-              key={tab}
-              value={tab}
-              className="min-h-11 flex-1 rounded-xl bg-transparent px-4 text-sm font-bold text-slate-500 shadow-none transition-all hover:bg-[var(--color-mod-admissions-bg)] hover:text-[var(--color-mod-admissions-text)] data-[state=active]:bg-[var(--color-mod-admissions-accent)] data-[state=active]:text-white data-[state=active]:shadow-sm"
-            >
-              {tab}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      <Tabs value={activeDetailTab} onValueChange={(value) => setActiveDetailTab(value as DetailTab)} className="space-y-6">
+        <div className="border-b border-slate-200">
+          <TabsList className="flex h-auto w-full items-center gap-1 overflow-x-auto rounded-none border-0 bg-transparent p-0 shadow-none">
+            {primaryTabs.map((tab) => (
+              <TabsTrigger
+                key={tab.value}
+                value={tab.value}
+                className="min-h-11 flex-none rounded-t-lg rounded-b-none border-b-2 border-transparent bg-transparent px-4 text-sm font-bold text-slate-500 shadow-none transition hover:bg-slate-50 hover:text-slate-900 data-[state=active]:border-[var(--color-mod-admissions-accent)] data-[state=active]:bg-transparent data-[state=active]:text-[var(--color-mod-admissions-text)] data-[state=active]:shadow-none"
+              >
+                {tab.label}
+              </TabsTrigger>
+            ))}
+            <ActionMenu
+              align="right"
+              label="More student profile sections"
+              trigger={
+                <button
+                  type="button"
+                  className={`flex min-h-11 flex-none items-center gap-1 rounded-t-lg border-b-2 px-4 text-sm font-bold transition ${
+                    activeOverflowTab
+                      ? 'border-[var(--color-mod-admissions-accent)] text-[var(--color-mod-admissions-text)]'
+                      : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                >
+                  <MoreHorizontal size={17} aria-hidden="true" />
+                  {activeOverflowTab?.label ?? 'More'}
+                </button>
+              }
+              items={overflowTabs.map((tab) => ({
+                label: tab.label,
+                icon: tab.value === 'Health' ? <ShieldCheck size={16} /> : undefined,
+                onClick: () => setActiveDetailTab(tab.value),
+              }))}
+            />
+          </TabsList>
+        </div>
 
         <div className="min-h-[400px]">
           <TabsContent value="Overview" className="mt-0">
-            <ProfileTabs.OverviewTab profile={profile} onOpenPdf={openStudentPdf} />
+            <ProfileTabs.OverviewTab profile={profile} onOpenPdf={openStudentPdf} onSelectTab={setActiveDetailTab} />
           </TabsContent>
           <TabsContent value="Guardians" className="mt-0">
-            <ProfileTabs.GuardiansTab 
+            <ProfileTabs.GuardiansTab
               guardians={profile.guardians}
               editingGuardianId={editingGuardianId}
               isSaving={guardianUpdateMutation.isPending}
@@ -210,7 +274,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
             <ProfileTabs.AcademicsTab profile={profile} onOpenPdf={openStudentPdf} />
           </TabsContent>
           <TabsContent value="Documents" className="mt-0">
-            <ProfileTabs.DocumentsTab 
+            <ProfileTabs.DocumentsTab
               studentId={studentId}
               documents={profile.documents}
               generatedDocuments={profile.generatedDocuments}
