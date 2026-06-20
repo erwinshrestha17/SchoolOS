@@ -6,6 +6,7 @@ Token-light global rules for agents. Detailed behavior lives in the active docs 
 
 Start with `README.md`, `docs/README.md`, `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`, `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`, and `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`. Then read the focused source for the touched area:
 
+- Formal business/product/requirements/design docs: `docs/product/SCHOOLOS_BRD.md`, `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `docs/requirements/SCHOOLOS_SRS.md`, `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`
 - Product/function: `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`
 - Architecture/security/platform: `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `docs/architecture/SCHOOLOS_NAMING_CONVENTIONS.md`, `docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md`
 - Notification module: `docs/architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md`
@@ -14,6 +15,19 @@ Start with `README.md`, `docs/README.md`, `docs/production/SCHOOLOS_GA_RELEASE_P
 - Deploy/staging: `docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md`
 
 Do not recreate old split plans or duplicate docs. Update the smallest active source of truth only when docs truly need changes.
+
+Formal ownership is fixed:
+
+| Artifact | Canonical path |
+|---|---|
+| BRD | `docs/product/SCHOOLOS_BRD.md` |
+| PRD | `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md` |
+| FRS | `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` |
+| SRS | `docs/requirements/SCHOOLOS_SRS.md` |
+| SDD | `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` |
+| MDD | `docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md` |
+
+Use `docs/project/SCHOOLOS_DOCUMENTATION_INVENTORY.md` for active/supporting/temporary/retired/archive decisions before creating, merging, archiving, or deleting Markdown.
 
 ## Active module taxonomy
 
@@ -43,7 +57,7 @@ Inventory & Asset Management is scrapped from the active module plan. Do not add
 
 ## Product stance and release target
 
-SchoolOS is a Nepal-first multi-tenant KG-12 school operating SaaS, not a CRUD dashboard and not an MVP delivery exercise. Every change must move the supported release boundary toward **Production / General Availability (GA)**.
+SchoolOS is a Nepal-first multi-tenant school operating SaaS for `PRESCHOOL`, `SCHOOL`, and `HIGHER_SECONDARY`, not a CRUD dashboard and not an MVP delivery exercise. Every change must move the supported release boundary toward **Production / General Availability (GA)**.
 
 Use the release stages defined in `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`:
 

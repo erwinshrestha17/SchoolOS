@@ -4,7 +4,14 @@ Scoped rules for `apps/api`. Root `AGENTS.md` applies first.
 
 ## Read
 
-Before API work, read relevant parts of root `AGENTS.md`, `docs/architecture/SCHOOLOS_NAMING_CONVENTIONS.md`, project status/plan, FRS, architecture/security, platform operations, Prisma schema, touched controller/service/DTO/tests, and OpenAPI/shared contracts.
+Before API work, read relevant parts of root `AGENTS.md`, `docs/architecture/SCHOOLOS_NAMING_CONVENTIONS.md`, project status/plan, FRS, SRS, SDD, MDD, platform operations, Prisma schema, touched controller/service/DTO/tests, and OpenAPI/shared contracts.
+
+Formal requirements/design owners:
+
+- FRS: `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`
+- SRS: `docs/requirements/SCHOOLOS_SRS.md`
+- SDD: `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`
+- MDD: `docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`
 
 ## Never break
 

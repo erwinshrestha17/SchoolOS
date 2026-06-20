@@ -1,6 +1,6 @@
 # SchoolOS
 
-SchoolOS is a production-grade, multi-tenant SaaS School Operating System for Nepal, with a staged product direction from Kindergarten / Montessori to Grade 12.
+SchoolOS is a production-grade, multi-tenant SaaS School Operating System for Nepal, with one shared platform that supports `PRESCHOOL`, `SCHOOL`, and `HIGHER_SECONDARY` as configurable experience packs.
 
 It is designed as a modular school operating platform covering admissions, student records, attendance, fees, academics, homework, timetable, HR/payroll, library, transport, canteen, accounting, notifications, notices, communication, chat, classroom learning, parent engagement, protected files, reporting readiness, and future intelligence/analytics.
 
@@ -12,6 +12,17 @@ Inventory & Asset Management is intentionally **scrapped from the active module 
 
 ## Source of Truth
 
+The formal source-of-truth hierarchy is:
+
+| Artifact | Owner |
+|---|---|
+| BRD | `docs/product/SCHOOLOS_BRD.md` |
+| PRD | `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md` |
+| FRS | `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` |
+| SRS | `docs/requirements/SCHOOLOS_SRS.md` |
+| SDD | `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` |
+| MDD | `docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md` |
+
 The consolidated active documentation set is:
 
 ```text
@@ -19,16 +30,20 @@ README.md
 AGENTS.md
 docs/README.md
 
+docs/product/SCHOOLOS_BRD.md
 docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
 docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
 docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md
+docs/requirements/SCHOOLOS_SRS.md
 
 docs/project/SCHOOLOS_PROJECT_STATUS.md
 docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
 docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md
 docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md
+docs/project/SCHOOLOS_DOCUMENTATION_INVENTORY.md
 
 docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
+docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md
 docs/architecture/SCHOOLOS_NAMING_CONVENTIONS.md
 docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
 docs/architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md
@@ -63,18 +78,20 @@ SchoolOS Intelligence = future teacher-reviewed analytics and safe AI after reli
 
 Cross-surface product allocation is defined in `docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`: backend owns official truth and workflow rules, web is the school operating desk, and mobile remains purpose-limited and persona-first.
 
-KG-12 expansion must be staged:
+SchoolOS uses one shared tenant-aware core plus configurable experience packs:
 
 ```text
-Stage A: Kindergarten / ECD / Montessori
-Stage B: Grade 1-3
-Stage C: Grade 4-5
-Stage D: Grade 6-8
-Stage E: Grade 9-10
-Stage F: Grade 11-12
+PRESCHOOL
+  Montessori, Nursery, LKG, UKG
+
+SCHOOL
+  Grade 1-10
+
+HIGHER_SECONDARY
+  Grade 11-12 / +2
 ```
 
-The current management modules remain the foundation. The Learning Layer is a separate domain that reuses existing students, teachers, classes, subjects, timetable, communication, File Registry, audit, RBAC, and tenant isolation. The Notification Module is explicit product scope and is not Intelligence/AI.
+Do not build separate preschool, school, and +2 products, databases, mobile apps, or student record systems. The current management modules remain the foundation. The Learning Layer is a separate domain that reuses existing students, teachers, classes, subjects, timetable, communication, File Registry, audit, RBAC, and tenant isolation. The Notification Module is explicit product scope and is not Intelligence/AI.
 
 ---
 
@@ -125,7 +142,7 @@ Staging/provider/storage/backup/restore verification: Blocked until staging envi
 Notification Module: Architecture documented; implementation/readiness claims still require code, provider, queue, browser, mobile, and staging evidence
 M13 Learning Layer: Implemented foundation; staging/browser/device depth remains staged
 M14 Intelligence/AI: Roadmap only
-KG-12 Expansion: Product direction added; Grade 11-12 and advanced learning features are staged future scope
+Stage-aware expansion: Preschool, School (Grade 1-10), and Higher Secondary / +2 product direction is documented; stage resolver, +2 streams, and advanced learning features remain staged future scope
 ```
 
 Latest audited local verification snapshot:

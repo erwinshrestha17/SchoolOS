@@ -1,10 +1,10 @@
 # SchoolOS Production Readiness Audit
 
-**Status:** Canonical evidence-based audit  
-**Audit date:** 2026-06-18  
-**Branch audited:** `main`  
-**Commit audited:** `edeef795ecd16b02ab046a4b45a4c68503ab6bfc`  
-**Current target recommendation:** Internal QA, with demo readiness for controlled local demonstrations  
+**Status:** Canonical evidence-based audit
+**Audit date:** 2026-06-18
+**Branch audited:** `main`
+**Commit audited:** `edeef795ecd16b02ab046a4b45a4c68503ab6bfc`
+**Current target recommendation:** Internal QA, with demo readiness for controlled local demonstrations
 
 This audit treats repository code, tests, CI, scripts, schema, migrations, deployment/runbook files, and commands run on 2026-06-18 as evidence. Documentation claims are not treated as proof by themselves.
 
@@ -171,6 +171,8 @@ This audit treats repository code, tests, CI, scripts, schema, migrations, deplo
 Deployment is `BLOCKED` across modules because no staging deployment, production env validation, provider validation, restore drill, or pilot smoke passed during this audit.
 
 ## Documentation Inventory and Consolidation Decisions
+
+The full current tracked Markdown inventory is now owned by `docs/project/SCHOOLOS_DOCUMENTATION_INVENTORY.md`. The table below is retained as the 2026-06-18 audit snapshot and should not be treated as the complete current inventory after the 2026-06-20 documentation consolidation pass.
 
 | Markdown File | Decision | Notes |
 | --- | --- | --- |

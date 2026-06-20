@@ -1,7 +1,12 @@
 # SchoolOS Architecture and Security
 
-**Last updated:** 2026-06-19  
-**Status:** Consolidated source of truth for storage boundaries, database scaling, cost-aware performance, tenant isolation, security rules, and active module numbering.  
+**Status:** Canonical SDD
+**Owner/audience:** CTO, lead NestJS developer, lead Next.js developer, senior Flutter developer, database designer, PostgreSQL DBA, security engineer, QA lead, DevOps/SRE, support/operations lead
+**Scope:** Architecture, service/module boundaries, data model direction, integration boundaries, runtime topology, authorization, security, files, queues, notifications, performance, backup/recovery, and operational design.
+**Precedence:** This document owns architectural rules and design constraints. Software requirements are owned by `../requirements/SCHOOLOS_SRS.md`; module design by `SCHOOLOS_MODULE_DESIGN_CATALOG.md`; product/functional behavior by `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md` and `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`; current readiness by `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
+**Inputs/source documents:** `../product/SCHOOLOS_BRD.md`, `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `../requirements/SCHOOLOS_SRS.md`, `SCHOOLOS_MODULE_DESIGN_CATALOG.md`, `SCHOOLOS_NOTIFICATION_ARCHITECTURE.md`, `SCHOOLOS_PLATFORM_OPERATIONS.md`, `../production/SCHOOLOS_GA_RELEASE_POLICY.md`, repository source inspected on 2026-06-20.
+**Out-of-scope content:** Endpoint URL invention, Prisma migrations for proposed structures, UI visual detail, staging credentials, and GA readiness claims.
+**Last reviewed date:** 2026-06-20
 **Architecture:** PostgreSQL-first, NestJS modular monolith, Redis/BullMQ, private object storage, cost-aware performance budgets.
 
 ---
@@ -31,6 +36,50 @@
 Inventory & Asset Management is not active scope.
 
 ---
+
+## 1A. Stage-Aware Shared-Core Architecture
+
+SchoolOS must support `PRESCHOOL`, `SCHOOL`, and `HIGHER_SECONDARY` as configurable experience packs over one shared core, not as separate products or data systems.
+
+The shared record model remains:
+
+```text
+Student
++ Guardian relationship
++ Student enrollment
++ Academic year
++ Class/section
++ stage/program classification
++ role and permission scope
++ enabled module/capability
+```
+
+Current code evidence shows shared `Tenant`, `Student`, `Guardian`, `StudentGuardian`, `Enrollment`, `AcademicYear`, `Class`, `Section`, and `Subject` models. A canonical program-offering, class stage profile, stream/subject-combination model, pickup/drop workflow model, and `ExperienceContext` contract were not verified in this pass and are therefore **proposed / needs schema design**.
+
+Backend-owned experience resolution must eventually derive from:
+
+```text
+Tenant program offerings
++ platform module entitlement
++ school-level configuration
++ class/section stage or program
++ active enrollment
++ user role
++ permission
++ teacher assignment
++ guardian-child relationship
++ enabled capability
+```
+
+The SRS owns the conceptual system diagram, non-functional requirements, data lifecycle matrix, and quality/operations matrix. The MDD owns module-stage applicability and the code-evidence gap matrix.
+
+Required architecture guardrails for proposed stage-aware work:
+
+1. Do not add `PreschoolStudent`, `PrimaryStudent`, `PlusTwoStudent`, or a separate app/database.
+2. Extend the shared tenant/student/enrollment/academic model only through reviewed schema design, migration replay, OpenAPI/shared DTO updates, web/mobile contract updates, and tests.
+3. Preschool pickup/drop, authorized pickup, temporary pickup changes, and care alerts must be narrow, auditable, and permission-scoped.
+4. Higher Secondary streams, subject combinations, practicals, projects, and lab timetables must be school-configurable, not hard-coded.
+5. Backend authorization must enforce the active experience independently of UI composition.
 
 ## 2. Storage and File Registry Architecture
 
