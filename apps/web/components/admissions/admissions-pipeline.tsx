@@ -1,617 +1,1064 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../lib/api';
-import { fileToBase64Payload } from '../../lib/files';
-import { SectionCard } from '../ui/section-card';
-import { Badge } from '../ui/badge';
-import { EmptyState } from '../ui/empty-state';
-import { StatusBadge } from '../ui/status-badge';
-import { cn } from '../../lib/utils';
-import { 
-  Search, 
-  Filter, 
-  User, 
-  FileText, 
-  CheckCircle2, 
-  AlertCircle, 
-  Upload, 
-  ExternalLink, 
-  Trash2, 
-  Phone, 
-  Calendar, 
-  ChevronRight, 
-  UserCheck, 
-  CreditCard, 
-  ShieldAlert,
+import type {
+  AdmissionApplication,
+  AdmissionApplicationStatus,
+} from '@schoolos/core';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import {
+  AlertTriangle,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardCheck,
+  FileWarning,
   Loader2,
-  Check
+  Search,
+  UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import { Toast, ToastTone } from '../ui/toast';
-import type { AdmissionSummary } from '@schoolos/core';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { api } from '../../lib/api';
+import { Button } from '../ui/button';
+import { EmptyState } from '../ui/empty-state';
+import { ErrorState } from '../ui/error-state';
+import { KpiCard, KpiGrid } from '../ui/kpi-card';
+import { LoadingState } from '../ui/loading-state';
+import { StatusBadge } from '../ui/status-badge';
 
-type AdmissionNotice = {
-  title: string;
-  description?: string;
-  tone: ToastTone;
+const PAGE_SIZE = 25;
+
+const APPLICATION_STATUSES: Array<{
+  value: AdmissionApplicationStatus;
+  label: string;
+}> = [
+  { value: 'INQUIRY', label: 'Inquiry' },
+  { value: 'APPLICATION', label: 'Application' },
+  { value: 'DOCUMENT_PENDING', label: 'Documents Pending' },
+  { value: 'ENTRANCE_INTERVIEW', label: 'Entrance / Interview' },
+  { value: 'ACCEPTED', label: 'Accepted' },
+  { value: 'ENROLLED', label: 'Enrolled' },
+  { value: 'REJECTED', label: 'Rejected' },
+];
+
+const NEXT_STATUSES: Record<
+  AdmissionApplicationStatus,
+  AdmissionApplicationStatus[]
+> = {
+  INQUIRY: ['APPLICATION', 'DOCUMENT_PENDING', 'REJECTED'],
+  APPLICATION: [
+    'DOCUMENT_PENDING',
+    'ENTRANCE_INTERVIEW',
+    'ACCEPTED',
+    'REJECTED',
+  ],
+  DOCUMENT_PENDING: [
+    'APPLICATION',
+    'ENTRANCE_INTERVIEW',
+    'ACCEPTED',
+    'REJECTED',
+  ],
+  ENTRANCE_INTERVIEW: ['DOCUMENT_PENDING', 'ACCEPTED', 'REJECTED'],
+  ACCEPTED: ['REJECTED'],
+  ENROLLED: [],
+  REJECTED: [],
 };
-
-const STAGES = [
-  { key: 'ACTIVE', label: 'Active' },
-  { key: 'PROMOTED', label: 'Promoted' },
-  { key: 'TRANSFERRED', label: 'Transferred' },
-  { key: 'EXITED', label: 'Exited' },
-] as const;
-
-// Documents to verify
-const REQUIRED_DOCS = [
-  { kind: 'BIRTH_CERTIFICATE', label: 'Birth Certificate', required: true },
-  { kind: 'TRANSFER_CERTIFICATE', label: 'Transfer Certificate', required: false },
-  { kind: 'PHOTO', label: 'Student Photo', required: true },
-  { kind: 'ID_CARD', label: 'Guardian ID Card', required: true }
-] as const;
 
 export function AdmissionsPipeline() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
-  const [selectedClassId, setSelectedClassId] = useState('');
-  const [selectedStage, setSelectedStage] = useState<string>('all');
-  const [selectedAdmissionId, setSelectedAdmissionId] = useState<string | null>(null);
-  
-  // File upload state per document kind
-  const [uploadingKind, setUploadingKind] = useState<string | null>(null);
-  const [verificationNotes, setVerificationNotes] = useState('');
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actionNotice, setActionNotice] = useState<AdmissionNotice | null>(null);
+  const deferredSearch = useDeferredValue(search);
+  const [classId, setClassId] = useState('');
+  const [status, setStatus] = useState<AdmissionApplicationStatus | ''>('');
+  const [page, setPage] = useState(1);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [actionError, setActionError] = useState('');
 
-  // Queries
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
-  const admissionsQuery = useQuery({ 
-    queryKey: ['admissions', search, selectedClassId, selectedStage], 
-    queryFn: () => api.listAdmissions({ 
-      search: search || undefined, 
-      classId: selectedClassId || undefined,
-      status: selectedStage === 'all' ? undefined : selectedStage,
-      limit: 30,
-    }) 
+  const classesQuery = useQuery({
+    queryKey: ['classes'],
+    queryFn: api.listClasses,
+  });
+  const academicYearsQuery = useQuery({
+    queryKey: ['academic-years'],
+    queryFn: api.listAcademicYears,
+  });
+  const applicationsQuery = useQuery({
+    queryKey: [
+      'admission-applications',
+      deferredSearch,
+      classId,
+      status,
+      page,
+    ],
+    queryFn: () =>
+      api.listAdmissionApplications({
+        search: deferredSearch || undefined,
+        classId: classId || undefined,
+        status: status || undefined,
+        page,
+        limit: PAGE_SIZE,
+      }),
   });
 
-  const selectedAdmission = admissionsQuery.data?.items.find(
-    (item) => item.id === selectedAdmissionId
-  ) || null;
+  const applications = useMemo(
+    () => applicationsQuery.data?.items ?? [],
+    [applicationsQuery.data?.items],
+  );
+  const selected =
+    applications.find((application) => application.id === selectedId) ?? null;
 
-  // Documents of selected admission
-  const documentsQuery = useQuery({
-    queryKey: ['student-documents', selectedAdmissionId],
-    queryFn: () => api.listStudentDocuments(selectedAdmissionId!),
-    enabled: !!selectedAdmissionId
-  });
-
-  // Mutations
-  const uploadDocMutation = useMutation({
-    mutationFn: (payload: any) => api.uploadStudentDocument(payload),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['student-documents', selectedAdmissionId] });
-      void queryClient.invalidateQueries({ queryKey: ['admissions'] });
-      setUploadingKind(null);
-    },
-    onError: (err: any) => {
-      setActionError(err.message || 'Failed to upload document');
+  useEffect(() => {
+    if (selectedId && !applications.some((item) => item.id === selectedId)) {
+      setSelectedId(null);
     }
-  });
+  }, [applications, selectedId]);
 
-  const verifyDocMutation = useMutation({
-    mutationFn: ({ id, status, notes }: { id: string; status: 'VERIFIED' | 'REJECTED'; notes: string }) => 
-      api.verifyStudentDocument(id, { status, notes }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['student-documents', selectedAdmissionId] });
-      void queryClient.invalidateQueries({ queryKey: ['admissions'] });
-      setVerificationNotes('');
-    },
-    onError: (err: any) => {
-      setActionError(err.message || 'Failed to verify document');
-    }
-  });
-
-  const deleteDocMutation = useMutation({
-    mutationFn: (id: string) => api.deleteStudentDocument(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['student-documents', selectedAdmissionId] });
-      void queryClient.invalidateQueries({ queryKey: ['admissions'] });
-    },
-    onError: (err: any) => {
-      setActionError(err.message || 'Failed to delete document');
-    }
-  });
-
-  const getAdmissionStage = (admission: AdmissionSummary) =>
-    admission.latestEnrollment?.status ?? 'NO_ENROLLMENT';
-
-  // Calculate stage index
-  const getStageIndex = (stage: string) => {
-    return STAGES.findIndex((s) => s.key === stage);
-  };
-
-  const filteredAdmissions = admissionsQuery.data?.items ?? [];
-
-  // Handle document upload
-  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>, kind: string) => {
-    const file = event.target.files?.[0];
-    if (!file || !selectedAdmissionId) return;
-
-    setActionError(null);
-    setUploadingKind(kind);
-
-    try {
-      const payload = await fileToBase64Payload(file);
-      uploadDocMutation.mutate({
-        studentId: selectedAdmissionId,
-        kind,
-        title: `${REQUIRED_DOCS.find(d => d.kind === kind)?.label ?? kind} - ${file.name}`,
-        fileName: file.name,
-        contentType: payload.contentType,
-        base64Content: payload.base64Content
+  const statusMutation = useMutation({
+    mutationFn: ({
+      applicationId,
+      nextStatus,
+      reason,
+    }: {
+      applicationId: string;
+      nextStatus: AdmissionApplicationStatus;
+      reason?: string;
+    }) =>
+      api.updateAdmissionApplicationStatus(applicationId, {
+        status: nextStatus,
+        ...(reason ? { reason } : {}),
+      }),
+    onSuccess: (updated) => {
+      setRejectionReason('');
+      setActionError('');
+      void queryClient.invalidateQueries({
+        queryKey: ['admission-applications'],
       });
-    } catch (err: any) {
-      setActionError(err.message || 'Error processing file');
-      setUploadingKind(null);
-    }
-  };
+      queryClient.setQueriesData(
+        { queryKey: ['admission-applications'] },
+        (current: unknown) => replaceApplication(current, updated),
+      );
+    },
+    onError: (error) => {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : 'Application status could not be changed.',
+      );
+    },
+  });
+
+  const filteredCount = applicationsQuery.data?.total ?? 0;
+  const duplicateWarnings = applications.filter(
+    (application) =>
+      (application.duplicateReview?.matches?.length ?? 0) > 0,
+  ).length;
+  const staleOnPage = applications.filter(
+    (application) =>
+      Date.now() - new Date(application.updatedAt).getTime() >
+      7 * 24 * 60 * 60 * 1000,
+  ).length;
+
+  if (classesQuery.isError || academicYearsQuery.isError) {
+    return (
+      <ErrorState
+        title="Admission filters could not load"
+        message="No application state was changed."
+        onRetry={() => {
+          void classesQuery.refetch();
+          void academicYearsQuery.refetch();
+        }}
+      />
+    );
+  }
 
   return (
-    <div className="grid min-h-[500px] grid-cols-1 gap-6 lg:h-[calc(100vh-12rem)] lg:grid-cols-12">
-      
-      {/* LEFT COLUMN: Pipeline List & Search */}
-      <div className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-5">
-        {/* Filters Header */}
-        <div className="p-5 border-b border-slate-100 bg-slate-50/50 space-y-4">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
-              <input
-                type="text"
-                placeholder="Search by student name or code"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm focus:border-[var(--color-mod-admissions-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
-              />
-            </div>
-            
-            <select
-              value={selectedClassId}
-              onChange={(e) => setSelectedClassId(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
-            >
-              <option value="">All Classes</option>
-              {classesQuery.data?.map((cls) => (
-                <option key={cls.id} value={cls.id}>{cls.name}</option>
-              ))}
-            </select>
-          </div>
+    <div className="space-y-5">
+      <KpiGrid className="sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          title="Matching applications"
+          value={filteredCount}
+          icon={<ClipboardCheck size={18} />}
+          tone="info"
+          description="Backend total for the current filters"
+        />
+        <KpiCard
+          title="Duplicate warnings"
+          value={duplicateWarnings}
+          icon={<AlertTriangle size={18} />}
+          tone={duplicateWarnings ? 'warning' : 'success'}
+          description="Warnings on this page; no aggregate contract"
+        />
+        <KpiCard
+          title="No update in 7 days"
+          value={staleOnPage}
+          icon={<CalendarDays size={18} />}
+          tone={staleOnPage ? 'warning' : 'success'}
+          description="Derived age label for this page, not an official KPI"
+        />
+        <KpiCard
+          title="Application stages"
+          value={APPLICATION_STATUSES.length}
+          icon={<UserRound size={18} />}
+          tone="neutral"
+          description="Backend workflow statuses"
+        />
+      </KpiGrid>
 
-          {/* Pipeline Stage Quick Tabs */}
-          <div className="flex flex-wrap gap-1 p-1 bg-slate-100 rounded-xl text-xs font-bold">
-            <button
-              onClick={() => setSelectedStage('all')}
-              className={cn(
-                "flex-1 rounded-lg py-1.5 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]",
-                selectedStage === 'all' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
-              )}
-            >
-              All ({selectedStage === 'all' ? admissionsQuery.data?.total ?? 0 : 'server'})
-            </button>
-            {STAGES.map((stg) => {
-              return (
-                <button
-                  key={stg.key}
-                  onClick={() => setSelectedStage(stg.key)}
-                  className={cn(
-                    "flex-1 rounded-lg py-1.5 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]",
-                    selectedStage === stg.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
-                  )}
+      <div className="grid min-h-[580px] gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="space-y-4 border-b border-slate-100 bg-slate-50/70 p-4">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_190px]">
+              <label className="relative">
+                <span className="sr-only">Search applications</span>
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Student, guardian, or phone"
+                  className="pl-9"
+                />
+              </label>
+              <select
+                value={classId}
+                onChange={(event) => {
+                  setClassId(event.target.value);
+                  setPage(1);
+                }}
+                aria-label="Filter by requested class"
+              >
+                <option value="">All requested classes</option>
+                {(classesQuery.data ?? []).map((schoolClass) => (
+                  <option key={schoolClass.id} value={schoolClass.id}>
+                    {schoolClass.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              <FilterButton
+                active={status === ''}
+                onClick={() => {
+                  setStatus('');
+                  setPage(1);
+                }}
+              >
+                All
+              </FilterButton>
+              {APPLICATION_STATUSES.map((item) => (
+                <FilterButton
+                  key={item.value}
+                  active={status === item.value}
+                  onClick={() => {
+                    setStatus(item.value);
+                    setPage(1);
+                  }}
                 >
-                  {stg.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Candidate List */}
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-          {admissionsQuery.isLoading ? (
-            <div className="p-8 text-center">
-              <Loader2 className="h-8 w-8 text-[var(--color-mod-admissions-accent)] animate-spin mx-auto mb-2" />
-              <p className="text-sm text-slate-500 font-medium">Loading admissions...</p>
+                  {item.label}
+                </FilterButton>
+              ))}
             </div>
-          ) : filteredAdmissions.length === 0 ? (
-            <div className="p-8 text-center">
-              <EmptyState
-                title="No applicants found"
-                description={search || selectedClassId !== '' ? "Try adjustments to search or filters." : "Admit student to populate files."}
-              />
+          </div>
+
+          {applicationsQuery.isLoading ? (
+            <LoadingState
+              variant="skeleton"
+              label="Loading admission applications…"
+            />
+          ) : applicationsQuery.isError ? (
+            <ErrorState
+              title="Applications could not load"
+              message="Your filters are preserved. Retry without changing workflow state."
+              onRetry={() => void applicationsQuery.refetch()}
+            />
+          ) : applications.length === 0 ? (
+            <EmptyState
+              title="No applications found"
+              description={
+                search || classId || status
+                  ? 'No application matches the current filters.'
+                  : 'Create the first inquiry/application to start the review pipeline.'
+              }
+              action={
+                <Link
+                  href="/dashboard/admissions/new"
+                  className="inline-flex min-h-11 items-center rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-sm font-bold text-white hover:bg-[var(--color-mod-admissions-text)]"
+                >
+                  New application
+                </Link>
+              }
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[820px] text-left text-sm">
+                <thead className="bg-slate-50 text-[0.68rem] font-black uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Applicant</th>
+                    <th className="px-4 py-3">Guardian</th>
+                    <th className="px-4 py-3">Requested class</th>
+                    <th className="px-4 py-3">Stage</th>
+                    <th className="px-4 py-3">Duplicate review</th>
+                    <th className="px-4 py-3">Updated</th>
+                    <th className="px-4 py-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {applications.map((application) => {
+                    const duplicateCount =
+                      application.duplicateReview?.matches?.length ?? 0;
+                    const active = application.id === selectedId;
+                    return (
+                      <tr
+                        key={application.id}
+                        className={
+                          active
+                            ? 'bg-[var(--color-mod-admissions-soft)]'
+                            : 'hover:bg-slate-50'
+                        }
+                      >
+                        <td className="px-4 py-3">
+                          <strong className="block text-slate-900">
+                            {application.fullNameEn}
+                          </strong>
+                          <span className="text-xs text-slate-500">
+                            {application.source || 'Source not recorded'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="block font-semibold text-slate-700">
+                            {application.guardianFullName ||
+                              'Guardian not recorded'}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            {application.guardianPhone || 'Phone not recorded'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {classNameFor(
+                            application.classId,
+                            classesQuery.data ?? [],
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <StatusBadge status={application.status} />
+                        </td>
+                        <td className="px-4 py-3">
+                          {duplicateCount ? (
+                            <StatusBadge
+                              status={`${duplicateCount} TO REVIEW`}
+                              tone="pending"
+                            />
+                          ) : (
+                            <StatusBadge status="NO WARNING" tone="approved" />
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500">
+                          {new Date(application.updatedAt).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedId(application.id);
+                              setActionError('');
+                              setRejectionReason('');
+                            }}
+                          >
+                            Review
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between border-t border-slate-100 p-4">
+            <p className="text-xs font-semibold text-slate-500">
+              Page {applicationsQuery.data?.page ?? page} · {filteredCount}{' '}
+              matching applications
+            </p>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={page <= 1}
+                onClick={() => setPage((current) => current - 1)}
+              >
+                Previous
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!applicationsQuery.data?.hasNextPage}
+                onClick={() => setPage((current) => current + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <aside
+          className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:sticky xl:top-24"
+          aria-label="Application review panel"
+        >
+          {!selected ? (
+            <div className="py-12 text-center">
+              <ClipboardCheck className="mx-auto h-10 w-10 text-[var(--color-mod-admissions-accent)]" />
+              <h2 className="mt-3 text-base font-black text-slate-950">
+                Application review
+              </h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Select an application to review recorded details, duplicate
+                warnings, workflow actions, and enrollment state.
+              </p>
             </div>
           ) : (
-            filteredAdmissions.map((admission) => {
-              const stage = getAdmissionStage(admission);
-              const isSelected = selectedAdmissionId === admission.id;
-              
-              return (
-                <div
-                  key={admission.id}
-                  onClick={() => {
-                    setSelectedAdmissionId(admission.id);
-                    setActionError(null);
-                  }}
-                  className={cn(
-                    "p-5 cursor-pointer flex items-center justify-between transition-all hover:bg-slate-50",
-                    isSelected ? "bg-[var(--color-mod-admissions-soft)] hover:bg-[var(--color-mod-admissions-soft)] border-l-4 border-[var(--color-mod-admissions-accent)] pl-4" : ""
-                  )}
-                >
-                  <div className="space-y-1.5">
-                    <h4 className="text-sm font-bold text-slate-900">{admission.fullNameEn}</h4>
-                    <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                      <span>{admission.studentSystemId}</span>
-                      <span>•</span>
-                      <span>Class {admission.className}</span>
-                    </div>
-                    {admission.guardians && admission.guardians[0] && (
-                      <p className="text-[0.7rem] text-slate-400 font-medium">
-                        Guardian: {admission.guardians[0].fullName} ({admission.guardians[0].relation})
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <Badge variant={stage === 'ACTIVE' ? 'success' : stage === 'TRANSFERRED' || stage === 'EXITED' ? 'warning' : 'info'}>
-                      {STAGES.find((s) => s.key === stage)?.label ?? stage}
-                    </Badge>
-                    <span className="text-[0.65rem] text-slate-400 font-medium">
-                      {admission.documentCount} docs
-                    </span>
-                  </div>
-                </div>
-              );
-            })
+            <ApplicationInspector
+              key={selected.id}
+              application={selected}
+              classes={classesQuery.data ?? []}
+              academicYears={academicYearsQuery.data ?? []}
+              rejectionReason={rejectionReason}
+              setRejectionReason={setRejectionReason}
+              actionError={actionError}
+              mutationPending={statusMutation.isPending}
+              onTransition={(nextStatus) => {
+                if (
+                  nextStatus === 'REJECTED' &&
+                  rejectionReason.trim().length < 5
+                ) {
+                  setActionError(
+                    'Enter a rejection reason of at least five characters.',
+                  );
+                  return;
+                }
+                statusMutation.mutate({
+                  applicationId: selected.id,
+                  nextStatus,
+                  reason:
+                    nextStatus === 'REJECTED'
+                      ? rejectionReason.trim()
+                      : undefined,
+                });
+              }}
+              onEnrolled={() => {
+                void queryClient.invalidateQueries({
+                  queryKey: ['admission-applications'],
+                });
+                void queryClient.invalidateQueries({ queryKey: ['students'] });
+                void queryClient.invalidateQueries({ queryKey: ['admissions'] });
+              }}
+            />
           )}
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function ApplicationInspector({
+  application,
+  classes,
+  academicYears,
+  rejectionReason,
+  setRejectionReason,
+  actionError,
+  mutationPending,
+  onTransition,
+  onEnrolled,
+}: {
+  application: AdmissionApplication;
+  classes: Array<{ id: string; name: string }>;
+  academicYears: Array<{ id: string; name: string }>;
+  rejectionReason: string;
+  setRejectionReason: (value: string) => void;
+  actionError: string;
+  mutationPending: boolean;
+  onTransition: (status: AdmissionApplicationStatus) => void;
+  onEnrolled: () => void;
+}) {
+  const duplicateMatches = application.duplicateReview?.matches ?? [];
+  const nextStatuses = NEXT_STATUSES[application.status];
+
+  return (
+    <div className="space-y-5">
+      <div className="border-b border-slate-100 pb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-black text-slate-950">
+            {application.fullNameEn}
+          </h2>
+          <StatusBadge status={application.status} />
         </div>
+        <p className="mt-2 text-xs font-semibold text-slate-500">
+          Created {new Date(application.createdAt).toLocaleString()}
+        </p>
       </div>
 
-      {/* RIGHT COLUMN: Stepper & Checklist Workspace */}
-      <div className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-7">
-        {selectedAdmission ? (
-          <div className="flex flex-col h-full">
-            
-            {/* Candidate Header */}
-            <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <span className="text-[0.65rem] font-extrabold uppercase tracking-widest text-[var(--color-mod-admissions-text)]">Pipeline Workspace</span>
-                <h3 className="text-xl font-extrabold text-slate-900 mt-1">{selectedAdmission.fullNameEn}</h3>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">
-                  Class {selectedAdmission.className} {selectedAdmission.sectionName ? `• Section ${selectedAdmission.sectionName}` : ''}
+      <dl className="grid gap-3 rounded-xl bg-slate-50 p-4 text-xs">
+        <InspectorRow
+          label="Academic year"
+          value={academicYearNameFor(
+            application.academicYearId,
+            academicYears,
+          )}
+        />
+        <InspectorRow
+          label="Requested class"
+          value={classNameFor(application.classId, classes)}
+        />
+        <InspectorRow
+          label="Guardian"
+          value={application.guardianFullName || 'Guardian not recorded'}
+        />
+        <InspectorRow
+          label="Guardian phone"
+          value={application.guardianPhone || 'Guardian phone not entered'}
+        />
+        <InspectorRow
+          label="Previous school"
+          value={application.previousSchool || 'Previous school not recorded'}
+        />
+        <InspectorRow
+          label="Date of birth"
+          value={
+            application.dateOfBirth
+              ? new Date(application.dateOfBirth).toLocaleDateString()
+              : 'Date of birth not entered'
+          }
+        />
+      </dl>
+
+      {application.notes ? (
+        <div>
+          <h3 className="text-xs font-black uppercase tracking-wide text-slate-500">
+            Review notes
+          </h3>
+          <p className="mt-2 whitespace-pre-wrap rounded-xl border border-slate-100 p-3 text-sm text-slate-700">
+            {application.notes}
+          </p>
+        </div>
+      ) : null}
+
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-xs font-black uppercase tracking-wide text-slate-500">
+            Duplicate review
+          </h3>
+          <StatusBadge
+            status={
+              duplicateMatches.length
+                ? `${duplicateMatches.length} WARNING`
+                : 'NO WARNING'
+            }
+            tone={duplicateMatches.length ? 'pending' : 'approved'}
+          />
+        </div>
+        {duplicateMatches.length ? (
+          <div className="mt-2 space-y-2">
+            {duplicateMatches.slice(0, 3).map((match) => (
+              <div
+                key={match.studentId}
+                className="rounded-xl border border-warning-200 bg-warning-50 p-3"
+              >
+                <p className="text-xs font-black text-warning-900">
+                  {match.fullNameEn} · {match.studentSystemId}
+                </p>
+                <p className="mt-1 text-xs text-warning-800">
+                  {match.matchTypes.join(', ') || 'Possible duplicate'}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <Link
-                  href={`/dashboard/students/${selectedAdmission.id}`}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-all hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
-                >
-                  Full Profile
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Visual Stepper */}
-            <div className="p-6 border-b border-slate-100 bg-white">
-              <div className="flex justify-between items-center relative">
-                {/* Enrollment states are backend-owned; this is a status legend, not a derived workflow. */}
-                <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 -z-10" />
-                
-                {STAGES.map((stg, idx) => {
-                  const currentStage = getAdmissionStage(selectedAdmission);
-                  const currentIdx = getStageIndex(currentStage);
-                  const isCompleted = false;
-                  const isActive = idx === currentIdx;
-
-                  return (
-                    <div key={stg.key} className="flex flex-col items-center gap-1 z-10">
-                      <div
-                        className={cn(
-                          "w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold border transition-all duration-300",
-                          isCompleted ? "bg-success-500 border-success-500 text-white shadow-md shadow-success-500/20" :
-                          isActive ? "bg-[var(--color-mod-admissions-accent)] border-[var(--color-mod-admissions-accent)] text-white shadow-sm ring-4 ring-[var(--color-mod-admissions-soft)]" :
-                          "bg-white border-slate-200 text-slate-400"
-                        )}
-                      >
-                        {isCompleted ? <Check className="h-4 w-4 stroke-[3px]" /> : idx + 1}
-                      </div>
-                      <span className={cn(
-                        "text-[0.68rem] font-bold mt-1",
-                        isActive ? "text-slate-900 font-extrabold" : "text-slate-400"
-                      )}>
-                        {stg.label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Details and Checklist Tabs */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {actionError && (
-                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100 text-rose-700 text-xs font-bold flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  {actionError}
-                </div>
-              )}
-              {actionNotice ? (
-                <Toast
-                  title={actionNotice.title}
-                  description={actionNotice.description}
-                  tone={actionNotice.tone}
-                  onDismiss={() => setActionNotice(null)}
-                />
-              ) : null}
-
-              {/* Grid split of details */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Personal & Guardian details */}
-                <div className="space-y-5">
-                  <div className="rounded-2xl border border-slate-200 p-5 space-y-4">
-                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">Guardian Contacts</h4>
-                    {selectedAdmission.guardians && selectedAdmission.guardians.length > 0 ? (
-                      <div className="space-y-4">
-                        {selectedAdmission.guardians.map((guar) => (
-                          <div key={guar.id} className="flex items-start justify-between">
-                            <div>
-                              <p className="text-sm font-bold text-slate-800">{guar.fullName}</p>
-                              <p className="text-xs text-slate-500 font-medium capitalize">{guar.relation} {guar.isPrimary && '• Primary'}</p>
-                            </div>
-                            {guar.primaryPhone && (
-                              <a
-                                href={`tel:${guar.primaryPhone}`}
-                                className="h-8 w-8 rounded-xl bg-[var(--color-mod-admissions-soft)] hover:bg-[var(--color-mod-admissions-border)] text-[var(--color-mod-admissions-text)] flex items-center justify-center transition-all"
-                                title="Call Guardian"
-                              >
-                                <Phone className="h-3.5 w-3.5" />
-                              </a>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-500">No guardians registered.</p>
-                    )}
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 p-5 space-y-4">
-                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">Academic Placement</h4>
-                    <div className="grid grid-cols-2 gap-4 text-xs font-bold">
-                      <div>
-                        <span className="text-[0.65rem] text-slate-400 uppercase">Roll Number</span>
-                        <p className="text-slate-800 mt-0.5">{selectedAdmission.rollNumber ?? 'Not assigned'}</p>
-                      </div>
-                      <div>
-                        <span className="text-[0.65rem] text-slate-400 uppercase">Academic Year</span>
-                        <p className="text-slate-800 mt-0.5">{selectedAdmission.latestEnrollment?.academicYear ?? 'Academic year not assigned'}</p>
-                      </div>
-                      <div>
-                        <span className="text-[0.65rem] text-slate-400 uppercase">Enrollment Status</span>
-                        <p className="text-slate-800 mt-0.5">
-                          {selectedAdmission.latestEnrollment?.status ?? 'Not enrolled'}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-[0.65rem] text-slate-400 uppercase">Invoice Status</span>
-                        <p className="mt-0.5">
-                          {selectedAdmission.latestInvoice ? (
-                            <span className={cn(
-                              "underline",
-                              selectedAdmission.latestInvoice.status === 'PAID' ? "text-success-600" : "text-danger-600"
-                            )}>
-                              {selectedAdmission.latestInvoice.invoiceNumber} ({selectedAdmission.latestInvoice.status})
-                            </span>
-                          ) : 'No Invoices'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Document Verification Checklist */}
-                <div className="space-y-4 rounded-2xl border border-slate-200 p-5">
-                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">Document Checklist</h4>
-                  
-                  {documentsQuery.isLoading ? (
-                    <div className="text-center py-4">
-                      <Loader2 className="h-5 w-5 text-[var(--color-mod-admissions-accent)] animate-spin mx-auto" />
-                    </div>
-                  ) : (
-                    <div className="space-y-3.5">
-                      {REQUIRED_DOCS.map((docSpec) => {
-                        // Find matching document of this kind
-                        const match = (documentsQuery.data ?? []).find(
-                          (d: any) => d.kind === docSpec.kind
-                        );
-
-                        return (
-                          <div key={docSpec.kind} className="p-3 border border-slate-100 rounded-xl bg-slate-50/50 flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className={cn(
-                                  "h-4 w-4 rounded-full flex items-center justify-center text-[0.6rem] font-bold text-white",
-                                  match?.status === 'VERIFIED' ? "bg-success-500" : 
-                                  match ? "bg-amber-500" : "bg-slate-200"
-                                )}>
-                                  {match?.status === 'VERIFIED' ? <Check className="h-2.5 w-2.5" /> : '!'}
-                                </div>
-                                <span className="text-xs font-bold text-slate-800">
-                                  {docSpec.label} {docSpec.required && <span className="text-danger-500">*</span>}
-                                </span>
-                              </div>
-                              
-                              {/* Action Trigger / Status */}
-                              {match ? (
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      try {
-                                        const res = await api.previewStudentDocument(
-                                          selectedAdmission.id,
-                                          match.id,
-                                        );
-                                        window.open(
-                                          res.url,
-                                          '_blank',
-                                          'noopener,noreferrer',
-                                        );
-                                      } catch (err) {
-                                        setActionNotice({
-                                          title: 'Could not preview document',
-                                          description: 'The protected preview link could not be created.',
-                                          tone: 'danger',
-                                        });
-                                      }
-                                    }}
-                                    className="p-1 text-slate-400 transition-colors hover:text-[var(--color-mod-admissions-text)]"
-                                    title="Preview"
-                                  >
-                                    <ExternalLink className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => deleteDocMutation.mutate(match.id)}
-                                    className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <label className="cursor-pointer text-[0.68rem] font-bold text-[var(--color-mod-admissions-text)] hover:text-[var(--color-mod-admissions-accent)] flex items-center gap-1">
-                                  <Upload className="h-3 w-3" />
-                                  {uploadingKind === docSpec.kind ? 'Uploading...' : 'Upload'}
-                                  <input
-                                    type="file"
-                                    className="hidden"
-                                    onChange={(e) => handleUpload(e, docSpec.kind)}
-                                    disabled={uploadingKind !== null}
-                                  />
-                                </label>
-                              )}
-                            </div>
-
-                            {/* Document details / Verification workflow */}
-                            {match && (
-                              <div className="text-[0.68rem] border-t border-slate-100 pt-2 flex flex-col gap-1.5">
-                                <div className="flex justify-between text-slate-500">
-                                  <span>{match.fileName}</span>
-                                  <span className="font-bold uppercase tracking-wider text-[0.55rem]">
-                                    {match.status}
-                                  </span>
-                                </div>
-                                {match.status !== 'VERIFIED' && (
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <input
-                                      type="text"
-                                      placeholder="Quick verification note..."
-                                      value={verificationNotes}
-                                      onChange={(e) => setVerificationNotes(e.target.value)}
-                                      className="flex-1 px-2.5 py-1 text-[0.65rem] border border-slate-200 rounded-lg focus:outline-none"
-                                    />
-                                    <button
-                                      onClick={() => verifyDocMutation.mutate({ id: match.id, status: 'VERIFIED', notes: verificationNotes })}
-                                      className="px-2.5 py-1 bg-success-500 text-white rounded-lg font-bold hover:bg-success-600 transition-all text-[0.65rem] whitespace-nowrap"
-                                    >
-                                      Approve
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-              </div>
-
-            </div>
-
-            {/* Bottom Actions Workspace Panel */}
-            <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-4">
-              <div className="text-xs text-slate-500 font-medium">
-                {getAdmissionStage(selectedAdmission) === 'Admitted' ? (
-                  <span className="flex items-center gap-1.5 text-success-700 font-bold">
-                    <CheckCircle2 className="h-4 w-4 text-success-500" />
-                    Enrolled successfully.
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5 text-amber-700 font-bold">
-                    <ShieldAlert className="h-4 w-4 text-amber-500" />
-                    Complete document review before enrollment verification.
-                  </span>
-                )}
-              </div>
-              
-              <div className="flex items-center gap-2">
-                {getAdmissionStage(selectedAdmission) === 'Admitted' ? (
-                  <>
-                    {selectedAdmission.latestInvoice && (
-                      <Link
-                        href={`/dashboard/finance?studentId=${selectedAdmission.id}`}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-mod-admissions-accent)] px-5 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
-                      >
-                        <CreditCard className="h-3.5 w-3.5" />
-                        Collect Fee
-                      </Link>
-                    )}
-                    <button
-                      onClick={async () => {
-                        try {
-                          await api.openStudentDocumentPdf(selectedAdmission.id, 'ID_CARD');
-                        } catch (err) {
-                          setActionNotice({
-                            title: 'Could not open ID card',
-                            description: 'The ID-card PDF could not be generated or viewed.',
-                            tone: 'danger',
-                          });
-                        }
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-mod-admissions-accent)] px-5 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
-                    >
-                      <UserCheck className="h-3.5 w-3.5" />
-                      Print ID Card
-                    </button>
-                  </>
-                ) : (
-                  <Link
-                    href={`/dashboard/students/${selectedAdmission.id}`}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-mod-admissions-accent)] px-5 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
-                  >
-                    Open Student Review
-                  </Link>
-                )}
-              </div>
-            </div>
-
+            ))}
+            <Link
+              href="/dashboard/admissions/duplicates"
+              className="inline-flex text-xs font-bold text-[var(--color-mod-admissions-text)] hover:text-[var(--color-mod-admissions-accent)]"
+            >
+              Open full duplicate review
+            </Link>
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center p-12 text-center bg-slate-50/50">
-            <EmptyState
-              title="No Applicant Selected"
-              description="Click on an applicant from the list on the left to load their pipeline workspace and document checklist."
-            />
-          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            The backend returned no duplicate warning when this application was
+            created.
+          </p>
         )}
       </div>
 
+      {application.status === 'ACCEPTED' ? (
+        <EnrollmentConversion
+          application={application}
+          onEnrolled={onEnrolled}
+        />
+      ) : null}
+
+      {application.status === 'ENROLLED' &&
+      application.convertedStudentId ? (
+        <div className="rounded-xl border border-success-200 bg-success-50 p-4">
+          <div className="flex items-center gap-2 text-success-800">
+            <CheckCircle2 className="h-4 w-4" />
+            <strong className="text-sm">Student enrolled</strong>
+          </div>
+          <Link
+            href={`/dashboard/students/${application.convertedStudentId}`}
+            className="mt-3 inline-flex text-sm font-bold text-success-800 underline"
+          >
+            Open student profile
+          </Link>
+        </div>
+      ) : null}
+
+      {nextStatuses.length ? (
+        <div className="border-t border-slate-100 pt-4">
+          <h3 className="text-xs font-black uppercase tracking-wide text-slate-500">
+            Allowed workflow actions
+          </h3>
+          {nextStatuses.includes('REJECTED') ? (
+            <label className="mt-3 block space-y-2 text-xs font-bold text-slate-700">
+              Rejection reason
+              <textarea
+                rows={3}
+                value={rejectionReason}
+                onChange={(event) => setRejectionReason(event.target.value)}
+                placeholder="Required only when rejecting"
+              />
+            </label>
+          ) : null}
+          <div className="mt-3 grid gap-2">
+            {nextStatuses.map((nextStatus) => (
+              <Button
+                key={nextStatus}
+                type="button"
+                variant={nextStatus === 'REJECTED' ? 'outline' : 'default'}
+                disabled={mutationPending}
+                onClick={() => onTransition(nextStatus)}
+                className={
+                  nextStatus === 'REJECTED'
+                    ? 'border-danger-200 text-danger-700 hover:bg-danger-50'
+                    : ''
+                }
+              >
+                {mutationPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : null}
+                {transitionLabel(nextStatus)}
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {application.status === 'REJECTED' && application.rejectedReason ? (
+        <div className="rounded-xl border border-danger-200 bg-danger-50 p-3">
+          <p className="text-xs font-black uppercase tracking-wide text-danger-700">
+            Rejection reason
+          </p>
+          <p className="mt-1 text-sm text-danger-800">
+            {application.rejectedReason}
+          </p>
+        </div>
+      ) : null}
+
+      {actionError ? (
+        <p
+          className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-xs font-bold text-danger-800"
+          role="alert"
+        >
+          {actionError}
+        </p>
+      ) : null}
     </div>
   );
+}
+
+function EnrollmentConversion({
+  application,
+  onEnrolled,
+}: {
+  application: AdmissionApplication;
+  onEnrolled: () => void;
+}) {
+  const academicYearsQuery = useQuery({
+    queryKey: ['academic-years'],
+    queryFn: api.listAcademicYears,
+  });
+  const classesQuery = useQuery({
+    queryKey: ['classes'],
+    queryFn: api.listClasses,
+  });
+  const sectionsQuery = useQuery({
+    queryKey: ['sections'],
+    queryFn: api.listSections,
+  });
+
+  const [form, setForm] = useState({
+    dateOfBirth: application.dateOfBirth?.slice(0, 10) ?? '',
+    gender: application.gender ?? 'FEMALE',
+    admissionDate: new Date().toISOString().slice(0, 10),
+    academicYearId: application.academicYearId ?? '',
+    classId: application.classId ?? '',
+    sectionId: application.sectionId ?? '',
+    guardianFullName: application.guardianFullName ?? '',
+    guardianRelation: application.guardianRelation ?? 'guardian',
+    guardianPhone: application.guardianPhone ?? '',
+    mediumOfInstruction: 'English',
+    disabilityFlag: '',
+    confirmNoDisability: false,
+  });
+  const [error, setError] = useState('');
+
+  const availableSections = useMemo(
+    () =>
+      (sectionsQuery.data ?? []).filter((section) => {
+        const candidateClassId = section.classId ?? section.class?.id;
+        return !form.classId || candidateClassId === form.classId;
+      }),
+    [form.classId, sectionsQuery.data],
+  );
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      api.enrollAdmissionApplication(application.id, {
+        firstNameEn: application.firstNameEn,
+        lastNameEn: application.lastNameEn,
+        ...(application.firstNameNp
+          ? { firstNameNp: application.firstNameNp }
+          : {}),
+        ...(application.lastNameNp
+          ? { lastNameNp: application.lastNameNp }
+          : {}),
+        dateOfBirth: new Date(form.dateOfBirth).toISOString(),
+        gender: form.gender,
+        admissionDate: new Date(form.admissionDate).toISOString(),
+        academicYearId: form.academicYearId,
+        classId: form.classId,
+        ...(form.sectionId ? { sectionId: form.sectionId } : {}),
+        mediumOfInstruction: form.mediumOfInstruction,
+        ...(form.disabilityFlag
+          ? { disabilityFlag: form.disabilityFlag }
+          : {}),
+        confirmNoDisability: form.confirmNoDisability,
+        guardians: [
+          {
+            fullName: form.guardianFullName,
+            relation: form.guardianRelation,
+            primaryPhone: form.guardianPhone,
+            isPrimary: true,
+            receivesAlerts: true,
+          },
+        ],
+        documents: [],
+      }),
+    onSuccess: () => {
+      setError('');
+      onEnrolled();
+    },
+    onError: (mutationError) => {
+      setError(
+        mutationError instanceof Error
+          ? mutationError.message
+          : 'Application could not be enrolled.',
+      );
+    },
+  });
+
+  function update(key: keyof typeof form, value: string | boolean) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function submit() {
+    setError('');
+    if (
+      !form.dateOfBirth ||
+      !form.admissionDate ||
+      !form.academicYearId ||
+      !form.classId ||
+      !form.guardianFullName.trim() ||
+      !form.guardianRelation.trim() ||
+      !form.guardianPhone.trim()
+    ) {
+      setError('Complete all required enrollment and guardian fields.');
+      return;
+    }
+    if (!form.confirmNoDisability && !form.disabilityFlag.trim()) {
+      setError(
+        'Confirm no known disability or record the applicable disability information.',
+      );
+      return;
+    }
+    mutation.mutate();
+  }
+
+  return (
+    <div className="rounded-xl border border-success-200 bg-success-50/60 p-4">
+      <div className="flex items-center gap-2">
+        <CheckCircle2 className="h-4 w-4 text-success-700" />
+        <h3 className="text-sm font-black text-success-900">
+          Accepted — ready for enrollment review
+        </h3>
+      </div>
+      <p className="mt-1 text-xs text-success-800">
+        The backend creates the student, enrollment, and guardian atomically.
+      </p>
+      <div className="mt-4 grid gap-3">
+        <CompactField label="Date of birth">
+          <input
+            type="date"
+            value={form.dateOfBirth}
+            onChange={(event) => update('dateOfBirth', event.target.value)}
+          />
+        </CompactField>
+        <CompactField label="Gender">
+          <select
+            value={form.gender}
+            onChange={(event) => update('gender', event.target.value)}
+          >
+            <option value="FEMALE">Female</option>
+            <option value="MALE">Male</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </CompactField>
+        <CompactField label="Admission date">
+          <input
+            type="date"
+            value={form.admissionDate}
+            onChange={(event) => update('admissionDate', event.target.value)}
+          />
+        </CompactField>
+        <CompactField label="Academic year">
+          <select
+            value={form.academicYearId}
+            onChange={(event) => update('academicYearId', event.target.value)}
+          >
+            <option value="">Select academic year</option>
+            {(academicYearsQuery.data ?? []).map((year) => (
+              <option key={year.id} value={year.id}>
+                {year.name}
+              </option>
+            ))}
+          </select>
+        </CompactField>
+        <CompactField label="Class">
+          <select
+            value={form.classId}
+            onChange={(event) => {
+              update('classId', event.target.value);
+              update('sectionId', '');
+            }}
+          >
+            <option value="">Select class</option>
+            {(classesQuery.data ?? []).map((schoolClass) => (
+              <option key={schoolClass.id} value={schoolClass.id}>
+                {schoolClass.name}
+              </option>
+            ))}
+          </select>
+        </CompactField>
+        <CompactField label="Section">
+          <select
+            value={form.sectionId}
+            onChange={(event) => update('sectionId', event.target.value)}
+          >
+            <option value="">No section</option>
+            {availableSections.map((section) => (
+              <option key={section.id} value={section.id}>
+                {section.name}
+              </option>
+            ))}
+          </select>
+        </CompactField>
+        <CompactField label="Guardian name">
+          <input
+            value={form.guardianFullName}
+            onChange={(event) =>
+              update('guardianFullName', event.target.value)
+            }
+          />
+        </CompactField>
+        <CompactField label="Guardian relationship">
+          <input
+            value={form.guardianRelation}
+            onChange={(event) =>
+              update('guardianRelation', event.target.value)
+            }
+          />
+        </CompactField>
+        <CompactField label="Guardian phone">
+          <input
+            value={form.guardianPhone}
+            onChange={(event) => update('guardianPhone', event.target.value)}
+            inputMode="tel"
+          />
+        </CompactField>
+        <CompactField label="Medium of instruction">
+          <input
+            value={form.mediumOfInstruction}
+            onChange={(event) =>
+              update('mediumOfInstruction', event.target.value)
+            }
+          />
+        </CompactField>
+        <CompactField label="Disability information">
+          <input
+            value={form.disabilityFlag}
+            onChange={(event) => update('disabilityFlag', event.target.value)}
+            disabled={form.confirmNoDisability}
+            placeholder="Record only when applicable"
+          />
+        </CompactField>
+        <label className="flex items-start gap-2 text-xs font-semibold text-slate-700">
+          <input
+            type="checkbox"
+            checked={form.confirmNoDisability}
+            onChange={(event) => {
+              update('confirmNoDisability', event.target.checked);
+              if (event.target.checked) update('disabilityFlag', '');
+            }}
+            className="mt-0.5 h-4 w-4"
+          />
+          Confirm no known disability has been reported.
+        </label>
+      </div>
+      {error ? (
+        <p
+          className="mt-3 rounded-lg border border-danger-200 bg-danger-50 p-2 text-xs font-bold text-danger-800"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
+      <Button
+        type="button"
+        className="mt-4 w-full"
+        disabled={
+          mutation.isPending ||
+          academicYearsQuery.isLoading ||
+          classesQuery.isLoading ||
+          sectionsQuery.isLoading
+        }
+        onClick={submit}
+      >
+        {mutation.isPending ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <CheckCircle2 className="h-4 w-4" />
+        )}
+        Confirm and enroll student
+      </Button>
+    </div>
+  );
+}
+
+function FilterButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`min-h-9 whitespace-nowrap rounded-lg px-3 text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] ${
+        active
+          ? 'bg-[var(--color-mod-admissions-accent)] text-white'
+          : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function InspectorRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <dt className="text-slate-500">{label}</dt>
+      <dd className="text-right font-bold text-slate-800">{value}</dd>
+    </div>
+  );
+}
+
+function CompactField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="space-y-1 text-xs font-bold text-slate-700">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function classNameFor(
+  classId: string | null,
+  classes: Array<{ id: string; name: string }>,
+) {
+  if (!classId) return 'Class not selected';
+  return classes.find((item) => item.id === classId)?.name ?? 'Unavailable';
+}
+
+function academicYearNameFor(
+  academicYearId: string | null,
+  academicYears: Array<{ id: string; name: string }>,
+) {
+  if (!academicYearId) return 'Academic year not assigned';
+  return (
+    academicYears.find((item) => item.id === academicYearId)?.name ??
+    'Academic year unavailable'
+  );
+}
+
+function transitionLabel(status: AdmissionApplicationStatus) {
+  const labels: Record<AdmissionApplicationStatus, string> = {
+    INQUIRY: 'Move to inquiry',
+    APPLICATION: 'Move to application',
+    DOCUMENT_PENDING: 'Mark documents pending',
+    ENTRANCE_INTERVIEW: 'Move to entrance / interview',
+    ACCEPTED: 'Accept application',
+    ENROLLED: 'Enroll student',
+    REJECTED: 'Reject application',
+  };
+  return labels[status];
+}
+
+function replaceApplication(
+  current: unknown,
+  updated: AdmissionApplication,
+): unknown {
+  if (!current || typeof current !== 'object' || !('items' in current)) {
+    return current;
+  }
+  const result = current as {
+    items?: AdmissionApplication[];
+    [key: string]: unknown;
+  };
+  if (!Array.isArray(result.items)) return current;
+  return {
+    ...result,
+    items: result.items.map((item) =>
+      item.id === updated.id ? updated : item,
+    ),
+  };
 }

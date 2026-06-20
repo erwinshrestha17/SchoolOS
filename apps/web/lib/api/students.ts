@@ -1,8 +1,11 @@
 import type {
   AdmissionCreationResult,
+  AdmissionApplication,
+  AdmissionApplicationStatus,
   AdmissionDuplicateCheckResult,
   AdmissionSummary,
   BulkAdmissionImportResult,
+  CreateAdmissionApplicationPayload,
   IemisExportResult,
   PaginatedResponse,
   RevokeGeneratedStudentDocumentPayload,
@@ -185,6 +188,46 @@ export const studentsApi = {
   }) =>
     request<PaginatedResponse<AdmissionSummary>>(
       withQuery('/admissions', params ?? {}),
+    ),
+  listAdmissionApplications: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: AdmissionApplicationStatus;
+    classId?: string;
+  }) =>
+    request<PaginatedResponse<AdmissionApplication>>(
+      withQuery('/admissions/applications', params ?? {}),
+    ),
+  createAdmissionApplication: (body: CreateAdmissionApplicationPayload) =>
+    request<AdmissionApplication>('/admissions/applications', {
+      method: 'POST',
+      json: body as JsonBody,
+    }),
+  updateAdmissionApplicationStatus: (
+    applicationId: string,
+    body: { status: AdmissionApplicationStatus; reason?: string },
+  ) =>
+    request<AdmissionApplication>(
+      `/admissions/applications/${encodeURIComponent(applicationId)}/status`,
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
+  enrollAdmissionApplication: (
+    applicationId: string,
+    body: JsonBody,
+  ) =>
+    request<{
+      application: AdmissionApplication;
+      admission: AdmissionCreationResult;
+    }>(
+      `/admissions/applications/${encodeURIComponent(applicationId)}/enroll`,
+      {
+        method: 'POST',
+        json: body,
+      },
     ),
   createAdmission: (body: JsonBody) =>
     request<AdmissionCreationResult>('/admissions', {

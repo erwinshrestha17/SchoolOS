@@ -1424,6 +1424,7 @@ describe("SchoolOS web production contracts", () => {
       "components/students/student-detail-page.tsx",
       "components/students/profile/tabs/documents-tab.tsx",
       "components/admissions/admissions-pipeline.tsx",
+      "components/m1/student-documents-workspace.tsx",
     ]);
     const apiClient = readMany(["lib/api/students.ts", "lib/api/client.ts"]);
 
@@ -1460,10 +1461,8 @@ describe("SchoolOS web production contracts", () => {
     assert.match(detailPage, /openUploadedDocument\(doc\.id\)/);
     assert.match(detailPage, /window\.open\(access\.url/);
     assert.match(detailPage, /formatDocumentStatus\(doc\.status\)/);
-    assert.match(
-      detailPage,
-      /api\.previewStudentDocument\(\s*selectedAdmission\.id,\s*match\.id/,
-    );
+    assert.match(detailPage, /ProtectedFileButton/);
+    assert.match(detailPage, /fileAssetId=\{selectedDocument\.fileId\}/);
     assert.doesNotMatch(detailPage, /href="#"/);
     assert.match(apiClient, /revokeGeneratedStudentDocument:/);
     assert.match(apiClient, /openStudentDocumentPdf[\s\S]*openPdfBlob/);

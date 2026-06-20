@@ -91,6 +91,77 @@ export type AdmissionCreationResult = {
   } | null;
 };
 
+export const ADMISSION_APPLICATION_STATUSES = [
+  'INQUIRY',
+  'APPLICATION',
+  'DOCUMENT_PENDING',
+  'ENTRANCE_INTERVIEW',
+  'ACCEPTED',
+  'ENROLLED',
+  'REJECTED',
+] as const;
+
+export type AdmissionApplicationStatus =
+  (typeof ADMISSION_APPLICATION_STATUSES)[number];
+
+export type AdmissionApplicationDuplicateReview = {
+  hasWarnings?: boolean;
+  matches?: Array<{
+    studentId: string;
+    studentSystemId: string;
+    fullNameEn: string;
+    matchTypes: string[];
+  }>;
+};
+
+export type AdmissionApplication = {
+  id: string;
+  status: AdmissionApplicationStatus;
+  firstNameEn: string;
+  lastNameEn: string;
+  fullNameEn: string;
+  firstNameNp: string | null;
+  lastNameNp: string | null;
+  dateOfBirth: string | null;
+  gender: string | null;
+  guardianFullName: string | null;
+  guardianRelation: string | null;
+  guardianPhone: string | null;
+  guardianEmail: string | null;
+  academicYearId: string | null;
+  classId: string | null;
+  sectionId: string | null;
+  previousSchool: string | null;
+  source: string | null;
+  notes: string | null;
+  duplicateReview: AdmissionApplicationDuplicateReview | null;
+  convertedStudentId: string | null;
+  rejectedReason: string | null;
+  createdById: string | null;
+  updatedById: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateAdmissionApplicationPayload = {
+  firstNameEn: string;
+  lastNameEn: string;
+  firstNameNp?: string;
+  lastNameNp?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  guardianFullName?: string;
+  guardianRelation?: string;
+  guardianPhone?: string;
+  guardianEmail?: string;
+  academicYearId?: string;
+  classId?: string;
+  sectionId?: string;
+  previousSchool?: string;
+  source?: string;
+  notes?: string;
+};
+
 export type StudentDuplicateCandidateStudent = {
   id: string;
   studentSystemId: string;

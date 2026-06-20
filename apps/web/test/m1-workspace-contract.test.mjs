@@ -22,11 +22,29 @@ test('M1 workspaces expose real route-backed operations', () => {
   assert.match(routes, /QrIdWorkspace/);
   assert.match(routes, /ApplicationReviewWorkspace/);
   assert.match(api, /\/students\/duplicates\/merge/);
+  assert.match(api, /\/admissions\/applications/);
+  assert.match(api, /updateAdmissionApplicationStatus/);
+  assert.match(api, /enrollAdmissionApplication/);
   assert.match(api, /\/students\/summary/);
   assert.match(api, /\/admissions\/bulk-import\/batches/);
   assert.match(api, /\/admissions\/m1\/import-review\/queue/);
   assert.match(api, /\/students\/document-expiry\/templates/);
   assert.match(api, /confirmFileAccessReview: true/);
+});
+
+test('M1 admissions pipeline uses the persisted application workflow', () => {
+  const pipeline = read('components/admissions/admissions-pipeline.tsx');
+  const applicationForm = read('components/m1/admission-application-form.tsx');
+  const page = read('app/dashboard/admissions/new/page.tsx');
+
+  assert.match(pipeline, /listAdmissionApplications/);
+  assert.match(pipeline, /updateAdmissionApplicationStatus/);
+  assert.match(pipeline, /enrollAdmissionApplication/);
+  assert.match(pipeline, /PAGE_SIZE = 25/);
+  assert.match(applicationForm, /createAdmissionApplication/);
+  assert.match(applicationForm, /Creates an inquiry; it does not enroll a student/);
+  assert.match(page, /AdmissionApplicationForm/);
+  assert.doesNotMatch(pipeline + applicationForm, /publicUrl|objectKey/);
 });
 
 test('M1 high-risk workflows remain server controlled and protected', () => {
