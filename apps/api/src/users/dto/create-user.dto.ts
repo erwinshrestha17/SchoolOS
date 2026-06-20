@@ -1,13 +1,14 @@
+import { IsArray, IsOptional, IsString, MinLength } from 'class-validator';
 import {
-  IsArray,
-  IsEmail,
-  IsOptional,
-  IsString,
-  MinLength,
-} from 'class-validator';
+  IsNepalPhone,
+  IsProfileEmail,
+  NormalizeEmailAddress,
+  NormalizeNepalPhone,
+} from '../../common/validation/contact-profile.decorators';
 
 export class CreateUserDto {
-  @IsEmail()
+  @NormalizeEmailAddress()
+  @IsProfileEmail()
   email!: string;
 
   @IsString()
@@ -16,6 +17,8 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   phone?: string;
 
   @IsArray()

@@ -25,6 +25,7 @@ Use one approved term for one business concept. Do not introduce aliases unless 
 | Tenant | schoolId, organizationId | `tenantId` remains the strict SchoolOS tenancy boundary. |
 | Student | pupil, learner, entity | Use `student` in code and contracts unless a learning-specific actor is truly required. |
 | Guardian | parentRelation, contactPerson | A parent is a guardian persona; use `guardian` for the linked record. |
+| Admission Case | fast admission, pipeline record | One progressive, policy-evaluated M1 case backed by `AdmissionApplication`; direct admission and review are paths through the same case. |
 | Class | gradeGroup, group | `class` is the academic class entity. |
 | Section | subgroup, division | `section` is the class subdivision. |
 | Academic year | session, schoolYear | Use `academicYear` / `academicYearId`. |

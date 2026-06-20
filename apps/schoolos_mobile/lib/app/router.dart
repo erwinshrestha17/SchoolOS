@@ -323,6 +323,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const PrincipalMoreScreen(),
       ),
       GoRoute(
+        path: AppRoutes.principalAdmissions,
+        builder: (context, state) => const PrincipalSnapshotScreen(
+          snapshotKey: 'admissions',
+          title: 'Admissions Snapshot',
+          subtitle: 'Review-only admissions follow-up for school leadership',
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.principalAttendanceRisk,
         builder: (context, state) => const PrincipalSnapshotScreen(
           snapshotKey: 'attendance',

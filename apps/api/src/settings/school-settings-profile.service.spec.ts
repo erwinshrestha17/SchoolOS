@@ -94,4 +94,37 @@ describe('SchoolSettingsProfileService', () => {
       }),
     );
   });
+
+  it('normalizes Nepal contact values before saving school settings', async () => {
+    const { service, prisma } = buildService();
+    prisma.tenantSetting.upsert.mockResolvedValue({});
+    prisma.tenantSetting.findMany.mockResolvedValue([]);
+
+    await service.updateProfile(
+      tenantId,
+      {
+        principalName: '  आशा   श्रेष्ठ ',
+        schoolPhone: '९८५१२३४५६७',
+        schoolEmail: ' INFO+OFFICE@SCHOOL.EDU.NP ',
+      },
+      userId,
+    );
+
+    expect(prisma.tenantSetting.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          key: 'school_phone',
+          value: '+9779851234567',
+        }),
+      }),
+    );
+    expect(prisma.tenantSetting.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          key: 'school_email',
+          value: 'info+office@school.edu.np',
+        }),
+      }),
+    );
+  });
 });

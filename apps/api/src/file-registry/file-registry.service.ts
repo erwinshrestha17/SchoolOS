@@ -247,7 +247,7 @@ export class FileRegistryService {
     entityId: string,
     userId: string,
   ) {
-    const asset = await this.getFileMetadata(tenantId, assetId);
+    await this.getFileMetadata(tenantId, assetId);
 
     const updated = await this.prisma.fileAsset.update({
       where: { id: assetId },
@@ -261,6 +261,65 @@ export class FileRegistryService {
       tenantId,
       userId,
       after: { module, entityId },
+    });
+
+    return updated;
+  }
+
+  async linkToEntityInTransaction(
+    tx: Prisma.TransactionClient,
+    input: {
+      tenantId: string;
+      assetId: string;
+      module: string;
+      entityId: string;
+      userId: string;
+      ownerType?: string;
+      ownerId?: string;
+    },
+  ) {
+    const asset = await tx.fileAsset.findFirst({
+      where: {
+        id: input.assetId,
+        tenantId: input.tenantId,
+        softDeletedAt: null,
+        deletedAt: null,
+      },
+    });
+    if (!asset) {
+      throw new NotFoundException('File not found');
+    }
+
+    const updated = await tx.fileAsset.update({
+      where: { id: asset.id },
+      data: {
+        module: input.module,
+        entityId: input.entityId,
+        ownerType: input.ownerType ?? input.module,
+        ownerId: input.ownerId ?? input.entityId,
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        action: 'file_linked',
+        resource: 'file_registry',
+        resourceId: asset.id,
+        tenantId: input.tenantId,
+        userId: input.userId,
+        before: {
+          module: asset.module,
+          entityId: asset.entityId,
+          ownerType: asset.ownerType,
+          ownerId: asset.ownerId,
+        },
+        after: {
+          module: input.module,
+          entityId: input.entityId,
+          ownerType: input.ownerType ?? input.module,
+          ownerId: input.ownerId ?? input.entityId,
+        },
+      },
     });
 
     return updated;
@@ -699,6 +758,6 @@ const FILE_READ_PERMISSIONS: Record<string, string[]> = {
   payroll: ['payroll:read', 'payroll:manage'],
   finance: ['fees:manage', 'receipts:read', 'receipts:manage'],
   fees: ['fees:manage', 'receipts:read', 'receipts:manage'],
-  admissions: ['admissions:read'],
+  admissions: ['students:read', 'student_documents:manage'],
   settings: ['settings:read'],
 };

@@ -1,11 +1,39 @@
 # M1 Admissions and Student Profiles — Frontend Web Design Reference
 
 **Status:** Active module-level frontend design reference.
-**Updated:** 2026-06-19
+**Updated:** 2026-06-20
 **Module:** M1 Admissions and Student Profiles
 **Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`
 **Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
 **Backend contract rule:** Backend/OpenAPI/shared contracts remain authoritative.
+
+---
+
+## Implemented Admission Workflow Decision
+
+All supported sources create or continue one `AdmissionApplication`-backed Admission Case. The school policy selects direct admission or review; “Direct Admission” and “Admission Review” are entry choices into the same case model, not separate systems.
+
+The default Nepal office flow is:
+
+```text
+Choose admission path
+→ Student and guardian basics
+→ Academic placement and optional protected documents
+→ Backend eligibility, duplicate, and policy check
+→ Admit Student or continue the same case through review
+→ Student-profile follow-up for documents, IEMIS, guardian verification, and QR/ID
+```
+
+Confirmed routes include:
+
+```text
+/dashboard/admissions
+/dashboard/admissions/new
+/dashboard/admissions/cases/[admissionCaseId]
+/dashboard/settings/admissions
+```
+
+Confirmed API capabilities include admission policy read/update, Admission Case create/read/update/eligibility, audited review actions, duplicate-safe direct admission, approved-case finalization, paginated business-status queues, student follow-ups, and a purpose-limited principal mobile admissions summary. Legacy application routes remain compatibility contracts; active web entry and review use the unified case routes.
 
 ---
 
@@ -215,9 +243,12 @@ Follow [the master web design plan](../SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md) and
 
 ```text
 /dashboard/admissions
+/dashboard/admissions/new
+/dashboard/admissions/cases/[admissionCaseId]
 /dashboard/admissions/applications
 /dashboard/admissions/applications/[applicationId]
 /dashboard/admissions/duplicate-review
+/dashboard/settings/admissions
 /dashboard/students
 /dashboard/students/[studentId]
 /dashboard/students/import-review
@@ -690,15 +721,15 @@ Preserve the primary job; convert the right rail to a drawer, prioritize essenti
 
 ### Read APIs
 
-Purpose-limited summaries; paginated lists; scoped detail; backend totals/status. **needs OpenAPI confirmation** unless already present in the current contract.
+Confirmed unified-case reads: school admission policy; tenant-scoped case detail and eligibility; paginated business-status queues; admitted-student follow-ups; and purpose-limited principal mobile summary. Other planned summaries still need OpenAPI confirmation.
 
 ### Write / Mutation APIs
 
-Create/update commands with validation, permission, entitlement, and idempotency where relevant. **needs OpenAPI confirmation** unless already present in the current contract.
+Confirmed unified-case writes: policy update, progressive case create/update, audited review actions, direct admission, and approved-case finalization. Direct/finalize commands are duplicate-safe and backend-authorized. Other planned mutations still need OpenAPI confirmation.
 
 ### Workflow APIs
 
-Application submit/review/approve/reject/convert; duplicate resolution; guardian link/unlink; lifecycle transitions; import commit; artifact generation. **needs OpenAPI confirmation** unless already present in the current contract.
+Unified Admission Case review/approve/reject/escalate/close, duplicate override with permission and reason, and final conversion are confirmed. Duplicate merge, guardian link/unlink, lifecycle transitions, import commit, and artifact generation remain separate existing module commands and must not be simulated from case UI.
 
 ### Validation APIs
 

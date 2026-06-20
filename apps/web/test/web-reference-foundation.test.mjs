@@ -86,13 +86,13 @@ describe('reference dashboard foundation', () => {
     );
   });
 
-  it('adds a permission-scoped real-API operations hub', () => {
+  it('keeps the permission-scoped real-API operations composition route', () => {
     const operations = read('app/dashboard/operations/page.tsx');
     const layout = read('app/dashboard/layout.tsx');
     const sidebar = read('components/layout/sidebar.tsx');
 
     assert.match(layout, /prefix: '\/dashboard\/operations'/);
-    assert.match(sidebar, /href: '\/dashboard\/operations'/);
+    assert.doesNotMatch(sidebar, /href: '\/dashboard\/operations'/);
     for (const helper of [
       'libraryApi.getOverdueBooksReport',
       'transportApi.getReports',

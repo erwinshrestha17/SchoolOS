@@ -1,4 +1,5 @@
-import { IsArray, IsDateString, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsOptional, IsString } from 'class-validator';
+import { IsDateOfBirth } from '../../common/validation/contact-profile.decorators';
 
 export class CheckAdmissionDuplicateDto {
   @IsString()
@@ -7,7 +8,7 @@ export class CheckAdmissionDuplicateDto {
   @IsString()
   lastNameEn!: string;
 
-  @IsDateString()
+  @IsDateOfBirth()
   dateOfBirth!: string;
 
   @IsOptional()

@@ -1,10 +1,11 @@
 'use client';
 
 import type { CreateAdmissionCasePayload } from '@schoolos/core';
+import { isValidDateOfBirth, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone } from '@schoolos/core';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ClipboardCheck, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { api } from '../../lib/api';
 import { admissionCasesApi } from '../../lib/api/admission-cases';
 import { Button } from '../ui/button';
@@ -29,6 +30,7 @@ const emptyForm: CreateAdmissionCasePayload = {
 
 export function AdmissionReviewCaseForm() {
   const router = useRouter();
+  const admissionCaseIdRef = useRef<string | null>(null);
   const [form, setForm] = useState<CreateAdmissionCasePayload>(emptyForm);
   const [error, setError] = useState('');
   const years = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
@@ -41,8 +43,11 @@ export function AdmissionReviewCaseForm() {
 
   const submit = useMutation({
     mutationFn: async () => {
-      const payload = Object.fromEntries(Object.entries(form).filter(([, value]) => value !== '' && value !== undefined)) as CreateAdmissionCasePayload;
-      const admissionCase = await admissionCasesApi.createCase(payload);
+      const payload = Object.fromEntries(Object.entries({ ...form, firstNameEn: normalizePersonName(form.firstNameEn), lastNameEn: normalizePersonName(form.lastNameEn), guardianFullName: form.guardianFullName ? normalizePersonName(form.guardianFullName) : '', guardianPhone: form.guardianPhone ? normalizeNepalPhone(form.guardianPhone) : '', guardianEmail: form.guardianEmail ? normalizeEmail(form.guardianEmail) : '' }).filter(([, value]) => value !== '' && value !== undefined)) as CreateAdmissionCasePayload;
+      const admissionCase = admissionCaseIdRef.current
+        ? await admissionCasesApi.updateCase(admissionCaseIdRef.current, payload)
+        : await admissionCasesApi.createCase(payload);
+      admissionCaseIdRef.current = admissionCase.id;
       await admissionCasesApi.reviewCase(admissionCase.id, {
         action: 'MARK_READY_FOR_REVIEW',
         reason: 'Admission review requested from the school admission desk.',
@@ -62,10 +67,12 @@ export function AdmissionReviewCaseForm() {
     setError('');
   };
   const validate = () => {
-    if (!form.firstNameEn.trim() || !form.lastNameEn.trim() || !form.dateOfBirth) return 'Enter the student name and date of birth.';
-    if (!form.guardianFullName?.trim() || !form.guardianRelation?.trim() || !form.guardianPhone?.trim()) return 'Enter guardian name, relationship, and phone.';
+    if (!isValidPersonName(form.firstNameEn) || !isValidPersonName(form.lastNameEn) || !form.dateOfBirth) return 'Enter a valid student name and date of birth.';
+    if (!isValidDateOfBirth(form.dateOfBirth)) return 'Enter a valid date of birth.';
+    if (!form.guardianFullName || !isValidPersonName(form.guardianFullName) || !form.guardianRelation?.trim() || !form.guardianPhone) return 'Enter a valid guardian name, relationship, and phone.';
+    if (!tryNormalizeNepalPhone(form.guardianPhone)) return 'Enter a valid NTC or Ncell guardian number.';
+    if (form.guardianEmail && !isValidEmail(form.guardianEmail)) return 'Enter a valid guardian email.';
     if (!form.academicYearId || !form.classId || !form.admissionDate) return 'Choose academic year, class, and admission date.';
-    if (sectionOptions.length > 0 && !form.sectionId) return 'Choose a section for this class.';
     return '';
   };
 
@@ -81,6 +88,9 @@ export function AdmissionReviewCaseForm() {
           <Field label="Guardian relationship" required><input value={form.guardianRelation ?? ''} onChange={(event) => update('guardianRelation', event.target.value)} /></Field>
           <Field label="Guardian phone" required><input value={form.guardianPhone ?? ''} onChange={(event) => update('guardianPhone', event.target.value)} inputMode="tel" /></Field>
           <Field label="Guardian email"><input type="email" value={form.guardianEmail ?? ''} onChange={(event) => update('guardianEmail', event.target.value)} /></Field>
+          <Field label="IEMIS student ID"><input value={form.nationalStudentId ?? ''} onChange={(event) => update('nationalStudentId', event.target.value)} /></Field>
+          <Field label="Emergency contact name"><input value={form.emergencyName ?? ''} onChange={(event) => update('emergencyName', event.target.value)} /></Field>
+          <Field label="Emergency contact phone"><input value={form.emergencyPhone ?? ''} onChange={(event) => update('emergencyPhone', event.target.value)} inputMode="tel" /></Field>
         </div>
       </SectionCard>
       <SectionCard title="Requested placement" description="The school saves these details once and reviewers only resolve missing or policy-required items.">

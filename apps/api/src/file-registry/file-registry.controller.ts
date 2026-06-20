@@ -85,6 +85,7 @@ const SAFE_MIME_TYPES = new Set([
 const DANGEROUS_EXTENSIONS = /\.(exe|bat|cmd|com|scr|js|mjs|sh|ps1|php|jar)$/i;
 const MODULE_UPLOAD_PERMISSIONS: Record<string, string[]> = {
   activity: ['activity_feed:create'],
+  admissions: ['student_documents:manage'],
   homework: ['homework:create', 'homework:update'],
   'homework-submission': ['homework:submit'],
   reports: ['reports:export'],

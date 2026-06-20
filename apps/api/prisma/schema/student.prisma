@@ -7,7 +7,7 @@ model Student {
   lastNameEn                String
   firstNameNp               String?
   lastNameNp                String?
-  dateOfBirth               DateTime
+  dateOfBirth               DateTime                @db.Date
   gender                    Gender
   bloodGroup                String?
   nationality               String                 @default("Nepali")
@@ -137,7 +137,7 @@ model Guardian {
   messageReadReceipts      MessageReadReceipt[]
   identityVerifications    GuardianIdentityVerification[]
 
-  @@unique([tenantId, primaryPhone])
+  @@index([tenantId, primaryPhone])
   @@index([tenantId, email])
 }
 
@@ -355,7 +355,7 @@ model AdmissionApplication {
   lastNameEn          String
   firstNameNp         String?
   lastNameNp          String?
-  dateOfBirth         DateTime?
+  dateOfBirth         DateTime? @db.Date
   gender              Gender?
   guardianFullName    String?
   guardianRelation    String?

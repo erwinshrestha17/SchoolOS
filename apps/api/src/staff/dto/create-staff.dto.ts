@@ -3,12 +3,20 @@ import {
   ArrayMinSize,
   IsArray,
   IsDateString,
-  IsEmail,
   IsEnum,
   IsOptional,
   IsString,
   MinLength,
 } from 'class-validator';
+import {
+  IsDateOfBirth,
+  IsNepalPhone,
+  IsPersonName,
+  IsProfileEmail,
+  NormalizeEmailAddress,
+  NormalizeNepalPhone,
+  NormalizePersonName,
+} from '../../common/validation/contact-profile.decorators';
 
 export class CreateStaffDto {
   @IsOptional()
@@ -16,12 +24,16 @@ export class CreateStaffDto {
   employeeId?: string;
 
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   firstName!: string;
 
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   lastName!: string;
 
-  @IsDateString()
+  @IsDateOfBirth()
   dateOfBirth!: string;
 
   @IsEnum(Gender)
@@ -36,7 +48,8 @@ export class CreateStaffDto {
   @IsEnum(ContractType)
   contractType!: ContractType;
 
-  @IsEmail()
+  @NormalizeEmailAddress()
+  @IsProfileEmail()
   email!: string;
 
   @IsString()
@@ -45,6 +58,8 @@ export class CreateStaffDto {
 
   @IsOptional()
   @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   phone?: string;
 
   @IsOptional()

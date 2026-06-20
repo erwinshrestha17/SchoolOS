@@ -1,12 +1,19 @@
 import {
   ArrayMaxSize,
   IsArray,
-  IsEmail,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
 } from 'class-validator';
+import {
+  IsNepalPhone,
+  IsPersonName,
+  IsProfileEmail,
+  NormalizeEmailAddress,
+  NormalizeNepalPhone,
+  NormalizePersonName,
+} from '../../common/validation/contact-profile.decorators';
 
 export class CreateDemoRequestDto {
   @IsString()
@@ -36,6 +43,8 @@ export class CreateDemoRequestDto {
 
   @IsString()
   @IsNotEmpty()
+  @NormalizePersonName()
+  @IsPersonName()
   @MaxLength(120)
   contactName!: string;
 
@@ -46,12 +55,15 @@ export class CreateDemoRequestDto {
 
   @IsString()
   @IsNotEmpty()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   @MaxLength(40)
   phone!: string;
 
   @IsNotEmpty()
-  @IsEmail()
-  @MaxLength(160)
+  @NormalizeEmailAddress()
+  @IsProfileEmail()
+  @MaxLength(254)
   email!: string;
 
   @IsOptional()

@@ -1,7 +1,5 @@
 import { Type } from 'class-transformer';
 import {
-  IsDateString,
-  IsEmail,
   IsEnum,
   IsIn,
   IsInt,
@@ -12,6 +10,15 @@ import {
   Min,
 } from 'class-validator';
 import { Gender } from '@prisma/client';
+import {
+  IsDateOfBirth,
+  IsNepalPhone,
+  IsPersonName,
+  IsProfileEmail,
+  NormalizeEmailAddress,
+  NormalizeNepalPhone,
+  NormalizePersonName,
+} from '../../common/validation/contact-profile.decorators';
 
 export const ADMISSION_APPLICATION_STATUSES = [
   'INQUIRY',
@@ -55,25 +62,33 @@ export class ListAdmissionApplicationsDto {
 
 export class CreateAdmissionApplicationDto {
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   @MaxLength(100)
   firstNameEn!: string;
 
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   @MaxLength(100)
   lastNameEn!: string;
 
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   @MaxLength(100)
   firstNameNp?: string;
 
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   @MaxLength(100)
   lastNameNp?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsDateOfBirth()
   dateOfBirth?: string;
 
   @IsOptional()
@@ -82,6 +97,8 @@ export class CreateAdmissionApplicationDto {
 
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   @MaxLength(160)
   guardianFullName?: string;
 
@@ -92,11 +109,14 @@ export class CreateAdmissionApplicationDto {
 
   @IsOptional()
   @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   @MaxLength(32)
   guardianPhone?: string;
 
   @IsOptional()
-  @IsEmail()
+  @NormalizeEmailAddress()
+  @IsProfileEmail()
   guardianEmail?: string;
 
   @IsOptional()

@@ -1202,34 +1202,29 @@ async function seedCanonicalStudents(
           password: canonicalGuardianPassword,
           roleId: parentRoleId,
         });
-        const guardian = await prisma.guardian.upsert({
-          where: {
-            tenantId_primaryPhone: {
-              tenantId,
-              primaryPhone: guardianPhone(grade, sectionName, roll),
-            },
-          },
-          update: {
-            userId: guardianUser.id,
-            fullName: `${guardianName(grade, roll)} ${studentLastName(grade, roll)}`,
-            relation: 'Guardian',
-            email: guardianEmail,
-            homeAddress: 'Lalitpur, Nepal',
-            receivesAlerts: true,
-            privacyConsentAt: new Date(),
-          },
-          create: {
-            tenantId,
-            userId: guardianUser.id,
-            fullName: `${guardianName(grade, roll)} ${studentLastName(grade, roll)}`,
-            relation: 'Guardian',
-            primaryPhone: guardianPhone(grade, sectionName, roll),
-            email: guardianEmail,
-            homeAddress: 'Lalitpur, Nepal',
-            receivesAlerts: true,
-            privacyConsentAt: new Date(),
-          },
+        const primaryPhone = guardianPhone(grade, sectionName, roll);
+        const fullName = `${guardianName(grade, roll)} ${studentLastName(grade, roll)}`;
+        const existingGuardian = await prisma.guardian.findFirst({
+          where: { tenantId, primaryPhone, fullName },
         });
+        const guardianData = {
+          userId: guardianUser.id,
+          fullName,
+          relation: 'Guardian',
+          primaryPhone,
+          email: guardianEmail,
+          homeAddress: 'Lalitpur, Nepal',
+          receivesAlerts: true,
+          privacyConsentAt: new Date(),
+        };
+        const guardian = existingGuardian
+          ? await prisma.guardian.update({
+              where: { id: existingGuardian.id },
+              data: guardianData,
+            })
+          : await prisma.guardian.create({
+              data: { tenantId, ...guardianData },
+            });
 
         const student = await prisma.student.upsert({
           where: {

@@ -1,5 +1,4 @@
 import {
-  IsEmail,
   IsIn,
   IsInt,
   IsOptional,
@@ -8,6 +7,14 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import {
+  IsNepalPhone,
+  IsPersonName,
+  IsProfileEmail,
+  NormalizeEmailAddress,
+  NormalizeNepalPhone,
+  NormalizePersonName,
+} from '../../common/validation/contact-profile.decorators';
 
 export class UpdateSchoolProfileDto {
   @IsOptional()
@@ -22,11 +29,14 @@ export class UpdateSchoolProfileDto {
 
   @IsOptional()
   @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   @MaxLength(50)
   schoolPhone?: string | null;
 
   @IsOptional()
-  @IsEmail()
+  @NormalizeEmailAddress()
+  @IsProfileEmail()
   @MaxLength(254)
   schoolEmail?: string | null;
 
@@ -37,6 +47,8 @@ export class UpdateSchoolProfileDto {
 
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   @MaxLength(200)
   principalName?: string | null;
 

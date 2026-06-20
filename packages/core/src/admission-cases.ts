@@ -69,17 +69,25 @@ export type AdmissionCaseEligibility = {
     requireDocumentReview: boolean;
     requireInterview: boolean;
     requirePrincipalApproval: boolean;
+    requireTransferCertificate: boolean;
+    requirePriorMarksheet: boolean;
+    requireStreamOrMarksReview: boolean;
     allowAdmissionWithDocumentsPending: boolean;
     enforceCapacityWhenAvailable: boolean;
+    requireSection: boolean;
     requiredDocuments: string[];
     requiredFields: string[];
   };
   canAdmitDirectly: boolean;
+  canOverrideDuplicate: boolean;
   requiresReview: boolean;
   requiresApproval: boolean;
   classSection: {
     valid: boolean;
     sectionRequired?: boolean;
+    academicYearName?: string | null;
+    className?: string | null;
+    sectionName?: string | null;
     message: string | null;
   };
   capacityStatus: {
@@ -121,7 +129,6 @@ export type AdmissionCase = {
   notes: string | null;
   documents: AdmissionCaseDocumentReference[];
   displayStatus: AdmissionCaseDisplayStatus;
-  storageStatus: string;
   admittedStudentId: string | null;
   followUps: Array<{ code: string; label: string; blocking: boolean }>;
   createdAt: string;

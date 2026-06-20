@@ -14,6 +14,11 @@ import {
 import { CreateDemoRequestDto } from './dto/create-demo-request.dto';
 import { ListDemoRequestsDto } from './dto/list-demo-requests.dto';
 import { UpdateDemoRequestStatusDto } from './dto/update-demo-request-status.dto';
+import {
+  requireNepalPhone,
+  requirePersonName,
+  requireProfileEmail,
+} from '../common/validation/contact-profile';
 
 @Injectable()
 export class DemoRequestsService {
@@ -30,10 +35,10 @@ export class DemoRequestsService {
         location: clean(dto.location),
         studentsCount: clean(dto.studentsCount),
         branchesCount: cleanOptional(dto.branchesCount),
-        contactName: clean(dto.contactName),
+        contactName: requirePersonName(dto.contactName, 'contactName'),
         role: clean(dto.role),
-        phone: clean(dto.phone),
-        email: clean(dto.email).toLowerCase(),
+        phone: requireNepalPhone(dto.phone),
+        email: requireProfileEmail(dto.email),
         preferredContact: cleanOptional(dto.preferredContact),
         currentSystem: cleanOptional(dto.currentSystem),
         expectedTimeline: clean(dto.expectedTimeline),

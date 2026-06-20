@@ -8,6 +8,7 @@ const read = (path) => readFileSync(join(webRoot, path), 'utf8');
 
 test('M1 workspaces expose real route-backed operations', () => {
   const api = read('lib/api/students.ts');
+  const documentsWorkspace = read('components/m1/student-documents-workspace.tsx');
   const routes = [
     'app/dashboard/admissions/documents/page.tsx',
     'app/dashboard/admissions/duplicates/page.tsx',
@@ -20,7 +21,7 @@ test('M1 workspaces expose real route-backed operations', () => {
   assert.match(routes, /DuplicateCandidatesWorkspace/);
   assert.match(routes, /IemisReadinessWorkspace/);
   assert.match(routes, /QrIdWorkspace/);
-  assert.match(routes, /ApplicationReviewWorkspace/);
+  assert.match(routes, /redirect\('\/dashboard\/admissions'\)/);
   assert.match(api, /\/students\/duplicates\/merge/);
   assert.match(api, /\/admissions\/applications/);
   assert.match(api, /updateAdmissionApplicationStatus/);
@@ -29,7 +30,7 @@ test('M1 workspaces expose real route-backed operations', () => {
   assert.match(api, /\/admissions\/bulk-import\/batches/);
   assert.match(api, /\/admissions\/m1\/import-review\/queue/);
   assert.match(api, /\/students\/document-expiry\/templates/);
-  assert.match(api, /confirmFileAccessReview: true/);
+  assert.match(documentsWorkspace, /confirmFileAccessReview: true/);
 });
 
 test('M1 entry creates one unified admission case for direct and review workflows', () => {
@@ -42,6 +43,8 @@ test('M1 entry creates one unified admission case for direct and review workflow
   const queues = read('components/m1/admission-case-queues.tsx');
   const caseApi = read('lib/api/admission-cases.ts');
   const admissionsPage = read('app/dashboard/admissions/page.tsx');
+  const policySettings = read('components/settings/admission-policy-settings.tsx');
+  const mobileRouter = read('../schoolos_mobile/lib/app/router.dart');
 
   assert.match(legacyPipeline, /listAdmissionApplications/);
   assert.match(legacyApplicationForm, /createAdmissionApplication/);
@@ -53,7 +56,11 @@ test('M1 entry creates one unified admission case for direct and review workflow
   assert.match(directWizard, /SchoolOS checks placement, policy requirements, and possible duplicates/);
   assert.match(directWizard, /directAdmit/);
   assert.match(directWizard, /Admit student/);
+  assert.match(directWizard, /admissionCasesApi\.updateCase/);
+  assert.match(directWizard, /api\.uploadFile\(file, 'admissions', caseId\)/);
+  assert.match(directWizard, /Add another student/);
   assert.match(reviewForm, /admissionCasesApi\.createCase/);
+  assert.match(reviewForm, /admissionCaseIdRef/);
   assert.match(reviewForm, /MARK_READY_FOR_REVIEW/);
   assert.match(queues, /listQueues/);
   assert.match(queues, /Ready to Admit/);
@@ -62,6 +69,9 @@ test('M1 entry creates one unified admission case for direct and review workflow
   assert.match(caseApi, /\/finalize/);
   assert.match(admissionsPage, /AdmissionCaseQueues/);
   assert.match(admissionsPage, /New admission/);
+  assert.match(policySettings, /Rules for selected admissions/);
+  assert.match(policySettings, /GRADE_11_12/);
+  assert.match(mobileRouter, /snapshotKey: 'admissions'/);
   assert.doesNotMatch(directWizard + reviewForm + caseApi, /publicUrl|objectKey/);
 });
 
@@ -83,6 +93,7 @@ test('M1 high-risk workflows remain server controlled and protected', () => {
   assert.match(iemis, /Import Review Queue/);
   assert.match(admissionCase, /Finalize admission/);
   assert.match(admissionCase, /Duplicate override/);
+  assert.match(admissionCase, /canOverrideDuplicate/);
   assert.doesNotMatch(duplicates + documents + qr + iemis + admissionCase, /publicUrl|objectKey/);
 });
 

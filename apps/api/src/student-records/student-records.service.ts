@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { FileStatus, Prisma, StudentDocumentKind } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -87,6 +88,89 @@ export class StudentRecordsService {
     });
   }
 
+  async attachRegisteredAdmissionDocuments(
+    tx: Prisma.TransactionClient,
+    input: {
+      tenantId: string;
+      studentId: string;
+      admissionCaseId: string;
+      documents: Array<{ fileId: string; kind: string; title?: string }>;
+      userId: string;
+    },
+  ) {
+    for (const reference of input.documents) {
+      const existing = await tx.studentDocument.findFirst({
+        where: {
+          tenantId: input.tenantId,
+          studentId: input.studentId,
+          fileId: reference.fileId,
+        },
+        select: { id: true },
+      });
+      if (existing) continue;
+
+      const asset = await tx.fileAsset.findFirst({
+        where: {
+          id: reference.fileId,
+          tenantId: input.tenantId,
+          softDeletedAt: null,
+          deletedAt: null,
+        },
+      });
+      if (
+        !asset ||
+        asset.status !== FileStatus.UPLOADED ||
+        asset.module !== 'admissions' ||
+        (asset.entityId !== input.admissionCaseId &&
+          (asset.entityId !== null || asset.uploadedByUserId !== input.userId))
+      ) {
+        throw new BadRequestException(
+          'One or more admission documents are unavailable for this school.',
+        );
+      }
+
+      await this.fileRegistryService.linkToEntityInTransaction(tx, {
+        tenantId: input.tenantId,
+        assetId: asset.id,
+        module: 'students',
+        entityId: input.studentId,
+        ownerType: 'student',
+        ownerId: input.studentId,
+        userId: input.userId,
+      });
+
+      const document = await tx.studentDocument.create({
+        data: {
+          tenantId: input.tenantId,
+          studentId: input.studentId,
+          fileId: asset.id,
+          kind: normalizeAdmissionDocumentKind(reference.kind),
+          title: reference.title?.trim() || asset.originalFilename,
+          fileName: asset.originalFilename,
+          contentType: asset.mimeType,
+          sizeBytes: Number(asset.sizeBytes),
+          provider: asset.storageProvider,
+          objectKey: asset.objectKey,
+          uploadedById: input.userId,
+          notes: `Linked from admission case ${input.admissionCaseId}`,
+        },
+      });
+
+      await tx.studentDocumentHistory.create({
+        data: {
+          tenantId: input.tenantId,
+          documentId: document.id,
+          action: 'UPLOAD',
+          documentTitle: document.title,
+          documentKind: document.kind,
+          performedBy: input.userId,
+          reason: 'Linked during admission finalization',
+          metadata: { admissionCaseId: input.admissionCaseId },
+        },
+      });
+    }
+  }
+
   async uploadDocument(dto: UploadStudentDocumentDto, actor: AuthContext) {
     const student = await this.prisma.student.findFirst({
       where: {
@@ -135,7 +219,7 @@ export class StudentRecordsService {
         title: dto.title ?? dto.fileName,
         fileName: dto.fileName,
         contentType: dto.contentType,
-        sizeBytes: Number(stored.sizeBytes),
+        sizeBytes: stored.sizeBytes,
         provider: stored.provider,
         objectKey: stored.objectKey,
         publicUrl: stored.publicUrl,
@@ -509,24 +593,52 @@ export class StudentRecordsService {
       take: 100,
     });
 
-    return documents.map((doc) => ({
-      id: doc.id,
-      studentId: doc.studentId,
-      studentSystemId: doc.student.studentSystemId,
-      studentName:
-        `${doc.student.firstNameEn} ${doc.student.lastNameEn}`.trim(),
-      fileId: doc.fileId,
-      kind: doc.kind,
-      status: doc.status,
-      title: doc.title,
-      fileName: doc.fileName,
-      expiryDate: doc.expiryDate!.toISOString(),
-      isExpired: doc.expiryDate!.getTime() < now.getTime(),
-      daysUntilExpiry: Math.ceil(
-        (doc.expiryDate!.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-      ),
-    }));
+    return documents.map((doc) => {
+      const expiryDate = doc.expiryDate;
+      if (!expiryDate) {
+        throw new BadRequestException(
+          'An expiring student document is missing its expiry date.',
+        );
+      }
+      return {
+        id: doc.id,
+        studentId: doc.studentId,
+        studentSystemId: doc.student.studentSystemId,
+        studentName:
+          `${doc.student.firstNameEn} ${doc.student.lastNameEn}`.trim(),
+        fileId: doc.fileId,
+        kind: doc.kind,
+        status: doc.status,
+        title: doc.title,
+        fileName: doc.fileName,
+        expiryDate: expiryDate.toISOString(),
+        isExpired: expiryDate.getTime() < now.getTime(),
+        daysUntilExpiry: Math.ceil(
+          (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        ),
+      };
+    });
   }
+}
+
+function normalizeAdmissionDocumentKind(value: string): StudentDocumentKind {
+  const normalized = value
+    .trim()
+    .replace(/[\s-]+/g, '_')
+    .toUpperCase();
+  if (normalized === 'BIRTH_CERTIFICATE') {
+    return StudentDocumentKind.BIRTH_CERTIFICATE;
+  }
+  if (normalized === 'TRANSFER_CERTIFICATE') {
+    return StudentDocumentKind.TRANSFER_CERTIFICATE;
+  }
+  if (
+    normalized === 'PRIOR_MARKSHEET' ||
+    normalized === 'PREVIOUS_REPORT_CARD'
+  ) {
+    return StudentDocumentKind.PREVIOUS_REPORT_CARD;
+  }
+  return StudentDocumentKind.OTHER;
 }
 
 function parseOptionalDocumentExpiryDate(value?: string) {

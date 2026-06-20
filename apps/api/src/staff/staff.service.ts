@@ -26,6 +26,12 @@ import type {
   RecordStaffAttendanceDto,
   ReviewStaffLeaveRequestDto,
 } from './dto/staff-actions.dto';
+import {
+  optionalNepalPhone,
+  parseDateOfBirth,
+  requirePersonName,
+  requireProfileEmail,
+} from '../common/validation/contact-profile';
 
 @Injectable()
 export class StaffService {
@@ -38,6 +44,11 @@ export class StaffService {
   ) {}
 
   async createStaff(dto: CreateStaffDto, actor: AuthContext) {
+    const firstName = requirePersonName(dto.firstName, 'firstName');
+    const lastName = requirePersonName(dto.lastName, 'lastName');
+    const email = requireProfileEmail(dto.email);
+    const phone = optionalNepalPhone(dto.phone);
+    const dateOfBirth = parseDateOfBirth(dto.dateOfBirth);
     const employeeId = dto.employeeId ?? (await this.generateEmployeeId(actor));
 
     const existingStaff = await this.prisma.staff.findFirst({
@@ -52,9 +63,9 @@ export class StaffService {
 
     const managedUser = await this.usersService.createManagedUser({
       tenantId: actor.tenantId,
-      email: dto.email,
+      email,
       password: dto.password,
-      phone: dto.phone,
+      phone: phone ?? undefined,
       roleIds: dto.roleIds,
       assignedById: actor.userId,
     });
@@ -64,10 +75,10 @@ export class StaffService {
         tenantId: actor.tenantId,
         userId: managedUser.id,
         employeeId,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
+        firstName,
+        lastName,
         photoUrl: dto.photoUrl ?? null,
-        dateOfBirth: new Date(dto.dateOfBirth),
+        dateOfBirth,
         gender: dto.gender,
         address: dto.address,
         teacherRegistryId: dto.teacherRegistryId ?? null,
@@ -303,10 +314,10 @@ export class StaffService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      if (dto.email && dto.email !== existing.user.email) {
+      if (dto.email && requireProfileEmail(dto.email) !== existing.user.email) {
         await tx.user.update({
           where: { id: existing.userId },
-          data: { email: dto.email },
+          data: { email: requireProfileEmail(dto.email) },
         });
       }
 
@@ -1245,9 +1256,15 @@ function buildStaffUpdateData(dto: UpdateStaffDto): Prisma.StaffUpdateInput {
   return {
     employeeId: dto.employeeId,
     staffCode: dto.staffCode,
-    firstName: dto.firstName,
-    lastName: dto.lastName,
-    dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
+    firstName: dto.firstName
+      ? requirePersonName(dto.firstName, 'firstName')
+      : undefined,
+    lastName: dto.lastName
+      ? requirePersonName(dto.lastName, 'lastName')
+      : undefined,
+    dateOfBirth: dto.dateOfBirth
+      ? parseDateOfBirth(dto.dateOfBirth)
+      : undefined,
     gender: dto.gender,
     address: dto.address,
     joiningDate: dto.joiningDate ? new Date(dto.joiningDate) : undefined,
@@ -1262,8 +1279,11 @@ function buildStaffUpdateData(dto: UpdateStaffDto): Prisma.StaffUpdateInput {
     panNumber: dto.panNumber,
     bankAccount: dto.bankAccount,
     bankName: dto.bankName,
-    emergencyContactName: dto.emergencyContactName,
-    emergencyContactPhone: dto.emergencyContactPhone,
+    emergencyContactName: dto.emergencyContactName
+      ? requirePersonName(dto.emergencyContactName, 'emergencyContactName')
+      : undefined,
+    emergencyContactPhone:
+      optionalNepalPhone(dto.emergencyContactPhone) ?? undefined,
     emergencyContactRelation: dto.emergencyContactRelation,
     qualifications: dto.qualifications,
     experience: dto.experience,

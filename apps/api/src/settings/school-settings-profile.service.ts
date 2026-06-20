@@ -8,6 +8,11 @@ import {
   schoolProfileKeyMap,
   schoolProfileSettingKeys,
 } from './school-profile.keys';
+import {
+  optionalNepalPhone,
+  optionalPersonName,
+  optionalProfileEmail,
+} from '../common/validation/contact-profile';
 
 @Injectable()
 export class SchoolSettingsProfileService {
@@ -52,10 +57,20 @@ export class SchoolSettingsProfileService {
     dto: UpdateSchoolProfileDto,
     userId: string,
   ) {
+    if (dto.schoolPhone !== undefined) {
+      dto.schoolPhone = optionalNepalPhone(dto.schoolPhone);
+    }
+    if (dto.schoolEmail !== undefined) {
+      dto.schoolEmail = optionalProfileEmail(dto.schoolEmail);
+    }
+    if (dto.principalName !== undefined) {
+      dto.principalName = optionalPersonName(
+        dto.principalName,
+        'principalName',
+      );
+    }
     const updates = Object.entries(schoolProfileKeyMap)
-      .filter(
-        ([field]) => dto[field as keyof UpdateSchoolProfileDto] !== undefined,
-      )
+      .filter(([field]) => dto[field] !== undefined)
       .map(([field, key]) => ({
         key: key as TenantSettingKey,
         value: normalize(dto[field as keyof UpdateSchoolProfileDto]),

@@ -28,7 +28,8 @@ describe('canonical development seed', () => {
 
   it('uses idempotent central seed writes for canonical identity and operations data', () => {
     expect(source).toContain('prisma.student.upsert');
-    expect(source).toContain('prisma.guardian.upsert');
+    expect(source).toContain('prisma.guardian.findFirst');
+    expect(source).toContain('prisma.guardian.create');
     expect(source).toContain('prisma.studentGuardian.upsert');
     expect(source).toContain('prisma.enrollment.upsert');
     expect(source).toContain('prisma.subjectTeacherAssignment.findMany');

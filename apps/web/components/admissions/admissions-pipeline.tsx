@@ -741,7 +741,7 @@ function EnrollmentConversion({
         ...(application.lastNameNp
           ? { lastNameNp: application.lastNameNp }
           : {}),
-        dateOfBirth: new Date(form.dateOfBirth).toISOString(),
+        dateOfBirth: form.dateOfBirth,
         gender: form.gender,
         admissionDate: new Date(form.admissionDate).toISOString(),
         academicYearId: form.academicYearId,

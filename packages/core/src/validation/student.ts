@@ -1,20 +1,17 @@
 import { z } from 'zod';
+import { dateOfBirthSchema, normalizedEmailSchema, nepalPhoneSchema, personNameSchema } from './contact-profile.js';
 
 export const guardianSchema = z.object({
-  fullName: z.string().min(2),
+  fullName: personNameSchema,
   relation: z.string().min(2),
-  primaryPhone: z.string().regex(/^9[678]\d{8}$/, {
-    message: 'Must be exactly 10 digits starting with 98, 97, or 96',
-  }),
+  primaryPhone: nepalPhoneSchema,
   secondaryPhone: z
     .string()
-    .regex(/^9[678]\d{8}$/, {
-      message: 'Must be exactly 10 digits starting with 98, 97, or 96',
-    })
+    .pipe(nepalPhoneSchema)
     .or(z.literal(''))
     .optional()
     .nullable(),
-  email: z.email().optional().nullable(),
+  email: normalizedEmailSchema.optional().nullable(),
   occupation: z.string().optional().nullable(),
   wardNumber: z.string().optional().nullable(),
   isPrimary: z.boolean().default(false)
@@ -41,11 +38,11 @@ export const studentDocumentFormSchema = z.object({
 });
 
 export const admissionFormSchema = z.object({
-  firstNameEn: z.string().min(1),
-  lastNameEn: z.string().min(1),
-  firstNameNp: z.string().optional().nullable(),
-  lastNameNp: z.string().optional().nullable(),
-  dateOfBirth: z.string().min(1),
+  firstNameEn: personNameSchema,
+  lastNameEn: personNameSchema,
+  firstNameNp: personNameSchema.optional().nullable(),
+  lastNameNp: personNameSchema.optional().nullable(),
+  dateOfBirth: dateOfBirthSchema,
   gender: z.string().min(1),
   disabilityFlag: z.string().optional().nullable(),
   confirmNoDisability: z.boolean().default(false),

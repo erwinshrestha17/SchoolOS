@@ -187,9 +187,7 @@ export function AdmissionForm({ defaultWorkspaceTab = "pipeline" }: { defaultWor
         draftKey,
         firstNameEn: values.firstNameEn || undefined,
         lastNameEn: values.lastNameEn || undefined,
-        dateOfBirth: values.dateOfBirth
-          ? new Date(values.dateOfBirth).toISOString()
-          : undefined,
+        dateOfBirth: values.dateOfBirth || undefined,
         guardianFullName: guardian?.fullName || undefined,
         guardianPhone: guardian?.primaryPhone || undefined,
         academicYearId: values.academicYearId || undefined,
@@ -208,7 +206,7 @@ export function AdmissionForm({ defaultWorkspaceTab = "pipeline" }: { defaultWor
       const duplicates = await api.checkAdmissionDuplicates({
         firstNameEn: values.firstNameEn,
         lastNameEn: values.lastNameEn,
-        dateOfBirth: new Date(values.dateOfBirth).toISOString(),
+        dateOfBirth: values.dateOfBirth,
       });
       if (duplicates.hasWarnings) {
         setDuplicateWarning(duplicates);
@@ -229,7 +227,7 @@ export function AdmissionForm({ defaultWorkspaceTab = "pipeline" }: { defaultWor
       disabilityFlag: values.disabilityFlag?.trim() || undefined,
       confirmNoDisability: Boolean(values.confirmNoDisability),
       admissionDate: new Date(values.admissionDate).toISOString(),
-      dateOfBirth: new Date(values.dateOfBirth).toISOString(),
+      dateOfBirth: values.dateOfBirth,
       confirmDuplicate,
       documents: documentPayload ? [documentPayload] : [],
     });

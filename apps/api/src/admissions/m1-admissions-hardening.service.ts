@@ -24,6 +24,13 @@ import {
   ResolveAdmissionRelationshipsDto,
 } from './dto/m1-admissions-hardening.dto';
 import { normalizeAdmissionName } from './admissions.utils';
+import {
+  optionalNepalPhone,
+  optionalPersonName,
+  parseDateOfBirth,
+  requireNepalPhone,
+  requirePersonName,
+} from '../common/validation/contact-profile';
 
 interface DuplicateSignal {
   code: string;
@@ -201,15 +208,19 @@ export class M1AdmissionsHardeningService {
 
     const data = {
       status: 'INQUIRY',
-      firstNameEn: normalizeRequiredName(dto.firstNameEn, 'Draft'),
-      lastNameEn: normalizeRequiredName(dto.lastNameEn, 'Applicant'),
-      firstNameNp: normalizeNullableString(dto.firstNameNp),
-      lastNameNp: normalizeNullableString(dto.lastNameNp),
-      dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
-      guardianFullName: normalizeNullableString(dto.guardianFullName),
-      guardianPhone: dto.guardianPhone
-        ? normalizeGuardianPhone(dto.guardianPhone)
-        : null,
+      firstNameEn: requirePersonName(dto.firstNameEn ?? 'Draft', 'firstNameEn'),
+      lastNameEn: requirePersonName(
+        dto.lastNameEn ?? 'Applicant',
+        'lastNameEn',
+      ),
+      firstNameNp: optionalPersonName(dto.firstNameNp, 'firstNameNp'),
+      lastNameNp: optionalPersonName(dto.lastNameNp, 'lastNameNp'),
+      dateOfBirth: dto.dateOfBirth ? parseDateOfBirth(dto.dateOfBirth) : null,
+      guardianFullName: optionalPersonName(
+        dto.guardianFullName,
+        'guardianFullName',
+      ),
+      guardianPhone: optionalNepalPhone(dto.guardianPhone),
       academicYearId: dto.academicYearId ?? null,
       classId: dto.classId ?? null,
       sectionId: dto.sectionId ?? null,
@@ -949,7 +960,7 @@ function buildDuplicateSearchConditions(
     { lastNameEn: { equals: dto.lastNameEn, mode: 'insensitive' } },
   ];
   if (dto.dateOfBirth)
-    conditions.push({ dateOfBirth: new Date(dto.dateOfBirth) });
+    conditions.push({ dateOfBirth: parseDateOfBirth(dto.dateOfBirth) });
   if (dto.firstNameNp && dto.lastNameNp) {
     conditions.push({
       firstNameNp: { equals: dto.firstNameNp, mode: 'insensitive' },
@@ -1166,17 +1177,11 @@ function readString(payload: Record<string, unknown> | undefined, key: string) {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
-function normalizeRequiredName(value: string | undefined, fallback: string) {
-  return value?.trim() || fallback;
-}
-
 function normalizeNullableString(value: string | undefined) {
   return value?.trim() || null;
 }
 
-function normalizeGuardianPhone(phone: string) {
-  return phone.trim().replace(/\s+/g, ' ');
-}
+const normalizeGuardianPhone = requireNepalPhone;
 
 function draftSource(draftKey: string) {
   return `autosave:${draftKey.trim()}`;

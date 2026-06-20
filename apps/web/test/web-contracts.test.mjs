@@ -1063,7 +1063,7 @@ describe("SchoolOS web production contracts", () => {
       coreValidation,
       /guardians: z\.array\(guardianSchema\)\.min\(1\)/,
     );
-    assert.match(coreValidation, /primaryPhone: z\.string\(\)\.regex\(/);
+    assert.match(coreValidation, /primaryPhone: nepalPhoneSchema/);
     assert.match(admissionForm, /Document/);
     assert.match(admissionForm, /Review & Documents/);
     assert.match(admissionForm, /fileToBase64Payload/);

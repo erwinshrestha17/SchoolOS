@@ -134,16 +134,19 @@ Manage student lifecycle from inquiry/application to active, transferred, withdr
 
 ### Core functions
 
-1. Create inquiry/application.
-2. Create, reopen, and server-save application draft where supported.
-3. Capture student, guardian, address, academic, medical/emergency, and document information.
-4. Review duplicate candidates using Nepali/English names, guardian phone reuse, DOB, previous school, and sibling clues.
-5. Convert approved application to active student.
-6. Manage lifecycle: active, transferred, withdrawn, graduated, archived, alumni.
-7. Generate protected documents such as ID card and transfer certificate where supported.
-8. Manage guardian links and removal with immediate file-access revocation.
-9. Generate/rotate/revoke QR credentials with audit.
-10. Review IEMIS/export readiness issues.
+1. Create or continue one tenant-scoped Admission Case from office/walk-in, parent online, phone inquiry, transfer request, or import sources.
+2. Configure a school default admission policy plus selected academic-year, grade-band, class, source, or transfer rules without creating a separate fast-admission system.
+3. Keep normal Nepal office admission direct when policy permits; route only policy-, approval-, document-, interview-, capacity-, or duplicate-blocked cases through review.
+4. Create, reopen, and server-save admission-case drafts while progressively capturing student, guardian, academic placement, medical/emergency, and protected document information.
+5. Evaluate backend-owned admission eligibility, including missing requirements, tenant-scoped placement, duplicate candidates, policy requirements, optional capacity state, and the safe next action.
+6. Review duplicate candidates using Nepali/English names, guardian phone reuse, DOB, previous school, and sibling clues; never auto-merge.
+7. Admit directly or finalize an approved case through a serializable, retry-safe command that creates the student, guardian link, enrollment, lifecycle history, protected document links, follow-up state, and audit atomically.
+8. Keep optional documents, IEMIS information, guardian portal verification, and QR/ID readiness as post-admission follow-up where policy permits; M1 must not create M3 payment or receipt records.
+9. Manage lifecycle: active, transferred, withdrawn, graduated, archived, alumni.
+10. Generate protected documents such as ID card and transfer certificate where supported.
+11. Manage guardian links and removal with immediate file-access revocation.
+12. Generate/rotate/revoke QR credentials with audit.
+13. Review IEMIS/export readiness issues.
 
 ### Acceptance criteria
 
@@ -152,6 +155,9 @@ Manage student lifecycle from inquiry/application to active, transferred, withdr
 3. Student documents and photos use File Registry protected access.
 4. Duplicate warnings appear before conversion.
 5. Lifecycle mutations require permission and audit.
+6. A repeat finalization/direct-admission submission cannot create a second student.
+7. Principal approval policy is enforced by backend role checks, not frontend labels.
+8. Ordinary users see simple business statuses rather than internal workflow statuses.
 
 ---
 

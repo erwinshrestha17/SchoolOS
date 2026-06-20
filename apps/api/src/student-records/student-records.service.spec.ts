@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import {
   AuthMethod,
+  FileStatus,
   StorageProvider,
   StudentDocumentKind,
 } from '@prisma/client';
@@ -50,6 +52,7 @@ describe('StudentRecordsService', () => {
       getSignedUrl: jest.fn(),
       softDeleteFile: jest.fn(),
       auditAccess: jest.fn(),
+      linkToEntityInTransaction: jest.fn(),
     };
     actor = {
       userId: 'user-1',
@@ -67,6 +70,71 @@ describe('StudentRecordsService', () => {
       auditService,
       fileRegistryService,
     );
+  });
+
+  it('attaches File Registry admission documents to the admitted student inside the caller transaction', async () => {
+    const tx = {
+      studentDocument: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockImplementation(async ({ data }: any) => ({
+          id: 'document-1',
+          ...data,
+        })),
+      },
+      studentDocumentHistory: { create: jest.fn() },
+      fileAsset: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'asset-1',
+          tenantId: 'tenant-1',
+          originalFilename: 'birth.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: BigInt(12),
+          storageProvider: StorageProvider.LOCAL,
+          objectKey: 'tenant-1/admissions/case-1/birth.pdf',
+          status: FileStatus.UPLOADED,
+          module: 'admissions',
+          entityId: 'case-1',
+          uploadedByUserId: 'user-1',
+        }),
+      },
+    } as any;
+
+    await service.attachRegisteredAdmissionDocuments(tx, {
+      tenantId: 'tenant-1',
+      studentId: 'student-1',
+      admissionCaseId: 'case-1',
+      documents: [
+        {
+          fileId: 'asset-1',
+          kind: 'BIRTH_CERTIFICATE',
+          title: 'Birth certificate',
+        },
+      ],
+      userId: 'user-1',
+    });
+
+    expect(fileRegistryService.linkToEntityInTransaction).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        assetId: 'asset-1',
+        entityId: 'student-1',
+        ownerType: 'student',
+      }),
+    );
+    expect(tx.studentDocument.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: 'tenant-1',
+        studentId: 'student-1',
+        fileId: 'asset-1',
+        kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+      }),
+    });
+    expect(tx.studentDocumentHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: 'UPLOAD',
+        metadata: { admissionCaseId: 'case-1' },
+      }),
+    });
   });
 
   it('stores document metadata only after validating tenant-scoped student access', async () => {
@@ -285,7 +353,7 @@ describe('StudentRecordsService', () => {
     expect(resultAll[1].daysUntilExpiry).toBe(10);
 
     // Exclude expired test
-    const resultActiveOnly = await service.getExpiringDocuments(actor, {
+    await service.getExpiringDocuments(actor, {
       days: 30,
       excludeExpired: true,
     });

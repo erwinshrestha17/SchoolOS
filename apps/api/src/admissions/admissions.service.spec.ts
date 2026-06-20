@@ -79,14 +79,19 @@ describe('AdmissionsService production hardening', () => {
       }),
     });
 
-    expect(tx.guardian.upsert).toHaveBeenCalledWith(
+    expect(tx.guardian.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        primaryPhone: '+9779800000000',
+        fullName: { equals: 'Maya Tamang', mode: 'insensitive' },
+      },
+    });
+    expect(tx.guardian.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
-          tenantId_primaryPhone: {
-            tenantId: actor.tenantId,
-            primaryPhone: '9800000000',
-          },
-        },
+        data: expect.objectContaining({
+          tenantId: actor.tenantId,
+          primaryPhone: '+9779800000000',
+        }),
       }),
     );
 
@@ -494,7 +499,7 @@ describe('AdmissionsService production hardening', () => {
         gender: Gender.FEMALE,
         guardianFullName: 'Maya Tamang',
         guardianRelation: 'mother',
-        guardianPhone: '9800000000',
+        guardianPhone: '+9779800000000',
         academicYearId: 'ay-1',
         classId: 'class-1',
         sectionId: 'section-1',
@@ -507,7 +512,7 @@ describe('AdmissionsService production hardening', () => {
         tenantId: actor.tenantId,
         status: 'INQUIRY',
         firstNameEn: 'Asha',
-        guardianPhone: '9800000000',
+        guardianPhone: '+9779800000000',
         duplicateReview: expect.objectContaining({ hasWarnings: false }),
         createdById: actor.userId,
       }),
@@ -873,11 +878,13 @@ function buildTransaction() {
       create: jest.fn(),
     },
     guardian: {
-      upsert: jest.fn().mockResolvedValue({
+      findFirst: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({
         id: 'guardian-1',
         fullName: 'Maya Tamang',
-        primaryPhone: '9800000000',
+        primaryPhone: '+9779800000000',
       }),
+      update: jest.fn(),
     },
     studentGuardian: {
       create: jest.fn().mockResolvedValue({

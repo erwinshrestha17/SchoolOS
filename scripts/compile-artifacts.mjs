@@ -168,7 +168,7 @@ if (fs.existsSync(valDir)) {
   const files = fs.readdirSync(valDir);
   // Sort files with custom order (auth and student first) to prevent hoisting issues
   files.sort((a, b) => {
-    const order = ['auth.ts', 'student.ts', 'academic.ts'];
+    const order = ['auth.ts', 'contact-profile.ts', 'student.ts', 'academic.ts'];
     const idxA = order.indexOf(a);
     const idxB = order.indexOf(b);
     if (idxA !== -1 && idxB !== -1) return idxA - idxB;

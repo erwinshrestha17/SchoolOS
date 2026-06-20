@@ -460,6 +460,13 @@ class _MoreBody extends StatelessWidget {
               enabled: modules['students'] == true,
             ),
             _MenuItem(
+              'Admissions Snapshot',
+              Icons.person_add_alt_1_rounded,
+              AppColors.info,
+              AppRoutes.principalAdmissions,
+              enabled: modules['students'] == true,
+            ),
+            _MenuItem(
               'Academics',
               Icons.menu_book_rounded,
               AppColors.info,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CreateStudentGuardianPayload, GuardianProfile, UpdateStudentGuardianPayload } from '@schoolos/core';
+import { CreateStudentGuardianPayload, GuardianProfile, UpdateStudentGuardianPayload, getNepalMobileCarrier, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone } from '@schoolos/core';
 import { SectionCard } from '@/components/ui/section-card';
 import { Badge } from '@/components/ui/badge';
 import { Phone, Mail, MapPin, Edit3, Plus, Trash2 } from 'lucide-react';
@@ -180,17 +180,17 @@ function GuardianEditForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!/^9[678]\d{8}$/.test(primaryPhone)) {
-      setPhoneError('Must be exactly 10 digits starting with 98, 97, or 96');
-      return;
-    }
+    if (!isValidPersonName(fullName)) { setPhoneError('Enter a valid guardian name.'); return; }
+    if (!tryNormalizeNepalPhone(primaryPhone)) { setPhoneError('Enter a valid NTC or Ncell mobile number.'); return; }
+    if (secondaryPhone && !tryNormalizeNepalPhone(secondaryPhone)) { setPhoneError('Enter a valid secondary NTC or Ncell mobile number.'); return; }
+    if (email && !isValidEmail(email)) { setPhoneError('Enter a valid email address.'); return; }
     setPhoneError(null);
     onSave({
-      fullName,
+      fullName: normalizePersonName(fullName),
       relation,
-      primaryPhone,
-      secondaryPhone: secondaryPhone || null,
-      email: email || null,
+      primaryPhone: normalizeNepalPhone(primaryPhone),
+      secondaryPhone: secondaryPhone ? normalizeNepalPhone(secondaryPhone) : null,
+      email: email ? normalizeEmail(email) : null,
       occupation: occupation || null,
       wardNumber: wardNumber || null,
       isPrimary,
@@ -235,11 +235,9 @@ function GuardianEditForm({
           <input
             type="text"
             className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-[var(--color-mod-admissions-accent)] focus:outline-none"
-            maxLength={10}
             value={primaryPhone}
             onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-              setPrimaryPhone(val);
+              setPrimaryPhone(e.target.value);
               if (phoneError) setPhoneError(null);
             }}
             disabled={isSaving}
@@ -247,6 +245,7 @@ function GuardianEditForm({
           {phoneError && (
             <p className="text-[10px] font-bold text-rose-600 mt-1">{phoneError}</p>
           )}
+          {getNepalMobileCarrier(primaryPhone) ? <p className="text-[10px] font-bold text-slate-500">Carrier: {getNepalMobileCarrier(primaryPhone)}</p> : null}
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">

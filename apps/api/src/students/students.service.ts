@@ -53,6 +53,14 @@ import { UpdateStudentDto } from './dto/update-student.dto';
 import { UpdateStudentGuardianDto } from './dto/update-student-guardian.dto';
 import { UploadStudentDocumentDto } from './dto/upload-student-document.dto';
 import { AttendanceHistoryQueryDto } from './dto/attendance-history.dto';
+import {
+  optionalNepalPhone,
+  optionalPersonName,
+  optionalProfileEmail,
+  parseDateOfBirth,
+  requireNepalPhone,
+  requirePersonName,
+} from '../common/validation/contact-profile';
 
 @Injectable()
 export class StudentsService {
@@ -68,6 +76,9 @@ export class StudentsService {
   ) {}
 
   async createStudent(dto: CreateStudentDto, actor: AuthContext) {
+    const firstNameEn = requirePersonName(dto.firstNameEn, 'firstNameEn');
+    const lastNameEn = requirePersonName(dto.lastNameEn, 'lastNameEn');
+    const dateOfBirth = parseDateOfBirth(dto.dateOfBirth);
     const classroom = await this.prisma.class.findFirst({
       where: {
         id: dto.classId,
@@ -127,11 +138,11 @@ export class StudentsService {
         userId: linkedUserId,
         studentSystemId:
           dto.studentSystemId ?? (await this.generateStudentSystemId(actor)),
-        firstNameEn: dto.firstNameEn,
-        lastNameEn: dto.lastNameEn,
-        firstNameNp: dto.firstNameNp ?? null,
-        lastNameNp: dto.lastNameNp ?? null,
-        dateOfBirth: new Date(dto.dateOfBirth),
+        firstNameEn,
+        lastNameEn,
+        firstNameNp: optionalPersonName(dto.firstNameNp, 'firstNameNp'),
+        lastNameNp: optionalPersonName(dto.lastNameNp, 'lastNameNp'),
+        dateOfBirth,
         gender: dto.gender,
         admissionDate: new Date(dto.admissionDate),
         classId: dto.classId,
@@ -140,8 +151,8 @@ export class StudentsService {
         admissionNumber: dto.admissionNumber ?? null,
         nationality: dto.nationality ?? 'Nepali',
         mediumOfInstruct: dto.mediumOfInstruct ?? 'English',
-        emergencyName: dto.emergencyName ?? null,
-        emergencyPhone: dto.emergencyPhone ?? null,
+        emergencyName: optionalPersonName(dto.emergencyName, 'emergencyName'),
+        emergencyPhone: optionalNepalPhone(dto.emergencyPhone),
       },
       include: {
         class: true,
@@ -1114,19 +1125,19 @@ export class StudentsService {
 
     const studentData: Prisma.StudentUncheckedUpdateInput = {
       ...(dto.firstNameEn !== undefined
-        ? { firstNameEn: assertNonEmpty(dto.firstNameEn, 'firstNameEn') }
+        ? { firstNameEn: requirePersonName(dto.firstNameEn, 'firstNameEn') }
         : {}),
       ...(dto.lastNameEn !== undefined
-        ? { lastNameEn: assertNonEmpty(dto.lastNameEn, 'lastNameEn') }
+        ? { lastNameEn: requirePersonName(dto.lastNameEn, 'lastNameEn') }
         : {}),
       ...(dto.firstNameNp !== undefined
-        ? { firstNameNp: normalizeNullableString(dto.firstNameNp) }
+        ? { firstNameNp: optionalPersonName(dto.firstNameNp, 'firstNameNp') }
         : {}),
       ...(dto.lastNameNp !== undefined
-        ? { lastNameNp: normalizeNullableString(dto.lastNameNp) }
+        ? { lastNameNp: optionalPersonName(dto.lastNameNp, 'lastNameNp') }
         : {}),
       ...(dto.dateOfBirth !== undefined
-        ? { dateOfBirth: new Date(dto.dateOfBirth) }
+        ? { dateOfBirth: parseDateOfBirth(dto.dateOfBirth) }
         : {}),
       ...(dto.gender !== undefined ? { gender: dto.gender } : {}),
       ...(dto.nationality !== undefined
@@ -1176,16 +1187,21 @@ export class StudentsService {
         ? { specialNeeds: normalizeNullableString(dto.specialNeeds) }
         : {}),
       ...(dto.emergencyName !== undefined
-        ? { emergencyName: normalizeNullableString(dto.emergencyName) }
+        ? {
+            emergencyName: optionalPersonName(
+              dto.emergencyName,
+              'emergencyName',
+            ),
+          }
         : {}),
       ...(dto.emergencyPhone !== undefined
-        ? { emergencyPhone: normalizeNullableString(dto.emergencyPhone) }
+        ? { emergencyPhone: optionalNepalPhone(dto.emergencyPhone) }
         : {}),
       ...(dto.doctorName !== undefined
         ? { doctorName: normalizeNullableString(dto.doctorName) }
         : {}),
       ...(dto.doctorPhone !== undefined
-        ? { doctorPhone: normalizeNullableString(dto.doctorPhone) }
+        ? { doctorPhone: optionalNepalPhone(dto.doctorPhone) }
         : {}),
     };
 
@@ -1329,22 +1345,6 @@ export class StudentsService {
       orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
     });
 
-    if (dto.primaryPhone && dto.primaryPhone !== link.guardian.primaryPhone) {
-      const phoneOwner = await this.prisma.guardian.findFirst({
-        where: {
-          tenantId: actor.tenantId,
-          primaryPhone: dto.primaryPhone,
-          id: { not: guardianId },
-        },
-      });
-
-      if (phoneOwner) {
-        throw new ConflictException(
-          'Guardian phone number is already used in this tenant',
-        );
-      }
-    }
-
     if (dto.isPrimary === false && link.isPrimary) {
       throw new BadRequestException(
         'Choose another primary guardian before removing this one.',
@@ -1367,16 +1367,16 @@ export class StudentsService {
         where: { id: guardianId },
         data: {
           ...(dto.fullName !== undefined
-            ? { fullName: assertNonEmpty(dto.fullName, 'fullName') }
+            ? { fullName: requirePersonName(dto.fullName, 'fullName') }
             : {}),
           ...(dto.primaryPhone !== undefined
-            ? { primaryPhone: assertNonEmpty(dto.primaryPhone, 'primaryPhone') }
+            ? { primaryPhone: requireNepalPhone(dto.primaryPhone) }
             : {}),
           ...(dto.secondaryPhone !== undefined
-            ? { secondaryPhone: normalizeNullableString(dto.secondaryPhone) }
+            ? { secondaryPhone: optionalNepalPhone(dto.secondaryPhone) }
             : {}),
           ...(dto.email !== undefined
-            ? { email: normalizeNullableString(dto.email) }
+            ? { email: optionalProfileEmail(dto.email) }
             : {}),
           ...(dto.occupation !== undefined
             ? { occupation: normalizeNullableString(dto.occupation) }
@@ -1475,16 +1475,6 @@ export class StudentsService {
         if (!guardian) {
           throw new NotFoundException('Guardian not found in this tenant');
         }
-      } else if (dto.primaryPhone) {
-        guardian = await tx.guardian.findFirst({
-          where: { tenantId: actor.tenantId, primaryPhone: dto.primaryPhone },
-          select: {
-            id: true,
-            fullName: true,
-            primaryPhone: true,
-            relation: true,
-          },
-        });
       }
 
       if (!guardian) {
@@ -1496,11 +1486,11 @@ export class StudentsService {
         guardian = await tx.guardian.create({
           data: {
             tenantId: actor.tenantId,
-            fullName: assertNonEmpty(dto.fullName, 'fullName'),
+            fullName: requirePersonName(dto.fullName, 'fullName'),
             relation,
-            primaryPhone: assertNonEmpty(dto.primaryPhone, 'primaryPhone'),
-            secondaryPhone: normalizeNullableString(dto.secondaryPhone),
-            email: normalizeNullableString(dto.email),
+            primaryPhone: requireNepalPhone(dto.primaryPhone),
+            secondaryPhone: optionalNepalPhone(dto.secondaryPhone),
+            email: optionalProfileEmail(dto.email),
             occupation: normalizeNullableString(dto.occupation),
             homeAddress: normalizeNullableString(dto.homeAddress),
             wardNumber: normalizeNullableString(dto.wardNumber),
@@ -1514,7 +1504,7 @@ export class StudentsService {
         });
       }
 
-      if (existingLinks.some((link) => link.guardianId === guardian!.id)) {
+      if (existingLinks.some((link) => link.guardianId === guardian.id)) {
         throw new ConflictException(
           'This guardian is already linked to the student.',
         );

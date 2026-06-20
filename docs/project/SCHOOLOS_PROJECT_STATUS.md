@@ -96,7 +96,7 @@ Use the readiness statuses from the audit. Most modules are `IMPLEMENTED_UNVERIF
 | Module | Overall Status | Main Gap |
 | --- | --- | --- |
 | M0 Platform Core | IMPLEMENTED_UNVERIFIED | Staging/provider/queue/support-override operational proof. |
-| M1 Admissions and Student Profiles | IMPLEMENTED_UNVERIFIED | Seeded browser flows and pilot data workflow proof. |
+| M1 Admissions and Student Profiles | IMPLEMENTED_UNVERIFIED | Unified Admission Case direct/review flow is locally implemented; seeded authenticated browser, protected-document, mobile snapshot, staging, and pilot workflow proof remain. |
 | M2 Smart Attendance | IMPLEMENTED_UNVERIFIED | Teacher/parent/mobile role QA and pilot smoke. |
 | M3 Fees and Receipts | IMPLEMENTED_UNVERIFIED | Provider/payment sandbox and finance workflow smoke. |
 | M4 Academics, Exams, CAS, Report Cards | IMPLEMENTED_UNVERIFIED | Browser/staging workflow proof and report-card file verification. |

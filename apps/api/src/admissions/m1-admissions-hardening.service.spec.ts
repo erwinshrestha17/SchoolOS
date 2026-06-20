@@ -103,7 +103,7 @@ describe('M1AdmissionsHardeningService', () => {
       data: expect.objectContaining({
         tenantId: actor.tenantId,
         source: 'autosave:front-desk-1',
-        guardianPhone: '980 000 0000',
+        guardianPhone: '+9779800000000',
         duplicateReview: expect.objectContaining({ hasWarnings: false }),
       }),
     });
@@ -126,7 +126,7 @@ describe('M1AdmissionsHardeningService', () => {
         tenantId: actor.tenantId,
         status: { in: ['INQUIRY', 'APPLICATION', 'DOCUMENT_PENDING'] },
         source: { startsWith: 'autosave:' },
-        guardianPhone: '980 000 0000',
+        guardianPhone: '+9779800000000',
       },
       orderBy: [{ updatedAt: 'desc' }],
       take: 5,

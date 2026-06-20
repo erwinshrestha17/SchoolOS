@@ -4,13 +4,16 @@ import {
   StaffEmploymentType,
   StaffStatus,
 } from '@prisma/client';
+import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
 import {
-  IsDateString,
-  IsEmail,
-  IsEnum,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+  IsDateOfBirth,
+  IsNepalPhone,
+  IsPersonName,
+  IsProfileEmail,
+  NormalizeEmailAddress,
+  NormalizeNepalPhone,
+  NormalizePersonName,
+} from '../../common/validation/contact-profile.decorators';
 
 export class UpdateStaffDto {
   @IsOptional()
@@ -23,14 +26,18 @@ export class UpdateStaffDto {
 
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   firstName?: string;
 
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   lastName?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsDateOfBirth()
   dateOfBirth?: string;
 
   @IsOptional()
@@ -91,10 +98,14 @@ export class UpdateStaffDto {
 
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   emergencyContactName?: string;
 
   @IsOptional()
   @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   emergencyContactPhone?: string;
 
   @IsOptional()
@@ -110,6 +121,7 @@ export class UpdateStaffDto {
   experience?: string;
 
   @IsOptional()
-  @IsEmail()
+  @NormalizeEmailAddress()
+  @IsProfileEmail()
   email?: string;
 }

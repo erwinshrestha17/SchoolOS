@@ -4,6 +4,7 @@ import type {
   AdmissionApplication,
   CreateAdmissionApplicationPayload,
 } from '@schoolos/core';
+import { isValidDateOfBirth, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, ClipboardList, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -85,14 +86,18 @@ export function AdmissionApplicationForm() {
     event.preventDefault();
     setValidationError('');
 
-    if (!form.firstNameEn.trim() || !form.lastNameEn.trim()) {
-      setValidationError('Enter the student’s English first and last name.');
+    if (!isValidPersonName(form.firstNameEn) || !isValidPersonName(form.lastNameEn)) {
+      setValidationError('Enter valid student names using Nepali or English letters.');
       return;
     }
+    if (form.dateOfBirth && !isValidDateOfBirth(form.dateOfBirth)) { setValidationError('Enter a valid date of birth.'); return; }
+    if (form.guardianFullName && !isValidPersonName(form.guardianFullName)) { setValidationError('Enter a valid guardian name.'); return; }
+    if (form.guardianPhone && !tryNormalizeNepalPhone(form.guardianPhone)) { setValidationError('Enter a valid NTC or Ncell guardian number.'); return; }
+    if (form.guardianEmail && !isValidEmail(form.guardianEmail)) { setValidationError('Enter a valid guardian email.'); return; }
 
     mutation.mutate(
       Object.fromEntries(
-        Object.entries(form).filter(([, value]) => value !== ''),
+        Object.entries({ ...form, firstNameEn: normalizePersonName(form.firstNameEn), lastNameEn: normalizePersonName(form.lastNameEn), guardianFullName: form.guardianFullName ? normalizePersonName(form.guardianFullName) : '', guardianPhone: form.guardianPhone ? normalizeNepalPhone(form.guardianPhone) : '', guardianEmail: form.guardianEmail ? normalizeEmail(form.guardianEmail) : '' }).filter(([, value]) => value !== ''),
       ) as CreateAdmissionApplicationPayload,
     );
   }

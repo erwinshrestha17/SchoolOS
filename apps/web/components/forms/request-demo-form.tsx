@@ -25,6 +25,7 @@ import { Select } from '../ui/select';
 import { Textarea } from '../ui/textarea';
 import { Progress } from '../ui/progress';
 import { api } from '../../lib/api';
+import { isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone } from '@schoolos/core';
 
 const MODULES = [
   'Admissions',
@@ -95,13 +96,13 @@ export function RequestDemoForm() {
     if (!formData.location.trim()) newErrors.location = 'School Location is required';
     if (!formData.studentsCount) newErrors.studentsCount = 'Number of Students is required';
     
-    if (!formData.contactName.trim()) newErrors.contactName = 'Contact Person Name is required';
+    if (!isValidPersonName(formData.contactName)) newErrors.contactName = 'Enter a valid contact name';
     if (!formData.role.trim()) newErrors.role = 'Role / Designation is required';
-    if (!formData.phone.trim()) newErrors.phone = 'Phone Number is required';
+    if (!tryNormalizeNepalPhone(formData.phone)) newErrors.phone = 'Enter a valid NTC or Ncell mobile number';
     
     if (!formData.email.trim()) {
       newErrors.email = 'Email Address is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+    } else if (!isValidEmail(formData.email)) {
       newErrors.email = 'Enter a valid email address';
     }
     
@@ -121,6 +122,9 @@ export function RequestDemoForm() {
     try {
       const result = await api.submitDemoRequest({
         ...formData,
+        contactName: normalizePersonName(formData.contactName),
+        phone: normalizeNepalPhone(formData.phone),
+        email: normalizeEmail(formData.email),
         interestedModules: selectedModules,
       });
       setSubmittedRequestId(result.id);

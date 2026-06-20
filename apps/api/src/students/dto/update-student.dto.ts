@@ -1,33 +1,47 @@
 import { Gender } from '@prisma/client';
 import {
   IsBoolean,
-  IsDateString,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
   Min,
 } from 'class-validator';
+import {
+  IsDateOfBirth,
+  IsNepalPhone,
+  IsPersonName,
+  NormalizeNepalPhone,
+  NormalizePersonName,
+} from '../../common/validation/contact-profile.decorators';
 
 export class UpdateStudentDto {
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   firstNameEn?: string;
 
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   lastNameEn?: string;
 
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   firstNameNp?: string;
 
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   lastNameNp?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsDateOfBirth()
   dateOfBirth?: string;
 
   @IsOptional()
@@ -101,6 +115,8 @@ export class UpdateStudentDto {
 
   @IsOptional()
   @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   emergencyPhone?: string;
 
   @IsOptional()
@@ -109,6 +125,8 @@ export class UpdateStudentDto {
 
   @IsOptional()
   @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   doctorPhone?: string;
 
   @IsOptional()

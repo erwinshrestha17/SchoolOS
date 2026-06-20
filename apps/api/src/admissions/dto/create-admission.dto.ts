@@ -4,13 +4,11 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
-  IsEmail,
   IsEnum,
   IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
-  Matches,
   Min,
   MinLength,
   ValidateIf,
@@ -18,10 +16,21 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { UploadStudentDocumentDto } from '../../student-records/dto/upload-student-document.dto';
+import {
+  IsDateOfBirth,
+  IsNepalPhone,
+  IsPersonName,
+  IsProfileEmail,
+  NormalizeEmailAddress,
+  NormalizeNepalPhone,
+  NormalizePersonName,
+} from '../../common/validation/contact-profile.decorators';
 
 class GuardianInputDto {
   @IsString()
   @IsNotEmpty()
+  @NormalizePersonName()
+  @IsPersonName()
   fullName!: string;
 
   @IsString()
@@ -30,17 +39,19 @@ class GuardianInputDto {
 
   @IsString()
   @IsNotEmpty()
-  @Matches(/^\+?[0-9][0-9\s-]{6,19}$/, {
-    message: 'primaryPhone must be a valid phone number',
-  })
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   primaryPhone!: string;
 
   @IsOptional()
   @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   secondaryPhone?: string;
 
   @IsOptional()
-  @IsEmail()
+  @NormalizeEmailAddress()
+  @IsProfileEmail()
   email?: string;
 
   @IsOptional()
@@ -70,20 +81,28 @@ export class CreateAdmissionDto {
   studentSystemId?: string;
 
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   firstNameEn!: string;
 
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   lastNameEn!: string;
 
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   firstNameNp?: string;
 
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   lastNameNp?: string;
 
-  @IsDateString()
+  @IsDateOfBirth()
   dateOfBirth!: string;
 
   @IsEnum(Gender)
@@ -154,10 +173,14 @@ export class CreateAdmissionDto {
 
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   emergencyName?: string;
 
   @IsOptional()
   @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   emergencyPhone?: string;
 
   @IsOptional()
@@ -182,6 +205,8 @@ export class CreateAdmissionDto {
 
   @IsOptional()
   @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   doctorPhone?: string;
 
   @IsOptional()
@@ -205,7 +230,8 @@ export class CreateAdmissionDto {
   createLogin?: boolean;
 
   @ValidateIf((dto: CreateAdmissionDto) => dto.createLogin === true)
-  @IsEmail()
+  @NormalizeEmailAddress()
+  @IsProfileEmail()
   email?: string;
 
   @ValidateIf((dto: CreateAdmissionDto) => dto.createLogin === true)
@@ -215,6 +241,8 @@ export class CreateAdmissionDto {
 
   @IsOptional()
   @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   phone?: string;
 
   @IsOptional()

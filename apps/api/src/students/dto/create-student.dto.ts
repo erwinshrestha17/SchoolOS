@@ -2,7 +2,6 @@ import { Gender } from '@prisma/client';
 import {
   IsBoolean,
   IsDateString,
-  IsEmail,
   IsEnum,
   IsInt,
   IsOptional,
@@ -11,6 +10,15 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
+import {
+  IsDateOfBirth,
+  IsNepalPhone,
+  IsPersonName,
+  IsProfileEmail,
+  NormalizeEmailAddress,
+  NormalizeNepalPhone,
+  NormalizePersonName,
+} from '../../common/validation/contact-profile.decorators';
 
 export class CreateStudentDto {
   @IsOptional()
@@ -18,20 +26,28 @@ export class CreateStudentDto {
   studentSystemId?: string;
 
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   firstNameEn!: string;
 
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   lastNameEn!: string;
 
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   firstNameNp?: string;
 
   @IsOptional()
   @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
   lastNameNp?: string;
 
-  @IsDateString()
+  @IsDateOfBirth()
   dateOfBirth!: string;
 
   @IsEnum(Gender)
@@ -77,7 +93,8 @@ export class CreateStudentDto {
   createLogin?: boolean;
 
   @ValidateIf((dto: CreateStudentDto) => dto.createLogin === true)
-  @IsEmail()
+  @NormalizeEmailAddress()
+  @IsProfileEmail()
   email?: string;
 
   @ValidateIf((dto: CreateStudentDto) => dto.createLogin === true)
@@ -87,5 +104,7 @@ export class CreateStudentDto {
 
   @IsOptional()
   @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   phone?: string;
 }

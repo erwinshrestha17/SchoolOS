@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { StudentProfileDetail, UpdateStudentProfilePayload } from '@schoolos/core';
 import { formatBsDateForInput, parseBsDateInput, toGregorianDateFromBs } from '@schoolos/core';
+import { isValidDateOfBirth, isValidPersonName, normalizePersonName } from '@schoolos/core';
 import { Accessibility, CheckCircle2, Heart, ImageUp, Save, Trash2, X } from 'lucide-react';
 import { SectionCard } from '@/components/ui/section-card';
 import { cn } from '@/lib/utils';
@@ -55,7 +56,7 @@ export function StudentEditCard({ profile, isSaving, error, photoError, isUpload
 
   const handleSave = () => {
     setValidationError('');
-    if (!firstNameEn.trim() || !lastNameEn.trim()) { setValidationError('First name and last name are required.'); return; }
+    if (!isValidPersonName(firstNameEn) || !isValidPersonName(lastNameEn)) { setValidationError('Enter valid student names.'); return; }
     if (!dateOfBirthBs) { setValidationError('Date of birth is required.'); return; }
     let dateOfBirth: string;
     try {
@@ -65,9 +66,10 @@ export function StudentEditCard({ profile, isSaving, error, photoError, isUpload
       setValidationError(error instanceof Error ? error.message : 'Enter a valid BS date of birth.');
       return;
     }
+    if (!isValidDateOfBirth(dateOfBirth)) { setValidationError('Date of birth cannot be future or more than 120 years ago.'); return; }
     if (disabilityStatus === 'yes' && !disabilityFlag.trim()) { setValidationError('Add disability support details or select no known disability.'); return; }
     onSave({
-      firstNameEn: firstNameEn.trim(), lastNameEn: lastNameEn.trim(), dateOfBirth,
+      firstNameEn: normalizePersonName(firstNameEn), lastNameEn: normalizePersonName(lastNameEn), dateOfBirth,
       ...(gender ? { gender } : {}), nationalStudentId: nationalStudentId.trim() || null,
       disabilityFlag: disabilityStatus === 'yes' ? disabilityFlag.trim() : null,
       confirmNoDisability: disabilityStatus === 'no', medicalConditions: medicalConditions.trim() || null,

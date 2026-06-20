@@ -66,5 +66,42 @@ void main() {
       expect(dashboard['attentionCount'], 1);
       expect(dashboard['_mobileFromCache'], isTrue);
     });
+
+    test('loads the purpose-limited admissions snapshot', () async {
+      when(
+        () => apiClient.get<dynamic>('/mobile/principal/admissions-summary'),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(
+            path: '/mobile/principal/admissions-summary',
+          ),
+          data: {
+            'metrics': {
+              'waitingForReview': 2,
+              'approvedReadyToAdmit': 1,
+              'documentsPending': 3,
+              'duplicateWarnings': 1,
+              'iemisFollowUp': 4,
+            },
+            'items': [
+              {
+                'id': 'waiting-review',
+                'title': 'Admissions needing review',
+                'detail': '2 cases awaiting a school decision',
+              },
+            ],
+          },
+        ),
+      );
+
+      final repository = PrincipalRepository(apiClient);
+      final summary = await repository.getAdmissionsSummary();
+
+      expect(summary['metrics']['waitingForReview'], 2);
+      expect(summary['_mobileFromCache'], isFalse);
+      verify(
+        () => apiClient.get<dynamic>('/mobile/principal/admissions-summary'),
+      ).called(1);
+    });
   });
 }

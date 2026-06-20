@@ -22,6 +22,7 @@ import {
 
 const tenantAId = 'tenant-m1-http-a';
 const tenantBId = 'tenant-m1-http-b';
+const replacementGuardianId = '11111111-1111-4111-8111-111111111111';
 
 const actorA = buildActor(tenantAId, 'registrar-a');
 const actorB = buildActor(tenantBId, 'registrar-b');
@@ -153,6 +154,7 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
       .send({
         confirmFileAccessReview: true,
         reason: 'Guardian changed after admission review',
+        newPrimaryGuardianId: replacementGuardianId,
       })
       .expect(200);
 
@@ -224,7 +226,7 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
       expect.objectContaining({
         draftKey: 'front-desk-1',
         fullNameEn: 'Asha Tamang',
-        guardianPhone: '9800000000',
+        guardianPhone: '+9779800000000',
       }),
     );
     expect(prisma.__state.admissionApplications).toContainEqual(
@@ -503,6 +505,7 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
       .send({
         confirmFileAccessReview: true,
         reason: 'Guardian access revoked before document handover',
+        newPrimaryGuardianId: replacementGuardianId,
       })
       .expect(200);
 
@@ -511,7 +514,9 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
       .set('x-test-tenant', tenantAId)
       .expect(200);
 
-    expect(audit.body.guardians).toEqual([]);
+    expect(audit.body.guardians).toEqual([
+      expect.objectContaining({ id: replacementGuardianId }),
+    ]);
     expect(audit.body.policy).toEqual(
       expect.objectContaining({
         guardianFileAccessRequiresActiveStudentGuardianLink: true,
@@ -668,6 +673,13 @@ function seedM1Data(prisma: PrismaMock) {
     relation: 'mother',
     primaryPhone: '9800000000',
   });
+  prisma.__state.guardians.push({
+    id: replacementGuardianId,
+    tenantId: tenantAId,
+    fullName: 'Ram Tamang',
+    relation: 'father',
+    primaryPhone: '+9779811111111',
+  });
   prisma.__state.studentGuardians.push({
     id: 'link-a',
     tenantId: tenantAId,
@@ -675,6 +687,14 @@ function seedM1Data(prisma: PrismaMock) {
     guardianId: 'guardian-a',
     relation: 'mother',
     isPrimary: true,
+  });
+  prisma.__state.studentGuardians.push({
+    id: 'link-b',
+    tenantId: tenantAId,
+    studentId: 'student-a',
+    guardianId: replacementGuardianId,
+    relation: 'father',
+    isPrimary: false,
   });
   prisma.__state.studentDocuments.push({
     id: 'doc-a',

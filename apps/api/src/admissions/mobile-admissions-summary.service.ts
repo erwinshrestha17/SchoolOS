@@ -76,6 +76,13 @@ export class MobileAdmissionsSummaryService {
         status: duplicateWarnings.total > 0 ? 'attention' : 'clear',
         route: '/principal/admissions/duplicates',
       },
+      {
+        id: 'iemis-follow-up',
+        title: 'IEMIS follow-up',
+        detail: `${iemisFollowUp} active student${iemisFollowUp === 1 ? '' : 's'} need IEMIS information`,
+        status: iemisFollowUp > 0 ? 'attention' : 'clear',
+        route: '/principal/admissions/iemis',
+      },
     ];
 
     return {

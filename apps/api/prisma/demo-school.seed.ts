@@ -252,20 +252,9 @@ async function seedStudentsAndGuardians(
     if (!student.sectionId) throw new Error(`Demo student ${studentSystemId} has no sectionId`);
     const safeStudent: DemoStudent = { ...student, sectionId: student.sectionId };
 
-    const guardian = await prisma.guardian.upsert({
-      where: { tenantId_primaryPhone: { tenantId, primaryPhone: phone } },
-      update: {
+    const existingGuardian = await prisma.guardian.findFirst({ where: { tenantId, primaryPhone: phone, fullName: guardianName } });
+    const guardianData = {
         userId: linkParent && parentUser ? parentUser.id : undefined,
-        fullName: guardianName,
-        relation: 'Guardian',
-        email: `${phone}@demo.schoolos.local`,
-        homeAddress: 'Demo Address, Nepal',
-        receivesAlerts: true,
-        privacyConsentAt: new Date(),
-      },
-      create: {
-        tenantId,
-        userId: linkParent && parentUser ? parentUser.id : null,
         fullName: guardianName,
         relation: 'Guardian',
         primaryPhone: phone,
@@ -273,9 +262,10 @@ async function seedStudentsAndGuardians(
         homeAddress: 'Demo Address, Nepal',
         receivesAlerts: true,
         privacyConsentAt: new Date(),
-      },
-      select: { id: true, userId: true, primaryPhone: true },
-    });
+    };
+    const guardian = existingGuardian
+      ? await prisma.guardian.update({ where: { id: existingGuardian.id }, data: guardianData, select: { id: true, userId: true, primaryPhone: true } })
+      : await prisma.guardian.create({ data: { tenantId, ...guardianData }, select: { id: true, userId: true, primaryPhone: true } });
 
     await prisma.studentGuardian.upsert({
       where: { studentId_guardianId: { studentId: safeStudent.id, guardianId: guardian.id } },

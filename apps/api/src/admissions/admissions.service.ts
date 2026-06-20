@@ -41,6 +41,14 @@ import { ListAdmissionsDto } from './dto/list-admissions.dto';
 import { CheckAdmissionDuplicateDto } from './dto/check-admission-duplicate.dto';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
 import { TransferStudentDto } from './dto/transfer-student.dto';
+import {
+  optionalNepalPhone,
+  optionalPersonName,
+  optionalProfileEmail,
+  parseDateOfBirth,
+  requireNepalPhone,
+  requirePersonName,
+} from '../common/validation/contact-profile';
 
 interface AdmissionReferenceContext {
   academicYear: { id: string; startsOn: Date };
@@ -262,7 +270,7 @@ export class AdmissionsService {
         OR: [
           // 1. Exact name (English or Nepali) + Date of Birth
           {
-            dateOfBirth: new Date(dto.dateOfBirth),
+            dateOfBirth: parseDateOfBirth(dto.dateOfBirth),
             OR: [
               {
                 firstNameEn: {
@@ -385,7 +393,7 @@ export class AdmissionsService {
 
         const dobMatches =
           new Date(candidate.dateOfBirth).getTime() ===
-          new Date(dto.dateOfBirth).getTime();
+          parseDateOfBirth(dto.dateOfBirth).getTime();
 
         const nameEnMatches =
           normalizeAdmissionName(candidate.firstNameEn) ===
@@ -527,18 +535,19 @@ export class AdmissionsService {
       data: {
         tenantId: actor.tenantId,
         status: 'INQUIRY',
-        firstNameEn: dto.firstNameEn.trim(),
-        lastNameEn: dto.lastNameEn.trim(),
-        firstNameNp: dto.firstNameNp?.trim() || null,
-        lastNameNp: dto.lastNameNp?.trim() || null,
-        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
+        firstNameEn: requirePersonName(dto.firstNameEn, 'firstNameEn'),
+        lastNameEn: requirePersonName(dto.lastNameEn, 'lastNameEn'),
+        firstNameNp: optionalPersonName(dto.firstNameNp, 'firstNameNp'),
+        lastNameNp: optionalPersonName(dto.lastNameNp, 'lastNameNp'),
+        dateOfBirth: dto.dateOfBirth ? parseDateOfBirth(dto.dateOfBirth) : null,
         gender: dto.gender ?? null,
-        guardianFullName: dto.guardianFullName?.trim() || null,
+        guardianFullName: optionalPersonName(
+          dto.guardianFullName,
+          'guardianFullName',
+        ),
         guardianRelation: dto.guardianRelation?.trim() || null,
-        guardianPhone: dto.guardianPhone
-          ? normalizeGuardianPhone(dto.guardianPhone)
-          : null,
-        guardianEmail: dto.guardianEmail?.trim() || null,
+        guardianPhone: optionalNepalPhone(dto.guardianPhone),
+        guardianEmail: optionalProfileEmail(dto.guardianEmail),
         academicYearId: dto.academicYearId ?? null,
         classId: dto.classId ?? null,
         sectionId: dto.sectionId ?? null,
@@ -987,11 +996,11 @@ export class AdmissionsService {
         tenantId: actor.tenantId,
         userId: linkedUserId,
         studentSystemId,
-        firstNameEn: dto.firstNameEn,
-        lastNameEn: dto.lastNameEn,
-        firstNameNp: dto.firstNameNp ?? null,
-        lastNameNp: dto.lastNameNp ?? null,
-        dateOfBirth: new Date(dto.dateOfBirth),
+        firstNameEn: requirePersonName(dto.firstNameEn, 'firstNameEn'),
+        lastNameEn: requirePersonName(dto.lastNameEn, 'lastNameEn'),
+        firstNameNp: optionalPersonName(dto.firstNameNp, 'firstNameNp'),
+        lastNameNp: optionalPersonName(dto.lastNameNp, 'lastNameNp'),
+        dateOfBirth: parseDateOfBirth(dto.dateOfBirth),
         gender: dto.gender,
         admissionDate: new Date(dto.admissionDate),
         admissionNumber: dto.admissionNumber ?? null,
@@ -1007,8 +1016,8 @@ export class AdmissionsService {
         ethnicity: dto.ethnicity ?? null,
         citizenshipNo: dto.citizenshipNo ?? null,
         mediumOfInstruct: dto.mediumOfInstruction ?? 'English',
-        emergencyName: dto.emergencyName ?? null,
-        emergencyPhone: dto.emergencyPhone ?? null,
+        emergencyName: optionalPersonName(dto.emergencyName, 'emergencyName'),
+        emergencyPhone: optionalNepalPhone(dto.emergencyPhone),
         medicalConditions: encryptSensitiveField(
           dto.medicalConditions,
           this.configService.medicalEncryptionKey,
@@ -1136,39 +1145,41 @@ export class AdmissionsService {
     const guardianLinks: AdmissionCoreWrite['guardians'] = [];
 
     for (const guardianInput of dto.guardians) {
-      const guardianPhone = normalizeGuardianPhone(guardianInput.primaryPhone);
-      const guardian = await tx.guardian.upsert({
+      const guardianPhone = requireNepalPhone(guardianInput.primaryPhone);
+      const guardianName = requirePersonName(
+        guardianInput.fullName,
+        'guardian.fullName',
+      );
+      const existingGuardian = await tx.guardian.findFirst({
         where: {
-          tenantId_primaryPhone: {
-            tenantId: actor.tenantId,
-            primaryPhone: guardianPhone,
-          },
-        },
-        update: {
-          fullName: guardianInput.fullName.trim(),
-          relation: guardianInput.relation.trim(),
-          secondaryPhone: guardianInput.secondaryPhone ?? null,
-          email: guardianInput.email ?? null,
-          occupation: guardianInput.occupation ?? null,
-          homeAddress: guardianInput.homeAddress ?? null,
-          wardNumber: guardianInput.wardNumber ?? null,
-          receivesAlerts: guardianInput.receivesAlerts ?? false,
-          privacyConsentAt: new Date(),
-        },
-        create: {
           tenantId: actor.tenantId,
-          fullName: guardianInput.fullName.trim(),
-          relation: guardianInput.relation.trim(),
           primaryPhone: guardianPhone,
-          secondaryPhone: guardianInput.secondaryPhone ?? null,
-          email: guardianInput.email ?? null,
-          occupation: guardianInput.occupation ?? null,
-          homeAddress: guardianInput.homeAddress ?? null,
-          wardNumber: guardianInput.wardNumber ?? null,
-          receivesAlerts: guardianInput.receivesAlerts ?? false,
-          privacyConsentAt: new Date(),
+          fullName: { equals: guardianName, mode: 'insensitive' },
         },
       });
+      const guardianData = {
+        fullName: guardianName,
+        relation: guardianInput.relation.trim(),
+        secondaryPhone: optionalNepalPhone(guardianInput.secondaryPhone),
+        email: optionalProfileEmail(guardianInput.email),
+        occupation: guardianInput.occupation ?? null,
+        homeAddress: guardianInput.homeAddress ?? null,
+        wardNumber: guardianInput.wardNumber ?? null,
+        receivesAlerts: guardianInput.receivesAlerts ?? false,
+        privacyConsentAt: new Date(),
+      };
+      const guardian = existingGuardian
+        ? await tx.guardian.update({
+            where: { id: existingGuardian.id },
+            data: guardianData,
+          })
+        : await tx.guardian.create({
+            data: {
+              tenantId: actor.tenantId,
+              primaryPhone: guardianPhone,
+              ...guardianData,
+            },
+          });
 
       guardianLinks.push(
         await tx.studentGuardian.create({
@@ -1750,9 +1761,7 @@ function isAllowedApplicationTransition(current: string, next: string) {
   return allowed[current]?.includes(next) ?? false;
 }
 
-function normalizeGuardianPhone(phone: string) {
-  return phone.trim().replace(/\s+/g, ' ');
-}
+const normalizeGuardianPhone = requireNepalPhone;
 
 function formatImportError(error: unknown) {
   if (error instanceof HttpException) {

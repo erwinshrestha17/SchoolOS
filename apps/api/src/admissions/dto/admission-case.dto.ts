@@ -3,7 +3,6 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
-  IsEmail,
   IsEnum,
   IsIn,
   IsInt,
@@ -14,6 +13,15 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Gender } from '@prisma/client';
+import {
+  IsDateOfBirth,
+  IsNepalPhone,
+  IsPersonName,
+  IsProfileEmail,
+  NormalizeEmailAddress,
+  NormalizeNepalPhone,
+  NormalizePersonName,
+} from '../../common/validation/contact-profile.decorators';
 
 export const ADMISSION_SOURCES = [
   'OFFICE_WALK_IN',
@@ -24,6 +32,34 @@ export const ADMISSION_SOURCES = [
 ] as const;
 
 export const ADMISSION_MODES = ['DIRECT_ALLOWED', 'REVIEW_REQUIRED'] as const;
+
+export const ADMISSION_GRADE_BANDS = [
+  'MONTESSORI',
+  'PRIMARY',
+  'BASIC_SECONDARY',
+  'GRADE_11_12',
+] as const;
+
+export const ADMISSION_REQUIRED_FIELDS = [
+  'firstNameEn',
+  'lastNameEn',
+  'firstNameNp',
+  'lastNameNp',
+  'dateOfBirth',
+  'gender',
+  'guardianFullName',
+  'guardianRelation',
+  'guardianPhone',
+  'guardianEmail',
+  'academicYearId',
+  'classId',
+  'sectionId',
+  'previousSchool',
+  'admissionDate',
+  'nationalStudentId',
+  'emergencyName',
+  'emergencyPhone',
+] as const;
 
 export const ADMISSION_REVIEW_ACTIONS = [
   'REQUEST_INFORMATION',
@@ -57,7 +93,7 @@ export class AdmissionPolicyRuleDto {
   admissionMode: AdmissionMode = 'DIRECT_ALLOWED';
 
   @IsOptional() @IsString() academicYearId?: string;
-  @IsOptional() @IsString() gradeBand?: string;
+  @IsOptional() @IsIn(ADMISSION_GRADE_BANDS) gradeBand?: string;
   @IsOptional() @IsString() classId?: string;
   @IsOptional() @IsEnum(ADMISSION_SOURCES) source?: AdmissionSource;
   @IsOptional() @IsBoolean() transferStudent?: boolean;
@@ -74,7 +110,10 @@ export class AdmissionPolicyRuleDto {
   @IsArray()
   @IsString({ each: true })
   requiredDocuments?: string[];
-  @IsOptional() @IsArray() @IsString({ each: true }) requiredFields?: string[];
+  @IsOptional()
+  @IsArray()
+  @IsIn(ADMISSION_REQUIRED_FIELDS, { each: true })
+  requiredFields?: string[];
 }
 
 export class UpdateAdmissionPolicyDto {
@@ -90,16 +129,47 @@ export class UpdateAdmissionPolicyDto {
 }
 
 export class CreateAdmissionCaseDto {
-  @IsString() @MaxLength(100) firstNameEn!: string;
-  @IsString() @MaxLength(100) lastNameEn!: string;
-  @IsOptional() @IsString() @MaxLength(100) firstNameNp?: string;
-  @IsOptional() @IsString() @MaxLength(100) lastNameNp?: string;
-  @IsOptional() @IsDateString() dateOfBirth?: string;
+  @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
+  @MaxLength(100)
+  firstNameEn!: string;
+  @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
+  @MaxLength(100)
+  lastNameEn!: string;
+  @IsOptional()
+  @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
+  @MaxLength(100)
+  firstNameNp?: string;
+  @IsOptional()
+  @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
+  @MaxLength(100)
+  lastNameNp?: string;
+  @IsOptional() @IsDateOfBirth() dateOfBirth?: string;
   @IsOptional() @IsEnum(Gender) gender?: Gender;
-  @IsOptional() @IsString() @MaxLength(160) guardianFullName?: string;
+  @IsOptional()
+  @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
+  @MaxLength(160)
+  guardianFullName?: string;
   @IsOptional() @IsString() @MaxLength(80) guardianRelation?: string;
-  @IsOptional() @IsString() @MaxLength(32) guardianPhone?: string;
-  @IsOptional() @IsEmail() guardianEmail?: string;
+  @IsOptional()
+  @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
+  @MaxLength(32)
+  guardianPhone?: string;
+  @IsOptional()
+  @NormalizeEmailAddress()
+  @IsProfileEmail()
+  guardianEmail?: string;
   @IsOptional() @IsBoolean() guardianReceivesAlerts?: boolean;
   @IsOptional() @IsString() academicYearId?: string;
   @IsOptional() @IsString() classId?: string;
@@ -112,8 +182,18 @@ export class CreateAdmissionCaseDto {
   @IsOptional() @IsString() @MaxLength(80) mediumOfInstruction?: string;
   @IsOptional() @IsInt() @Min(1) @Type(() => Number) rollNumber?: number;
   @IsOptional() @IsString() @MaxLength(100) nationalStudentId?: string;
-  @IsOptional() @IsString() @MaxLength(160) emergencyName?: string;
-  @IsOptional() @IsString() @MaxLength(32) emergencyPhone?: string;
+  @IsOptional()
+  @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
+  @MaxLength(160)
+  emergencyName?: string;
+  @IsOptional()
+  @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
+  @MaxLength(32)
+  emergencyPhone?: string;
   @IsOptional() @IsString() @MaxLength(2000) medicalConditions?: string;
   @IsOptional()
   @IsArray()
@@ -123,16 +203,49 @@ export class CreateAdmissionCaseDto {
 }
 
 export class UpdateAdmissionCaseDto {
-  @IsOptional() @IsString() @MaxLength(100) firstNameEn?: string;
-  @IsOptional() @IsString() @MaxLength(100) lastNameEn?: string;
-  @IsOptional() @IsString() @MaxLength(100) firstNameNp?: string;
-  @IsOptional() @IsString() @MaxLength(100) lastNameNp?: string;
-  @IsOptional() @IsDateString() dateOfBirth?: string;
+  @IsOptional()
+  @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
+  @MaxLength(100)
+  firstNameEn?: string;
+  @IsOptional()
+  @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
+  @MaxLength(100)
+  lastNameEn?: string;
+  @IsOptional()
+  @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
+  @MaxLength(100)
+  firstNameNp?: string;
+  @IsOptional()
+  @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
+  @MaxLength(100)
+  lastNameNp?: string;
+  @IsOptional() @IsDateOfBirth() dateOfBirth?: string;
   @IsOptional() @IsEnum(Gender) gender?: Gender;
-  @IsOptional() @IsString() @MaxLength(160) guardianFullName?: string;
+  @IsOptional()
+  @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
+  @MaxLength(160)
+  guardianFullName?: string;
   @IsOptional() @IsString() @MaxLength(80) guardianRelation?: string;
-  @IsOptional() @IsString() @MaxLength(32) guardianPhone?: string;
-  @IsOptional() @IsEmail() guardianEmail?: string;
+  @IsOptional()
+  @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
+  @MaxLength(32)
+  guardianPhone?: string;
+  @IsOptional()
+  @NormalizeEmailAddress()
+  @IsProfileEmail()
+  guardianEmail?: string;
   @IsOptional() @IsBoolean() guardianReceivesAlerts?: boolean;
   @IsOptional() @IsString() academicYearId?: string;
   @IsOptional() @IsString() classId?: string;
@@ -145,8 +258,18 @@ export class UpdateAdmissionCaseDto {
   @IsOptional() @IsString() @MaxLength(80) mediumOfInstruction?: string;
   @IsOptional() @IsInt() @Min(1) @Type(() => Number) rollNumber?: number;
   @IsOptional() @IsString() @MaxLength(100) nationalStudentId?: string;
-  @IsOptional() @IsString() @MaxLength(160) emergencyName?: string;
-  @IsOptional() @IsString() @MaxLength(32) emergencyPhone?: string;
+  @IsOptional()
+  @IsString()
+  @NormalizePersonName()
+  @IsPersonName()
+  @MaxLength(160)
+  emergencyName?: string;
+  @IsOptional()
+  @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
+  @MaxLength(32)
+  emergencyPhone?: string;
   @IsOptional() @IsString() @MaxLength(2000) medicalConditions?: string;
   @IsOptional()
   @IsArray()

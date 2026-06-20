@@ -9,6 +9,7 @@ import { Button } from '../ui/button';
 import { FormField, Input, Select, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
 import { X, Shield } from 'lucide-react';
+import { isValidDateOfBirth, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone } from '@schoolos/core';
 
 type StaffCreateDialogProps = {
   isOpen: boolean;
@@ -97,6 +98,13 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
       setToastError('Password must be at least 8 characters long.');
       return;
     }
+    if (!isValidPersonName(formData.firstName) || !isValidPersonName(formData.lastName)) {
+      setToastError('Enter valid staff names using Nepali or English letters.');
+      return;
+    }
+    if (!isValidEmail(formData.email)) { setToastError('Enter a valid email address.'); return; }
+    if (!isValidDateOfBirth(formData.dateOfBirth)) { setToastError('Date of birth cannot be future or more than 120 years ago.'); return; }
+    if (formData.phone && !tryNormalizeNepalPhone(formData.phone)) { setToastError('Enter a valid NTC or Ncell mobile number.'); return; }
     if (formData.roleIds.length === 0) {
       setToastError('Please assign at least one role to the staff member.');
       return;
@@ -110,12 +118,12 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
     const payload = {
       ...formData,
       employeeId: optionalTrim(formData.employeeId),
-      firstName: formData.firstName.trim(),
-      lastName: formData.lastName.trim(),
-      email: formData.email.trim(),
+      firstName: normalizePersonName(formData.firstName),
+      lastName: normalizePersonName(formData.lastName),
+      email: normalizeEmail(formData.email),
       password: formData.password.trim(),
       address: formData.address.trim(),
-      phone: optionalTrim(formData.phone),
+      phone: formData.phone ? normalizeNepalPhone(formData.phone) : undefined,
       teacherRegistryId: optionalTrim(formData.teacherRegistryId),
       citizenshipNo: optionalTrim(formData.citizenshipNo),
       panNumber: optionalTrim(formData.panNumber),

@@ -12,6 +12,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
+import {
+  optionalNepalPhone,
+  requireProfileEmail,
+} from '../common/validation/contact-profile';
 
 @Injectable()
 export class UsersService {
@@ -47,7 +51,9 @@ export class UsersService {
   }
 
   async createManagedUser(input: CreateManagedUserInput) {
-    await this.ensureEmailIsAvailable(input.tenantId, input.email);
+    const email = requireProfileEmail(input.email);
+    const phone = optionalNepalPhone(input.phone);
+    await this.ensureEmailIsAvailable(input.tenantId, email);
 
     const roles = await this.prisma.role.findMany({
       where: {
@@ -70,8 +76,8 @@ export class UsersService {
     return this.prisma.user.create({
       data: {
         tenantId: input.tenantId,
-        email: input.email,
-        phone: input.phone ?? null,
+        email,
+        phone,
         passwordHash,
         authMethod: AuthMethod.PASSWORD,
         status: input.status ?? UserStatus.ACTIVE,

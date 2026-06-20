@@ -792,7 +792,7 @@ describe('students lifecycle hardening', () => {
     expect(prisma.transaction.guardian.update).toHaveBeenCalledWith({
       where: { id: 'guardian-1' },
       data: {
-        primaryPhone: '9811111111',
+        primaryPhone: '+9779811111111',
       },
     });
     expect(prisma.transaction.studentGuardian.update).toHaveBeenCalledWith({

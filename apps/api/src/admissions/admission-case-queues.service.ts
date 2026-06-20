@@ -13,9 +13,25 @@ const DISPLAY_STATUS_MAP: Record<string, string> = {
   REJECTED: 'NOT_ADMITTED',
   FINALIZING: 'READY_TO_ADMIT',
 };
+const SIMPLE_DISPLAY_STATUSES = new Set([
+  'DRAFT',
+  'NEEDS_INFORMATION',
+  'READY_TO_ADMIT',
+  'WAITING_FOR_REVIEW',
+  'APPROVED',
+  'ADMITTED',
+  'NOT_ADMITTED',
+  'CLOSED',
+]);
 
 const QUEUE_STORAGE_STATUSES: Record<string, string[]> = {
-  NEEDS_INFORMATION: ['NEEDS_INFORMATION', 'APPLICATION', 'DOCUMENT_PENDING'],
+  NEEDS_INFORMATION: [
+    'DRAFT',
+    'INQUIRY',
+    'NEEDS_INFORMATION',
+    'APPLICATION',
+    'DOCUMENT_PENDING',
+  ],
   WAITING_FOR_REVIEW: ['WAITING_FOR_REVIEW', 'ENTRANCE_INTERVIEW'],
   READY_TO_ADMIT: ['READY_TO_ADMIT'],
   APPROVED: ['APPROVED', 'ACCEPTED'],
@@ -48,17 +64,32 @@ export class AdmissionCaseQueuesService {
     const where: Prisma.AdmissionApplicationWhereInput = {
       tenantId: actor.tenantId,
       ...(storageStatuses ? { status: { in: storageStatuses } } : {}),
-      ...(query.search
-        ? {
-            OR: [
-              { firstNameEn: { contains: query.search, mode: 'insensitive' } },
-              { lastNameEn: { contains: query.search, mode: 'insensitive' } },
+      AND: [
+        this.queueMetadataWhere(query.queue),
+        ...(query.search
+          ? [
               {
-                guardianPhone: { contains: query.search, mode: 'insensitive' },
-              },
-            ],
-          }
-        : {}),
+                OR: [
+                  {
+                    firstNameEn: {
+                      contains: query.search,
+                      mode: 'insensitive',
+                    },
+                  },
+                  {
+                    lastNameEn: { contains: query.search, mode: 'insensitive' },
+                  },
+                  {
+                    guardianPhone: {
+                      contains: query.search,
+                      mode: 'insensitive',
+                    },
+                  },
+                ],
+              } satisfies Prisma.AdmissionApplicationWhereInput,
+            ]
+          : []),
+      ],
     };
     const [total, records] = await Promise.all([
       this.prisma.admissionApplication.count({ where }),
@@ -84,52 +115,67 @@ export class AdmissionCaseQueuesService {
       }),
     ]);
 
-    const items = records
-      .map((record) => ({
-        id: record.id,
-        displayStatus: DISPLAY_STATUS_MAP[record.status] ?? record.status,
-        fullNameEn: `${record.firstNameEn} ${record.lastNameEn}`.trim(),
-        guardianFullName: record.guardianFullName,
-        guardianPhone: record.guardianPhone,
-        source: record.source ?? 'OFFICE_WALK_IN',
-        classId: record.classId,
-        sectionId: record.sectionId,
-        admittedStudentId: record.convertedStudentId,
-        hasDuplicateWarning: this.hasDuplicateWarning(record.duplicateReview),
-        hasDocumentsPending: this.hasDocumentsPending(record.duplicateReview),
-        updatedAt: record.updatedAt.toISOString(),
-      }))
-      .filter((item) => {
-        if (query.queue === 'DUPLICATE_WARNINGS')
-          return item.hasDuplicateWarning;
-        if (query.queue === 'DOCUMENTS_PENDING')
-          return item.hasDocumentsPending;
-        return true;
-      });
+    const items = records.map((record) => ({
+      id: record.id,
+      displayStatus: this.displayStatus(record.status),
+      fullNameEn: `${record.firstNameEn} ${record.lastNameEn}`.trim(),
+      guardianFullName: record.guardianFullName,
+      guardianPhone: record.guardianPhone,
+      source: normalizeAdmissionSource(record.source),
+      classId: record.classId,
+      sectionId: record.sectionId,
+      admittedStudentId: record.convertedStudentId,
+      hasDuplicateWarning: this.hasDuplicateWarning(record.duplicateReview),
+      hasDocumentsPending: this.hasDocumentsPending(record.duplicateReview),
+      updatedAt: record.updatedAt.toISOString(),
+    }));
 
     return {
       items,
-      total:
-        query.queue === 'DUPLICATE_WARNINGS' ||
-        query.queue === 'DOCUMENTS_PENDING'
-          ? items.length
-          : total,
+      total,
       page,
       limit,
-      hasNextPage:
-        query.queue === 'DUPLICATE_WARNINGS' ||
-        query.queue === 'DOCUMENTS_PENDING'
-          ? records.length === limit && items.length > 0
-          : total > skip + records.length,
+      hasNextPage: total > skip + records.length,
     };
+  }
+
+  private queueMetadataWhere(
+    queue: string | undefined,
+  ): Prisma.AdmissionApplicationWhereInput {
+    if (queue === 'DUPLICATE_WARNINGS') {
+      return {
+        OR: [
+          { duplicateReview: { path: ['duplicateRisk'], equals: true } },
+          { duplicateReview: { path: ['hasWarnings'], equals: true } },
+        ],
+      };
+    }
+    if (queue === 'DOCUMENTS_PENDING') {
+      return {
+        duplicateReview: {
+          path: ['followUps'],
+          array_contains: [{ code: 'DOCUMENTS_PENDING' }],
+        },
+      };
+    }
+    return {};
+  }
+
+  private displayStatus(status: string) {
+    return (
+      DISPLAY_STATUS_MAP[status] ??
+      (SIMPLE_DISPLAY_STATUSES.has(status) ? status : 'DRAFT')
+    );
   }
 
   private hasDuplicateWarning(value: Prisma.JsonValue | null) {
     const metadata = this.metadata(value);
     return (
       metadata.duplicateRisk === true ||
-      Array.isArray(metadata.duplicateCandidates) ||
-      'matches' in metadata
+      metadata.hasWarnings === true ||
+      (Array.isArray(metadata.duplicateCandidates) &&
+        metadata.duplicateCandidates.length > 0) ||
+      (Array.isArray(metadata.matches) && metadata.matches.length > 0)
     );
   }
 
@@ -144,7 +190,7 @@ export class AdmissionCaseQueuesService {
 
   private metadata(value: Prisma.JsonValue | null): Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
+      ? value
       : {};
   }
 
@@ -155,4 +201,26 @@ export class AdmissionCaseQueuesService {
       (value as { code?: unknown }).code === 'DOCUMENTS_PENDING'
     );
   }
+}
+
+function normalizeAdmissionSource(value: string | null) {
+  const normalized = value
+    ?.trim()
+    .toUpperCase()
+    .replace(/[\s/-]+/g, '_');
+  if (
+    normalized === 'PARENT_ONLINE' ||
+    normalized === 'ONLINE' ||
+    normalized === 'WEBSITE'
+  ) {
+    return 'PARENT_ONLINE';
+  }
+  if (normalized === 'PHONE_INQUIRY' || normalized === 'PHONE') {
+    return 'PHONE_INQUIRY';
+  }
+  if (normalized === 'TRANSFER_REQUEST' || normalized === 'TRANSFER') {
+    return 'TRANSFER_REQUEST';
+  }
+  if (normalized === 'IMPORT' || normalized === 'BULK_IMPORT') return 'IMPORT';
+  return 'OFFICE_WALK_IN';
 }

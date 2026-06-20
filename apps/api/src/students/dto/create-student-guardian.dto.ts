@@ -1,13 +1,19 @@
 import {
   IsBoolean,
-  IsEmail,
   IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
-  Matches,
   MaxLength,
 } from 'class-validator';
+import {
+  IsNepalPhone,
+  IsPersonName,
+  IsProfileEmail,
+  NormalizeEmailAddress,
+  NormalizeNepalPhone,
+  NormalizePersonName,
+} from '../../common/validation/contact-profile.decorators';
 
 export class CreateStudentGuardianDto {
   @IsOptional()
@@ -17,6 +23,8 @@ export class CreateStudentGuardianDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
+  @NormalizePersonName()
+  @IsPersonName()
   @MaxLength(160)
   fullName?: string;
 
@@ -28,17 +36,19 @@ export class CreateStudentGuardianDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  @Matches(/^\+?[0-9][0-9\s-]{6,19}$/, {
-    message: 'primaryPhone must be a valid phone number',
-  })
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   primaryPhone?: string;
 
   @IsOptional()
   @IsString()
+  @NormalizeNepalPhone()
+  @IsNepalPhone()
   secondaryPhone?: string | null;
 
   @IsOptional()
-  @IsEmail()
+  @NormalizeEmailAddress()
+  @IsProfileEmail()
   email?: string | null;
 
   @IsOptional()

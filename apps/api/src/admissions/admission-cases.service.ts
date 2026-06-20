@@ -8,6 +8,7 @@ import {
 import { randomUUID } from 'crypto';
 import {
   EnrollmentStatus,
+  FileStatus,
   Gender,
   Prisma,
   StudentLifecycleStatus,
@@ -16,7 +17,17 @@ import type { AuthContext } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
 import { ConfigService } from '../config/config.service';
 import { encryptSensitiveField } from '../common/security/field-encryption';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StudentRecordsService } from '../student-records/student-records.service';
+import {
+  optionalNepalPhone,
+  optionalPersonName,
+  optionalProfileEmail,
+  parseDateOfBirth,
+  requireNepalPhone,
+  requirePersonName,
+} from '../common/validation/contact-profile';
 import {
   CreateAdmissionCaseDto,
   DirectAdmitAdmissionCaseDto,
@@ -48,7 +59,7 @@ const ADMITTABLE_STORAGE_STATUSES = [
   'ACCEPTED',
 ] as const;
 
-const LEGACY_DISPLAY_STATUS: Record<string, AdmissionDisplayStatus> = {
+const LEGACY_DISPLAY_STATUS: Partial<Record<string, AdmissionDisplayStatus>> = {
   INQUIRY: 'DRAFT',
   APPLICATION: 'NEEDS_INFORMATION',
   DOCUMENT_PENDING: 'NEEDS_INFORMATION',
@@ -56,7 +67,18 @@ const LEGACY_DISPLAY_STATUS: Record<string, AdmissionDisplayStatus> = {
   ACCEPTED: 'APPROVED',
   ENROLLED: 'ADMITTED',
   REJECTED: 'NOT_ADMITTED',
+  FINALIZING: 'READY_TO_ADMIT',
 };
+const DISPLAY_STATUSES = new Set<AdmissionDisplayStatus>([
+  'DRAFT',
+  'NEEDS_INFORMATION',
+  'READY_TO_ADMIT',
+  'WAITING_FOR_REVIEW',
+  'APPROVED',
+  'ADMITTED',
+  'NOT_ADMITTED',
+  'CLOSED',
+]);
 
 type AdmissionDisplayStatus =
   | 'DRAFT'
@@ -68,20 +90,27 @@ type AdmissionDisplayStatus =
   | 'NOT_ADMITTED'
   | 'CLOSED';
 
-type StoredDocumentReference = {
+type AdmissionSource =
+  | 'OFFICE_WALK_IN'
+  | 'PARENT_ONLINE'
+  | 'PHONE_INQUIRY'
+  | 'TRANSFER_REQUEST'
+  | 'IMPORT';
+
+interface StoredDocumentReference {
   fileId: string;
   kind: string;
   title?: string;
-};
+}
 
-type StoredReviewNote = {
+interface StoredReviewNote {
   action: string;
   reason?: string;
   at: string;
   byUserId: string;
-};
+}
 
-type StoredCaseMetadata = {
+interface StoredCaseMetadata {
   schemaVersion?: number;
   transferStudent?: boolean;
   guardianReceivesAlerts?: boolean;
@@ -109,9 +138,9 @@ type StoredCaseMetadata = {
   };
   policySnapshot?: Record<string, unknown>;
   followUps?: Array<{ code: string; label: string; blocking: boolean }>;
-};
+}
 
-type PolicyRule = {
+interface PolicyRule {
   admissionMode: 'DIRECT_ALLOWED' | 'REVIEW_REQUIRED';
   academicYearId?: string;
   gradeBand?: string;
@@ -129,14 +158,14 @@ type PolicyRule = {
   requireSection?: boolean;
   requiredDocuments?: string[];
   requiredFields?: string[];
-};
+}
 
-type AdmissionPolicy = {
+interface AdmissionPolicy {
   defaultPolicy: PolicyRule;
   overrides: PolicyRule[];
-};
+}
 
-type AdmissionCaseRecord = {
+interface AdmissionCaseRecord {
   id: string;
   tenantId: string;
   status: string;
@@ -161,15 +190,15 @@ type AdmissionCaseRecord = {
   rejectedReason: string | null;
   createdAt: Date;
   updatedAt: Date;
-};
+}
 
-type CapacityStatus = {
+interface CapacityStatus {
   state: 'NOT_CONFIGURED' | 'AVAILABLE' | 'FULL';
   capacity: number | null;
   enrolled: number | null;
-};
+}
 
-type AdmissionEvaluation = {
+interface AdmissionEvaluation {
   missingRequiredFields: string[];
   missingRequiredDocuments: string[];
   duplicateRisk: boolean;
@@ -179,23 +208,31 @@ type AdmissionEvaluation = {
     requireDocumentReview: boolean;
     requireInterview: boolean;
     requirePrincipalApproval: boolean;
+    requireTransferCertificate: boolean;
+    requirePriorMarksheet: boolean;
+    requireStreamOrMarksReview: boolean;
     allowAdmissionWithDocumentsPending: boolean;
     enforceCapacityWhenAvailable: boolean;
+    requireSection: boolean;
     requiredDocuments: string[];
     requiredFields: string[];
   };
   canAdmitDirectly: boolean;
+  canOverrideDuplicate: boolean;
   requiresReview: boolean;
   requiresApproval: boolean;
   classSection: {
     valid: boolean;
     sectionRequired?: boolean;
+    academicYearName?: string | null;
+    className?: string | null;
+    sectionName?: string | null;
     message: string | null;
   };
   capacityStatus: CapacityStatus | null;
   suggestedStatus: AdmissionDisplayStatus;
   nextActionLabel: string;
-};
+}
 
 const DEFAULT_POLICY: PolicyRule = {
   admissionMode: 'DIRECT_ALLOWED',
@@ -218,6 +255,8 @@ export class AdmissionCasesService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
+    private readonly fileRegistryService: FileRegistryService,
+    private readonly studentRecordsService: StudentRecordsService,
   ) {}
 
   async getPolicy(actor: AuthContext) {
@@ -226,6 +265,7 @@ export class AdmissionCasesService {
 
   async updatePolicy(dto: UpdateAdmissionPolicyDto, actor: AuthContext) {
     const policy = this.normalizePolicy(dto);
+    await this.validatePolicyScopes(policy, actor);
     await this.prisma.tenantSetting.upsert({
       where: {
         tenantId_key: {
@@ -236,9 +276,9 @@ export class AdmissionCasesService {
       create: {
         tenantId: actor.tenantId,
         key: ADMISSION_POLICY_SETTING_KEY,
-        value: policy as Prisma.InputJsonValue,
+        value: policy as unknown as Prisma.InputJsonValue,
       },
-      update: { value: policy as Prisma.InputJsonValue },
+      update: { value: policy as unknown as Prisma.InputJsonValue },
     });
 
     await this.auditService.record({
@@ -257,20 +297,24 @@ export class AdmissionCasesService {
 
   async createCase(dto: CreateAdmissionCaseDto, actor: AuthContext) {
     const metadata = this.mergeMetadata({}, dto);
+    await this.validateDocumentReferences(metadata.documents ?? [], actor);
     const created = await this.prisma.admissionApplication.create({
       data: {
         tenantId: actor.tenantId,
         status: 'DRAFT',
-        firstNameEn: dto.firstNameEn.trim(),
-        lastNameEn: dto.lastNameEn.trim(),
-        firstNameNp: dto.firstNameNp?.trim() || null,
-        lastNameNp: dto.lastNameNp?.trim() || null,
-        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
+        firstNameEn: requirePersonName(dto.firstNameEn, 'firstNameEn'),
+        lastNameEn: requirePersonName(dto.lastNameEn, 'lastNameEn'),
+        firstNameNp: optionalPersonName(dto.firstNameNp, 'firstNameNp'),
+        lastNameNp: optionalPersonName(dto.lastNameNp, 'lastNameNp'),
+        dateOfBirth: dto.dateOfBirth ? parseDateOfBirth(dto.dateOfBirth) : null,
         gender: dto.gender ?? null,
-        guardianFullName: dto.guardianFullName?.trim() || null,
+        guardianFullName: optionalPersonName(
+          dto.guardianFullName,
+          'guardianFullName',
+        ),
         guardianRelation: dto.guardianRelation?.trim() || null,
-        guardianPhone: dto.guardianPhone?.trim() || null,
-        guardianEmail: dto.guardianEmail?.trim() || null,
+        guardianPhone: optionalNepalPhone(dto.guardianPhone),
+        guardianEmail: optionalProfileEmail(dto.guardianEmail),
         academicYearId: dto.academicYearId ?? null,
         classId: dto.classId ?? null,
         sectionId: dto.sectionId ?? null,
@@ -326,33 +370,48 @@ export class AdmissionCasesService {
       this.readMetadata(current.duplicateReview),
       dto,
     );
+    await this.validateDocumentReferences(
+      metadata.documents ?? [],
+      actor,
+      current.id,
+    );
     const updated = await this.prisma.admissionApplication.update({
       where: { id: current.id },
       data: {
-        firstNameEn: this.requiredString(dto.firstNameEn, current.firstNameEn),
-        lastNameEn: this.requiredString(dto.lastNameEn, current.lastNameEn),
-        firstNameNp: this.optionalString(dto.firstNameNp, current.firstNameNp),
-        lastNameNp: this.optionalString(dto.lastNameNp, current.lastNameNp),
+        firstNameEn: dto.firstNameEn
+          ? requirePersonName(dto.firstNameEn, 'firstNameEn')
+          : current.firstNameEn,
+        lastNameEn: dto.lastNameEn
+          ? requirePersonName(dto.lastNameEn, 'lastNameEn')
+          : current.lastNameEn,
+        firstNameNp:
+          dto.firstNameNp !== undefined
+            ? optionalPersonName(dto.firstNameNp, 'firstNameNp')
+            : current.firstNameNp,
+        lastNameNp:
+          dto.lastNameNp !== undefined
+            ? optionalPersonName(dto.lastNameNp, 'lastNameNp')
+            : current.lastNameNp,
         dateOfBirth: dto.dateOfBirth
-          ? new Date(dto.dateOfBirth)
+          ? parseDateOfBirth(dto.dateOfBirth)
           : current.dateOfBirth,
         gender: dto.gender ?? current.gender,
-        guardianFullName: this.optionalString(
-          dto.guardianFullName,
-          current.guardianFullName,
-        ),
+        guardianFullName:
+          dto.guardianFullName !== undefined
+            ? optionalPersonName(dto.guardianFullName, 'guardianFullName')
+            : current.guardianFullName,
         guardianRelation: this.optionalString(
           dto.guardianRelation,
           current.guardianRelation,
         ),
-        guardianPhone: this.optionalString(
-          dto.guardianPhone,
-          current.guardianPhone,
-        ),
-        guardianEmail: this.optionalString(
-          dto.guardianEmail,
-          current.guardianEmail,
-        ),
+        guardianPhone:
+          dto.guardianPhone !== undefined
+            ? optionalNepalPhone(dto.guardianPhone)
+            : current.guardianPhone,
+        guardianEmail:
+          dto.guardianEmail !== undefined
+            ? optionalProfileEmail(dto.guardianEmail)
+            : current.guardianEmail,
         academicYearId: dto.academicYearId ?? current.academicYearId,
         classId: dto.classId ?? current.classId,
         sectionId: dto.sectionId ?? current.sectionId,
@@ -442,6 +501,16 @@ export class AdmissionCasesService {
 
     const evaluation = await this.evaluate(current, actor);
     if (dto.action === 'APPROVE') {
+      if (
+        evaluation.requiresApproval &&
+        !actor.roles.some((role) =>
+          ['principal', 'platform_super_admin'].includes(role),
+        )
+      ) {
+        throw new ForbiddenException(
+          'This admission requires approval from the principal.',
+        );
+      }
       const documentBlock =
         evaluation.missingRequiredDocuments.length > 0 &&
         !evaluation.policyRequirements.allowAdmissionWithDocumentsPending;
@@ -496,7 +565,8 @@ export class AdmissionCasesService {
       where: { id: current.id },
       data: {
         status: nextStatus,
-        rejectedReason: dto.action === 'REJECT' ? dto.reason!.trim() : null,
+        rejectedReason:
+          dto.action === 'REJECT' ? (dto.reason?.trim() ?? null) : null,
         duplicateReview: nextMetadata as Prisma.InputJsonValue,
         updatedById: actor.userId,
       },
@@ -583,27 +653,9 @@ export class AdmissionCasesService {
     }
 
     const reviewIsApproved = displayStatus === 'APPROVED';
-    if (evaluation.requiresReview && !reviewIsApproved) {
-      await this.prisma.admissionApplication.update({
-        where: { id: current.id },
-        data: { status: 'WAITING_FOR_REVIEW', updatedById: actor.userId },
-      });
-      throw new BadRequestException(
-        'This admission needs review before it can be finalized.',
-      );
-    }
-    if (
-      evaluation.duplicateRisk &&
-      !reviewIsApproved &&
-      !dto.overrideDuplicate
-    ) {
-      throw new ConflictException({
-        message: 'Possible duplicate students need review before admission.',
-        admissionCaseId: current.id,
-        duplicateCandidates: evaluation.duplicateCandidates,
-      });
-    }
-    if (dto.overrideDuplicate) {
+    const duplicateOverrideRequested =
+      evaluation.duplicateRisk && dto.overrideDuplicate === true;
+    if (duplicateOverrideRequested) {
       if (!dto.overrideReason?.trim()) {
         throw new BadRequestException(
           'Provide a reason before overriding a duplicate warning.',
@@ -616,6 +668,31 @@ export class AdmissionCasesService {
       }
     }
 
+    const policyRequiresReview = this.policyRequiresReview(evaluation);
+    if (!reviewIsApproved && policyRequiresReview) {
+      await this.prisma.admissionApplication.update({
+        where: { id: current.id },
+        data: { status: 'WAITING_FOR_REVIEW', updatedById: actor.userId },
+      });
+      throw new BadRequestException(
+        'This admission needs review before it can be finalized.',
+      );
+    }
+    if (
+      evaluation.duplicateRisk &&
+      !reviewIsApproved &&
+      !duplicateOverrideRequested
+    ) {
+      await this.prisma.admissionApplication.update({
+        where: { id: current.id },
+        data: { status: 'WAITING_FOR_REVIEW', updatedById: actor.userId },
+      });
+      throw new ConflictException({
+        message: 'Possible duplicate students need review before admission.',
+        admissionCaseId: current.id,
+        duplicateCandidates: evaluation.duplicateCandidates,
+      });
+    }
     const placement = await this.validatePlacement(current, actor, true);
     const academicYear = placement.academicYear;
     const classroom = placement.classroom;
@@ -628,8 +705,28 @@ export class AdmissionCasesService {
     }
 
     const metadata = this.readMetadata(current.duplicateReview);
-    await this.validateDocumentReferences(metadata.documents ?? [], actor);
+    await this.validateDocumentReferences(
+      metadata.documents ?? [],
+      actor,
+      current.id,
+    );
     const followUps = this.followUps(metadata, evaluation);
+    const dateOfBirth = current.dateOfBirth;
+    const gender = current.gender;
+    const guardianPhone = current.guardianPhone;
+    const guardianFullName = current.guardianFullName;
+    const guardianRelation = current.guardianRelation;
+    if (
+      !dateOfBirth ||
+      !gender ||
+      !guardianPhone ||
+      !guardianFullName ||
+      !guardianRelation
+    ) {
+      throw new BadRequestException(
+        'Complete the required student and guardian information before admission.',
+      );
+    }
 
     const result = await this.prisma.$transaction(
       async (tx) => {
@@ -666,8 +763,8 @@ export class AdmissionCasesService {
             lastNameEn: current.lastNameEn,
             firstNameNp: current.firstNameNp,
             lastNameNp: current.lastNameNp,
-            dateOfBirth: current.dateOfBirth!,
-            gender: current.gender!,
+            dateOfBirth,
+            gender,
             admissionDate: this.admissionDate(metadata),
             classId: classroom.id,
             sectionId: section?.id ?? null,
@@ -688,33 +785,28 @@ export class AdmissionCasesService {
           },
         });
 
-        const phone = this.normalizePhone(current.guardianPhone!);
-        const existingGuardian = await tx.guardian.findUnique({
+        const phone = requireNepalPhone(guardianPhone);
+        const guardianName = requirePersonName(
+          guardianFullName,
+          'guardianFullName',
+        );
+        const existingGuardian = await tx.guardian.findFirst({
           where: {
-            tenantId_primaryPhone: {
-              tenantId: actor.tenantId,
-              primaryPhone: phone,
-            },
+            tenantId: actor.tenantId,
+            primaryPhone: phone,
+            fullName: { equals: guardianName, mode: 'insensitive' },
           },
           select: { id: true },
         });
         const guardian = existingGuardian
-          ? await tx.guardian.update({
-              where: { id: existingGuardian.id },
-              data: {
-                fullName: current.guardianFullName!,
-                relation: current.guardianRelation!,
-                email: current.guardianEmail,
-                receivesAlerts: metadata.guardianReceivesAlerts ?? true,
-              },
-            })
+          ? existingGuardian
           : await tx.guardian.create({
               data: {
                 tenantId: actor.tenantId,
-                fullName: current.guardianFullName!,
-                relation: current.guardianRelation!,
+                fullName: guardianName,
+                relation: guardianRelation,
                 primaryPhone: phone,
-                email: current.guardianEmail,
+                email: optionalProfileEmail(current.guardianEmail),
                 receivesAlerts: metadata.guardianReceivesAlerts ?? true,
                 privacyConsentAt: new Date(),
               },
@@ -725,7 +817,7 @@ export class AdmissionCasesService {
             tenantId: actor.tenantId,
             studentId: student.id,
             guardianId: guardian.id,
-            relation: current.guardianRelation!,
+            relation: guardianRelation,
             isPrimary: true,
           },
         });
@@ -756,6 +848,17 @@ export class AdmissionCasesService {
           },
         });
 
+        await this.studentRecordsService.attachRegisteredAdmissionDocuments(
+          tx,
+          {
+            tenantId: actor.tenantId,
+            studentId: student.id,
+            admissionCaseId: current.id,
+            documents: metadata.documents ?? [],
+            userId: actor.userId,
+          },
+        );
+
         await tx.admissionApplication.update({
           where: { id: current.id },
           data: {
@@ -764,7 +867,7 @@ export class AdmissionCasesService {
             duplicateReview: {
               ...this.persistedMetadata(metadata, evaluation),
               followUps,
-            } as Prisma.InputJsonValue,
+            } as unknown as Prisma.InputJsonValue,
             updatedById: actor.userId,
           },
         });
@@ -816,7 +919,7 @@ export class AdmissionCasesService {
       displayStatus === 'APPROVED' || displayStatus === 'ADMITTED';
     return {
       id: record.id,
-      source: record.source ?? 'OFFICE_WALK_IN',
+      source: this.admissionSource(record.source),
       student: {
         firstNameEn: record.firstNameEn,
         lastNameEn: record.lastNameEn,
@@ -841,7 +944,8 @@ export class AdmissionCasesService {
         mediumOfInstruction: metadata.mediumOfInstruction ?? 'English',
       },
       transferStudent:
-        metadata.transferStudent ?? record.source === 'TRANSFER_REQUEST',
+        metadata.transferStudent ??
+        this.admissionSource(record.source) === 'TRANSFER_REQUEST',
       previousSchool: record.previousSchool,
       notes: record.notes,
       documents: (metadata.documents ?? []).map((document) => ({
@@ -850,13 +954,13 @@ export class AdmissionCasesService {
         title: document.title ?? null,
       })),
       displayStatus,
-      storageStatus: record.status,
       missingRequiredFields: evaluation.missingRequiredFields,
       missingRequiredDocuments: evaluation.missingRequiredDocuments,
       duplicateRisk: evaluation.duplicateRisk,
       duplicateCandidates: evaluation.duplicateCandidates,
       policyRequirements: evaluation.policyRequirements,
       canAdmitDirectly: evaluation.canAdmitDirectly && !reviewComplete,
+      canOverrideDuplicate: evaluation.canOverrideDuplicate && !reviewComplete,
       requiresReview: evaluation.requiresReview && !reviewComplete,
       requiresApproval: evaluation.requiresApproval && !reviewComplete,
       classSection: evaluation.classSection,
@@ -889,6 +993,10 @@ export class AdmissionCasesService {
     if (policy.requireSection) requiredFields.add('sectionId');
 
     const fieldValues: Record<string, unknown> = {
+      firstNameEn: record.firstNameEn,
+      lastNameEn: record.lastNameEn,
+      firstNameNp: record.firstNameNp,
+      lastNameNp: record.lastNameNp,
       dateOfBirth: record.dateOfBirth,
       gender: record.gender,
       guardianFullName: record.guardianFullName,
@@ -897,6 +1005,11 @@ export class AdmissionCasesService {
       academicYearId: record.academicYearId,
       classId: record.classId,
       sectionId: record.sectionId,
+      previousSchool: record.previousSchool,
+      admissionDate: metadata.admissionDate,
+      nationalStudentId: metadata.nationalStudentId,
+      emergencyName: metadata.emergencyName,
+      emergencyPhone: metadata.emergencyPhone,
     };
     const missingRequiredFields = [...requiredFields].filter(
       (field) => !fieldValues[field],
@@ -907,7 +1020,9 @@ export class AdmissionCasesService {
       record.source,
     );
     const documentKinds = new Set(
-      (metadata.documents ?? []).map((document) => document.kind.toUpperCase()),
+      (metadata.documents ?? []).map((document) =>
+        this.normalizeDocumentKind(document.kind),
+      ),
     );
     const missingRequiredDocuments = requiredDocuments.filter(
       (kind) => !documentKinds.has(kind),
@@ -926,19 +1041,40 @@ export class AdmissionCasesService {
       policy.enforceCapacityWhenAvailable === true &&
       placement.capacityStatus?.state === 'FULL';
     const requiresApproval = policy.requirePrincipalApproval === true;
-    const requiresReview =
-      policy.admissionMode === 'REVIEW_REQUIRED' ||
-      policy.requireDocumentReview === true ||
-      policy.requireInterview === true ||
-      policy.requireStreamOrMarksReview === true ||
-      requiresApproval ||
-      duplicateRisk;
+    const policyRequirements: AdmissionEvaluation['policyRequirements'] = {
+      admissionMode: policy.admissionMode,
+      requireDocumentReview: policy.requireDocumentReview === true,
+      requireInterview: policy.requireInterview === true,
+      requirePrincipalApproval: requiresApproval,
+      requireTransferCertificate: policy.requireTransferCertificate === true,
+      requirePriorMarksheet: policy.requirePriorMarksheet === true,
+      requireStreamOrMarksReview: policy.requireStreamOrMarksReview === true,
+      allowAdmissionWithDocumentsPending:
+        policy.allowAdmissionWithDocumentsPending === true,
+      enforceCapacityWhenAvailable:
+        policy.enforceCapacityWhenAvailable === true,
+      requireSection: policy.requireSection === true,
+      requiredDocuments,
+      requiredFields: [...requiredFields],
+    };
+    const policyRequiresReview = this.policyRequiresReview({
+      policyRequirements,
+    });
+    const requiresReview = policyRequiresReview || duplicateRisk;
     const canAdmitDirectly =
       !record.convertedStudentId &&
       missingRequiredFields.length === 0 &&
       !documentBlocksAdmission &&
       !capacityBlocksAdmission &&
       !requiresReview;
+    const canOverrideDuplicate =
+      duplicateRisk &&
+      !record.convertedStudentId &&
+      missingRequiredFields.length === 0 &&
+      !documentBlocksAdmission &&
+      !capacityBlocksAdmission &&
+      !policyRequiresReview &&
+      actor.permissions.includes('students:manage_lifecycle');
 
     const suggestedStatus: AdmissionDisplayStatus = record.convertedStudentId
       ? 'ADMITTED'
@@ -953,22 +1089,22 @@ export class AdmissionCasesService {
       missingRequiredDocuments,
       duplicateRisk,
       duplicateCandidates,
-      policyRequirements: {
-        admissionMode: policy.admissionMode,
-        requireDocumentReview: policy.requireDocumentReview === true,
-        requireInterview: policy.requireInterview === true,
-        requirePrincipalApproval: requiresApproval,
-        allowAdmissionWithDocumentsPending:
-          policy.allowAdmissionWithDocumentsPending === true,
-        enforceCapacityWhenAvailable:
-          policy.enforceCapacityWhenAvailable === true,
-        requiredDocuments,
-        requiredFields: [...requiredFields],
-      },
+      policyRequirements,
       canAdmitDirectly,
+      canOverrideDuplicate,
       requiresReview,
       requiresApproval,
-      classSection: placement.classSection,
+      classSection: {
+        ...placement.classSection,
+        sectionRequired:
+          policy.requireSection === true && placement.hasSections,
+        message:
+          policy.requireSection === true &&
+          placement.hasSections &&
+          !record.sectionId
+            ? 'Select a section for this class.'
+            : placement.classSection.message,
+      },
       capacityStatus: placement.capacityStatus,
       suggestedStatus,
       nextActionLabel: canAdmitDirectly ? 'Admit student' : 'Review admission',
@@ -988,8 +1124,9 @@ export class AdmissionCasesService {
         })
       : null;
     const gradeBand = this.gradeBand(classroom?.level ?? null);
+    const source = this.admissionSource(record.source);
     const transferStudent =
-      metadata.transferStudent ?? record.source === 'TRANSFER_REQUEST';
+      metadata.transferStudent ?? source === 'TRANSFER_REQUEST';
     const matchingOverride = configured.overrides
       .map((rule) => ({
         rule,
@@ -1014,8 +1151,12 @@ export class AdmissionCasesService {
         academicYear: null,
         classroom: null,
         section: null,
+        hasSections: false,
         classSection: {
           valid: false,
+          academicYearName: null,
+          className: null,
+          sectionName: null,
           message: 'Academic year and class are required.',
         },
         capacityStatus: null as CapacityStatus | null,
@@ -1045,7 +1186,7 @@ export class AdmissionCasesService {
     if (
       !academicYear ||
       !classroom ||
-      (record.sectionId && (!section || section.classId !== record.classId))
+      (record.sectionId && section?.classId !== record.classId)
     ) {
       if (throwOnInvalid) {
         throw new BadRequestException(
@@ -1056,8 +1197,12 @@ export class AdmissionCasesService {
         academicYear: null,
         classroom: null,
         section: null,
+        hasSections: false,
         classSection: {
           valid: false,
+          academicYearName: null,
+          className: null,
+          sectionName: null,
           message: 'Choose a valid class and section for this school.',
         },
         capacityStatus: null as CapacityStatus | null,
@@ -1065,7 +1210,7 @@ export class AdmissionCasesService {
     }
 
     let capacityStatus: CapacityStatus | null = null;
-    if (section?.capacity != null) {
+    if (section?.capacity !== null && section?.capacity !== undefined) {
       const enrolled = await this.prisma.enrollment.count({
         where: {
           tenantId: actor.tenantId,
@@ -1085,13 +1230,13 @@ export class AdmissionCasesService {
       academicYear,
       classroom,
       section,
+      hasSections: sectionCount > 0,
       classSection: {
         valid: true,
-        sectionRequired: sectionCount > 0,
-        message:
-          sectionCount > 0 && !section
-            ? 'Select a section for this class.'
-            : null,
+        academicYearName: academicYear.name,
+        className: classroom.name,
+        sectionName: section?.name ?? null,
+        message: null,
       },
       capacityStatus,
     };
@@ -1116,7 +1261,7 @@ export class AdmissionCasesService {
         guardianLinks: {
           some: {
             guardian: {
-              primaryPhone: this.normalizePhone(record.guardianPhone),
+              primaryPhone: requireNepalPhone(record.guardianPhone),
             },
           },
         },
@@ -1152,22 +1297,35 @@ export class AdmissionCasesService {
   private async validateDocumentReferences(
     documents: StoredDocumentReference[],
     actor: AuthContext,
+    admissionCaseId?: string,
   ) {
     if (!documents.length) return;
     const distinctIds = [
       ...new Set(documents.map((document) => document.fileId)),
     ];
-    const files = await this.prisma.fileAsset.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        id: { in: distinctIds },
-        softDeletedAt: null,
-      },
-      select: { id: true },
-    });
-    if (files.length !== distinctIds.length) {
+    if (distinctIds.length !== documents.length) {
       throw new BadRequestException(
-        'One or more admission documents are unavailable for this school. Upload them again before admission.',
+        'Each admission document can be linked only once.',
+      );
+    }
+
+    try {
+      const files = await Promise.all(
+        distinctIds.map((fileId) =>
+          this.fileRegistryService.getFileMetadata(actor.tenantId, fileId),
+        ),
+      );
+      const invalid = files.some(
+        (file) =>
+          file.status !== FileStatus.UPLOADED ||
+          file.module !== 'admissions' ||
+          (file.entityId !== null && file.entityId !== admissionCaseId) ||
+          (file.entityId === null && file.uploadedByUserId !== actor.userId),
+      );
+      if (invalid) throw new Error('invalid admission document ownership');
+    } catch {
+      throw new BadRequestException(
+        'One or more admission documents are unavailable for this admission case. Upload them again before admission.',
       );
     }
   }
@@ -1204,15 +1362,15 @@ export class AdmissionCasesService {
   }
 
   private displayStatus(status: string): AdmissionDisplayStatus {
-    return (LEGACY_DISPLAY_STATUS[status] ?? status) as AdmissionDisplayStatus;
+    const mapped = LEGACY_DISPLAY_STATUS[status];
+    if (mapped) return mapped;
+    return DISPLAY_STATUSES.has(status as AdmissionDisplayStatus)
+      ? (status as AdmissionDisplayStatus)
+      : 'DRAFT';
   }
 
   private nextStatusAfterSave(status: string, evaluation: AdmissionEvaluation) {
-    if (
-      TERMINAL_STATUSES.has(status) ||
-      REVIEW_LOCKED_STATUSES.has(status) ||
-      status in LEGACY_DISPLAY_STATUS
-    ) {
+    if (TERMINAL_STATUSES.has(status) || REVIEW_LOCKED_STATUSES.has(status)) {
       return status;
     }
     return evaluation.suggestedStatus;
@@ -1247,16 +1405,32 @@ export class AdmissionCasesService {
     );
   }
 
+  private policyRequiresReview(
+    evaluation: Pick<AdmissionEvaluation, 'policyRequirements'>,
+  ) {
+    const policy = evaluation.policyRequirements;
+    return (
+      policy.admissionMode === 'REVIEW_REQUIRED' ||
+      policy.requireDocumentReview ||
+      policy.requireInterview ||
+      policy.requirePrincipalApproval ||
+      policy.requireStreamOrMarksReview
+    );
+  }
+
   private requiredDocuments(
     policy: PolicyRule,
     metadata: StoredCaseMetadata,
     source: string | null,
   ) {
     const documents = new Set(
-      (policy.requiredDocuments ?? []).map((value) => value.toUpperCase()),
+      (policy.requiredDocuments ?? []).map((value) =>
+        this.normalizeDocumentKind(value),
+      ),
     );
     if (
-      (metadata.transferStudent || source === 'TRANSFER_REQUEST') &&
+      (metadata.transferStudent ||
+        this.admissionSource(source) === 'TRANSFER_REQUEST') &&
       policy.requireTransferCertificate
     ) {
       documents.add('TRANSFER_CERTIFICATE');
@@ -1330,7 +1504,7 @@ export class AdmissionCasesService {
       documents: dto.documents
         ? dto.documents.map((document) => ({
             fileId: document.fileId,
-            kind: document.kind,
+            kind: this.normalizeDocumentKind(document.kind),
             title: document.title,
           }))
         : (current.documents ?? []),
@@ -1366,12 +1540,111 @@ export class AdmissionCasesService {
           this.isRecord(rule),
         )
       : [];
+    const normalizedDefault = this.normalizePolicyRule(
+      defaultPolicy,
+      DEFAULT_POLICY.admissionMode,
+      true,
+    );
     return {
-      defaultPolicy: { ...DEFAULT_POLICY, ...defaultPolicy } as PolicyRule,
-      overrides: overrides.map(
-        (rule) => ({ ...DEFAULT_POLICY, ...rule }) as PolicyRule,
+      defaultPolicy: normalizedDefault,
+      overrides: overrides.map((rule) =>
+        this.normalizePolicyRule(rule, normalizedDefault.admissionMode, false),
       ),
     };
+  }
+
+  private normalizePolicyRule(
+    value: Record<string, unknown>,
+    fallbackMode: PolicyRule['admissionMode'],
+    includeDefaults: boolean,
+  ): PolicyRule {
+    const mode =
+      value.admissionMode === 'REVIEW_REQUIRED' ||
+      value.admissionMode === 'DIRECT_ALLOWED'
+        ? value.admissionMode
+        : fallbackMode;
+    const rule = {
+      ...(includeDefaults ? DEFAULT_POLICY : {}),
+      ...value,
+      admissionMode: mode,
+    };
+    if (Array.isArray(value.requiredDocuments)) {
+      rule.requiredDocuments = value.requiredDocuments
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => this.normalizeDocumentKind(item))
+        .filter(Boolean);
+    }
+    if (Array.isArray(value.requiredFields)) {
+      rule.requiredFields = value.requiredFields
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+    return rule;
+  }
+
+  private async validatePolicyScopes(
+    policy: AdmissionPolicy,
+    actor: AuthContext,
+  ) {
+    const rules = [policy.defaultPolicy, ...policy.overrides];
+    const academicYearIds = [
+      ...new Set(rules.flatMap((rule) => rule.academicYearId ?? [])),
+    ];
+    const classIds = [...new Set(rules.flatMap((rule) => rule.classId ?? []))];
+    const [academicYears, classes] = await Promise.all([
+      academicYearIds.length
+        ? this.prisma.academicYear.findMany({
+            where: { tenantId: actor.tenantId, id: { in: academicYearIds } },
+            select: { id: true },
+          })
+        : Promise.resolve([]),
+      classIds.length
+        ? this.prisma.class.findMany({
+            where: { tenantId: actor.tenantId, id: { in: classIds } },
+            select: { id: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    if (
+      academicYears.length !== academicYearIds.length ||
+      classes.length !== classIds.length
+    ) {
+      throw new BadRequestException(
+        'Admission policy scopes must use academic years and classes from this school.',
+      );
+    }
+  }
+
+  private normalizeDocumentKind(value: string) {
+    return value
+      .trim()
+      .replace(/[\s-]+/g, '_')
+      .toUpperCase();
+  }
+
+  private admissionSource(value: string | null): AdmissionSource {
+    const normalized = value
+      ?.trim()
+      .toUpperCase()
+      .replace(/[\s/-]+/g, '_');
+    if (
+      normalized === 'PARENT_ONLINE' ||
+      normalized === 'ONLINE' ||
+      normalized === 'WEBSITE'
+    ) {
+      return 'PARENT_ONLINE';
+    }
+    if (normalized === 'PHONE_INQUIRY' || normalized === 'PHONE') {
+      return 'PHONE_INQUIRY';
+    }
+    if (normalized === 'TRANSFER_REQUEST' || normalized === 'TRANSFER') {
+      return 'TRANSFER_REQUEST';
+    }
+    if (normalized === 'IMPORT' || normalized === 'BULK_IMPORT') {
+      return 'IMPORT';
+    }
+    return 'OFFICE_WALK_IN';
   }
 
   private policyScore(
@@ -1394,7 +1667,7 @@ export class AdmissionCasesService {
       score += 4;
     }
     if (rule.source) {
-      if (rule.source !== record.source) return -1;
+      if (rule.source !== this.admissionSource(record.source)) return -1;
       score += 4;
     }
     if (typeof rule.transferStudent === 'boolean') {
@@ -1405,7 +1678,7 @@ export class AdmissionCasesService {
   }
 
   private gradeBand(level: number | null) {
-    if (level == null) return null;
+    if (level === null) return null;
     if (level <= 0) return 'MONTESSORI';
     if (level <= 5) return 'PRIMARY';
     if (level <= 10) return 'BASIC_SECONDARY';
@@ -1424,7 +1697,7 @@ export class AdmissionCasesService {
   }
 
   private readMetadata(value: Prisma.JsonValue | null): StoredCaseMetadata {
-    return this.isRecord(value) ? (value as StoredCaseMetadata) : {};
+    return this.isRecord(value) ? value : {};
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {
@@ -1437,10 +1710,6 @@ export class AdmissionCasesService {
 
   private optionalString(next: string | undefined, current: string | null) {
     return typeof next === 'undefined' ? current : next.trim() || null;
-  }
-
-  private normalizePhone(value: string) {
-    return value.replace(/[^0-9+]/g, '').trim();
   }
 
   private admissionDate(metadata: StoredCaseMetadata) {

@@ -9,7 +9,7 @@ model Staff {
   firstNameNp              String?
   lastNameNp               String?
   photoUrl                 String?
-  dateOfBirth              DateTime
+  dateOfBirth              DateTime             @db.Date
   gender                   Gender
   address                  String
   teacherRegistryId        String?

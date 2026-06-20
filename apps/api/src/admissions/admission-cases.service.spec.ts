@@ -1,4 +1,10 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import * as PrismaClient from '@prisma/client';
 import { AdmissionCasesService } from './admission-cases.service';
 
@@ -18,6 +24,7 @@ Object.assign(PrismaClient as Record<string, unknown>, {
 const actor = {
   tenantId: 'tenant-a',
   userId: 'user-a',
+  roles: ['admin'],
   permissions: ['students:manage_lifecycle'],
 } as any;
 
@@ -64,11 +71,13 @@ function buildPrisma(overrides: Record<string, any> = {}) {
     },
     academicYear: {
       findFirst: jest.fn().mockResolvedValue({ id: 'year-a', name: '2082/83' }),
+      findMany: jest.fn().mockResolvedValue([{ id: 'year-a' }]),
     },
     class: {
       findFirst: jest
         .fn()
         .mockResolvedValue({ id: 'class-a', name: 'Grade 5', level: 5 }),
+      findMany: jest.fn().mockResolvedValue([{ id: 'class-a' }]),
     },
     section: {
       findFirst: jest.fn().mockResolvedValue({
@@ -94,6 +103,7 @@ function buildPrisma(overrides: Record<string, any> = {}) {
       create: jest.fn().mockResolvedValue({ id: 'student-a' }),
     },
     guardian: {
+      findFirst: jest.fn().mockResolvedValue(null),
       findUnique: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({ id: 'guardian-a' }),
       update: jest.fn(),
@@ -114,14 +124,22 @@ function buildPrisma(overrides: Record<string, any> = {}) {
   return prisma;
 }
 
+function buildService(prisma: any, dependencies: Record<string, any> = {}) {
+  return new AdmissionCasesService(
+    prisma,
+    dependencies.auditService ?? { record: jest.fn() },
+    { medicalEncryptionKey: undefined } as any,
+    dependencies.fileRegistryService ?? { getFileMetadata: jest.fn() },
+    dependencies.studentRecordsService ?? {
+      attachRegisteredAdmissionDocuments: jest.fn(),
+    },
+  );
+}
+
 describe('AdmissionCasesService', () => {
   it('creates the M1 student, guardian, enrollment, lifecycle, and audit atomically without finance writes', async () => {
     const prisma = buildPrisma();
-    const service = new AdmissionCasesService(
-      prisma,
-      { record: jest.fn() } as any,
-      { medicalEncryptionKey: undefined } as any,
-    );
+    const service = buildService(prisma);
 
     const result = await service.directAdmit('case-a', {}, actor);
 
@@ -178,11 +196,7 @@ describe('AdmissionCasesService', () => {
         }),
       },
     });
-    const service = new AdmissionCasesService(
-      prisma,
-      { record: jest.fn() } as any,
-      { medicalEncryptionKey: undefined } as any,
-    );
+    const service = buildService(prisma);
 
     const result = await service.directAdmit('case-a', {}, actor);
 
@@ -193,6 +207,35 @@ describe('AdmissionCasesService', () => {
       }),
     );
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('reuses a matching tenant guardian without silently overwriting the guardian profile', async () => {
+    const prisma = buildPrisma();
+    prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-existing' });
+    const service = buildService(prisma);
+
+    await service.directAdmit('case-a', {}, actor);
+
+    expect(prisma.guardian.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-a',
+        primaryPhone: '+9779800000000',
+        fullName: { equals: 'Sita Shrestha', mode: 'insensitive' },
+      },
+      select: { id: true },
+    });
+    expect(prisma.guardian.create).not.toHaveBeenCalled();
+    expect(prisma.guardian.update).not.toHaveBeenCalled();
+    expect(prisma.studentGuardian.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ guardianId: 'guardian-existing' }),
+    });
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          after: expect.objectContaining({ guardianReused: true }),
+        }),
+      }),
+    );
   });
 
   it('moves review-required policy cases out of direct admission', async () => {
@@ -206,11 +249,7 @@ describe('AdmissionCasesService', () => {
         }),
       },
     });
-    const service = new AdmissionCasesService(
-      prisma,
-      { record: jest.fn() } as any,
-      { medicalEncryptionKey: undefined } as any,
-    );
+    const service = buildService(prisma);
 
     await expect(
       service.directAdmit('case-a', {}, actor),
@@ -226,14 +265,233 @@ describe('AdmissionCasesService', () => {
     const prisma = buildPrisma({
       admissionApplication: { findFirst: jest.fn().mockResolvedValue(null) },
     });
-    const service = new AdmissionCasesService(
-      prisma,
-      { record: jest.fn() } as any,
-      { medicalEncryptionKey: undefined } as any,
-    );
+    const service = buildService(prisma);
 
     await expect(
       service.getCase('case-other-tenant', actor),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('returns safe duplicate candidates before admission and permits only an audited authorized override', async () => {
+    const duplicate = {
+      id: 'student-existing',
+      studentSystemId: 'STU-EXISTING',
+      firstNameEn: 'Aarav',
+      lastNameEn: 'Shrestha',
+      lifecycleStatus: 'ACTIVE',
+      class: { name: 'Grade 5' },
+      sectionRef: { name: 'A' },
+    };
+    const prisma = buildPrisma();
+    prisma.student.findMany.mockResolvedValue([duplicate]);
+    const service = buildService(prisma);
+
+    await expect(service.directAdmit('case-a', {}, actor)).rejects.toEqual(
+      expect.objectContaining({
+        constructor: ConflictException,
+        response: expect.objectContaining({
+          admissionCaseId: 'case-a',
+          duplicateCandidates: [
+            expect.objectContaining({ studentId: 'student-existing' }),
+          ],
+        }),
+      }),
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+
+    const result = await service.directAdmit(
+      'case-a',
+      {
+        overrideDuplicate: true,
+        overrideReason: 'Same name and date, confirmed as a different child.',
+      },
+      actor,
+    );
+    expect(result.alreadyAdmitted).toBe(false);
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          after: expect.objectContaining({
+            duplicateOverride: true,
+            duplicateOverrideReason:
+              'Same name and date, confirmed as a different child.',
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('does not let duplicate override bypass policy-required review or missing permission', async () => {
+    const duplicate = {
+      id: 'student-existing',
+      studentSystemId: 'STU-EXISTING',
+      firstNameEn: 'Aarav',
+      lastNameEn: 'Shrestha',
+      lifecycleStatus: 'ACTIVE',
+      class: { name: 'Grade 5' },
+      sectionRef: null,
+    };
+    const prisma = buildPrisma();
+    prisma.student.findMany.mockResolvedValue([duplicate]);
+    const service = buildService(prisma);
+
+    await expect(
+      service.directAdmit(
+        'case-a',
+        { overrideDuplicate: true, overrideReason: 'Reviewed.' },
+        { ...actor, permissions: [] },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    prisma.tenantSetting.findFirst.mockResolvedValue({
+      value: {
+        defaultPolicy: { admissionMode: 'REVIEW_REQUIRED' },
+        overrides: [],
+      },
+    });
+    await expect(
+      service.directAdmit(
+        'case-a',
+        { overrideDuplicate: true, overrideReason: 'Reviewed.' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('finalizes approved cases only and attaches protected admission documents inside the transaction', async () => {
+    const caseWithDocument = {
+      ...admissionCase,
+      status: 'APPROVED',
+      duplicateReview: {
+        documents: [
+          {
+            fileId: 'file-a',
+            kind: 'BIRTH_CERTIFICATE',
+            title: 'Birth certificate',
+          },
+        ],
+      },
+    };
+    const prisma = buildPrisma({
+      admissionApplication: {
+        findFirst: jest.fn().mockResolvedValue(caseWithDocument),
+        update: jest.fn().mockResolvedValue(caseWithDocument),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    });
+    const studentRecordsService = {
+      attachRegisteredAdmissionDocuments: jest.fn(),
+    };
+    const service = buildService(prisma, {
+      fileRegistryService: {
+        getFileMetadata: jest.fn().mockResolvedValue({
+          id: 'file-a',
+          status: 'UPLOADED',
+          module: 'admissions',
+          entityId: 'case-a',
+          uploadedByUserId: 'user-a',
+        }),
+      },
+      studentRecordsService,
+    });
+
+    await service.finalizeApprovedCase('case-a', {}, actor);
+    expect(
+      studentRecordsService.attachRegisteredAdmissionDocuments,
+    ).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({
+        admissionCaseId: 'case-a',
+        studentId: 'student-a',
+        documents: [expect.objectContaining({ fileId: 'file-a' })],
+      }),
+    );
+
+    const unapproved = buildPrisma();
+    await expect(
+      buildService(unapproved).finalizeApprovedCase('case-a', {}, actor),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('enforces principal-only approval when the resolved policy requires it', async () => {
+    const prisma = buildPrisma();
+    prisma.tenantSetting.findFirst.mockResolvedValue({
+      value: {
+        defaultPolicy: {
+          admissionMode: 'REVIEW_REQUIRED',
+          requirePrincipalApproval: true,
+        },
+        overrides: [],
+      },
+    });
+    const service = buildService(prisma);
+
+    await expect(
+      service.reviewCase(
+        'case-a',
+        { action: 'APPROVE', reason: 'Reviewed.' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rejects policy scopes that do not belong to the authenticated tenant', async () => {
+    const prisma = buildPrisma();
+    prisma.class.findMany.mockResolvedValue([]);
+    const auditService = { record: jest.fn() };
+    const service = buildService(prisma, { auditService });
+
+    await expect(
+      service.updatePolicy(
+        {
+          defaultPolicy: { admissionMode: 'DIRECT_ALLOWED' },
+          overrides: [
+            { admissionMode: 'REVIEW_REQUIRED', classId: 'class-other' },
+          ],
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.tenantSetting.upsert).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('inherits school defaults into a scoped rule instead of resetting unspecified controls', async () => {
+    const prisma = buildPrisma();
+    prisma.tenantSetting.findFirst.mockResolvedValue({
+      value: {
+        defaultPolicy: {
+          admissionMode: 'DIRECT_ALLOWED',
+          requireDocumentReview: true,
+          allowAdmissionWithDocumentsPending: true,
+        },
+        overrides: [{ classId: 'class-a', admissionMode: 'DIRECT_ALLOWED' }],
+      },
+    });
+    const service = buildService(prisma);
+
+    const result = await service.getCase('case-a', actor);
+
+    expect(result.policyRequirements.requireDocumentReview).toBe(true);
+    expect(result.requiresReview).toBe(true);
+  });
+
+  it('does not require a section merely because the class has sections', async () => {
+    const prisma = buildPrisma({
+      admissionApplication: {
+        findFirst: jest.fn().mockResolvedValue({
+          ...admissionCase,
+          sectionId: null,
+        }),
+      },
+    });
+    const service = buildService(prisma);
+
+    const result = await service.getCase('case-a', actor);
+
+    expect(result.classSection.sectionRequired).toBe(false);
+    expect(result.missingRequiredFields).not.toContain('sectionId');
+    expect(result.canAdmitDirectly).toBe(true);
+    expect(result).not.toHaveProperty('storageStatus');
   });
 });

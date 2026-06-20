@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, ChevronLeft, Save } from 'lucide-react';
-import { formatBsDateTime, type SchoolProfileSettings, type UpdateSchoolProfilePayload } from '@schoolos/core';
+import { formatBsDateTime, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone, type SchoolProfileSettings, type UpdateSchoolProfilePayload } from '@schoolos/core';
 import { PageHeader } from '../ui/page-header';
 import { Button } from '../ui/button';
 import { ErrorState } from '../ui/error-state';
@@ -18,6 +18,7 @@ export function SchoolProfileWorkspace() {
   const profileQuery = useQuery({ queryKey: ['school-settings', 'school-profile'], queryFn: schoolSettingsApi.getSchoolProfile });
   const [form, setForm] = useState<ProfileForm>(emptyProfile);
   const [notice, setNotice] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   useEffect(() => { if (profileQuery.data) setForm(withoutUpdatedAt(profileQuery.data)); }, [profileQuery.data]);
   const changed = useMemo(() => profileQuery.data ? JSON.stringify(form) !== JSON.stringify(withoutUpdatedAt(profileQuery.data)) : false, [form, profileQuery.data]);
   const updateMutation = useMutation({ mutationFn: schoolSettingsApi.updateSchoolProfile, onSuccess: async (profile) => { client.setQueryData(['school-settings', 'school-profile'], profile); await client.invalidateQueries({ queryKey: ['school-settings', 'overview'] }); setNotice('School profile saved.'); } });
@@ -27,12 +28,21 @@ export function SchoolProfileWorkspace() {
 
   const profile = profileQuery.data;
   const setValue = <K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) => setForm((current) => ({ ...current, [key]: value }));
-  const save = () => { const payload = changedPayload(form, withoutUpdatedAt(profile)); if (Object.keys(payload).length) updateMutation.mutate(payload); };
+  const save = () => {
+    setValidationError(null);
+    if (form.principalName && !isValidPersonName(form.principalName)) { setValidationError('Enter a valid principal name.'); return; }
+    if (form.schoolPhone && !tryNormalizeNepalPhone(form.schoolPhone)) { setValidationError('Enter a valid NTC or Ncell contact number.'); return; }
+    if (form.schoolEmail && !isValidEmail(form.schoolEmail)) { setValidationError('Enter a valid contact email address.'); return; }
+    const normalized = { ...form, principalName: form.principalName ? normalizePersonName(form.principalName) : form.principalName, schoolPhone: form.schoolPhone ? normalizeNepalPhone(form.schoolPhone) : form.schoolPhone, schoolEmail: form.schoolEmail ? normalizeEmail(form.schoolEmail) : form.schoolEmail };
+    const payload = changedPayload(normalized, withoutUpdatedAt(profile));
+    if (Object.keys(payload).length) updateMutation.mutate(payload);
+  };
 
   return <div className="space-y-6 p-6 pb-28">
     <PageHeader title="School Profile" description="Official information used in school records, receipts, certificates, and reports." actions={<Link href="/dashboard/settings/overview" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-slate-950"><ChevronLeft className="h-4 w-4" /> Settings overview</Link>} />
     <section className="rounded-2xl border border-sky-100 bg-sky-50 p-5 text-sm text-sky-900"><p className="font-bold">SchoolOS Nepal operating standard</p><p className="mt-1">School time uses Asia/Kathmandu, operational dates use Bikram Sambat, and school currency is NPR. These standards are enforced and are not changed here.</p></section>
     {notice ? <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"><CheckCircle2 className="h-4 w-4" />{notice}</div> : null}
+    {validationError ? <div className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm font-semibold text-danger-800">{validationError}</div> : null}
     {updateMutation.isError ? <ErrorState title="Could not save the school profile" error={updateMutation.error} onRetry={save} className="min-h-[180px]" /> : null}
     <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <Section title="Official identity" description="Legal school information. Changes are audited.">
