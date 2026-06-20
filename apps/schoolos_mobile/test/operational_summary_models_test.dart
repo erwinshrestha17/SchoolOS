@@ -4,30 +4,24 @@ import 'package:schoolos_mobile/features/operational_summary/domain/operational_
 
 void main() {
   test('maps every persona to its dedicated mobile summary endpoint', () {
-    expect(
+    final paths = [
       OperationalSummaryRepository.pathFor(OperationalMobilePersona.parent),
-      '/mobile/parent/summary',
-    );
-    expect(
       OperationalSummaryRepository.pathFor(OperationalMobilePersona.teacher),
-      '/mobile/teacher/summary',
-    );
-    expect(
       OperationalSummaryRepository.pathFor(OperationalMobilePersona.principal),
-      '/mobile/principal/summary',
-    );
-    expect(
       OperationalSummaryRepository.pathFor(OperationalMobilePersona.driver),
-      '/mobile/driver/summary',
-    );
-    expect(
       OperationalSummaryRepository.pathFor(OperationalMobilePersona.staff),
-      '/mobile/staff/summary',
-    );
-    expect(
       OperationalSummaryRepository.pathFor(OperationalMobilePersona.student),
+    ];
+
+    expect(paths, [
+      '/mobile/parent/summary',
+      '/mobile/teacher/summary',
+      '/mobile/principal/summary',
+      '/mobile/driver/summary',
+      '/mobile/staff/summary',
       '/mobile/student/summary',
-    );
+    ]);
+    expect(paths.where((path) => path.contains('/dashboard/')), isEmpty);
   });
 
   test('parses a bounded persona summary without private fields', () {
