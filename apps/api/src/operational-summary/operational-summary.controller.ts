@@ -27,6 +27,23 @@ import {
 } from './operational-summary.types';
 import { OperationalSummaryService } from './operational-summary.service';
 
+const MODULE_ROUTE_ALIASES: Record<string, OperationalSummaryModule> = {
+  students: 'm1_students',
+  attendance: 'm2_attendance',
+  fees: 'm3_fees',
+  academics: 'm4_academics',
+  activity: 'm5_activity',
+  'homework-timetable': 'm6_homework_timetable',
+  'hr-payroll': 'm7_hr_payroll',
+  library: 'm8a_library',
+  transport: 'm8b_transport',
+  canteen: 'm8c_canteen',
+  accounting: 'm9_accounting',
+  communications: 'm10_communications',
+  intelligence: 'm11_intelligence',
+  learning: 'm12_learning',
+};
+
 @ApiTags('dashboard-summary')
 @Controller('dashboard')
 @UseGuards(JwtAuthGuard, TenantActiveGuard, RolesPermissionsGuard)
@@ -49,7 +66,10 @@ export class OperationalDashboardSummaryController {
 
   @Get('summary')
   @ApiOperation({ summary: 'Get the safe, lightweight school operations summary' })
-  @ApiOkResponse({ description: 'A bounded, permission-filtered dashboard summary.' })
+  @ApiOkResponse({
+    description:
+      'A bounded, permission-filtered dashboard summary. Module failures are returned as partial module states.',
+  })
   getDashboardSummary(@CurrentAuth() auth: AuthContext) {
     return this.service.getDashboardSummary(auth);
   }
@@ -58,18 +78,26 @@ export class OperationalDashboardSummaryController {
   @ApiOperation({ summary: 'Get an operational summary for one school module' })
   @ApiParam({
     name: 'module',
-    enum: OPERATIONAL_SUMMARY_MODULES,
-    description: 'SchoolOS operational summary module key.',
+    enum: [
+      ...Object.keys(MODULE_ROUTE_ALIASES),
+      ...OPERATIONAL_SUMMARY_MODULES,
+    ],
+    description:
+      'Route-aligned module key such as attendance, fees, academics, or learning. Legacy internal module keys remain accepted for compatibility.',
   })
-  @ApiOkResponse({ description: 'A bounded module summary, locked state, or permission-denied state.' })
+  @ApiOkResponse({
+    description:
+      'A bounded module summary, module-locked state, or permission-denied state.',
+  })
   getModuleSummary(
     @Param('module') module: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    if (!isOperationalSummaryModule(module)) {
+    const resolvedModule = resolveModule(module);
+    if (!resolvedModule) {
       throw new BadRequestException('Unknown SchoolOS summary module.');
     }
-    return this.service.getModuleSummary(module, auth);
+    return this.service.getModuleSummary(resolvedModule, auth);
   }
 }
 
@@ -90,7 +118,7 @@ export class OperationalMobileSummaryController {
   @Get('teacher/summary')
   @Roles('teacher', 'subject_teacher')
   @Permissions('attendance:read')
-  @Entitlement(FEATURE_KEYS.MOBILE_FULL_ROLE)
+  @Entitlement(FEATURE_KEYS.MOBILE_TEACHER_PARENT)
   @ApiOperation({ summary: 'Get an assigned-scope teacher mobile summary' })
   teacherSummary(@CurrentAuth() auth: AuthContext) {
     return this.service.getMobileSummary('teacher', auth);
@@ -130,6 +158,9 @@ export class OperationalMobileSummaryController {
   }
 }
 
-function isOperationalSummaryModule(value: string): value is OperationalSummaryModule {
-  return (OPERATIONAL_SUMMARY_MODULES as readonly string[]).includes(value);
+function resolveModule(value: string): OperationalSummaryModule | null {
+  if (value in MODULE_ROUTE_ALIASES) return MODULE_ROUTE_ALIASES[value];
+  return (OPERATIONAL_SUMMARY_MODULES as readonly string[]).includes(value)
+    ? (value as OperationalSummaryModule)
+    : null;
 }
