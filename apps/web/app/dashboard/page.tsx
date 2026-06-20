@@ -1,5 +1,6 @@
 'use client';
 
+import type { OperationalNextAction } from '@schoolos/core';
 import type { ActionMenuItem } from '../../components/ui/action-menu';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
@@ -24,7 +25,7 @@ export default function DashboardPage() {
 
   const quickActions: ActionMenuItem[] = (dashboardQuery.data?.nextActions ?? [])
     .map((action) => ({ action, href: resolveOperationalSummaryAction(action) }))
-    .filter((item): item is { action: typeof dashboardQuery.data.nextActions[number]; href: string } => Boolean(item.href))
+    .filter((item): item is { action: OperationalNextAction; href: string } => Boolean(item.href))
     .slice(0, 6)
     .map(({ action, href }) => ({
       label: action.label,
