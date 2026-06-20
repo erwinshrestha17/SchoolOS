@@ -31,6 +31,12 @@ export type AdmissionCaseQueueItem = {
   updatedAt: string;
 };
 
+export type AdmissionFollowUp = {
+  code: string;
+  label: string;
+  blocking: boolean;
+};
+
 export type ReviewAdmissionCasePayload = {
   action:
     | 'REQUEST_INFORMATION'
@@ -64,6 +70,10 @@ export const admissionCasesApi = {
       hasNextPage: boolean;
     }>(`/admissions/cases${suffix ? `?${suffix}` : ''}`);
   },
+  getStudentFollowUps: (studentId: string) =>
+    request<{ admissionCaseId: string | null; updatedAt: string | null; items: AdmissionFollowUp[] }>(
+      `/admissions/students/${studentId}/follow-ups`,
+    ),
   createCase: (payload: CreateAdmissionCasePayload) =>
     request<AdmissionCase>('/admissions/cases', { method: 'POST', json: payload }),
   getCase: (admissionCaseId: string) =>
