@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { SettingsController } from './settings.controller';
+import { SchoolSettingsWorkspaceController } from './school-settings-workspace.controller';
 import { SettingsService } from './settings.service';
 import { SchoolSettingsNavigationV1Service } from './school-settings-navigation-v1.service';
+import { SchoolSettingsProfileService } from './school-settings-profile.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 import { PlatformModule } from '../platform/platform.module';
@@ -16,8 +18,12 @@ import { FileRegistryModule } from '../file-registry/file-registry.module';
     StorageModule,
     FileRegistryModule,
   ],
-  controllers: [SettingsController],
-  providers: [SettingsService, SchoolSettingsNavigationV1Service],
+  controllers: [SettingsController, SchoolSettingsWorkspaceController],
+  providers: [
+    SettingsService,
+    SchoolSettingsNavigationV1Service,
+    SchoolSettingsProfileService,
+  ],
   exports: [SettingsService],
 })
 export class SettingsModule {}
