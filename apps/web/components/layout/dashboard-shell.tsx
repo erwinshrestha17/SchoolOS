@@ -20,12 +20,15 @@ const MODULE_LANDING_SUMMARIES: Record<string, OperationalSummaryRouteModule> = 
   '/dashboard/academics': 'academics',
   '/dashboard/activity': 'activity',
   '/dashboard/homework': 'homework-timetable',
+  '/dashboard/timetable': 'homework-timetable',
   '/dashboard/hr': 'hr-payroll',
+  '/dashboard/payroll': 'hr-payroll',
   '/dashboard/library': 'library',
   '/dashboard/transport': 'transport',
   '/dashboard/canteen': 'canteen',
   '/dashboard/accounting': 'accounting',
   '/dashboard/notices': 'communications',
+  '/dashboard/messages': 'communications',
   '/dashboard/learning': 'learning',
 };
 
