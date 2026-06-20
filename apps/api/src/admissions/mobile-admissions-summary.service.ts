@@ -11,36 +11,41 @@ export class MobileAdmissionsSummaryService {
   ) {}
 
   async getPrincipalSummary(actor: AuthContext) {
-    const [waitingReview, approved, documentsPending, duplicateWarnings, iemisFollowUp] =
-      await Promise.all([
-        this.admissionCaseQueuesService.list(actor, {
-          queue: 'WAITING_FOR_REVIEW',
-          page: 1,
-          limit: 1,
-        }),
-        this.admissionCaseQueuesService.list(actor, {
-          queue: 'APPROVED',
-          page: 1,
-          limit: 1,
-        }),
-        this.admissionCaseQueuesService.list(actor, {
-          queue: 'DOCUMENTS_PENDING',
-          page: 1,
-          limit: 1,
-        }),
-        this.admissionCaseQueuesService.list(actor, {
-          queue: 'DUPLICATE_WARNINGS',
-          page: 1,
-          limit: 1,
-        }),
-        this.prisma.student.count({
-          where: {
-            tenantId: actor.tenantId,
-            lifecycleStatus: 'ACTIVE',
-            nationalStudentId: null,
-          },
-        }),
-      ]);
+    const [
+      waitingReview,
+      approved,
+      documentsPending,
+      duplicateWarnings,
+      iemisFollowUp,
+    ] = await Promise.all([
+      this.admissionCaseQueuesService.list(actor, {
+        queue: 'WAITING_FOR_REVIEW',
+        page: 1,
+        limit: 1,
+      }),
+      this.admissionCaseQueuesService.list(actor, {
+        queue: 'APPROVED',
+        page: 1,
+        limit: 1,
+      }),
+      this.admissionCaseQueuesService.list(actor, {
+        queue: 'DOCUMENTS_PENDING',
+        page: 1,
+        limit: 1,
+      }),
+      this.admissionCaseQueuesService.list(actor, {
+        queue: 'DUPLICATE_WARNINGS',
+        page: 1,
+        limit: 1,
+      }),
+      this.prisma.student.count({
+        where: {
+          tenantId: actor.tenantId,
+          lifecycleStatus: 'ACTIVE',
+          nationalStudentId: null,
+        },
+      }),
+    ]);
 
     const items = [
       {

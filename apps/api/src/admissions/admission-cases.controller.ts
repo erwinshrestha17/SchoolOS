@@ -39,25 +39,37 @@ export class AdmissionCasesController {
 
   @Put('policy')
   @Permissions('students:manage_lifecycle')
-  updatePolicy(@Body() dto: UpdateAdmissionPolicyDto, @CurrentAuth() actor: AuthContext) {
+  updatePolicy(
+    @Body() dto: UpdateAdmissionPolicyDto,
+    @CurrentAuth() actor: AuthContext,
+  ) {
     return this.admissionCasesService.updatePolicy(dto, actor);
   }
 
   @Post('cases')
   @Permissions('enrollments:create', 'students:create', 'guardians:create')
-  createCase(@Body() dto: CreateAdmissionCaseDto, @CurrentAuth() actor: AuthContext) {
+  createCase(
+    @Body() dto: CreateAdmissionCaseDto,
+    @CurrentAuth() actor: AuthContext,
+  ) {
     return this.admissionCasesService.createCase(dto, actor);
   }
 
   @Get('cases/:admissionCaseId')
   @Permissions('enrollments:read', 'students:read', 'guardians:read')
-  getCase(@Param('admissionCaseId') admissionCaseId: string, @CurrentAuth() actor: AuthContext) {
+  getCase(
+    @Param('admissionCaseId') admissionCaseId: string,
+    @CurrentAuth() actor: AuthContext,
+  ) {
     return this.admissionCasesService.getCase(admissionCaseId, actor);
   }
 
   @Get('cases/:admissionCaseId/eligibility')
   @Permissions('enrollments:read', 'students:read', 'guardians:read')
-  evaluateCase(@Param('admissionCaseId') admissionCaseId: string, @CurrentAuth() actor: AuthContext) {
+  evaluateCase(
+    @Param('admissionCaseId') admissionCaseId: string,
+    @CurrentAuth() actor: AuthContext,
+  ) {
     return this.admissionCasesService.evaluateCase(admissionCaseId, actor);
   }
 
@@ -98,6 +110,10 @@ export class AdmissionCasesController {
     @Body() dto: FinalizeAdmissionCaseDto,
     @CurrentAuth() actor: AuthContext,
   ) {
-    return this.admissionCasesService.finalizeApprovedCase(admissionCaseId, dto, actor);
+    return this.admissionCasesService.finalizeApprovedCase(
+      admissionCaseId,
+      dto,
+      actor,
+    );
   }
 }

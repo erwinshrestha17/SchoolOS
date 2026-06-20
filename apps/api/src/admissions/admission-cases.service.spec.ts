@@ -50,17 +50,33 @@ const admissionCase = {
 
 function buildPrisma(overrides: Record<string, any> = {}) {
   const prisma: any = {
-    tenantSetting: { findFirst: jest.fn().mockResolvedValue(null), upsert: jest.fn() },
+    tenantSetting: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      upsert: jest.fn(),
+    },
     admissionApplication: {
       findFirst: jest.fn().mockResolvedValue(admissionCase),
       create: jest.fn(),
-      update: jest.fn().mockResolvedValue({ ...admissionCase, status: 'ADMITTED' }),
+      update: jest
+        .fn()
+        .mockResolvedValue({ ...admissionCase, status: 'ADMITTED' }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
-    academicYear: { findFirst: jest.fn().mockResolvedValue({ id: 'year-a', name: '2082/83' }) },
-    class: { findFirst: jest.fn().mockResolvedValue({ id: 'class-a', name: 'Grade 5', level: 5 }) },
+    academicYear: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'year-a', name: '2082/83' }),
+    },
+    class: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue({ id: 'class-a', name: 'Grade 5', level: 5 }),
+    },
     section: {
-      findFirst: jest.fn().mockResolvedValue({ id: 'section-a', name: 'A', classId: 'class-a', capacity: 40 }),
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'section-a',
+        name: 'A',
+        classId: 'class-a',
+        capacity: 40,
+      }),
       count: jest.fn().mockResolvedValue(1),
     },
     enrollment: {
@@ -69,7 +85,12 @@ function buildPrisma(overrides: Record<string, any> = {}) {
     },
     student: {
       findMany: jest.fn().mockResolvedValue([]),
-      findFirst: jest.fn().mockResolvedValue({ id: 'student-a', studentSystemId: 'STU-001', firstNameEn: 'Aarav', lastNameEn: 'Shrestha' }),
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'student-a',
+        studentSystemId: 'STU-001',
+        firstNameEn: 'Aarav',
+        lastNameEn: 'Shrestha',
+      }),
       create: jest.fn().mockResolvedValue({ id: 'student-a' }),
     },
     guardian: {
@@ -77,8 +98,12 @@ function buildPrisma(overrides: Record<string, any> = {}) {
       create: jest.fn().mockResolvedValue({ id: 'guardian-a' }),
       update: jest.fn(),
     },
-    studentGuardian: { create: jest.fn().mockResolvedValue({ id: 'student-guardian-a' }) },
-    studentLifecycleTransition: { create: jest.fn().mockResolvedValue({ id: 'transition-a' }) },
+    studentGuardian: {
+      create: jest.fn().mockResolvedValue({ id: 'student-guardian-a' }),
+    },
+    studentLifecycleTransition: {
+      create: jest.fn().mockResolvedValue({ id: 'transition-a' }),
+    },
     studentDocument: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
     fileAsset: { findMany: jest.fn().mockResolvedValue([]) },
     auditLog: { create: jest.fn().mockResolvedValue({ id: 'audit-a' }) },
@@ -92,32 +117,81 @@ function buildPrisma(overrides: Record<string, any> = {}) {
 describe('AdmissionCasesService', () => {
   it('creates the M1 student, guardian, enrollment, lifecycle, and audit atomically without finance writes', async () => {
     const prisma = buildPrisma();
-    const service = new AdmissionCasesService(prisma, { record: jest.fn() } as any, { medicalEncryptionKey: undefined } as any);
+    const service = new AdmissionCasesService(
+      prisma,
+      { record: jest.fn() } as any,
+      { medicalEncryptionKey: undefined } as any,
+    );
 
     const result = await service.directAdmit('case-a', {}, actor);
 
-    expect(result).toEqual(expect.objectContaining({ admissionCaseId: 'case-a', alreadyAdmitted: false }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        admissionCaseId: 'case-a',
+        alreadyAdmitted: false,
+      }),
+    );
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(prisma.student.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ tenantId: 'tenant-a' }) }));
-    expect(prisma.guardian.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ tenantId: 'tenant-a' }) }));
-    expect(prisma.studentGuardian.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ tenantId: 'tenant-a' }) }));
-    expect(prisma.enrollment.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ tenantId: 'tenant-a' }) }));
-    expect(prisma.studentLifecycleTransition.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ tenantId: 'tenant-a' }) }));
-    expect(prisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: 'admission_case_direct_admit', tenantId: 'tenant-a' }) }));
+    expect(prisma.student.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tenantId: 'tenant-a' }),
+      }),
+    );
+    expect(prisma.guardian.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tenantId: 'tenant-a' }),
+      }),
+    );
+    expect(prisma.studentGuardian.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tenantId: 'tenant-a' }),
+      }),
+    );
+    expect(prisma.enrollment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tenantId: 'tenant-a' }),
+      }),
+    );
+    expect(prisma.studentLifecycleTransition.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tenantId: 'tenant-a' }),
+      }),
+    );
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'admission_case_direct_admit',
+          tenantId: 'tenant-a',
+        }),
+      }),
+    );
     expect((service as any).financeService).toBeUndefined();
   });
 
   it('returns the already admitted student on a repeat submission', async () => {
     const prisma = buildPrisma({
       admissionApplication: {
-        findFirst: jest.fn().mockResolvedValue({ ...admissionCase, status: 'ADMITTED', convertedStudentId: 'student-a' }),
+        findFirst: jest.fn().mockResolvedValue({
+          ...admissionCase,
+          status: 'ADMITTED',
+          convertedStudentId: 'student-a',
+        }),
       },
     });
-    const service = new AdmissionCasesService(prisma, { record: jest.fn() } as any, { medicalEncryptionKey: undefined } as any);
+    const service = new AdmissionCasesService(
+      prisma,
+      { record: jest.fn() } as any,
+      { medicalEncryptionKey: undefined } as any,
+    );
 
     const result = await service.directAdmit('case-a', {}, actor);
 
-    expect(result).toEqual(expect.objectContaining({ alreadyAdmitted: true, student: expect.objectContaining({ id: 'student-a' }) }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        alreadyAdmitted: true,
+        student: expect.objectContaining({ id: 'student-a' }),
+      }),
+    );
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -125,22 +199,41 @@ describe('AdmissionCasesService', () => {
     const prisma = buildPrisma({
       tenantSetting: {
         findFirst: jest.fn().mockResolvedValue({
-          value: { defaultPolicy: { admissionMode: 'REVIEW_REQUIRED' }, overrides: [] },
+          value: {
+            defaultPolicy: { admissionMode: 'REVIEW_REQUIRED' },
+            overrides: [],
+          },
         }),
       },
     });
-    const service = new AdmissionCasesService(prisma, { record: jest.fn() } as any, { medicalEncryptionKey: undefined } as any);
+    const service = new AdmissionCasesService(
+      prisma,
+      { record: jest.fn() } as any,
+      { medicalEncryptionKey: undefined } as any,
+    );
 
-    await expect(service.directAdmit('case-a', {}, actor)).rejects.toBeInstanceOf(BadRequestException);
-    expect(prisma.admissionApplication.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'WAITING_FOR_REVIEW' }) }));
+    await expect(
+      service.directAdmit('case-a', {}, actor),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.admissionApplication.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'WAITING_FOR_REVIEW' }),
+      }),
+    );
   });
 
   it('fails closed for an admission case outside the authenticated tenant', async () => {
     const prisma = buildPrisma({
       admissionApplication: { findFirst: jest.fn().mockResolvedValue(null) },
     });
-    const service = new AdmissionCasesService(prisma, { record: jest.fn() } as any, { medicalEncryptionKey: undefined } as any);
+    const service = new AdmissionCasesService(
+      prisma,
+      { record: jest.fn() } as any,
+      { medicalEncryptionKey: undefined } as any,
+    );
 
-    await expect(service.getCase('case-other-tenant', actor)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.getCase('case-other-tenant', actor),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

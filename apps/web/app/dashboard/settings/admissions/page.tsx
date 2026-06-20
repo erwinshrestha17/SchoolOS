@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { DashboardPageShell } from '../../../../../components/dashboard/dashboard-page-shell';
-import { M1PageHeader } from '../../../../../components/m1/m1-page-header';
-import { AdmissionPolicySettings } from '../../../../../components/settings/admission-policy-settings';
+import { DashboardPageShell } from '../../../../components/dashboard/dashboard-page-shell';
+import { M1PageHeader } from '../../../../components/m1/m1-page-header';
+import { AdmissionPolicySettings } from '../../../../components/settings/admission-policy-settings';
 
 export default function AdmissionSettingsPage() {
   return (

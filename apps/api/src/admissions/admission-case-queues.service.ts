@@ -21,18 +21,30 @@ const QUEUE_STORAGE_STATUSES: Record<string, string[]> = {
   APPROVED: ['APPROVED', 'ACCEPTED'],
   NOT_ADMITTED: ['NOT_ADMITTED', 'REJECTED'],
   DOCUMENTS_PENDING: ['ADMITTED'],
-  DUPLICATE_WARNINGS: ['DRAFT', 'NEEDS_INFORMATION', 'READY_TO_ADMIT', 'WAITING_FOR_REVIEW', 'APPROVED', 'ACCEPTED'],
+  DUPLICATE_WARNINGS: [
+    'DRAFT',
+    'NEEDS_INFORMATION',
+    'READY_TO_ADMIT',
+    'WAITING_FOR_REVIEW',
+    'APPROVED',
+    'ACCEPTED',
+  ],
 };
 
 @Injectable()
 export class AdmissionCaseQueuesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(actor: AuthContext, query: { queue?: string; page?: number; limit?: number; search?: string }) {
+  async list(
+    actor: AuthContext,
+    query: { queue?: string; page?: number; limit?: number; search?: string },
+  ) {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 25));
     const skip = (page - 1) * limit;
-    const storageStatuses = query.queue ? QUEUE_STORAGE_STATUSES[query.queue] : undefined;
+    const storageStatuses = query.queue
+      ? QUEUE_STORAGE_STATUSES[query.queue]
+      : undefined;
     const where: Prisma.AdmissionApplicationWhereInput = {
       tenantId: actor.tenantId,
       ...(storageStatuses ? { status: { in: storageStatuses } } : {}),
@@ -41,7 +53,9 @@ export class AdmissionCaseQueuesService {
             OR: [
               { firstNameEn: { contains: query.search, mode: 'insensitive' } },
               { lastNameEn: { contains: query.search, mode: 'insensitive' } },
-              { guardianPhone: { contains: query.search, mode: 'insensitive' } },
+              {
+                guardianPhone: { contains: query.search, mode: 'insensitive' },
+              },
             ],
           }
         : {}),
@@ -86,18 +100,25 @@ export class AdmissionCaseQueuesService {
         updatedAt: record.updatedAt.toISOString(),
       }))
       .filter((item) => {
-        if (query.queue === 'DUPLICATE_WARNINGS') return item.hasDuplicateWarning;
-        if (query.queue === 'DOCUMENTS_PENDING') return item.hasDocumentsPending;
+        if (query.queue === 'DUPLICATE_WARNINGS')
+          return item.hasDuplicateWarning;
+        if (query.queue === 'DOCUMENTS_PENDING')
+          return item.hasDocumentsPending;
         return true;
       });
 
     return {
       items,
-      total: query.queue === 'DUPLICATE_WARNINGS' || query.queue === 'DOCUMENTS_PENDING' ? items.length : total,
+      total:
+        query.queue === 'DUPLICATE_WARNINGS' ||
+        query.queue === 'DOCUMENTS_PENDING'
+          ? items.length
+          : total,
       page,
       limit,
       hasNextPage:
-        query.queue === 'DUPLICATE_WARNINGS' || query.queue === 'DOCUMENTS_PENDING'
+        query.queue === 'DUPLICATE_WARNINGS' ||
+        query.queue === 'DOCUMENTS_PENDING'
           ? records.length === limit && items.length > 0
           : total > skip + records.length,
     };
@@ -105,13 +126,20 @@ export class AdmissionCaseQueuesService {
 
   private hasDuplicateWarning(value: Prisma.JsonValue | null) {
     const metadata = this.metadata(value);
-    return metadata.duplicateRisk === true || Array.isArray(metadata.duplicateCandidates) || 'matches' in metadata;
+    return (
+      metadata.duplicateRisk === true ||
+      Array.isArray(metadata.duplicateCandidates) ||
+      'matches' in metadata
+    );
   }
 
   private hasDocumentsPending(value: Prisma.JsonValue | null) {
     const metadata = this.metadata(value);
     const followUps = metadata.followUps;
-    return Array.isArray(followUps) && followUps.some((item) => this.isDocumentFollowUp(item));
+    return (
+      Array.isArray(followUps) &&
+      followUps.some((item) => this.isDocumentFollowUp(item))
+    );
   }
 
   private metadata(value: Prisma.JsonValue | null): Record<string, unknown> {
@@ -121,6 +149,10 @@ export class AdmissionCaseQueuesService {
   }
 
   private isDocumentFollowUp(value: unknown) {
-    return typeof value === 'object' && value !== null && (value as { code?: unknown }).code === 'DOCUMENTS_PENDING';
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      (value as { code?: unknown }).code === 'DOCUMENTS_PENDING'
+    );
   }
 }

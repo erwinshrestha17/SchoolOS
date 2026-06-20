@@ -15,7 +15,9 @@ import { MobileAdmissionsSummaryService } from './mobile-admissions-summary.serv
 @Entitlement(FEATURE_KEYS.MOBILE_FULL_ROLE)
 @Roles('principal', 'admin', 'platform_super_admin')
 export class MobileAdmissionsSummaryController {
-  constructor(private readonly mobileAdmissionsSummaryService: MobileAdmissionsSummaryService) {}
+  constructor(
+    private readonly mobileAdmissionsSummaryService: MobileAdmissionsSummaryService,
+  ) {}
 
   @Get('admissions-summary')
   @Permissions('students:read', 'enrollments:read')

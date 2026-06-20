@@ -12,11 +12,16 @@ import { AdmissionCaseFollowUpsService } from './admission-case-follow-ups.servi
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.students')
 export class AdmissionCaseFollowUpsController {
-  constructor(private readonly followUpsService: AdmissionCaseFollowUpsService) {}
+  constructor(
+    private readonly followUpsService: AdmissionCaseFollowUpsService,
+  ) {}
 
   @Get(':studentId/follow-ups')
   @Permissions('students:manage_lifecycle')
-  getForStudent(@Param('studentId') studentId: string, @CurrentAuth() actor: AuthContext) {
+  getForStudent(
+    @Param('studentId') studentId: string,
+    @CurrentAuth() actor: AuthContext,
+  ) {
     return this.followUpsService.getForStudent(studentId, actor);
   }
 }

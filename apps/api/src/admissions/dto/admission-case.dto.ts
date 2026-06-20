@@ -70,7 +70,10 @@ export class AdmissionPolicyRuleDto {
   @IsOptional() @IsBoolean() allowAdmissionWithDocumentsPending?: boolean;
   @IsOptional() @IsBoolean() enforceCapacityWhenAvailable?: boolean;
   @IsOptional() @IsBoolean() requireSection?: boolean;
-  @IsOptional() @IsArray() @IsString({ each: true }) requiredDocuments?: string[];
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  requiredDocuments?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) requiredFields?: string[];
 }
 
@@ -112,7 +115,10 @@ export class CreateAdmissionCaseDto {
   @IsOptional() @IsString() @MaxLength(160) emergencyName?: string;
   @IsOptional() @IsString() @MaxLength(32) emergencyPhone?: string;
   @IsOptional() @IsString() @MaxLength(2000) medicalConditions?: string;
-  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => AdmissionDocumentReferenceDto)
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AdmissionDocumentReferenceDto)
   documents?: AdmissionDocumentReferenceDto[];
 }
 
@@ -142,7 +148,10 @@ export class UpdateAdmissionCaseDto {
   @IsOptional() @IsString() @MaxLength(160) emergencyName?: string;
   @IsOptional() @IsString() @MaxLength(32) emergencyPhone?: string;
   @IsOptional() @IsString() @MaxLength(2000) medicalConditions?: string;
-  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => AdmissionDocumentReferenceDto)
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AdmissionDocumentReferenceDto)
   documents?: AdmissionDocumentReferenceDto[];
 }
 

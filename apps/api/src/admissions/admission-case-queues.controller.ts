@@ -47,11 +47,16 @@ class ListAdmissionCaseQueuesDto {
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.students')
 export class AdmissionCaseQueuesController {
-  constructor(private readonly admissionCaseQueuesService: AdmissionCaseQueuesService) {}
+  constructor(
+    private readonly admissionCaseQueuesService: AdmissionCaseQueuesService,
+  ) {}
 
   @Get()
   @Permissions('enrollments:read', 'students:read', 'guardians:read')
-  list(@Query() query: ListAdmissionCaseQueuesDto, @CurrentAuth() actor: AuthContext) {
+  list(
+    @Query() query: ListAdmissionCaseQueuesDto,
+    @CurrentAuth() actor: AuthContext,
+  ) {
     return this.admissionCaseQueuesService.list(actor, query);
   }
 }
