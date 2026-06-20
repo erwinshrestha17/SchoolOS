@@ -1,7 +1,7 @@
 # SchoolOS Documentation Archive
 
 **Status:** Archive index
-**Last updated:** 2026-06-16
+**Last updated:** 2026-06-20
 
 This folder is for old, superseded, duplicated, or one-off planning documents.
 
@@ -48,13 +48,21 @@ Use these instead of archived docs:
 
 ```text
 docs/README.md
+docs/product/SCHOOLOS_BRD.md
 docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
 docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
+docs/requirements/SCHOOLOS_SRS.md
 docs/project/SCHOOLOS_PROJECT_STATUS.md
 docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
+docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md
+docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md
+docs/project/SCHOOLOS_DOCUMENTATION_INVENTORY.md
 docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
+docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md
 docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
 docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
 docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
 docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md
 ```
+
+Check `docs/project/SCHOOLOS_DOCUMENTATION_INVENTORY.md` before archiving or deleting any tracked Markdown file.

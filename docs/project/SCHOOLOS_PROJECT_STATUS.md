@@ -1,8 +1,8 @@
 # SchoolOS Project Status
 
-**Status:** Current evidence-based project status snapshot  
-**Last updated:** 2026-06-19  
-**Product:** Nepal-first multi-tenant school operating SaaS with staged KG-12 direction  
+**Status:** Current evidence-based project status snapshot
+**Last updated:** 2026-06-19
+**Product:** Nepal-first multi-tenant school operating SaaS with staged Preschool, School (Grade 1-10), and Higher Secondary / +2 direction
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js App Router, Flutter companion app, shared `@schoolos/core` contracts
 
 This document is the concise current status snapshot. It does not replace:

@@ -1,11 +1,16 @@
-# SchoolOS Functional Requirements Specification 2026
+# SchoolOS Functional Requirements Specification
 
-**Product:** SchoolOS  
-**Market:** Nepal-focused school operating SaaS  
-**Target schools:** Kindergarten / Montessori to Grade 12 as the long-term product direction; current implementation remains staged around controlled pilot readiness for existing core modules  
-**Document type:** Functional Requirements Specification  
-**Status:** Active FRS aligned with the current module taxonomy, M12 Notification/Communication, and M13 Learning Layer  
-**Last updated:** 2026-06-20
+**Product:** SchoolOS
+**Market:** Nepal-focused school operating SaaS
+**Target schools:** Preschool, School (Grade 1-10), and Higher Secondary / +2 inside one multi-tenant product
+**Document type:** Functional Requirements Specification
+**Status:** Canonical FRS
+**Owner/audience:** Product management, QA lead, backend/web/mobile leads, school administrator, accountant, teacher, principal, support/operations
+**Scope:** Functional workflows, inputs, outputs, validations, states, transitions, permissions, edge cases, acceptance criteria, and stage-aware workflow behavior.
+**Precedence:** Product intent is owned by `SCHOOLOS_PRODUCT_REQUIREMENTS.md`; software/non-functional requirements by `../requirements/SCHOOLOS_SRS.md`; module design by `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`; current readiness by `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
+**Inputs/source documents:** `SCHOOLOS_BRD.md`, `SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`, `../requirements/SCHOOLOS_SRS.md`, `../architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`, `../architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md`, `../design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `../design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`, repository source inspected on 2026-06-20.
+**Out-of-scope content:** Endpoint URL invention for proposed APIs, Prisma migrations, UI visual layouts, staging credentials, and GA readiness claims.
+**Last reviewed date:** 2026-06-20
 
 ---
 
@@ -21,7 +26,7 @@ Important distinction:
 
 ```text
 Current core = broad implemented management foundation with remaining seed, browser, mobile, staging, provider, and pilot verification gates
-KG-12 expansion = staged product direction
+Stage-aware expansion = one shared core plus configurable Preschool, School, and Higher Secondary experience packs
 M12 Notification/Communication = explicit notification center, event, template, delivery, preference, retry, notice, chat, and emergency-audit module
 M13 Learning Layer = backend, web runtime, parent/student web summary, and Flutter summary foundation implemented locally; AI/adaptive/simulation depth remains staged
 M14 Intelligence / AI = deferred roadmap only
@@ -96,11 +101,164 @@ These rules apply to every module:
 
 ---
 
+## 4A. Stage-Aware Workflow And API Evidence
+
+The workflows below define functional direction. A diagram does not prove implementation. Each workflow must be checked against backend code, OpenAPI/shared contracts, web/mobile clients, tests, and current verification evidence before it is claimed as implemented or ready.
+
+### 4A.1 Stage-Aware Capability Contract Status
+
+| Capability | Existing verified endpoint | Existing but unverified endpoint | Missing endpoint | Needs OpenAPI confirmation | Needs DTO | Needs authorization rule | Needs idempotency rule |
+|---|---|---|---|---|---|---|---|
+| Shared student/guardian/enrollment | No fresh verification in this pass | Yes, broad M1/student/admission controllers exist | No | Yes for stage additions | Yes for stage additions | Existing rules plus stage scope | Yes for finalization/direct admission |
+| Preschool authorized pickup | No | No | Yes | Yes | Yes | Yes | Yes for temporary changes |
+| Preschool arrival/checkout | No | Attendance exists, preschool checkout not verified | Yes for checkout/pickup exception | Yes | Yes | Yes | Yes for replay-safe mobile events |
+| Activity diary/milestones/media | No fresh verification | Yes, M5 activity/media/milestone controllers exist | Preschool policy gaps remain | Yes for preschool diary | Yes for diary/observation | Yes for care/media scope | Yes for media retry/cleanup |
+| School attendance/homework/exams/fees | No fresh verification | Yes, broad M2/M3/M4/M6 controllers exist | No for core workflows | Yes before new UI paths | As needed | Existing role/scope rules | Required for money/sync |
+| Higher Secondary streams/combinations | No | No | Yes | Yes | Yes | Yes | Depends on write commands |
+| Higher Secondary practical/project flow | No | Partial assessment/practical fields exist | Yes for full lifecycle | Yes | Yes | Yes | Yes for submissions/publishing |
+| ExperienceContext | No | No | Yes | Yes | Yes | Yes | N/A |
+
+### 4A.2 Admissions To Enrollment
+
+```mermaid
+flowchart LR
+  Inquiry["Inquiry / application / walk-in"] --> Draft["Admission case or direct admission draft"]
+  Draft --> Validate["Backend validates tenant, policy, class, capacity, duplicate risk, documents"]
+  Validate --> Review{"Review required?"}
+  Review -->|No| Finalize["Finalize admission command"]
+  Review -->|Yes| Queue["Review / approve / request info"]
+  Queue --> Finalize
+  Finalize --> Core["Create or update Student + Guardian link + Enrollment + documents + audit"]
+  Core --> Context["Experience context resolves Preschool / School / Higher Secondary"]
+  Context --> Access["Web/mobile surfaces show only permitted scope"]
+```
+
+### 4A.3 Attendance
+
+```mermaid
+flowchart LR
+  Context["Academic year + class/section + date + role scope"] --> Roster["Backend roster"]
+  Roster --> Draft["Draft / mark present / exceptions"]
+  Draft --> Submit["Submit attendance"]
+  Submit --> Validate["Validate tenant, assignment, enrollment, lock window, idempotency"]
+  Validate --> Records["Persist records and audit"]
+  Records --> Notify["Emit absence/late event to M12 where policy allows"]
+  Records --> Views["Registers, parent child view, principal exceptions"]
+```
+
+### 4A.4 Preschool Arrival And Pickup/Drop
+
+Current status: **NEEDS_SCHEMA_DESIGN**.
+
+```mermaid
+flowchart LR
+  Child["Child arrives"] --> Arrival["Record arrival/late/absence"]
+  Arrival --> Care["Show permitted care/allergy alerts to authorized staff"]
+  Guardian["Guardian pickup plan"] --> Authorized["Verify authorized pickup contact or temporary change"]
+  Authorized --> Exception{"Exception?"}
+  Exception -->|No| Checkout["Record checkout/handover"]
+  Exception -->|Yes| Review["Hold for admin/teacher/principal review + reason + audit"]
+  Checkout --> ParentUpdate["Parent update through M12/mobile"]
+  Review --> ParentUpdate
+```
+
+### 4A.5 Fees, Payment, Receipt, Reversal
+
+```mermaid
+flowchart LR
+  Plan["Fee plan / invoice"] --> Due["Backend due ledger"]
+  Due --> Payment["Payment command or gateway intent"]
+  Payment --> Idem["Idempotency + tenant + linked-child/payment scope"]
+  Idem --> Confirm{"Confirmed?"}
+  Confirm -->|Yes| Receipt["Receipt + audit + protected file where generated"]
+  Confirm -->|No| Failed["Safe failed/pending state"]
+  Receipt --> Accounting["Approved accounting handoff"]
+  Receipt --> Reversal["Refund/reversal/correction requires permission + reason + audit"]
+```
+
+### 4A.6 Activity Feed And Consent-Safe Media
+
+```mermaid
+flowchart LR
+  Compose["Teacher/admin composes activity"] --> Audience["Backend audience preview"]
+  Audience --> Consent["Consent and linked-child media checks"]
+  Consent --> Upload["File Registry upload / media processing"]
+  Upload --> Publish["Publish or queue moderation"]
+  Publish --> Notify["M12 notification/read state"]
+  Notify --> Parent["Parent sees linked-child consent-safe update"]
+```
+
+### 4A.7 Homework And Timetable
+
+```mermaid
+flowchart LR
+  Structure["Class/section/subject/teacher assignment"] --> Timetable["Timetable periods, rooms, conflicts"]
+  Timetable --> Homework["Assigned teacher creates homework"]
+  Homework --> Validate["Validate tenant, assignment, due date, attachments, entitlement"]
+  Validate --> Publish["Draft or publish"]
+  Publish --> ParentStudent["Parent/student assigned-scope visibility"]
+  Publish --> Submission["Submission/review where enabled"]
+```
+
+### 4A.8 Exam, Marks, Report-Card Publishing
+
+```mermaid
+flowchart LR
+  Setup["Exam term + components + subjects"] --> Marks["Teacher enters marks/CAS"]
+  Marks --> Validate["Validate assigned subject, status, range, lock"]
+  Validate --> Ready["Readiness preview"]
+  Ready --> Generate["Generate report cards / protected PDFs"]
+  Generate --> Publish["Publish results"]
+  Publish --> ParentStudent["Parent/student sees own published records only"]
+  Publish --> Correction["Correction/unpublish requires permission, reason, audit"]
+```
+
+### 4A.9 Higher Secondary Stream/Combination/Practical/Project Flow
+
+Current status: **NEEDS_SCHEMA_DESIGN** beyond partial subject practical fields.
+
+```mermaid
+flowchart LR
+  Program["School-configured +2 program/stream"] --> Combination["Subject combination"]
+  Combination --> Enrollment["Student enrollment context"]
+  Enrollment --> Theory["Theory timetable/classes"]
+  Enrollment --> Practical["Lab/practical timetable"]
+  Practical --> Evidence["Practical/project evidence and assessment"]
+  Theory --> Exam["Exam/mock/internal assessment"]
+  Evidence --> Result["Result/report card/board readiness"]
+  Exam --> Result
+```
+
+### 4A.10 Notice And Notification Delivery
+
+```mermaid
+flowchart LR
+  Source["Feature module or notice composer"] --> Event["Normalized event / notice"]
+  Event --> Recipients["M12 recipient resolver"]
+  Recipients --> Template["Template + language + priority + quiet hours"]
+  Template --> Queue["Delivery queue"]
+  Queue --> Providers["In-app / push / email / SMS provider mode"]
+  Providers --> Callback["Verified callbacks / retry / failure"]
+  Callback --> Center["Notification center + read receipts + audit"]
+```
+
+### 4A.11 Protected File Preview/Download
+
+```mermaid
+flowchart LR
+  Feature["Feature module creates or links file"] --> Registry["FileRegistryService metadata"]
+  Registry --> Storage["StorageService / adapter"]
+  User["User requests preview/download"] --> Authz["Tenant + role + owner/scope check"]
+  Authz --> Registry
+  Registry --> Short["Short-lived signed/protected response"]
+  Short --> Client["Web/mobile helper opens or downloads without raw object key"]
+```
+
 ## 5. M0 Platform Core / SaaS Foundation
 
 ### 5.1 Purpose
 
-Manage tenants, platform administration, feature controls, provider readiness, queues, File Registry, API keys, SaaS billing records, support override, onboarding, audit workflows, KG-12 school-level settings, and module entitlement.
+Manage tenants, platform administration, feature controls, provider readiness, queues, File Registry, API keys, SaaS billing records, support override, onboarding, audit workflows, Preschool / School / Higher Secondary settings, and module entitlement.
 
 ### 5.2 Core functions
 
@@ -113,7 +271,7 @@ Manage tenants, platform administration, feature controls, provider readiness, q
 7. Retry or discard failed jobs with audit.
 8. View File Registry entries and report export history.
 9. Use support tenant override with reason and expiry where supported.
-10. Configure school level coverage: ECD, primary, lower secondary, secondary, Grade 11-12.
+10. Configure school experience coverage: `PRESCHOOL`, `SCHOOL`, and `HIGHER_SECONDARY` after the backend-owned program/stage model is designed.
 11. Enable/disable M12 Notification/Communication and M13 Learning Layer per tenant/plan.
 
 ### 5.3 Acceptance criteria

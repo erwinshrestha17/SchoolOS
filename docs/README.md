@@ -1,6 +1,6 @@
 # SchoolOS Documentation
 
-**Status:** Active documentation map and GA release-governance index  
+**Status:** Active documentation map and GA release-governance index
 **Last updated:** 2026-06-20
 
 This folder contains the active detailed SchoolOS documentation. Use this page as the folder-level map only; the root `README.md` remains the repository entry point and source-of-truth summary.
@@ -44,21 +44,25 @@ Inventory & Asset Management is not an active module. Do not recreate Inventory 
 | 3 | `production/SCHOOLOS_GA_RELEASE_POLICY.md` | Canonical release terminology, stage definitions, GA gates, non-goals, and required reporting format. |
 | 4 | `project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` | Canonical evidence-based readiness audit, scores, command results, blockers, and documentation inventory. |
 | 5 | `project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` | Focused dependency-driven execution plan from internal QA through staging, controlled pilot, release candidate, and production readiness. |
-| 6 | `product/SCHOOLOS_PRODUCT_REQUIREMENTS.md` | Product vision, Nepal-first requirements, module taxonomy, actors, and product boundaries. |
-| 7 | `product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` | Feature-level behavior, validation rules, edge cases, and acceptance criteria. |
-| 8 | `product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md` | Canonical backend/web/mobile allocation, allowed roles, and explicit surface boundaries. |
-| 9 | `project/SCHOOLOS_PROJECT_STATUS.md` | Current implementation status snapshot; should summarize, not replace, the audit. |
-| 10 | `project/SCHOOLOS_IMPLEMENTATION_PLAN.md` | Longer implementation backlog and module detail; execution priority is governed by the next-phase plan and GA policy. |
-| 11 | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Storage, File Registry, tenant isolation, scaling, performance, and security architecture. |
-| 12 | `architecture/SCHOOLOS_NAMING_CONVENTIONS.md` | Canonical vocabulary plus naming for files, folders, routes, DTOs, schema values, contracts, web, and mobile. |
-| 13 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, and provider/queue operations. |
-| 14 | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | M12 notification events, delivery, preferences, retries, provider operations, notification center, notices, chat, and audit behavior. |
-| 15 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, components, route behavior, API usage, and web persona smoke plan. |
-| 16 | `design/modules/README.md` | M1-M13 module-level frontend design reference index. |
-| 17 | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Approved supporting visual-reference appendix for the supplied principal dashboard and M1 desktop screens. |
-| 18 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit and contract-safe reference-screen implementation guidance. |
-| 19 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
-| 20 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
+| 6 | `product/SCHOOLOS_BRD.md` | Canonical BRD: business case, Nepal market, buyer personas, packaging direction, stage-based go-to-market, and business risks. |
+| 7 | `product/SCHOOLOS_PRODUCT_REQUIREMENTS.md` | Canonical PRD: product vision, stage-aware experience model, capability matrices, user journeys, and product boundaries. |
+| 8 | `product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` | Canonical FRS: feature behavior, validations, state transitions, workflow diagrams, edge cases, and acceptance criteria. |
+| 9 | `requirements/SCHOOLOS_SRS.md` | Canonical SRS: software, non-functional, API, web, mobile, database, security, performance, and operational requirements. |
+| 10 | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Canonical SDD: architecture, storage, File Registry, tenant isolation, scaling, performance, and security architecture. |
+| 11 | `architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md` | Canonical MDD: module ownership, stage matrix, code-evidence gap matrix, and stage-aware architecture roadmap. |
+| 12 | `product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md` | Backend/web/mobile allocation, allowed roles, and explicit surface boundaries. |
+| 13 | `project/SCHOOLOS_DOCUMENTATION_INVENTORY.md` | Complete tracked Markdown inventory and consolidation decisions. |
+| 14 | `project/SCHOOLOS_PROJECT_STATUS.md` | Current implementation status snapshot; should summarize, not replace, the audit. |
+| 15 | `project/SCHOOLOS_IMPLEMENTATION_PLAN.md` | Longer implementation backlog and module detail; execution priority is governed by the next-phase plan and GA policy. |
+| 16 | `architecture/SCHOOLOS_NAMING_CONVENTIONS.md` | Canonical vocabulary plus naming for files, folders, routes, DTOs, schema values, contracts, web, and mobile. |
+| 17 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, and provider/queue operations. |
+| 18 | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | M12 notification events, delivery, preferences, retries, provider operations, notification center, notices, chat, and audit behavior. |
+| 19 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, components, route behavior, API usage, and web persona smoke plan. |
+| 20 | `design/modules/README.md` | M1-M13 module-level frontend design reference index. |
+| 21 | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Approved supporting visual-reference appendix for the supplied principal dashboard and M1 desktop screens. |
+| 22 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit and contract-safe reference-screen implementation guidance. |
+| 23 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
+| 24 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
 
 ---
 
@@ -84,14 +88,18 @@ Inventory & Asset Management is not an active module. Do not recreate Inventory 
 
 ```text
 README.md
+product/SCHOOLOS_BRD.md
 product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
 product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
 product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md
+requirements/SCHOOLOS_SRS.md
 project/SCHOOLOS_PROJECT_STATUS.md
 project/SCHOOLOS_IMPLEMENTATION_PLAN.md
 project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md
 project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md
+project/SCHOOLOS_DOCUMENTATION_INVENTORY.md
 architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
+architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md
 architecture/SCHOOLOS_NAMING_CONVENTIONS.md
 architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
 architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md
@@ -147,8 +155,12 @@ design/HOSTEL_WEB_REFERENCE_ANALYSIS_RETIRED.md
 | Production / GA target, release stages, and required gates | `production/SCHOOLOS_GA_RELEASE_POLICY.md` | Product, engineering, QA, deployment owner |
 | Current readiness evidence and scores | `project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` | Product, engineering, deployment owner |
 | Next development sequence | `project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` | Engineering team |
+| Business requirements | `product/SCHOOLOS_BRD.md` | Executive, product, sales/support, school owner/principal |
 | Product scope and module taxonomy | `product/SCHOOLOS_PRODUCT_REQUIREMENTS.md` | Product, engineering |
 | Functional behavior | `product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` | Engineering, QA |
+| Software and non-functional requirements | `requirements/SCHOOLOS_SRS.md` | Engineering, security, QA, SRE |
+| Module design and code-evidence gap matrix | `architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md` | Product, architecture, engineering, QA |
+| Documentation inventory and consolidation decisions | `project/SCHOOLOS_DOCUMENTATION_INVENTORY.md` | Documentation owner, maintainers |
 | Backend/web/mobile feature allocation and role/surface boundaries | `product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md` | Product, engineering, design, QA |
 | Architecture/security rules | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Engineering, security |
 | Naming conventions and canonical vocabulary | `architecture/SCHOOLOS_NAMING_CONVENTIONS.md` | Engineering, QA, coding agents |
@@ -185,3 +197,5 @@ The generated/tool-cache Markdown file `.cache/corepack/v1/pnpm/10.12.1/README.m
 9. Forward execution sequencing belongs in `project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`.
 10. Production / GA terms, stages, and exit gates belong in `production/SCHOOLOS_GA_RELEASE_POLICY.md`.
 11. Module-specific product/functional requirements may live under `product/` only when they are large enough to remain readable outside the master PRD/FRS; index them here and make precedence explicit.
+12. Formal BRD/PRD/FRS/SRS/SDD/MDD ownership must remain explicit. Do not duplicate content between them; link to the owner document.
+13. New docs must include Status, Owner/audience, Scope, Precedence, Inputs/source documents, Out-of-scope content, and Last reviewed date when they are intended to be canonical.

@@ -1,8 +1,8 @@
 # SchoolOS Next Phase Delivery Plan
 
-**Status:** Canonical focused execution plan  
-**Created:** 2026-06-18  
-**Source audit:** `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`  
+**Status:** Canonical focused execution plan
+**Created:** 2026-06-18
+**Source audit:** `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`
 
 This plan is dependency-driven. It does not replace the product requirements, functional requirements, architecture/security guide, design plans, or production runbook. It is the focused execution path for moving from local internal QA evidence to controlled pilot and then production readiness.
 
@@ -34,6 +34,17 @@ Cross-surface scope is governed by `docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEA
 - Android emulator role-flow QA against the same backend.
 - Staging `prisma migrate deploy`, seed, smoke, provider/storage readiness, backup, restore, and rollback evidence.
 - Monitoring, queue health, logs, alert routing, and incident response verification.
+
+## Stage-Aware Architecture Gaps
+
+The formal BRD/PRD/FRS/SRS/SDD/MDD set defines SchoolOS as one shared platform with `PRESCHOOL`, `SCHOOL`, and `HIGHER_SECONDARY` experience packs. Current code evidence supports the shared tenant/student/guardian/enrollment/class/section/subject foundation, but these items remain design work, not implementation claims:
+
+- Backend-owned `ExperienceContext`.
+- Tenant program offerings and class/section stage profile.
+- Preschool authorized pickup, temporary pickup change, arrival/checkout, pickup exception, and care-alert scope.
+- Higher Secondary / +2 streams, subject combinations, practical/lab timetable, practical components, projects, and board-readiness lifecycle.
+
+Do not build UI-only stage switches or hard-code +2 streams before schema, OpenAPI/shared DTO, authorization, web/mobile, migration, seed, and test requirements are designed.
 
 ## Explicitly Deferred Scope
 
