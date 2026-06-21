@@ -160,6 +160,6 @@ Latest audited local verification snapshot:
 - pnpm verify:production
 
 Important caveats:
-- pnpm smoke:pilot failed because local Postgres, Redis, and API were not running.
+- 2026-06-21: pnpm smoke:pilot passed after local Docker Postgres/Redis/API were running and seed idempotency was fixed.
 - pnpm test:web:e2e passed with 5 public checks and 12 authenticated checks skipped.
 ```

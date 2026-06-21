@@ -14,26 +14,26 @@ Cross-surface scope is governed by `docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEA
 - Prisma generation and validation pass: `pnpm db:generate`, `pnpm db:validate`.
 - OpenAPI wiring gate passes: `pnpm verify:openapi`.
 - Web local production build passes and web contract tests pass.
-- Playwright public/browser-independent smoke passes, but authenticated checks skip.
+- Playwright authenticated/browser smoke passes locally against the live seeded backend: `pnpm test:web:e2e` passed 17 checks on 2026-06-21.
 - Flutter mobile gates pass: `flutter pub get`, `dart format --output=none --set-exit-if-changed .`, `flutter analyze`, `flutter test`, `flutter build apk --debug`.
 - API has broad module, RBAC, entitlement, tenant isolation, File Registry, finance, payroll, learning, and mobile endpoint coverage in code and tests.
+- 2026-06-21 Phase 1 local seed/smoke evidence passes with Docker Postgres/Redis and local API: `pnpm db:migrate`, `pnpm db:seed` twice, `pnpm smoke:pilot`, API typecheck/test/E2E, and Flutter analyze/test.
+- 2026-06-21 Phase 3 local Android emulator role-flow QA passes for principal/admin, parent, class teacher, subject teacher, support staff, accountant, and driver against the same seeded backend, with narrow mobile fixes recorded in the audit.
 
 ## Current Blockers
 
-1. `pnpm smoke:pilot` fails without running Postgres, Redis, API, and seeded data.
-2. Production env preflight fails when forced because required production variables/secrets are absent.
-3. Authenticated Playwright browser checks skip.
-4. Mobile role flows are not verified on Android emulator/device against a live seeded backend.
-5. Staging migration/deploy/provider/storage/backup/restore evidence is missing.
-6. Current demo seed work is dirty/uncommitted and was not proven idempotent in this audit.
+1. Production env preflight fails when forced because required production variables/secrets are absent.
+2. Staging migration/deploy/provider/storage/backup/restore evidence is missing.
+3. Authenticated browser E2E and mobile role-flow QA have only local evidence; staging and physical-device evidence are missing.
+4. External provider, object-storage, monitoring, rollback, and controlled-pilot evidence is missing.
 
 ## Production-Critical Gaps
 
-- Realistic default tenant seed and role assignments for admin, principal, parent, class teacher, subject teacher, staff/accountant, and driver.
-- Authenticated browser E2E against a live seeded backend.
-- Android emulator role-flow QA against the same backend.
+- Authenticated browser E2E against staging once staging exists.
+- Android emulator/physical-device role-flow QA against staging once staging exists.
 - Staging `prisma migrate deploy`, seed, smoke, provider/storage readiness, backup, restore, and rollback evidence.
 - Monitoring, queue health, logs, alert routing, and incident response verification.
+- Keep the realistic default tenant seed and `pnpm smoke:pilot` repeatable as the browser/mobile/staging evidence expands.
 
 ## Stage-Aware Architecture Gaps
 
@@ -156,6 +156,8 @@ pnpm verify:production
 
 The `verify:production` result is acceptable for this phase only if authenticated browser checks run and pass; public-only browser passes are insufficient.
 
+**2026-06-21 local result:** `pnpm test:web:e2e` passed 17 checks against the live seeded local backend. This satisfies the local Phase 2 browser-E2E evidence target, but not the Phase 4 staging browser target.
+
 ## Phase 3 - Mobile Role Flows, Empty States, Device QA, and Real API Verification
 
 **Goal:** Verify the companion app on Android emulator with real seeded backend data.
@@ -188,6 +190,8 @@ flutter build apk --debug
 ```
 
 Plus an Android emulator checklist with screenshots/log evidence for every representative role.
+
+**2026-06-21 local result:** The Android emulator checklist covered principal/admin, parent, class teacher, subject teacher, support staff, accountant, and driver against `http://10.0.2.2:4000/api/v1`. Subject-teacher attendance correctly denied while subject homework rendered assigned Mathematics items. This satisfies the local Phase 3 emulator evidence target, but not physical-device, signed release, or staging mobile evidence.
 
 ## Phase 4 - Staging Deployment, Provider Validation, Migration Safety, Backups, and Observability
 
@@ -282,6 +286,8 @@ Plus staging-specific migration, backup, restore, provider, and alert verificati
 
 ## Immediate Next Phase
 
-Start with **Phase 1 - Realistic Seeded Tenant, Role Assignment, and Smokeable Demo Flows** after Phase 0 documentation changes are merged. Phase 1 is the dependency for authenticated browser E2E, mobile role QA, and meaningful pilot smoke.
+Phase 1 local seed/smoke evidence passed on 2026-06-21 after Phase 0 documentation cleanup: the seed is idempotent on local Postgres, representative role logins work, `pnpm smoke:pilot` passes with local Postgres/Redis/API, and parent/teacher/staff/driver API scope checks pass.
 
-Phase 1 is complete only when the seed is idempotent, representative role logins work, `pnpm smoke:pilot` passes with local services, and parent/teacher/staff/driver mobile/API scope tests prove the role boundaries.
+Phase 2 and Phase 3 local evidence also passed on 2026-06-21: authenticated browser E2E ran against the live seeded backend, and Android emulator role-flow QA covered representative parent, teacher, principal/admin, staff/accountant, and driver personas.
+
+Next release action: start **Phase 4 - Staging Deployment, Provider Validation, Migration Safety, Backups, and Observability** with staging migration/deploy evidence, provider/storage readiness, backup/restore, monitoring/alerts, staging authenticated browser E2E, and staging mobile QA. Do not claim staging, controlled-pilot, release-candidate, or GA readiness until Phase 4+ evidence is recorded.

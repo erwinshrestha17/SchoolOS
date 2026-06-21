@@ -193,16 +193,29 @@ async function expectRouteDenied(
   route: string,
   apiPattern: RegExp,
 ) {
+  const denialPattern =
+    /Access restricted|Insufficient platform permissions|Access denied|Forbidden|not authorized|Authentication required|Request failed with status 401|Request failed with status 403/i;
+  const denialMessage = page.getByText(denialPattern).first();
   const deniedResponsePromise = page
     .waitForResponse(
       (response) =>
         apiPattern.test(response.url()) && [401, 403].includes(response.status()),
-      { timeout: 15_000 },
+      { timeout: 5_000 },
     )
     .catch(() => null);
 
-  await page.goto(route);
-  await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => undefined);
+  await page.goto(route, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(300);
+
+  const currentPath = new URL(page.url()).pathname;
+  if (route.startsWith('/platform') && !currentPath.startsWith('/platform')) {
+    expect(currentPath).toMatch(/^\/(?:dashboard|login)$/);
+    return;
+  }
+
+  if (await denialMessage.isVisible().catch(() => false)) {
+    return;
+  }
 
   const deniedResponse = await deniedResponsePromise;
 
@@ -212,9 +225,7 @@ async function expectRouteDenied(
   }
 
   await expect(
-    page.getByText(
-      /Access restricted|Insufficient platform permissions|Access denied|Forbidden|not authorized|Authentication required|Request failed with status 401|Request failed with status 403/i,
-    ),
+    denialMessage,
     `${route} should render an authorization denial when no denied API response is observable`,
-  ).toBeVisible({ timeout: 10_000 });
+  ).toBeVisible({ timeout: 5_000 });
 }

@@ -1,3 +1,5 @@
+> Archived 2026-06-21. Unique implementation guidance was merged into `docs/design/modules/M6_HOMEWORK_TIMETABLE_FRONTEND_REFERENCE.md`. Retained as historical M6 reference analysis only.
+
 # M6 Homework & Timetable — Web Reference Analysis
 
 **Status:** Supporting M6 design analysis for the SchoolOS web implementation pass.  

@@ -190,15 +190,13 @@ class _PrincipalApprovalsScreenState
             const SizedBox(height: AppSpacing.lg),
             _ItemList(
               items: _list(data['items']),
-              actionBuilder: (item) => Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => _showReviewSheet(context, item),
-                    icon: const Icon(Icons.visibility_rounded, size: 18),
-                    label: const Text('Review'),
-                  ),
-                ],
+              actionBuilder: (item) => SizedBox(
+                width: 136,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showReviewSheet(context, item),
+                  icon: const Icon(Icons.visibility_rounded, size: 18),
+                  label: const Text('Review'),
+                ),
               ),
             ),
           ],

@@ -21,6 +21,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
+  static const _developmentPassword = 'schoolos-local-demo-only';
+
   final _formKey = GlobalKey<FormState>();
   final _tenantController = TextEditingController(
     text: EnvConfig.isDevelopment ? 'default-school' : '',
@@ -29,7 +31,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     text: EnvConfig.isDevelopment ? 'principal@schoolos.com' : '',
   );
   final _passwordController = TextEditingController(
-    text: EnvConfig.isDevelopment ? 'principal123' : '',
+    text: EnvConfig.isDevelopment ? _developmentPassword : '',
   );
 
   final List<_DemoLoginAccount> _demoAccounts = const [
@@ -37,8 +39,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       role: 'PARENT',
       label: 'Parent',
       description: 'Children, fees, homework',
-      email: 'guardian@schoolos.com',
-      password: 'guardian123',
+      email: 'guardian.c01a001@schoolos.test',
+      password: _developmentPassword,
       icon: Icons.family_restroom_rounded,
       color: AppColors.parentAccent,
     ),
@@ -46,26 +48,53 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       role: 'TEACHER',
       label: 'Teacher',
       description: 'Classes and attendance',
-      email: 'classteacher@schoolos.com',
-      password: 'classteacher123',
+      email: 'classteacher.1a@schoolos.com',
+      password: _developmentPassword,
       icon: Icons.co_present_rounded,
+      color: AppColors.teacherAccent,
+    ),
+    _DemoLoginAccount(
+      role: 'SUBJECT_TEACHER',
+      label: 'Subject',
+      description: 'Subject scopes',
+      email: 'subjectteacher.math@schoolos.com',
+      password: _developmentPassword,
+      icon: Icons.menu_book_rounded,
       color: AppColors.teacherAccent,
     ),
     _DemoLoginAccount(
       role: 'STAFF',
       label: 'Staff',
       description: 'HR, payslips, requests',
-      email: 'accountant@schoolos.com',
-      password: 'accountant123',
+      email: 'staff@schoolos.com',
+      password: _developmentPassword,
       icon: Icons.badge_rounded,
       color: AppColors.staffAccent,
+    ),
+    _DemoLoginAccount(
+      role: 'ACCOUNTANT',
+      label: 'Accountant',
+      description: 'Own staff services',
+      email: 'accountant@schoolos.com',
+      password: _developmentPassword,
+      icon: Icons.account_balance_wallet_rounded,
+      color: AppColors.staffAccent,
+    ),
+    _DemoLoginAccount(
+      role: 'DRIVER',
+      label: 'Driver',
+      description: 'Trips and manifests',
+      email: 'driver@schoolos.com',
+      password: _developmentPassword,
+      icon: Icons.directions_bus_filled_rounded,
+      color: AppColors.driverAccent,
     ),
     _DemoLoginAccount(
       role: 'ADMIN',
       label: 'Admin',
       description: 'Approvals and snapshot',
       email: 'principal@schoolos.com',
-      password: 'principal123',
+      password: _developmentPassword,
       icon: Icons.admin_panel_settings_rounded,
       color: AppColors.adminAccent,
     ),

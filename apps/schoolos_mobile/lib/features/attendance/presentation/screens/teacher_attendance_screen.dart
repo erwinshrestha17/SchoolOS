@@ -311,10 +311,15 @@ class _TeacherAttendanceHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
-              OutlinedButton.icon(
-                onPressed: state.isReadOnly ? null : controller.bulkMarkPresent,
-                icon: const Icon(Icons.done_all_rounded),
-                label: const Text('All present'),
+              SizedBox(
+                width: 148,
+                child: OutlinedButton.icon(
+                  onPressed: state.isReadOnly
+                      ? null
+                      : controller.bulkMarkPresent,
+                  icon: const Icon(Icons.done_all_rounded),
+                  label: const Text('All present'),
+                ),
               ),
             ],
           ),

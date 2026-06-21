@@ -1,3 +1,5 @@
+> Archived 2026-06-21. Unique implementation guidance was merged into `docs/design/modules/M8_LIBRARY_FRONTEND_REFERENCE.md`. Retained as historical app-local M8 implementation guide only.
+
 # M8 Library Web Frontend Implementation Guide
 
 **Status:** Active implementation guide for `apps/web`.  

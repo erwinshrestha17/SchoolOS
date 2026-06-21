@@ -1,3 +1,5 @@
+> Archived 2026-06-21. Unique implementation guidance was merged into `docs/design/modules/M7_HR_PAYROLL_FRONTEND_REFERENCE.md`. Retained as historical M7 reference-screen analysis only.
+
 # SchoolOS M7 HR & Payroll Web Design Reference
 
 **Status:** Active frontend design reference for Module 7 web implementation.  

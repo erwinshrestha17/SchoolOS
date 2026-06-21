@@ -1,7 +1,7 @@
 # M6 Homework and Timetable — Frontend Web Design Reference
 
 **Status:** Active module-level frontend design reference.
-**Updated:** 2026-06-19
+**Updated:** 2026-06-21
 **Module:** M6 Homework and Timetable
 **Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`
 **Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
@@ -173,9 +173,17 @@ Use a assignment and schedule workspace inside the standard SchoolOS app shell. 
 /dashboard/homework
 /dashboard/homework/new
 /dashboard/homework/[homeworkId]
+/dashboard/homework/templates
+/dashboard/homework/submissions
+/dashboard/homework/reminders
+/dashboard/homework/reports
 /dashboard/timetable
 /dashboard/timetable/builder
+/dashboard/timetable/conflicts
+/dashboard/timetable/versions
 /dashboard/timetable/substitutions
+/dashboard/timetable/workload
+/dashboard/timetable/reports
 ```
 
 ### Parent Routes
@@ -662,6 +670,20 @@ Teacher assignment, parent child-link, and student self APIs are distinct. **nee
 - Use class/section/subject labels familiar to Nepal schools.
 - Allow Nepali/English homework instructions where configured.
 - Make substitution notices explicit but do not promise SMS delivery before M12 confirmation.
+
+---
+
+## 12A. Consolidated M6 Reference Notes
+
+The retired M6 reference analysis was merged here so this file remains the single active M6 frontend source of truth.
+
+- Delivery priority is P0 for Homework Dashboard, Homework Composer and Publish, Submission Review, Timetable Overview, Timetable Builder and Conflict Center, Timetable Versions/Publish/Lock, and Substitution Queue/Candidate Selection. Template libraries, reminder history, completion reports, workload views, and persona read projections follow once contracts are confirmed.
+- Homework templates can be created, cloned, reused, shared, or archived only through backend-supported template lifecycle. A template used by published homework is archived rather than silently deleted.
+- Submission review keeps attempt history. Return for correction requires a teacher comment or reason, preserves prior evidence, and never turns homework scoring into official academic marks without an M4 contract.
+- Reminder delivery shows provider mode explicitly: disabled, log/dev, mock, configured, queued, delivered, failed, retried, or partial where supported. Completion comes from assignment/submission data, not delivery status.
+- Timetable builder drag/drop is a convenience only. Backend validation owns teacher, room, period, workload, requirement, version, stale/race, and publish eligibility checks.
+- Timetable publish, lock, archive, restore, compare, and snapshot actions show affected classes, teachers, rooms, effective date, impacted substitutions, confirmation, audit state, and safe failure handling. Restore never silently overwrites a live timetable.
+- Substitute candidate selection is deterministic and explainable: available in the affected period, qualified or assigned for the subject, conflict-free, and within configured workload limits. Leave-linked substitution tasks expose only allowed operational reason categories, not private leave details.
 
 ---
 

@@ -12,11 +12,11 @@ This audit records repository truth before and during reference-dashboard alignm
 The M4 desktop reference set has been translated into the following planning artifacts. They refine visual composition and implementation sequencing only; they do not add or claim backend, Prisma, OpenAPI, permission, route, test, or browser-verification changes.
 
 ```text
-docs/design/M4_ACADEMICS_WEB_REFERENCE_SPEC.md
 docs/design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md
+docs/archive/design/M4_ACADEMICS_WEB_REFERENCE_SPEC.md
 ```
 
-These M4 documents must be used with this alignment audit. They preserve the current contract gaps: no invented overview KPI values, no unverified CAS rubric/evidence/moderation payloads, no simulated report-card job progress, no raw protected-file URLs, and no uncontrolled mark-unlock interaction. The previous W0-W8 execution-slice note is archived at `docs/archive/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md` for historical detail only.
+The active M4 module reference must be used with this alignment audit. The old `docs/design/M4_ACADEMICS_WEB_REFERENCE_SPEC.md` was consolidated into `docs/design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md` and archived at `docs/archive/design/M4_ACADEMICS_WEB_REFERENCE_SPEC.md` for historical detail only. The active M4 guidance preserves the current contract gaps: no invented overview KPI values, no unverified CAS rubric/evidence/moderation payloads, no simulated report-card job progress, no raw protected-file URLs, and no uncontrolled mark-unlock interaction. The previous W0-W8 execution-slice note is archived at `docs/archive/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md` for historical detail only.
 
 ## Shared foundation
 

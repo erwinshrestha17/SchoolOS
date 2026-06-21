@@ -21,14 +21,15 @@ class OperationalSummaryCard extends ConsumerWidget {
           child: Center(child: CircularProgressIndicator.adaptive()),
         ),
       ),
-      error: (_, __) => _SummaryShell(
+      error: (_, _) => _SummaryShell(
         child: Row(
           children: [
             const Expanded(
               child: Text('School summary is temporarily unavailable.'),
             ),
             TextButton(
-              onPressed: () => ref.invalidate(operationalSummaryProvider(persona)),
+              onPressed: () =>
+                  ref.invalidate(operationalSummaryProvider(persona)),
               child: const Text('Retry'),
             ),
           ],
@@ -68,9 +69,9 @@ class _SummaryBody extends StatelessWidget {
             children: [
               Text(
                 'Operational snapshot',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
               ),
               if (summary.status == OperationalSummaryStatus.partial) ...[
                 const SizedBox(height: AppSpacing.xs),
@@ -86,7 +87,10 @@ class _SummaryBody extends StatelessWidget {
                   runSpacing: AppSpacing.sm,
                   children: [
                     for (final metric in metrics)
-                      _MetricChip(label: _label(metric.key), value: '${metric.value ?? '—'}'),
+                      _MetricChip(
+                        label: _label(metric.key),
+                        value: '${metric.value ?? '—'}',
+                      ),
                   ],
                 ),
               ],
@@ -124,7 +128,12 @@ class _MetricChip extends StatelessWidget {
         children: [
           Text(label, style: Theme.of(context).textTheme.labelSmall),
           const SizedBox(height: 2),
-          Text(value, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
         ],
       ),
     );
@@ -151,5 +160,8 @@ class _SummaryShell extends StatelessWidget {
 }
 
 String _label(String value) {
-  return value.replaceAllMapped(RegExp(r'([a-z])([A-Z])'), (match) => '${match[1]} ${match[2]}');
+  return value.replaceAllMapped(
+    RegExp(r'([a-z])([A-Z])'),
+    (match) => '${match[1]} ${match[2]}',
+  );
 }

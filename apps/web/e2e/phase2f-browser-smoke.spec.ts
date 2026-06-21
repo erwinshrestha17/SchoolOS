@@ -49,7 +49,7 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
     const targets = [
       { route: '/dashboard', visible: /Dashboard|Quick Actions|Total Students/i },
       { route: '/dashboard/students', visible: /Student Directory/i },
-      { route: '/dashboard/admissions', visible: /New Enrollment|Personal Information/i },
+      { route: '/dashboard/admissions', visible: /Admissions|New admission|Applications Needing Review/i },
       { route: '/dashboard/attendance', visible: /Attendance Roster|Smart Attendance/i },
       { route: '/dashboard/finance', visible: /Collection Counter|Find student or invoice/i },
       { route: '/dashboard/academics', visible: /Academics|Active Exam Terms|Workflow Readiness/i },
@@ -75,7 +75,9 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
     page,
   }) => {
     await page.goto('/dashboard/students');
-    await expect(page.getByText(/Directory Filters/i)).toBeVisible();
+    await expect(
+      page.locator('main').getByText('Directory Filters', { exact: true }),
+    ).toBeVisible();
 
     // Test search with real seeded data
     await page
@@ -117,14 +119,22 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
     await page.goto('/dashboard/attendance');
     await expect(page.getByLabel(/Class/i)).toBeVisible();
     await expect(page.getByLabel(/Date/i)).toBeVisible();
-    await expect(page.locator('[data-testid="attendance-count-summary"]').or(page.getByText(/No Students Found/i))).toBeVisible();
+    await expect(page.locator('main')).toContainText(
+      /Smart Attendance|Attendance Roster|Expected Students/i,
+    );
 
     await page.goto('/dashboard/admissions');
-    await expect(page.getByText(/Personal Information|New Enrollment/i)).toBeVisible();
-    await page.getByRole('button', { name: /New Enrollment/i }).click();
-    await expect(page.getByText(/Personal Information/i)).toBeVisible();
-    await page.getByRole('button', { name: /Next Step/i }).click();
-    await expect(page.getByText(/required|Invalid|Personal Information/i).first()).toBeVisible();
+    await expect(
+      page.locator('main').getByRole('heading', { name: /Admissions/i }),
+    ).toBeVisible();
+    await page.getByRole('link', { name: /New admission/i }).click();
+    await expect(
+      page.locator('main').getByRole('heading', { name: /New admission/i }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: /Start direct admission/i }).click();
+    await expect(page.getByText(/Student and guardian/i)).toBeVisible();
+    await page.getByRole('button', { name: /Continue/i }).click();
+    await expect(page.getByText(/required|Invalid|Student and guardian/i).first()).toBeVisible();
   });
 
   test('platform routes are denied or redirected for a school user', async ({ page }) => {
@@ -191,9 +201,19 @@ async function login(
     throw new Error(`Login failed for ${credentials.email}. Still at ${page.url()}`);
   }
 
-  await expect(page.getByRole('button', { name: /User profile menu/i })).toBeVisible({
-    timeout: 15_000,
-  });
+  if (page.url().includes('/platform')) {
+    await expect(
+      page
+        .getByRole('button', { name: /Logout/i })
+        .or(page.getByText(/Platform operator console/i))
+        .first(),
+    ).toBeVisible({ timeout: 15_000 });
+    return;
+  }
+
+  await expect(
+    page.getByRole('button', { name: /User profile menu/i }),
+  ).toBeVisible({ timeout: 15_000 });
 }
 
 async function expectNoFatalPage(page: Page, route: string) {

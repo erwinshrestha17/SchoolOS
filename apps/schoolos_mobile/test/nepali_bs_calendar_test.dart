@@ -3,14 +3,17 @@ import 'package:schoolos_mobile/shared/utils/nepali_bs_calendar.dart';
 
 void main() {
   group('NepaliBsCalendar', () {
-    test('converts an authoritative BS new-year fixture in both directions', () {
-      final bs = NepaliBsCalendar.fromAd(DateTime.utc(2024, 4, 13));
+    test(
+      'converts an authoritative BS new-year fixture in both directions',
+      () {
+        final bs = NepaliBsCalendar.fromAd(DateTime.utc(2024, 4, 13));
 
-      expect(bs.year, 2081);
-      expect(bs.month, 1);
-      expect(bs.day, 1);
-      expect(NepaliBsCalendar.toAd(bs), DateTime.utc(2024, 4, 13));
-    });
+        expect(bs.year, 2081);
+        expect(bs.month, 1);
+        expect(bs.day, 1);
+        expect(NepaliBsCalendar.toAd(bs), DateTime.utc(2024, 4, 13));
+      },
+    );
 
     test('formats canonical English BS date and Nepal time presets', () {
       final instant = DateTime.utc(2026, 6, 20, 5);
@@ -52,8 +55,14 @@ void main() {
     });
 
     test('rejects malformed and impossible BS input dates', () {
-      expect(() => NepaliBsCalendar.parseBsDateInput('2083-3-06'), throwsArgumentError);
-      expect(() => NepaliBsCalendar.parseBsDateInput('2083-03-32'), throwsArgumentError);
+      expect(
+        () => NepaliBsCalendar.parseBsDateInput('2083-3-06'),
+        throwsArgumentError,
+      );
+      expect(
+        () => NepaliBsCalendar.parseBsDateInput('2083-03-33'),
+        throwsArgumentError,
+      );
     });
   });
 }

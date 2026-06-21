@@ -6,7 +6,7 @@
 **Precedence:** Backend/OpenAPI/shared contracts and backend authorization remain authoritative. Cross-surface ownership lives in `../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`; module-specific web details live in `modules/`.
 **Inputs/source documents:** `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`, `../requirements/SCHOOLOS_SRS.md`, `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`, `apps/web/docs/DESIGN_SYSTEM.md`.
 **Out-of-scope content:** Endpoint invention, DTO schemas, mock production data, runtime implementation claims, staging proof, and GA readiness claims.
-**Last reviewed date:** 2026-06-20
+**Last reviewed date:** 2026-06-21
 
 This document contains global web rules only. Feature lists, module workflows, expected screens, wireframes, role projections, and module backend needs live in [`docs/design/modules/`](modules/README.md). Backend/web/mobile allocation and explicit surface boundaries live in [`SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`](../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md). This is design guidance, not evidence that a route or API exists.
 
@@ -311,6 +311,20 @@ Rules:
 - Do not expose private messages, salary/bank details, journal lines, raw student-sensitive data, or protected-file metadata.
 - Click-through reauthorizes and preserves safe filters.
 - One unavailable module summary must not block the rest of the dashboard.
+
+### 14.1 Principal Dashboard Family
+
+The archived dashboard reference screens are consolidated here as global dashboard guidance. Principal dashboards are role-safe orientation and triage surfaces, not replacement module workspaces.
+
+| Surface | Main job | Required data boundary |
+|---|---|---|
+| Principal Home | Orient the principal to school health and immediate work. | Uses permission-filtered summary APIs and one top-alert drill-through. |
+| Attention and Approvals | Review approvals, risks, recent decisions, and escalations. | Aggregates only authorized approval/attention records; sensitive finance/payroll/message detail stays scoped. |
+| Today's Operations | Monitor the current school day across attendance, transport, fees, canteen, admissions, and communication. | Each card opens a real module route and distinguishes zero, locked, unavailable, stale, and permission states. |
+| Academic and Learning Snapshot | Review readiness, teaching load, homework, exams, report cards, and controlled learning sessions. | Uses supportive labels only; no rankings, AI predictions, or teacher/student performance verdicts. |
+| Finance and Collections Snapshot | Review collection health and pending finance work without bypassing workflows. | Backend Decimal totals only; no journal, bank, payroll, or accounting internals without explicit permission. |
+
+Principal dashboard sections load independently. A failed summary renders a section-level error and retry rather than blanking the full dashboard. Dashboard drill-throughs must preserve safe filters and reauthorize the target module before showing data.
 
 ---
 

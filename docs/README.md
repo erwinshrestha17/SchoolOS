@@ -1,7 +1,7 @@
 # SchoolOS Documentation
 
 **Status:** Active documentation map and GA release-governance index
-**Last updated:** 2026-06-20
+**Last updated:** 2026-06-21
 
 This folder contains the active detailed SchoolOS documentation. Use this page as the folder-level map only; the root `README.md` remains the repository entry point and source-of-truth summary.
 
@@ -59,10 +59,9 @@ Inventory & Asset Management is not an active module. Do not recreate Inventory 
 | 18 | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | M12 notification events, delivery, preferences, retries, provider operations, notification center, notices, chat, and audit behavior. |
 | 19 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, components, route behavior, API usage, and web persona smoke plan. |
 | 20 | `design/modules/README.md` | M1-M13 module-level frontend design reference index. |
-| 21 | `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | Approved supporting visual-reference appendix for the supplied principal dashboard and M1 desktop screens. |
-| 22 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit and contract-safe reference-screen implementation guidance. |
-| 23 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
-| 24 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
+| 21 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit and contract-safe reference-screen implementation guidance. |
+| 22 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
+| 23 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
 
 ---
 
@@ -104,7 +103,6 @@ architecture/SCHOOLOS_NAMING_CONVENTIONS.md
 architecture/SCHOOLOS_PLATFORM_OPERATIONS.md
 architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md
 design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
-design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md
 design/modules/README.md
 design/modules/M1_ADMISSIONS_STUDENT_PROFILES_FRONTEND_REFERENCE.md
 design/modules/M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md
@@ -119,10 +117,6 @@ design/modules/M10_CANTEEN_FRONTEND_REFERENCE.md
 design/modules/M11_ACCOUNTING_FINANCE_FRONTEND_REFERENCE.md
 design/modules/M12_NOTIFICATIONS_COMMUNICATION_FRONTEND_REFERENCE.md
 design/modules/M13_LEARNING_LAYER_FRONTEND_REFERENCE.md
-design/M9_TRANSPORT_WEB_REFERENCE_ANALYSIS.md
-design/M10_CANTEEN_WEB_REFERENCE_ANALYSIS.md
-design/M11_ACCOUNTING_WEB_REFERENCE_ANALYSIS.md
-design/M12_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md
 implementation/WEB_UI_API_ALIGNMENT_AUDIT.md
 design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
 production/SCHOOLOS_GA_RELEASE_POLICY.md
@@ -135,8 +129,6 @@ App-specific active docs outside this folder:
 apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md
 apps/web/AGENTS.md
 apps/web/e2e/README.md
-apps/web/docs/modules/README.md
-apps/web/docs/modules/M8_LIBRARY_FRONTEND_IMPLEMENTATION_GUIDE.md
 ```
 
 Archived supporting references:
@@ -144,11 +136,21 @@ Archived supporting references:
 ```text
 archive/design/HOSTEL_WEB_REFERENCE_ANALYSIS_RETIRED.md
 archive/design/design-qa.md
+archive/design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md
+archive/design/M4_ACADEMICS_WEB_REFERENCE_SPEC.md
+archive/design/M6_HOMEWORK_TIMETABLE_WEB_REFERENCE_ANALYSIS.md
+archive/design/SCHOOLOS_M7_HR_PAYROLL_WEB_DESIGN_REFERENCE.md
+archive/design/M9_TRANSPORT_WEB_REFERENCE_ANALYSIS.md
+archive/design/M10_CANTEEN_WEB_REFERENCE_ANALYSIS.md
+archive/design/M11_ACCOUNTING_WEB_REFERENCE_ANALYSIS.md
+archive/design/M12_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md
 archive/design/decisions/2026-06-19-m2-attendance-web-reference.md
 archive/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md
 archive/project/M6_HOMEWORK_TIMETABLE_FRONTEND_IMPLEMENTATION_CHECKLIST.md
 archive/project/M10_CANTEEN_FRONTEND_IMPLEMENTATION_CHECKLIST.md
 archive/project/checklists/2026-06-19-m2-attendance-frontend-delivery-checklist.md
+archive/web/modules/README.md
+archive/web/modules/M8_LIBRARY_FRONTEND_IMPLEMENTATION_GUIDE.md
 ```
 
 ---
@@ -182,6 +184,8 @@ archive/project/checklists/2026-06-19-m2-attendance-frontend-delivery-checklist.
 ## Deprecated or Merged References
 
 The old combined web/mobile planning reference `docs/design/SCHOOLOS_WEB_MOBILE_PRODUCT_DESIGN_AND_IMPLEMENTATION_PLAN.md` is not an active document. Use the separate web and mobile design plans plus the next-phase delivery plan.
+
+The one-off web reference/specification files from the 2026-06-19 implementation pass were consolidated into `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` and matching files under `design/modules/` on 2026-06-21, then archived. Do not read archived copies as current source of truth.
 
 Any `M8A`, `M8B`, or `M8C` reference is legacy numbering and must be normalized to M8 Library, M9 Transport, or M10 Canteen when touched.
 

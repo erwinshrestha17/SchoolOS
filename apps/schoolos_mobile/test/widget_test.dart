@@ -9,6 +9,8 @@ import 'package:schoolos_mobile/core/storage/token_storage_service.dart';
 import 'package:schoolos_mobile/core/auth/auth_provider.dart';
 import 'package:schoolos_mobile/core/auth/data/auth_repository.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
+import 'package:schoolos_mobile/features/operational_summary/application/operational_summary_providers.dart';
+import 'package:schoolos_mobile/features/operational_summary/domain/operational_summary_models.dart';
 import 'package:schoolos_mobile/features/parent/application/parent_portal_providers.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_portal_models.dart';
 import 'package:schoolos_mobile/shared/widgets/app_button.dart';
@@ -42,6 +44,17 @@ class FakeAuthNotifier extends AuthNotifier {
     state = AuthState(status: AuthStatus.unauthenticated);
   }
 }
+
+final testOperationalSummaryOverride = operationalSummaryProvider.overrideWith(
+  (ref, persona) async => OperationalMobileSummary(
+    persona: persona,
+    generatedAt: 'test',
+    schoolDay: 'test',
+    status: OperationalSummaryStatus.empty,
+    metrics: const {},
+    attentionItems: const [],
+  ),
+);
 
 void main() {
   setUp(() {
@@ -132,8 +145,9 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
-      const ProviderScope(
-        child: MaterialApp(
+      ProviderScope(
+        overrides: [testOperationalSummaryOverride],
+        child: const MaterialApp(
           home: RoleShellScaffold(
             role: 'PARENT',
             selectedIndex: 0,
@@ -155,8 +169,9 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
-      const ProviderScope(
-        child: MaterialApp(
+      ProviderScope(
+        overrides: [testOperationalSummaryOverride],
+        child: const MaterialApp(
           home: RoleShellScaffold(
             role: 'STUDENT',
             selectedIndex: 0,
@@ -178,8 +193,9 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
-      const ProviderScope(
-        child: MaterialApp(
+      ProviderScope(
+        overrides: [testOperationalSummaryOverride],
+        child: const MaterialApp(
           home: RoleShellScaffold(
             role: 'TEACHER',
             selectedIndex: 0,
@@ -210,6 +226,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          testOperationalSummaryOverride,
           parentPortalDataProvider.overrideWith(
             (ref) async => const ParentPortalData(
               parentName: 'Erwin Shrestha',

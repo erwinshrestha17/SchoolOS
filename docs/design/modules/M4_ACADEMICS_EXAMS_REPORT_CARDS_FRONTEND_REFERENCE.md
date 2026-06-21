@@ -1,7 +1,7 @@
 # M4 Academics, Exams, CAS, Report Cards — Frontend Web Design Reference
 
 **Status:** Active module-level frontend design reference.
-**Updated:** 2026-06-19
+**Updated:** 2026-06-21
 **Module:** M4 Academics, Exams, CAS, Report Cards
 **Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`
 **Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
@@ -764,6 +764,20 @@ Teacher assigned subject/class; parent linked-child; student self; published-onl
 - Allow bilingual subject names, remarks, and report-card labels where school templates provide them.
 - Report cards must carry school-approved academic-year, attendance/comment, grading-policy and authorized-signature context from backend/template.
 - Promotion must fit Nepal academic-year transitions and school policy; never infer policy in UI.
+
+---
+
+## 12A. Consolidated M4 Reference Notes
+
+The retired M4 web reference specification was merged here so `docs/design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md` remains the only active M4 frontend source of truth.
+
+- Every M4 workspace carries a backend-backed academic context bar: academic year, term, class, section, subject, stream/program where enabled, and workflow status. A selector never grants permission by itself; context changes refetch dependent data.
+- Teacher marks and CAS screens show the effective backend-confirmed assignment scope. Use a teacher-scope banner where a teacher can edit only a subset of class, section, subject, component, or academic-year data.
+- Academic setup separates years/classes/sections, subjects, teacher assignments, exam terms, components, templates, presets, rubrics, grading policy, and stage-aware streams/programs. Do not combine all master data, marks, and reports into one mega-screen.
+- Marks entry may use a spreadsheet-style grid only when keyboard, paste, cell validation, row validation, lock state, autosave, and stale/race conflict behavior are contract-confirmed.
+- States such as absent, withheld, retest/make-up, practical pending, and project pending appear only when the backend exposes them. A blank mark must not silently become a lifecycle state.
+- Locked sheets are read-only. Corrections, result withholding, publication changes, report-card regeneration, and promotion decisions use reasoned, audited workflows and never silently mutate a published snapshot.
+- Report-card generation, exports, and regeneration are backend jobs with queued, processing, completed, failed, partial-failure, unavailable, version, and protected-file states.
 
 ---
 

@@ -1,7 +1,7 @@
 # SchoolOS Project Status
 
 **Status:** Current evidence-based project status snapshot
-**Last updated:** 2026-06-19
+**Last updated:** 2026-06-21
 **Product:** Nepal-first multi-tenant school operating SaaS with staged Preschool, School (Grade 1-10), and Higher Secondary / +2 direction
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js App Router, Flutter companion app, shared `@schoolos/core` contracts
 
@@ -19,18 +19,18 @@ Inventory & Asset Management is scrapped from the active SchoolOS module taxonom
 
 | Readiness Level | Current State | Basis |
 | --- | --- | --- |
-| Demo-ready | Conditional | Local core gates pass, but `pnpm smoke:pilot` failed during the 2026-06-18 audit because local Postgres, Redis, and API were not running. Current demo seed work also needs idempotency verification. |
-| Internal QA-ready | Yes | Root lint/typecheck/test/E2E/build, API tests, web contract tests, web build, Flutter analyze/tests, and Android debug APK build passed locally. |
-| Controlled pilot-ready | Conditional | Requires staging migration, provider/storage checks, authenticated browser E2E, mobile emulator role QA, backup restore drill, and pilot smoke. |
+| Demo-ready | Local-only | 2026-06-21 Phase 1-3 local evidence passed with Docker Postgres/Redis/API: seed idempotency, `pnpm smoke:pilot`, authenticated browser E2E, and Android emulator role-flow QA. This is not staging or pilot proof. |
+| Internal QA-ready | Yes | Root lint/typecheck/test/E2E/build, API tests, web contract tests, web build, authenticated browser E2E, Flutter analyze/tests, Android debug APK build, and Android emulator role-flow QA passed locally. |
+| Controlled pilot-ready | Conditional | Requires staging migration, provider/storage checks, staging browser/mobile QA, backup restore drill, monitoring/rollback proof, and pilot smoke. |
 | Single-school production-ready | No | No executed staging deployment, production env validation, backup restore drill, signed mobile release, provider verification, or pilot exit evidence. |
 | Multi-school production-ready | No | Multi-tenant operational readiness, capacity, monitoring, support override, backup/restore, rollback, and incident evidence are missing. |
 
 Current audited scores:
 
 ```text
-Product Implementation Completion Score: 74 / 100
-Production Deployment Readiness Score: 50 / 100
-Recommended target: Internal QA; demo-ready only after local services, seed, and smoke pass
+Product Implementation Completion Score: 80 / 100
+Production Deployment Readiness Score: 56 / 100
+Recommended target: Internal QA; local demo smokeable, but not staging, controlled-pilot, release-candidate, or GA ready
 ```
 
 ---
@@ -65,11 +65,24 @@ cd apps/schoolos_mobile && flutter build apk --debug
 
 Important caveats:
 
-- `pnpm test:web:e2e` passed with 5 public/browser-independent checks and 12 authenticated checks skipped.
+- The original `pnpm test:web:e2e` audit passed with 5 public/browser-independent checks and 12 authenticated checks skipped; the later 2026-06-21 local seeded run passed 17 checks with authenticated coverage running.
 - `pnpm verify:production` passed only as a local deploy gate. The production env preflight skipped because production env was unset.
 - `DEPLOY_ENV=production pnpm verify:env:deploy` failed because required production secrets/origins were absent.
-- `pnpm smoke:pilot` failed because Postgres, Redis, and the API were not running.
 - No staging, provider, object storage, backup restore, signed release, or pilot workflow was verified.
+
+2026-06-21 Phase 1 local update:
+
+- `pnpm db:migrate` passed on local Docker Postgres with no pending migrations.
+- `pnpm db:seed` passed twice on the same local database after staff seed idempotency was fixed.
+- `pnpm smoke:pilot` passed against local Postgres, Redis, API, and seeded data.
+- `pnpm --filter @schoolos/api typecheck`, `pnpm --filter @schoolos/api test`, and `pnpm --filter @schoolos/api test:e2e` passed.
+- `cd apps/schoolos_mobile && flutter analyze && flutter test` passed after narrow test/lint fixes.
+
+2026-06-21 Phase 2/3 local update:
+
+- `pnpm test:web:e2e` passed 17 authenticated/public Playwright checks against the live seeded local API.
+- Android emulator QA ran on `Pixel_10_Pro` / `emulator-5554` against `http://10.0.2.2:4000/api/v1`.
+- Principal/admin, parent, class-teacher, subject-teacher, support-staff, accountant, and driver role flows rendered expected local seeded states after narrow mobile fixes.
 
 ---
 
@@ -79,9 +92,9 @@ Important caveats:
 | --- | --- | --- |
 | Repository and shared contracts | IMPLEMENTED_UNVERIFIED | Workspace scripts, `@schoolos/core`, Prisma compile artifacts, and boundary checks pass locally. |
 | Backend/API | IMPLEMENTED_UNVERIFIED | Broad module implementation and tests exist across platform, admissions, attendance, finance, academics, activity, homework, HR/payroll, library, transport, canteen, accounting, communications, learning, mobile, File Registry, reports, usage, and settings. Production/staging evidence is missing. |
-| Web | IMPLEMENTED_UNVERIFIED | Next.js routes, shared primitives, API helpers, cookie-first session metadata, contract tests, lint, typecheck, and build pass. Authenticated browser E2E still needs to run with live seeded backend. |
-| Flutter mobile | PARTIALLY_IMPLEMENTED | Secure storage/session handling, role shell, parent/teacher/staff/driver repositories/screens, tests, analyze, and debug APK build pass. Emulator role-flow QA against live seeded backend is pending. |
-| Seed/demo data | PARTIALLY_IMPLEMENTED | Central seed exists and is being expanded, but seed idempotency still needs to be proven in pilot-smoke conditions. |
+| Web | LOCALLY_VERIFIED | Next.js routes, shared primitives, API helpers, cookie-first session metadata, contract tests, lint, typecheck, build, and authenticated browser E2E pass locally. Staging browser proof is missing. |
+| Flutter mobile | LOCALLY_VERIFIED | Secure storage/session handling, role shell, parent/teacher/staff/driver repositories/screens, tests, analyze, debug APK build, and Android emulator role-flow QA pass locally. Physical-device/staging proof is missing. |
+| Seed/demo data | LOCALLY_VERIFIED | Central seed is idempotent on local Postgres and `pnpm smoke:pilot` passes with representative role logins and scope checks. Staging seed proof is still missing. |
 | Staging/deployment | BLOCKED | No staging deployment, production env validation, provider/storage checks, backup restore, rollback, or monitoring proof. |
 | M12 Notifications / Communication | IMPLEMENTED_UNVERIFIED | Architecture and broad communication surfaces exist, but provider callbacks, mobile notices/chat, delivery retry, read state, queue, and staging proof remain gaps. |
 | M13 Learning Layer | IMPLEMENTED_UNVERIFIED | Implemented foundation exists; authenticated browser, lab/device, and staging proof remain gaps. |
@@ -97,14 +110,14 @@ Use the readiness statuses from the audit. Most modules are `IMPLEMENTED_UNVERIF
 | --- | --- | --- |
 | M0 Platform Core | IMPLEMENTED_UNVERIFIED | Staging/provider/queue/support-override operational proof. |
 | M1 Admissions and Student Profiles | IMPLEMENTED_UNVERIFIED | Unified Admission Case direct/review flow is locally implemented; seeded authenticated browser, protected-document, mobile snapshot, staging, and pilot workflow proof remain. |
-| M2 Smart Attendance | IMPLEMENTED_UNVERIFIED | Teacher/parent/mobile role QA and pilot smoke. |
+| M2 Smart Attendance | IMPLEMENTED_UNVERIFIED | Local teacher/parent mobile evidence exists; staging and pilot smoke remain. |
 | M3 Fees and Receipts | IMPLEMENTED_UNVERIFIED | Provider/payment sandbox and finance workflow smoke. |
 | M4 Academics, Exams, CAS, Report Cards | IMPLEMENTED_UNVERIFIED | Browser/staging workflow proof and report-card file verification. |
 | M5 Activity Feed and Milestones | IMPLEMENTED_UNVERIFIED | Media/provider/staging and mobile proof. |
-| M6 Homework and Timetable | IMPLEMENTED_UNVERIFIED | Teacher/parent mobile and timetable smoke with realistic assignments. |
-| M7 HR and Payroll | IMPLEMENTED_UNVERIFIED | Staff self-service mobile proof and payroll operational smoke. |
+| M6 Homework and Timetable | IMPLEMENTED_UNVERIFIED | Local teacher homework evidence exists; timetable staging/pilot smoke remains. |
+| M7 HR and Payroll | IMPLEMENTED_UNVERIFIED | Local staff/accountant self-service mobile proof exists; payroll operational smoke remains. |
 | M8 Library | IMPLEMENTED_UNVERIFIED | Browser/staging operational smoke. |
-| M9 Transport | IMPLEMENTED_UNVERIFIED | Driver/route/trip mobile and staging proof. |
+| M9 Transport | IMPLEMENTED_UNVERIFIED | Local driver/route/trip mobile proof exists; staging proof remains. |
 | M10 Canteen | IMPLEMENTED_UNVERIFIED | POS/wallet/parent mobile operational smoke. |
 | M11 Accounting and Finance | IMPLEMENTED_UNVERIFIED | Staging export/queue/accounting close proof. |
 | M12 Notifications, Notices, Communication, Chat | IMPLEMENTED_UNVERIFIED | Provider callbacks, mobile notices/chat, delivery retries, read state, and delivery smoke. |
@@ -115,13 +128,12 @@ Use the readiness statuses from the audit. Most modules are `IMPLEMENTED_UNVERIF
 
 ## Current Blockers
 
-1. Complete and verify the realistic central seed for the default tenant.
-2. Make `pnpm smoke:pilot` pass with local Docker services and seeded accounts.
-3. Make authenticated Playwright checks run and pass rather than skip.
-4. Run Android emulator role-flow QA against the seeded backend.
-5. Run staging migration/deploy/provider/storage/backup/restore verification.
-6. Resolve production environment requirements and document validated deployment values without committing secrets.
-7. Prove M12 notification provider callbacks, delivery retries, mobile notification center, read state, and delivery smoke before production-readiness claims.
+1. Run staging migration/deploy/provider/storage/backup/restore verification.
+2. Run staging authenticated browser E2E and staging mobile role-flow QA once staging exists.
+3. Add physical-device and signed mobile release evidence before release-candidate claims.
+4. Resolve production environment requirements and document validated deployment values without committing secrets.
+5. Prove M12 notification provider callbacks, delivery retries, mobile notification center, read state, and delivery smoke before production-readiness claims.
+6. Keep the local seed and `pnpm smoke:pilot` repeatable as browser/mobile/staging fixtures evolve.
 
 ---
 
@@ -130,15 +142,15 @@ Use the readiness statuses from the audit. Most modules are `IMPLEMENTED_UNVERIF
 The next development phase is:
 
 ```text
-Phase 1 - Realistic Seeded Tenant, Role Assignment, and Smokeable Demo Flows
+Phase 4 - Staging Deployment, Provider Validation, Migration Safety, Backups, and Observability
 ```
 
 Source of truth: `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`.
 
-Exit criteria:
+Entry criteria already met locally:
 
-- Central seed is idempotent.
-- Representative parent, class teacher, subject teacher, principal, staff/accountant, and driver accounts work.
-- Parent, teacher, staff, and driver scope tests pass.
-- `pnpm smoke:pilot` passes with local Postgres, Redis, API, and seeded data.
-- Mobile role endpoints return real records or valid empty responses, not generic backend failures.
+- Central seed is idempotent on local Postgres.
+- Representative parent, class teacher, subject teacher, principal, support staff/accountant, and driver accounts work locally.
+- Parent, teacher, staff, and driver scope checks pass locally.
+- `pnpm smoke:pilot` and `pnpm test:web:e2e` pass with local Postgres, Redis, API, and seeded data.
+- Android emulator role-flow QA returns real records or valid permission/empty responses, not generic backend failures.

@@ -1,3 +1,5 @@
+> Archived 2026-06-21. Unique implementation guidance was merged into `docs/design/modules/M12_NOTIFICATIONS_COMMUNICATION_FRONTEND_REFERENCE.md`. Retained as historical M12 reference analysis only.
+
 # M12 Notifications, Notices, Communication, Chat — Web Reference Analysis
 
 **Status:** Approved supporting visual-reference appendix for M12 web frontend design.  

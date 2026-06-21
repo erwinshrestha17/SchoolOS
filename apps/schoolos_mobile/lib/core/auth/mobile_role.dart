@@ -62,6 +62,7 @@ class MobileRole {
         value == 'ACCOUNTANT' ||
         value == 'LIBRARIAN' ||
         value == 'RECEPTIONIST' ||
+        value == 'SUPPORT_STAFF' ||
         value == 'HR' ||
         value == 'HR_MANAGER' ||
         value == 'FINANCE' ||

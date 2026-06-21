@@ -1,3 +1,5 @@
+> Archived 2026-06-21. Unique implementation guidance was merged into `docs/design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md`. Retained as historical M4 reference-screen analysis only.
+
 # M4 Academics Web Reference Specification
 
 **Status:** Active design and implementation-reference document  

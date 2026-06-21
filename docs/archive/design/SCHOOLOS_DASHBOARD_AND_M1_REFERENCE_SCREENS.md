@@ -1,3 +1,5 @@
+> Archived 2026-06-21. Replaced by `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` for principal dashboard rules and `docs/design/modules/M1_ADMISSIONS_STUDENT_PROFILES_FRONTEND_REFERENCE.md` for M1 module workflow guidance. Retained as historical reference-screen analysis only.
+
 # SchoolOS Dashboard and M1 Reference Screens
 
 **Status:** Approved visual-reference appendix for the 2026-06-19 principal dashboard and M1 Admissions / Student Profiles desktop screens.  

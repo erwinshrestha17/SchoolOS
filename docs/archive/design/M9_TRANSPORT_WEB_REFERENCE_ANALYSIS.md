@@ -1,3 +1,5 @@
+> Archived 2026-06-21. Unique implementation guidance was merged into `docs/design/modules/M9_TRANSPORT_FRONTEND_REFERENCE.md`. Retained as historical M9 reference analysis only.
+
 # M9 Transport — Web Reference Analysis
 
 **Status:** Supporting design analysis for the SchoolOS M9 Transport web implementation pass.  

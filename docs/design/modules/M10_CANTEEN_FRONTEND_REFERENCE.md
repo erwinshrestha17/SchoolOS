@@ -1,7 +1,7 @@
 # M10 Canteen — Frontend Web Design Reference
 
 **Status:** Active module-level frontend design reference.
-**Updated:** 2026-06-19
+**Updated:** 2026-06-21
 **Module:** M10 Canteen
 **Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`
 **Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
@@ -246,15 +246,25 @@ Use a counter and meal operations workspace under the standard shell. Follow [th
 /dashboard/canteen/meal-plans
 /dashboard/canteen/pos
 /dashboard/canteen/serve
+/dashboard/canteen/qr-serve
 /dashboard/canteen/wallets
 /dashboard/canteen/stock-close
+/dashboard/canteen/stock
 /dashboard/canteen/vendors
+/dashboard/canteen/reports
+/dashboard/canteen/receipts
+/dashboard/canteen/settings
 ```
 
 ### Parent Routes
 
 ```text
 /parent/children/[studentId]/canteen
+/parent/canteen
+/parent/canteen/wallet
+/parent/canteen/menu
+/parent/canteen/transactions
+/parent/canteen/receipts
 ```
 
 ---
@@ -869,6 +879,19 @@ Parent linked-child and canteen staff minimum-safe student projections; no admin
 - Support practical QR plus admission/roll/manual fallback without weakening backend validation.
 - Vendor bills and daily close should fit local school recordkeeping and fiscal context.
 - Health warnings must remain prominent even during fast queues.
+
+---
+
+## 12A. Consolidated M10 Reference Notes
+
+The retired M10 canteen analysis was merged here so this file remains the active Canteen frontend source of truth.
+
+- Delivery priority is P0 for Canteen Dashboard, POS Workspace, QR Serve and Allergy Verification, Wallet Top-up and Spending Controls, Menu Planner, and Stock Close. Meal plans, finance handoff, vendor bills, parent views, reports, scanner parity, and offline/retry visibility follow only after safe contracts are confirmed.
+- POS sale and QR serve stay disabled until backend verifies student, wallet/meal eligibility, selected meal safety, duplicate-sale/duplicate-serve status, stock availability, spending limits, and idempotency.
+- Allergy and medical warnings are safety-critical: text plus icon, minimum necessary detail only, explicit acknowledgement when policy requires, and audit for override/serve decisions.
+- Wallet balance, spending limit, top-up, adjustment, freeze/restrict, low-balance alert, stock close, vendor bill, receipt, and finance handoff states are backend truth. The browser never calculates final balances or posts accounting.
+- Stock close states include open day, close pending, closed, reopened, and discrepancy pending review. Reopen, correction, bill lock/unlock, mark paid, and finance sync/retry require confirmation, reason where policy requires, and audit state.
+- Parent Canteen is linked-child only and may show wallet balance, spending limit, today's spending, backend-confirmed allergy-safe status, menus, meal plans, transactions, and receipts. It must not expose vendor, stock, schoolwide sales, other students, or internal audit.
 
 ---
 

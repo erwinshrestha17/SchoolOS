@@ -1,7 +1,7 @@
 # M7 HR and Payroll — Frontend Web Design Reference
 
 **Status:** Active module-level frontend design reference.
-**Updated:** 2026-06-19
+**Updated:** 2026-06-21
 **Module:** M7 HR and Payroll
 **Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`
 **Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
@@ -200,11 +200,27 @@ Use a sensitive staff and payroll workspace inside the standard SchoolOS app she
 ```text
 /dashboard/hr
 /dashboard/hr/staff
+/dashboard/hr/staff/new
 /dashboard/hr/staff/[staffId]
+/dashboard/hr/staff/[staffId]/documents
+/dashboard/hr/departments
+/dashboard/hr/designations
+/dashboard/hr/contracts
+/dashboard/hr/contracts/[contractId]
 /dashboard/hr/leave
 /dashboard/hr/attendance
+/dashboard/hr/attendance/corrections
+/dashboard/hr/shifts
+/dashboard/hr/rosters
 /dashboard/payroll
+/dashboard/payroll/salary-structures
+/dashboard/payroll/allowances
+/dashboard/payroll/deductions
 /dashboard/payroll/runs/[runId]
+/dashboard/payroll/runs/[runId]/exceptions
+/dashboard/payroll/runs/[runId]/journals
+/dashboard/payroll/payslips
+/dashboard/payroll/reports
 ```
 
 ### Staff Self-Service Routes
@@ -687,6 +703,20 @@ Staff self-service is own-data only; principal/accountant receive purpose-limite
 - Use school leave calendars, holidays, shifts and attendance policies.
 - Payslips need approved school identity, period, earnings/deductions, net, status, and protected delivery.
 - Tax/statutory calculations remain backend/policy owned and need current legal verification.
+
+---
+
+## 12A. Consolidated M7 Reference Notes
+
+The retired M7 web design reference was merged here so this file remains the active M7 frontend source of truth.
+
+- M7 navigation keeps HR staff lifecycle, attendance, leave, contracts, salary structures, payroll runs, payslips, reports, and staff self-service separated. Global finance may link to payroll handoff/status, but it does not own HR staff lifecycle or payroll processing.
+- Staff profile is a full protected route, not only a drawer. Bank, salary, PAN, tax, contract, and protected document sections are masked or omitted unless permission allows; reveal/download actions are audit-sensitive where backend supports audit.
+- Staff directory, profile, contracts, attendance, leave, salary structures, payroll runs, payslips, reports, and self-service should reuse shared tables, filters, rails, protected fields, protected-file controls, workflow steppers, queued job state, partial failure state, and audit timelines.
+- Missing but expected HR flows are add/edit staff, import review, duplicate staff warning, deactivate/resign/terminate, reactivation, contract renewal/non-renewal, attendance corrections, shift/roster setup, leave policy/balance adjustments, payroll exception resolution, correction run creation, payslip delivery retry, and export queues. Implement only when backend contracts are verified.
+- Payroll uses a controlled state model: Draft, Review, Approved, Posted, Reversed, Correction Run, Failed Posting, Period Locked, and Accounting Disconnected where exposed. Posted payroll is immutable; corrections use reversal/correction flows only.
+- High-risk actions require impact preview, permission, pending/success/error state, safe retry behavior, and reason where policy requires it: leave decisions, payslip generation/delivery, salary version activation, payroll create/recalculate/approve/post/lock/reverse/correction, protected bulk download, contract non-renewal, staff termination, and password reset.
+- Staff self-service uses purpose-limited own-data APIs and a more mobile-friendly layout than admin payroll screens. It must never receive admin directory or payroll-run payloads.
 
 ---
 

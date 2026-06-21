@@ -3,7 +3,7 @@
 **Status:** Archived frontend execution plan
 **Updated:** 2026-06-19  
 **Scope:** `apps/web` work for M4 Academics, Exams, CAS, Results, Report Cards, and Promotion  
-**Companion design specification:** `docs/design/M4_ACADEMICS_WEB_REFERENCE_SPEC.md`  
+**Companion design specification:** `docs/archive/design/M4_ACADEMICS_WEB_REFERENCE_SPEC.md`
 **Implementation status:** Planning only. This document does not claim backend, frontend, OpenAPI, Prisma, test, staging, or browser-E2E completion.
 
 > Archived 2026-06-20. Active M4 module guidance now lives in `docs/design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md`; active sequencing lives in `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`. This file is retained for historical W0-W8 slice detail.

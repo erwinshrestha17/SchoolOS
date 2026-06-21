@@ -1,7 +1,7 @@
 # M12 Notifications, Notices, Communication, Chat — Frontend Web Design Reference
 
 **Status:** Active module-level frontend design reference.
-**Updated:** 2026-06-19
+**Updated:** 2026-06-21
 **Module:** M12 Notifications, Notices, Communication, Chat
 **Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`
 **Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
@@ -245,12 +245,17 @@ Use a communication reliability workspace under the standard shell. Follow [the 
 ```text
 /dashboard/communications
 /dashboard/communications/notices
+/dashboard/communications/notices/create
 /dashboard/communications/templates
 /dashboard/communications/scheduled
 /dashboard/communications/approvals
+/dashboard/communications/notification-center
+/dashboard/communications/unread-follow-up
 /dashboard/communications/delivery-logs
 /dashboard/communications/retry-center
+/dashboard/communications/provider-callbacks
 /dashboard/communications/chat
+/dashboard/communications/archived-conversations
 /dashboard/communications/moderation
 ```
 
@@ -892,6 +897,19 @@ User inbox is self; parent chat linked-child; teacher assignment; platform provi
 - Guardian phone reuse and child links require backend recipient resolution, not browser deduplication.
 - Show SMS/email/push/in-app outcomes separately; poor connectivity and delayed callbacks are normal states.
 - Emergency communication needs school-approved audience, sender, timing, acknowledgement, and immutable evidence.
+
+---
+
+## 12A. Consolidated M12 Reference Notes
+
+The retired M12 communication analysis was merged here so this file remains the active Notifications, Notices, Communication, and Chat frontend source of truth.
+
+- M12 is the full communication operating system: create notice, choose channels, target audience, preview recipients, preview content by channel, schedule/send/request approval, approve high-impact notices, dispatch, track delivery/callbacks/read state, retry failures, follow up unread recipients, manage inboxes, chat, report, escalate, moderate, and audit.
+- Keep workflow groups separate: dashboard, notices, notification center, unread follow-up, messages/chat, delivery logs, retry center, provider callbacks, moderation, and provider settings. Platform provider diagnostics stay separate from tenant message content.
+- Communication dashboards answer what was sent, what is scheduled, what failed, who has not read important communication, whether providers are healthy, and what chats/escalations are waiting. A notice queued for dispatch is not the same as delivered.
+- Delivery state labels include draft, approval pending, approved, scheduled, queued, dispatching, sent to provider, delivered, opened/read, partially delivered, delayed, failed, retried, cancelled, archived, provider disabled, mock/dev, callback pending, and retry eligible where exposed.
+- Recipient targeting, channel eligibility, quiet hours, provider mode, costs, previews, approval policies, callback verification, retries, and read/unread follow-up are backend-owned. The browser must not calculate official recipient lists.
+- Chat report/block/escalation/moderation preserves evidence through protected File Registry access and audit while hiding private bodies, attachments, and cases from unauthorized users.
 
 ---
 

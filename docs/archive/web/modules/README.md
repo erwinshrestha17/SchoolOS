@@ -1,3 +1,5 @@
+> Archived 2026-06-21. Active module-level web frontend references now live in `docs/design/modules/`. Retained as historical app-local module guide index only.
+
 # SchoolOS Web Module Implementation Guides
 
 **Status:** Module-level implementation guide index for `apps/web`.  

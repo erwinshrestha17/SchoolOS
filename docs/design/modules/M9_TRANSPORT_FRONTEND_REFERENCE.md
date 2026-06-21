@@ -1,7 +1,7 @@
 # M9 Transport — Frontend Web Design Reference
 
 **Status:** Active module-level frontend design reference.
-**Updated:** 2026-06-19
+**Updated:** 2026-06-21
 **Module:** M9 Transport
 **Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`
 **Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
@@ -214,10 +214,17 @@ Use a route and trip operations workspace inside the standard SchoolOS app shell
 ```text
 /dashboard/transport
 /dashboard/transport/routes
+/dashboard/transport/routes/:routeId
+/dashboard/transport/stops
 /dashboard/transport/vehicles
+/dashboard/transport/drivers
 /dashboard/transport/assignments
 /dashboard/transport/trips
+/dashboard/transport/trips/:tripId
 /dashboard/transport/incidents
+/dashboard/transport/maintenance
+/dashboard/transport/reports
+/dashboard/transport/settings
 ```
 
 ### Parent Routes
@@ -774,6 +781,18 @@ Driver/conductor assigned-trip only; parent linked-child only; no admin payload 
 - Support morning/day shifts, route variants, traffic/weather delays, and intermittent connectivity with honest timestamps.
 - Track local vehicle registration, insurance, fitness, permit and maintenance expiry types as configured.
 - Emergency UI must support phone coordination while preserving audited system status; M12 owns delivery evidence.
+
+---
+
+## 12A. Consolidated M9 Reference Notes
+
+The retired M9 transport analysis was merged here so this file remains the active Transport frontend source of truth.
+
+- Transport manages route operations, not a generic vehicle list: vehicles, drivers/conductors, routes/stops, student assignments, trips, boarding/deboarding, parent status, GPS readiness, emergencies, and maintenance reminders stay connected through backend contracts.
+- Parent status is linked-child and route-scoped. Driver/conductor views are assigned-trip scoped. Transport surfaces must not expose unrelated academic, fee, guardian, HR/payroll, maintenance, or private profile detail.
+- Trip and GPS/status UI always shows timestamp, source where safe, stale label, and unavailable state. Live maps, WebSocket/SSE, ETA, route deviation, geofence, and overspeed UI remain deferred until backend/provider/load/privacy contracts are confirmed.
+- Route stop reorder, one-day route changes, overlapping trip assignments, emergency contact actions, and route publish/version changes require backend validation, confirmation where high impact, and audit where supported.
+- Parent transport may show assigned route/vehicle, pickup/drop stop, policy-allowed crew contact, boarding/deboarding state, latest status timestamp, and stale state only. It must not show other children, full route rosters, crew private HR data, or internal maintenance notes.
 
 ---
 

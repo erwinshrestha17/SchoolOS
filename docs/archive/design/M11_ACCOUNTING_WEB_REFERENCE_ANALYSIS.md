@@ -1,3 +1,5 @@
+> Archived 2026-06-21. Unique implementation guidance was merged into `docs/design/modules/M11_ACCOUNTING_FINANCE_FRONTEND_REFERENCE.md`. Retained as historical M11 reference analysis only.
+
 # M11 Accounting — Web Reference Analysis
 
 **Status:** Supporting M11 design analysis for the SchoolOS web implementation pass.  

@@ -1,7 +1,7 @@
 # M11 Accounting and Finance — Frontend Web Design Reference
 
 **Status:** Active module-level frontend design reference.
-**Updated:** 2026-06-19
+**Updated:** 2026-06-21
 **Module:** M11 Accounting and Finance
 **Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`
 **Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
@@ -229,12 +229,27 @@ Use a controlled accounting workspace under the standard shell. Follow [the mast
 ```text
 /dashboard/accounting
 /dashboard/accounting/chart-of-accounts
+/dashboard/accounting/chart-of-accounts/import
 /dashboard/accounting/vouchers
+/dashboard/accounting/vouchers/[voucherId]
 /dashboard/accounting/journals
+/dashboard/accounting/journal-entries
+/dashboard/accounting/journal-entries/[journalEntryId]
 /dashboard/accounting/source-mappings
 /dashboard/accounting/fiscal-periods
+/dashboard/accounting/banking/accounts
 /dashboard/accounting/reconciliation
+/dashboard/accounting/banking/cheques
+/dashboard/accounting/receivables
+/dashboard/accounting/payables
 /dashboard/accounting/reports
+/dashboard/accounting/reports/trial-balance
+/dashboard/accounting/reports/general-ledger
+/dashboard/accounting/reports/balance-sheet
+/dashboard/accounting/reports/income-expenditure
+/dashboard/accounting/reports/cash-flow
+/dashboard/accounting/audit-trail
+/dashboard/accounting/settings
 ```
 
 ### Platform/Admin Routes
@@ -855,6 +870,19 @@ Principal/read-only/cashier projections omit journal, bank and sensitive finance
 - Support local voucher types/numbering, narration, bank statement practice, and school approval separation.
 - Reports must disclose period, as-of time, accounting basis/version, school identity, and generated status.
 - Current tax/statutory/reporting requirements need policy/backend verification.
+
+---
+
+## 12A. Consolidated M11 Reference Notes
+
+The retired M11 accounting analysis was merged here so this file remains the active Accounting and Finance frontend source of truth.
+
+- M11 is the school accounting control center, not platform SaaS billing and not a fee-only report page. Other module UIs may expose source status, but official ledger posting belongs to backend-owned M11 accounting boundaries.
+- Chart of accounts supports Nepal-ready templates, import preview before commit, type/code/parent/active state, dependency review, and no silent delete/archive when an account has history.
+- Voucher and journal states include draft, review, approved, posted, reversed, rejected, fiscal-period locked, posting blocked, and reversal required where backend exposes them. Posted records are corrected only through linked reversal/correction workflows.
+- Source mapping status should distinguish mapped, unmapped, failed, pending, duplicate, and reversed. No frontend code in M3, M7, M8, M10, or other modules writes journals directly.
+- Bank reconciliation suggestions are review-only until confirmed by an authorized user. Suggestions must not auto-post; confirmation/unmatch/import/close/reopen actions require audit and reason where policy requires it.
+- Principal finance views are read-only, summary-first, and hide edit/post/reverse/source-mapping/period-reopen controls plus private operational detail beyond leadership need.
 
 ---
 

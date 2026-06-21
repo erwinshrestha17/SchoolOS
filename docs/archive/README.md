@@ -1,7 +1,7 @@
 # SchoolOS Documentation Archive
 
 **Status:** Archive index
-**Last updated:** 2026-06-20
+**Last updated:** 2026-06-21
 
 This folder is for old, superseded, duplicated, or one-off planning documents.
 
@@ -84,3 +84,18 @@ Check `docs/project/SCHOOLOS_DOCUMENTATION_INVENTORY.md` before archiving or del
 | `implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md` | `docs/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md` | `docs/design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md` and `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`. |
 | `project/M6_HOMEWORK_TIMETABLE_FRONTEND_IMPLEMENTATION_CHECKLIST.md` | `docs/project/M6_HOMEWORK_TIMETABLE_FRONTEND_IMPLEMENTATION_CHECKLIST.md` | `docs/design/modules/M6_HOMEWORK_TIMETABLE_FRONTEND_REFERENCE.md` and `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`. |
 | `project/M10_CANTEEN_FRONTEND_IMPLEMENTATION_CHECKLIST.md` | `docs/project/M10_CANTEEN_FRONTEND_IMPLEMENTATION_CHECKLIST.md` | `docs/design/modules/M10_CANTEEN_FRONTEND_REFERENCE.md` and `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`. |
+
+## Archived In 2026-06-21 Markdown Cleanup
+
+| Archived path | Original path | Replacement / current owner |
+|---|---|---|
+| `design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | `docs/design/SCHOOLOS_DASHBOARD_AND_M1_REFERENCE_SCREENS.md` | `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` and `docs/design/modules/M1_ADMISSIONS_STUDENT_PROFILES_FRONTEND_REFERENCE.md`. |
+| `design/M4_ACADEMICS_WEB_REFERENCE_SPEC.md` | `docs/design/M4_ACADEMICS_WEB_REFERENCE_SPEC.md` | `docs/design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md`. |
+| `design/M6_HOMEWORK_TIMETABLE_WEB_REFERENCE_ANALYSIS.md` | `docs/design/M6_HOMEWORK_TIMETABLE_WEB_REFERENCE_ANALYSIS.md` | `docs/design/modules/M6_HOMEWORK_TIMETABLE_FRONTEND_REFERENCE.md`. |
+| `design/SCHOOLOS_M7_HR_PAYROLL_WEB_DESIGN_REFERENCE.md` | `docs/design/SCHOOLOS_M7_HR_PAYROLL_WEB_DESIGN_REFERENCE.md` | `docs/design/modules/M7_HR_PAYROLL_FRONTEND_REFERENCE.md`. |
+| `design/M9_TRANSPORT_WEB_REFERENCE_ANALYSIS.md` | `docs/design/M9_TRANSPORT_WEB_REFERENCE_ANALYSIS.md` | `docs/design/modules/M9_TRANSPORT_FRONTEND_REFERENCE.md`. |
+| `design/M10_CANTEEN_WEB_REFERENCE_ANALYSIS.md` | `docs/design/M10_CANTEEN_WEB_REFERENCE_ANALYSIS.md` | `docs/design/modules/M10_CANTEEN_FRONTEND_REFERENCE.md`. |
+| `design/M11_ACCOUNTING_WEB_REFERENCE_ANALYSIS.md` | `docs/design/M11_ACCOUNTING_WEB_REFERENCE_ANALYSIS.md` | `docs/design/modules/M11_ACCOUNTING_FINANCE_FRONTEND_REFERENCE.md`. |
+| `design/M12_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md` | `docs/design/M12_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md` | `docs/design/modules/M12_NOTIFICATIONS_COMMUNICATION_FRONTEND_REFERENCE.md`. |
+| `web/modules/M8_LIBRARY_FRONTEND_IMPLEMENTATION_GUIDE.md` | `apps/web/docs/modules/M8_LIBRARY_FRONTEND_IMPLEMENTATION_GUIDE.md` | `docs/design/modules/M8_LIBRARY_FRONTEND_REFERENCE.md`. |
+| `web/modules/README.md` | `apps/web/docs/modules/README.md` | `docs/design/modules/README.md`. |

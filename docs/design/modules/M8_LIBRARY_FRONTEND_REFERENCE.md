@@ -1,7 +1,7 @@
 # M8 Library — Frontend Web Design Reference
 
 **Status:** Active module-level frontend design reference.
-**Updated:** 2026-06-19
+**Updated:** 2026-06-21
 **Module:** M8 Library
 **Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`
 **Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
@@ -215,11 +215,18 @@ Use a catalogue and circulation workspace inside the standard SchoolOS app shell
 /dashboard/library
 /dashboard/library/catalogue
 /dashboard/library/catalogue/[bookId]
+/dashboard/library/catalogue/[bookId]/copies
+/dashboard/library/copies
 /dashboard/library/circulation
+/dashboard/library/circulation/scanner
 /dashboard/library/borrowers
+/dashboard/library/borrowers/[borrowerId]
 /dashboard/library/reservations
 /dashboard/library/overdues
+/dashboard/library/fines
+/dashboard/library/lost-damaged
 /dashboard/library/reports
+/dashboard/library/settings
 ```
 
 ### Parent Routes
@@ -775,6 +782,18 @@ Parent linked-child and student self APIs exclude other borrowers and internal n
 - Search Nepali/English titles, names, admission numbers, class/section/roll and guardian phone where permitted.
 - Fine, renewal, holiday and borrowing policies are school-configured; UI does not assume universal values.
 - Use NPR for backend fine values and keep payment posting out of the circulation screen.
+
+---
+
+## 12A. Consolidated M8 Implementation Notes
+
+The retired app-local M8 implementation guide was merged here so this file remains the active Library frontend source of truth.
+
+- Catalogue and physical copies stay visually and contractually separate. Title metadata is not copy availability; copy lifecycle actions such as add, print barcode/QR, move shelf, mark lost/damaged, replace, and archive use backend mutations.
+- Official title counts, copy counts, availability, issued counts, overdue counts, fines, borrower eligibility, borrowing limits, fine calculations, holiday-aware days, accounting posting state, reservation position, and export completion state are backend truth.
+- Scanner circulation supports issue, return, and renew modes with scanner unavailable, camera permission blocked, unknown barcode, duplicate scan, borrower missing, borrower blocked, copy unavailable, policy missing, and override-required states.
+- Do not confirm issue, return, renew, reservation, fine adjustment, lost/damaged, replacement, or queue change until backend validation succeeds. Preserve scanned session context after recoverable row-level errors.
+- Borrower views show eligibility, active loans, overdues, fine due, policy group, and last activity from backend responses only. Parent Library shows linked-child borrowed books, due soon, overdue, fine due, reservations, notices, and policy; it excludes global queues, other borrowers, staff notes, audit notes, and accounting posting details.
 
 ---
 

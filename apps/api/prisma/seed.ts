@@ -830,6 +830,8 @@ async function ensureSeedUserWithRole({
       passwordHash,
       authMethod: AuthMethod.PASSWORD,
       status: UserStatus.ACTIVE,
+      failedLoginCount: 0,
+      lockedUntil: null,
     },
     create: {
       tenantId,
@@ -2989,6 +2991,23 @@ async function upsertStaffProfile({
     contractType: ContractType.PERMANENT,
     privacyConsentAt: new Date(),
   };
+
+  const existingByUser = await prisma.staff.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+
+  if (existingByUser) {
+    return prisma.staff.update({
+      where: { id: existingByUser.id },
+      data: {
+        tenantId,
+        employeeId,
+        staffCode: employeeId,
+        ...base,
+      },
+    });
+  }
 
   return prisma.staff.upsert({
     where: { tenantId_employeeId: { tenantId, employeeId } },

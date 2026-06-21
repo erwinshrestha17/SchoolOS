@@ -152,22 +152,25 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: AppSpacing.sm),
           AppCard(
             padding: EdgeInsets.zero,
-            child: ListTile(
-              leading: Icon(
-                Icons.logout_rounded,
-                color: isDark ? AppColors.danger : AppColors.dangerDark,
+            child: Material(
+              type: MaterialType.transparency,
+              child: ListTile(
+                leading: Icon(
+                  Icons.logout_rounded,
+                  color: isDark ? AppColors.danger : AppColors.dangerDark,
+                ),
+                title: const Text('Log out'),
+                subtitle: const Text('End this session and return to sign in'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                textColor: isDark ? AppColors.danger : AppColors.dangerDark,
+                iconColor: isDark ? AppColors.danger : AppColors.dangerDark,
+                onTap: () async {
+                  await ref.read(authProvider.notifier).logout();
+                  if (context.mounted) {
+                    context.go(AppRoutes.login);
+                  }
+                },
               ),
-              title: const Text('Log out'),
-              subtitle: const Text('End this session and return to sign in'),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              textColor: isDark ? AppColors.danger : AppColors.dangerDark,
-              iconColor: isDark ? AppColors.danger : AppColors.dangerDark,
-              onTap: () async {
-                await ref.read(authProvider.notifier).logout();
-                if (context.mounted) {
-                  context.go(AppRoutes.login);
-                }
-              },
             ),
           ),
         ],

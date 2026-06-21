@@ -1,3 +1,5 @@
+> Archived 2026-06-21. Unique implementation guidance was merged into `docs/design/modules/M10_CANTEEN_FRONTEND_REFERENCE.md`. Retained as historical M10 reference analysis only.
+
 # M10 Canteen — Web Reference Analysis
 
 **Status:** Supporting M10 design analysis for the SchoolOS web implementation pass.  

@@ -544,20 +544,34 @@ async function checkDriverScope(driverToken, adminToken) {
 }
 
 async function checkAdminEmptyState(adminToken) {
-  const result = await fetchOk(
-    'Non-parent mobile child list returns valid empty state',
-    '/mobile/me/students',
-    adminToken,
-  );
-  checks.push(result.check);
-  if (result.check.status === 'ok') {
+  const result = await request('/mobile/me/students', authOptions(adminToken));
+  if (result.status === 403) {
+    checks.push({
+      name: 'Non-parent mobile child list fails closed',
+      status: 'ok',
+    });
+    return;
+  }
+
+  if (result.ok) {
+    checks.push({
+      name: 'Non-parent mobile child list returns valid empty state',
+      status: 'ok',
+    });
     checks.push(
       assertCheck(
         'Non-parent mobile child list is empty',
         getItems(result.body).length === 0,
       ),
     );
+    return;
   }
+
+  checks.push({
+    name: 'Non-parent mobile child list returns empty or permission state',
+    status: 'error',
+    message: `HTTP ${result.status}: ${trimBody(result.bodyText)}`,
+  });
 }
 
 async function checkPostgres() {

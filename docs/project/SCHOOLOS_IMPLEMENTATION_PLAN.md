@@ -24,16 +24,16 @@ Next execution phase: Phase 1 - Realistic Seeded Tenant, Role Assignment, and Sm
 The repository has broad implemented foundations across M0-M13, web, mobile, File Registry, RBAC, entitlement, finance/accounting/payroll, learning, and platform operations. The blocking issue is not lack of source code; it is missing proof for realistic seeded flows, authenticated browser E2E, mobile device QA, staging deployment, provider/storage checks, backup restore, and pilot operation.
 
 ### Overall Product Readiness
-* **Demo-ready:** Conditional
+* **Demo-ready:** Local-only
 * **Internal QA-ready:** Yes
 * **Controlled pilot-ready:** Conditional, after staging checks, authenticated browser E2E, mobile emulator QA, backup restore, and pilot smoke verification
 * **Single-school production-ready:** No
 * **Multi-school production-ready:** Not yet
 * **Full SchoolOS product complete:** No
 
-**Verification snapshot:** On 2026-06-18, root lint/typecheck/test/E2E/build and local `pnpm verify:production` passed with caveats. `pnpm smoke:pilot` failed because Postgres, Redis, and the API were not running. `pnpm test:web:e2e` passed with 5 public checks and 12 authenticated checks skipped. See `SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` for exact command results.
+**Verification snapshot:** On 2026-06-18, root lint/typecheck/test/E2E/build and local `pnpm verify:production` passed with caveats. On 2026-06-21, local Docker Postgres/Redis/API seed/smoke evidence passed after staff seed idempotency was fixed. `pnpm test:web:e2e` still has only public-browser checks passing with authenticated checks skipped. See `SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` for exact command results.
 
-**Remaining work categories:** realistic demo seed and role assignment, pilot smoke, authenticated browser E2E, mobile role/device QA, provider/staging verification, backup/restore, monitoring, pilot feedback, and future AI. M14 remains roadmap/deferred.
+**Remaining work categories:** authenticated browser E2E, mobile role/device QA, provider/staging verification, backup/restore, monitoring, pilot feedback, keeping seed/smoke repeatable, and future AI. M14 remains roadmap/deferred.
 
 ---
 
@@ -430,7 +430,7 @@ Current implementation status:
 ```text
 Backend foundation: Implemented for approval workflows, deterministic automation, descriptive analytics summaries, document templates/generated documents, verification/access logs, and data export jobs.
 Migration: apps/api/prisma/migrations/20260615090000_advanced_operations_foundation adds advanced-operations enums, tenant-scoped tables, indexes, and foreign keys.
-Local verification: root gates passed on 2026-06-18 with caveats; pilot smoke failed because local services were not running. See `SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
+Local verification: root gates passed on 2026-06-18 with caveats; local Phase 1 seed/smoke passed on 2026-06-21. See `SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
 Still pending: staging migration apply/deploy, seeded browser E2E, frontend workspaces, mobile/offline workflow depth, provider/staging checks, and pilot feedback.
 M14 AI: Deferred/roadmap only.
 ```
