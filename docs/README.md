@@ -1,7 +1,7 @@
 # SchoolOS Documentation
 
 **Status:** Active documentation map and GA release-governance index
-**Last updated:** 2026-06-21
+**Last updated:** 2026-06-22
 
 This folder contains the active detailed SchoolOS documentation. Use this page as the folder-level map only; the root `README.md` remains the repository entry point and source-of-truth summary.
 
@@ -19,6 +19,7 @@ Inventory & Asset Management is not an active module. Do not recreate Inventory 
 | M1 | Admissions and Student Profiles |
 | M2 | Smart Attendance |
 | M3 | Fees and Receipts |
+| M3B | IRD Billing Compliance extension |
 | M4 | Academics, Exams, CAS, Report Cards |
 | M5 | Activity Feed and Milestones |
 | M6 | Homework and Timetable |
@@ -30,8 +31,11 @@ Inventory & Asset Management is not an active module. Do not recreate Inventory 
 | M12 | Notifications, Notices, Communication, Chat |
 | M13 | Learning Layer |
 | M14 | Intelligence / AI |
+| M15 | Education Compliance |
 
 `M8A`, `M8B`, and `M8C` are obsolete labels. Library, Transport, and Canteen have standalone module numbers.
+
+M3B is an M3 extension for formal and IRD-compliance-ready billing. M15 is a planned compliance module for iEMIS, UGC/HEMIS-ready reporting, QAA readiness, validation, exports, and submission history. M14 Intelligence / AI remains deferred.
 
 ---
 
@@ -47,33 +51,35 @@ Inventory & Asset Management is not an active module. Do not recreate Inventory 
 | 6 | `product/SCHOOLOS_BRD.md` | Canonical BRD: business case, Nepal market, buyer personas, packaging direction, stage-based go-to-market, and business risks. |
 | 7 | `product/SCHOOLOS_PRODUCT_REQUIREMENTS.md` | Canonical PRD: product vision, stage-aware experience model, capability matrices, user journeys, and product boundaries. |
 | 8 | `product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` | Canonical FRS: feature behavior, validations, state transitions, workflow diagrams, edge cases, and acceptance criteria. |
-| 9 | `requirements/SCHOOLOS_SRS.md` | Canonical SRS: software, non-functional, API, web, mobile, database, security, performance, and operational requirements. |
-| 10 | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Canonical SDD: architecture, storage, File Registry, tenant isolation, scaling, performance, and security architecture. |
-| 11 | `architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md` | Canonical MDD: module ownership, stage matrix, code-evidence gap matrix, and stage-aware architecture roadmap. |
-| 12 | `product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md` | Backend/web/mobile allocation, allowed roles, and explicit surface boundaries. |
-| 13 | `project/SCHOOLOS_DOCUMENTATION_INVENTORY.md` | Complete tracked Markdown inventory and consolidation decisions. |
-| 14 | `project/SCHOOLOS_PROJECT_STATUS.md` | Current implementation status snapshot; should summarize, not replace, the audit. |
-| 15 | `project/SCHOOLOS_IMPLEMENTATION_PLAN.md` | Longer implementation backlog and module detail; execution priority is governed by the next-phase plan and GA policy. |
-| 16 | `architecture/SCHOOLOS_NAMING_CONVENTIONS.md` | Canonical vocabulary plus naming for files, folders, routes, DTOs, schema values, contracts, web, and mobile. |
-| 17 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, and provider/queue operations. |
-| 18 | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | M12 notification events, delivery, preferences, retries, provider operations, notification center, notices, chat, and audit behavior. |
-| 19 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, components, route behavior, API usage, and web persona smoke plan. |
-| 20 | `design/modules/README.md` | M1-M13 module-level frontend design reference index. |
-| 21 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit and contract-safe reference-screen implementation guidance. |
-| 22 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
-| 23 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
+| 9 | `product/SCHOOLOS_EDUCATION_COMPLIANCE_IRD_BILLING_SPEC.md` | Canonical companion specification for M15 Education Compliance and M3B IRD Billing Compliance until absorbed into the PRD/FRS/SRS/SDD. |
+| 10 | `requirements/SCHOOLOS_SRS.md` | Canonical SRS: software, non-functional, API, web, mobile, database, security, performance, and operational requirements. |
+| 11 | `architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Canonical SDD: architecture, storage, File Registry, tenant isolation, scaling, performance, and security architecture. |
+| 12 | `architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md` | Canonical MDD: module ownership, stage matrix, code-evidence gap matrix, and stage-aware architecture roadmap. |
+| 13 | `product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md` | Backend/web/mobile allocation, allowed roles, and explicit surface boundaries. |
+| 14 | `project/SCHOOLOS_DOCUMENTATION_INVENTORY.md` | Complete tracked Markdown inventory and consolidation decisions. |
+| 15 | `project/SCHOOLOS_PROJECT_STATUS.md` | Current implementation status snapshot; should summarize, not replace, the audit. |
+| 16 | `project/SCHOOLOS_IMPLEMENTATION_PLAN.md` | Longer implementation backlog and module detail; execution priority is governed by the next-phase plan and GA policy. |
+| 17 | `architecture/SCHOOLOS_NAMING_CONVENTIONS.md` | Canonical vocabulary plus naming for files, folders, routes, DTOs, schema values, contracts, web, and mobile. |
+| 18 | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform control plane, tenant configuration boundaries, SaaS billing, and provider/queue operations. |
+| 19 | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | M12 notification events, delivery, preferences, retries, provider operations, notification center, notices, chat, and audit behavior. |
+| 20 | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Active web frontend design, UI/UX, components, route behavior, API usage, and web persona smoke plan. |
+| 21 | `design/modules/README.md` | M1-M13 module-level frontend design reference index plus approved planned compliance references. |
+| 22 | `implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Active implementation alignment audit and contract-safe reference-screen implementation guidance. |
+| 23 | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Active Flutter mobile app UI/UX, persona flows, mobile wireframes, API/offline rules, and mobile smoke plan. |
+| 24 | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment, environment, backup/restore, pilot onboarding, rollback, and go/no-go procedures. Procedures are not proof unless executed. |
 
 ---
 
 ## Active Docs
 
-### M1-M13 Frontend Web Design References
+### M1-M13 Frontend Web Design References and Planned Compliance References
 
 | Module | Reference |
 |---|---|
 | M1 Admissions and Student Profiles | [M1 frontend reference](design/modules/M1_ADMISSIONS_STUDENT_PROFILES_FRONTEND_REFERENCE.md) |
 | M2 Smart Attendance | [M2 frontend reference](design/modules/M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md) |
 | M3 Fees and Receipts | [M3 frontend reference](design/modules/M3_FEES_RECEIPTS_FRONTEND_REFERENCE.md) |
+| M3B IRD Billing Compliance extension | [M3B frontend reference](design/modules/M3B_IRD_BILLING_COMPLIANCE_FRONTEND_REFERENCE.md) |
 | M4 Academics, Exams, CAS, Report Cards | [M4 frontend reference](design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md) |
 | M5 Activity Feed and Milestones | [M5 frontend reference](design/modules/M5_ACTIVITY_FEED_MILESTONES_FRONTEND_REFERENCE.md) |
 | M6 Homework and Timetable | [M6 frontend reference](design/modules/M6_HOMEWORK_TIMETABLE_FRONTEND_REFERENCE.md) |
@@ -84,12 +90,14 @@ Inventory & Asset Management is not an active module. Do not recreate Inventory 
 | M11 Accounting and Finance | [M11 frontend reference](design/modules/M11_ACCOUNTING_FINANCE_FRONTEND_REFERENCE.md) |
 | M12 Notifications, Notices, Communication, Chat | [M12 frontend reference](design/modules/M12_NOTIFICATIONS_COMMUNICATION_FRONTEND_REFERENCE.md) |
 | M13 Learning Layer | [M13 frontend reference](design/modules/M13_LEARNING_LAYER_FRONTEND_REFERENCE.md) |
+| M15 Education Compliance | [M15 frontend reference](design/modules/M15_EDUCATION_COMPLIANCE_FRONTEND_REFERENCE.md) |
 
 ```text
 README.md
 product/SCHOOLOS_BRD.md
 product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
 product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
+product/SCHOOLOS_EDUCATION_COMPLIANCE_IRD_BILLING_SPEC.md
 product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md
 requirements/SCHOOLOS_SRS.md
 project/SCHOOLOS_PROJECT_STATUS.md
@@ -107,6 +115,7 @@ design/modules/README.md
 design/modules/M1_ADMISSIONS_STUDENT_PROFILES_FRONTEND_REFERENCE.md
 design/modules/M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md
 design/modules/M3_FEES_RECEIPTS_FRONTEND_REFERENCE.md
+design/modules/M3B_IRD_BILLING_COMPLIANCE_FRONTEND_REFERENCE.md
 design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md
 design/modules/M5_ACTIVITY_FEED_MILESTONES_FRONTEND_REFERENCE.md
 design/modules/M6_HOMEWORK_TIMETABLE_FRONTEND_REFERENCE.md
@@ -117,6 +126,7 @@ design/modules/M10_CANTEEN_FRONTEND_REFERENCE.md
 design/modules/M11_ACCOUNTING_FINANCE_FRONTEND_REFERENCE.md
 design/modules/M12_NOTIFICATIONS_COMMUNICATION_FRONTEND_REFERENCE.md
 design/modules/M13_LEARNING_LAYER_FRONTEND_REFERENCE.md
+design/modules/M15_EDUCATION_COMPLIANCE_FRONTEND_REFERENCE.md
 implementation/WEB_UI_API_ALIGNMENT_AUDIT.md
 design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md
 production/SCHOOLOS_GA_RELEASE_POLICY.md
@@ -165,6 +175,7 @@ archive/web/modules/M8_LIBRARY_FRONTEND_IMPLEMENTATION_GUIDE.md
 | Business requirements | `product/SCHOOLOS_BRD.md` | Executive, product, sales/support, school owner/principal |
 | Product scope and module taxonomy | `product/SCHOOLOS_PRODUCT_REQUIREMENTS.md` | Product, engineering |
 | Functional behavior | `product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` | Engineering, QA |
+| M15 Education Compliance and M3B IRD Billing Compliance companion scope | `product/SCHOOLOS_EDUCATION_COMPLIANCE_IRD_BILLING_SPEC.md` | Product, finance, compliance advisor, engineering, QA |
 | Software and non-functional requirements | `requirements/SCHOOLOS_SRS.md` | Engineering, security, QA, SRE |
 | Module design and code-evidence gap matrix | `architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md` | Product, architecture, engineering, QA |
 | Documentation inventory and consolidation decisions | `project/SCHOOLOS_DOCUMENTATION_INVENTORY.md` | Documentation owner, maintainers |
@@ -174,7 +185,7 @@ archive/web/modules/M8_LIBRARY_FRONTEND_IMPLEMENTATION_GUIDE.md
 | Platform operations boundary | `architecture/SCHOOLOS_PLATFORM_OPERATIONS.md` | Platform/admin engineers |
 | M12 notification events, delivery, preferences, retry, audit, and notification center | `architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md` | Product, engineering, QA, platform/admin engineers |
 | Web UI and state rules | `design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` | Web engineers |
-| M1-M13 module-level frontend design details | `design/modules/README.md` and matching module file | Product, design, web engineers, QA, Codex agents |
+| M1-M13 module-level frontend design details and planned M3B/M15 compliance design details | `design/modules/README.md` and matching module file | Product, design, web engineers, QA, Codex agents |
 | Mobile companion app rules | `design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md` | Mobile engineers |
 | Deployment and recovery procedure | `production/SCHOOLOS_PRODUCTION_RUNBOOK.md` | Deployment/operator team |
 | Historical/superseded docs | `archive/README.md` | Maintainers |
@@ -205,6 +216,7 @@ The generated/tool-cache Markdown file `.cache/corepack/v1/pnpm/10.12.1/README.m
 8. Release evidence and scores belong in `project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
 9. Forward execution sequencing belongs in `project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`.
 10. Production / GA terms, stages, and exit gates belong in `production/SCHOOLOS_GA_RELEASE_POLICY.md`.
-11. Module-specific product/functional requirements may live under `product/` only when they are large enough to remain readable outside the master PRD/FRS; index them here and make precedence explicit.
+11. Module-specific product/functional requirements may live under `product/` only when they are large enough to remain readable outside the master PRD/FRD; index them here and make precedence explicit.
 12. Formal BRD/PRD/FRS/SRS/SDD/MDD ownership must remain explicit. Do not duplicate content between them; link to the owner document.
 13. New docs must include Status, Owner/audience, Scope, Precedence, Inputs/source documents, Out-of-scope content, and Last reviewed date when they are intended to be canonical.
+14. M3B and M15 compliance references are approved planning companions as of 2026-06-22; do not claim implementation, UGC direct integration, IRD verification, or CBMS certification until backend evidence and official approval exist.
