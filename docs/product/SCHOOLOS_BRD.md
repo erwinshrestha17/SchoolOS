@@ -1,125 +1,71 @@
 # SchoolOS Business Requirements Document
 
 **Status:** Canonical BRD
-**Owner/audience:** CEO, school owner/principal, preschool owner, finance lead, product leadership, sales/support leadership
-**Scope:** Business case, buyer personas, Nepal market fit, packaging direction, stage-aware rollout, business risks, and success metrics for one multi-tenant SchoolOS platform.
-**Precedence:** Business intent only. Product scope is owned by `SCHOOLOS_PRODUCT_REQUIREMENTS.md`; functional behavior by `SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`; current readiness by `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`; release stage policy by `../production/SCHOOLOS_GA_RELEASE_POLICY.md`.
-**Inputs/source documents:** `README.md`, `../README.md`, `SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`, `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`, `../project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`, `../architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `../design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `../design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`.
-**Out-of-scope content:** API contracts, Prisma schema design, screen layouts, implementation status, staging proof, pricing numbers, legal contract terms, and GA readiness claims.
-**Last reviewed date:** 2026-06-20
+**Last reviewed date:** 2026-06-22
 
----
+## Business Decision
 
-## 1. Business Decision
-
-SchoolOS is one Nepal-first multi-tenant education operating SaaS for three configurable education experiences:
+SchoolOS is one Nepal-first multi-tenant education operating SaaS for:
 
 ```text
-One SchoolOS platform
-+ shared tenant-aware core
-+ Preschool experience pack
-+ School (Grade 1-10) experience pack
-+ Higher Secondary / +2 experience pack
-+ shared Web application
-+ shared Flutter companion app
+SCHOOL
+  Grade 1-10
+
+HIGHER_SECONDARY
+  Grade 11-12 / +2
+
+COLLEGE
+  Bachelor, Master, Diploma, and professional programs
 ```
 
-SchoolOS must not become three separate products, databases, apps, or student systems. The business advantage is a single school record and operating ledger that can follow a child from Montessori through Grade 12 while letting each tenant enable only the experience packs, modules, and workflows it needs.
+SchoolOS must not become separate products, databases, or apps for school, +2, and college segments.
 
-Current evidenced release stage remains **Internal QA ready**. This BRD does not upgrade readiness.
+## Target Segments
 
-## 2. Target Segments
+| Segment | Business need |
+|---|---|
+| School Grade 1-10 | Admissions, attendance, fees, homework, timetable, exams, report cards, notices, operations, and reporting. |
+| Higher Secondary / +2 | Streams, subject combinations, practicals, projects, internal assessment, exams, and board-readiness workflows. |
+| College | Departments, programs, batches, terms, courses, course registration, GPA/CGPA, back papers, projects, internships, placement, and portal workflows. |
+| Multi-branch education groups | Tenant isolation, shared platform operations, reporting, subscriptions, support, and common controls. |
 
-| Segment | Business need | SchoolOS fit |
-|---|---|---|
-| Preschool / Montessori / Nursery / LKG / UKG | Trust, child safety, parent visibility, simple teacher workflow, admissions, fees, staff/classroom coverage. | Preschool experience pack over shared students, guardians, attendance, activity, milestones, notices, fees, files, and mobile companion. |
-| School Grade 1-10 | Daily operations, attendance, homework, timetable, exams, CAS, report cards, library, transport, canteen, parent communication. | School experience pack over shared academic, operations, finance, communication, and reporting modules. |
-| Higher Secondary / +2 | Streams/programs, subject combinations, practicals, projects, labs, internal assessment, board readiness, parent/student controlled visibility. | Higher Secondary experience pack extending shared academics, timetable, exams, staff assignment, reports, files, and communication without a parallel platform. |
-| Multi-branch or growing school groups | Tenant isolation, common operating discipline, role separation, reporting, platform support. | Multi-tenant SaaS with `tenantId` boundary, platform control plane, school configuration plane, and daily operations plane. |
+## Business Requirements
 
-## 3. Buyer And User Personas
+| ID | Requirement |
+|---|---|
+| BRD-01 | Support `SCHOOL`, `HIGHER_SECONDARY`, and `COLLEGE` as configurable experience packs over one shared core. |
+| BRD-02 | Use `School (Grade 1-10)` as the official label for Grade 1-10 institutions. |
+| BRD-03 | Support +2 through configurable streams, subject combinations, practicals, projects, internal assessments, and board-readiness workflows. |
+| BRD-04 | Support college through departments, programs, batches, terms, courses, course offerings, course registrations, GPA/CGPA, back papers, projects, internships, placement, and alumni readiness. |
+| BRD-05 | Keep one shared web application and one Flutter companion app with role-scoped capabilities. |
+| BRD-06 | Keep release status evidence-based; documentation changes do not upgrade release readiness. |
+| BRD-07 | Keep M14 Intelligence / AI roadmap-only until approved production controls exist. |
 
-| Persona | Buying or adoption driver | Non-negotiable concern |
-|---|---|---|
-| School owner / principal | Better control, parent trust, reporting confidence, collections visibility, fewer operational surprises. | Must see exception-focused, accurate, permission-safe information. |
-| Preschool owner | Child safety, authorized pickup, parent confidence, simple classroom updates. | Must avoid heavy school-grade exam workflows and harsh child labels. |
-| School administrator / receptionist | Faster admissions, student/guardian records, attendance follow-up, notices, documents. | Needs one reliable source of truth and friendly unavailable states when a module is locked. |
-| Accountant / cashier | Accurate invoices, receipts, reversals, cashier close, audit, handoff to accounting. | No browser/mobile financial truth and no silent mutation of confirmed money records. |
-| Teacher | Fast assigned-class attendance, homework, observations, parent updates, marks where applicable. | Mobile must be task-first, assigned-scope, and not an admin dashboard. |
-| Parent / guardian | Linked-child attendance, fees, receipts, notices, activity, milestones, report cards, transport where enabled. | Must never expose another child or unsafe private media. |
-| Academic coordinator / exam head | Timetable, homework, assessments, marks, report-card readiness, +2 practical/project readiness. | Needs configurable academic structure, not hard-coded streams or grade assumptions. |
-| SchoolOS operator / support | Tenant setup, subscriptions, provider readiness, queue health, support override, audit. | Platform controls must not mix with school operations or school fee collection. |
-
-## 4. Value Proposition
-
-SchoolOS sells operational confidence:
-
-- One tenant-aware student record, guardian relationship, enrollment history, fee ledger, attendance record, communication trail, file registry, and audit trail.
-- Preschool child-safety workflows without forcing heavy academic screens.
-- School Grade 1-10 academic and operational workflows in one operating desk.
-- Higher Secondary / +2 support through configurable programs, streams, subject combinations, practicals, projects, and board-readiness workflows.
-- Parent trust through child-scoped mobile visibility and consent-safe updates.
-- Finance trust through backend-owned totals, idempotent writes, reversals, receipts, cashier close, and accounting handoff.
-- Operator trust through release gates, tenant isolation, provider readiness, backup/restore, monitoring, and support override audit.
-
-## 5. Business Requirements
-
-| ID | Requirement | Rationale |
-|---|---|---|
-| BRD-01 | SchoolOS must support `PRESCHOOL`, `SCHOOL`, and `HIGHER_SECONDARY` through configurable experience packs over one shared core. | Avoid fragmented products and duplicate records while supporting real market differences. |
-| BRD-02 | The official user-facing label for Grade 1-10 is `School (Grade 1-10)`. | Avoid using "Primary" as a universal system label for grades it does not cover. |
-| BRD-03 | Preschool positioning must emphasize child safety, safe handover, parent trust, daily care/activity visibility, teacher simplicity, admissions, fees, and developmental milestones. | Preschool buyers evaluate trust and safety before dense academics. |
-| BRD-04 | School Grade 1-10 positioning must emphasize attendance, timetable, homework, exams, marks, CAS, report cards, parent communication, fees, and operations. | This is the daily school operating core. |
-| BRD-05 | Higher Secondary / +2 positioning must emphasize programs/streams, subject combinations, theory/practical timetables, labs, projects, internal assessment, mock exams, and board readiness. | +2 schools need academic flexibility without a separate platform. |
-| BRD-06 | Mobile must remain one Flutter companion app with persona-first flows. | Separate app binaries increase support, release, QA, and data-boundary risk. |
-| BRD-07 | Release status must remain evidence-based and must not be upgraded by documentation improvements. | Protects buyer trust and internal planning discipline. |
-| BRD-08 | M14 Intelligence / AI remains roadmap-only until production data, privacy, audit, safety, human-review, and cost controls are approved. | Prevents premature high-risk product claims. |
-
-## 6. Packaging Direction
-
-Packaging is conceptual until pricing is approved.
+## Packaging Direction
 
 | Package axis | Direction |
 |---|---|
-| Experience packs | `PRESCHOOL`, `SCHOOL`, `HIGHER_SECONDARY`; a tenant may enable one or more. |
-| Core modules | M0-M7 and M12 are likely baseline for most supported schools, subject to entitlement policy. |
-| Operations modules | Library, Transport, Canteen, Accounting, Learning, and advanced operations can be entitlement-controlled. |
-| Mobile | Included as one companion app; persona capabilities are controlled by backend entitlement, role, scope, and capability. |
-| Providers | SMS, email, push, payment, and storage modes must be explicit as disabled, log/dev, mock, sandbox, or configured. |
-| Support | Support override must be reasoned, expiring where supported, and audited. |
+| Experience packs | `SCHOOL`, `HIGHER_SECONDARY`, `COLLEGE`. |
+| Core modules | M0-M7 and M12 remain the likely baseline for most institutions, subject to entitlement policy. |
+| Operations modules | Library, Transport, Canteen, Accounting, Learning, and advanced operations remain entitlement-controlled. |
+| College expansion | Programs, courses, registration, GPA/CGPA, back papers, projects, internships, placement, and alumni can be phased by plan. |
+| Mobile | One companion app; capabilities are controlled by backend entitlement, role, and scope. |
 
-SchoolOS SaaS billing remains separate from school fee collection and school accounting.
-
-## 7. Stage-Based Go-To-Market
-
-| Stage | Business objective | Minimum proof before external claim |
-|---|---|---|
-| Internal QA ready | Stabilize local workflows and documentation source of truth. | Local gates recorded in the readiness audit. |
-| Staging validated | Demonstrate deployable workflows in a staging-like environment. | Migration apply, health/readiness, provider/storage modes, authenticated browser smoke, mobile QA, backup/restore evidence. |
-| Controlled pilot validated | Prove one school can run agreed workflows with support. | Pilot workflow evidence, incident/support process, backup/rollback readiness, no open P0/P1 school-safety/finance/tenant defects. |
-| Release candidate | Freeze supported release boundary and close GA blockers. | Release checklist approval and rollback/recovery proof. |
-| GA / Production release | Public onboarding for supported plans/modules. | GA policy gates complete and release owner approval recorded. |
-
-## 8. Business Success Metrics
+## Success Metrics
 
 | Metric | Target direction |
 |---|---|
-| Pilot workflow completion | One school completes agreed workflows without engineering intervention. |
-| Parent trust | Parents can find linked-child notices, attendance, fees, receipts, activity, and stage-appropriate updates without support help. |
-| Preschool safety visibility | Leadership can see uncollected children, pickup exceptions, attendance gaps, care alerts, and unresolved concerns. |
-| Finance correctness | No unresolved duplicate receipt/payment, silent mutation, or client-calculated official total defect. |
-| Teacher adoption | Teachers can complete assigned daily mobile/web tasks quickly and safely. |
-| Operational reliability | Staging smoke, provider modes, queues, backup/restore, monitoring, and rollback are recorded. |
+| Pilot workflow completion | One institution completes agreed workflows without engineering intervention. |
+| Finance correctness | Official totals remain backend-owned and auditable. |
+| Academic readiness | Grade 1-10, +2, and college workflows are configurable without separate systems. |
 | Support burden | Common tenant setup, role, provider, and module-lock questions are diagnosable from platform operations. |
 
-## 9. Business Risks
+## Business Risks
 
-| Risk | Mitigation owner |
+| Risk | Mitigation |
 |---|---|
 | Overclaiming readiness before staging/pilot proof | GA release policy and readiness audit remain authoritative. |
-| Trying to build three products | PRD, FRS, SRS, and architecture enforce one shared core plus experience packs. |
-| Preschool workflow becoming too academic-heavy | Preschool scope explicitly excludes heavy marks grids, ranking, harsh labels, broad child app, and mandatory detailed care logs. |
-| +2 workflows becoming hard-coded | SRS/MDD require school-configurable programs, streams, subject combinations, practicals, and projects. |
-| Financial or child-data trust failure | Backend authorization, Decimal/database totals, audit, File Registry, and narrow permission scopes are mandatory. |
-| Support/ops cannot run the product | Production runbook, platform operations, monitoring, provider readiness, backup/restore, and support override evidence are GA gates. |
-
+| Building separate products | PRD, FRS, SRS, and architecture enforce one shared core plus experience packs. |
+| +2 workflows becoming hard-coded | Require configurable streams, combinations, practicals, and projects. |
+| College workflows becoming class-only | Require program, batch, term, course, offering, and registration structures. |
+| Support/ops cannot run the product | Production runbook, platform operations, monitoring, backup/restore, and support evidence are GA gates. |
