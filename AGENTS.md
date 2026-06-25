@@ -57,7 +57,7 @@ Inventory & Asset Management is scrapped from the active module plan. Do not add
 
 ## Product stance and release target
 
-SchoolOS is a Nepal-first multi-tenant school operating SaaS for `PRESCHOOL`, `SCHOOL`, and `HIGHER_SECONDARY`, not a CRUD dashboard and not an MVP delivery exercise. Every change must move the supported release boundary toward **Production / General Availability (GA)**.
+SchoolOS is a Nepal-first multi-tenant school operating SaaS for `SCHOOL` and `HIGHER_SECONDARY`, not a CRUD dashboard and not an MVP delivery exercise. Every change must move the supported release boundary toward **Production / General Availability (GA)**.
 
 Use the release stages defined in `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`:
 
