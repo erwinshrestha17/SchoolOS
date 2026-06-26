@@ -1,7 +1,7 @@
 # SchoolOS Naming Conventions
 
 **Status:** Active architecture companion for naming files, folders, database identifiers, API routes, contracts, and frontend/mobile surfaces.  
-**Last updated:** 2026-06-20  
+**Last updated:** 2026-06-26
 **Applies to:** All new SchoolOS code, routes, DTOs, contracts, schema work, tests, and documentation.
 
 ---
@@ -37,6 +37,11 @@ Use one approved term for one business concept. Do not introduce aliases unless 
 | Notice | announcement | Use `notice` for the school communication record. |
 | Learning activity | lesson activity, quiz item | Use `learningActivity` for the teacher-created M13 activity. |
 | Learning session | classroom session, lab session | Use `learningSession` for the live/controlled session. |
+| Education experience | stage, level, pack | Use `educationExperience` in proposed contracts for `PRESCHOOL`, `SCHOOL`, `HIGHER_SECONDARY`, `BACHELOR`, and future `MASTER` eligibility. Do not infer it from class labels. |
+| Experience context | stage switch, local mode | Use `ExperienceContext` for the proposed backend-owned projection derived from tenant offerings, enrollment, role, permission, entitlement, and assignment/relationship scope. |
+| Student App | student portal, student mobile | Use `Student App` for broad Bachelor/Master self-service only. Use `Student Session` or `learningSession` for Preschool through +2 controlled learning flows. |
+| Bachelor's | Bachelors, Bachelor.s | Use `BACHELOR` for enum-like values and "Bachelor's" in prose. |
+| Master's | Masters, Master.s | Use `MASTER` only for future eligibility enum-like values; do not add active Master's management terminology without approval. |
 
 Do not rename `tenantId` to `schoolId` in Prisma, TypeScript, DTOs, APIs, jobs, cache keys, logs, or frontend/mobile models.
 

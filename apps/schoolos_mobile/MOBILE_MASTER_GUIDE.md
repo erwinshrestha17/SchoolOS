@@ -1,7 +1,7 @@
 # SchoolOS Mobile Master Guide
 
 **Status:** App-local pointer and guardrail
-**Updated:** 2026-06-20
+**Updated:** 2026-06-26
 **Authoritative mobile plan:** `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`
 **Authoritative surface allocation:** `docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`
 **Authoritative release policy:** `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`
@@ -31,12 +31,13 @@ This file stays in the Flutter app so mobile contributors can find the active mo
 6. Principal flows are attention/approval/snapshot first, not full admin.
 7. Driver flows are assigned-trip only.
 8. Staff flows are own-staff self-service only.
-9. Students do not get a broad public mobile app in the currently supported release scope.
-10. Student learning access is lab-only or controlled school-device only until a separately approved production release boundary expands it.
-11. Do not use admin-shaped endpoints for parent, teacher, principal, driver, staff, or lab/student screens.
-12. Every screen needs loading, empty, error, permission-denied, module-locked, offline, and success/pending states where applicable.
-13. Protected files use authenticated download/share helpers only.
-14. Passing Flutter unit tests or a debug APK build is not mobile GA proof; supported personas require seeded backend, emulator/device, deep-link, permission-denial, logout-cache-clearing, and protected-file evidence.
+9. Preschool, Grade 1-10, and Grade 11-12 / +2 students do not get a broad Student App.
+10. Student learning access for Preschool through +2 is lab-only or controlled school-device only.
+11. Future Bachelor/Master Student App access is allowed only for active enrolled students and must be self-only, tenant-scoped, enrollment-scoped, module-entitlement-scoped, and backend-authorized.
+12. Do not use admin-shaped endpoints for parent, teacher, principal, driver, staff, lab/student-session, or future Student App screens.
+13. Every screen needs loading, empty, error, permission-denied, module-locked, offline, and success/pending states where applicable.
+14. Protected files use authenticated download/share helpers only.
+15. Passing Flutter unit tests or a debug APK build is not mobile GA proof; supported personas require seeded backend, emulator/device, deep-link, permission-denial, logout-cache-clearing, and protected-file evidence.
 
 ## Current Feature Roots
 

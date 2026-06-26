@@ -189,7 +189,7 @@ export const dashboardNavGroups: NavGroup[] = [
       },
       {
         href: '/dashboard/communications',
-        label: 'Communications',
+        label: 'Notices & Communication',
         icon: MessageSquare,
         permissions: communicationsPermissions,
         activeWhen: [
@@ -203,6 +203,13 @@ export const dashboardNavGroups: NavGroup[] = [
         label: 'Activity Feed',
         icon: Images,
         permissions: ['activity_feed:read', 'activity_feed:create'],
+      },
+      {
+        href: '/dashboard/messages',
+        label: 'Messages',
+        icon: MessageSquare,
+        permissions: ['messaging:create', 'messaging:manage'],
+        moduleKeys: ['notices'],
       },
     ],
   },
@@ -242,10 +249,16 @@ export const dashboardNavGroups: NavGroup[] = [
     items: [
       {
         href: '/dashboard/hr',
-        label: 'HR & Payroll',
+        label: 'HR / Staff',
         icon: UserCog,
         permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
-        activeWhen: ['/dashboard/hr', '/dashboard/payroll'],
+        activeWhen: ['/dashboard/hr'],
+      },
+      {
+        href: '/dashboard/payroll',
+        label: 'Payroll',
+        icon: Wallet,
+        permissions: ['payroll:read', 'payroll:manage'],
       },
       {
         href: '/dashboard/accounting',

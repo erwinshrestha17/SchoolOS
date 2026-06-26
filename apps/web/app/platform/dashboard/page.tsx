@@ -17,7 +17,7 @@ export default function PlatformDashboard() {
   });
 
   if (summaryQuery.isLoading) {
-    return <LoadingState variant="page" label="Loading platform operations..." />;
+    return <PlatformDashboardSkeleton />;
   }
 
   if (summaryQuery.isError || !summaryQuery.data) {
@@ -44,8 +44,8 @@ export default function PlatformDashboard() {
     <div className="space-y-6">
       <ModuleHeader
         eyebrow="Platform control plane"
-        title="Operator attention dashboard"
-        description="Tenant lifecycle, provider readiness, queues, usage, and SchoolOS SaaS operations. School fee collection is not shown here."
+        title="Operator Attention Dashboard"
+        description="Tenant lifecycle, provider readiness, queues, usage warning review, and SchoolOS SaaS operations. School fee collection is not shown here."
         primaryAction={<RefreshSummaryButton onClick={() => void summaryQuery.refetch()} />}
       />
 
@@ -65,6 +65,24 @@ export default function PlatformDashboard() {
           );
         })}
       </div>
+
+      <SectionCard
+        title="Attention queue"
+        description="Prioritized operator follow-up across tenant lifecycle, provider issues, queue health, and the SaaS billing boundary."
+      >
+        <div className="grid gap-3 md:grid-cols-2">
+          <AttentionQueueItem
+            label="Overdue SaaS invoices"
+            value={displayValue(summary.overdueSaasInvoices ?? summary.overdueInvoices)}
+            detail="SchoolOS subscription billing only. M3 student fee collection and M11 school accounting stay inside the school workspace."
+          />
+          <AttentionQueueItem
+            label="Provider issues"
+            value={displayValue(summary.providerIssues ?? summary.providerIssueCount)}
+            detail="Provider readiness is reviewed without exposing credentials, callback secrets, or tenant-private records."
+          />
+        </div>
+      </SectionCard>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <SectionCard
@@ -101,6 +119,39 @@ export default function PlatformDashboard() {
           )}
         </SectionCard>
       </div>
+
+      <SectionCard
+        title="SaaS billing boundary"
+        description="Platform operators manage SchoolOS subscriptions, provider readiness, and tenant lifecycle here. M3 student fee collection and M11 school accounting remain separate school-owned workflows."
+      >
+        <p className="rounded-xl border border-[var(--color-mod-platform-accent)] bg-[var(--color-mod-platform-bg)] p-4 text-sm font-semibold text-[var(--color-mod-platform-text)]">
+          Use this page for operator attention only; do not inspect or reconcile school-private fee, payroll, or journal data from the platform plane.
+        </p>
+      </SectionCard>
+    </div>
+  );
+}
+
+function PlatformDashboardSkeleton() {
+  return <LoadingState variant="page" label="Loading platform operations..." />;
+}
+
+function AttentionQueueItem({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <p className="text-xs font-black uppercase tracking-wide text-[var(--color-mod-platform-text)]">
+        {label}
+      </p>
+      <p className="mt-3 text-2xl font-black text-slate-950">{value}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{detail}</p>
     </div>
   );
 }

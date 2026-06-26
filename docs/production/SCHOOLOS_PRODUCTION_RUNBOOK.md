@@ -1,10 +1,12 @@
 # SchoolOS Production Runbook
 
-**Last updated:** 2026-06-18  
+**Last updated:** 2026-06-26
 **Status:** Consolidated active production runbook, deployment manual, database backup/restore procedures, and pilot onboarding guidelines.  
 **Architecture:** NestJS modular monolith, PostgreSQL, Redis/BullMQ, private storage.
 
 This runbook defines the deployment and recovery procedure. It is not proof that SchoolOS is currently production-ready. Use `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` for current evidence, scores, blockers, and command results.
+
+The deployable release boundary remains evidence-driven. Preschool, School (Grade 1-10), Higher Secondary / +2, and Bachelor's direction share one tenant-aware core. Bachelor's rollout requires later schema/OpenAPI/shared-contract/security/seed/test/staging proof before inclusion in a pilot or production deployment. Master's is not a full current management pack.
 
 ---
 
@@ -13,7 +15,7 @@ This runbook defines the deployment and recovery procedure. It is not proof that
 ### Scope
 Use this runbook for every staging or production deployment.
 The target pilot architecture is: NestJS API, Next.js dashboard, PostgreSQL, Redis/BullMQ, private local or object storage, and provider adapters in disabled/dev-log/configured mode.
-SchoolOS remains a modular monolith for the pilot stage. Angular migration, microservices, AI/ML, biometric workflows, and live transport map expansion are out of scope unless explicitly approved.
+SchoolOS remains a modular monolith for the pilot stage. Angular migration, microservices, AI/ML, biometric workflows, live transport map expansion, Bachelor's runtime rollout before contract proof, and Master's administration scope are out of scope unless explicitly approved.
 
 ### Server Requirements
 Recommended pilot VPS specs:

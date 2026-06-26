@@ -6,7 +6,7 @@
 **Precedence:** Backend/OpenAPI/shared contracts and backend authorization remain authoritative. Cross-surface ownership lives in `../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`; mobile implementation guidance also lives in `../../apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md`.
 **Inputs/source documents:** `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`, `../requirements/SCHOOLOS_SRS.md`, `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`, `../../apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md`.
 **Out-of-scope content:** Endpoint invention, DTO schemas, Flutter runtime implementation, provider setup, staging/device proof, and GA readiness claims.
-**Last reviewed date:** 2026-06-20
+**Last reviewed date:** 2026-06-26
 
 This document is planning and design guidance only. It does not implement mobile screens, APIs, backend code, database, migrations, package changes, or tests.
 
@@ -67,7 +67,8 @@ Mobile is for quick, role-scoped work:
 | Principal / Head Teacher | Review attention items: attendance risks, staff absence, approvals, fees snapshot, transport alerts, high-impact notices. |
 | Driver / Conductor | Operate assigned trip safely: route, stop list, pickup/drop, latest GPS, emergency contacts. |
 | Staff Self-Service | Manage own work info: profile, attendance/check-in, leave, payslips, notices. |
-| Student Lab / Controlled Device | Join teacher-controlled learning session, autosave, submit, view own result only. |
+| Student Lab / Controlled Device | Preschool through +2 students join teacher-controlled learning sessions, autosave, submit, and view own result only. |
+| Future Bachelor/Master Student App | Self-only, active-enrollment-scoped Student App after backend eligibility, entitlement, role, and self-scope contracts exist. |
 
 Web-first areas stay web-first:
 
@@ -86,7 +87,7 @@ System configuration
 Mobile must not become:
 
 - Full admin dashboard.
-- Public student app for every feature.
+- Public student app for every feature. Broad Student App is future-eligible only for active Bachelor or Master enrollments and must be backend-authorized.
 - Accounting/payroll workstation.
 - Platform control plane.
 - Offline financial terminal.
@@ -98,8 +99,9 @@ Mobile must not become:
 ## 3. Non-Negotiables
 
 - No mini-dashboard copy of web.
-- No broad student mobile app in MVP.
-- Student access is lab/session-only or controlled school-device only.
+- No broad Student App for Preschool, Grade 1-10, or Grade 11-12 / +2.
+- Student access for Preschool through +2 is lab/session-only or controlled school-device only.
+- Future Bachelor/Master Student App access must be self-only, active-enrollment-scoped, tenant-scoped, module-entitlement-scoped, and backend-authorized.
 - No financial write queueing unless backend idempotency and reconciliation are confirmed.
 - No session credentials, verification codes, passwords, student data, salary data, or private payloads in logs.
 - Store session credentials only in secure storage.
@@ -347,7 +349,7 @@ Navigation rules:
 
 ## 7A. Stage-Aware Mobile Context Model
 
-SchoolOS has one Flutter companion app. Preschool, School (Grade 1-10), and Higher Secondary / +2 appear as role- and task-specific experiences inside that app. They are not separate app binaries.
+SchoolOS has one Flutter companion app. Preschool, School (Grade 1-10), Higher Secondary / +2, and future Bachelor's appear as role- and task-specific experiences inside that app. They are not separate app binaries.
 
 The backend-owned `ExperienceContext` is **PROPOSED / NEEDS_SCHEMA_DESIGN**. Until backend schema, OpenAPI/shared DTOs, Flutter DTOs, and scope tests exist, Flutter must not fake stage switching from class names, local enum guesses, route labels, or hidden buttons.
 
@@ -358,13 +360,16 @@ Required context behavior:
 | Parent with multiple children | Switch child -> active stage experience changes. | Child list, enabled modules, activity/attendance/fees/report-card visibility, and files come from linked-child backend scope. |
 | Teacher assigned across stages | Switch assigned class/context -> valid tools change. | Teacher tools are assignment-, class/section-, subject-, stage-, capability-, and entitlement-scoped by backend. |
 | Principal | Combined alerts -> Preschool / School / +2 filters. | Filtered attention summaries must come from backend summaries, not Flutter aggregation. |
-| Controlled +2 student session | Join active session -> show only approved session tools. | Student sees only own/session-scoped learning, timetable/homework/result details where a purpose-limited contract exists. |
+| Controlled Preschool-+2 student session | Join active session -> show only approved session tools. | Student sees only own/session-scoped learning details where a purpose-limited contract exists. |
+| Future Bachelor/Master Student App | Backend eligibility -> show only self-service tools for the authenticated enrolled student. | Eligibility, active enrollment, entitlement, role, tenant, and self-scope must come from backend contracts, not Flutter route conditions. |
 
 Mobile never replaces backend authorization. Hidden navigation is only UX.
 
 Stage-aware mobile must preserve these boundaries:
 
-- Preschool child does not receive a broad student app.
+- Preschool child does not receive a broad Student App.
+- School Grade 1-10 and Higher Secondary / +2 students do not receive a broad Student App.
+- Bachelor/Master broad Student App access, when implemented, is self-only and excludes admin, finance, payroll, accounting, staff/faculty, settings, result publishing, attendance correction approval, fee reversal/refund, cashier, bulk export, unscoped chat, raw storage URL, object key, and provider-secret capabilities.
 - Preschool learning remains teacher-led and screen-light.
 - Teachers only see assigned children/classes/subjects unless permission explicitly allows more.
 - Parents only see linked children.
@@ -484,8 +489,16 @@ Notices
 | Priority | Navigation / workflow | Contract status |
 |---|---|---|
 | P0 | Join approved active learning/lab session, autosave, submit, view own session result. | M13 foundation exists; stage-specific +2 session proof pending. |
-| P1 | Own published timetable/homework/result where a purpose-limited student contract exists. | Needs backend verification; no broad app by default. |
-| Deferred | Broad independent student app, open chat, ranking, AI tutor/adaptive runtime. | Not approved. |
+| P1 | Own published timetable/homework/result where a purpose-limited controlled-session contract exists. | Needs backend verification; no broad app by default. |
+| Deferred | Broad independent Student App, open chat, ranking, AI tutor/adaptive runtime. | Not approved. |
+
+### 7B.11 Future Bachelor/Master Student App
+
+| Priority | Navigation / workflow | Contract status |
+|---|---|---|
+| Proposed | Today/Home, own profile, enrollment status, timetable, attendance, assignments, published grades/results, notices, fee invoices and confirmed receipts, library status where enabled, authorized protected documents, support requests where approved. | **PROPOSED / NEEDS_SCHEMA_DESIGN**; needs OpenAPI confirmation, shared-contract confirmation, RBAC and entitlement design, tenant-isolation tests, student self-scope tests, seed, device QA, and staging proof. |
+| Blocked | Other student records, staff/faculty/admin actions, finance/payroll/accounting work, institution settings, program/course/faculty management, bulk exports, result publishing, attendance correction approval, fee reversal/refund, cashier operations, unscoped chat, unsafe offline financial writes, raw storage URLs, object keys, provider secrets, permanent file URLs. | Must remain backend-denied, not merely hidden in Flutter. |
+| Master's boundary | Broad Student App eligibility only for enrolled Master's students. | No Master's administration pack, finance, faculty, course-management, seed, or UI work in current scope. |
 
 ## 8. Mobile Screen States
 

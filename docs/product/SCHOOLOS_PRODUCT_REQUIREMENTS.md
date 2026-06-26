@@ -2,7 +2,7 @@
 
 **Product:** SchoolOS
 **Market:** Nepal-focused school operating SaaS
-**Target schools:** Preschool, School (Grade 1-10), and Higher Secondary / +2 inside one multi-tenant product
+**Target schools:** Preschool, School (Grade 1-10), Higher Secondary / +2, and Bachelor's-level programs inside one multi-tenant product
 **Document type:** Product Requirements Document
 **Status:** Canonical PRD
 **Owner/audience:** CEO, CTO, product management, design, engineering leads, QA, school owner/principal, preschool owner, school administrator, accountant, teacher, parent/guardian, support/operations
@@ -10,18 +10,19 @@
 **Precedence:** Business rationale is owned by `SCHOOLOS_BRD.md`; functional detail by `SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`; software requirements by `../requirements/SCHOOLOS_SRS.md`; module design by `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`; current readiness by `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`; release stage policy by `../production/SCHOOLOS_GA_RELEASE_POLICY.md`.
 **Inputs/source documents:** `SCHOOLOS_BRD.md`, `SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`, `../requirements/SCHOOLOS_SRS.md`, `../architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`, `../design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `../design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`, `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`, repository source inspected on 2026-06-20.
 **Out-of-scope content:** Endpoint URLs, DTO schemas, Prisma migrations, code implementation plans, pricing numbers, staging credentials, and GA readiness claims.
-**Last reviewed date:** 2026-06-20
+**Last reviewed date:** 2026-06-26
 
 ---
 
 ## 0. Maintainer Note
 
-This document is the active PRD for SchoolOS. It keeps the existing pilot-hardening direction while defining one product model for three configurable education experiences:
+This document is the active PRD for SchoolOS. It keeps the existing pilot-hardening direction while defining one product model for four education focus areas:
 
 ```text
 PRESCHOOL
 SCHOOL
 HIGHER_SECONDARY
+BACHELOR
 ```
 
 The canonical allocation of backend ownership, SchoolOS Web responsibilities, mobile companion responsibilities, allowed roles, and explicit surface exclusions is [`SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`](SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md). This PRD owns product intent; it does not duplicate the module-by-module allocation.
@@ -30,7 +31,8 @@ Important distinction:
 
 ```text
 Current implemented core = broad school-management foundation with remaining seed, browser, mobile, staging, provider, and pilot verification gates
-Stage-aware SchoolOS = one shared core plus configurable Preschool, School, and Higher Secondary experience packs
+Stage-aware SchoolOS = one shared core plus configurable Preschool, School, Higher Secondary, and proposed Bachelor's experience direction
+Master's = not an active full management pack; future extension and Student App eligibility level only
 M12 Notification Module = explicit product module for notification center, events, delivery, preferences, retries, provider diagnostics, read state, and audit
 M13 Learning Layer = backend, web runtime, parent/student web summary, and Flutter summary foundation implemented locally; staging/browser/device depth remains staged
 M14 Intelligence / AI = roadmap-only until production data, privacy, audit, and human-review controls are ready
@@ -107,7 +109,7 @@ Inventory & Asset Management is not part of the active taxonomy.
 
 ## 3. Product Overview
 
-SchoolOS is a production-grade, multi-tenant SaaS school operating system for Nepali schools. It should support Preschool, School (Grade 1-10), and Higher Secondary / +2 through configurable experience packs over one shared core.
+SchoolOS is a production-grade, multi-tenant SaaS education operating system for Nepal. It should support Preschool, School (Grade 1-10), Higher Secondary / +2, and Bachelor's direction through configurable experiences over one shared core.
 
 The platform covers:
 
@@ -171,7 +173,7 @@ SchoolOS solves this by providing a single tenant-isolated system where each sch
 2. Support controlled pilot deployment after staging verification.
 3. Provide strong coverage for school operations, fees, accounting, academics, attendance, communication, notifications, and parent access.
 4. Build trust through accurate receipts, ledgers, reports, audit trails, protected files, permission-scoped learning records, and delivery evidence.
-5. Prepare a foundation for stage-aware Preschool, School (Grade 1-10), and Higher Secondary / +2 expansion, analytics, mobile expansion, provider integrations, SaaS billing automation, M13 Learning, and M14 Intelligence/AI.
+5. Prepare a foundation for stage-aware Preschool, School (Grade 1-10), Higher Secondary / +2, and Bachelor's expansion, analytics, mobile expansion, provider integrations, SaaS billing automation, M13 Learning, and M14 Intelligence/AI.
 6. Differentiate through Nepal-first operating context, cashier workflows, IEMIS readiness, smart-board learning support, computer-lab practice, and strong tenant isolation.
 
 ### 5.2 Product Goals
@@ -181,7 +183,7 @@ SchoolOS solves this by providing a single tenant-isolated system where each sch
 3. Provide principals with visibility into school health, collections, attendance gaps, academic status, pending approvals, communication delivery, reporting-readiness issues, and learning adoption.
 4. Allow teachers to manage attendance, homework, academics, marks/CAS, timetable, communication, and planned classroom activities.
 5. Allow parents to view child-specific notices, notifications, dues, fees, receipts, attendance, homework, progress, report cards, and safe learning summaries.
-6. Allow students to view their own timetable, homework, notices, attendance, report cards, library/canteen information, and school-approved learning activities where enabled.
+6. Allow Preschool through +2 students only approved controlled learning/session access. Future broad Student App access is allowed only for active Bachelor or Master enrollments and must be self-only, tenant-scoped, enrollment-scoped, module-entitlement-scoped, and backend-authorized.
 7. Provide finance staff/cashiers with fee ledgers, receipts, refunds, reversals, cashier close, reconciliation, and accounting controls.
 8. Provide school operations staff with library, transport, canteen, and daily workflow tools.
 9. Keep platform administration separate from tenant/school operations.
@@ -226,7 +228,7 @@ SchoolOS solves this by providing a single tenant-isolated system where each sch
 
 ## 7. Stage-Aware Product Model
 
-SchoolOS must support three configurable education experiences inside one multi-tenant product:
+SchoolOS must support these education focus areas inside one multi-tenant product:
 
 ```text
 PRESCHOOL
@@ -242,9 +244,14 @@ SCHOOL
 
 HIGHER_SECONDARY
   Grade 11-12 / +2
+
+BACHELOR
+  Bachelor's-level institutions/programs
 ```
 
 Do not use "Primary" as the universal Grade 1-10 system label in product UX. Prefer `School (Grade 1-10)` unless an existing compatibility contract requires a narrower internal label.
+
+Master's is not an active full institution-management experience pack. It remains a future extension and broad Student App eligibility level only.
 
 ### 7.1 Shared Core
 
@@ -288,7 +295,7 @@ Student
 + enabled module/capability
 ```
 
-Do not create separate data systems such as `PreschoolStudent`, `PrimaryStudent`, or `PlusTwoStudent`.
+Do not create separate data systems such as `PreschoolStudent`, `SchoolStudent`, `PlusTwoStudent`, `BachelorStudent`, or `MasterStudent`.
 
 ### 7.2 Experience Resolution
 
@@ -325,28 +332,35 @@ Current repository status: this is a **PROPOSED** product contract and **NEEDS_S
 
 ### 7.3 Program And Capability Matrix
 
-| Capability | `PRESCHOOL` | `SCHOOL` Grade 1-10 | `HIGHER_SECONDARY` Grade 11-12 |
-|---|---|---|---|
-| Student and guardian profile | P0, child-care fields emphasized | P0 | P0 |
-| Emergency contacts | P0 | P0 | P0 |
-| Authorized pickup and temporary pickup change | P0 proposed workflow | Optional | Optional |
-| Arrival, absence, late, checkout | P0 proposed preschool extension of attendance | Attendance P0 | Attendance P0 plus theory/lab context proposed |
-| Attendance registers and corrections | Simple daily safety lens | P0 | P0 |
-| Activity diary and consent-safe photos | P0 | P1/P2 by school policy | P2 |
-| Observations and supportive milestones | P0 | Grade 1-3 P1, otherwise optional | Usually not core |
-| Homework and timetable | Light/optional | P0 | P0 |
-| Exams, marks, CAS, report cards | Not default except supportive reporting | P0 | P0 plus +2 practical/project readiness |
-| Streams/subject combinations | Not applicable | Usually not applicable | P0 proposed |
-| Practical/lab timetable | Not applicable | P2 for labs | P0 proposed |
-| Projects/internal assessment | Light observations | P1/P2 | P0 proposed |
-| Fees, invoices, receipts, dues | P0 | P0 | P0 |
-| Library | Optional | Common | Common |
-| Transport | Where enabled | Where enabled | Where enabled |
-| Canteen | Optional/allergy-safe where enabled | Where enabled | Where enabled |
-| Notices and notifications | P0 | P0 | P0 |
-| Parent-teacher chat | Policy-controlled, not open all-day by default | Policy-controlled | Policy-controlled |
-| Learning Layer | Teacher-led/screen-light only | Classroom/lab/session mode | Lab/project resource support where approved |
-| Intelligence / AI | Deferred | Deferred | Deferred |
+| Capability | `PRESCHOOL` | `SCHOOL` Grade 1-10 | `HIGHER_SECONDARY` Grade 11-12 | `BACHELOR` proposed |
+|---|---|---|---|---|
+| Student and guardian profile | P0, child-care fields emphasized | P0 | P0 | Student profile plus enrolled-program context; guardian optional by institution policy |
+| Emergency contacts | P0 | P0 | P0 | Emergency/contact profile where institution policy requires it |
+| Authorized pickup and temporary pickup change | P0 proposed workflow | Optional | Optional | Usually not core |
+| Arrival, absence, late, checkout | P0 proposed preschool extension of attendance | Attendance P0 | Attendance P0 plus theory/lab context proposed | Attendance by program/course/term; **PROPOSED / NEEDS_SCHEMA_DESIGN** |
+| Attendance registers and corrections | Simple daily safety lens | P0 | P0 | Course/session attendance; **needs OpenAPI/shared-contract confirmation** |
+| Activity diary and consent-safe photos | P0 | P1/P2 by school policy | P2 | Usually not core |
+| Observations and supportive milestones | P0 | Grade 1-3 P1, otherwise optional | Usually not core | Not default |
+| Homework and timetable | Light/optional | P0 | P0 | Assignments and timetable by course/term; **PROPOSED / NEEDS_SCHEMA_DESIGN** |
+| Exams, marks, CAS, report cards | Not default except supportive reporting | P0 | P0 plus +2 practical/project readiness | Exams/results and published grades; **needs schema/OpenAPI/shared-contract confirmation** |
+| Streams/subject combinations | Not applicable | Usually not applicable | P0 proposed | Programs/departments/intakes/batches/semesters/courses; **PROPOSED / NEEDS_SCHEMA_DESIGN** |
+| Practical/lab timetable | Not applicable | P2 for labs | P0 proposed | Labs/practicals where configured; **needs RBAC and entitlement design** |
+| Projects/internal assessment | Light observations | P1/P2 | P0 proposed | Assignments/projects/results; **needs tenant-isolation and student self-scope tests** |
+| Fees, invoices, receipts, dues | P0 | P0 | P0 | Fees/invoices/confirmed receipts; no offline financial writes |
+| Library | Optional | Common | Common | Common where enabled |
+| Transport | Where enabled | Where enabled | Where enabled | Optional by institution |
+| Canteen | Optional/allergy-safe where enabled | Where enabled | Where enabled | Optional by institution |
+| Notices and notifications | P0 | P0 | P0 | P0 |
+| Parent-teacher chat | Policy-controlled, not open all-day by default | Policy-controlled | Policy-controlled | Student support requests/messages only where approved; no unscoped chat |
+| Broad Student App | Blocked | Blocked | Blocked | Future approved, self-only and backend-authorized; **PROPOSED / NEEDS_SCHEMA_DESIGN** |
+| Learning Layer | Teacher-led/screen-light only | Classroom/lab/session mode | Lab/project resource support where approved | Course/session support where approved |
+| Intelligence / AI | Deferred | Deferred | Deferred | Deferred |
+
+### 7.3A Student App Access Policy
+
+Broad Student App access is permitted only for active Bachelor or Master enrollments after backend eligibility exists. Preschool, Grade 1-10, and Grade 11-12 / +2 students must not receive broad self-service Student App access; they may access only approved controlled learning/session flows that are teacher-led, school-controlled, self-scoped, and backend-authorized.
+
+Future Bachelor/Master Student App scope may include Today/Home, own profile, enrollment status, timetable, attendance, assignments, published grades/results, notices, fee invoices and confirmed receipts, library status where enabled, authorized protected documents, and support requests where approved. It must explicitly block other-student records, staff/faculty/admin/finance/payroll/accounting actions, institution settings, program/course/faculty management, bulk exports, result publishing, attendance correction approval, fee reversal/refund, cashier work, payroll/accounting work, unscoped chat, unsafe offline financial writes, raw storage URLs, object keys, provider secrets, and permanent private-file URLs.
 
 ### 7.4 Persona And Surface Matrix
 
@@ -359,7 +373,8 @@ Current repository status: this is a **PROPOSED** product contract and **NEEDS_S
 | Accountant/cashier | Fees, receipts, cashier close, accounting handoff | No | No | Read-only finance attention where permitted | No |
 | Teacher | Detailed assigned class/subject work | No | Today, attendance, homework, activities, messages | No | Can launch/monitor controlled sessions |
 | Parent/guardian | Optional future child-only portal, not operations desk | Main linked-child experience | No | No | No |
-| Student | No broad operations dashboard | No | No | No | Controlled learning/session-only surface |
+| Student Preschool-+2 | No broad operations dashboard | No | No | No | Controlled learning/session-only surface |
+| Future Bachelor/Master student | No admin/operations desk | Future broad self-service app only after backend eligibility contract | No | No | Own records only, active-enrollment-scoped |
 | Driver/conductor | Not web-first | No | No | No | No |
 | Staff self-service | Own profile/HR web where enabled | No | No | No | No |
 

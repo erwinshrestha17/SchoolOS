@@ -78,6 +78,7 @@ const APPROVED_DASHBOARD_ROUTES = new Set([
   '/dashboard/learning',
   '/dashboard/learning/sessions',
   '/dashboard/learning/resources',
+  '/dashboard/settings',
 ]);
 
 export function resolveOperationalSummaryAction(

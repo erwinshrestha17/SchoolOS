@@ -27,7 +27,7 @@ describe('school operations sidebar', () => {
       'Workforce & Finance',
       'Insights',
       'Fees & Receipts',
-      'Communications',
+      'Notices & Communication',
       'Homework & Timetable',
       'Exams & Results',
       'Reports & Exports',

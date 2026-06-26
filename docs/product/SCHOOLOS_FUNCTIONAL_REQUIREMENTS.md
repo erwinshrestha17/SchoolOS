@@ -2,7 +2,7 @@
 
 **Product:** SchoolOS
 **Market:** Nepal-focused school operating SaaS
-**Target schools:** Preschool, School (Grade 1-10), and Higher Secondary / +2 inside one multi-tenant product
+**Target schools:** Preschool, School (Grade 1-10), Higher Secondary / +2, and Bachelor's-level programs inside one multi-tenant product
 **Document type:** Functional Requirements Specification
 **Status:** Canonical FRS
 **Owner/audience:** Product management, QA lead, backend/web/mobile leads, school administrator, accountant, teacher, principal, support/operations
@@ -10,7 +10,7 @@
 **Precedence:** Product intent is owned by `SCHOOLOS_PRODUCT_REQUIREMENTS.md`; software/non-functional requirements by `../requirements/SCHOOLOS_SRS.md`; module design by `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`; current readiness by `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
 **Inputs/source documents:** `SCHOOLOS_BRD.md`, `SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`, `../requirements/SCHOOLOS_SRS.md`, `../architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`, `../architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md`, `../design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `../design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`, repository source inspected on 2026-06-20.
 **Out-of-scope content:** Endpoint URL invention for proposed APIs, Prisma migrations, UI visual layouts, staging credentials, and GA readiness claims.
-**Last reviewed date:** 2026-06-20
+**Last reviewed date:** 2026-06-26
 
 ---
 
@@ -26,7 +26,8 @@ Important distinction:
 
 ```text
 Current core = broad implemented management foundation with remaining seed, browser, mobile, staging, provider, and pilot verification gates
-Stage-aware expansion = one shared core plus configurable Preschool, School, and Higher Secondary experience packs
+Stage-aware expansion = one shared core plus configurable Preschool, School, Higher Secondary, and proposed Bachelor's experience direction
+Master's = Student App eligibility/future extension only; no active full management pack
 M12 Notification/Communication = explicit notification center, event, template, delivery, preference, retry, notice, chat, and emergency-audit module
 M13 Learning Layer = backend, web runtime, parent/student web summary, and Flutter summary foundation implemented locally; AI/adaptive/simulation depth remains staged
 M14 Intelligence / AI = deferred roadmap only
@@ -57,7 +58,7 @@ These rules apply to every module:
 
 1. Every tenant-owned action must be scoped to the authenticated tenant.
 2. Parent users can only access linked child records.
-3. Student users can only access their own allowed records.
+3. Student users can only access their own allowed records. Broad Student App access is permitted only for active Bachelor or Master enrollments after backend eligibility, enrollment, entitlement, role, tenant, and self-scope checks exist.
 4. Staff users can only perform actions allowed by role and permission.
 5. Platform override must require reason and audit.
 6. Sensitive files must be accessed only through protected File Registry flows.
@@ -68,14 +69,15 @@ These rules apply to every module:
 11. Learning activity/session data must be tenant-scoped and must not duplicate core student, teacher, class, subject, parent, file, notification, or audit systems.
 12. Teacher-created learning content must be limited to assigned class/section/subject unless an explicit admin permission allows broader curriculum management.
 13. Student learning session access must fail closed when session, class, section, tenant, feature, or school-only policy validation fails.
-14. Parent learning summaries must be child-scoped, non-comparative, and free from public ranking.
-15. Dashboard and summary surfaces must use permission-filtered backend responses; a browser must not calculate official attendance, financial, payroll, accounting, readiness, delivery, library, transport, or canteen totals.
-16. A missing, locked, unauthorized, queued, failed, partial-failure, or unavailable summary must remain distinct from a genuine zero state.
-17. Screen actions must resolve into a real permitted workflow. A dashboard card, right rail, quick action, or contextual button must not simulate a backend state in browser-only production state.
-18. Any user-visible aggregate that spans modules must be explicitly approved as a server-owned summary or consist only of separately authorized, non-official safe summaries.
-19. Notification delivery must be backend-owned. Source modules emit events; M12 owns recipient resolution, templates, routing, provider state, retries, delivery logs, read state, and audit.
-20. Web is the detailed school operating surface; mobile is persona-first and purpose-limited. Surface allocation must follow `SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md` and must not weaken backend authorization or ownership checks.
-21. Inventory & Asset Management is not active scope; do not add requirements for it unless re-approved.
+14. Preschool, Grade 1-10, and Grade 11-12 / +2 students must not receive broad Student App APIs or routes; only approved controlled learning/session flows may be exposed.
+15. Parent learning summaries must be child-scoped, non-comparative, and free from public ranking.
+16. Dashboard and summary surfaces must use permission-filtered backend responses; a browser must not calculate official attendance, financial, payroll, accounting, readiness, delivery, library, transport, or canteen totals.
+17. A missing, locked, unauthorized, queued, failed, partial-failure, or unavailable summary must remain distinct from a genuine zero state.
+18. Screen actions must resolve into a real permitted workflow. A dashboard card, right rail, quick action, or contextual button must not simulate a backend state in browser-only production state.
+19. Any user-visible aggregate that spans modules must be explicitly approved as a server-owned summary or consist only of separately authorized, non-official safe summaries.
+20. Notification delivery must be backend-owned. Source modules emit events; M12 owns recipient resolution, templates, routing, provider state, retries, delivery logs, read state, and audit.
+21. Web is the detailed school operating surface; mobile is persona-first and purpose-limited. Surface allocation must follow `SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md` and must not weaken backend authorization or ownership checks.
+22. Inventory & Asset Management is not active scope; do not add requirements for it unless re-approved.
 
 ---
 
@@ -117,6 +119,14 @@ The workflows below define functional direction. A diagram does not prove implem
 | Higher Secondary streams/combinations | No | No | Yes | Yes | Yes | Yes | Depends on write commands |
 | Higher Secondary practical/project flow | No | Partial assessment/practical fields exist | Yes for full lifecycle | Yes | Yes | Yes | Yes for submissions/publishing |
 | ExperienceContext | No | No | Yes | Yes | Yes | Yes | N/A |
+| Bachelor's program/course/term model | No | No | Yes | Yes | Yes | Yes | Depends on write commands |
+| Bachelor/Master broad Student App eligibility guard | No | No | Yes | Yes | Yes | Yes | N/A |
+
+### 4A.1A Student App Functional Policy
+
+Broad Student App access must be backend-authorized and allowed only when all of these are true: the authenticated user has the student role, the tenant is active, the relevant module entitlement allows Student App, an active enrollment exists, the verified education level is Bachelor or Master, the requested record belongs to the same student, and role/permission checks pass.
+
+For Preschool, Grade 1-10, and Grade 11-12 / +2, broad Student App routes and APIs must fail closed. Controlled learning/session routes remain separate and may be exposed only when session, tenant, assignment, enrollment, module entitlement, and self-scope checks pass.
 
 ### 4A.2 Admissions To Enrollment
 
@@ -271,7 +281,7 @@ Manage tenants, platform administration, feature controls, provider readiness, q
 7. Retry or discard failed jobs with audit.
 8. View File Registry entries and report export history.
 9. Use support tenant override with reason and expiry where supported.
-10. Configure school experience coverage: `PRESCHOOL`, `SCHOOL`, and `HIGHER_SECONDARY` after the backend-owned program/stage model is designed.
+10. Configure school experience coverage: `PRESCHOOL`, `SCHOOL`, `HIGHER_SECONDARY`, and future `BACHELOR` after the backend-owned program/stage model is designed.
 11. Enable/disable M12 Notification/Communication and M13 Learning Layer per tenant/plan.
 
 ### 5.3 Acceptance criteria

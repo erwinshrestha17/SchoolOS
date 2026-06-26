@@ -49,7 +49,7 @@ When evidence is missing, state the exact missing gate rather than using an opti
 
 ## 3. Product and architecture boundaries remain unchanged
 
-SchoolOS remains a Nepal-first, multi-tenant school operating SaaS for `PRESCHOOL`, `SCHOOL`, and `HIGHER_SECONDARY`. The GA target must preserve these boundaries:
+SchoolOS remains a Nepal-first, multi-tenant education operating SaaS for `PRESCHOOL`, `SCHOOL`, `HIGHER_SECONDARY`, and `BACHELOR` direction. Master's is not a full active management pack; it is future extension and Student App eligibility only. The GA target must preserve these boundaries:
 
 - Keep the NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js App Router, Flutter companion app, and shared contracts where available.
 - Keep `tenantId` as the strict tenant boundary.
@@ -58,6 +58,7 @@ SchoolOS remains a Nepal-first, multi-tenant school operating SaaS for `PRESCHOO
 - Keep backend authorization, RBAC, tenant scope, and module entitlement as the source of truth.
 - Keep M13 Learning as a separate domain that reuses core student, staff, class, subject, timetable, communication, file, RBAC, and audit systems.
 - Keep M14 Intelligence / AI as roadmap-only until explicitly approved after the required data, review, safety, and cost controls exist.
+- Keep broad Student App access backend-authorized and limited to active Bachelor or Master enrollments; Preschool through Grade 12 remain controlled learning/session-only.
 - Do not introduce microservices, Angular migration, broad public student mobile, unsafe offline financial operations, or unverified live-map/provider scope as a shortcut to release.
 
 ---
@@ -173,6 +174,7 @@ Local verification is necessary but insufficient for GA. GA also requires the st
 6. Flutter device QA for purpose-limited parent, teacher, staff, driver, principal, and student-session roles.
 7. Performance, retention, observability, queue/retry diagnostics, recovery, and release automation.
 8. New product scope only after GA blockers are understood, tracked, and do not weaken the supported release boundary.
+9. Later Bachelor's design/validation only after pilot hardening, with schema, OpenAPI, shared-contract, RBAC/entitlement, tenant-isolation, student self-scope, seed, browser/mobile, staging, and release evidence.
 
 ---
 

@@ -6,7 +6,7 @@
 **Precedence:** Product intent remains in `SCHOOLOS_PRODUCT_REQUIREMENTS.md`; functional behavior remains in `SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`; software requirements remain in `../requirements/SCHOOLOS_SRS.md`; web and mobile UX rules remain in their design plans. This document owns cross-surface allocation and persona boundaries.
 **Inputs/source documents:** `SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `../requirements/SCHOOLOS_SRS.md`, `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`, `../design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `../design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`, repository code evidence recorded in the SRS/MDD.
 **Out-of-scope content:** Endpoint URL invention, DTO schemas, Prisma migrations, runtime implementation, staging proof, and GA readiness claims.
-**Last reviewed date:** 2026-06-20
+**Last reviewed date:** 2026-06-26
 
 ---
 
@@ -30,13 +30,14 @@ This document allocates product capability. It does not prove that an endpoint, 
 
 ## 2. Product Surface Model
 
-SchoolOS has one shared tenant-aware core and three configurable experience packs:
+SchoolOS has one shared tenant-aware core and four education focus areas:
 
 ```text
 Shared core
 + PRESCHOOL experience pack
 + SCHOOL experience pack
 + HIGHER_SECONDARY experience pack
++ BACHELOR proposed higher-education direction
 + shared Web app
 + shared Flutter companion app
 ```
@@ -47,10 +48,12 @@ The experience packs change workspace composition, labels, allowed workflows, an
 
 | Layer | Owns | Must not do |
 |---|---|---|
-| Shared core | Tenant, users/RBAC, students, guardians, staff, admissions, academic years, classes, sections, enrollment history, attendance, fees, files, notices, transport, canteen, library, HR/payroll, accounting, audit, reports, module entitlement, school settings. | Split into `PreschoolStudent`, `SchoolStudent`, `PlusTwoStudent`, separate ledgers, or separate apps. |
+| Shared core | Tenant, users/RBAC, students, guardians, staff, admissions, academic years, classes, sections, enrollment history, attendance, fees, files, notices, transport, canteen, library, HR/payroll, accounting, audit, reports, module entitlement, school settings. | Split into `PreschoolStudent`, `SchoolStudent`, `PlusTwoStudent`, `BachelorStudent`, `MasterStudent`, separate ledgers, or separate apps. |
 | `PRESCHOOL` pack | Montessori, Nursery, LKG, UKG child-safety composition: safe handover, activity diary, simple observations, supportive milestones, parent trust, admissions, fees, staff/classroom coverage. | Make heavy exams, marks grids, CAS, ranking, broad child app, or mandatory detailed care logs default. |
 | `SCHOOL` pack | Grade 1-10 academic/operations composition: attendance, classes/subjects, timetable, homework, exams, marks/CAS, report cards, library, transport, canteen, fees, notices. | Use "Primary" as the universal Grade 1-10 label in product UX unless an existing compatibility contract requires it. |
 | `HIGHER_SECONDARY` pack | Grade 11-12 / +2 composition: configurable streams/programs, subject combinations, theory/lab timetables, practicals, projects, internal assessment, mock exams, board-readiness workflows. | Hard-code streams or build a separate +2 academic platform. |
+| `BACHELOR` direction | Configurable programs, departments, intakes/batches, semesters/terms, courses, faculty assignment, attendance, timetable, assignments, exams/results, fees, notices, library, and Student App self-service. | Claim schema/API/UI implementation, hard-code university policies, or bypass current pilot/staging gates. |
+| `MASTER` eligibility | Future extension and Student App eligibility level only. | Create Master's administration, finance, faculty, academic-structure, course-management, seed, or UI features without approval. |
 
 ### 2.0A Backend-Owned Experience Context
 
@@ -120,6 +123,7 @@ A school user never receives platform controls. A platform operator does not cas
 | Driver / Conductor | Operate one assigned trip. |
 | Staff Self-Service | Manage the authenticated staff member's own work life. |
 | Student controlled session | Join and complete a teacher-controlled learning session only. |
+| Future Bachelor/Master Student App | Self-only view of own active enrollment, timetable, attendance, assignments, published results, notices, fees/receipts, library status, protected documents, and support requests where approved. |
 
 Parents, broad student users, drivers, casual visitors, and public users are not users of the main school operations workspace. Any future parent web portal must remain child-scoped and must not resemble the staff operating system.
 
@@ -134,6 +138,7 @@ Parents, broad student users, drivers, casual visitors, and public users are not
 | Parent and staff self-service information | Mobile first |
 | Driver and field workflow | Mobile first |
 | Student session activity | Controlled school device, tablet, or classroom runtime |
+| Future Bachelor/Master Student App | Mobile first after backend eligibility contract and self-scope tests |
 | High-risk or irreversible action | Web with confirmation, reason where required, permission, and audit |
 
 ### 2.4 Stage-Aware Context Switching Rules
@@ -161,7 +166,7 @@ Backend owns the official record and workflow rules for every stage:
 Web owns the school operating desk in one Next.js app:
 
 - Setup, configuration, dense tables, bulk work, approvals, correction/reversal, reporting, protected exports, audit, and platform operations.
-- Stage-specific workspace composition for Preschool, School (Grade 1-10), and Higher Secondary / +2 after backend contracts exist.
+- Stage-specific workspace composition for Preschool, School (Grade 1-10), Higher Secondary / +2, and future Bachelor's after backend contracts exist.
 - Honest unavailable, locked, permission, partial-failure, and queued states when a safe API is absent.
 
 Web must not own authorization, official totals, lifecycle state, financial truth, file scope, notification recipient scope, or stage/program resolution.
@@ -176,8 +181,15 @@ Mobile owns one Flutter companion app:
 - Driver assigned-trip flow.
 - Staff self-service own-record flow.
 - Controlled student learning/session flow.
+- Future Bachelor/Master Student App self-service only after backend eligibility and self-scope contracts exist.
 
 Mobile may cache safe reads and may queue only explicitly idempotent, reconciled, visible sync writes. Stage-aware switching must come from backend contracts and must not be faked in Flutter.
+
+### 2.7A Student App Access Policy
+
+Broad Student App access is permitted only for active Bachelor or Master enrollments. Preschool, Grade 1-10, and Grade 11-12 / +2 students must not receive broad Student App routes or APIs; they may access only approved controlled learning/session flows that are teacher-led, school-controlled, self-scoped, and backend-authorized.
+
+Future Bachelor/Master Student App APIs must be purpose-limited and backend-authorized by active tenant, role, active enrollment, verified education level, module entitlement, permission, and self-scope. Flutter and Next.js navigation may hide or show entries only after consuming backend results; they must never become the eligibility source of truth.
 
 ### 2.8 Not Appropriate For Mobile
 
@@ -255,7 +267,8 @@ If a safe API is missing, inspect existing contracts, OpenAPI, permissions, DTOs
 | Driver / Conductor | Not web-first | Assigned trip, boarding/drop, status, GPS |
 | Canteen Manager / Staff | POS, menu, wallets, stock, vendors, reports | QR scan and serving where approved |
 | Parent / Guardian | Optional future child-only portal | Main parent experience |
-| Student | No broad operations dashboard | Controlled learning session only |
+| Student Preschool-+2 | No broad operations dashboard | Controlled learning session only |
+| Future Bachelor/Master student | No admin/operations dashboard | Broad self-service only after backend eligibility contract |
 | School IT / System Admin | Users, roles, permissions, school integrations, settings, audit | Normally no dedicated workflow |
 | SchoolOS Platform Operator | Platform control plane only | No meaningful mobile requirement |
 
@@ -678,6 +691,9 @@ This table is the contract discipline for new stage-aware scope. It identifies t
 | +2 subject combinations | No verified stream/combination model. | Configurable allowed subject combinations per tenant/program/intake. | Schema/migration/backfill plan, validation APIs, enrollment impact, web academic coordinator screens, mobile read projection, tests. |
 | +2 practicals/projects/lab timetable | Practical mark fields exist; no full lifecycle verified. | Practical components, lab timetable, project evidence, assessment, result/report-card impact. | M4/M6/File Registry ownership design, lifecycle DTOs, idempotency, protected evidence files, report-card integration, teacher/mobile DTOs, tests. |
 | Stage-aware principal dashboard | Principal/admin summaries exist broadly. | Combined attention with Preschool / School / +2 filters and permission-filtered drilldowns. | Backend stage summary contracts, no browser totals, web composition, Flutter principal filters, role/tenant/stage tests. |
+| Bachelor's program/course/term scope | No verified foundation beyond shared core and demo seed text. | Configurable programs, departments, intakes/batches, semesters/terms, courses, faculty assignment, attendance, timetable, assignments, exams/results, fees, notices, library, Student App self-service. | **PROPOSED / NEEDS_SCHEMA_DESIGN**, OpenAPI/shared DTOs, RBAC and entitlement design, tenant-isolation tests, student self-scope tests, web/mobile contracts, seed, staging proof. |
+| Bachelor/Master broad Student App guard | Student role and learning-session permissions exist; no broad eligibility contract verified. | Allow broad Student App only for active Bachelor/Master enrollments and same-student records. | Education-level model, active enrollment resolver, entitlement key, backend guard, OpenAPI/shared contracts, Flutter DTO, denial tests for Preschool/School/+2, suspended-tenant tests, cross-student denial tests. |
+| Master's management pack | No active scope. | Eligibility/future extension only. | No administration, academic structure, finance, faculty, course-management, seed, route, or UI work unless separately approved. |
 
 ## 6. Cross-Department Workflow Rule
 

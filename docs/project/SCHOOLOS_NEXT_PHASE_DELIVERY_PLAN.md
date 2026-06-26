@@ -37,18 +37,20 @@ Cross-surface scope is governed by `docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEA
 
 ## Stage-Aware Architecture Gaps
 
-The formal BRD/PRD/FRS/SRS/SDD/MDD set defines SchoolOS as one shared platform with `PRESCHOOL`, `SCHOOL`, and `HIGHER_SECONDARY` experience packs. Current code evidence supports the shared tenant/student/guardian/enrollment/class/section/subject foundation, but these items remain design work, not implementation claims:
+The formal BRD/PRD/FRS/SRS/SDD/MDD set defines SchoolOS as one shared platform with `PRESCHOOL`, `SCHOOL`, `HIGHER_SECONDARY`, and proposed `BACHELOR` direction. Current code evidence supports the shared tenant/student/guardian/enrollment/class/section/subject foundation, but these items remain design work, not implementation claims:
 
 - Backend-owned `ExperienceContext`.
 - Tenant program offerings and class/section stage profile.
 - Preschool authorized pickup, temporary pickup change, arrival/checkout, pickup exception, and care-alert scope.
 - Higher Secondary / +2 streams, subject combinations, practical/lab timetable, practical components, projects, and board-readiness lifecycle.
+- Bachelor's programs, departments, intakes/batches, semesters/terms, courses, faculty assignment, Student App self-service, and result/assignment workflows.
+- Master eligibility for future Student App only; no active Master's management pack.
 
 Do not build UI-only stage switches or hard-code +2 streams before schema, OpenAPI/shared DTO, authorization, web/mobile, migration, seed, and test requirements are designed.
 
 ## Stage-Aware Implementation Readiness Appendix
 
-Stage-aware runtime implementation comes after the current GA blockers remain under control. Do not move new Preschool/+2 feature work ahead of Phase 1 seed, smoke, authenticated browser, mobile-device, staging, provider, storage, backup/restore, monitoring, and pilot evidence priorities.
+Stage-aware runtime implementation comes after the current GA blockers remain under control. Do not move new Preschool/+2/Bachelor feature work ahead of seed, smoke, authenticated browser, mobile-device, staging, provider, storage, backup/restore, monitoring, and pilot evidence priorities.
 
 Later runtime sequence:
 
@@ -59,14 +61,16 @@ Later runtime sequence:
 5. Implement stage-aware Web compositions.
 6. Implement stage-aware Flutter context switching.
 7. Implement +2 streams, combinations, practicals, projects, and lab workflows.
-8. Add role/tenant/stage scope tests before calling any stage experience complete.
+8. Run a later Bachelor's design/validation phase: schema, OpenAPI, shared contracts, RBAC/entitlement model, web/mobile contracts, seed, tenant-isolation tests, student self-scope tests, and staging proof.
+9. Add role/tenant/stage/self-scope tests before calling any stage experience complete.
 
 Readiness rule: a stage experience is not complete until backend schema/contracts, OpenAPI/shared DTOs, web/mobile projections, tenant/RBAC/stage tests, protected-file behavior where relevant, seed coverage, browser/mobile QA, and staging evidence prove the workflow. Documentation alone does not establish implementation status.
 
 ## Explicitly Deferred Scope
 
 - M14 Intelligence / AI.
-- Broad student-owned mobile app beyond approved learning/session flows.
+- Broad student-owned mobile app beyond approved learning/session flows, except future Bachelor/Master Student App after backend eligibility and self-scope contracts exist.
+- Master's full institution-management pack.
 - Architecture rewrites, microservices, Kubernetes, search clusters, GPU workloads, or unrelated infrastructure.
 - Production provider integrations without sandbox/staging credentials and verification.
 

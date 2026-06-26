@@ -6,6 +6,8 @@
 
 Backend/web/mobile scope allocation is defined in `docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`. That reference prevents cross-surface duplication but does not turn every listed capability into an active task; sequencing remains governed by `SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` and current repository evidence.
 
+Active education scope now includes Preschool, School (Grade 1-10), Higher Secondary / +2, and Bachelor's direction over one shared core. Bachelor's implementation remains a later design/validation phase after pilot hardening and needs schema, OpenAPI, shared-contract, RBAC/entitlement, tenant-isolation, student self-scope, seed, browser/mobile, and staging proof. Master's is not a full current management pack; it is future extension and Student App eligibility only.
+
 ---
 
 ## 1. Project Verdict and Readiness Status
@@ -33,7 +35,7 @@ The repository has broad implemented foundations across M0-M13, web, mobile, Fil
 
 **Verification snapshot:** On 2026-06-18, root lint/typecheck/test/E2E/build and local `pnpm verify:production` passed with caveats. On 2026-06-21, local Docker Postgres/Redis/API seed/smoke evidence passed after staff seed idempotency was fixed. `pnpm test:web:e2e` still has only public-browser checks passing with authenticated checks skipped. See `SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` for exact command results.
 
-**Remaining work categories:** authenticated browser E2E, mobile role/device QA, provider/staging verification, backup/restore, monitoring, pilot feedback, keeping seed/smoke repeatable, and future AI. M14 remains roadmap/deferred.
+**Remaining work categories:** authenticated browser E2E, mobile role/device QA, provider/staging verification, backup/restore, monitoring, pilot feedback, keeping seed/smoke repeatable, later Bachelor's design/validation, and future AI. M14 remains roadmap/deferred.
 
 ---
 

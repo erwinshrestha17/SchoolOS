@@ -140,7 +140,7 @@ export function DocumentsTab({
 
       <SectionCard
         title="Uploaded Documents"
-        description="Uploaded files remain incomplete until school staff verify them."
+        description="Scanned copies and attachments provided during enrollment. Uploaded files remain incomplete until school staff verify them."
       >
         <div className="mb-5 rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

@@ -2,7 +2,7 @@
 
 **Status:** Current evidence-based project status snapshot
 **Last updated:** 2026-06-21
-**Product:** Nepal-first multi-tenant school operating SaaS with staged Preschool, School (Grade 1-10), and Higher Secondary / +2 direction
+**Product:** Nepal-first multi-tenant education operating SaaS with staged Preschool, School (Grade 1-10), Higher Secondary / +2, and Bachelor's direction. Master's is eligibility/future-extension only, not a full active management pack.
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js App Router, Flutter companion app, shared `@schoolos/core` contracts
 
 This document is the concise current status snapshot. It does not replace:
@@ -12,6 +12,8 @@ This document is the concise current status snapshot. It does not replace:
 - `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md` for longer module backlog and implementation history.
 
 Inventory & Asset Management is scrapped from the active SchoolOS module taxonomy. Do not treat prior M13 Inventory docs as active scope.
+
+Bachelor's schema/API/UI/workflows are not currently verified as implemented. Any Bachelor's runtime claim needs schema, OpenAPI, shared-contract, RBAC/entitlement, tenant-isolation, student self-scope, seed, browser/mobile, and staging proof. Master's remains outside full management scope.
 
 ---
 

@@ -199,7 +199,7 @@ export function ActionMenu({
             role="menu"
             aria-label={label}
             onKeyDown={handleMenuKeyDown}
-            className="fixed z-[2147483647] min-w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-2xl shadow-slate-900/15 animate-in fade-in zoom-in-95 duration-100"
+            className="fixed z-[2147483647] min-w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg animate-in fade-in zoom-in-95 duration-100"
             style={{
               top: position?.top ?? -9999,
               left: position?.left ?? -9999,

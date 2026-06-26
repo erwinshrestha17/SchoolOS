@@ -57,7 +57,7 @@ Inventory & Asset Management is scrapped from the active module plan. Do not add
 
 ## Product stance and release target
 
-SchoolOS is a Nepal-first multi-tenant school operating SaaS for `PRESCHOOL`, `SCHOOL`, and `HIGHER_SECONDARY`, not a CRUD dashboard and not an MVP delivery exercise. Every change must move the supported release boundary toward **Production / General Availability (GA)**.
+SchoolOS is a Nepal-first multi-tenant education operating SaaS for `PRESCHOOL`, `SCHOOL`, `HIGHER_SECONDARY`, and `BACHELOR`, not a CRUD dashboard and not an MVP delivery exercise. Master's is not an active full institution-management pack; it is only a future higher-education extension and an allowed Student App eligibility level. Every change must move the supported release boundary toward **Production / General Availability (GA)**.
 
 Use the release stages defined in `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`:
 
@@ -72,7 +72,7 @@ GA / Production release
 
 Report readiness honestly. The documented current stage is Internal QA ready; SchoolOS is not GA until staging migration and provider checks, authenticated browser E2E, device QA, backup/restore proof, controlled-pilot workflows, monitoring, rollback, and release evidence pass. Passing local tests, showing a demo, or completing backend code does not establish production or GA readiness.
 
-Current priorities: security/RBAC/tenant-isolation evidence; staging deployment and operational proof; browser E2E; real-API web workspaces; pilot workflows; mobile device QA; performance/backup/observability/release automation. M14 AI remains roadmap only unless explicitly approved.
+Current priorities: security/RBAC/tenant-isolation evidence; staging deployment and operational proof; browser E2E; real-API web workspaces; pilot workflows; mobile device QA; performance/backup/observability/release automation. Bachelor's design/validation comes after pilot hardening and must not be claimed implemented without schema, OpenAPI, shared-contract, RBAC, entitlement, tenant-isolation, seed, browser/mobile, and staging proof. M14 AI remains roadmap only unless explicitly approved.
 
 ## Architecture: never break
 
@@ -113,7 +113,7 @@ Notifications: source modules emit normalized events and never call SMS/email/pu
 
 Web: one screen = one main job; real APIs only; no fake production data; server-side pagination for growing lists; states for loading/empty/error/success/permission/module locked/validation/file unavailable/queued/partial failure; high-risk actions need confirmation and reason where required.
 
-Mobile: companion app only; persona-first; purpose-limited APIs only; no admin-shaped mobile payloads; safe offline reads only; visible sync states for approved idempotent writes; no broad student app.
+Mobile: companion app only; persona-first; purpose-limited APIs only; no admin-shaped mobile payloads; safe offline reads only; visible sync states for approved idempotent writes. Broad Student App access is permitted only for active Bachelor or Master enrollments after backend-owned eligibility, enrollment, entitlement, role, self-scope, and tenant checks exist; Preschool through Grade 12 students get controlled learning/session access only.
 
 Learning: school-controlled, teacher-led, lab/session or controlled-device student access; expiring session codes/QR; parent summaries child-scoped and non-comparative; no leaderboard, open student chat, harsh labels, AI tutor, adaptive runtime, or broad home learning unless approved.
 

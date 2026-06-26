@@ -360,7 +360,7 @@ function GuardianRemoveButton({
       </button>
       {isOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-lg">
             <h3 className="text-base font-black text-slate-950">Remove guardian?</h3>
             <p className="mt-2 text-sm text-slate-600">Guardian access is revoked immediately and protected-file access review is recorded.</p>
             {guardian.isPrimary && replacement ? <p className="mt-2 text-sm font-semibold text-slate-700">{replacement.fullName} will become Primary.</p> : null}

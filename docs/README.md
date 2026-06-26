@@ -1,11 +1,13 @@
 # SchoolOS Documentation
 
 **Status:** Active documentation map and GA release-governance index
-**Last updated:** 2026-06-22
+**Last updated:** 2026-06-26
 
 This folder contains the active detailed SchoolOS documentation. Use this page as the folder-level map only; the root `README.md` remains the repository entry point and source-of-truth summary.
 
 SchoolOS is governed by a Production / General Availability (GA) release target, not an MVP target. Current work is evidence-led internal QA hardening, seeded school workflow proof, authenticated browser/mobile verification, staging validation, controlled-pilot validation, and release-operational readiness.
+
+Active education focus is `PRESCHOOL`, `SCHOOL` (Grade 1-10), `HIGHER_SECONDARY` (+2 / Grade 11-12), and `BACHELOR` over one shared tenant-aware core. Master's is not a full active institution-management pack; it is a future extension and an allowed Student App eligibility level only. Documentation updates must not claim Bachelor or Master's runtime implementation without code and verification evidence.
 
 Inventory & Asset Management is not an active module. Do not recreate Inventory documentation unless the project owner explicitly re-approves that module.
 

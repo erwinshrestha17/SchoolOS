@@ -330,9 +330,9 @@ Principal dashboard sections load independently. A failed summary renders a sect
 
 ## 14A. Stage-Aware Workspace Compositions
 
-SchoolOS Web uses one shared Next.js App Router application. Preschool, School (Grade 1-10), and Higher Secondary / +2 are workspace compositions inside the same shell, data model, permission system, File Registry flow, and module taxonomy. They are not separate dashboards, codebases, databases, or student record systems.
+SchoolOS Web uses one shared Next.js App Router application. Preschool, School (Grade 1-10), Higher Secondary / +2, and future Bachelor's work are workspace compositions inside the same shell, data model, permission system, File Registry flow, and module taxonomy. They are not separate dashboards, codebases, databases, or student record systems.
 
-The stage-aware composition depends on backend-owned `ExperienceContext`, tenant program offerings, class/section stage profile, and +2 stream/practical/project structures. Current status: **PROPOSED / NEEDS_SCHEMA_DESIGN** unless a module-specific contract has already been verified. Do not infer stage from local labels or class names in the browser.
+The stage-aware composition depends on backend-owned `ExperienceContext`, tenant program offerings, class/section stage profile, +2 stream/practical/project structures, and Bachelor's program/course/term structures. Current status: **PROPOSED / NEEDS_SCHEMA_DESIGN** unless a module-specific contract has already been verified. Do not infer stage from local labels or class names in the browser.
 
 ### 14A.1 Preschool Web Admin
 
@@ -398,6 +398,22 @@ Higher Secondary / +2 extends shared academics; it is not a separate academic pl
 | Academic coordinator dashboard | Stream enrollment, subject combinations, practicals, projects, labs, internal assessment, mock exams, workload, dues. | Needs ExperienceContext and bounded backend summaries. |
 
 Parent and controlled student web/mobile views for +2 must remain own-scope, published-only where relevant, and non-comparative.
+
+### 14A.4 Bachelor's Web Direction
+
+Bachelor's is an active future product direction, not an implemented web workspace claim. The web remains the official operating desk for setup, dense work, approvals, finance, reports, administration, program/course configuration, faculty assignment, result publishing, and high-risk workflows.
+
+| Workspace | Main job | Evidence boundary |
+|---|---|---|
+| Programs/departments | Configure institution-owned programs and departments. | **PROPOSED / NEEDS_SCHEMA_DESIGN**. |
+| Intakes/batches | Manage intakes, batches, and enrollment cohorts. | Needs schema, OpenAPI, shared-contract, and migration design. |
+| Semesters/terms | Configure academic terms without hard-coded university policy. | Needs schema/RBAC/entitlement design. |
+| Courses/faculty assignment | Assign courses and faculty by term/program. | Needs shared contracts and tenant-isolation tests. |
+| Attendance/timetable | Manage course/session attendance and timetable. | Needs backend-owned summaries; no browser-derived official totals. |
+| Assignments/exams/results | Manage assignments, exams, published results, protected documents, and correction workflows. | Needs File Registry, audit, OpenAPI, and result-publishing controls. |
+| Student App eligibility | Surface backend eligibility and denied states only. | Web must not hard-code eligibility or bypass backend authorization. |
+
+Master's web administration is intentionally not in current scope.
 
 ## 15. Module Design References
 
