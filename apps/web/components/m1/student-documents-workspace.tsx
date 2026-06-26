@@ -3,8 +3,7 @@
 import { formatBsDate, formatBsDateTime, type StudentDocument, type StudentProfile } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, FileCheck2, FileClock, FileWarning, Search, ShieldCheck, Upload } from 'lucide-react';
-import { useDeferredValue, useRef, useState } from 'react';
-import { useEffect } from 'react';
+import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '../../lib/api';
 import { fileToBase64Payload } from '../../lib/files';
@@ -32,10 +31,18 @@ export function StudentDocumentsWorkspace() {
   const [guardianRemovalReason, setGuardianRemovalReason] = useState('');
   const [reviewReason, setReviewReason] = useState('');
   const searchParams = useSearchParams();
+  const requestedStudentId = searchParams.get('studentId') ?? searchParams.get('student');
+  const requestedDocumentId = searchParams.get('documentId');
+  const requestedKind = searchParams.get('kind');
 
   const studentsQuery = useQuery({
     queryKey: ['students', 'documents-workspace', deferredSearch],
     queryFn: () => api.listStudents({ search: deferredSearch || undefined, page: 1, limit: 30 }),
+  });
+  const requestedProfileQuery = useQuery({
+    queryKey: ['student-profile', requestedStudentId],
+    queryFn: () => api.getStudentProfile(requestedStudentId!),
+    enabled: Boolean(requestedStudentId) && selectedStudent?.id !== requestedStudentId,
   });
   const profileQuery = useQuery({
     queryKey: ['student-profile', selectedStudent?.id],
@@ -53,11 +60,31 @@ export function StudentDocumentsWorkspace() {
   });
 
   useEffect(() => {
-    const requestedId = searchParams.get('studentId') ?? searchParams.get('student');
-    if (!requestedId || selectedStudent?.id === requestedId) return;
-    const requestedStudent = studentsQuery.data?.items.find((student) => student.id === requestedId);
-    if (requestedStudent) setSelectedStudent(requestedStudent);
-  }, [searchParams, selectedStudent?.id, studentsQuery.data]);
+    if (requestedKind) setDocumentKind(requestedKind);
+  }, [requestedKind]);
+
+  useEffect(() => {
+    if (!requestedStudentId || selectedStudent?.id === requestedStudentId) return;
+    const requestedStudent = studentsQuery.data?.items.find((student) => student.id === requestedStudentId);
+    if (requestedStudent) {
+      setSelectedStudent(requestedStudent);
+      setSelectedDocument(null);
+    }
+  }, [requestedStudentId, selectedStudent?.id, studentsQuery.data]);
+
+  useEffect(() => {
+    if (!requestedStudentId || selectedStudent?.id === requestedStudentId) return;
+    if (requestedProfileQuery.data?.student) {
+      setSelectedStudent(requestedProfileQuery.data.student);
+      setSelectedDocument(null);
+    }
+  }, [requestedProfileQuery.data, requestedStudentId, selectedStudent?.id]);
+
+  useEffect(() => {
+    if (!requestedDocumentId || selectedDocument?.id === requestedDocumentId) return;
+    const requestedDocument = profileQuery.data?.documents.find((document) => document.id === requestedDocumentId);
+    if (requestedDocument) setSelectedDocument(requestedDocument);
+  }, [profileQuery.data, requestedDocumentId, selectedDocument?.id]);
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -109,8 +136,8 @@ export function StudentDocumentsWorkspace() {
     onError: (error) => setToast({ tone: 'danger', title: 'Guardian access was not changed', description: error instanceof Error ? error.message : 'The backend rejected this request.' }),
   });
 
-  if (studentsQuery.isLoading) return <LoadingState variant="page" label="Loading student documents…" />;
-  if (studentsQuery.isError) return <ErrorState title="Student records could not load" message="No files were changed." onRetry={() => void studentsQuery.refetch()} />;
+  if (studentsQuery.isLoading && !requestedStudentId) return <LoadingState variant="page" label="Loading student documents…" />;
+  if (studentsQuery.isError && !requestedStudentId) return <ErrorState title="Student records could not load" message="No files were changed." onRetry={() => void studentsQuery.refetch()} />;
 
   const documents = profileQuery.data?.documents ?? [];
   const verified = documents.filter((document) => document.status === 'VERIFIED').length;
@@ -128,6 +155,8 @@ export function StudentDocumentsWorkspace() {
           <h2 className="text-sm font-black text-slate-950">Select Student</h2>
           <label className="relative mt-3 block"><span className="sr-only">Search students</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name or admission no." className="pl-9" /></label>
           <div className="mt-3 max-h-[620px] space-y-1 overflow-y-auto">
+            {studentsQuery.isLoading ? <p className="rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-500">Loading student list…</p> : null}
+            {studentsQuery.isError ? <p className="rounded-xl border border-warning-100 bg-warning-50 p-3 text-xs font-semibold text-warning-800">Student list is unavailable. The linked student record can still load from the protected profile route.</p> : null}
             {(studentsQuery.data?.items ?? []).map((student) => {
               const name = student.fullNameEn || [student.firstNameEn, student.lastNameEn].filter(Boolean).join(' ') || 'Unnamed student';
               return <button key={student.id} type="button" onClick={() => { setSelectedStudent(student); setSelectedDocument(null); }} className={`flex w-full items-center gap-3 rounded-xl p-2 text-left transition ${selectedStudent?.id === student.id ? 'bg-primary-50 ring-1 ring-primary-200' : 'hover:bg-slate-50'}`}><Avatar src={student.photoUrl} initials={name.slice(0, 2)} size="sm" /><span className="min-w-0"><strong className="block truncate text-xs text-slate-900">{name}</strong><span className="block truncate text-[0.68rem] text-slate-500">{student.studentSystemId}</span></span></button>;
@@ -136,7 +165,15 @@ export function StudentDocumentsWorkspace() {
         </aside>
 
         <main className="min-w-0 space-y-5">
-          {!selectedStudent ? <EmptyState title="Select a student" description="Choose a student to review guardians, document checklist, protected files, and verification history." /> : profileQuery.isLoading ? <LoadingState variant="skeleton" label="Loading protected student record…" /> : profileQuery.isError || !profileQuery.data ? <ErrorState title="Student documents could not load" message="No files were changed." onRetry={() => void profileQuery.refetch()} /> : (
+          {!selectedStudent ? (
+            requestedStudentId && requestedProfileQuery.isError ? (
+              <ErrorState title="Linked student could not load" message="The student may not exist or you may not have access to this protected document workspace." onRetry={() => void requestedProfileQuery.refetch()} />
+            ) : requestedStudentId ? (
+              <LoadingState variant="skeleton" label="Loading linked student documents…" />
+            ) : (
+              <EmptyState title="Select a student" description="Choose a student to review guardians, document checklist, protected files, and verification history." />
+            )
+          ) : profileQuery.isLoading ? <LoadingState variant="skeleton" label="Loading protected student record…" /> : profileQuery.isError || !profileQuery.data ? <ErrorState title="Student documents could not load" message="No files were changed." onRetry={() => void profileQuery.refetch()} /> : (
             <>
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

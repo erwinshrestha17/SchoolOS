@@ -31,6 +31,11 @@ test('M1 workspaces expose real route-backed operations', () => {
   assert.match(api, /\/admissions\/m1\/import-review\/queue/);
   assert.match(api, /\/students\/document-expiry\/templates/);
   assert.match(documentsWorkspace, /confirmFileAccessReview: true/);
+  assert.match(documentsWorkspace, /requestedStudentId/);
+  assert.match(documentsWorkspace, /requestedDocumentId/);
+  assert.match(documentsWorkspace, /requestedKind/);
+  assert.match(documentsWorkspace, /api\.getStudentProfile\(requestedStudentId!\)/);
+  assert.match(documentsWorkspace, /The linked student record can still load from the protected profile route/);
 });
 
 test('M1 entry creates one unified admission case for direct and review workflows', () => {
