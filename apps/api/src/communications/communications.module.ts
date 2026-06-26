@@ -5,6 +5,7 @@ import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { UsageModule } from '../usage/usage.module';
 import { CommunicationsService } from './communications.service';
+import { CommunicationsOperationsController } from './communications-operations.controller';
 import { ConsentsController } from './consents.controller';
 import { DeliveriesController } from './deliveries.controller';
 import { DeliveryRetryService } from './delivery-retry.service';
@@ -40,6 +41,7 @@ import { RedisModule } from '../redis/redis.module';
     NotificationCenterController,
     NotificationCenterAliasController,
     NotificationDeliveriesAliasController,
+    CommunicationsOperationsController,
     M10HardeningController,
   ],
   providers: [

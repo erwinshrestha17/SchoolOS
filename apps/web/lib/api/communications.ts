@@ -1,4 +1,7 @@
 import type {
+  CommunicationTemplateSummary,
+  CommunicationsProviderDiagnostics,
+  CommunicationsSummary,
   ConsentRecord,
   EventSummary,
   GuardianConsentStatus,
@@ -6,11 +9,7 @@ import type {
   NotificationDelivery,
   NotificationDeliveryFailureSummary,
 } from '@schoolos/core';
-import {
-  JsonBody,
-  NotificationCenterSummary,
-  request,
-} from './client';
+import { JsonBody, NotificationCenterSummary, request } from './client';
 
 export type NoticeDetail = {
   id: string;
@@ -92,6 +91,37 @@ export type NotificationDeliveryAnalytics = {
 };
 
 export const communicationsApi = {
+  getCommunicationsSummary: () =>
+    request<CommunicationsSummary>('/communications/summary'),
+  getCommunicationsProviderDiagnostics: () =>
+    request<CommunicationsProviderDiagnostics>(
+      '/communications/provider-diagnostics',
+    ),
+  listCommunicationTemplates: () =>
+    request<CommunicationTemplateSummary[]>('/communications/templates'),
+  createCommunicationTemplate: (body: JsonBody) =>
+    request<CommunicationTemplateSummary>('/communications/templates', {
+      method: 'POST',
+      json: body,
+    }),
+  updateCommunicationTemplate: (templateId: string, body: JsonBody) =>
+    request<CommunicationTemplateSummary>(
+      `/communications/templates/${encodeURIComponent(templateId)}`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
+  publishCommunicationTemplate: (templateId: string) =>
+    request<CommunicationTemplateSummary>(
+      `/communications/templates/${encodeURIComponent(templateId)}/publish`,
+      { method: 'POST' },
+    ),
+  archiveCommunicationTemplate: (templateId: string) =>
+    request<CommunicationTemplateSummary>(
+      `/communications/templates/${encodeURIComponent(templateId)}/archive`,
+      { method: 'POST' },
+    ),
   listNotices: () => request<NoticeSummary[]>('/notices'),
   getNoticeDetail: (noticeId: string) =>
     request<NoticeDetail>(`/notices/${encodeURIComponent(noticeId)}`),
@@ -144,10 +174,7 @@ export const communicationsApi = {
     ),
 
   // Academics - Assessment Components
-  retryNotificationDelivery: (
-    deliveryId: string,
-    body?: { reason?: string },
-  ) =>
+  retryNotificationDelivery: (deliveryId: string, body?: { reason?: string }) =>
     request<any>(
       `/communications/deliveries/${encodeURIComponent(deliveryId)}/retry`,
       {

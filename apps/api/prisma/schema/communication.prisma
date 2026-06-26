@@ -121,6 +121,31 @@ model NoticeReadReceipt {
   @@index([tenantId, noticeId, readAt])
 }
 
+model CommunicationTemplate {
+  id          String                        @id @default(uuid())
+  tenantId    String
+  key         String
+  category    CommunicationTemplateCategory @default(GENERAL)
+  channel     CommunicationTemplateChannel  @default(IN_APP)
+  language    String                        @default("en")
+  title       String
+  body        String
+  status      CommunicationTemplateStatus   @default(DRAFT)
+  version     Int                           @default(1)
+  publishedAt DateTime?
+  archivedAt  DateTime?
+  createdById String
+  updatedById String?
+  createdAt   DateTime                      @default(now())
+  updatedAt   DateTime                      @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key, version])
+  @@index([tenantId, status, category])
+  @@index([tenantId, key, status])
+}
+
 model GuardianConsent {
   id                String      @id @default(uuid())
   tenantId          String

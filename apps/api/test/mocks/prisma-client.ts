@@ -737,6 +737,38 @@ export const MessageStatus = {
   READ: 'READ',
 } as const;
 
+export const ProviderType = {
+  SMS: 'SMS',
+  EMAIL: 'EMAIL',
+  FCM: 'FCM',
+  OBJECT_STORAGE: 'OBJECT_STORAGE',
+  PAYMENT_GATEWAY: 'PAYMENT_GATEWAY',
+  AI_PROVIDER: 'AI_PROVIDER',
+} as const;
+
+export const CommunicationTemplateCategory = {
+  GENERAL: 'GENERAL',
+  HOLIDAY: 'HOLIDAY',
+  EMERGENCY: 'EMERGENCY',
+  FEES: 'FEES',
+  EXAMS: 'EXAMS',
+  TRANSPORT_DELAY: 'TRANSPORT_DELAY',
+  EVENT: 'EVENT',
+} as const;
+
+export const CommunicationTemplateChannel = {
+  IN_APP: 'IN_APP',
+  PUSH: 'PUSH',
+  SMS: 'SMS',
+  EMAIL: 'EMAIL',
+} as const;
+
+export const CommunicationTemplateStatus = {
+  DRAFT: 'DRAFT',
+  PUBLISHED: 'PUBLISHED',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+
 export const ParentTeacherThreadStatus = {
   OPEN: 'OPEN',
   CLOSED: 'CLOSED',

@@ -1,6 +1,58 @@
 import fs from 'fs';
 import path from 'path';
 
+function getImportSource(importBlock) {
+  const fromMatch = importBlock.match(/\bfrom\s+['"]([^'"]+)['"]/);
+  if (fromMatch) {
+    return fromMatch[1];
+  }
+
+  const sideEffectMatch = importBlock.match(/^\s*import\s+['"]([^'"]+)['"]/m);
+  return sideEffectMatch?.[1] ?? null;
+}
+
+function stripImportBlocks(content, shouldStripSource) {
+  const lines = content.split('\n');
+  const cleaned = [];
+  let importBlock = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (importBlock) {
+      importBlock.push(line);
+      if (trimmed.endsWith(';')) {
+        const source = getImportSource(importBlock.join('\n'));
+        if (!source || !shouldStripSource(source)) {
+          cleaned.push(...importBlock);
+        }
+        importBlock = null;
+      }
+      continue;
+    }
+
+    if (trimmed.startsWith('import ')) {
+      if (trimmed.endsWith(';')) {
+        const source = getImportSource(line);
+        if (!source || !shouldStripSource(source)) {
+          cleaned.push(line);
+        }
+      } else {
+        importBlock = [line];
+      }
+      continue;
+    }
+
+    cleaned.push(line);
+  }
+
+  if (importBlock) {
+    cleaned.push(...importBlock);
+  }
+
+  return cleaned.join('\n');
+}
+
 // 1. Compile schema.prisma
 const prismaSchemaDir = 'apps/api/prisma/schema';
 const prismaSchemaOut = 'apps/api/prisma/schema.prisma';
@@ -25,10 +77,16 @@ if (fs.existsSync(prismaSchemaDir)) {
 
   for (const file of files) {
     if (file.endsWith('.prisma')) {
-      let fileContent = fs.readFileSync(path.join(prismaSchemaDir, file), 'utf8');
+      let fileContent = fs.readFileSync(
+        path.join(prismaSchemaDir, file),
+        'utf8',
+      );
       // For schema.prisma, we must remove the previewFeatures line if it's there
       if (file === 'main.prisma') {
-        fileContent = fileContent.replace('  previewFeatures = ["prismaSchemaFolder"]\n', '');
+        fileContent = fileContent.replace(
+          '  previewFeatures = ["prismaSchemaFolder"]\n',
+          '',
+        );
       }
       combinedSchema += `// ─── Compiled from schema/${file} ───\n${fileContent}\n\n`;
     }
@@ -47,9 +105,11 @@ if (fs.existsSync(permsDir)) {
   const catalogDir = path.join(permsDir, 'catalog');
   const catalogOut = path.join(permsDir, 'catalog.ts');
   if (fs.existsSync(catalogDir)) {
-    const files = fs.readdirSync(catalogDir).filter(file => file.endsWith('.ts'));
+    const files = fs
+      .readdirSync(catalogDir)
+      .filter((file) => file.endsWith('.ts'));
     files.sort();
-    
+
     let combinedItems = '';
     for (const file of files) {
       const content = fs.readFileSync(path.join(catalogDir, file), 'utf8');
@@ -85,15 +145,17 @@ export type PermissionKey =
     console.log(`Compiled permission catalog to: ${catalogOut}`);
   }
 
-  const catalogContent = fs.readFileSync(path.join(permsDir, 'catalog.ts'), 'utf8');
+  const catalogContent = fs.readFileSync(
+    path.join(permsDir, 'catalog.ts'),
+    'utf8',
+  );
   const utilsContent = fs.readFileSync(path.join(permsDir, 'utils.ts'), 'utf8');
   const rolesContent = fs.readFileSync(path.join(permsDir, 'roles.ts'), 'utf8');
 
   // Strip relative imports from rolesContent
-  const cleanedRoles = rolesContent
-    .split('\n')
-    .filter(line => !line.trim().startsWith("import ") || !line.includes("./"))
-    .join('\n');
+  const cleanedRoles = stripImportBlocks(rolesContent, (source) =>
+    source.startsWith('./'),
+  );
 
   // Combine them
   const combinedPerms = `// ─────────────────────────────────────────────────────────────────────────────
@@ -137,22 +199,17 @@ import type { PermissionKey } from './permissions.js';
   for (const file of files) {
     if (file.endsWith('.ts')) {
       const fileContent = fs.readFileSync(path.join(typesDir, file), 'utf8');
-      
-      // Clean relative imports (e.g. import type { ... } from './...')
-      const cleanedLines = fileContent
-        .split('\n')
-        .filter(line => {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('import ') && trimmed.includes('./')) {
-            return false;
-          }
-          if (trimmed.startsWith('import ') && (trimmed.includes('../permissions') || trimmed.includes('../payroll'))) {
-            return false;
-          }
-          return true;
-        });
 
-      combinedTypes += `// ─── Compiled from types/${file} ───\n${cleanedLines.join('\n')}\n\n`;
+      // Clean relative imports (e.g. import type { ... } from './...')
+      const cleanedContent = stripImportBlocks(
+        fileContent,
+        (source) =>
+          source.startsWith('./') ||
+          source.startsWith('../permissions') ||
+          source.startsWith('../payroll'),
+      );
+
+      combinedTypes += `// ─── Compiled from types/${file} ───\n${cleanedContent}\n\n`;
     }
   }
 
@@ -168,7 +225,12 @@ if (fs.existsSync(valDir)) {
   const files = fs.readdirSync(valDir);
   // Sort files with custom order (auth and student first) to prevent hoisting issues
   files.sort((a, b) => {
-    const order = ['auth.ts', 'contact-profile.ts', 'student.ts', 'academic.ts'];
+    const order = [
+      'auth.ts',
+      'contact-profile.ts',
+      'student.ts',
+      'academic.ts',
+    ];
     const idxA = order.indexOf(a);
     const idxB = order.indexOf(b);
     if (idxA !== -1 && idxB !== -1) return idxA - idxB;
@@ -189,22 +251,14 @@ import { z } from 'zod';
   for (const file of files) {
     if (file.endsWith('.ts')) {
       const fileContent = fs.readFileSync(path.join(valDir, file), 'utf8');
-      
-      // Clean Zod imports and local schema file imports
-      const cleanedLines = fileContent
-        .split('\n')
-        .filter(line => {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('import ') && trimmed.includes('zod')) {
-            return false;
-          }
-          if (trimmed.startsWith('import ') && trimmed.includes('./')) {
-            return false;
-          }
-          return true;
-        });
 
-      combinedVal += `// ─── Compiled from validation/${file} ───\n${cleanedLines.join('\n')}\n\n`;
+      // Clean Zod imports and local schema file imports
+      const cleanedContent = stripImportBlocks(
+        fileContent,
+        (source) => source === 'zod' || source.startsWith('./'),
+      );
+
+      combinedVal += `// ─── Compiled from validation/${file} ───\n${cleanedContent}\n\n`;
     }
   }
 

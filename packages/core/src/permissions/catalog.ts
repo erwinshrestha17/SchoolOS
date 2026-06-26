@@ -626,6 +626,11 @@ export const permissionCatalog = [
   },
   {
     resource: "communications",
+    action: "manage_templates",
+    description: "Create, publish, and archive communication templates",
+  },
+  {
+    resource: "communications",
     action: "manage_consent",
     description: "Manage communication consent settings",
   },

@@ -213,6 +213,29 @@ enum AudienceType {
   STUDENT
 }
 
+enum CommunicationTemplateCategory {
+  GENERAL
+  HOLIDAY
+  EMERGENCY
+  FEES
+  EXAMS
+  TRANSPORT_DELAY
+  EVENT
+}
+
+enum CommunicationTemplateChannel {
+  IN_APP
+  PUSH
+  SMS
+  EMAIL
+}
+
+enum CommunicationTemplateStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 enum EventType {
   GENERAL
   EXAM

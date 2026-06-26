@@ -229,6 +229,29 @@ enum AudienceType {
   STUDENT
 }
 
+enum CommunicationTemplateCategory {
+  GENERAL
+  HOLIDAY
+  EMERGENCY
+  FEES
+  EXAMS
+  TRANSPORT_DELAY
+  EVENT
+}
+
+enum CommunicationTemplateChannel {
+  IN_APP
+  PUSH
+  SMS
+  EMAIL
+}
+
+enum CommunicationTemplateStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 enum EventType {
   GENERAL
   EXAM
@@ -2989,6 +3012,31 @@ model NoticeReadReceipt {
 
   @@unique([tenantId, noticeId, userId])
   @@index([tenantId, noticeId, readAt])
+}
+
+model CommunicationTemplate {
+  id          String                        @id @default(uuid())
+  tenantId    String
+  key         String
+  category    CommunicationTemplateCategory @default(GENERAL)
+  channel     CommunicationTemplateChannel  @default(IN_APP)
+  language    String                        @default("en")
+  title       String
+  body        String
+  status      CommunicationTemplateStatus   @default(DRAFT)
+  version     Int                           @default(1)
+  publishedAt DateTime?
+  archivedAt  DateTime?
+  createdById String
+  updatedById String?
+  createdAt   DateTime                      @default(now())
+  updatedAt   DateTime                      @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key, version])
+  @@index([tenantId, status, category])
+  @@index([tenantId, key, status])
 }
 
 model GuardianConsent {
@@ -5806,6 +5854,7 @@ model Tenant {
   approvalDecisions             ApprovalDecision[]
   approvalComments              ApprovalComment[]
   approvalAttachments           ApprovalAttachment[]
+  communicationTemplates        CommunicationTemplate[]
   automationRules               AutomationRule[]
   automationTriggers            AutomationTrigger[]
   automationConditions          AutomationCondition[]

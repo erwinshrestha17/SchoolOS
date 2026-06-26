@@ -380,6 +380,90 @@ export type GuardianConsentStatus = {
   revokedAt: string | null;
 };
 
+export type CommunicationProviderMode =
+  | 'disabled'
+  | 'dev-log'
+  | 'mock'
+  | 'configured';
+
+export type CommunicationProviderHealth =
+  | 'healthy'
+  | 'degraded'
+  | 'unavailable';
+
+export type CommunicationProviderDiagnosticChannel = {
+  channel: 'EMAIL' | 'SMS' | 'PUSH';
+  label: string;
+  mode: CommunicationProviderMode;
+  health: CommunicationProviderHealth;
+  deliveryCount: number;
+  sentCount: number;
+  failedCount: number;
+  retryableCount: number;
+  validationStatus: string | null;
+  lastValidatedAt: string | null;
+  lastEventAt: string | null;
+  callbackStatus:
+    | 'not_applicable'
+    | 'not_configured'
+    | 'configured'
+    | 'recent'
+    | 'failing';
+  lastCallbackAt: string | null;
+  message: string;
+};
+
+export type CommunicationsProviderDiagnostics = {
+  generatedAt: string;
+  overallMode: CommunicationProviderMode;
+  health: CommunicationProviderHealth;
+  channels: CommunicationProviderDiagnosticChannel[];
+};
+
+export type CommunicationsSummary = {
+  generatedAt: string;
+  schoolDay: string;
+  sentToday: number;
+  scheduledNotices: number;
+  failedDeliveries: number;
+  unreadHighImpactNotices: number;
+  escalatedChatCount: number;
+  providerStatus: CommunicationProviderMode;
+  providerHealth: CommunicationProviderHealth;
+};
+
+export type CommunicationTemplateCategory =
+  | 'GENERAL'
+  | 'HOLIDAY'
+  | 'EMERGENCY'
+  | 'FEES'
+  | 'EXAMS'
+  | 'TRANSPORT_DELAY'
+  | 'EVENT';
+
+export type CommunicationTemplateChannel = 'IN_APP' | 'PUSH' | 'SMS' | 'EMAIL';
+
+export type CommunicationTemplateStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+
+export type CommunicationTemplateSummary = {
+  id: string;
+  tenantId: string;
+  key: string;
+  category: CommunicationTemplateCategory;
+  channel: CommunicationTemplateChannel;
+  language: string;
+  title: string;
+  body: string;
+  status: CommunicationTemplateStatus;
+  version: number;
+  publishedAt: string | null;
+  archivedAt: string | null;
+  createdById: string;
+  updatedById: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type PromotionResult = {
   studentId: string;
   studentName: string;

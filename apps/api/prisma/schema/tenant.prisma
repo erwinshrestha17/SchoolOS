@@ -169,6 +169,7 @@ model Tenant {
   approvalDecisions             ApprovalDecision[]
   approvalComments              ApprovalComment[]
   approvalAttachments           ApprovalAttachment[]
+  communicationTemplates        CommunicationTemplate[]
   automationRules               AutomationRule[]
   automationTriggers            AutomationTrigger[]
   automationConditions          AutomationCondition[]

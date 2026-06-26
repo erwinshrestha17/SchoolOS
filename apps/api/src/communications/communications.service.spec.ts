@@ -1,11 +1,15 @@
 import {
   AudienceType,
   AuthMethod,
+  CommunicationTemplateCategory,
+  CommunicationTemplateChannel,
+  CommunicationTemplateStatus,
   ConsentType,
   EventType,
   NotificationChannel,
   NotificationStatus,
   NoticePriority,
+  ProviderType,
   StudentLifecycleStatus,
 } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
@@ -36,6 +40,7 @@ describe('CommunicationsService', () => {
       notice: {
         create: jest.fn(),
         findMany: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
       },
       student: {
         findMany: jest.fn(),
@@ -52,6 +57,21 @@ describe('CommunicationsService', () => {
         ),
         update: jest.fn(),
         findMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      parentTeacherThread: {
+        count: jest.fn().mockResolvedValue(0),
+      },
+      providerConfig: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      communicationTemplate: {
+        findMany: jest.fn(),
+        aggregate: jest.fn(),
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
       },
       guardian: {
         findFirst: jest.fn(),
@@ -719,6 +739,328 @@ describe('CommunicationsService', () => {
         count: 1,
         queuedCount: 1,
         replayed: true,
+      }),
+    );
+  });
+
+  it('summarizes communications from tenant-scoped backend counts', async () => {
+    const previousMode = process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE;
+    process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = 'mock';
+
+    try {
+      prisma.notificationDelivery.count
+        .mockResolvedValueOnce(5)
+        .mockResolvedValueOnce(2)
+        .mockResolvedValueOnce(7)
+        .mockResolvedValue(0);
+      prisma.notice.count.mockResolvedValueOnce(3);
+      prisma.parentTeacherThread.count.mockResolvedValueOnce(1);
+
+      const summary = await service.getCommunicationsSummary(actor);
+
+      expect(summary).toEqual(
+        expect.objectContaining({
+          sentToday: 5,
+          scheduledNotices: 3,
+          failedDeliveries: 2,
+          unreadHighImpactNotices: 7,
+          escalatedChatCount: 1,
+          providerStatus: 'mock',
+          providerHealth: 'unavailable',
+        }),
+      );
+      expect(prisma.notice.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          publishedAt: null,
+        }),
+      });
+      expect(prisma.notificationDelivery.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: 'tenant-1',
+            status: {
+              in: [NotificationStatus.FAILED, NotificationStatus.RETRY_PENDING],
+            },
+          }),
+        }),
+      );
+      expect(prisma.parentTeacherThread.count).toHaveBeenCalledWith({
+        where: {
+          tenantId: 'tenant-1',
+          status: 'ESCALATED',
+        },
+      });
+    } finally {
+      if (previousMode === undefined) {
+        delete process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE;
+      } else {
+        process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = previousMode;
+      }
+    }
+  });
+
+  it('returns provider diagnostics without leaking secrets or recipient destinations', async () => {
+    const previousMode = process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE;
+    process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = 'configured';
+
+    try {
+      prisma.providerConfig.findFirst.mockResolvedValue({
+        enabled: true,
+        validationStatus: 'READY',
+        lastValidatedAt: new Date('2026-06-01T00:00:00.000Z'),
+        configEncrypted: {
+          callbackSecret: 'secret-callback-token',
+          apiKey: 'secret-api-key',
+        },
+        updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+      });
+      prisma.notificationDelivery.count.mockImplementation(({ where }) => {
+        if (where.status === NotificationStatus.FAILED) {
+          return Promise.resolve(1);
+        }
+        if (
+          where.status?.in?.includes(NotificationStatus.FAILED) &&
+          where.status?.in?.includes(NotificationStatus.RETRY_PENDING)
+        ) {
+          return Promise.resolve(2);
+        }
+        if (
+          where.status?.in?.includes(NotificationStatus.SENT) &&
+          where.status?.in?.includes(NotificationStatus.DELIVERED)
+        ) {
+          return Promise.resolve(4);
+        }
+        return Promise.resolve(10);
+      });
+      prisma.notificationDelivery.findFirst.mockResolvedValue({
+        sentAt: new Date('2026-06-01T00:00:00.000Z'),
+        deliveredAt: null,
+        failedAt: null,
+        createdAt: new Date('2026-06-01T00:00:00.000Z'),
+      });
+
+      const diagnostics =
+        await service.getCommunicationProviderDiagnostics(actor);
+      const serialized = JSON.stringify(diagnostics);
+
+      expect(diagnostics.overallMode).toBe('configured');
+      expect(diagnostics.health).toBe('degraded');
+      expect(diagnostics.channels).toHaveLength(3);
+      expect(diagnostics.channels[0]).toEqual(
+        expect.objectContaining({
+          mode: 'configured',
+          deliveryCount: 10,
+          sentCount: 4,
+          failedCount: 1,
+          retryableCount: 2,
+          validationStatus: 'READY',
+          callbackStatus: 'recent',
+        }),
+      );
+      expect(serialized).not.toContain('secret-callback-token');
+      expect(serialized).not.toContain('secret-api-key');
+      expect(serialized).not.toContain('destination');
+      expect(prisma.providerConfig.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            type: ProviderType.EMAIL,
+            enabled: true,
+          }),
+          select: expect.not.objectContaining({
+            secretKeys: true,
+            name: true,
+          }),
+        }),
+      );
+      expect(prisma.notificationDelivery.count).toHaveBeenCalledWith({
+        where: {
+          tenantId: 'tenant-1',
+          channel: NotificationChannel.EMAIL,
+        },
+      });
+    } finally {
+      if (previousMode === undefined) {
+        delete process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE;
+      } else {
+        process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = previousMode;
+      }
+    }
+  });
+
+  it('creates communication templates as tenant-scoped versioned drafts', async () => {
+    prisma.communicationTemplate.aggregate.mockResolvedValue({
+      _max: { version: 2 },
+    });
+    prisma.communicationTemplate.create.mockResolvedValue({
+      id: 'template-3',
+      tenantId: 'tenant-1',
+      key: 'holiday-notice',
+      category: CommunicationTemplateCategory.HOLIDAY,
+      channel: CommunicationTemplateChannel.IN_APP,
+      language: 'en',
+      title: 'Holiday notice',
+      body: 'School remains closed for the approved holiday.',
+      status: CommunicationTemplateStatus.DRAFT,
+      version: 3,
+      publishedAt: null,
+      archivedAt: null,
+      createdById: 'admin-1',
+      updatedById: null,
+      createdAt: new Date('2026-06-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+    });
+
+    const template = await service.createCommunicationTemplate(
+      {
+        key: ' Holiday-Notice ',
+        category: CommunicationTemplateCategory.HOLIDAY,
+        channel: CommunicationTemplateChannel.IN_APP,
+        title: ' Holiday notice ',
+        body: ' School remains closed for the approved holiday. ',
+      },
+      actor,
+    );
+
+    expect(template.version).toBe(3);
+    expect(prisma.communicationTemplate.aggregate).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-1',
+        key: 'holiday-notice',
+      },
+      _max: {
+        version: true,
+      },
+    });
+    expect(prisma.communicationTemplate.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tenantId: 'tenant-1',
+          key: 'holiday-notice',
+          title: 'Holiday notice',
+          body: 'School remains closed for the approved holiday.',
+          version: 3,
+          createdById: 'admin-1',
+        }),
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'create',
+        resource: 'communication_template',
+        tenantId: 'tenant-1',
+        resourceId: 'template-3',
+      }),
+    );
+  });
+
+  it('rejects communication template edits outside the actor tenant', async () => {
+    prisma.communicationTemplate.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.updateCommunicationTemplate(
+        'template-foreign',
+        { title: 'Updated title' },
+        actor,
+      ),
+    ).rejects.toThrow('Communication template not found in this tenant');
+
+    expect(prisma.communicationTemplate.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'template-foreign',
+        tenantId: 'tenant-1',
+      },
+      select: expect.any(Object),
+    });
+    expect(prisma.communicationTemplate.update).not.toHaveBeenCalled();
+  });
+
+  it('requires draft status before editing communication templates', async () => {
+    prisma.communicationTemplate.findFirst.mockResolvedValue({
+      id: 'template-1',
+      tenantId: 'tenant-1',
+      key: 'holiday-notice',
+      category: CommunicationTemplateCategory.HOLIDAY,
+      channel: CommunicationTemplateChannel.IN_APP,
+      language: 'en',
+      title: 'Holiday notice',
+      body: 'School remains closed.',
+      status: CommunicationTemplateStatus.PUBLISHED,
+      version: 1,
+      publishedAt: new Date('2026-06-01T00:00:00.000Z'),
+      archivedAt: null,
+      createdById: 'admin-1',
+      updatedById: null,
+      createdAt: new Date('2026-06-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+    });
+
+    await expect(
+      service.updateCommunicationTemplate(
+        'template-1',
+        { body: 'Updated body' },
+        actor,
+      ),
+    ).rejects.toThrow('Only draft communication templates can be edited');
+
+    expect(prisma.communicationTemplate.update).not.toHaveBeenCalled();
+  });
+
+  it('publishes communication templates with tenant-scoped audit state', async () => {
+    const current = {
+      id: 'template-1',
+      tenantId: 'tenant-1',
+      key: 'holiday-notice',
+      category: CommunicationTemplateCategory.HOLIDAY,
+      channel: CommunicationTemplateChannel.IN_APP,
+      language: 'en',
+      title: 'Holiday notice',
+      body: 'School remains closed.',
+      status: CommunicationTemplateStatus.DRAFT,
+      version: 1,
+      publishedAt: null,
+      archivedAt: null,
+      createdById: 'admin-1',
+      updatedById: null,
+      createdAt: new Date('2026-06-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+    };
+    prisma.communicationTemplate.findFirst.mockResolvedValue(current);
+    prisma.communicationTemplate.update.mockResolvedValue({
+      ...current,
+      status: CommunicationTemplateStatus.PUBLISHED,
+      publishedAt: new Date('2026-06-01T00:00:00.000Z'),
+      updatedById: 'admin-1',
+    });
+
+    const template = await service.publishCommunicationTemplate(
+      'template-1',
+      actor,
+    );
+
+    expect(template.status).toBe(CommunicationTemplateStatus.PUBLISHED);
+    expect(prisma.communicationTemplate.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'template-1',
+        tenantId: 'tenant-1',
+      },
+      select: expect.any(Object),
+    });
+    expect(prisma.communicationTemplate.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'template-1' },
+        data: expect.objectContaining({
+          status: CommunicationTemplateStatus.PUBLISHED,
+          updatedById: 'admin-1',
+        }),
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'publish',
+        resource: 'communication_template',
+        tenantId: 'tenant-1',
+        resourceId: 'template-1',
       }),
     );
   });

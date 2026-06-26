@@ -4,16 +4,20 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { getNepalSchoolDay } from '@schoolos/core';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   AudienceType,
   AuthMethod,
+  CommunicationTemplateStatus,
   ConsentType,
   EventType,
   NotificationChannel,
   NotificationStatus,
   NoticePriority,
+  ParentTeacherThreadStatus,
   Prisma,
+  ProviderType,
   StudentLifecycleStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -23,9 +27,53 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { CreateNoticeDto } from './dto/create-notice.dto';
+import {
+  CreateCommunicationTemplateDto,
+  UpdateCommunicationTemplateDto,
+} from './dto/communication-template.dto';
 import { CaptureConsentDto } from './dto/capture-consent.dto';
 import { UsageService } from '../usage/usage.service';
 import { RedisService } from '../redis/redis.service';
+
+const TEMPLATE_SELECT = {
+  id: true,
+  tenantId: true,
+  key: true,
+  category: true,
+  channel: true,
+  language: true,
+  title: true,
+  body: true,
+  status: true,
+  version: true,
+  publishedAt: true,
+  archivedAt: true,
+  createdById: true,
+  updatedById: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.CommunicationTemplateSelect;
+
+const PROVIDER_CHANNELS = [
+  {
+    channel: NotificationChannel.EMAIL,
+    label: 'Email',
+    providerType: ProviderType.EMAIL,
+    modeKey: 'email' as const,
+  },
+  {
+    channel: NotificationChannel.SMS,
+    label: 'SMS',
+    providerType: ProviderType.SMS,
+    modeKey: 'sms' as const,
+  },
+  {
+    channel: NotificationChannel.PUSH,
+    label: 'Push',
+    providerType: ProviderType.FCM,
+    modeKey: 'push' as const,
+  },
+] as const;
 
 @Injectable()
 export class CommunicationsService {
@@ -276,6 +324,444 @@ export class CommunicationsService {
       })),
       emergencyNoticeCount: emergencyCount,
     };
+  }
+
+  async getCommunicationsSummary(actor: AuthContext) {
+    const day = getNepalSchoolDay();
+    const now = new Date();
+    const [
+      sentToday,
+      scheduledNotices,
+      failedDeliveries,
+      unreadHighImpactNotices,
+      escalatedChatCount,
+      providerDiagnostics,
+    ] = await Promise.all([
+      this.prisma.notificationDelivery.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: {
+            in: [NotificationStatus.SENT, NotificationStatus.DELIVERED],
+          },
+          OR: [
+            {
+              sentAt: {
+                gte: day.startUtc,
+                lt: day.endExclusiveUtc,
+              },
+            },
+            {
+              deliveredAt: {
+                gte: day.startUtc,
+                lt: day.endExclusiveUtc,
+              },
+            },
+          ],
+        },
+      }),
+      this.prisma.notice.count({
+        where: {
+          tenantId: actor.tenantId,
+          publishedAt: null,
+          scheduledFor: {
+            gte: now,
+          },
+        },
+      }),
+      this.prisma.notificationDelivery.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: {
+            in: [NotificationStatus.FAILED, NotificationStatus.RETRY_PENDING],
+          },
+        },
+      }),
+      this.prisma.notificationDelivery.count({
+        where: {
+          tenantId: actor.tenantId,
+          recipientUserId: { not: null },
+          notice: {
+            tenantId: actor.tenantId,
+            priority: {
+              in: [NoticePriority.URGENT, NoticePriority.EMERGENCY],
+            },
+            publishedAt: { not: null },
+          },
+          readReceipts: {
+            none: {},
+          },
+          status: {
+            notIn: [NotificationStatus.CANCELLED, NotificationStatus.SKIPPED],
+          },
+        },
+      }),
+      this.prisma.parentTeacherThread.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: ParentTeacherThreadStatus.ESCALATED,
+        },
+      }),
+      this.getCommunicationProviderDiagnostics(actor),
+    ]);
+
+    return {
+      generatedAt: now.toISOString(),
+      schoolDay: day.gregorianDate,
+      sentToday,
+      scheduledNotices,
+      failedDeliveries,
+      unreadHighImpactNotices,
+      escalatedChatCount,
+      providerStatus: providerDiagnostics.overallMode,
+      providerHealth: providerDiagnostics.health,
+    };
+  }
+
+  async getCommunicationProviderDiagnostics(actor: AuthContext) {
+    const generatedAt = new Date();
+    const channels = await Promise.all(
+      PROVIDER_CHANNELS.map((channel) =>
+        this.getProviderChannelDiagnostic(actor, channel),
+      ),
+    );
+    const health = channels.some((channel) => channel.health === 'degraded')
+      ? 'degraded'
+      : channels.every((channel) => channel.health === 'unavailable')
+        ? 'unavailable'
+        : 'healthy';
+
+    return {
+      generatedAt: generatedAt.toISOString(),
+      overallMode: resolveOverallProviderMode(
+        channels.map((channel) => channel.mode),
+      ),
+      health,
+      channels,
+    };
+  }
+
+  private async getProviderChannelDiagnostic(
+    actor: AuthContext,
+    channelConfig: (typeof PROVIDER_CHANNELS)[number],
+  ) {
+    const mode = resolveSchoolProviderMode(channelConfig.modeKey);
+    const where = {
+      tenantId: actor.tenantId,
+      channel: channelConfig.channel,
+    };
+    const [
+      provider,
+      deliveryCount,
+      sentCount,
+      failedCount,
+      retryableCount,
+      latestDelivery,
+      latestCallback,
+    ] = await Promise.all([
+      this.prisma.providerConfig.findFirst({
+        where: {
+          type: channelConfig.providerType,
+          enabled: true,
+        },
+        orderBy: [{ updatedAt: 'desc' }],
+        select: {
+          enabled: true,
+          validationStatus: true,
+          lastValidatedAt: true,
+          configEncrypted: true,
+          updatedAt: true,
+        },
+      }),
+      this.prisma.notificationDelivery.count({ where }),
+      this.prisma.notificationDelivery.count({
+        where: {
+          ...where,
+          status: {
+            in: [NotificationStatus.SENT, NotificationStatus.DELIVERED],
+          },
+        },
+      }),
+      this.prisma.notificationDelivery.count({
+        where: {
+          ...where,
+          status: NotificationStatus.FAILED,
+        },
+      }),
+      this.prisma.notificationDelivery.count({
+        where: {
+          ...where,
+          status: {
+            in: [NotificationStatus.FAILED, NotificationStatus.RETRY_PENDING],
+          },
+        },
+      }),
+      this.prisma.notificationDelivery.findFirst({
+        where,
+        orderBy: [{ createdAt: 'desc' }],
+        select: {
+          status: true,
+          sentAt: true,
+          deliveredAt: true,
+          failedAt: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.notificationDelivery.findFirst({
+        where: {
+          ...where,
+          OR: [
+            { providerMessageId: { not: null } },
+            { deliveredAt: { not: null } },
+            { failedAt: { not: null } },
+          ],
+        },
+        orderBy: [{ createdAt: 'desc' }],
+        select: {
+          deliveredAt: true,
+          failedAt: true,
+          sentAt: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+    const providerConfig = asRecord(provider?.configEncrypted);
+    const validationStatus = safeProviderValidationStatus(
+      provider?.validationStatus,
+    );
+    const hasProvider = Boolean(provider);
+    const callbackStatus =
+      mode !== 'configured'
+        ? 'not_applicable'
+        : provider?.validationStatus === 'FAILED'
+          ? 'failing'
+          : latestCallback
+            ? 'recent'
+            : hasCallbackSecretConfig(providerConfig)
+              ? 'configured'
+              : 'not_configured';
+    const health = resolveProviderHealth({
+      mode,
+      hasProvider,
+      validationStatus,
+      failedCount,
+      retryableCount,
+      deliveryCount,
+    });
+
+    return {
+      channel: channelConfig.channel,
+      label: channelConfig.label,
+      mode,
+      health,
+      deliveryCount,
+      sentCount,
+      failedCount,
+      retryableCount,
+      validationStatus,
+      lastValidatedAt: toIso(provider?.lastValidatedAt),
+      lastEventAt: toIso(resolveDeliveryEventTime(latestDelivery)),
+      callbackStatus,
+      lastCallbackAt: toIso(resolveDeliveryEventTime(latestCallback)),
+      message: providerDiagnosticMessage({
+        label: channelConfig.label,
+        mode,
+        health,
+        hasProvider,
+        validationStatus,
+      }),
+    };
+  }
+
+  async listCommunicationTemplates(actor: AuthContext) {
+    return this.prisma.communicationTemplate.findMany({
+      where: {
+        tenantId: actor.tenantId,
+      },
+      select: TEMPLATE_SELECT,
+      orderBy: [{ key: 'asc' }, { version: 'desc' }],
+    });
+  }
+
+  async createCommunicationTemplate(
+    dto: CreateCommunicationTemplateDto,
+    actor: AuthContext,
+  ) {
+    const key = normalizeTemplateKey(dto.key);
+    const latest = await this.prisma.communicationTemplate.aggregate({
+      where: {
+        tenantId: actor.tenantId,
+        key,
+      },
+      _max: {
+        version: true,
+      },
+    });
+    const template = await this.prisma.communicationTemplate.create({
+      data: {
+        tenantId: actor.tenantId,
+        key,
+        category: dto.category,
+        channel: dto.channel,
+        language: dto.language ?? 'en',
+        title: dto.title.trim(),
+        body: dto.body.trim(),
+        version: (latest._max.version ?? 0) + 1,
+        createdById: actor.userId,
+      },
+      select: TEMPLATE_SELECT,
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'communication_template',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: template.id,
+      after: {
+        key: template.key,
+        category: template.category,
+        channel: template.channel,
+        version: template.version,
+      },
+    });
+
+    return template;
+  }
+
+  async updateCommunicationTemplate(
+    templateId: string,
+    dto: UpdateCommunicationTemplateDto,
+    actor: AuthContext,
+  ) {
+    const current = await this.prisma.communicationTemplate.findFirst({
+      where: {
+        id: templateId,
+        tenantId: actor.tenantId,
+      },
+      select: TEMPLATE_SELECT,
+    });
+
+    if (!current) {
+      throw new NotFoundException(
+        'Communication template not found in this tenant',
+      );
+    }
+
+    if (current.status !== CommunicationTemplateStatus.DRAFT) {
+      throw new ConflictException(
+        'Only draft communication templates can be edited',
+      );
+    }
+
+    const template = await this.prisma.communicationTemplate.update({
+      where: {
+        id: templateId,
+      },
+      data: {
+        ...(dto.category ? { category: dto.category } : {}),
+        ...(dto.channel ? { channel: dto.channel } : {}),
+        ...(dto.language ? { language: dto.language } : {}),
+        ...(dto.title ? { title: dto.title.trim() } : {}),
+        ...(dto.body ? { body: dto.body.trim() } : {}),
+        updatedById: actor.userId,
+      },
+      select: TEMPLATE_SELECT,
+    });
+
+    await this.auditService.record({
+      action: 'update',
+      resource: 'communication_template',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: template.id,
+      before: {
+        status: current.status,
+      },
+      after: {
+        category: template.category,
+        channel: template.channel,
+        version: template.version,
+      },
+    });
+
+    return template;
+  }
+
+  async publishCommunicationTemplate(templateId: string, actor: AuthContext) {
+    return this.transitionCommunicationTemplate(
+      templateId,
+      CommunicationTemplateStatus.PUBLISHED,
+      actor,
+    );
+  }
+
+  async archiveCommunicationTemplate(templateId: string, actor: AuthContext) {
+    return this.transitionCommunicationTemplate(
+      templateId,
+      CommunicationTemplateStatus.ARCHIVED,
+      actor,
+    );
+  }
+
+  private async transitionCommunicationTemplate(
+    templateId: string,
+    status:
+      | (typeof CommunicationTemplateStatus)['PUBLISHED']
+      | (typeof CommunicationTemplateStatus)['ARCHIVED'],
+    actor: AuthContext,
+  ) {
+    const current = await this.prisma.communicationTemplate.findFirst({
+      where: {
+        id: templateId,
+        tenantId: actor.tenantId,
+      },
+      select: TEMPLATE_SELECT,
+    });
+
+    if (!current) {
+      throw new NotFoundException(
+        'Communication template not found in this tenant',
+      );
+    }
+
+    const now = new Date();
+    const template = await this.prisma.communicationTemplate.update({
+      where: {
+        id: templateId,
+      },
+      data: {
+        status,
+        updatedById: actor.userId,
+        publishedAt:
+          status === CommunicationTemplateStatus.PUBLISHED
+            ? (current.publishedAt ?? now)
+            : current.publishedAt,
+        archivedAt:
+          status === CommunicationTemplateStatus.ARCHIVED ? now : null,
+      },
+      select: TEMPLATE_SELECT,
+    });
+
+    await this.auditService.record({
+      action:
+        status === CommunicationTemplateStatus.PUBLISHED
+          ? 'publish'
+          : 'archive',
+      resource: 'communication_template',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: template.id,
+      before: {
+        status: current.status,
+      },
+      after: {
+        status: template.status,
+        key: template.key,
+        version: template.version,
+      },
+    });
+
+    return template;
   }
 
   async processScheduledNotices(actor: AuthContext) {
@@ -1203,4 +1689,156 @@ function summarizeExistingDeliveries(
     deliveryIds: deliveries.map((delivery) => delivery.id),
     replayed: true,
   };
+}
+
+type SchoolProviderMode = 'disabled' | 'dev-log' | 'mock' | 'configured';
+type ProviderHealth = 'healthy' | 'degraded' | 'unavailable';
+
+function resolveSchoolProviderMode(
+  channel: 'email' | 'sms' | 'push',
+): SchoolProviderMode {
+  if (isDisabled(process.env.NOTIFICATIONS_DISABLED)) {
+    return 'disabled';
+  }
+  if (isDisabled(process.env[`${channel.toUpperCase()}_PROVIDER_ENABLED`])) {
+    return 'disabled';
+  }
+
+  const raw =
+    process.env[`${channel.toUpperCase()}_PROVIDER_MODE`] ??
+    process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE ??
+    (channel === 'email' ? process.env.EMAIL_DELIVERY_MODE : undefined);
+  const normalized = raw?.trim().toLowerCase();
+
+  if (normalized === 'disabled') return 'disabled';
+  if (normalized === 'mock') return 'mock';
+  if (normalized === 'configured' || normalized === 'configured-provider') {
+    return 'configured';
+  }
+  if (normalized === 'webhook') return 'configured';
+  if (normalized === 'dev-log' || normalized === 'log') return 'dev-log';
+  return 'dev-log';
+}
+
+function resolveOverallProviderMode(modes: SchoolProviderMode[]) {
+  if (modes.includes('configured')) return 'configured';
+  if (modes.includes('mock')) return 'mock';
+  if (modes.includes('dev-log')) return 'dev-log';
+  return 'disabled';
+}
+
+function resolveProviderHealth(input: {
+  mode: SchoolProviderMode;
+  hasProvider: boolean;
+  validationStatus: string | null;
+  failedCount: number;
+  retryableCount: number;
+  deliveryCount: number;
+}): ProviderHealth {
+  if (input.mode === 'disabled') {
+    return 'unavailable';
+  }
+  if (
+    input.mode === 'configured' &&
+    (!input.hasProvider || input.validationStatus === 'FAILED')
+  ) {
+    return 'degraded';
+  }
+  if (input.failedCount > 0 || input.retryableCount > 0) {
+    return 'degraded';
+  }
+  if (input.deliveryCount === 0) {
+    return 'unavailable';
+  }
+  return 'healthy';
+}
+
+function providerDiagnosticMessage(input: {
+  label: string;
+  mode: SchoolProviderMode;
+  health: ProviderHealth;
+  hasProvider: boolean;
+  validationStatus: string | null;
+}) {
+  if (input.mode === 'disabled') {
+    return `${input.label} delivery is disabled. It is not treated as live provider delivery.`;
+  }
+  if (input.mode === 'dev-log') {
+    return `${input.label} delivery is in dev-log mode and is not live provider delivery.`;
+  }
+  if (input.mode === 'mock') {
+    return `${input.label} delivery is in mock mode and is not live provider delivery.`;
+  }
+  if (!input.hasProvider) {
+    return `${input.label} delivery is configured mode, but no enabled backend provider is available.`;
+  }
+  if (input.validationStatus === 'FAILED') {
+    return `${input.label} delivery provider validation failed. Review platform provider setup.`;
+  }
+  if (input.health === 'degraded') {
+    return `${input.label} delivery has failed or retryable records that need review.`;
+  }
+  return `${input.label} delivery is configured through the backend provider boundary.`;
+}
+
+function normalizeTemplateKey(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function toIso(value: Date | string | null | undefined) {
+  if (!value) return null;
+  return value instanceof Date
+    ? value.toISOString()
+    : new Date(value).toISOString();
+}
+
+function resolveDeliveryEventTime(
+  delivery:
+    | {
+        sentAt?: Date | null;
+        deliveredAt?: Date | null;
+        failedAt?: Date | null;
+        createdAt?: Date | null;
+      }
+    | null
+    | undefined,
+) {
+  if (!delivery) return null;
+  return (
+    delivery.deliveredAt ??
+    delivery.failedAt ??
+    delivery.sentAt ??
+    delivery.createdAt ??
+    null
+  );
+}
+
+function safeProviderValidationStatus(value: string | null | undefined) {
+  if (!value) return null;
+  if (['VALID', 'READY', 'OK', 'DEGRADED', 'FAILED'].includes(value)) {
+    return value;
+  }
+  return 'NOT_VALIDATED';
+}
+
+function hasCallbackSecretConfig(config: Record<string, unknown>) {
+  return [
+    'callbackSecret',
+    'webhookSecret',
+    'signingSecret',
+    'providerWebhookSecret',
+  ].some((key) => typeof config[key] === 'string' && config[key]);
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function isDisabled(value: string | undefined) {
+  if (!value) return false;
+  return ['0', 'false', 'disabled', 'off', 'no'].includes(
+    value.trim().toLowerCase(),
+  );
 }
