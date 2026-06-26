@@ -13,6 +13,7 @@ describe('School Settings workspaces', () => {
     const calendarApi = read('lib/api/academic-calendar-settings.ts');
     assert.match(api, /settings\/workspaces/);
     assert.match(api, /getSchoolSettingsOverview/);
+    assert.match(api, /getSchoolIntegrationsStatus/);
     assert.match(api, /getSchoolProfile/);
     assert.match(api, /updateSchoolProfile/);
     assert.match(api, /getBrandingDocuments/);
@@ -20,6 +21,29 @@ describe('School Settings workspaces', () => {
     assert.match(calendarApi, /academic-calendar/);
     assert.match(calendarApi, /createAcademicYear/);
     assert.match(calendarApi, /upsertCalendarDay/);
+  });
+
+  it('replaces integrations placeholders with safe status contracts', () => {
+    const page = read('app/dashboard/settings/integrations/page.tsx');
+    const workspace = read('components/settings/integrations-status-workspace.tsx');
+    const api = read('lib/api/school-settings.ts');
+
+    assert.match(page, /IntegrationsStatusWorkspace/);
+    assert.match(api, /settings\/workspaces/);
+    assert.match(api, /\/integrations/);
+    assert.match(workspace, /ModuleLockedState/);
+    for (const label of [
+      'disabled',
+      'dev-log',
+      'mock',
+      'configured',
+      'needs attention',
+      'unavailable',
+    ]) {
+      assert.match(workspace, new RegExp(label));
+    }
+    assert.doesNotMatch(page, /contract-needed|School API & webhooks/);
+    assert.doesNotMatch(workspace, /providerId|apiToken|secretKey|bucket|queue|callback URL|webhook URL/i);
   });
 
   it('renders overview, profile, branding, and calendar through dedicated workspaces', () => {

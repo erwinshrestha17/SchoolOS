@@ -1,5 +1,6 @@
 import type {
   BrandingDocumentsSettings,
+  SchoolIntegrationsStatus,
   SchoolProfileSettings,
   SchoolSettingsNavigation,
   SchoolSettingsOverview,
@@ -17,6 +18,7 @@ const basePath = '/settings/workspaces';
 export const schoolSettingsApi = {
   getSchoolSettingsNavigation: () => request<SchoolSettingsNavigation>(`${basePath}/navigation`),
   getSchoolSettingsOverview: () => request<SchoolSettingsOverview>(`${basePath}/overview`),
+  getSchoolIntegrationsStatus: () => request<SchoolIntegrationsStatus>(`${basePath}/integrations`),
   getSchoolProfile: () => request<SchoolProfileSettings>(`${basePath}/school-profile`),
   updateSchoolProfile: (body: UpdateSchoolProfilePayload) => request<SchoolProfileSettings>(`${basePath}/school-profile`, { method: 'PATCH', json: body }),
   getBrandingDocuments: () => request<BrandingDocumentsSettings>(`${basePath}/branding-documents`),

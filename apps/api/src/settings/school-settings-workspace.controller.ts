@@ -18,6 +18,7 @@ import { SchoolSettingsNavigationV1Service } from './school-settings-navigation-
 import { SchoolSettingsProfileService } from './school-settings-profile.service';
 import { BrandingDocumentsService } from './branding-documents.service';
 import { AcademicCalendarSettingsService } from './academic-calendar-settings.service';
+import { SchoolSettingsIntegrationsService } from './school-settings-integrations.service';
 import { UpdateSchoolProfileDto } from './dto/update-school-profile.dto';
 import { UpdateBrandingDocumentsDto } from './dto/update-branding-documents.dto';
 import { CreateAcademicCalendarYearDto } from './dto/create-academic-calendar-year.dto';
@@ -32,6 +33,7 @@ export class SchoolSettingsWorkspaceController {
     private readonly profileService: SchoolSettingsProfileService,
     private readonly brandingService: BrandingDocumentsService,
     private readonly academicCalendarService: AcademicCalendarSettingsService,
+    private readonly integrationsService: SchoolSettingsIntegrationsService,
   ) {}
 
   @Get('navigation')
@@ -100,6 +102,12 @@ export class SchoolSettingsWorkspaceController {
         },
       ],
     };
+  }
+
+  @Get('integrations')
+  @Permissions('settings:read')
+  getIntegrations(@CurrentAuth() auth: AuthContext) {
+    return this.integrationsService.getIntegrationsStatus(auth.tenantId);
   }
 
   @Get('school-profile')

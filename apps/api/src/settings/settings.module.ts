@@ -6,6 +6,7 @@ import { SchoolSettingsNavigationV1Service } from './school-settings-navigation-
 import { SchoolSettingsProfileService } from './school-settings-profile.service';
 import { BrandingDocumentsService } from './branding-documents.service';
 import { AcademicCalendarSettingsService } from './academic-calendar-settings.service';
+import { SchoolSettingsIntegrationsService } from './school-settings-integrations.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 import { PlatformModule } from '../platform/platform.module';
@@ -27,6 +28,7 @@ import { FileRegistryModule } from '../file-registry/file-registry.module';
     SchoolSettingsProfileService,
     BrandingDocumentsService,
     AcademicCalendarSettingsService,
+    SchoolSettingsIntegrationsService,
   ],
   exports: [SettingsService],
 })
