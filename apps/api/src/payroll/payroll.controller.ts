@@ -106,6 +106,36 @@ export class PayrollController {
     return this.payrollService.getPayrollRun(id, auth);
   }
 
+  @Post('runs/:runId/payslips/:payslipId/regeneration-jobs')
+  @Permissions('payroll:payslip:generate')
+  queuePayslipRegeneration(
+    @Param('runId') runId: string,
+    @Param('payslipId') payslipId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.queuePayslipRegenerationJob(
+      runId,
+      payslipId,
+      auth,
+    );
+  }
+
+  @Get('runs/:runId/payslips/:payslipId/regeneration-jobs/:jobId')
+  @Permissions('payroll:payslip:generate')
+  getPayslipRegenerationJob(
+    @Param('runId') runId: string,
+    @Param('payslipId') payslipId: string,
+    @Param('jobId') jobId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getPayslipRegenerationJob(
+      runId,
+      payslipId,
+      jobId,
+      auth,
+    );
+  }
+
   @Post('runs')
   @Permissions('payroll:run:create')
   createRun(

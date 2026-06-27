@@ -639,6 +639,12 @@ Employment state, effective dates, leave balance/overlap, check-in policy, payro
 
 Payroll registers, exception reports, payslips and summaries are queued protected outputs. **needs OpenAPI confirmation** unless verified in the current contract.
 
+The protected payslip regeneration contract is verified as:
+
+- `POST /api/v1/payroll/runs/:runId/payslips/:payslipId/regeneration-jobs` queues or reuses the active job.
+- `GET /api/v1/payroll/runs/:runId/payslips/:payslipId/regeneration-jobs/:jobId` returns `QUEUED`, `PROCESSING`, `SUCCEEDED`, or `FAILED` plus bounded generation counts.
+- Both routes require `payroll:payslip:generate`, remain tenant/run/payslip scoped, and never expose queue payloads, storage keys, provider errors, or raw failure reasons.
+
 ### File Registry / Protected File APIs
 
 Staff documents, contracts, evidence, payslips, payroll reports use File Registry. **needs OpenAPI confirmation** unless verified in the current contract.

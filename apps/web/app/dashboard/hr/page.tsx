@@ -163,15 +163,11 @@ export default function HRDashboardPage() {
         />
         <KpiCard
           title="Payroll Exceptions"
-          value={
-            payrollSummaryQuery.isError
-              ? 'Unavailable'
-              : payrollSummary?.selectedPayrollRun?.validationExceptionCount ?? 'Unavailable'
-          }
+          value="Unavailable"
           icon={<BadgeCheck className="h-5 w-5" />}
           loading={payrollSummaryQuery.isLoading}
           tone="neutral"
-          description="No exception workflow contract yet"
+          description="Unavailable until a backend exception workflow contract exists"
         />
         <KpiCard
           title="Payslips Generated"

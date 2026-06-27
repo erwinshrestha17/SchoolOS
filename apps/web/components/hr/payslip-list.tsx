@@ -1,16 +1,42 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../../lib/api';
-import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
+import type {
+  PayslipRegenerationJobSummary,
+  PayslipSummary,
+} from '@schoolos/core';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { ApiRequestError, api } from '../../lib/api';
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Loader2,
+  RefreshCw,
+  Search,
+} from 'lucide-react';
 import { useState } from 'react';
+import { useSession } from '../session-provider';
+
+type PayslipRegenerationTarget = Pick<
+  PayslipSummary,
+  'id' | 'payrollRunId' | 'payslipNumber'
+>;
 
 export function PayslipList() {
+  const { hasPermissions } = useSession();
   const [search, setSearch] = useState('');
   const [downloadingPayslip, setDownloadingPayslip] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [regenerationTarget, setRegenerationTarget] =
+    useState<PayslipRegenerationTarget | null>(null);
+  const [regenerationJob, setRegenerationJob] =
+    useState<PayslipRegenerationJobSummary | null>(null);
   const [page, setPage] = useState(1);
   const limit = 10;
+  const canRegeneratePayslips = hasPermissions([
+    'payroll:payslip:generate',
+  ]);
   const { data: payslipPage, isLoading, error } = useQuery({
     queryKey: ['payslips', page, limit, search],
     queryFn: () =>
@@ -20,10 +46,46 @@ export function PayslipList() {
         search: search.trim() || undefined,
       }),
   });
+  const regenerationMutation = useMutation({
+    mutationFn: (target: PayslipRegenerationTarget) =>
+      api.queuePayslipRegeneration(target.payrollRunId, target.id),
+    onSuccess: (job) => {
+      setRegenerationJob(job);
+      setDownloadError(null);
+    },
+  });
+  const regenerationJobQuery = useQuery({
+    queryKey: [
+      'payslip-regeneration-job',
+      regenerationJob?.payrollRunId,
+      regenerationJob?.payslipId,
+      regenerationJob?.jobId,
+    ],
+    queryFn: () =>
+      api.getPayslipRegenerationJob(
+        regenerationJob!.payrollRunId,
+        regenerationJob!.payslipId,
+        regenerationJob!.jobId,
+      ),
+    enabled: Boolean(regenerationJob?.jobId),
+    refetchInterval: (query) => {
+      const jobStatus =
+        query.state.data?.status ?? regenerationJob?.status ?? null;
+      return jobStatus === 'QUEUED' || jobStatus === 'PROCESSING'
+        ? 2_000
+        : false;
+    },
+  });
 
   const payslips = payslipPage?.items ?? [];
   const totalItems = payslipPage?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+  const currentRegenerationJob =
+    regenerationJobQuery.data ?? regenerationJob;
+  const regenerationInProgress =
+    regenerationMutation.isPending ||
+    currentRegenerationJob?.status === 'QUEUED' ||
+    currentRegenerationJob?.status === 'PROCESSING';
 
   const moneyFormatter = new Intl.NumberFormat('en-NP', {
     style: 'currency',
@@ -31,16 +93,34 @@ export function PayslipList() {
     maximumFractionDigits: 0,
   });
 
-  async function openPayslipPdf(payslipNumber: string) {
-    setDownloadingPayslip(payslipNumber);
+  async function openPayslipPdf(payslip: PayslipRegenerationTarget) {
+    setDownloadingPayslip(payslip.payslipNumber);
     setDownloadError(null);
 
     try {
-      await api.openPayslipPdf(payslipNumber);
-    } catch {
-      setDownloadError(
-        'Could not download this protected payslip. Check your permission and try again.',
-      );
+      await api.openPayslipPdf(payslip.payslipNumber);
+      setRegenerationTarget(null);
+      setRegenerationJob(null);
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.statusCode === 409) {
+        setRegenerationTarget(payslip);
+        setRegenerationJob(null);
+        setDownloadError(
+          'This protected payslip file is unavailable. Regenerate payslips before downloading.',
+        );
+      } else if (
+        error instanceof ApiRequestError &&
+        error.statusCode === 403
+      ) {
+        setDownloadError(
+          'You do not have permission to download this payslip.',
+        );
+      } else {
+        setRegenerationTarget(null);
+        setDownloadError(
+          'Could not download this protected payslip. Try again later.',
+        );
+      }
     } finally {
       setDownloadingPayslip(null);
     }
@@ -68,7 +148,100 @@ export function PayslipList() {
           role="alert"
           className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700"
         >
-          {downloadError}
+          <p>{downloadError}</p>
+          {regenerationTarget && canRegeneratePayslips ? (
+            <button
+              type="button"
+              onClick={() =>
+                regenerationMutation.mutate(regenerationTarget)
+              }
+              disabled={regenerationInProgress}
+              className="mt-3 inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {regenerationInProgress ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {regenerationInProgress
+                ? 'Regeneration queued'
+                : 'Queue payslip regeneration'}
+            </button>
+          ) : regenerationTarget ? (
+            <p className="mt-2 text-xs text-rose-600">
+              A payroll administrator with payslip generation permission must
+              regenerate this file.
+            </p>
+          ) : null}
+          {regenerationMutation.isError ? (
+            <p className="mt-2 text-xs text-rose-600">
+              Regeneration could not be queued. Try again.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {currentRegenerationJob ? (
+        <div
+          role="status"
+          className={
+            currentRegenerationJob.status === 'SUCCEEDED'
+              ? 'rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800'
+              : currentRegenerationJob.status === 'FAILED' ||
+                  regenerationJobQuery.isError
+                ? 'rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800'
+                : 'rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800'
+          }
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-2 font-semibold">
+              {currentRegenerationJob.status === 'SUCCEEDED' ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : (
+                <RefreshCw
+                  className={
+                    regenerationInProgress ? 'h-4 w-4 animate-spin' : 'h-4 w-4'
+                  }
+                />
+              )}
+              {regenerationJobQuery.isError
+                ? 'Could not refresh regeneration status.'
+                : currentRegenerationJob.status === 'QUEUED'
+                  ? 'Payslip regeneration is queued.'
+                  : currentRegenerationJob.status === 'PROCESSING'
+                    ? 'Payslip regeneration is processing.'
+                    : currentRegenerationJob.status === 'SUCCEEDED'
+                      ? 'Payslip file regenerated. Download it again.'
+                      : 'Payslip regeneration failed. Queue it again to retry.'}
+            </span>
+            {currentRegenerationJob.status === 'SUCCEEDED' &&
+            regenerationTarget ? (
+              <button
+                type="button"
+                onClick={() => void openPayslipPdf(regenerationTarget)}
+                disabled={
+                  downloadingPayslip === regenerationTarget.payslipNumber
+                }
+                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-60"
+              >
+                <Download className="h-4 w-4" />
+                Download regenerated PDF
+              </button>
+            ) : currentRegenerationJob.status === 'FAILED' &&
+              regenerationTarget &&
+              canRegeneratePayslips ? (
+              <button
+                type="button"
+                onClick={() =>
+                  regenerationMutation.mutate(regenerationTarget)
+                }
+                disabled={regenerationMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-800 transition hover:bg-rose-100 disabled:opacity-60"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Retry regeneration
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -125,7 +298,7 @@ export function PayslipList() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button
-                        onClick={() => void openPayslipPdf(payslip.payslipNumber)}
+                        onClick={() => void openPayslipPdf(payslip)}
                         disabled={downloadingPayslip === payslip.payslipNumber}
                         className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 font-bold text-slate-600 transition-all hover:bg-[var(--color-mod-hr-soft)] hover:text-[var(--color-mod-hr-text)]"
                       >

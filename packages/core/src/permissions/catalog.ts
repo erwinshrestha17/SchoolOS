@@ -977,6 +977,11 @@ export const permissionCatalog = [
     description: "Read payslips",
   },
   {
+    resource: "payroll:payslip",
+    action: "generate",
+    description: "Queue and track protected payslip generation",
+  },
+  {
     resource: "payroll:reports",
     action: "read",
     description: "Read payroll reports",

@@ -982,6 +982,11 @@ export const permissionCatalog = [
     description: "Read payslips",
   },
   {
+    resource: "payroll:payslip",
+    action: "generate",
+    description: "Queue and track protected payslip generation",
+  },
+  {
     resource: "payroll:reports",
     action: "read",
     description: "Read payroll reports",
@@ -1609,6 +1614,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "payroll:run:post",
     "payroll:run:pay",
     "payroll:payslip:read",
+    "payroll:payslip:generate",
     "payroll:reports:read",
     "payroll:exports:create",
     "accounting:accounts:read",

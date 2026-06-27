@@ -2177,6 +2177,26 @@ export type PayslipSummary = {
   netAmount?: PayrollMoneyAmount;
 };
 
+export type PayslipRegenerationJobStatus =
+  | 'QUEUED'
+  | 'PROCESSING'
+  | 'SUCCEEDED'
+  | 'FAILED';
+
+export type PayslipRegenerationJobSummary = {
+  jobId: string;
+  payrollRunId: string;
+  payslipId: string;
+  payslipNumber: string;
+  status: PayslipRegenerationJobStatus;
+  requestedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  generated: number | null;
+  skipped: number | null;
+  payslipCount: number | null;
+};
+
 export type PayrollDashboardSummary = {
   filters: {
     periodMonth: number;
@@ -2236,8 +2256,8 @@ export type PayrollDashboardSummary = {
       expected: number;
       byStatus: Record<string, number>;
     };
-    validationExceptionCount: number | null;
-    validationExceptionSource: string;
+    validationExceptionCount: null;
+    validationExceptionSource: 'needs_exception_workflow_contract';
   } | null;
 };
 

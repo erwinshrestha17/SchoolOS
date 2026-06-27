@@ -3,6 +3,7 @@ import type {
   PayrollDashboardSummary,
   PayrollPreviewResult,
   PayrollRunSummary,
+  PayslipRegenerationJobSummary,
   PayslipSummary,
   RoleSummary,
   SalaryStructureSummary,
@@ -254,6 +255,19 @@ export const payrollApi = {
     const page = await payrollApi.listPayslipsPage();
     return page.items;
   },
+  queuePayslipRegeneration: (runId: string, payslipId: string) =>
+    request<PayslipRegenerationJobSummary>(
+      `/payroll/runs/${encodeURIComponent(runId)}/payslips/${encodeURIComponent(payslipId)}/regeneration-jobs`,
+      { method: 'POST', json: {} },
+    ),
+  getPayslipRegenerationJob: (
+    runId: string,
+    payslipId: string,
+    jobId: string,
+  ) =>
+    request<PayslipRegenerationJobSummary>(
+      `/payroll/runs/${encodeURIComponent(runId)}/payslips/${encodeURIComponent(payslipId)}/regeneration-jobs/${encodeURIComponent(jobId)}`,
+    ),
   openPayrollRunStaffPayslipPdf: async (runId: string, staffId: string) => {
     const response = await fetch(
       `${API_BASE_URL}/payroll/runs/${encodeURIComponent(runId)}/staff/${encodeURIComponent(staffId)}/payslip.pdf`,

@@ -1,5 +1,6 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import {
+  FileStatus,
   PayrollLineStatus,
   PayrollRunStatus,
   PayslipStatus,
@@ -375,6 +376,8 @@ describe('PayrollService hardening boundaries', () => {
           expected: 2,
           byStatus: expect.objectContaining({ ISSUED: 1 }),
         }),
+        validationExceptionCount: null,
+        validationExceptionSource: 'needs_exception_workflow_contract',
       }),
     });
     expect(prisma.staff.count).toHaveBeenCalledWith(
@@ -470,6 +473,7 @@ describe('PayrollService hardening boundaries', () => {
         tenantId: actor.tenantId,
         module: 'payroll',
         entityId: 'payslip-1',
+        status: FileStatus.UPLOADED,
       }),
       assertFileAccessForAuth: jest.fn().mockResolvedValue(undefined),
       getProtectedDownload: jest.fn().mockResolvedValue({
@@ -528,9 +532,319 @@ describe('PayrollService hardening boundaries', () => {
       },
     });
 
+    const result = service.getPayslipPdf('PS-001', actor as never);
+
+    await expect(result).rejects.toBeInstanceOf(ConflictException);
+    await expect(result).rejects.toThrow(
+      'Protected payslip file is unavailable. Regenerate payslips before downloading.',
+    );
+  });
+
+  it('returns the same safe conflict when a completed export points to a missing File Registry asset', async () => {
+    const { service } = buildService({
+      payslip: buildPayslip({ id: 'payslip-1', payslipNumber: 'PS-001' }),
+      reportExports: [
+        {
+          fileAssetId: 'missing-file',
+          filters: { payslipId: 'payslip-1', payslipNumber: 'PS-001' },
+        },
+      ],
+      fileRegistryService: {
+        getFileMetadata: jest
+          .fn()
+          .mockRejectedValue(new NotFoundException('File not found')),
+        assertFileAccessForAuth: jest.fn(),
+        getProtectedDownload: jest.fn(),
+      },
+    });
+
+    const result = service.getPayslipPdf('PS-001', actor as never);
+
+    await expect(result).rejects.toBeInstanceOf(ConflictException);
+    await expect(result).rejects.toThrow(
+      'Protected payslip file is unavailable. Regenerate payslips before downloading.',
+    );
+  });
+
+  it('returns the same safe conflict when the generated File Registry asset has no stored object', async () => {
+    const missingObjectError = Object.assign(
+      new Error('Local storage object is missing'),
+      { code: 'ENOENT' },
+    );
+    const { service } = buildService({
+      payslip: buildPayslip({ id: 'payslip-1', payslipNumber: 'PS-001' }),
+      reportExports: [
+        {
+          fileAssetId: 'file-1',
+          filters: { payslipId: 'payslip-1', payslipNumber: 'PS-001' },
+        },
+      ],
+      fileRegistryService: {
+        getFileMetadata: jest.fn().mockResolvedValue({
+          id: 'file-1',
+          tenantId: actor.tenantId,
+          module: 'payroll',
+          entityId: 'payslip-1',
+          status: FileStatus.UPLOADED,
+        }),
+        assertFileAccessForAuth: jest.fn().mockResolvedValue(undefined),
+        getProtectedDownload: jest.fn().mockRejectedValue(missingObjectError),
+      },
+    });
+
+    const result = service.getPayslipPdf('PS-001', actor as never);
+
+    await expect(result).rejects.toBeInstanceOf(ConflictException);
+    await expect(result).rejects.toThrow(
+      'Protected payslip file is unavailable. Regenerate payslips before downloading.',
+    );
+  });
+
+  it('queues a tenant-scoped payslip regeneration job with a stable deduplication id', async () => {
+    const job = {
+      id: 'payroll-payslip-tenant-1-run-1-payslip-1',
+      name: 'regeneratePayslip',
+      data: {
+        tenantId: actor.tenantId,
+        payrollRunId: 'run-1',
+        payslipId: 'payslip-1',
+        requestedByUserId: actor.userId,
+      },
+      timestamp: Date.parse('2026-06-27T06:00:00.000Z'),
+      processedOn: null,
+      finishedOn: null,
+      returnvalue: null,
+      getState: jest.fn().mockResolvedValue('waiting'),
+      remove: jest.fn(),
+    };
+    const payrollQueue = {
+      getJob: jest.fn().mockResolvedValue(null),
+      add: jest.fn().mockResolvedValue(job),
+    };
+    const { service, auditService } = buildService({
+      payslip: buildPayslip({
+        id: 'payslip-1',
+        payrollRunId: 'run-1',
+        payrollRun: {
+          id: 'run-1',
+          periodMonth: 5,
+          periodYear: 2026,
+          status: PayrollRunStatus.POSTED,
+        },
+      }),
+      payrollQueue,
+    });
+
     await expect(
-      service.getPayslipPdf('PS-001', actor as never),
-    ).rejects.toThrow('Protected payslip file is unavailable');
+      service.queuePayslipRegenerationJob('run-1', 'payslip-1', actor as never),
+    ).resolves.toMatchObject({
+      jobId: job.id,
+      payrollRunId: 'run-1',
+      payslipId: 'payslip-1',
+      payslipNumber: 'PS-001',
+      status: 'QUEUED',
+    });
+    expect(payrollQueue.add).toHaveBeenCalledWith(
+      'regeneratePayslip',
+      {
+        tenantId: actor.tenantId,
+        payrollRunId: 'run-1',
+        payslipId: 'payslip-1',
+        requestedByUserId: actor.userId,
+      },
+      expect.objectContaining({ jobId: job.id, attempts: 3 }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'queue_payslip_regeneration',
+        resource: 'payslip',
+        resourceId: 'payslip-1',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+      }),
+    );
+  });
+
+  it('reuses an active payslip regeneration job instead of queueing a duplicate', async () => {
+    const activeJob = {
+      id: 'payroll-payslip-tenant-1-run-1-payslip-1',
+      name: 'regeneratePayslip',
+      data: {
+        tenantId: actor.tenantId,
+        payrollRunId: 'run-1',
+        payslipId: 'payslip-1',
+        requestedByUserId: actor.userId,
+      },
+      timestamp: Date.parse('2026-06-27T06:00:00.000Z'),
+      processedOn: Date.parse('2026-06-27T06:00:01.000Z'),
+      finishedOn: null,
+      returnvalue: null,
+      getState: jest.fn().mockResolvedValue('active'),
+      remove: jest.fn(),
+    };
+    const payrollQueue = {
+      getJob: jest.fn().mockResolvedValue(activeJob),
+      add: jest.fn(),
+    };
+    const { service } = buildService({ payrollQueue });
+
+    await expect(
+      service.queuePayslipRegenerationJob('run-1', 'payslip-1', actor as never),
+    ).resolves.toMatchObject({
+      jobId: activeJob.id,
+      status: 'PROCESSING',
+    });
+    expect(payrollQueue.add).not.toHaveBeenCalled();
+    expect(activeJob.remove).not.toHaveBeenCalled();
+  });
+
+  it('does not expose a payslip regeneration job from another tenant', async () => {
+    const payrollQueue = {
+      getJob: jest.fn().mockResolvedValue({
+        id: 'job-other-tenant',
+        name: 'regeneratePayslip',
+        data: {
+          tenantId: 'tenant-other',
+          payrollRunId: 'run-1',
+          payslipId: 'payslip-1',
+          requestedByUserId: 'user-other',
+        },
+        getState: jest.fn().mockResolvedValue('waiting'),
+      }),
+      add: jest.fn(),
+    };
+    const { service } = buildService({ payrollQueue });
+
+    await expect(
+      service.getPayslipRegenerationJob(
+        'run-1',
+        'payslip-1',
+        'job-other-tenant',
+        actor as never,
+      ),
+    ).rejects.toThrow('Payslip regeneration job not found');
+  });
+
+  it('returns bounded completed regeneration status without queue internals', async () => {
+    const payrollQueue = {
+      getJob: jest.fn().mockResolvedValue({
+        id: 'job-1',
+        name: 'regeneratePayslip',
+        data: {
+          tenantId: actor.tenantId,
+          payrollRunId: 'run-1',
+          payslipId: 'payslip-1',
+          requestedByUserId: actor.userId,
+        },
+        timestamp: Date.parse('2026-06-27T06:00:00.000Z'),
+        processedOn: Date.parse('2026-06-27T06:00:01.000Z'),
+        finishedOn: Date.parse('2026-06-27T06:00:02.000Z'),
+        returnvalue: {
+          payrollRunId: 'run-1',
+          periodMonth: 5,
+          periodYear: 2026,
+          payslipCount: 1,
+          generated: 1,
+          skipped: 0,
+        },
+        getState: jest.fn().mockResolvedValue('completed'),
+      }),
+      add: jest.fn(),
+    };
+    const { service } = buildService({ payrollQueue });
+
+    const result = await service.getPayslipRegenerationJob(
+      'run-1',
+      'payslip-1',
+      'job-1',
+      actor as never,
+    );
+
+    expect(result).toEqual({
+      jobId: 'job-1',
+      payrollRunId: 'run-1',
+      payslipId: 'payslip-1',
+      payslipNumber: 'PS-001',
+      status: 'SUCCEEDED',
+      requestedAt: '2026-06-27T06:00:00.000Z',
+      startedAt: '2026-06-27T06:00:01.000Z',
+      completedAt: '2026-06-27T06:00:02.000Z',
+      generated: 1,
+      skipped: 0,
+      payslipCount: 1,
+    });
+    expect(result).not.toHaveProperty('data');
+    expect(result).not.toHaveProperty('failedReason');
+  });
+
+  it('regenerates the requested payslip even when a stale completed export exists', async () => {
+    const generatedAsset = { id: 'file-regenerated' };
+    const fileRegistryService = {
+      registerGeneratedFile: jest.fn().mockResolvedValue(generatedAsset),
+    };
+    const payslip = buildPayslip({
+      id: 'payslip-1',
+      payrollRunId: 'run-1',
+      staff: buildStaff(),
+      payrollLine: buildPayrollLine(),
+    });
+    const { service, prisma, auditService } = buildService({
+      payrollRun: buildPayrollRun({
+        id: 'run-1',
+        status: PayrollRunStatus.POSTED,
+        tenant: { name: 'SchoolOS Academy' },
+        payslips: [payslip],
+      }),
+      reportExports: [
+        {
+          id: 'stale-export',
+          filters: { payrollRunId: 'run-1', payslipId: 'payslip-1' },
+        },
+      ],
+      fileRegistryService,
+    });
+
+    await expect(
+      service.generatePayslipPdfBatch({
+        tenantId: actor.tenantId,
+        payrollRunId: 'run-1',
+        payslipId: 'payslip-1',
+        requestedByUserId: actor.userId,
+      }),
+    ).resolves.toEqual({
+      payrollRunId: 'run-1',
+      periodMonth: 5,
+      periodYear: 2026,
+      payslipCount: 1,
+      generated: 1,
+      skipped: 0,
+    });
+    expect(prisma.reportExport.findMany).not.toHaveBeenCalled();
+    expect(fileRegistryService.registerGeneratedFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: actor.tenantId,
+        generatedByUserId: actor.userId,
+        module: 'payroll',
+        entityId: 'payslip-1',
+      }),
+    );
+    expect(prisma.reportExport.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        reportKey: 'payroll.payslip',
+        status: 'COMPLETED',
+        fileAssetId: 'file-regenerated',
+        requestedBy: actor.userId,
+      }),
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'generate_payslip_pdf_batch',
+        resourceId: 'run-1',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+      }),
+    );
   });
 
   it('lists statutory deductions from tenant-scoped active salary structures only', async () => {
@@ -631,6 +945,7 @@ function buildService(options: {
   payslipStatusGroups?: unknown[];
   reportExports?: unknown[];
   fileRegistryService?: unknown;
+  payrollQueue?: unknown;
 }) {
   const salaryStructureFindFirstQueue = [
     ...(options.salaryStructureFindFirstQueue ?? []),
@@ -769,11 +1084,13 @@ function buildService(options: {
       auditService as never,
       accountingPostingService as never,
       options.fileRegistryService as never,
+      options.payrollQueue as never,
     ),
     prisma,
     tx,
     auditService,
     accountingPostingService,
+    payrollQueue: options.payrollQueue,
   };
 }
 
@@ -860,12 +1177,15 @@ function buildPayrollLine(overrides: Record<string, unknown> = {}) {
     staffId: 'staff-1',
     staff: buildStaff(),
     grossSalary: new Prisma.Decimal(50000),
+    allowances: new Prisma.Decimal(5000),
     deductions: new Prisma.Decimal(1000),
     pfEmployee: new Prisma.Decimal(0),
     pfEmployer: new Prisma.Decimal(0),
     tds: new Prisma.Decimal(0),
     leaveDeductions: new Prisma.Decimal(0),
     netSalary: new Prisma.Decimal(49000),
+    attendanceDays: 26,
+    workingDays: 30,
     paidDays: new Prisma.Decimal(26),
     unpaidDays: new Prisma.Decimal(4),
     ...overrides,

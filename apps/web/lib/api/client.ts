@@ -449,9 +449,11 @@ export async function openImageBlob(response: Response) {
 export async function downloadBlob(response: Response, fileName: string) {
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(
+    throw new ApiRequestError(
       parseApiErrorMessage(text) ||
         `Download failed with status ${response.status}`,
+      response.status,
+      response.headers.get("x-request-id") ?? undefined,
     );
   }
 

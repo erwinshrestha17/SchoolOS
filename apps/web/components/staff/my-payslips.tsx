@@ -14,7 +14,7 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react';
-import { api } from '../../lib/api';
+import { ApiRequestError, api } from '../../lib/api';
 import { Toast } from '@/components/ui/toast';
 
 export function MyPayslips() {
@@ -38,8 +38,18 @@ export function MyPayslips() {
     try {
       await api.openMyPayslipPdf(payslipNumber);
     } catch (error) {
-      console.error('Download failed', error);
-      setDownloadError('Failed to download payslip. Please try again.');
+      if (error instanceof ApiRequestError && error.statusCode === 409) {
+        setDownloadError(
+          'This payslip file is unavailable. Ask your payroll administrator to regenerate it.',
+        );
+      } else if (
+        error instanceof ApiRequestError &&
+        error.statusCode === 403
+      ) {
+        setDownloadError('You do not have access to this payslip.');
+      } else {
+        setDownloadError('Could not download this payslip. Try again later.');
+      }
     } finally {
       setDownloadingPayslip(null);
     }

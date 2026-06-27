@@ -223,6 +223,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "payroll:run:post",
     "payroll:run:pay",
     "payroll:payslip:read",
+    "payroll:payslip:generate",
     "payroll:reports:read",
     "payroll:exports:create",
     "accounting:accounts:read",

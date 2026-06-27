@@ -16,6 +16,8 @@ function createController() {
     getPayrollPreview: jest.fn(),
     listPayrollRuns: jest.fn(),
     getPayrollRun: jest.fn(),
+    queuePayslipRegenerationJob: jest.fn(),
+    getPayslipRegenerationJob: jest.fn(),
     createPayrollRun: jest.fn(),
     approvePayrollRun: jest.fn(),
     reviewPayrollRun: jest.fn(),
@@ -235,6 +237,44 @@ describe('PayrollController M7 contracts', () => {
     expect(salarySlipService.getApprovedSalarySlipPdf).toHaveBeenCalledWith(
       'run-1',
       'line-1',
+      actor,
+    );
+  });
+
+  it('delegates tenant-scoped payslip regeneration queue and status contracts', () => {
+    const { controller, payrollService } = createController();
+    const queued = {
+      jobId: 'job-1',
+      payrollRunId: 'run-1',
+      payslipId: 'payslip-1',
+      status: 'QUEUED',
+    };
+    payrollService.queuePayslipRegenerationJob.mockReturnValue(queued);
+    payrollService.getPayslipRegenerationJob.mockReturnValue({
+      ...queued,
+      status: 'PROCESSING',
+    });
+
+    expect(
+      controller.queuePayslipRegeneration('run-1', 'payslip-1', actor),
+    ).toEqual(queued);
+    expect(
+      controller.getPayslipRegenerationJob(
+        'run-1',
+        'payslip-1',
+        'job-1',
+        actor,
+      ),
+    ).toEqual({ ...queued, status: 'PROCESSING' });
+    expect(payrollService.queuePayslipRegenerationJob).toHaveBeenCalledWith(
+      'run-1',
+      'payslip-1',
+      actor,
+    );
+    expect(payrollService.getPayslipRegenerationJob).toHaveBeenCalledWith(
+      'run-1',
+      'payslip-1',
+      'job-1',
       actor,
     );
   });

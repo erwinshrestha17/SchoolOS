@@ -37,6 +37,7 @@ const permissionAliases: Record<string, string[]> = {
   'payroll:run:post': ['payroll:manage'],
   'payroll:run:pay': ['payroll:manage'],
   'payroll:payslip:read': ['payroll:read', 'staff:read'],
+  'payroll:payslip:generate': ['payroll:manage'],
   'payroll:reports:read': ['payroll:read'],
   'payroll:exports:create': ['payroll:manage', 'reports:export'],
   'accounting:accounts:read': ['accounting:read'],

@@ -5,7 +5,9 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
 import {
+  FileStatus,
   JournalLineSide,
   PayrollLineStatus,
   PayrollPaymentStatus,
@@ -16,7 +18,13 @@ import {
   SalaryStructureStatus,
   StaffStatus,
 } from '@prisma/client';
-import { getNepalSchoolDay, type PayrollPreviewResult } from '@schoolos/core';
+import {
+  getNepalSchoolDay,
+  type PayrollPreviewResult,
+  type PayslipRegenerationJobStatus,
+  type PayslipRegenerationJobSummary,
+} from '@schoolos/core';
+import type { Job, Queue } from 'bullmq';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -24,6 +32,7 @@ import { buildSalarySlipPdf, buildSimplePdf } from '../common/pdf/simple-pdf';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { CreateStaffContractDto } from '../hr/dto/create-staff-contract.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageOperationError } from '../storage/storage.utils';
 import { CreateSalaryStructureDto } from './dto/create-salary-structure.dto';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { PayrollActionDto } from './dto/payroll-action.dto';
@@ -55,6 +64,41 @@ interface PaginationResult {
   skip: number;
 }
 
+export interface PayslipGenerationJobData {
+  tenantId: string;
+  payrollRunId: string;
+  payslipId?: string;
+  requestedByUserId: string | null;
+}
+
+export interface PayslipGenerationJobResult {
+  payrollRunId: string;
+  periodMonth: number;
+  periodYear: number;
+  payslipCount: number;
+  generated: number;
+  skipped: number;
+}
+
+interface PayslipGenerationTarget {
+  id: string;
+  payslipNumber: string;
+  payrollRun: {
+    id: string;
+    periodMonth: number;
+    periodYear: number;
+    status: PayrollRunStatus;
+  };
+}
+
+const PAYSLIP_FILE_UNAVAILABLE_MESSAGE =
+  'Protected payslip file is unavailable. Regenerate payslips before downloading.';
+const PAYSLIP_GENERATION_RUN_STATUSES: ReadonlySet<PayrollRunStatus> = new Set([
+  PayrollRunStatus.APPROVED,
+  PayrollRunStatus.POSTED,
+  PayrollRunStatus.PAID,
+]);
+
 @Injectable()
 export class PayrollService {
   constructor(
@@ -62,6 +106,12 @@ export class PayrollService {
     private readonly auditService: AuditService,
     private readonly accountingPostingService: AccountingPostingService,
     @Optional() private readonly fileRegistryService?: FileRegistryService,
+    @Optional()
+    @InjectQueue('payroll')
+    private readonly payrollQueue?: Queue<
+      PayslipGenerationJobData,
+      PayslipGenerationJobResult
+    >,
   ) {}
 
   async listContracts(
@@ -1608,6 +1658,101 @@ export class PayrollService {
     return serializePayrollRunDetail(run);
   }
 
+  async queuePayslipRegenerationJob(
+    runId: string,
+    payslipId: string,
+    actor: AuthContext,
+  ): Promise<PayslipRegenerationJobSummary> {
+    if (!this.payrollQueue) {
+      throw new ConflictException(
+        'Payslip regeneration is temporarily unavailable',
+      );
+    }
+
+    const target = await this.getPayslipGenerationTargetOrThrow(
+      runId,
+      payslipId,
+      actor,
+    );
+    const jobId = payslipRegenerationJobId(actor.tenantId, runId, payslipId);
+    const existingJob = await this.payrollQueue.getJob(jobId);
+
+    if (existingJob) {
+      const state = await existingJob.getState();
+      if (state !== 'completed' && state !== 'failed') {
+        return serializePayslipRegenerationJob(existingJob, target, state);
+      }
+      await existingJob.remove();
+    }
+
+    const job = await this.payrollQueue.add(
+      'regeneratePayslip',
+      {
+        tenantId: actor.tenantId,
+        payrollRunId: runId,
+        payslipId,
+        requestedByUserId: actor.userId,
+      },
+      {
+        jobId,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1_000 },
+        removeOnComplete: { age: 86_400, count: 5_000 },
+        removeOnFail: { age: 604_800, count: 5_000 },
+      },
+    );
+
+    await this.auditService.record({
+      action: 'queue_payslip_regeneration',
+      resource: 'payslip',
+      resourceId: payslipId,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        jobId: job.id ?? jobId,
+        payrollRunId: runId,
+        payslipNumber: target.payslipNumber,
+        periodMonth: target.payrollRun.periodMonth,
+        periodYear: target.payrollRun.periodYear,
+        status: 'QUEUED',
+      },
+    });
+
+    return serializePayslipRegenerationJob(job, target, 'waiting');
+  }
+
+  async getPayslipRegenerationJob(
+    runId: string,
+    payslipId: string,
+    jobId: string,
+    actor: AuthContext,
+  ): Promise<PayslipRegenerationJobSummary> {
+    if (!this.payrollQueue) {
+      throw new ConflictException(
+        'Payslip regeneration is temporarily unavailable',
+      );
+    }
+
+    const target = await this.getPayslipGenerationTargetOrThrow(
+      runId,
+      payslipId,
+      actor,
+    );
+    const job = await this.payrollQueue.getJob(jobId);
+
+    if (
+      !job ||
+      job.name !== 'regeneratePayslip' ||
+      job.data.tenantId !== actor.tenantId ||
+      job.data.payrollRunId !== runId ||
+      job.data.payslipId !== payslipId
+    ) {
+      throw new NotFoundException('Payslip regeneration job not found');
+    }
+
+    return serializePayslipRegenerationJob(job, target, await job.getState());
+  }
+
   async listPayslips(
     query: PayslipListQueryDto | undefined,
     actor: AuthContext,
@@ -1730,9 +1875,7 @@ export class PayrollService {
 
   async getPayslipPdf(payslipNumber: string, actor: AuthContext) {
     if (!this.fileRegistryService) {
-      throw new ConflictException(
-        'Protected payslip files are unavailable. Regenerate payslips before downloading.',
-      );
+      throw new ConflictException(PAYSLIP_FILE_UNAVAILABLE_MESSAGE);
     }
 
     const payslip = await this.prisma.payslip.findFirst({
@@ -1781,21 +1924,42 @@ export class PayrollService {
     });
 
     if (!exportRecord?.fileAssetId) {
-      throw new ConflictException(
-        'Protected payslip file is unavailable. Regenerate payslips before downloading.',
-      );
+      throw new ConflictException(PAYSLIP_FILE_UNAVAILABLE_MESSAGE);
     }
 
-    const asset = await this.fileRegistryService.getFileMetadata(
-      actor.tenantId,
-      exportRecord.fileAssetId,
-    );
+    let asset: Awaited<ReturnType<FileRegistryService['getFileMetadata']>>;
+    try {
+      asset = await this.fileRegistryService.getFileMetadata(
+        actor.tenantId,
+        exportRecord.fileAssetId,
+      );
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new ConflictException(PAYSLIP_FILE_UNAVAILABLE_MESSAGE);
+      }
+      throw error;
+    }
+
+    if (asset.status !== FileStatus.UPLOADED) {
+      throw new ConflictException(PAYSLIP_FILE_UNAVAILABLE_MESSAGE);
+    }
+
     await this.fileRegistryService.assertFileAccessForAuth(asset, actor);
-    const protectedFile = await this.fileRegistryService.getProtectedDownload(
-      actor.tenantId,
-      asset.id,
-      actor.userId,
-    );
+    let protectedFile: Awaited<
+      ReturnType<FileRegistryService['getProtectedDownload']>
+    >;
+    try {
+      protectedFile = await this.fileRegistryService.getProtectedDownload(
+        actor.tenantId,
+        asset.id,
+        actor.userId,
+      );
+    } catch (error) {
+      if (isMissingGeneratedFileError(error)) {
+        throw new ConflictException(PAYSLIP_FILE_UNAVAILABLE_MESSAGE);
+      }
+      throw error;
+    }
 
     return protectedFile.content;
   }
@@ -1821,30 +1985,27 @@ export class PayrollService {
     return this.getPayslipPdf(payslip.payslipNumber, actor);
   }
 
-  async generatePayslipPdfBatch(input: { tenantId: string; month: string }) {
+  async generatePayslipPdfBatch(
+    input: PayslipGenerationJobData,
+  ): Promise<PayslipGenerationJobResult> {
     if (!this.fileRegistryService) {
       throw new ConflictException(
         'File Registry is required for payslip PDF batch generation',
       );
     }
 
-    const period = parsePayrollPeriod(input.month);
     const run = await this.prisma.payrollRun.findFirst({
       where: {
         tenantId: input.tenantId,
-        periodMonth: period.month,
-        periodYear: period.year,
+        id: input.payrollRunId,
         status: {
-          in: [
-            PayrollRunStatus.APPROVED,
-            PayrollRunStatus.POSTED,
-            PayrollRunStatus.PAID,
-          ],
+          in: Array.from(PAYSLIP_GENERATION_RUN_STATUSES),
         },
       },
       include: {
         tenant: true,
         payslips: {
+          where: input.payslipId ? { id: input.payslipId } : undefined,
           include: {
             staff: true,
             payrollLine: true,
@@ -1856,23 +2017,29 @@ export class PayrollService {
 
     if (!run) {
       throw new NotFoundException(
-        'Approved payroll run not found for payslip PDF generation',
+        'Eligible payroll run not found for payslip PDF generation',
       );
     }
 
-    const existingExports = await this.prisma.reportExport.findMany({
-      where: {
-        tenantId: input.tenantId,
-        reportKey: 'payroll.payslip',
-        format: 'pdf',
-        status: 'COMPLETED',
-      },
-      select: {
-        id: true,
-        filters: true,
-      },
-      take: 1000,
-    });
+    if (input.payslipId && run.payslips.length === 0) {
+      throw new NotFoundException('Payslip not found in this payroll run');
+    }
+
+    const existingExports = input.payslipId
+      ? []
+      : await this.prisma.reportExport.findMany({
+          where: {
+            tenantId: input.tenantId,
+            reportKey: 'payroll.payslip',
+            format: 'pdf',
+            status: 'COMPLETED',
+          },
+          select: {
+            id: true,
+            filters: true,
+          },
+          take: 1000,
+        });
     const exportedPayslipIds = new Set(
       existingExports
         .filter((exportRecord) =>
@@ -1900,7 +2067,7 @@ export class PayrollService {
       const fileName = `${payslip.payslipNumber}.pdf`;
       const asset = await this.fileRegistryService.registerGeneratedFile({
         tenantId: input.tenantId,
-        generatedByUserId: null,
+        generatedByUserId: input.requestedByUserId,
         originalFilename: fileName,
         content: pdf,
         mimeType: 'application/pdf',
@@ -1935,7 +2102,7 @@ export class PayrollService {
           },
           status: 'COMPLETED',
           fileAssetId: asset.id,
-          requestedBy: null,
+          requestedBy: input.requestedByUserId,
           completedAt: new Date(),
         },
       });
@@ -1949,7 +2116,7 @@ export class PayrollService {
       resource: 'payroll_run',
       resourceId: run.id,
       tenantId: input.tenantId,
-      userId: null,
+      userId: input.requestedByUserId,
       after: {
         periodMonth: run.periodMonth,
         periodYear: run.periodYear,
@@ -2457,6 +2624,44 @@ export class PayrollService {
     }
 
     return run;
+  }
+
+  private async getPayslipGenerationTargetOrThrow(
+    runId: string,
+    payslipId: string,
+    actor: AuthContext,
+  ) {
+    const payslip = await this.prisma.payslip.findFirst({
+      where: {
+        id: payslipId,
+        tenantId: actor.tenantId,
+        payrollRunId: runId,
+      },
+      select: {
+        id: true,
+        payslipNumber: true,
+        payrollRun: {
+          select: {
+            id: true,
+            periodMonth: true,
+            periodYear: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (!payslip) {
+      throw new NotFoundException('Payslip not found in this payroll run');
+    }
+
+    if (!PAYSLIP_GENERATION_RUN_STATUSES.has(payslip.payrollRun.status)) {
+      throw new ConflictException(
+        'Payslip regeneration requires an approved, posted, or paid payroll run',
+      );
+    }
+
+    return payslip;
   }
 
   async regeneratePayrollLines(id: string, actor: AuthContext) {
@@ -2977,6 +3182,73 @@ function sumReportMoney<T>(
   );
 }
 
+function isMissingGeneratedFileError(error: unknown) {
+  if (error instanceof NotFoundException) {
+    return true;
+  }
+
+  if (
+    error instanceof StorageOperationError &&
+    (error.message.includes('status 404') ||
+      error.message.includes('returned no data'))
+  ) {
+    return true;
+  }
+
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'ENOENT'
+  );
+}
+
+function payslipRegenerationJobId(
+  tenantId: string,
+  runId: string,
+  payslipId: string,
+) {
+  return `payroll-payslip-${tenantId}-${runId}-${payslipId}`;
+}
+
+function serializePayslipRegenerationJob(
+  job: Job<PayslipGenerationJobData, PayslipGenerationJobResult>,
+  target: PayslipGenerationTarget,
+  state: string,
+): PayslipRegenerationJobSummary {
+  const result = job.returnvalue;
+
+  return {
+    jobId: String(job.id),
+    payrollRunId: target.payrollRun.id,
+    payslipId: target.id,
+    payslipNumber: target.payslipNumber,
+    status: mapPayslipRegenerationJobStatus(state),
+    requestedAt: new Date(job.timestamp).toISOString(),
+    startedAt: job.processedOn ? new Date(job.processedOn).toISOString() : null,
+    completedAt: job.finishedOn ? new Date(job.finishedOn).toISOString() : null,
+    generated: typeof result?.generated === 'number' ? result.generated : null,
+    skipped: typeof result?.skipped === 'number' ? result.skipped : null,
+    payslipCount:
+      typeof result?.payslipCount === 'number' ? result.payslipCount : null,
+  };
+}
+
+function mapPayslipRegenerationJobStatus(
+  state: string,
+): PayslipRegenerationJobStatus {
+  if (state === 'active') {
+    return 'PROCESSING';
+  }
+  if (state === 'completed') {
+    return 'SUCCEEDED';
+  }
+  if (state === 'failed') {
+    return 'FAILED';
+  }
+  return 'QUEUED';
+}
+
 function normalizePayrollReportFilters(
   input?: PayrollReportFilterInput,
 ): PayrollReportFilters {
@@ -2996,50 +3268,6 @@ function normalizePayrollReportFilters(
     staffId: input.staffId,
     status: input.status,
   };
-}
-
-function parsePayrollPeriod(month: string) {
-  const normalized = month.trim();
-  let match = /^(\d{4})-(\d{1,2})$/.exec(normalized);
-  if (match) {
-    return normalizeParsedPayrollPeriod(
-      Number(match[1]),
-      Number(match[2]),
-      month,
-    );
-  }
-
-  match = /^(\d{1,2})\/(\d{4})$/.exec(normalized);
-  if (match) {
-    return normalizeParsedPayrollPeriod(
-      Number(match[2]),
-      Number(match[1]),
-      month,
-    );
-  }
-
-  throw new ConflictException(
-    'Payroll batch month must use YYYY-MM or MM/YYYY format',
-  );
-}
-
-function normalizeParsedPayrollPeriod(
-  year: number,
-  month: number,
-  input: string,
-) {
-  if (
-    !Number.isInteger(year) ||
-    !Number.isInteger(month) ||
-    year < 2000 ||
-    year > 2100 ||
-    month < 1 ||
-    month > 12
-  ) {
-    throw new ConflictException(`Invalid payroll batch month: ${input}`);
-  }
-
-  return { year, month };
 }
 
 function isPayslipExportForRun(

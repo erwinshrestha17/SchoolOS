@@ -32,6 +32,10 @@ describe('Payroll Runs UI contracts', () => {
       'lib/api/client.ts',
     ]);
     const payrollRuns = read('components/hr/payroll-runs.tsx');
+    const payrollWorkflow = readMany([
+      'components/hr/payroll-runs.tsx',
+      'components/hr/payroll-action-dialog.tsx',
+    ]);
 
     for (const helper of [
       'listPayrollRuns',
@@ -41,7 +45,7 @@ describe('Payroll Runs UI contracts', () => {
       'getPayrollPreview',
     ]) {
       assert.match(apiClient, new RegExp(`${helper}:`), `Missing API helper: ${helper}`);
-      assert.match(payrollRuns, new RegExp(`api\\.${helper}`), `Payroll Runs UI does not use ${helper}`);
+      assert.match(payrollWorkflow, new RegExp(`api\\.${helper}`), `Payroll Runs UI does not use ${helper}`);
     }
 
     assert.match(apiClient, /openApprovedSalarySlipPdf/);
@@ -49,7 +53,7 @@ describe('Payroll Runs UI contracts', () => {
     assert.match(apiClient, /%PDF-/);
     assert.match(payrollRuns, /openApprovedSalarySlipPdf/);
     assert.match(payrollRuns, /selectedRun\.status === 'APPROVED'/);
-    assert.match(payrollRuns, /Open Salary Slip PDF/);
+    assert.match(payrollRuns, /Download Salary Slip PDF/);
     assert.match(payrollRuns, /Post to M11 Accounting/);
 
     assert.doesNotMatch(payrollRuns, /api\.listPayslips/);
@@ -112,5 +116,59 @@ describe('Payroll Runs UI contracts', () => {
     assert.match(myPayslips, /api\.listMyPayslips/);
     assert.doesNotMatch(myPayslips, /api\.openPayslipPdf/);
     assert.match(adminPayslips, /api\.openPayslipPdf/);
+  });
+
+  it('keeps exception totals unavailable and maps missing payslip files to regeneration guidance', () => {
+    const client = read('lib/api/client.ts');
+    const hrDashboard = read('app/dashboard/hr/page.tsx');
+    const adminPayslips = read('components/hr/payslip-list.tsx');
+    const myPayslips = read('components/staff/my-payslips.tsx');
+
+    assert.match(hrDashboard, /title="Payroll Exceptions"/);
+    assert.match(hrDashboard, /value="Unavailable"/);
+    assert.match(
+      hrDashboard,
+      /Unavailable until a backend exception workflow contract exists/,
+    );
+    assert.match(client, /throw new ApiRequestError\(/);
+    assert.match(adminPayslips, /error instanceof ApiRequestError/);
+    assert.match(adminPayslips, /error\.statusCode === 409/);
+    assert.match(
+      adminPayslips,
+      /Regenerate payslips before downloading/,
+    );
+    assert.match(myPayslips, /error instanceof ApiRequestError/);
+    assert.match(myPayslips, /error\.statusCode === 409/);
+    assert.match(myPayslips, /Ask your payroll administrator to regenerate it/);
+  });
+
+  it('queues and tracks payslip regeneration behind the dedicated payroll permission', () => {
+    const payrollApi = read('lib/api/payroll.ts');
+    const adminPayslips = read('components/hr/payslip-list.tsx');
+    const permissionCatalog = readMany([
+      '../../packages/core/src/permissions/catalog/payroll.ts',
+      '../../packages/core/src/permissions/roles.ts',
+    ]);
+
+    assert.match(permissionCatalog, /resource: "payroll:payslip"/);
+    assert.match(permissionCatalog, /action: "generate"/);
+    assert.match(permissionCatalog, /"payroll:payslip:generate"/);
+    assert.match(payrollApi, /queuePayslipRegeneration:/);
+    assert.match(payrollApi, /getPayslipRegenerationJob:/);
+    assert.match(
+      payrollApi,
+      /payslips\/\$\{encodeURIComponent\(payslipId\)\}\/regeneration-jobs/,
+    );
+    assert.match(
+      adminPayslips,
+      /hasPermissions\(\[\s*'payroll:payslip:generate'/,
+    );
+    assert.match(adminPayslips, /api\.queuePayslipRegeneration/);
+    assert.match(adminPayslips, /api\.getPayslipRegenerationJob/);
+    assert.match(adminPayslips, /refetchInterval/);
+    for (const status of ['QUEUED', 'PROCESSING', 'SUCCEEDED', 'FAILED']) {
+      assert.match(adminPayslips, new RegExp(`'${status}'`));
+    }
+    assert.match(adminPayslips, /Download regenerated PDF/);
   });
 });

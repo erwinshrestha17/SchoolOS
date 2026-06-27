@@ -57,4 +57,13 @@ describe('RolesPermissionsGuard', () => {
       ForbiddenException,
     );
   });
+
+  it('accepts payroll manage as the compatibility alias for payslip generation', async () => {
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['payroll:payslip:generate']);
+    request.auth.permissions = ['payroll:manage'];
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
 });
