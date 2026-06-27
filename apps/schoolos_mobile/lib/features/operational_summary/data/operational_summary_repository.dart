@@ -12,7 +12,6 @@ class OperationalSummaryRepository {
     OperationalMobilePersona.principal: '/mobile/principal/summary',
     OperationalMobilePersona.driver: '/mobile/driver/summary',
     OperationalMobilePersona.staff: '/mobile/staff/summary',
-    OperationalMobilePersona.student: '/mobile/student/summary',
   };
 
   static String pathFor(OperationalMobilePersona persona) => _paths[persona]!;
@@ -27,8 +26,6 @@ class OperationalSummaryRepository {
       getSummary(OperationalMobilePersona.driver);
   Future<OperationalMobileSummary> getStaffSummary() =>
       getSummary(OperationalMobilePersona.staff);
-  Future<OperationalMobileSummary> getStudentSummary() =>
-      getSummary(OperationalMobilePersona.student);
 
   Future<OperationalMobileSummary> getSummary(
     OperationalMobilePersona persona,

@@ -48,11 +48,18 @@ describe('FinanceService - Hardening', () => {
   beforeEach(async () => {
     const mockPrisma = {
       payment: {
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      paymentRefund: { count: jest.fn(), create: jest.fn() },
+      paymentRefund: {
+        count: jest.fn(),
+        create: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       invoice: {
         findUnique: jest.fn(),
         update: jest.fn(),
@@ -83,13 +90,16 @@ describe('FinanceService - Hardening', () => {
         findMany: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
+      financeApprovalRequestHistory: { create: jest.fn() },
       feeHead: {
         findFirst: jest.fn(),
       },
       invoiceLine: {
         create: jest.fn(),
       },
+      $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn((cb) => cb(mockPrisma)),
     };
 
@@ -161,10 +171,51 @@ describe('FinanceService - Hardening', () => {
       await expect(
         service.refundPayment(
           'p1',
-          { amount: 500, refundDate: '2026-05-01', reason: 'Overpaid' },
+          {
+            amount: 500,
+            refundDate: '2026-05-01',
+            reason: 'Overpaid',
+            idempotencyKey: 'refund-overpaid',
+          },
           actor as any,
         ),
       ).rejects.toThrow('Refund exceeds the remaining refundable amount');
+    });
+
+    it('returns the original refund for an idempotent replay', async () => {
+      (
+        prisma.paymentRefund.findFirst as unknown as jest.Mock
+      ).mockResolvedValue({
+        id: 'refund-1',
+        refundNumber: 'RFD-001',
+        paymentId: 'payment-1',
+        amount: new Prisma.Decimal(250),
+        refundDate: new Date('2026-05-01T00:00:00.000Z'),
+        payment: {
+          id: 'payment-1',
+          invoiceId: 'invoice-1',
+          amount: new Prisma.Decimal(1000),
+          refunds: [{ amount: new Prisma.Decimal(250) }],
+          invoice: { status: InvoiceStatus.PARTIAL },
+        },
+      });
+      (prisma.journalEntry.findFirst as jest.Mock).mockResolvedValue({
+        entryNumber: 'JE-REFUND-1',
+      });
+
+      const result = await service.refundPayment(
+        'payment-1',
+        {
+          amount: 250,
+          reason: 'Correction',
+          idempotencyKey: 'refund-replay',
+        },
+        actor as any,
+      );
+
+      expect(result.disposition).toBe('REPLAYED');
+      expect(result.refundId).toBe('refund-1');
+      expect(accountingPostingService.postPaymentRefund).not.toHaveBeenCalled();
     });
   });
 
@@ -190,10 +241,17 @@ describe('FinanceService - Hardening', () => {
   describe('reversePayment', () => {
     it('blocks reversal without service-level permission', async () => {
       await expect(
-        service.reversePayment('p1', { reason: 'Incorrect collection' }, {
-          ...actor,
-          permissions: [],
-        } as any),
+        service.reversePayment(
+          'p1',
+          {
+            reason: 'Incorrect collection',
+            idempotencyKey: 'reverse-denied',
+          },
+          {
+            ...actor,
+            permissions: [],
+          } as any,
+        ),
       ).rejects.toThrow(ForbiddenException);
 
       expect(prisma.payment.findFirst).not.toHaveBeenCalled();
@@ -201,7 +259,11 @@ describe('FinanceService - Hardening', () => {
 
     it('requires a reason before reversing a payment', async () => {
       await expect(
-        service.reversePayment('p1', { reason: '   ' }, actor as any),
+        service.reversePayment(
+          'p1',
+          { reason: '   ', idempotencyKey: 'reverse-blank' },
+          actor as any,
+        ),
       ).rejects.toThrow(BadRequestException);
 
       expect(prisma.payment.findFirst).not.toHaveBeenCalled();
@@ -220,7 +282,11 @@ describe('FinanceService - Hardening', () => {
       (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
 
       await expect(
-        service.reversePayment('p1', { reason: 'Error' }, actor as any),
+        service.reversePayment(
+          'p1',
+          { reason: 'Error', idempotencyKey: 'reverse-refunded' },
+          actor as any,
+        ),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -240,7 +306,10 @@ describe('FinanceService - Hardening', () => {
       await expect(
         service.reversePayment(
           'p1',
-          { reason: 'Incorrect collection' },
+          {
+            reason: 'Incorrect collection',
+            idempotencyKey: 'reverse-already',
+          },
           actor as any,
         ),
       ).rejects.toThrow('This payment is already reversed.');
@@ -269,7 +338,10 @@ describe('FinanceService - Hardening', () => {
       await expect(
         service.reversePayment(
           'p1',
-          { reason: 'Incorrect collection' },
+          {
+            reason: 'Incorrect collection',
+            idempotencyKey: 'reverse-closed',
+          },
           actor as any,
         ),
       ).rejects.toThrow(
@@ -303,13 +375,16 @@ describe('FinanceService - Hardening', () => {
 
       const result = await service.reversePayment(
         'p1',
-        { reason: 'Incorrect charge' },
+        {
+          reason: 'Incorrect charge',
+          idempotencyKey: 'reverse-valid',
+        },
         actor as any,
       );
 
-      expect(prisma.payment.update).toHaveBeenCalledWith(
+      expect(prisma.payment.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'p1' },
+          where: expect.objectContaining({ id: 'p1', tenantId: 't1' }),
           data: expect.objectContaining({
             status: PaymentStatus.REVERSED,
           }),
@@ -321,6 +396,55 @@ describe('FinanceService - Hardening', () => {
           data: expect.objectContaining({
             status: InvoiceStatus.ISSUED,
           }),
+        }),
+      );
+    });
+
+    it('returns the original reversal for an idempotent replay', async () => {
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+        id: 'p1',
+        invoiceId: 'i1',
+        status: PaymentStatus.REVERSED,
+        reversedAt: new Date('2026-05-01T10:00:00.000Z'),
+        reversalReason: 'Incorrect charge',
+        reversalIdempotencyKey: 'reverse-replay',
+        refunds: [],
+        receipt: null,
+        invoice: { id: 'i1' },
+      });
+
+      const result = await service.reversePayment(
+        'p1',
+        {
+          reason: 'Incorrect charge',
+          idempotencyKey: 'reverse-replay',
+        },
+        actor as any,
+      );
+
+      expect(result.disposition).toBe('REPLAYED');
+      expect(accountingPostingService.postReversal).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('immutable cashier close', () => {
+    it('denies reopening without deleting the finalized close', async () => {
+      (prisma.cashierClose.findFirst as jest.Mock).mockResolvedValue({
+        id: 'close-1',
+        closeNumber: 'CLS-001',
+      });
+
+      await expect(
+        service.reopenCashierClose(
+          'close-1',
+          { reason: 'Counted cash was entered incorrectly' },
+          actor as any,
+        ),
+      ).rejects.toThrow('Finalized cashier closes are immutable');
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'reopen_denied',
+          resourceId: 'close-1',
         }),
       );
     });
@@ -343,6 +467,14 @@ describe('FinanceService - Hardening', () => {
       jest
         .spyOn(service as any, 'verifyWebhookSignature')
         .mockReturnValue(true);
+      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
+        id: 'intent-1',
+        tenantId: actor.tenantId,
+        invoiceId: 'invoice-1',
+        provider: 'ESEWA',
+        amount: new Prisma.Decimal(1500),
+        status: 'PENDING',
+      });
       (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
 
       const result = await service.handleOnlinePaymentWebhook(
@@ -390,6 +522,14 @@ describe('FinanceService - Hardening', () => {
       jest
         .spyOn(service as any, 'verifyWebhookSignature')
         .mockReturnValue(true);
+      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
+        id: 'intent-2',
+        tenantId: actor.tenantId,
+        invoiceId: 'i-webhook-1',
+        provider: 'KHALTI',
+        amount: new Prisma.Decimal(1000),
+        status: 'PENDING',
+      });
       (prisma.payment.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.invoice.findFirst as jest.Mock).mockResolvedValue(mockInvoice);
 
@@ -424,6 +564,14 @@ describe('FinanceService - Hardening', () => {
       jest
         .spyOn(service as any, 'verifyWebhookSignature')
         .mockReturnValue(true);
+      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
+        id: 'intent-3',
+        tenantId: actor.tenantId,
+        invoiceId: 'invoice-3',
+        provider: 'ESEWA',
+        amount: new Prisma.Decimal(1500),
+        status: 'PENDING',
+      });
 
       const result = await service.handleOnlinePaymentWebhook(
         'esewa',
@@ -457,6 +605,14 @@ describe('FinanceService - Hardening', () => {
       jest
         .spyOn(service as any, 'verifyWebhookSignature')
         .mockReturnValue(true);
+      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
+        id: 'intent-5',
+        tenantId: actor.tenantId,
+        invoiceId: 'invoice-5',
+        provider: 'KHALTI',
+        amount: new Prisma.Decimal(1500),
+        status: 'PENDING',
+      });
 
       await expect(
         service.handleOnlinePaymentWebhook(
@@ -484,6 +640,14 @@ describe('FinanceService - Hardening', () => {
       jest
         .spyOn(service as any, 'verifyWebhookSignature')
         .mockReturnValue(true);
+      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
+        id: 'intent-zero',
+        tenantId: actor.tenantId,
+        invoiceId: 'invoice-zero',
+        provider: 'KHALTI',
+        amount: new Prisma.Decimal(1500),
+        status: 'PENDING',
+      });
 
       await expect(
         service.handleOnlinePaymentWebhook(
@@ -501,6 +665,45 @@ describe('FinanceService - Hardening', () => {
       ).rejects.toThrow('Webhook amount must be greater than zero.');
       expect(prisma.payment.findFirst).not.toHaveBeenCalled();
       expect(prisma.invoice.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('ignores a delayed failed callback after payment success', async () => {
+      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
+        id: 'prov-delayed',
+        name: 'ESEWA',
+        configEncrypted: { webhookSecret: 'secret' },
+      });
+      jest
+        .spyOn(service as any, 'verifyWebhookSignature')
+        .mockReturnValue(true);
+      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
+        id: 'intent-succeeded',
+        tenantId: actor.tenantId,
+        invoiceId: 'invoice-1',
+        provider: 'ESEWA',
+        amount: new Prisma.Decimal(1500),
+        status: 'SUCCEEDED',
+      });
+
+      const result = await service.handleOnlinePaymentWebhook(
+        'esewa',
+        {
+          intentId: 'intent-succeeded',
+          amount: 1500,
+          status: 'FAILED',
+        },
+        { signature: 'valid-signature' },
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          status: 'ignored',
+          postedToLedger: true,
+          duplicate: true,
+        }),
+      );
+      expect(prisma.onlinePaymentIntent.update).not.toHaveBeenCalled();
+      expect(prisma.payment.findFirst).not.toHaveBeenCalled();
     });
   });
 
@@ -525,7 +728,11 @@ describe('FinanceService - Hardening', () => {
 
       const result = await service.requestRefund(
         'p-req-1',
-        { amount: 1000, reason: 'Accidental charge' },
+        {
+          amount: 1000,
+          reason: 'Accidental charge',
+          idempotencyKey: 'request-refund-1',
+        },
         actor as any,
       );
 
@@ -560,7 +767,10 @@ describe('FinanceService - Hardening', () => {
 
       const result = await service.requestReversal(
         'p-req-2',
-        { reason: 'Wrong student billed' },
+        {
+          reason: 'Wrong student billed',
+          idempotencyKey: 'request-reversal-1',
+        },
         actor as any,
       );
 
@@ -584,14 +794,19 @@ describe('FinanceService - Hardening', () => {
         amount: new Prisma.Decimal(500),
         reason: 'Double billing',
         status: 'PENDING',
+        requestedById: 'different-requester',
       };
 
       (prisma.financeApprovalRequest.findFirst as jest.Mock).mockResolvedValue(
         mockRequest,
       );
+      (prisma.financeApprovalRequest.updateMany as jest.Mock).mockResolvedValue(
+        { count: 1 },
+      );
       (prisma.financeApprovalRequest.update as jest.Mock).mockResolvedValue({
         ...mockRequest,
-        status: 'APPROVED',
+        status: 'EXECUTED',
+        history: [],
       });
 
       // Mock refundPayment dependencies
@@ -624,6 +839,9 @@ describe('FinanceService - Hardening', () => {
       (prisma.paymentRefund.create as jest.Mock).mockResolvedValue({
         id: 'refund-1',
         refundNumber: 'RFD-2026-00001',
+        paymentId: 'p1',
+        amount: new Prisma.Decimal(500),
+        refundDate: new Date('2026-05-01T00:00:00.000Z'),
       });
       (prisma.invoice.update as jest.Mock).mockResolvedValue({
         id: 'i1',
@@ -644,13 +862,12 @@ describe('FinanceService - Hardening', () => {
         actor as any,
       );
 
-      expect(result.status).toBe('APPROVED');
+      expect(result.status).toBe('EXECUTED');
       expect(prisma.financeApprovalRequest.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'req-1' },
           data: expect.objectContaining({
-            status: 'APPROVED',
-            reviewNote: 'Approved by principal',
+            status: 'EXECUTED',
           }),
         }),
       );

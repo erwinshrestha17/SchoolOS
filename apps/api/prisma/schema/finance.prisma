@@ -149,6 +149,7 @@ model Payment {
   paidAt          DateTime
   narration       String?
   idempotencyKey  String?
+  reversalIdempotencyKey String?
   createdAt       DateTime      @default(now())
 
   tenant      Tenant          @relation(fields: [tenantId], references: [id])
@@ -162,6 +163,7 @@ model Payment {
   onlinePaymentIntents OnlinePaymentIntent[]
 
   @@unique([tenantId, idempotencyKey])
+  @@unique([tenantId, reversalIdempotencyKey])
   @@index([tenantId, method, referenceNumber])
   @@index([tenantId, paidAt, status])
   @@index([tenantId, studentId, paidAt])
@@ -208,6 +210,7 @@ model PaymentRefund {
   reason          String
   referenceNumber String?
   narration       String?
+  idempotencyKey  String?
   createdById     String?
   createdAt       DateTime @default(now())
 
@@ -216,6 +219,7 @@ model PaymentRefund {
   createdBy User?   @relation("CreatedPaymentRefunds", fields: [createdById], references: [id])
 
   @@unique([tenantId, refundNumber])
+  @@unique([tenantId, idempotencyKey])
   @@index([tenantId, refundDate])
   @@index([paymentId])
 }
@@ -266,6 +270,9 @@ model Receipt {
   vatAmount     Decimal  @default(0) @db.Decimal(12, 2)
   metadata      Json?
   pdfUrl        String?
+  fileAssetId   String?
+  fileStatus    ReceiptFileStatus @default(PENDING)
+  fileGeneratedAt DateTime?
   issuedAt      DateTime @default(now())
 
   tenant         Tenant                  @relation(fields: [tenantId], references: [id])
@@ -273,6 +280,7 @@ model Receipt {
   reprintHistory ReceiptReprintHistory[]
 
   @@unique([tenantId, receiptNumber])
+  @@unique([tenantId, fileAssetId])
   @@index([tenantId, issuedAt])
 }
 
@@ -283,6 +291,7 @@ model ReceiptReprintHistory {
   paymentId     String?
   studentId     String?
   fileAssetId   String?
+  idempotencyKey String?
   reprintedById String?
   reprintedAt   DateTime @default(now())
   reason        String
@@ -295,6 +304,7 @@ model ReceiptReprintHistory {
   reprintedBy User?   @relation("ReceiptReprinter", fields: [reprintedById], references: [id], onDelete: SetNull)
 
   @@index([tenantId, receiptId])
+  @@unique([tenantId, idempotencyKey])
   @@index([tenantId, studentId, reprintedAt])
   @@index([tenantId, paymentId])
 }
@@ -391,12 +401,14 @@ model FinanceApprovalRequest {
   tenantId      String
   type          FinanceRequestType
   paymentId     String
+  idempotencyKey String?
   amount        Decimal?             @db.Decimal(12, 2)
   reason        String
   status        FinanceRequestStatus @default(PENDING)
   requestedById String
   reviewedById  String?
   reviewNote    String?
+  failureMessage String?
   reviewedAt    DateTime?
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
@@ -405,7 +417,25 @@ model FinanceApprovalRequest {
   payment     Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   requestedBy User    @relation("RequestedFinanceApprovals", fields: [requestedById], references: [id])
   reviewedBy  User?   @relation("ReviewedFinanceApprovals", fields: [reviewedById], references: [id])
+  history     FinanceApprovalRequestHistory[]
 
   @@index([tenantId, status])
+  @@unique([tenantId, idempotencyKey])
   @@index([paymentId])
+}
+
+model FinanceApprovalRequestHistory {
+  id         String                      @id @default(uuid())
+  tenantId   String
+  requestId  String
+  action     FinanceRequestHistoryAction
+  status     FinanceRequestStatus
+  actorUserId String
+  note       String?
+  createdAt  DateTime                    @default(now())
+
+  request FinanceApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, requestId, createdAt])
+  @@index([tenantId, status, createdAt])
 }

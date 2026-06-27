@@ -233,7 +233,11 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
       seedPaymentForReversal();
       seedOriginalPaymentJournal();
 
-      await financeService.reversePayment('pay-1', { reason: 'Refund' }, actor);
+      await financeService.reversePayment(
+        'pay-1',
+        { reason: 'Refund', idempotencyKey: 'reverse-pay-1' },
+        actor,
+      );
 
       expect(prisma.journalEntry.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -313,7 +317,11 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
       seedPaymentForReversal();
       seedOriginalPaymentJournal();
 
-      await financeService.reversePayment('pay-1', { reason: 'Test' }, actor);
+      await financeService.reversePayment(
+        'pay-1',
+        { reason: 'Test', idempotencyKey: 'reverse-pay-1-audit' },
+        actor,
+      );
 
       expect(auditSpy).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -497,9 +505,9 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
         invoiceId: overrides.invoiceId ?? 'inv-1',
         amount: overrides.amount ?? 1000,
         method: PaymentMethod.CASH,
-        ...(overrides.idempotencyKey
-          ? { idempotencyKey: overrides.idempotencyKey }
-          : {}),
+        idempotencyKey:
+          overrides.idempotencyKey ??
+          `collect-${overrides.referenceNumber ?? 'cash'}`,
         ...(overrides.referenceNumber
           ? { referenceNumber: overrides.referenceNumber }
           : {}),

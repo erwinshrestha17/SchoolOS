@@ -25,6 +25,10 @@ import { ReversePaymentDto } from './dto/reverse-payment.dto';
 import { CreateFinanceRequestDto } from './dto/create-finance-request.dto';
 import { ReviewFinanceRequestDto } from './dto/review-finance-request.dto';
 import { FinanceService } from './finance.service';
+import {
+  ListFinanceApprovalRequestsQueryDto,
+  ListPaymentsQueryDto,
+} from './dto/list-finance-records.query.dto';
 
 @Controller('payments')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -34,8 +38,11 @@ export class PaymentsController {
 
   @Get()
   @Permissions('payments:collect')
-  listPayments(@CurrentAuth() auth: AuthContext) {
-    return this.financeService.listPayments(auth);
+  listPayments(
+    @Query() query: ListPaymentsQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.listPayments(query, auth);
   }
 
   @Post()
@@ -140,14 +147,17 @@ export class PaymentsController {
   }
 
   @Get('requests')
-  listApprovalRequests(@CurrentAuth() auth: AuthContext) {
+  listApprovalRequests(
+    @Query() query: ListFinanceApprovalRequestsQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     const hasRefund = auth.permissions.includes('payments:refund');
     const hasReverse = auth.permissions.includes('payments:reverse');
     const isSuperAdmin = auth.roles.includes('platform_super_admin');
     if (!hasRefund && !hasReverse && !isSuperAdmin) {
       throw new ForbiddenException('Insufficient permissions');
     }
-    return this.financeService.listApprovalRequests(auth);
+    return this.financeService.listApprovalRequests(query, auth);
   }
 
   @Post('requests/:id/review')

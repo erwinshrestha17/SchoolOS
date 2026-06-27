@@ -132,17 +132,17 @@ import type {
   AttendanceRoster,
   CashierClosePreview,
   InvoiceDetail,
-} from '@schoolos/core';
+} from "@schoolos/core";
 import {
   clearStoredSession,
   getSupportOverrideTenantId,
   getSupportOverrideReason,
   setSupportOverride,
   clearSupportOverride,
-} from '../session';
+} from "../session";
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api/v1";
 
 let refreshPromise: Promise<boolean> | null = null;
 
@@ -152,7 +152,7 @@ export class ApiRequestError extends Error {
 
   constructor(message: string, statusCode: number, requestId?: string) {
     super(message);
-    this.name = 'ApiRequestError';
+    this.name = "ApiRequestError";
     this.statusCode = statusCode;
     this.requestId = requestId;
   }
@@ -178,7 +178,7 @@ export type TenantLogoAccess = {
 
 export type TenantLogoUploadResult = Omit<
   TenantLogoAccess,
-  'url' | 'expiresInSeconds'
+  "url" | "expiresInSeconds"
 > & {
   previewUrl: string;
   downloadUrl: string;
@@ -208,7 +208,7 @@ export type AssignPlatformTenantSubscriptionPayload = Record<
   unknown
 > & {
   planId: string;
-  status: 'TRIAL' | 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'EXPIRED' | 'CANCELLED';
+  status: "TRIAL" | "ACTIVE" | "GRACE" | "SUSPENDED" | "EXPIRED" | "CANCELLED";
   startsAt?: string;
   endsAt?: string;
   renewsAt?: string;
@@ -254,43 +254,43 @@ export type StaffLifecycleHistoryEvent = {
 };
 
 function getCookie(name: string): string | undefined {
-  if (typeof document === 'undefined') return undefined;
+  if (typeof document === "undefined") return undefined;
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  if (parts.length === 2) return parts.pop()?.split(";").shift();
   return undefined;
 }
 
 export async function request<T>(path: string, init?: RequestOptions) {
   const requestId = createRequestId();
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'X-Request-Id': requestId,
+    "Content-Type": "application/json",
+    "X-Request-Id": requestId,
     ...((init?.headers as Record<string, string>) ?? {}),
   };
 
-  const method = init?.method?.toUpperCase() ?? 'GET';
-  const unsafeMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
+  const method = init?.method?.toUpperCase() ?? "GET";
+  const unsafeMethods = ["POST", "PUT", "PATCH", "DELETE"];
   if (unsafeMethods.includes(method)) {
     const csrfToken =
-      getCookie('__Host-schoolos_csrf') ?? getCookie('schoolos_csrf');
+      getCookie("__Host-schoolos_csrf") ?? getCookie("schoolos_csrf");
     if (csrfToken) {
-      headers['X-CSRF-Token'] = csrfToken;
+      headers["X-CSRF-Token"] = csrfToken;
     }
   }
 
   const overrideTenantId = getSupportOverrideTenantId();
   const overrideReason = getSupportOverrideReason();
   if (overrideTenantId) {
-    headers['X-SchoolOS-Tenant-Id'] = overrideTenantId;
+    headers["X-SchoolOS-Tenant-Id"] = overrideTenantId;
   }
   if (overrideReason) {
-    headers['X-SchoolOS-Tenant-Override-Reason'] = overrideReason;
+    headers["X-SchoolOS-Tenant-Override-Reason"] = overrideReason;
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
-    credentials: 'include',
+    credentials: "include",
     headers,
     body: init?.json ? JSON.stringify(init.json) : init?.body,
   });
@@ -311,7 +311,7 @@ export async function request<T>(path: string, init?: RequestOptions) {
       clearStoredSession();
     }
 
-    const responseRequestId = response.headers.get('x-request-id') ?? requestId;
+    const responseRequestId = response.headers.get("x-request-id") ?? requestId;
 
     throw new ApiRequestError(
       parseApiErrorMessage(text) ||
@@ -326,19 +326,19 @@ export async function request<T>(path: string, init?: RequestOptions) {
 }
 
 export function createRequestId() {
-  if (typeof globalThis.crypto?.randomUUID === 'function') {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
     return globalThis.crypto.randomUUID();
   }
 
-  if (typeof globalThis.crypto?.getRandomValues === 'function') {
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
     const bytes = new Uint8Array(16);
     globalThis.crypto.getRandomValues(bytes);
     return `web-${Array.from(bytes, (byte) =>
-      byte.toString(16).padStart(2, '0'),
-    ).join('')}`;
+      byte.toString(16).padStart(2, "0"),
+    ).join("")}`;
   }
 
-  throw new Error('Secure random request IDs are unavailable');
+  throw new Error("Secure random request IDs are unavailable");
 }
 
 export function readFileAsBase64(file: File) {
@@ -346,17 +346,17 @@ export function readFileAsBase64(file: File) {
 
   return new Promise<string>((resolve, reject) => {
     reader.onload = () => {
-      const encoded = String(reader.result ?? '').split(',')[1] ?? '';
+      const encoded = String(reader.result ?? "").split(",")[1] ?? "";
       resolve(encoded);
     };
-    reader.onerror = () => reject(new Error('Unable to read file'));
+    reader.onerror = () => reject(new Error("Unable to read file"));
     reader.readAsDataURL(file);
   });
 }
 
 export function parseApiErrorMessage(text: string) {
   if (!text) {
-    return '';
+    return "";
   }
 
   try {
@@ -365,7 +365,7 @@ export function parseApiErrorMessage(text: string) {
       statusCode?: number;
     };
     const message = Array.isArray(payload.message)
-      ? payload.message.join(', ')
+      ? payload.message.join(", ")
       : payload.message;
 
     return message || payload.error || text;
@@ -383,29 +383,37 @@ export async function openPdfBlob(response: Response) {
     );
   }
 
-  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
 
-  if (!contentType.includes('application/pdf')) {
+  if (!contentType.includes("application/pdf")) {
     const text = await response.text();
     throw new Error(
       parseApiErrorMessage(text) ||
-        'The server did not return a PDF document. Please try again or contact support.',
+        "The server did not return a PDF document. Please try again or contact support.",
     );
   }
 
   const blob = await response.blob();
 
   if (blob.size === 0) {
-    throw new Error('The server returned an empty PDF document.');
+    throw new Error("The server returned an empty PDF document.");
   }
 
   const header = await blob.slice(0, 5).text();
 
-  if (header !== '%PDF-') {
-    throw new Error('The server returned an invalid PDF document.');
+  if (header !== "%PDF-") {
+    throw new Error("The server returned an invalid PDF document.");
   }
 
-  window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer');
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export async function openImageBlob(response: Response) {
@@ -417,24 +425,24 @@ export async function openImageBlob(response: Response) {
     );
   }
 
-  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
 
-  if (!contentType.startsWith('image/')) {
+  if (!contentType.startsWith("image/")) {
     const text = await response.text();
     throw new Error(
       parseApiErrorMessage(text) ||
-        'The server did not return an image preview. Please try again or contact support.',
+        "The server did not return an image preview. Please try again or contact support.",
     );
   }
 
   const blob = await response.blob();
 
   if (blob.size === 0) {
-    throw new Error('The server returned an empty image preview.');
+    throw new Error("The server returned an empty image preview.");
   }
 
   const url = URL.createObjectURL(blob);
-  window.open(url, '_blank', 'noopener,noreferrer');
+  window.open(url, "_blank", "noopener,noreferrer");
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
@@ -450,11 +458,11 @@ export async function downloadBlob(response: Response, fileName: string) {
   const blob = await response.blob();
 
   if (blob.size === 0) {
-    throw new Error('The server returned an empty file.');
+    throw new Error("The server returned an empty file.");
   }
 
   const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = fileName;
   document.body.appendChild(a);
@@ -469,19 +477,19 @@ export async function openProtectedFile(
 ) {
   const response = await fetch(
     `${API_BASE_URL}/files/${encodeURIComponent(fileAssetId)}/preview`,
-    { credentials: 'include' },
+    { credentials: "include" },
   );
-  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
 
-  if (contentType.includes('application/pdf')) {
+  if (contentType.includes("application/pdf")) {
     return openPdfBlob(response);
   }
 
-  if (contentType.startsWith('image/')) {
+  if (contentType.startsWith("image/")) {
     return openImageBlob(response);
   }
 
-  return downloadBlob(response, options?.fileName?.trim() || 'schoolos-file');
+  return downloadBlob(response, options?.fileName?.trim() || "schoolos-file");
 }
 
 export async function downloadProtectedFile(
@@ -490,25 +498,25 @@ export async function downloadProtectedFile(
 ) {
   const response = await fetch(
     `${API_BASE_URL}/files/${encodeURIComponent(fileAssetId)}/download`,
-    { credentials: 'include' },
+    { credentials: "include" },
   );
 
-  return downloadBlob(response, fileName.trim() || 'schoolos-file');
+  return downloadBlob(response, fileName.trim() || "schoolos-file");
 }
 
 export async function downloadCsv(path: string, fileName: string) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: 'include',
+    credentials: "include",
   });
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(parseApiErrorMessage(text) || 'Export failed');
+    throw new Error(parseApiErrorMessage(text) || "Export failed");
   }
 
   const blob = await response.blob();
   const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = fileName;
   document.body.appendChild(a);
@@ -517,21 +525,24 @@ export async function downloadCsv(path: string, fileName: string) {
   document.body.removeChild(a);
 }
 
-export async function downloadReport(reportKey: string, payload: ReportExportRequest) {
+export async function downloadReport(
+  reportKey: string,
+  payload: ReportExportRequest,
+) {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   };
   const csrfToken =
-    getCookie('__Host-schoolos_csrf') ?? getCookie('schoolos_csrf');
+    getCookie("__Host-schoolos_csrf") ?? getCookie("schoolos_csrf");
   if (csrfToken) {
-    headers['X-CSRF-Token'] = csrfToken;
+    headers["X-CSRF-Token"] = csrfToken;
   }
 
   const response = await fetch(
     `${API_BASE_URL}/reports/${encodeURIComponent(reportKey)}/export`,
     {
-      method: 'POST',
-      credentials: 'include',
+      method: "POST",
+      credentials: "include",
       headers,
       body: JSON.stringify(payload),
     },
@@ -545,13 +556,13 @@ export async function downloadReport(reportKey: string, payload: ReportExportReq
     );
   }
 
-  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
 
-  if (contentType.includes('application/pdf')) {
+  if (contentType.includes("application/pdf")) {
     return openPdfBlob(response);
   }
 
-  if (contentType.includes('application/json')) {
+  if (contentType.includes("application/json")) {
     const blob = await response.blob();
     const text = await blob.text();
     return JSON.parse(text).data;
@@ -559,10 +570,10 @@ export async function downloadReport(reportKey: string, payload: ReportExportReq
 
   const blob = await response.blob();
   const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
 
-  const contentDisposition = response.headers.get('content-disposition');
+  const contentDisposition = response.headers.get("content-disposition");
   let fileName = `${reportKey}-export.${payload.format}`;
   if (contentDisposition) {
     const match = contentDisposition.match(/filename="(.+)"/);
@@ -584,24 +595,24 @@ export async function refreshAccessCookie() {
   refreshPromise = (async () => {
     try {
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       };
       const csrfToken =
-        getCookie('__Host-schoolos_csrf') ?? getCookie('schoolos_csrf');
+        getCookie("__Host-schoolos_csrf") ?? getCookie("schoolos_csrf");
       if (csrfToken) {
-        headers['X-CSRF-Token'] = csrfToken;
+        headers["X-CSRF-Token"] = csrfToken;
       }
 
       const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include',
+        method: "POST",
+        credentials: "include",
         headers,
         body: JSON.stringify({}),
       });
 
       return response.ok;
     } catch (error) {
-      console.error('Failed to refresh access cookie:', error);
+      console.error("Failed to refresh access cookie:", error);
       return false;
     } finally {
       refreshPromise = null;
@@ -627,16 +638,15 @@ export function withQuery(path: string, params: Record<string, any>) {
 export function isAuthSession(
   value: AuthSession | AuthChallengeResponse,
 ): value is AuthSession {
-  return 'user' in value;
+  return "user" in value;
 }
 
-
 export const filesApi = {
-    uploadFile: async (file: File, module: string, entityId?: string) => {
+  uploadFile: async (file: File, module: string, entityId?: string) => {
     const reader = new FileReader();
     const base64Promise = new Promise<string>((resolve) => {
       reader.onload = () => {
-        const base64 = (reader.result as string).split(',')[1];
+        const base64 = (reader.result as string).split(",")[1];
         resolve(base64);
       };
       reader.readAsDataURL(file);
@@ -649,8 +659,8 @@ export const filesApi = {
       fileName: string;
       publicUrl: string | null;
       protectedUrl?: string;
-    }>('/files/upload', {
-      method: 'POST',
+    }>("/files/upload", {
+      method: "POST",
       json: {
         fileName: file.name,
         contentType: file.type,
@@ -660,7 +670,7 @@ export const filesApi = {
       },
     });
   },
-    getFileView: (id: string) =>
+  getFileView: (id: string) =>
     request<{
       id: string;
       fileName: string;
@@ -668,9 +678,7 @@ export const filesApi = {
       sizeBytes: number;
       url: string;
     }>(`/files/${encodeURIComponent(id)}/view`),
-
 };
-
 
 // Tail Type Definitions
 export type NotificationCenterItem = {

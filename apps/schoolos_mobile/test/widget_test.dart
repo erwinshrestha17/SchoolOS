@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:schoolos_mobile/app/app.dart';
+import 'package:schoolos_mobile/app/constants/app_routes.dart';
 import 'package:schoolos_mobile/core/storage/app_preferences_service.dart';
 import 'package:schoolos_mobile/core/storage/token_storage_service.dart';
 import 'package:schoolos_mobile/core/auth/auth_provider.dart';
 import 'package:schoolos_mobile/core/auth/data/auth_repository.dart';
+import 'package:schoolos_mobile/core/auth/models/auth_user.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
 import 'package:schoolos_mobile/features/operational_summary/application/operational_summary_providers.dart';
 import 'package:schoolos_mobile/features/operational_summary/domain/operational_summary_models.dart';
@@ -42,6 +45,25 @@ class FakeAuthNotifier extends AuthNotifier {
   @override
   Future<void> loadSession() async {
     state = AuthState(status: AuthStatus.unauthenticated);
+  }
+}
+
+class StudentAuthNotifier extends AuthNotifier {
+  StudentAuthNotifier(super.tokenStorage, super.authRepository, super.appPrefs);
+
+  @override
+  Future<void> loadSession() async {
+    state = AuthState(
+      status: AuthStatus.authenticated,
+      role: 'STUDENT',
+      user: AuthUser(
+        id: 'student-user',
+        name: 'Student User',
+        email: 'student@school.test',
+        role: 'STUDENT',
+        roles: ['student'],
+      ),
+    );
   }
 }
 
@@ -165,7 +187,7 @@ void main() {
     expect(find.text('More'), findsOneWidget);
   });
 
-  testWidgets('RoleShellScaffold renders routed student navigation', (
+  testWidgets('RoleShellScaffold limits student navigation to session entry', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -182,11 +204,59 @@ void main() {
     );
 
     expect(find.text('Student Home Body'), findsOneWidget);
-    expect(find.text('Home'), findsOneWidget);
-    expect(find.text('Homework'), findsOneWidget);
-    expect(find.text('Timetable'), findsOneWidget);
-    expect(find.text('Notices'), findsOneWidget);
-    expect(find.text('More'), findsOneWidget);
+    expect(find.text('Session'), findsNothing);
+    expect(find.text('Homework'), findsNothing);
+    expect(find.text('Timetable'), findsNothing);
+    expect(find.text('Notices'), findsNothing);
+    expect(find.text('More'), findsNothing);
+    expect(find.byTooltip('Notifications'), findsNothing);
+    expect(find.byTooltip('Profile'), findsNothing);
+  });
+
+  testWidgets('student deep links fail closed to controlled session entry', (
+    WidgetTester tester,
+  ) async {
+    final sharedPrefs = await SharedPreferences.getInstance();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPreferencesServiceProvider.overrideWithValue(
+            AppPreferencesService(sharedPrefs),
+          ),
+          tokenStorageServiceProvider.overrideWithValue(FakeTokenStorage()),
+          authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
+          authProvider.overrideWith((ref) {
+            return StudentAuthNotifier(
+              ref.watch(tokenStorageServiceProvider),
+              ref.watch(authRepositoryProvider),
+              ref.watch(appPreferencesServiceProvider),
+            );
+          }),
+        ],
+        child: const SchoolOSApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Student learning session'), findsOneWidget);
+
+    final context = tester.element(find.text('Student learning session'));
+    GoRouter.of(context).go(AppRoutes.studentHomework);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Student learning session'), findsOneWidget);
+    expect(find.text('Join a live session'), findsOneWidget);
+    expect(find.text('Homework'), findsNothing);
+
+    final sessionContext = tester.element(
+      find.text('Student learning session'),
+    );
+    GoRouter.of(sessionContext).go(AppRoutes.notices);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Student learning session'), findsOneWidget);
+    expect(find.text('Join a live session'), findsOneWidget);
   });
 
   testWidgets('RoleShellScaffold renders exact teacher bottom navigation', (

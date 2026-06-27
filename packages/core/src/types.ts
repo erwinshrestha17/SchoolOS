@@ -1293,11 +1293,47 @@ export type AuthSession = {
 
 
 // ─── Compiled from types/finance.ts ───
+
+export type FinanceMoneyAmount = string;
+
+export type FinanceDashboardSummary = {
+  period: {
+    fromDate: string;
+    toDate: string;
+    timeZone: string;
+    startUtc: string;
+    endExclusiveUtc: string;
+  };
+  collectedToday: {
+    grossAmount: FinanceMoneyAmount;
+    refundedAmount: FinanceMoneyAmount;
+    netAmount: FinanceMoneyAmount;
+  };
+  outstanding: {
+    amount: FinanceMoneyAmount;
+  };
+  overdue: {
+    studentCount: number;
+    amount: FinanceMoneyAmount;
+  };
+  pendingApprovalCount: number;
+  cashierClose: {
+    state: 'NOT_STARTED' | 'OPEN' | 'CLOSED';
+    latestCloseId: string | null;
+    latestCloseNumber: string | null;
+    latestClosedAt: string | null;
+    unclosedPaymentCount: number;
+  };
+  receiptsIssued: number;
+  generatedAt: string;
+};
+
 export type InvoiceSummary = {
   id: string;
   invoiceNumber: string;
   status: string;
   dueDate: string;
+  issuedAt?: string;
   totalAmount: number;
   studentId?: string;
   paidAmount?: number;
@@ -1365,7 +1401,8 @@ export type InvoiceDetailPayment = {
     id: string;
     receiptNumber: string;
     issuedAt: string;
-    pdfUrl: string | null;
+    fileAssetId: string | null;
+    fileStatus: 'PENDING' | 'AVAILABLE' | 'UNAVAILABLE';
   } | null;
   refunds: Array<{
     id: string;
@@ -1492,6 +1529,7 @@ export type PaymentRefundSummary = {
 };
 
 export type PaymentRefundPayload = {
+  idempotencyKey: string;
   amount?: number;
   reason: string;
   refundDate?: string;
@@ -1640,6 +1678,15 @@ export type FeeBillingRun = {
   status: string;
   generatedAt: string;
   invoiceCount?: number;
+  academicYear?: {
+    id: string;
+    name: string;
+  };
+  feePlan?: {
+    id: string;
+    code: string;
+    name: string;
+  } | null;
 };
 
 export type FeeDueScheduleSummary = {
@@ -1655,13 +1702,26 @@ export type FeeDueScheduleSummary = {
 };
 
 export type FeeCollectionReport = {
-  totalBilled: number;
-  totalCollected: number;
-  totalOutstanding: number;
-  totalWaived: number;
-  collectionTrend: Array<{ month: string; amount: number }>;
-  classWiseBreakdown: Array<{ className: string; amount: number }>;
-  feeHeadWiseBreakdown: Array<{ feeHeadName: string; amount: number }>;
+  totalBilled: FinanceMoneyAmount;
+  totalCollected: FinanceMoneyAmount;
+  totalRefunded: FinanceMoneyAmount;
+  netCollected: FinanceMoneyAmount;
+  totalOutstanding: FinanceMoneyAmount;
+  totalWaived: FinanceMoneyAmount;
+  collectionTrend: Array<{ month: string; amount: FinanceMoneyAmount }>;
+  refundTrend: Array<{ month: string; amount: FinanceMoneyAmount }>;
+  netCollectionTrend: Array<{
+    month: string;
+    amount: FinanceMoneyAmount;
+  }>;
+  classWiseBreakdown: Array<{
+    className: string;
+    amount: FinanceMoneyAmount;
+  }>;
+  feeHeadWiseBreakdown: Array<{
+    feeHeadName: string;
+    amount: FinanceMoneyAmount;
+  }>;
 };
 
 export type DefaulterSummary = {
@@ -1702,7 +1762,8 @@ export type WaiverRecord = {
 export type ReceiptView = {
   id: string;
   receiptNumber: string;
-  pdfUrl: string | null;
+  fileAssetId: string | null;
+  fileStatus: 'PENDING' | 'AVAILABLE' | 'UNAVAILABLE';
   issuedAt: string;
   paymentId?: string;
   amount?: number;
@@ -1733,6 +1794,56 @@ export type ReceiptView = {
     studentId: string;
   };
 };
+
+export type FinanceApprovalRequestView = {
+  id: string;
+  type: 'REFUND' | 'REVERSAL';
+  status:
+    | 'PENDING'
+    | 'PROCESSING'
+    | 'APPROVED'
+    | 'REJECTED'
+    | 'EXECUTED'
+    | 'FAILED';
+  paymentId: string;
+  amount: number | null;
+  reason: string;
+  reviewNote: string | null;
+  failureMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+  history: Array<{
+    id: string;
+    action:
+      | 'REQUESTED'
+      | 'REVIEW_STARTED'
+      | 'APPROVED'
+      | 'REJECTED'
+      | 'EXECUTED'
+      | 'EXECUTION_FAILED';
+    status: FinanceApprovalRequestView['status'];
+    actorUserId: string;
+    note: string | null;
+    createdAt: string;
+  }>;
+};
+
+export type FinancePaginatedResponse<T> = Omit<
+  PaginatedResponse<T>,
+  'page' | 'limit' | 'hasNextPage'
+> & {
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+};
+
+export type InvoiceSummaryPage = FinancePaginatedResponse<InvoiceSummary>;
+export type FeeBillingRunPage = FinancePaginatedResponse<FeeBillingRun>;
+export type DiscountRulePage = FinancePaginatedResponse<DiscountRule>;
+export type WaiverRecordPage = FinancePaginatedResponse<WaiverRecord>;
+export type ReceiptViewPage = FinancePaginatedResponse<ReceiptView>;
+export type FinanceApprovalRequestPage =
+  FinancePaginatedResponse<FinanceApprovalRequestView>;
 
 
 // ─── Compiled from types/library.ts ───

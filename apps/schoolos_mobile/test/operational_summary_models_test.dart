@@ -10,7 +10,6 @@ void main() {
       OperationalSummaryRepository.pathFor(OperationalMobilePersona.principal),
       OperationalSummaryRepository.pathFor(OperationalMobilePersona.driver),
       OperationalSummaryRepository.pathFor(OperationalMobilePersona.staff),
-      OperationalSummaryRepository.pathFor(OperationalMobilePersona.student),
     ];
 
     expect(paths, [
@@ -19,7 +18,6 @@ void main() {
       '/mobile/principal/summary',
       '/mobile/driver/summary',
       '/mobile/staff/summary',
-      '/mobile/student/summary',
     ]);
     expect(paths.where((path) => path.contains('/dashboard/')), isEmpty);
   });

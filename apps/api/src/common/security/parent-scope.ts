@@ -19,7 +19,7 @@ export function isParentOnly(actor: AuthContext): boolean {
     'support_staff',
   ];
   return (
-    actor.roles.includes('parent') &&
+    (actor.roles.includes('parent') || actor.roles.includes('guardian')) &&
     !actor.roles.some((role) => staffRoles.includes(role))
   );
 }

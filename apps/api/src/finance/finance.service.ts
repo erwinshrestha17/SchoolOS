@@ -26,6 +26,8 @@ import {
   AuthMethod,
   FinanceRequestType,
   FinanceRequestStatus,
+  FinanceRequestHistoryAction,
+  ReceiptFileStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
@@ -43,6 +45,10 @@ import { CommunicationsService } from '../communications/communications.service'
 import { PrismaService } from '../prisma/prisma.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { EntitlementsService } from '../plans/entitlements.service';
+import {
+  getParentStudentIds,
+  getStudentOwnId,
+} from '../common/security/parent-scope';
 import { ConfigService } from '../config/config.service';
 import {
   decryptSensitiveField,
@@ -71,13 +77,31 @@ import { ListCashierClosesDto } from './dto/list-cashier-closes.dto';
 import { VoidInvoiceDto } from './dto/void-invoice.dto';
 import { resolveCashAccountCode } from './finance.defaults';
 import { ReprintReceiptDto } from './dto/reprint-receipt.dto';
+import { ReversePaymentDto } from './dto/reverse-payment.dto';
 import { DuesQueryDto } from './dto/dues-query.dto';
 import { FeeAgingBucket, ListDefaultersDto } from './dto/list-defaulters.dto';
+import { FinanceDashboardSummaryQueryDto } from './dto/finance-dashboard-summary-query.dto';
+import {
+  BaseFinanceListQueryDto,
+  ListBillingRunsQueryDto,
+  ListDiscountRulesQueryDto,
+  ListFinanceApprovalRequestsQueryDto,
+  ListInvoicesQueryDto,
+  ListLedgerEntriesQueryDto,
+  ListPaymentsQueryDto,
+  ListReceiptsQueryDto,
+  ListWaiversQueryDto,
+} from './dto/list-finance-records.query.dto';
 import {
   PARENT_SANDBOX_PAYMENT_PROVIDERS,
   type ParentSandboxPaymentProvider,
 } from './sandbox-payment-provider';
-import type { StudentCollectionContext } from '@schoolos/core';
+import {
+  NEPAL_TIME_ZONE,
+  zonedNepalDateTimeToUtc,
+  type FinanceDashboardSummary,
+  type StudentCollectionContext,
+} from '@schoolos/core';
 
 interface CollectedPaymentWithReceipt {
   id: string;
@@ -86,8 +110,10 @@ interface CollectedPaymentWithReceipt {
   method: PaymentMethod;
   paidAt: Date;
   receipt: {
+    id: string;
     receiptNumber: string;
-    pdfUrl: string | null;
+    fileAssetId: string | null;
+    fileStatus: ReceiptFileStatus;
   } | null;
 }
 
@@ -195,6 +221,233 @@ export class FinanceService {
     private readonly entitlementsService?: EntitlementsService,
   ) {}
 
+  async getDashboardSummary(
+    query: FinanceDashboardSummaryQueryDto,
+    actor: AuthContext,
+  ): Promise<FinanceDashboardSummary> {
+    assertAnyFinancePermission(actor, [
+      'fees:manage',
+      'payments:collect',
+      'payments:close',
+      'payments:refund',
+      'payments:reverse',
+      'receipts:read',
+    ]);
+
+    const timeZoneSetting = await this.prisma.tenantSetting.findUnique({
+      where: {
+        tenantId_key: {
+          tenantId: actor.tenantId,
+          key: 'timezone',
+        },
+      },
+      select: { value: true },
+    });
+    const configuredTimeZone =
+      typeof timeZoneSetting?.value === 'string'
+        ? timeZoneSetting.value
+        : NEPAL_TIME_ZONE;
+
+    if (configuredTimeZone !== NEPAL_TIME_ZONE) {
+      throw new BadRequestException(
+        `Finance summaries require the supported school timezone ${NEPAL_TIME_ZONE}.`,
+      );
+    }
+    if (query.timeZone && query.timeZone !== configuredTimeZone) {
+      throw new BadRequestException(
+        'Requested timezone does not match the configured school timezone.',
+      );
+    }
+
+    const period = resolveFinanceSummaryPeriod(query, configuredTimeZone);
+    const openInvoiceWhere: Prisma.InvoiceWhereInput = {
+      tenantId: actor.tenantId,
+      status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
+    };
+    const overdueInvoiceWhere: Prisma.InvoiceWhereInput = {
+      ...openInvoiceWhere,
+      dueDate: { lt: period.endExclusiveUtc },
+    };
+    const periodDateWhere = {
+      gte: period.startUtc,
+      lt: period.endExclusiveUtc,
+    };
+
+    const [
+      periodPaymentAggregate,
+      periodRefundAggregate,
+      outstandingInvoiceAggregate,
+      outstandingPaymentAggregate,
+      outstandingRefundAggregate,
+      overdueInvoiceAggregate,
+      overduePaymentAggregate,
+      overdueRefundAggregate,
+      overdueStudentRows,
+      pendingApprovalCount,
+      receiptsIssued,
+      latestClose,
+    ] = await Promise.all([
+      this.prisma.payment.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          status: PaymentStatus.SUCCESS,
+          paidAt: periodDateWhere,
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.paymentRefund.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          refundDate: periodDateWhere,
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.invoice.aggregate({
+        where: openInvoiceWhere,
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.payment.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          status: PaymentStatus.SUCCESS,
+          invoice: openInvoiceWhere,
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.paymentRefund.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          payment: {
+            status: PaymentStatus.SUCCESS,
+            invoice: openInvoiceWhere,
+          },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.invoice.aggregate({
+        where: overdueInvoiceWhere,
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.payment.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          status: PaymentStatus.SUCCESS,
+          invoice: overdueInvoiceWhere,
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.paymentRefund.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          payment: {
+            status: PaymentStatus.SUCCESS,
+            invoice: overdueInvoiceWhere,
+          },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.$queryRaw<Array<{ studentCount: bigint }>>(Prisma.sql`
+        SELECT COUNT(DISTINCT "studentId")::bigint AS "studentCount"
+        FROM "Invoice"
+        WHERE "tenantId" = ${actor.tenantId}
+          AND "status" IN ('ISSUED', 'PARTIAL')
+          AND "dueDate" < ${period.endExclusiveUtc}
+      `),
+      this.prisma.financeApprovalRequest.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: FinanceRequestStatus.PENDING,
+        },
+      }),
+      this.prisma.receipt.count({
+        where: {
+          tenantId: actor.tenantId,
+          issuedAt: periodDateWhere,
+        },
+      }),
+      this.prisma.cashierClose.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          closedAt: {
+            gte: period.startUtc,
+            lt: period.endExclusiveUtc,
+          },
+        },
+        orderBy: [{ closedAt: 'desc' }, { createdAt: 'desc' }],
+        select: {
+          id: true,
+          closeNumber: true,
+          closedAt: true,
+        },
+      }),
+    ]);
+
+    const unclosedPaymentCount = await this.prisma.payment.count({
+      where: {
+        tenantId: actor.tenantId,
+        status: PaymentStatus.SUCCESS,
+        paidAt: {
+          gte:
+            latestClose && latestClose.closedAt > period.startUtc
+              ? latestClose.closedAt
+              : period.startUtc,
+          lt: period.endExclusiveUtc,
+        },
+      },
+    });
+
+    const grossCollected = decimalOrZero(periodPaymentAggregate._sum.amount);
+    const periodRefunded = decimalOrZero(periodRefundAggregate._sum.amount);
+    const outstandingAmount = calculateOutstandingAmount(
+      outstandingInvoiceAggregate._sum.totalAmount,
+      outstandingPaymentAggregate._sum.amount,
+      outstandingRefundAggregate._sum.amount,
+    );
+    const overdueAmount = calculateOutstandingAmount(
+      overdueInvoiceAggregate._sum.totalAmount,
+      overduePaymentAggregate._sum.amount,
+      overdueRefundAggregate._sum.amount,
+    );
+    const cashierState =
+      latestClose && unclosedPaymentCount === 0
+        ? 'CLOSED'
+        : unclosedPaymentCount > 0
+          ? 'OPEN'
+          : 'NOT_STARTED';
+
+    return {
+      period: {
+        fromDate: period.fromDate,
+        toDate: period.toDate,
+        timeZone: configuredTimeZone,
+        startUtc: period.startUtc.toISOString(),
+        endExclusiveUtc: period.endExclusiveUtc.toISOString(),
+      },
+      collectedToday: {
+        grossAmount: grossCollected.toFixed(2),
+        refundedAmount: periodRefunded.toFixed(2),
+        netAmount: grossCollected.sub(periodRefunded).toFixed(2),
+      },
+      outstanding: {
+        amount: outstandingAmount.toFixed(2),
+      },
+      overdue: {
+        studentCount: Number(overdueStudentRows[0]?.studentCount ?? 0),
+        amount: overdueAmount.toFixed(2),
+      },
+      pendingApprovalCount,
+      cashierClose: {
+        state: cashierState,
+        latestCloseId: latestClose?.id ?? null,
+        latestCloseNumber: latestClose?.closeNumber ?? null,
+        latestClosedAt: latestClose?.closedAt.toISOString() ?? null,
+        unclosedPaymentCount,
+      },
+      receiptsIssued,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   async reprintReceipt(
     receiptId: string,
     dto: ReprintReceiptDto,
@@ -206,6 +459,38 @@ export class FinanceService {
     if (!reason) {
       throw new BadRequestException(
         'A reason is required to reprint this receipt.',
+      );
+    }
+    const idempotencyKey = dto.idempotencyKey.trim();
+    const existingHistory = await this.prisma.receiptReprintHistory.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        idempotencyKey,
+      },
+    });
+    if (existingHistory?.fileAssetId) {
+      await this.auditService.record({
+        action: 'idempotent_replay',
+        resource: 'receipt_reprint',
+        resourceId: existingHistory.id,
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        after: {
+          receiptId: existingHistory.receiptId,
+          fileAssetId: existingHistory.fileAssetId,
+        },
+      });
+      return {
+        receiptId: existingHistory.receiptId,
+        reprintHistoryId: existingHistory.id,
+        fileAssetId: existingHistory.fileAssetId,
+        fileName: `Receipt_Reprint.pdf`,
+        disposition: 'REPLAYED' as const,
+      };
+    }
+    if (existingHistory) {
+      throw new ConflictException(
+        'This receipt reprint is already processing or unavailable. Retry with a new request after checking its status.',
       );
     }
 
@@ -228,6 +513,11 @@ export class FinanceService {
 
     if (!receipt) {
       throw new NotFoundException('Receipt not found in this tenant');
+    }
+    if (!this.fileRegistryService) {
+      throw new ConflictException(
+        'Protected receipt reprint is temporarily unavailable.',
+      );
     }
 
     const school = await this.prisma.tenant.findUnique({
@@ -264,40 +554,99 @@ export class FinanceService {
       qrToken: receipt.receiptNumber,
     });
     const fileName = `Receipt_${receipt.receiptNumber}_Reprint.pdf`;
-    const fileAsset = this.fileRegistryService
-      ? await this.fileRegistryService.registerGeneratedFile({
-          tenantId: actor.tenantId,
-          generatedByUserId: actor.userId,
-          originalFilename: fileName,
-          content: pdf,
-          mimeType: 'application/pdf',
-          module: 'fees',
-          entityId: receipt.id,
-          metadata: {
-            kind: 'receipt_reprint',
+    let history: Prisma.ReceiptReprintHistoryGetPayload<object> | null =
+      existingHistory;
+    if (!history) {
+      try {
+        history = await this.prisma.receiptReprintHistory.create({
+          data: {
+            tenantId: actor.tenantId,
             receiptId: receipt.id,
-            receiptNumber: receipt.receiptNumber,
             paymentId: receipt.paymentId,
             studentId: receipt.payment.studentId,
+            reprintedById: actor.userId,
+            reason,
+            format: 'pdf',
+            delivery: 'download',
+            idempotencyKey,
+            metadata: {
+              receiptNumber: receipt.receiptNumber,
+              fileName,
+              state: 'PROCESSING',
+            },
           },
-        })
-      : null;
+        });
+      } catch (error) {
+        if (!isPrismaUniqueConstraintError(error)) {
+          throw error;
+        }
+        history = await this.prisma.receiptReprintHistory.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            idempotencyKey,
+          },
+        });
+        if (!history) {
+          throw error;
+        }
+        if (history.fileAssetId) {
+          return {
+            receiptId: history.receiptId,
+            reprintHistoryId: history.id,
+            fileAssetId: history.fileAssetId,
+            fileName,
+            disposition: 'REPLAYED' as const,
+          };
+        }
+        throw new ConflictException(
+          'This receipt reprint is already processing or unavailable. Retry with a new request after checking its status.',
+        );
+      }
+    }
 
-    const history = await this.prisma.receiptReprintHistory.create({
-      data: {
+    let fileAsset: FileAsset;
+    try {
+      fileAsset = await this.fileRegistryService.registerGeneratedFile({
         tenantId: actor.tenantId,
-        receiptId: receipt.id,
-        paymentId: receipt.paymentId,
-        studentId: receipt.payment.studentId,
-        reprintedById: actor.userId,
-        reason,
-        format: 'pdf',
-        delivery: 'download',
-        fileAssetId: fileAsset?.id ?? null,
+        generatedByUserId: actor.userId,
+        originalFilename: fileName,
+        content: pdf,
+        mimeType: 'application/pdf',
+        module: 'fees',
+        entityId: receipt.id,
+        metadata: {
+          kind: 'receipt_reprint',
+          receiptId: receipt.id,
+          receiptNumber: receipt.receiptNumber,
+          paymentId: receipt.paymentId,
+          studentId: receipt.payment.studentId,
+        },
+      });
+    } catch {
+      await this.prisma.receiptReprintHistory.update({
+        where: { id: history.id },
+        data: {
+          metadata: {
+            receiptNumber: receipt.receiptNumber,
+            fileName,
+            state: 'UNAVAILABLE',
+          },
+        },
+      });
+      throw new ConflictException(
+        'Receipt reprint file is temporarily unavailable. Retry later.',
+      );
+    }
+
+    history = await this.prisma.receiptReprintHistory.update({
+      where: { id: history.id },
+      data: {
+        fileAssetId: fileAsset.id,
         metadata: {
           receiptNumber: receipt.receiptNumber,
           fileName,
-          fileAssetId: fileAsset?.id ?? null,
+          fileAssetId: fileAsset.id,
+          state: 'AVAILABLE',
         },
       },
     });
@@ -314,13 +663,16 @@ export class FinanceService {
         paymentId: receipt.paymentId,
         studentId: receipt.payment.studentId,
         reprintHistoryId: history.id,
-        fileAssetId: fileAsset?.id ?? null,
+        fileAssetId: fileAsset.id,
       },
     });
 
     return {
-      pdf,
+      receiptId: receipt.id,
+      reprintHistoryId: history.id,
+      fileAssetId: fileAsset.id,
       fileName,
+      disposition: 'SUCCEEDED' as const,
     };
   }
 
@@ -634,17 +986,67 @@ export class FinanceService {
     return feePlan;
   }
 
-  async listBillingRuns(actor: AuthContext) {
-    return this.prisma.feeBillingRun.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        academicYear: true,
-        feePlan: true,
-        invoices: true,
-      },
-      orderBy: [{ generatedAt: 'desc' }],
-      take: 100,
-    });
+  async listBillingRuns(query: ListBillingRunsQueryDto, actor: AuthContext) {
+    const pagination = resolveFinancePagination(query);
+    const where: Prisma.FeeBillingRunWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+      ...(query.feePlanId ? { feePlanId: query.feePlanId } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.runYear ? { runYear: query.runYear } : {}),
+      ...(query.runMonth ? { runMonth: query.runMonth } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              {
+                feePlan: {
+                  is: {
+                    name: {
+                      contains: query.search.trim(),
+                      mode: 'insensitive',
+                    },
+                  },
+                },
+              },
+              {
+                feePlan: {
+                  is: {
+                    code: {
+                      contains: query.search.trim(),
+                      mode: 'insensitive',
+                    },
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+    const sortBy = query.sortBy ?? 'generatedAt';
+    const sortDirection = query.sortDirection ?? 'desc';
+    const [runs, total] = await Promise.all([
+      this.prisma.feeBillingRun.findMany({
+        where,
+        include: {
+          academicYear: true,
+          feePlan: true,
+          _count: { select: { invoices: true } },
+        },
+        orderBy: [{ [sortBy]: sortDirection }, { id: 'asc' }],
+        skip: pagination.skip,
+        take: pagination.limit,
+      }),
+      this.prisma.feeBillingRun.count({ where }),
+    ]);
+
+    return buildFinancePage(
+      runs.map(({ _count, ...run }) => ({
+        ...run,
+        invoiceCount: _count.invoices,
+      })),
+      total,
+      pagination,
+    );
   }
 
   async generateBillingRun(dto: GenerateBillingRunDto, actor: AuthContext) {
@@ -777,17 +1179,40 @@ export class FinanceService {
     };
   }
 
-  async listDiscountRules(actor: AuthContext) {
-    return this.prisma.discountRule.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        feeHead: true,
-        class: true,
-        feePlan: true,
-      },
-      orderBy: [{ createdAt: 'desc' }],
-      take: 100,
-    });
+  async listDiscountRules(
+    query: ListDiscountRulesQueryDto,
+    actor: AuthContext,
+  ) {
+    const pagination = resolveFinancePagination(query);
+    const where: Prisma.DiscountRuleWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query.isActive === undefined ? {} : { isActive: query.isActive }),
+      ...(query.search
+        ? {
+            name: {
+              contains: query.search.trim(),
+              mode: 'insensitive',
+            },
+          }
+        : {}),
+    };
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortDirection = query.sortDirection ?? 'desc';
+    const [items, total] = await Promise.all([
+      this.prisma.discountRule.findMany({
+        where,
+        include: {
+          feeHead: true,
+          class: true,
+          feePlan: true,
+        },
+        orderBy: [{ [sortBy]: sortDirection }, { id: 'asc' }],
+        skip: pagination.skip,
+        take: pagination.limit,
+      }),
+      this.prisma.discountRule.count({ where }),
+    ]);
+    return buildFinancePage(items, total, pagination);
   }
 
   async createDiscountRule(dto: CreateDiscountRuleDto, actor: AuthContext) {
@@ -835,17 +1260,68 @@ export class FinanceService {
     return discount;
   }
 
-  async listWaivers(actor: AuthContext) {
-    return this.prisma.feeWaiver.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        student: true,
-        feeHead: true,
-        approvedBy: true,
-      },
-      orderBy: [{ createdAt: 'desc' }],
-      take: 100,
-    });
+  async listWaivers(query: ListWaiversQueryDto, actor: AuthContext) {
+    const pagination = resolveFinancePagination(query);
+    const where: Prisma.FeeWaiverWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query.studentId ? { studentId: query.studentId } : {}),
+      ...(query.invoiceId ? { invoiceId: query.invoiceId } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              {
+                reason: {
+                  contains: query.search.trim(),
+                  mode: 'insensitive',
+                },
+              },
+              {
+                student: {
+                  is: {
+                    OR: [
+                      {
+                        firstNameEn: {
+                          contains: query.search.trim(),
+                          mode: 'insensitive',
+                        },
+                      },
+                      {
+                        lastNameEn: {
+                          contains: query.search.trim(),
+                          mode: 'insensitive',
+                        },
+                      },
+                      {
+                        studentSystemId: {
+                          contains: query.search.trim(),
+                          mode: 'insensitive',
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortDirection = query.sortDirection ?? 'desc';
+    const [items, total] = await Promise.all([
+      this.prisma.feeWaiver.findMany({
+        where,
+        include: {
+          student: true,
+          feeHead: true,
+          approvedBy: true,
+        },
+        orderBy: [{ [sortBy]: sortDirection }, { id: 'asc' }],
+        skip: pagination.skip,
+        take: pagination.limit,
+      }),
+      this.prisma.feeWaiver.count({ where }),
+    ]);
+    return buildFinancePage(items, total, pagination);
   }
 
   async createWaiver(dto: CreateFeeWaiverDto, actor: AuthContext) {
@@ -1153,83 +1629,120 @@ export class FinanceService {
   }
 
   async getCollectionReport(actor: AuthContext) {
-    const invoices = await this.prisma.invoice.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        payments: {
-          include: { refunds: true },
+    assertFinancePermission(actor, 'fees:manage');
+    const [
+      invoiceAggregate,
+      paymentAggregate,
+      refundAggregate,
+      waiverAggregate,
+      collectionTrendRows,
+      refundTrendRows,
+      classWiseRows,
+      feeHeadWiseRows,
+    ] = await Promise.all([
+      this.prisma.invoice.aggregate({
+        where: { tenantId: actor.tenantId },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.payment.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          status: PaymentStatus.SUCCESS,
         },
-        lines: {
-          include: {
-            feeHead: true,
-          },
-        },
-        student: {
-          include: {
-            class: true,
-          },
-        },
-      },
-    });
-    const payments = await this.prisma.payment.findMany({
-      where: { tenantId: actor.tenantId },
-      include: { refunds: true },
-      orderBy: [{ paidAt: 'asc' }],
-    });
-    const totalBilled = invoices.reduce(
-      (sum, invoice) => sum + Number(invoice.totalAmount),
-      0,
-    );
-    const totalCollected = payments.reduce(
-      (sum, payment) => sum + Number(payment.amount),
-      0,
-    );
-    const totalRefunded = payments.reduce(
-      (sum, payment) => sum + Number(sumRefundedAmount(payment.refunds)),
-      0,
-    );
-    const totalWaived = (
-      await this.prisma.feeWaiver.aggregate({
+        _sum: { amount: true },
+      }),
+      this.prisma.paymentRefund.aggregate({
+        where: { tenantId: actor.tenantId },
+        _sum: { amount: true },
+      }),
+      this.prisma.feeWaiver.aggregate({
         where: { tenantId: actor.tenantId, status: 'APPROVED' },
         _sum: { amount: true },
-      })
-    )._sum.amount;
-    const classWise = groupByAmount(
-      invoices,
-      (invoice) => invoice.student.class.name,
+      }),
+      this.prisma.$queryRaw<Array<{ month: string; amount: Prisma.Decimal }>>(
+        Prisma.sql`
+          SELECT to_char(date_trunc('month', "paidAt"), 'YYYY-MM') AS "month",
+                 COALESCE(SUM("amount"), 0) AS "amount"
+          FROM "Payment"
+          WHERE "tenantId" = ${actor.tenantId} AND "status" = 'SUCCESS'
+          GROUP BY date_trunc('month', "paidAt")
+          ORDER BY date_trunc('month', "paidAt") ASC
+        `,
+      ),
+      this.prisma.$queryRaw<Array<{ month: string; amount: Prisma.Decimal }>>(
+        Prisma.sql`
+          SELECT to_char(date_trunc('month', "refundDate"), 'YYYY-MM') AS "month",
+                 COALESCE(SUM("amount"), 0) AS "amount"
+          FROM "PaymentRefund"
+          WHERE "tenantId" = ${actor.tenantId}
+          GROUP BY date_trunc('month', "refundDate")
+          ORDER BY date_trunc('month', "refundDate") ASC
+        `,
+      ),
+      this.prisma.$queryRaw<
+        Array<{ className: string; amount: Prisma.Decimal }>
+      >(Prisma.sql`
+        SELECT c."name" AS "className",
+               COALESCE(SUM(i."totalAmount"), 0) AS "amount"
+        FROM "Invoice" i
+        JOIN "Student" s ON s."id" = i."studentId" AND s."tenantId" = i."tenantId"
+        JOIN "Class" c ON c."id" = s."classId" AND c."tenantId" = i."tenantId"
+        WHERE i."tenantId" = ${actor.tenantId}
+        GROUP BY c."id", c."name"
+        ORDER BY c."name" ASC
+      `),
+      this.prisma.$queryRaw<
+        Array<{ feeHeadName: string; amount: Prisma.Decimal }>
+      >(Prisma.sql`
+        SELECT f."name" AS "feeHeadName",
+               COALESCE(SUM(l."totalAmount"), 0) AS "amount"
+        FROM "InvoiceLine" l
+        JOIN "FeeHead" f ON f."id" = l."feeHeadId" AND f."tenantId" = l."tenantId"
+        WHERE l."tenantId" = ${actor.tenantId}
+        GROUP BY f."id", f."name"
+        ORDER BY f."name" ASC
+      `),
+    ]);
+    const totalBilled = decimalOrZero(invoiceAggregate._sum.totalAmount);
+    const totalCollected = decimalOrZero(paymentAggregate._sum.amount);
+    const totalRefunded = decimalOrZero(refundAggregate._sum.amount);
+    const totalWaived = decimalOrZero(waiverAggregate._sum.amount);
+    const refundTrend = new Map(
+      refundTrendRows.map((row) => [row.month, decimalOrZero(row.amount)]),
     );
-    const feeHeadWise = new Map<string, number>();
-
-    for (const invoice of invoices) {
-      for (const line of invoice.lines) {
-        feeHeadWise.set(
-          line.feeHead.name,
-          (feeHeadWise.get(line.feeHead.name) ?? 0) + Number(line.totalAmount),
-        );
-      }
-    }
 
     return {
-      totalBilled,
-      totalCollected,
-      totalRefunded,
-      netCollected: totalCollected - totalRefunded,
-      totalOutstanding: Math.max(
-        0,
-        totalBilled -
-          Number(totalWaived ?? 0) -
-          (totalCollected - totalRefunded),
-      ),
-      totalWaived: Number(totalWaived ?? 0),
-      collectionTrend: groupPaymentsByMonth(payments),
-      refundTrend: groupRefundsByMonth(payments),
-      netCollectionTrend: groupNetCollectionsByMonth(payments),
-      classWiseBreakdown: Array.from(classWise.entries()).map(
-        ([className, amount]) => ({ className, amount }),
-      ),
-      feeHeadWiseBreakdown: Array.from(feeHeadWise.entries()).map(
-        ([feeHeadName, amount]) => ({ feeHeadName, amount }),
-      ),
+      totalBilled: totalBilled.toFixed(2),
+      totalCollected: totalCollected.toFixed(2),
+      totalRefunded: totalRefunded.toFixed(2),
+      netCollected: totalCollected.sub(totalRefunded).toFixed(2),
+      totalOutstanding: Prisma.Decimal.max(
+        new Prisma.Decimal(0),
+        totalBilled.sub(totalCollected).add(totalRefunded),
+      ).toFixed(2),
+      totalWaived: totalWaived.toFixed(2),
+      collectionTrend: collectionTrendRows.map((row) => ({
+        month: row.month,
+        amount: decimalOrZero(row.amount).toFixed(2),
+      })),
+      refundTrend: refundTrendRows.map((row) => ({
+        month: row.month,
+        amount: decimalOrZero(row.amount).toFixed(2),
+      })),
+      netCollectionTrend: collectionTrendRows.map((row) => ({
+        month: row.month,
+        amount: decimalOrZero(row.amount)
+          .sub(refundTrend.get(row.month) ?? 0)
+          .toFixed(2),
+      })),
+      classWiseBreakdown: classWiseRows.map((row) => ({
+        className: row.className,
+        amount: decimalOrZero(row.amount).toFixed(2),
+      })),
+      feeHeadWiseBreakdown: feeHeadWiseRows.map((row) => ({
+        feeHeadName: row.feeHeadName,
+        amount: decimalOrZero(row.amount).toFixed(2),
+      })),
     };
   }
 
@@ -1637,44 +2150,115 @@ export class FinanceService {
     };
   }
 
-  async listInvoices(actor: AuthContext) {
+  async listInvoices(query: ListInvoicesQueryDto, actor: AuthContext) {
     assertFinancePermission(actor, 'payments:collect');
-
-    const invoices = await this.prisma.invoice.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        student: true,
-        payments: {
-          include: {
-            refunds: true,
-            receipt: true,
+    const pagination = resolveFinancePagination(query);
+    const search = query.search?.trim();
+    const where: Prisma.InvoiceWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query.status
+        ? { status: query.status }
+        : query.outstandingOnly
+          ? { status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] } }
+          : {}),
+      ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+      ...(query.classId ? { student: { classId: query.classId } } : {}),
+      ...(query.dueFrom || query.dueTo
+        ? {
+            dueDate: {
+              ...(query.dueFrom ? { gte: new Date(query.dueFrom) } : {}),
+              ...(query.dueTo ? { lte: new Date(query.dueTo) } : {}),
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              {
+                invoiceNumber: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                student: {
+                  is: {
+                    OR: [
+                      {
+                        firstNameEn: {
+                          contains: search,
+                          mode: 'insensitive',
+                        },
+                      },
+                      {
+                        lastNameEn: {
+                          contains: search,
+                          mode: 'insensitive',
+                        },
+                      },
+                      {
+                        studentSystemId: {
+                          contains: search,
+                          mode: 'insensitive',
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+    const sortBy = query.sortBy ?? 'issuedAt';
+    const sortDirection = query.sortDirection ?? 'desc';
+    const [invoices, total] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where,
+        include: {
+          student: true,
+          payments: {
+            include: {
+              refunds: true,
+              receipt: true,
+            },
+            orderBy: { paidAt: 'desc' },
           },
-          orderBy: { paidAt: 'desc' },
         },
-      },
-      orderBy: [{ issuedAt: 'desc' }],
-      take: 100,
-    });
+        orderBy: [{ [sortBy]: sortDirection }, { id: 'asc' }],
+        skip: pagination.skip,
+        take: pagination.limit,
+      }),
+      this.prisma.invoice.count({ where }),
+    ]);
 
-    return invoices.map((invoice) => {
+    const items = invoices.map((invoice) => {
       const lastPayment = invoice.payments[0];
       const receipt = lastPayment?.receipt;
+      const paidAmount = sumNetPaidAmount(invoice.payments);
 
       return {
         id: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
         status: invoice.status,
         dueDate: invoice.dueDate,
+        issuedAt: invoice.issuedAt,
         totalAmount: Number(invoice.totalAmount),
         student: {
           id: invoice.student.id,
           name: `${invoice.student.firstNameEn} ${invoice.student.lastNameEn}`.trim(),
+          studentSystemId: invoice.student.studentSystemId,
         },
-        paidAmount: Number(sumNetPaidAmount(invoice.payments)),
+        paidAmount: Number(paidAmount),
+        outstandingAmount: Math.max(
+          0,
+          Number(invoice.totalAmount.sub(paidAmount)),
+        ),
         receiptId: receipt?.id || null,
         receiptNumber: receipt?.receiptNumber || null,
       };
     });
+    return buildFinancePage(items, total, pagination);
   }
 
   async getInvoiceDetail(invoiceId: string, actor: AuthContext) {
@@ -1868,7 +2452,8 @@ export class FinanceService {
                 id: payment.receipt.id,
                 receiptNumber: payment.receipt.receiptNumber,
                 issuedAt: payment.receipt.issuedAt,
-                pdfUrl: payment.receipt.pdfUrl,
+                fileAssetId: payment.receipt.fileAssetId,
+                fileStatus: payment.receipt.fileStatus,
               }
             : null,
           refunds: payment.refunds.map((refund) => ({
@@ -2597,42 +3182,132 @@ export class FinanceService {
   async listDefaulters(actor: AuthContext, filters: ListDefaultersDto = {}) {
     const today = new Date();
     const overdueFilter = resolveDefaulterOverdueFilter(filters, today);
-    const invoices = await this.prisma.invoice.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        dueDate: overdueFilter,
-        status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
-        ...(filters.classId
-          ? {
-              student: {
-                classId: filters.classId,
+    const pagination = resolveFinancePagination(filters);
+    const search = filters.search?.trim();
+    const where: Prisma.InvoiceWhereInput = {
+      tenantId: actor.tenantId,
+      dueDate: overdueFilter,
+      status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
+      ...(filters.classId
+        ? {
+            student: {
+              classId: filters.classId,
+            },
+          }
+        : {}),
+      ...(filters.feeHeadId
+        ? {
+            lines: {
+              some: {
+                feeHeadId: filters.feeHeadId,
               },
-            }
-          : {}),
-        ...(filters.feeHeadId
-          ? {
-              lines: {
-                some: {
-                  feeHeadId: filters.feeHeadId,
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              {
+                invoiceNumber: {
+                  contains: search,
+                  mode: 'insensitive',
                 },
               },
-            }
-          : {}),
-      },
-      include: {
-        student: {
-          include: {
-            class: true,
-            sectionRef: true,
+              {
+                student: {
+                  is: {
+                    OR: [
+                      {
+                        firstNameEn: {
+                          contains: search,
+                          mode: 'insensitive',
+                        },
+                      },
+                      {
+                        lastNameEn: {
+                          contains: search,
+                          mode: 'insensitive',
+                        },
+                      },
+                      {
+                        studentSystemId: {
+                          contains: search,
+                          mode: 'insensitive',
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+    const orderBy: Prisma.InvoiceOrderByWithRelationInput[] =
+      filters.sortBy === 'studentName'
+        ? [
+            {
+              student: {
+                firstNameEn: filters.sortDirection ?? 'asc',
+              },
+            },
+            { id: 'asc' },
+          ]
+        : [
+            {
+              [filters.sortBy === 'outstanding' ? 'totalAmount' : 'dueDate']:
+                filters.sortDirection ?? 'asc',
+            },
+            { id: 'asc' },
+          ];
+    const [
+      invoices,
+      total,
+      invoiceAmountAggregate,
+      paymentAmountAggregate,
+      refundAmountAggregate,
+    ] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where,
+        include: {
+          student: {
+            include: {
+              class: true,
+              sectionRef: true,
+            },
+          },
+          payments: {
+            include: { refunds: true },
           },
         },
-        payments: {
-          include: { refunds: true },
+        orderBy,
+        skip: pagination.skip,
+        take: pagination.limit,
+      }),
+      this.prisma.invoice.count({ where }),
+      this.prisma.invoice.aggregate({
+        where,
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.payment.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          status: PaymentStatus.SUCCESS,
+          invoice: where,
         },
-      },
-      orderBy: [{ dueDate: 'asc' }],
-      take: 100,
-    });
+        _sum: { amount: true },
+      }),
+      this.prisma.paymentRefund.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          payment: {
+            status: PaymentStatus.SUCCESS,
+            invoice: where,
+          },
+        },
+        _sum: { amount: true },
+      }),
+    ]);
 
     const items = invoices
       .map((invoice) => {
@@ -2671,9 +3346,16 @@ export class FinanceService {
         minDaysOverdue: filters.minDaysOverdue ?? null,
         maxDaysOverdue: filters.maxDaysOverdue ?? null,
       },
-      total: items.length,
-      totalOutstanding: roundMoney(
-        items.reduce((sum, item) => sum + item.outstanding, 0),
+      total,
+      page: pagination.page,
+      limit: pagination.limit,
+      hasNextPage: pagination.skip + items.length < total,
+      totalOutstanding: Number(
+        calculateOutstandingAmount(
+          invoiceAmountAggregate._sum.totalAmount,
+          paymentAmountAggregate._sum.amount,
+          refundAmountAggregate._sum.amount,
+        ),
       ),
       segments: buildDefaulterSegmentSummary(items),
       items,
@@ -2690,6 +3372,8 @@ export class FinanceService {
       agingBucket: dto.agingBucket,
       minDaysOverdue: dto.minDaysOverdue,
       maxDaysOverdue: dto.maxDaysOverdue,
+      page: 1,
+      limit: 100,
     });
     const defaulters = defaulterResult.items;
     const selectedDefaulters = dto.invoiceIds?.length
@@ -2987,6 +3671,37 @@ export class FinanceService {
 
   async collectPayment(dto: CollectPaymentDto, actor: AuthContext) {
     assertFinancePermission(actor, 'payments:collect');
+    const idempotencyKey = dto.idempotencyKey.trim();
+    if (!idempotencyKey) {
+      throw new BadRequestException(
+        'An idempotency key is required to collect a payment.',
+      );
+    }
+    const existingPayment = await this.prisma.payment.findUnique({
+      where: {
+        tenantId_idempotencyKey: {
+          tenantId: actor.tenantId,
+          idempotencyKey,
+        },
+      },
+      include: { receipt: true },
+    });
+
+    if (existingPayment) {
+      await this.auditService.record({
+        action: 'idempotent_replay',
+        resource: 'payment',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: existingPayment.id,
+        after: {
+          invoiceId: existingPayment.invoiceId,
+          idempotencyKey,
+        },
+      });
+      return mapCollectedPaymentResult(existingPayment, 'REPLAYED');
+    }
+
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: dto.invoiceId, tenantId: actor.tenantId },
       include: {
@@ -3031,28 +3746,6 @@ export class FinanceService {
       }
     }
 
-    if (dto.idempotencyKey) {
-      const existingPayment = await this.prisma.payment.findFirst({
-        where: {
-          tenantId: actor.tenantId,
-          idempotencyKey: dto.idempotencyKey,
-        },
-        include: { receipt: true },
-      });
-
-      if (existingPayment) {
-        return {
-          paymentId: existingPayment.id,
-          invoiceId: existingPayment.invoiceId,
-          amount: Number(existingPayment.amount),
-          method: existingPayment.method,
-          paidAt: existingPayment.paidAt,
-          receiptNumber: existingPayment.receipt?.receiptNumber ?? null,
-          receiptPdfUrl: existingPayment.receipt?.pdfUrl ?? null,
-        };
-      }
-    }
-
     await this.usageService.checkLimit(actor.tenantId, 'receipts.generated', 1);
 
     const fiscalYear = resolveFiscalYear(new Date());
@@ -3090,7 +3783,7 @@ export class FinanceService {
             },
             paidAt: new Date(),
             narration: dto.narration ?? null,
-            idempotencyKey: dto.idempotencyKey ?? null,
+            idempotencyKey,
             receipt: {
               create: {
                 tenantId: actor.tenantId,
@@ -3103,7 +3796,8 @@ export class FinanceService {
                   invoiceFiscalYear: invoice.fiscalYear,
                   billNumber: invoice.billNumber ?? invoice.invoiceNumber,
                 },
-                pdfUrl: `/api/v1/receipts/${receiptNumber}.pdf`,
+                pdfUrl: null,
+                fileStatus: ReceiptFileStatus.PENDING,
               },
             },
           },
@@ -3179,25 +3873,31 @@ export class FinanceService {
         return payment;
       });
     } catch (error) {
-      if (dto.idempotencyKey && isPrismaUniqueConstraintError(error)) {
-        const existingPayment = await this.prisma.payment.findFirst({
+      if (isPrismaUniqueConstraintError(error)) {
+        const existingPayment = await this.prisma.payment.findUnique({
           where: {
-            tenantId: actor.tenantId,
-            idempotencyKey: dto.idempotencyKey,
+            tenantId_idempotencyKey: {
+              tenantId: actor.tenantId,
+              idempotencyKey,
+            },
           },
           include: { receipt: true },
         });
 
         if (existingPayment) {
-          return {
-            paymentId: existingPayment.id,
-            invoiceId: existingPayment.invoiceId,
-            amount: Number(existingPayment.amount),
-            method: existingPayment.method,
-            paidAt: existingPayment.paidAt,
-            receiptNumber: existingPayment.receipt?.receiptNumber ?? null,
-            receiptPdfUrl: existingPayment.receipt?.pdfUrl ?? null,
-          };
+          await this.auditService.record({
+            action: 'idempotent_replay',
+            resource: 'payment',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: existingPayment.id,
+            after: {
+              invoiceId: existingPayment.invoiceId,
+              idempotencyKey,
+              concurrent: true,
+            },
+          });
+          return mapCollectedPaymentResult(existingPayment, 'REPLAYED');
         }
       }
 
@@ -3229,15 +3929,7 @@ export class FinanceService {
       receiptNumber: result.receipt?.receiptNumber ?? null,
     });
 
-    return {
-      paymentId: result.id,
-      invoiceId: dto.invoiceId,
-      amount: Number(result.amount),
-      method: result.method,
-      paidAt: result.paidAt,
-      receiptNumber: result.receipt?.receiptNumber ?? null,
-      receiptPdfUrl: result.receipt?.pdfUrl ?? null,
-    };
+    return mapCollectedPaymentResult(result, 'SUCCEEDED');
   }
 
   async requestRefund(
@@ -3246,6 +3938,32 @@ export class FinanceService {
     actor: AuthContext,
   ) {
     assertFinancePermission(actor, 'payments:collect');
+    const idempotencyKey = dto.idempotencyKey.trim();
+    const replay = await this.prisma.financeApprovalRequest.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        idempotencyKey,
+      },
+      include: {
+        payment: true,
+        requestedBy: true,
+        history: { orderBy: [{ createdAt: 'asc' }] },
+      },
+    });
+    if (replay) {
+      await this.auditService.record({
+        action: 'idempotent_replay',
+        resource: 'finance_approval_request',
+        resourceId: replay.id,
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        after: {
+          paymentId: replay.paymentId,
+          type: replay.type,
+        },
+      });
+      return { ...replay, disposition: 'REPLAYED' as const };
+    }
 
     const payment = await this.prisma.payment.findFirst({
       where: { id: paymentId, tenantId: actor.tenantId },
@@ -3292,21 +4010,69 @@ export class FinanceService {
       );
     }
 
-    const request = await this.prisma.financeApprovalRequest.create({
-      data: {
+    let request;
+    try {
+      request = await this.prisma.financeApprovalRequest.create({
+        data: {
+          tenantId: actor.tenantId,
+          type: FinanceRequestType.REFUND,
+          paymentId,
+          idempotencyKey,
+          amount: refundAmount,
+          reason: dto.reason.trim(),
+          status: FinanceRequestStatus.PENDING,
+          requestedById: actor.userId,
+          history: {
+            create: {
+              tenantId: actor.tenantId,
+              action: FinanceRequestHistoryAction.REQUESTED,
+              status: FinanceRequestStatus.PENDING,
+              actorUserId: actor.userId,
+              note: dto.reason.trim(),
+            },
+          },
+        },
+        include: {
+          payment: true,
+          requestedBy: true,
+          history: true,
+        },
+      });
+    } catch (error) {
+      if (!isPrismaUniqueConstraintError(error)) {
+        throw error;
+      }
+      const concurrentReplay =
+        await this.prisma.financeApprovalRequest.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            idempotencyKey,
+          },
+          include: {
+            payment: true,
+            requestedBy: true,
+            history: { orderBy: [{ createdAt: 'asc' }] },
+          },
+        });
+      if (!concurrentReplay) {
+        throw new ConflictException(
+          'The refund request could not be recorded safely. Retry with the same request key.',
+        );
+      }
+      await this.auditService.record({
+        action: 'idempotent_replay',
+        resource: 'finance_approval_request',
+        resourceId: concurrentReplay.id,
         tenantId: actor.tenantId,
-        type: FinanceRequestType.REFUND,
-        paymentId,
-        amount: refundAmount,
-        reason: dto.reason.trim(),
-        status: FinanceRequestStatus.PENDING,
-        requestedById: actor.userId,
-      },
-      include: {
-        payment: true,
-        requestedBy: true,
-      },
-    });
+        userId: actor.userId,
+        after: {
+          paymentId: concurrentReplay.paymentId,
+          type: concurrentReplay.type,
+          concurrent: true,
+        },
+      });
+      return { ...concurrentReplay, disposition: 'REPLAYED' as const };
+    }
 
     await this.auditService.record({
       action: 'create',
@@ -3322,7 +4088,7 @@ export class FinanceService {
       },
     });
 
-    return request;
+    return { ...request, disposition: 'SUCCEEDED' as const };
   }
 
   async requestReversal(
@@ -3331,6 +4097,32 @@ export class FinanceService {
     actor: AuthContext,
   ) {
     assertFinancePermission(actor, 'payments:collect');
+    const idempotencyKey = dto.idempotencyKey.trim();
+    const replay = await this.prisma.financeApprovalRequest.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        idempotencyKey,
+      },
+      include: {
+        payment: true,
+        requestedBy: true,
+        history: { orderBy: [{ createdAt: 'asc' }] },
+      },
+    });
+    if (replay) {
+      await this.auditService.record({
+        action: 'idempotent_replay',
+        resource: 'finance_approval_request',
+        resourceId: replay.id,
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        after: {
+          paymentId: replay.paymentId,
+          type: replay.type,
+        },
+      });
+      return { ...replay, disposition: 'REPLAYED' as const };
+    }
 
     const payment = await this.prisma.payment.findFirst({
       where: { id: paymentId, tenantId: actor.tenantId },
@@ -3366,21 +4158,69 @@ export class FinanceService {
       );
     }
 
-    const request = await this.prisma.financeApprovalRequest.create({
-      data: {
+    let request;
+    try {
+      request = await this.prisma.financeApprovalRequest.create({
+        data: {
+          tenantId: actor.tenantId,
+          type: FinanceRequestType.REVERSAL,
+          paymentId,
+          idempotencyKey,
+          amount: null,
+          reason: dto.reason.trim(),
+          status: FinanceRequestStatus.PENDING,
+          requestedById: actor.userId,
+          history: {
+            create: {
+              tenantId: actor.tenantId,
+              action: FinanceRequestHistoryAction.REQUESTED,
+              status: FinanceRequestStatus.PENDING,
+              actorUserId: actor.userId,
+              note: dto.reason.trim(),
+            },
+          },
+        },
+        include: {
+          payment: true,
+          requestedBy: true,
+          history: true,
+        },
+      });
+    } catch (error) {
+      if (!isPrismaUniqueConstraintError(error)) {
+        throw error;
+      }
+      const concurrentReplay =
+        await this.prisma.financeApprovalRequest.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            idempotencyKey,
+          },
+          include: {
+            payment: true,
+            requestedBy: true,
+            history: { orderBy: [{ createdAt: 'asc' }] },
+          },
+        });
+      if (!concurrentReplay) {
+        throw new ConflictException(
+          'The reversal request could not be recorded safely. Retry with the same request key.',
+        );
+      }
+      await this.auditService.record({
+        action: 'idempotent_replay',
+        resource: 'finance_approval_request',
+        resourceId: concurrentReplay.id,
         tenantId: actor.tenantId,
-        type: FinanceRequestType.REVERSAL,
-        paymentId,
-        amount: null,
-        reason: dto.reason.trim(),
-        status: FinanceRequestStatus.PENDING,
-        requestedById: actor.userId,
-      },
-      include: {
-        payment: true,
-        requestedBy: true,
-      },
-    });
+        userId: actor.userId,
+        after: {
+          paymentId: concurrentReplay.paymentId,
+          type: concurrentReplay.type,
+          concurrent: true,
+        },
+      });
+      return { ...concurrentReplay, disposition: 'REPLAYED' as const };
+    }
 
     await this.auditService.record({
       action: 'create',
@@ -3395,10 +4235,13 @@ export class FinanceService {
       },
     });
 
-    return request;
+    return { ...request, disposition: 'SUCCEEDED' as const };
   }
 
-  async listApprovalRequests(actor: AuthContext) {
+  async listApprovalRequests(
+    query: ListFinanceApprovalRequestsQueryDto,
+    actor: AuthContext,
+  ) {
     // Permission: either refund or reverse allows listing requests
     const hasRefundPerm = actor.permissions.includes('payments:refund');
     const hasReversePerm = actor.permissions.includes('payments:reverse');
@@ -3409,21 +4252,85 @@ export class FinanceService {
       );
     }
 
-    return this.prisma.financeApprovalRequest.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        payment: {
-          include: {
-            student: true,
-            invoice: true,
+    const pagination = resolveFinancePagination(query);
+    const search = query.search?.trim();
+    const where: Prisma.FinanceApprovalRequestWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query.type ? { type: query.type } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(search
+        ? {
+            OR: [
+              { reason: { contains: search, mode: 'insensitive' } },
+              {
+                payment: {
+                  is: {
+                    OR: [
+                      {
+                        referenceNumber: {
+                          contains: search,
+                          mode: 'insensitive',
+                        },
+                      },
+                      {
+                        student: {
+                          is: {
+                            OR: [
+                              {
+                                firstNameEn: {
+                                  contains: search,
+                                  mode: 'insensitive',
+                                },
+                              },
+                              {
+                                lastNameEn: {
+                                  contains: search,
+                                  mode: 'insensitive',
+                                },
+                              },
+                              {
+                                studentSystemId: {
+                                  contains: search,
+                                  mode: 'insensitive',
+                                },
+                              },
+                            ],
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortDirection = query.sortDirection ?? 'desc';
+    const [items, total] = await Promise.all([
+      this.prisma.financeApprovalRequest.findMany({
+        where,
+        include: {
+          payment: {
+            include: {
+              student: true,
+              invoice: true,
+            },
+          },
+          requestedBy: true,
+          reviewedBy: true,
+          history: {
+            orderBy: [{ createdAt: 'asc' }],
           },
         },
-        requestedBy: true,
-        reviewedBy: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
+        orderBy: [{ [sortBy]: sortDirection }, { id: 'asc' }],
+        skip: pagination.skip,
+        take: pagination.limit,
+      }),
+      this.prisma.financeApprovalRequest.count({ where }),
+    ]);
+    return buildFinancePage(items, total, pagination);
   }
 
   async reviewApprovalRequest(
@@ -3449,41 +4356,179 @@ export class FinanceService {
     } else {
       assertFinancePermission(actor, 'payments:reverse');
     }
+    if (
+      request.requestedById === actor.userId &&
+      !actor.roles.includes('platform_super_admin')
+    ) {
+      throw new ForbiddenException(
+        'A finance request must be reviewed by a different authorized user.',
+      );
+    }
+    const reviewNote = dto.reviewNote?.trim() || null;
+    if (dto.status === FinanceRequestStatus.REJECTED && !reviewNote) {
+      throw new BadRequestException(
+        'A review note is required to reject a finance request.',
+      );
+    }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      if (dto.status === FinanceRequestStatus.APPROVED) {
-        if (request.type === FinanceRequestType.REFUND) {
-          await this.refundPayment(
-            request.paymentId,
-            {
-              amount: request.amount ? Number(request.amount) : undefined,
-              reason: request.reason,
-            },
-            actor,
-          );
-        } else {
-          await this.reversePayment(
-            request.paymentId,
-            { reason: request.reason },
-            actor,
+    if (dto.status === FinanceRequestStatus.REJECTED) {
+      const rejected = await this.prisma.$transaction(async (tx) => {
+        const claim = await tx.financeApprovalRequest.updateMany({
+          where: {
+            id: request.id,
+            tenantId: actor.tenantId,
+            status: FinanceRequestStatus.PENDING,
+          },
+          data: {
+            status: FinanceRequestStatus.REJECTED,
+            reviewedById: actor.userId,
+            reviewedAt: new Date(),
+            reviewNote,
+            failureMessage: null,
+          },
+        });
+        if (claim.count !== 1) {
+          throw new ConflictException(
+            'This finance request was already reviewed.',
           );
         }
-      }
-
-      return tx.financeApprovalRequest.update({
-        where: { id: requestId },
-        data: {
-          status: dto.status,
-          reviewedById: actor.userId,
-          reviewedAt: new Date(),
-          reviewNote: dto.reviewNote?.trim() || null,
-        },
-        include: {
-          payment: true,
-          requestedBy: true,
-          reviewedBy: true,
-        },
+        await tx.financeApprovalRequestHistory.create({
+          data: {
+            tenantId: actor.tenantId,
+            requestId: request.id,
+            action: FinanceRequestHistoryAction.REJECTED,
+            status: FinanceRequestStatus.REJECTED,
+            actorUserId: actor.userId,
+            note: reviewNote,
+          },
+        });
+        return tx.financeApprovalRequest.findUniqueOrThrow({
+          where: { id: request.id },
+          include: {
+            payment: true,
+            requestedBy: true,
+            reviewedBy: true,
+            history: { orderBy: [{ createdAt: 'asc' }] },
+          },
+        });
       });
+      await this.auditService.record({
+        action: 'reject',
+        resource: 'finance_approval_request',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: request.id,
+        after: { status: rejected.status, reviewNote },
+      });
+      return rejected;
+    }
+
+    const claim = await this.prisma.financeApprovalRequest.updateMany({
+      where: {
+        id: request.id,
+        tenantId: actor.tenantId,
+        status: FinanceRequestStatus.PENDING,
+      },
+      data: {
+        status: FinanceRequestStatus.PROCESSING,
+        reviewedById: actor.userId,
+        reviewedAt: new Date(),
+        reviewNote,
+        failureMessage: null,
+      },
+    });
+    if (claim.count !== 1) {
+      throw new ConflictException('This finance request was already reviewed.');
+    }
+    await this.prisma.financeApprovalRequestHistory.create({
+      data: {
+        tenantId: actor.tenantId,
+        requestId: request.id,
+        action: FinanceRequestHistoryAction.REVIEW_STARTED,
+        status: FinanceRequestStatus.PROCESSING,
+        actorUserId: actor.userId,
+        note: reviewNote,
+      },
+    });
+
+    try {
+      const executionIdempotencyKey = `finance-request:${request.id}`;
+      if (request.type === FinanceRequestType.REFUND) {
+        await this.refundPayment(
+          request.paymentId,
+          {
+            amount: request.amount ? Number(request.amount) : undefined,
+            reason: request.reason,
+            idempotencyKey: executionIdempotencyKey,
+          },
+          actor,
+        );
+      } else {
+        await this.reversePayment(
+          request.paymentId,
+          {
+            reason: request.reason,
+            idempotencyKey: executionIdempotencyKey,
+          },
+          actor,
+        );
+      }
+    } catch {
+      await this.prisma.$transaction([
+        this.prisma.financeApprovalRequest.update({
+          where: { id: request.id },
+          data: {
+            status: FinanceRequestStatus.FAILED,
+            failureMessage:
+              'The approved correction could not be executed safely. Review the payment state before retrying.',
+          },
+        }),
+        this.prisma.financeApprovalRequestHistory.create({
+          data: {
+            tenantId: actor.tenantId,
+            requestId: request.id,
+            action: FinanceRequestHistoryAction.EXECUTION_FAILED,
+            status: FinanceRequestStatus.FAILED,
+            actorUserId: actor.userId,
+            note: 'Execution failed safely; no raw provider or database detail was recorded.',
+          },
+        }),
+      ]);
+      throw new ConflictException(
+        'The approved correction could not be executed safely. Review the payment state before retrying.',
+      );
+    }
+
+    const updated = await this.prisma.financeApprovalRequest.update({
+      where: { id: request.id },
+      data: {
+        status: FinanceRequestStatus.EXECUTED,
+        failureMessage: null,
+        history: {
+          create: [
+            {
+              tenantId: actor.tenantId,
+              action: FinanceRequestHistoryAction.APPROVED,
+              status: FinanceRequestStatus.APPROVED,
+              actorUserId: actor.userId,
+              note: reviewNote,
+            },
+            {
+              tenantId: actor.tenantId,
+              action: FinanceRequestHistoryAction.EXECUTED,
+              status: FinanceRequestStatus.EXECUTED,
+              actorUserId: actor.userId,
+              note: 'Approved correction executed idempotently.',
+            },
+          ],
+        },
+      },
+      include: {
+        payment: true,
+        requestedBy: true,
+        reviewedBy: true,
+        history: { orderBy: [{ createdAt: 'asc' }] },
+      },
     });
 
     await this.auditService.record({
@@ -3509,9 +4554,53 @@ export class FinanceService {
   ) {
     assertFinancePermission(actor, 'payments:refund');
     const reason = dto.reason?.trim();
+    const idempotencyKey = dto.idempotencyKey.trim();
 
     if (!reason) {
       throw new BadRequestException('Refund reason is required');
+    }
+
+    const existingRefund = await this.prisma.paymentRefund.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        idempotencyKey,
+      },
+      include: {
+        payment: {
+          include: {
+            invoice: true,
+            refunds: true,
+          },
+        },
+      },
+    });
+    if (existingRefund) {
+      const journalEntry = await this.prisma.journalEntry.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          sourceType: JournalSourceType.PAYMENT_REFUND,
+          sourceId: existingRefund.id,
+        },
+        select: { entryNumber: true },
+      });
+      const refundedAmount = sumRefundedAmount(existingRefund.payment.refunds);
+      return {
+        refundId: existingRefund.id,
+        refundNumber: existingRefund.refundNumber,
+        paymentId: existingRefund.paymentId,
+        invoiceId: existingRefund.payment.invoiceId,
+        amount: Number(existingRefund.amount),
+        refundDate: existingRefund.refundDate,
+        journalEntryNumber: journalEntry?.entryNumber ?? null,
+        remainingRefundableAmount: Number(
+          Prisma.Decimal.max(
+            new Prisma.Decimal(0),
+            existingRefund.payment.amount.sub(refundedAmount),
+          ),
+        ),
+        invoiceStatus: existingRefund.payment.invoice.status,
+        disposition: 'REPLAYED' as const,
+      };
     }
 
     const payment = await this.prisma.payment.findFirst({
@@ -3535,6 +4624,29 @@ export class FinanceService {
 
     if (payment.invoice.status === InvoiceStatus.VOID) {
       throw new ConflictException('Voided invoices cannot be refunded');
+    }
+
+    const closedWindow = await this.prisma.cashierClose.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        openedAt: { lte: payment.paidAt },
+        closedAt: { gte: payment.paidAt },
+        OR: [
+          { collectorUserId: null },
+          { collectorUserId: payment.collectedById },
+        ],
+        AND: [
+          {
+            OR: [{ paymentMethod: null }, { paymentMethod: payment.method }],
+          },
+        ],
+      },
+      select: { id: true, closeNumber: true },
+    });
+    if (closedWindow) {
+      throw new ConflictException(
+        'This cashier day is already closed. Record an approved correction instead.',
+      );
     }
 
     const sourceJournal = await this.prisma.journalEntry.findFirst({
@@ -3587,71 +4699,173 @@ export class FinanceService {
       actor.tenantId,
     );
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const refundNumber = await this.generateRefundNumber(actor.tenantId, tx);
-      const refund = await tx.paymentRefund.create({
-        data: {
-          tenantId: actor.tenantId,
-          paymentId: payment.id,
-          refundNumber,
-          amount: refundAmount,
-          refundDate,
-          reason,
-          referenceNumber: dto.referenceNumber?.trim() || null,
-          narration: dto.narration?.trim() || null,
-          createdById: actor.userId,
-        },
-      });
-
-      const journalEntry =
-        await this.accountingPostingService.postPaymentRefund(
-          {
+    let result;
+    try {
+      result = await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw(Prisma.sql`
+        SELECT "id"
+        FROM "Payment"
+        WHERE "id" = ${payment.id}
+          AND "tenantId" = ${actor.tenantId}
+        FOR UPDATE
+      `);
+        const currentPayment = await tx.payment.findFirst({
+          where: {
+            id: payment.id,
             tenantId: actor.tenantId,
-            refundId: refund.id,
-            paymentId: payment.id,
-            amount: refundAmount,
-            reason,
-            paymentMethod: payment.method,
-            paymentAccountCode: resolveCashAccountCode(payment.method),
-            entryDate: refundDate,
-            lines: reversedDebitLines.map((line) => ({
-              chartAccountId: line.chartAccountId,
-              amount: line.amount,
-              description: line.description ?? 'Payment refund reversal',
-            })),
           },
-          actor,
+          select: { status: true },
+        });
+        if (
+          !currentPayment ||
+          currentPayment.status === PaymentStatus.REVERSED
+        ) {
+          throw new ConflictException(
+            'This payment is no longer eligible for a refund.',
+          );
+        }
+        const currentRefunds = await tx.paymentRefund.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            paymentId: payment.id,
+          },
+          select: { amount: true },
+        });
+        const currentRefundableAmount = payment.amount.sub(
+          sumRefundedAmount(currentRefunds),
+        );
+        if (
+          currentRefundableAmount.lte(0) ||
+          refundAmount.gt(currentRefundableAmount)
+        ) {
+          throw new ConflictException(
+            'Another refund already changed the remaining refundable amount. Refresh and review the payment before retrying.',
+          );
+        }
+
+        const refundNumber = await this.generateRefundNumber(
+          actor.tenantId,
           tx,
         );
+        const refund = await tx.paymentRefund.create({
+          data: {
+            tenantId: actor.tenantId,
+            paymentId: payment.id,
+            refundNumber,
+            amount: refundAmount,
+            refundDate,
+            reason,
+            idempotencyKey,
+            referenceNumber: dto.referenceNumber?.trim() || null,
+            narration: dto.narration?.trim() || null,
+            createdById: actor.userId,
+          },
+        });
 
-      const netPaidAmount = sumNetPaidAmount(
-        payment.invoice.payments.map((invoicePayment) =>
-          invoicePayment.id === payment.id
-            ? {
-                ...invoicePayment,
-                refunds: [...invoicePayment.refunds, { amount: refundAmount }],
-              }
-            : invoicePayment,
-        ),
-      );
-      const updatedInvoice = await tx.invoice.update({
-        where: { id: payment.invoiceId },
-        data: {
-          status: resolveInvoiceStatusAfterAdjustment(
-            payment.invoice.status,
-            netPaidAmount,
-            payment.invoice.totalAmount,
+        const journalEntry =
+          await this.accountingPostingService.postPaymentRefund(
+            {
+              tenantId: actor.tenantId,
+              refundId: refund.id,
+              paymentId: payment.id,
+              amount: refundAmount,
+              reason,
+              paymentMethod: payment.method,
+              paymentAccountCode: resolveCashAccountCode(payment.method),
+              entryDate: refundDate,
+              lines: reversedDebitLines.map((line) => ({
+                chartAccountId: line.chartAccountId,
+                amount: line.amount,
+                description: line.description ?? 'Payment refund reversal',
+              })),
+            },
+            actor,
+            tx,
+          );
+
+        const netPaidAmount = sumNetPaidAmount(
+          payment.invoice.payments.map((invoicePayment) =>
+            invoicePayment.id === payment.id
+              ? {
+                  ...invoicePayment,
+                  refunds: [
+                    ...invoicePayment.refunds,
+                    { amount: refundAmount },
+                  ],
+                }
+              : invoicePayment,
           ),
-          paidAt:
-            netPaidAmount.gte(payment.invoice.totalAmount) &&
-            payment.invoice.totalAmount.gt(0)
-              ? (payment.invoice.paidAt ?? refundDate)
-              : null,
+        );
+        const updatedInvoice = await tx.invoice.update({
+          where: { id: payment.invoiceId },
+          data: {
+            status: resolveInvoiceStatusAfterAdjustment(
+              payment.invoice.status,
+              netPaidAmount,
+              payment.invoice.totalAmount,
+            ),
+            paidAt:
+              netPaidAmount.gte(payment.invoice.totalAmount) &&
+              payment.invoice.totalAmount.gt(0)
+                ? (payment.invoice.paidAt ?? refundDate)
+                : null,
+          },
+        });
+
+        return { refund, journalEntry, updatedInvoice };
+      });
+    } catch (error) {
+      if (!isPrismaUniqueConstraintError(error)) {
+        throw error;
+      }
+      const concurrentReplay = await this.prisma.paymentRefund.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          idempotencyKey,
+        },
+        include: {
+          payment: {
+            include: {
+              invoice: true,
+              refunds: true,
+            },
+          },
         },
       });
-
-      return { refund, journalEntry, updatedInvoice };
-    });
+      if (!concurrentReplay) {
+        throw new ConflictException(
+          'The refund could not be recorded safely. Retry with the same request key.',
+        );
+      }
+      const journalEntry = await this.prisma.journalEntry.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          sourceType: JournalSourceType.PAYMENT_REFUND,
+          sourceId: concurrentReplay.id,
+        },
+        select: { entryNumber: true },
+      });
+      const concurrentRefundedAmount = sumRefundedAmount(
+        concurrentReplay.payment.refunds,
+      );
+      return {
+        refundId: concurrentReplay.id,
+        refundNumber: concurrentReplay.refundNumber,
+        paymentId: concurrentReplay.paymentId,
+        invoiceId: concurrentReplay.payment.invoiceId,
+        amount: Number(concurrentReplay.amount),
+        refundDate: concurrentReplay.refundDate,
+        journalEntryNumber: journalEntry?.entryNumber ?? null,
+        remainingRefundableAmount: Number(
+          Prisma.Decimal.max(
+            new Prisma.Decimal(0),
+            concurrentReplay.payment.amount.sub(concurrentRefundedAmount),
+          ),
+        ),
+        invoiceStatus: concurrentReplay.payment.invoice.status,
+        disposition: 'REPLAYED' as const,
+      };
+    }
 
     await this.auditService.record({
       action: 'refund',
@@ -3680,12 +4894,13 @@ export class FinanceService {
       journalEntryNumber: result.journalEntry.entryNumber,
       remainingRefundableAmount: Number(refundableAmount.sub(refundAmount)),
       invoiceStatus: result.updatedInvoice.status,
+      disposition: 'SUCCEEDED' as const,
     };
   }
 
   async reversePayment(
     paymentId: string,
-    dto: { reason: string },
+    dto: ReversePaymentDto,
     actor: AuthContext,
   ) {
     assertFinancePermission(actor, 'payments:reverse');
@@ -3696,6 +4911,7 @@ export class FinanceService {
       );
     }
     const reason = dto.reason?.trim();
+    const idempotencyKey = dto.idempotencyKey.trim();
 
     if (!reason) {
       throw new BadRequestException(
@@ -3714,6 +4930,20 @@ export class FinanceService {
 
     if (!payment) {
       throw new NotFoundException('Payment not found in this tenant');
+    }
+
+    if (
+      payment.reversalIdempotencyKey === idempotencyKey &&
+      (payment.status === PaymentStatus.REVERSED || payment.reversedAt)
+    ) {
+      return {
+        paymentId: payment.id,
+        invoiceId: payment.invoiceId,
+        status: payment.status,
+        reversedAt: payment.reversedAt,
+        reversalReason: payment.reversalReason,
+        disposition: 'REPLAYED' as const,
+      };
     }
 
     if (payment.status === PaymentStatus.REVERSED || payment.reversedAt) {
@@ -3780,6 +5010,27 @@ export class FinanceService {
     });
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.payment.updateMany({
+        where: {
+          id: payment.id,
+          tenantId: actor.tenantId,
+          status: { not: PaymentStatus.REVERSED },
+          reversedAt: null,
+        },
+        data: {
+          status: PaymentStatus.REVERSED,
+          reversedAt: new Date(),
+          reversedById: actor.userId,
+          reversalReason: reason,
+          reversalIdempotencyKey: idempotencyKey,
+        },
+      });
+      if (claim.count !== 1) {
+        throw new ConflictException(
+          'This payment was already reversed or is being reversed.',
+        );
+      }
+
       const reversal = await this.accountingPostingService.postReversal(
         {
           tenantId: actor.tenantId,
@@ -3800,16 +5051,6 @@ export class FinanceService {
         actor,
         tx,
       );
-
-      await tx.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: PaymentStatus.REVERSED,
-          reversedAt: new Date(),
-          reversedById: actor.userId,
-          reversalReason: reason,
-        },
-      });
 
       const remainingPayments = await tx.payment.findMany({
         where: {
@@ -3849,7 +5090,13 @@ export class FinanceService {
       },
     });
 
-    return result;
+    return {
+      paymentId: payment.id,
+      invoiceId: payment.invoiceId,
+      status: PaymentStatus.REVERSED,
+      reversalEntryNumber: result.reversal.entryNumber,
+      disposition: 'SUCCEEDED' as const,
+    };
   }
 
   async previewCashierClose(query: CashierCloseWindowDto, actor: AuthContext) {
@@ -3888,35 +5135,47 @@ export class FinanceService {
 
   async listCashierCloses(query: ListCashierClosesDto, actor: AuthContext) {
     assertFinancePermission(actor, 'payments:close');
-    const closes = await this.prisma.cashierClose.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        ...(query.openedFrom
-          ? { openedAt: { gte: new Date(query.openedFrom) } }
-          : {}),
-        ...(query.closedTo
-          ? { closedAt: { lte: new Date(query.closedTo) } }
-          : {}),
-        ...(query.collectorUserId
-          ? { collectorUserId: query.collectorUserId }
-          : {}),
-        ...(query.paymentMethod ? { paymentMethod: query.paymentMethod } : {}),
-      },
-      include: {
-        collectorUser: true,
-        closedBy: true,
-      },
-      orderBy: [{ closedAt: 'desc' }, { createdAt: 'desc' }],
-      take: 100,
-    });
+    const pagination = resolveFinancePagination(query);
+    const where: Prisma.CashierCloseWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query.openedFrom
+        ? { openedAt: { gte: new Date(query.openedFrom) } }
+        : {}),
+      ...(query.closedTo
+        ? { closedAt: { lte: new Date(query.closedTo) } }
+        : {}),
+      ...(query.collectorUserId
+        ? { collectorUserId: query.collectorUserId }
+        : {}),
+      ...(query.paymentMethod ? { paymentMethod: query.paymentMethod } : {}),
+    };
+    const sortBy = query.sortBy ?? 'closedAt';
+    const sortDirection = query.sortDirection ?? 'desc';
+    const [closes, total] = await Promise.all([
+      this.prisma.cashierClose.findMany({
+        where,
+        include: {
+          collectorUser: true,
+          closedBy: true,
+        },
+        orderBy: [{ [sortBy]: sortDirection }, { id: 'asc' }],
+        skip: pagination.skip,
+        take: pagination.limit,
+      }),
+      this.prisma.cashierClose.count({ where }),
+    ]);
 
     const pdfFilesByCloseId = await this.getCashierClosePdfFilesByCloseId(
       actor.tenantId,
       closes.map((close) => close.id),
     );
 
-    return closes.map((close) =>
-      this.buildCashierCloseResponse(close, pdfFilesByCloseId.get(close.id)),
+    return buildFinancePage(
+      closes.map((close) =>
+        this.buildCashierCloseResponse(close, pdfFilesByCloseId.get(close.id)),
+      ),
+      total,
+      pagination,
     );
   }
 
@@ -4182,30 +5441,21 @@ export class FinanceService {
     if (!close) {
       throw new NotFoundException('Cashier close not found');
     }
-
-    // Business rule: Can only reopen if not already reopened or if needed.
-    // Here we just delete it (soft or hard depending on policy) or mark it.
-    // Requirement says "Audit close actions".
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.cashierClose.delete({
-        where: { id: closeId },
-      });
-
-      await this.auditService.record({
-        action: 'reopen',
-        resource: 'cashier_close',
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        resourceId: closeId,
-        after: {
-          closeNumber: close.closeNumber,
-          reason,
-        },
-      });
+    await this.auditService.record({
+      action: 'reopen_denied',
+      resource: 'cashier_close',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: closeId,
+      after: {
+        closeNumber: close.closeNumber,
+        reason,
+        immutable: true,
+      },
     });
-
-    return { success: true };
+    throw new ConflictException(
+      'Finalized cashier closes are immutable. Record a separately approved correction instead.',
+    );
   }
 
   async runFinanceConsistencyCheck(actor: AuthContext) {
@@ -4337,20 +5587,90 @@ export class FinanceService {
     return csv;
   }
 
-  async listPayments(actor: AuthContext) {
+  async listPayments(query: ListPaymentsQueryDto, actor: AuthContext) {
     assertAnyFinancePermission(actor, ['payments:collect', 'fees:manage']);
-    const payments = await this.prisma.payment.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        student: true,
-        receipt: true,
-        refunds: true,
-      },
-      orderBy: [{ paidAt: 'desc' }],
-      take: 100,
-    });
+    const pagination = resolveFinancePagination(query);
+    const search = query.search?.trim();
+    const where: Prisma.PaymentWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.method ? { method: query.method } : {}),
+      ...(query.studentId ? { studentId: query.studentId } : {}),
+      ...(query.paidFrom || query.paidTo
+        ? {
+            paidAt: {
+              ...(query.paidFrom ? { gte: new Date(query.paidFrom) } : {}),
+              ...(query.paidTo ? { lte: new Date(query.paidTo) } : {}),
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              {
+                referenceNumber: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                receipt: {
+                  is: {
+                    receiptNumber: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                },
+              },
+              {
+                student: {
+                  is: {
+                    OR: [
+                      {
+                        firstNameEn: {
+                          contains: search,
+                          mode: 'insensitive',
+                        },
+                      },
+                      {
+                        lastNameEn: {
+                          contains: search,
+                          mode: 'insensitive',
+                        },
+                      },
+                      {
+                        studentSystemId: {
+                          contains: search,
+                          mode: 'insensitive',
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+    const sortBy = query.sortBy ?? 'paidAt';
+    const sortDirection = query.sortDirection ?? 'desc';
+    const [payments, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where,
+        include: {
+          student: true,
+          receipt: true,
+          refunds: true,
+        },
+        orderBy: [{ [sortBy]: sortDirection }, { id: 'asc' }],
+        skip: pagination.skip,
+        take: pagination.limit,
+      }),
+      this.prisma.payment.count({ where }),
+    ]);
 
-    return payments.map((payment) => ({
+    const items = payments.map((payment) => ({
       id: payment.id,
       amount: Number(payment.amount),
       refundedAmount: Number(sumRefundedAmount(payment.refunds)),
@@ -4365,6 +5685,7 @@ export class FinanceService {
       },
       receiptNumber: payment.receipt?.receiptNumber ?? null,
     }));
+    return buildFinancePage(items, total, pagination);
   }
 
   async getPaymentGatewayReadiness(actor: AuthContext) {
@@ -4905,8 +6226,61 @@ export class FinanceService {
       },
     });
 
+    if (!paymentIntent) {
+      throw new NotFoundException(
+        'Payment intent was not found for this provider callback.',
+      );
+    }
+
+    if (
+      paymentIntent.status === OnlinePaymentIntentStatus.SUCCEEDED &&
+      webhookStatus !== 'SUCCESS'
+    ) {
+      await this.auditService.record({
+        action: 'webhook_ignored',
+        resource: 'online_payment_intent',
+        resourceId: paymentIntent.id,
+        tenantId: paymentIntent.tenantId,
+        userId: 'system',
+        after: {
+          provider: activeProvider.name,
+          callbackStatus: webhookStatus,
+          reason: 'terminal_success_preserved',
+        },
+      });
+      return {
+        status: 'ignored',
+        postedToLedger: true,
+        duplicate: true,
+        message:
+          'A delayed callback was ignored because the payment is already confirmed.',
+      };
+    }
+
     if (webhookStatus !== 'SUCCESS') {
-      if (paymentIntent) {
+      if (webhookStatus === 'UNKNOWN') {
+        await this.auditService.record({
+          action: 'webhook_ignored',
+          resource: 'online_payment_intent',
+          resourceId: paymentIntent.id,
+          tenantId: paymentIntent.tenantId,
+          userId: 'system',
+          after: {
+            provider: activeProvider.name,
+            callbackStatus: webhookStatus,
+            reason: 'unknown_status',
+          },
+        });
+        return {
+          status: 'ignored',
+          postedToLedger: false,
+          message: 'Unknown payment callback status was acknowledged safely.',
+        };
+      }
+      if (
+        paymentIntent.status !== OnlinePaymentIntentStatus.FAILED &&
+        paymentIntent.status !== OnlinePaymentIntentStatus.EXPIRED
+      ) {
         await this.prisma.onlinePaymentIntent.update({
           where: { id: paymentIntent.id },
           data: {
@@ -4920,6 +6294,17 @@ export class FinanceService {
           },
         });
       }
+      await this.auditService.record({
+        action: 'webhook_acknowledged',
+        resource: 'online_payment_intent',
+        resourceId: paymentIntent.id,
+        tenantId: paymentIntent.tenantId,
+        userId: 'system',
+        after: {
+          provider: activeProvider.name,
+          callbackStatus: webhookStatus,
+        },
+      });
       return {
         status: 'ignored',
         postedToLedger: false,
@@ -4934,34 +6319,17 @@ export class FinanceService {
       );
     }
 
-    let tenantId =
-      paymentIntent?.tenantId || headers['x-tenant-id'] || data?.tenantId;
-    if (!tenantId) {
-      const invoice = await this.prisma.invoice.findFirst({
-        where: {
-          OR: [{ id: reference }, { invoiceNumber: reference }],
-        },
-        select: { tenantId: true },
-      });
-      if (invoice) {
-        tenantId = invoice.tenantId;
-      }
-    }
-    if (!tenantId) {
-      tenantId = 'system';
-    }
+    const tenantId = paymentIntent.tenantId;
 
     // Duplicate event checking
-    const idempotencyKey = paymentIntent
-      ? `payment-intent:${paymentIntent.id}`
-      : `webhook:${provider.toLowerCase()}:${reference}`;
+    const idempotencyKey = `payment-intent:${paymentIntent.id}`;
     const existingPayment = await this.prisma.payment.findFirst({
       where: { tenantId, idempotencyKey },
       include: { receipt: true },
     });
 
     if (existingPayment) {
-      if (paymentIntent && paymentIntent.status !== 'SUCCEEDED') {
+      if (paymentIntent.status !== OnlinePaymentIntentStatus.SUCCEEDED) {
         await this.prisma.onlinePaymentIntent.update({
           where: { id: paymentIntent.id },
           data: {
@@ -4971,6 +6339,17 @@ export class FinanceService {
           },
         });
       }
+      await this.auditService.record({
+        action: 'idempotent_replay',
+        resource: 'online_payment_intent',
+        resourceId: paymentIntent.id,
+        tenantId,
+        userId: 'system',
+        after: {
+          provider: activeProvider.name,
+          paymentId: existingPayment.id,
+        },
+      });
       return {
         status: 'verified',
         postedToLedger: true,
@@ -4983,9 +6362,7 @@ export class FinanceService {
     // Look up invoice
     const invoice = await this.prisma.invoice.findFirst({
       where: {
-        OR: paymentIntent
-          ? [{ id: paymentIntent.invoiceId }]
-          : [{ id: reference }, { invoiceNumber: reference }],
+        id: paymentIntent.invoiceId,
         tenantId,
       },
       include: {
@@ -5009,6 +6386,18 @@ export class FinanceService {
     const remaining = invoice.totalAmount.sub(paidSoFar);
 
     if (remaining.lte(0)) {
+      await this.auditService.record({
+        action: 'webhook_ignored',
+        resource: 'online_payment_intent',
+        resourceId: paymentIntent.id,
+        tenantId,
+        userId: 'system',
+        after: {
+          provider: activeProvider.name,
+          invoiceId: invoice.id,
+          reason: 'invoice_already_paid',
+        },
+      });
       return {
         status: 'verified',
         postedToLedger: false,
@@ -5017,7 +6406,7 @@ export class FinanceService {
       };
     }
 
-    if (paymentIntent && !requestedAmount.equals(paymentIntent.amount)) {
+    if (!requestedAmount.equals(paymentIntent.amount)) {
       throw new BadRequestException(
         'Webhook amount does not match the initiated payment amount.',
       );
@@ -5044,96 +6433,98 @@ export class FinanceService {
       email: null,
     };
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const receiptNumber = await this.generateReceiptNumber(
-        tenantId,
-        fiscalYear,
-        tx,
-      );
-
-      const receiptVat = invoice.totalAmount.gt(0)
-        ? invoice.vatAmount.mul(paymentAmount).div(invoice.totalAmount)
-        : new Prisma.Decimal(0);
-
-      const payment = await tx.payment.create({
-        data: {
+    let result: CollectedPaymentWithReceipt;
+    try {
+      result = await this.prisma.$transaction(async (tx) => {
+        const receiptNumber = await this.generateReceiptNumber(
           tenantId,
-          studentId: invoice.studentId,
-          invoiceId: invoice.id,
-          collectedById: null, // Online payment has no cashier collector
-          method: PaymentMethod.TRANSFER, // Online gateway maps to TRANSFER in our system
-          status: PaymentStatus.SUCCESS,
-          referenceNumber: reference,
-          amount: paymentAmount,
-          isAdvance: false,
-          recognizedAt: new Date(),
-          metadata: {
-            remainingBeforePayment: Number(remaining),
-            webhookProvider: provider,
-          },
-          paidAt: new Date(),
-          narration: `Online payment via webhook for ${provider}`,
-          idempotencyKey,
-          receipt: {
-            create: {
-              tenantId,
-              receiptNumber,
-              fiscalYear,
-              schoolPan: tenant.panNumber,
-              vatAmount: receiptVat,
-              metadata: {
-                nonReusable: true,
-                invoiceFiscalYear: invoice.fiscalYear,
-                billNumber: invoice.billNumber ?? invoice.invoiceNumber,
+          fiscalYear,
+          tx,
+        );
+
+        const receiptVat = invoice.totalAmount.gt(0)
+          ? invoice.vatAmount.mul(paymentAmount).div(invoice.totalAmount)
+          : new Prisma.Decimal(0);
+
+        const payment = await tx.payment.create({
+          data: {
+            tenantId,
+            studentId: invoice.studentId,
+            invoiceId: invoice.id,
+            collectedById: null,
+            method: PaymentMethod.TRANSFER,
+            status: PaymentStatus.SUCCESS,
+            referenceNumber: reference,
+            amount: paymentAmount,
+            isAdvance: false,
+            recognizedAt: new Date(),
+            metadata: {
+              remainingBeforePayment: Number(remaining),
+              webhookProvider: provider,
+            },
+            paidAt: new Date(),
+            narration: `Online payment via webhook for ${provider}`,
+            idempotencyKey,
+            receipt: {
+              create: {
+                tenantId,
+                receiptNumber,
+                fiscalYear,
+                schoolPan: tenant.panNumber,
+                vatAmount: receiptVat,
+                metadata: {
+                  nonReusable: true,
+                  invoiceFiscalYear: invoice.fiscalYear,
+                  billNumber: invoice.billNumber ?? invoice.invoiceNumber,
+                },
+                pdfUrl: null,
+                fileStatus: ReceiptFileStatus.PENDING,
               },
-              pdfUrl: `/api/v1/receipts/${receiptNumber}.pdf`,
             },
           },
-        },
-        include: {
-          receipt: true,
-        },
-      });
+          include: {
+            receipt: true,
+          },
+        });
 
-      const usageNow = new Date();
-      const usagePeriodStart = new Date(
-        Date.UTC(usageNow.getUTCFullYear(), usageNow.getUTCMonth(), 1),
-      );
+        const usageNow = new Date();
+        const usagePeriodStart = new Date(
+          Date.UTC(usageNow.getUTCFullYear(), usageNow.getUTCMonth(), 1),
+        );
 
-      await tx.usageCounter.upsert({
-        where: {
-          tenantId_usageKey_period_periodStart: {
+        await tx.usageCounter.upsert({
+          where: {
+            tenantId_usageKey_period_periodStart: {
+              tenantId,
+              usageKey: 'receipts.generated',
+              period: 'MONTHLY',
+              periodStart: usagePeriodStart,
+            },
+          },
+          create: {
             tenantId,
             usageKey: 'receipts.generated',
             period: 'MONTHLY',
             periodStart: usagePeriodStart,
+            value: 1,
           },
-        },
-        create: {
-          tenantId,
-          usageKey: 'receipts.generated',
-          period: 'MONTHLY',
-          periodStart: usagePeriodStart,
-          value: 1,
-        },
-        update: {
-          value: { increment: 1 },
-        },
-      });
+          update: {
+            value: { increment: 1 },
+          },
+        });
 
-      const totalPaid = paidSoFar.add(paymentAmount);
+        const totalPaid = paidSoFar.add(paymentAmount);
 
-      await tx.invoice.update({
-        where: { id: invoice.id },
-        data: {
-          status: totalPaid.gte(invoice.totalAmount)
-            ? InvoiceStatus.PAID
-            : InvoiceStatus.PARTIAL,
-          paidAt: totalPaid.gte(invoice.totalAmount) ? new Date() : null,
-        },
-      });
+        await tx.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            status: totalPaid.gte(invoice.totalAmount)
+              ? InvoiceStatus.PAID
+              : InvoiceStatus.PARTIAL,
+            paidAt: totalPaid.gte(invoice.totalAmount) ? new Date() : null,
+          },
+        });
 
-      if (paymentIntent) {
         await tx.onlinePaymentIntent.update({
           where: { id: paymentIntent.id },
           data: {
@@ -5144,26 +6535,61 @@ export class FinanceService {
             failureMessage: null,
           },
         });
+
+        await this.accountingPostingService.postFeePayment(
+          {
+            tenantId,
+            paymentId: payment.id,
+            invoiceNumber: invoice.invoiceNumber,
+            receiptNumber,
+            paymentAmount,
+            paymentMethod: PaymentMethod.TRANSFER,
+            paymentAccountCode: resolveCashAccountCode(PaymentMethod.TRANSFER),
+            narration: `Fee payment via online webhook for ${provider}`,
+            lines: [],
+          },
+          webhookActor,
+          tx,
+        );
+
+        return payment;
+      });
+    } catch (error) {
+      if (!isPrismaUniqueConstraintError(error)) {
+        throw error;
       }
-
-      await this.accountingPostingService.postFeePayment(
-        {
+      const concurrentPayment = await this.prisma.payment.findFirst({
+        where: {
           tenantId,
-          paymentId: payment.id,
-          invoiceNumber: invoice.invoiceNumber,
-          receiptNumber,
-          paymentAmount,
-          paymentMethod: PaymentMethod.TRANSFER,
-          paymentAccountCode: resolveCashAccountCode(PaymentMethod.TRANSFER),
-          narration: `Fee payment via online webhook for ${provider}`,
-          lines: [],
+          idempotencyKey,
         },
-        webhookActor,
-        tx,
-      );
-
-      return payment;
-    });
+        include: { receipt: true },
+      });
+      if (!concurrentPayment) {
+        throw new ConflictException(
+          'The callback could not be reconciled safely. Retry the same provider event.',
+        );
+      }
+      await this.auditService.record({
+        action: 'idempotent_replay',
+        resource: 'online_payment_intent',
+        resourceId: paymentIntent.id,
+        tenantId,
+        userId: 'system',
+        after: {
+          provider: activeProvider.name,
+          paymentId: concurrentPayment.id,
+          concurrent: true,
+        },
+      });
+      return {
+        status: 'verified',
+        postedToLedger: true,
+        duplicate: true,
+        message: 'Payment already processed and posted.',
+        paymentId: concurrentPayment.id,
+      };
+    }
 
     await this.auditService.record({
       action: 'collect',
@@ -5245,40 +6671,119 @@ export class FinanceService {
     );
   }
 
-  async listReceipts(actor: AuthContext) {
+  async listReceipts(query: ListReceiptsQueryDto, actor: AuthContext) {
     assertFinancePermission(actor, 'receipts:read');
-    const receipts = await this.prisma.receipt.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        payment: {
-          include: {
-            invoice: true,
-            student: true,
-            refunds: true,
-          },
-        },
-        reprintHistory: {
-          include: {
-            reprintedBy: {
-              select: {
-                id: true,
-                email: true,
+    const pagination = resolveFinancePagination(query);
+    const search = query.search?.trim();
+    const where: Prisma.ReceiptWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query.studentId
+        ? { payment: { is: { studentId: query.studentId } } }
+        : {}),
+      ...(query.issuedFrom || query.issuedTo
+        ? {
+            issuedAt: {
+              ...(query.issuedFrom ? { gte: new Date(query.issuedFrom) } : {}),
+              ...(query.issuedTo ? { lte: new Date(query.issuedTo) } : {}),
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              {
+                receiptNumber: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
               },
+              {
+                payment: {
+                  is: {
+                    OR: [
+                      {
+                        invoice: {
+                          is: {
+                            invoiceNumber: {
+                              contains: search,
+                              mode: 'insensitive',
+                            },
+                          },
+                        },
+                      },
+                      {
+                        student: {
+                          is: {
+                            OR: [
+                              {
+                                firstNameEn: {
+                                  contains: search,
+                                  mode: 'insensitive',
+                                },
+                              },
+                              {
+                                lastNameEn: {
+                                  contains: search,
+                                  mode: 'insensitive',
+                                },
+                              },
+                              {
+                                studentSystemId: {
+                                  contains: search,
+                                  mode: 'insensitive',
+                                },
+                              },
+                            ],
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+    const sortBy = query.sortBy ?? 'issuedAt';
+    const sortDirection = query.sortDirection ?? 'desc';
+    const [receipts, total] = await Promise.all([
+      this.prisma.receipt.findMany({
+        where,
+        include: {
+          payment: {
+            include: {
+              invoice: true,
+              student: true,
+              refunds: true,
             },
           },
-          orderBy: [{ reprintedAt: 'desc' }],
-          take: 5,
+          reprintHistory: {
+            include: {
+              reprintedBy: {
+                select: {
+                  id: true,
+                  email: true,
+                },
+              },
+            },
+            orderBy: [{ reprintedAt: 'desc' }],
+            take: 5,
+          },
         },
-      },
-      orderBy: [{ issuedAt: 'desc' }],
-      take: 100,
-    });
+        orderBy: [{ [sortBy]: sortDirection }, { id: 'asc' }],
+        skip: pagination.skip,
+        take: pagination.limit,
+      }),
+      this.prisma.receipt.count({ where }),
+    ]);
 
-    return receipts.map((receipt) => ({
+    const items = receipts.map((receipt) => ({
       id: receipt.id,
       receiptNumber: receipt.receiptNumber,
       issuedAt: receipt.issuedAt,
-      pdfUrl: receipt.pdfUrl,
+      fileAssetId: receipt.fileAssetId,
+      fileStatus: receipt.fileStatus,
       paymentId: receipt.paymentId,
       amount: Number(receipt.payment.amount),
       refundedAmount: Number(sumRefundedAmount(receipt.payment.refunds)),
@@ -5304,6 +6809,7 @@ export class FinanceService {
           }
         : null,
     }));
+    return buildFinancePage(items, total, pagination);
   }
 
   async getReceiptPdf(receiptNumber: string, actor: AuthContext) {
@@ -5316,6 +6822,18 @@ export class FinanceService {
     studentId: string,
     actor: AuthContext,
   ) {
+    const parentStudentIds = await getParentStudentIds(this.prisma, actor);
+    if (parentStudentIds !== null && !parentStudentIds.includes(studentId)) {
+      throw new ForbiddenException(
+        'You do not have access to this student receipt.',
+      );
+    }
+    const ownStudentId = await getStudentOwnId(this.prisma, actor);
+    if (ownStudentId !== null && ownStudentId !== studentId) {
+      throw new ForbiddenException(
+        'You do not have access to this student receipt.',
+      );
+    }
     return this.getReceiptPdfInternal(receiptNumber, actor, {
       studentId,
       notFoundMessage: 'Receipt not found for this student',
@@ -5378,10 +6896,15 @@ export class FinanceService {
     const existingFile = await this.prisma.fileAsset.findFirst({
       where: {
         tenantId: actor.tenantId,
-        module: 'fees',
-        entityId: receipt.id,
-        originalFilename: fileName,
         softDeletedAt: null,
+        OR: [
+          ...(receipt.fileAssetId ? [{ id: receipt.fileAssetId }] : []),
+          {
+            module: 'fees',
+            entityId: receipt.id,
+            originalFilename: fileName,
+          },
+        ],
       },
     });
 
@@ -5426,7 +6949,13 @@ export class FinanceService {
       qrToken: receipt.receiptNumber,
     };
 
-    if (existingFile && this.fileRegistryService) {
+    if (!this.fileRegistryService) {
+      throw new ConflictException(
+        'Receipt file access is temporarily unavailable.',
+      );
+    }
+
+    if (existingFile) {
       const download = await this.fileRegistryService.getProtectedDownload(
         actor.tenantId,
         existingFile.id,
@@ -5434,10 +6963,23 @@ export class FinanceService {
       );
       pdf = download.content;
       fileAssetId = existingFile.id;
+      if (
+        receipt.fileAssetId !== existingFile.id ||
+        receipt.fileStatus !== ReceiptFileStatus.AVAILABLE
+      ) {
+        await this.prisma.receipt.update({
+          where: { id: receipt.id },
+          data: {
+            fileAssetId: existingFile.id,
+            fileStatus: ReceiptFileStatus.AVAILABLE,
+            fileGeneratedAt: receipt.fileGeneratedAt ?? new Date(),
+          },
+        });
+      }
     } else {
       pdf = buildReceiptPdf(pdfData);
 
-      if (this.fileRegistryService) {
+      try {
         const asset = await this.fileRegistryService.registerGeneratedFile({
           tenantId: actor.tenantId,
           generatedByUserId: actor.userId,
@@ -5455,6 +6997,24 @@ export class FinanceService {
           },
         });
         fileAssetId = asset.id;
+        await this.prisma.receipt.update({
+          where: { id: receipt.id },
+          data: {
+            fileAssetId: asset.id,
+            fileStatus: ReceiptFileStatus.AVAILABLE,
+            fileGeneratedAt: new Date(),
+          },
+        });
+      } catch {
+        await this.prisma.receipt.update({
+          where: { id: receipt.id },
+          data: {
+            fileStatus: ReceiptFileStatus.UNAVAILABLE,
+          },
+        });
+        throw new ConflictException(
+          'Receipt file is temporarily unavailable. Retry regeneration later.',
+        );
       }
     }
 
@@ -5475,19 +7035,61 @@ export class FinanceService {
     return pdf;
   }
 
-  async listLedgerEntries(actor: AuthContext) {
-    return this.prisma.journalEntry.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        lines: {
-          include: {
-            chartAccount: true,
+  async listLedgerEntries(
+    query: ListLedgerEntriesQueryDto,
+    actor: AuthContext,
+  ) {
+    const pagination = resolveFinancePagination(query);
+    const search = query.search?.trim();
+    const where: Prisma.JournalEntryWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query.sourceType ? { sourceType: query.sourceType } : {}),
+      ...(query.entryFrom || query.entryTo
+        ? {
+            entryDate: {
+              ...(query.entryFrom ? { gte: new Date(query.entryFrom) } : {}),
+              ...(query.entryTo ? { lte: new Date(query.entryTo) } : {}),
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              {
+                entryNumber: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                narration: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+    const sortBy = query.sortBy ?? 'entryDate';
+    const sortDirection = query.sortDirection ?? 'desc';
+    const [items, total] = await Promise.all([
+      this.prisma.journalEntry.findMany({
+        where,
+        include: {
+          lines: {
+            include: {
+              chartAccount: true,
+            },
           },
         },
-      },
-      orderBy: [{ entryDate: 'desc' }],
-      take: 100,
-    });
+        orderBy: [{ [sortBy]: sortDirection }, { id: 'asc' }],
+        skip: pagination.skip,
+        take: pagination.limit,
+      }),
+      this.prisma.journalEntry.count({ where }),
+    ]);
+    return buildFinancePage(items, total, pagination);
   }
 
   async listAccounts(actor: AuthContext) {
@@ -6754,6 +8356,139 @@ function startOfToday() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return today;
+}
+
+function resolveFinanceSummaryPeriod(
+  query: FinanceDashboardSummaryQueryDto,
+  timeZone: string,
+) {
+  const hasSingleDate = Boolean(query.date);
+  const hasRange = Boolean(query.fromDate || query.toDate);
+
+  if (hasSingleDate === hasRange) {
+    throw new BadRequestException(
+      'Provide either date or both fromDate and toDate for the finance summary.',
+    );
+  }
+  if (hasRange && (!query.fromDate || !query.toDate)) {
+    throw new BadRequestException(
+      'Both fromDate and toDate are required for a finance summary range.',
+    );
+  }
+  if (timeZone !== NEPAL_TIME_ZONE) {
+    throw new BadRequestException(
+      `Finance summary dates support ${NEPAL_TIME_ZONE} only.`,
+    );
+  }
+
+  const fromDate = query.date ?? query.fromDate!;
+  const toDate = query.date ?? query.toDate!;
+  const from = parseDateOnly(fromDate);
+  const to = parseDateOnly(toDate);
+  const nominalFrom = Date.UTC(from.year, from.month - 1, from.day);
+  const nominalTo = Date.UTC(to.year, to.month - 1, to.day);
+
+  if (nominalTo < nominalFrom) {
+    throw new BadRequestException('toDate must be on or after fromDate.');
+  }
+  const inclusiveDays = Math.floor((nominalTo - nominalFrom) / 86_400_000) + 1;
+  if (inclusiveDays > 366) {
+    throw new BadRequestException(
+      'Finance summary date ranges are limited to 366 days.',
+    );
+  }
+
+  const next = new Date(nominalTo + 86_400_000);
+  return {
+    fromDate,
+    toDate,
+    startUtc: zonedNepalDateTimeToUtc(from),
+    endExclusiveUtc: zonedNepalDateTimeToUtc({
+      year: next.getUTCFullYear(),
+      month: next.getUTCMonth() + 1,
+      day: next.getUTCDate(),
+    }),
+  };
+}
+
+function parseDateOnly(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    throw new BadRequestException('Finance summary dates must use YYYY-MM-DD.');
+  }
+  const parsed = {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+  };
+  const probe = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day));
+  if (
+    probe.getUTCFullYear() !== parsed.year ||
+    probe.getUTCMonth() + 1 !== parsed.month ||
+    probe.getUTCDate() !== parsed.day
+  ) {
+    throw new BadRequestException('Finance summary date is invalid.');
+  }
+  return parsed;
+}
+
+function decimalOrZero(value: Prisma.Decimal | null | undefined) {
+  return value ?? new Prisma.Decimal(0);
+}
+
+function calculateOutstandingAmount(
+  invoiceTotal: Prisma.Decimal | null | undefined,
+  paidTotal: Prisma.Decimal | null | undefined,
+  refundTotal: Prisma.Decimal | null | undefined,
+) {
+  return Prisma.Decimal.max(
+    new Prisma.Decimal(0),
+    decimalOrZero(invoiceTotal)
+      .sub(decimalOrZero(paidTotal))
+      .add(decimalOrZero(refundTotal)),
+  );
+}
+
+function resolveFinancePagination(query: BaseFinanceListQueryDto) {
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 25;
+  return {
+    page,
+    limit,
+    skip: (page - 1) * limit,
+  };
+}
+
+function buildFinancePage<T>(
+  items: T[],
+  total: number,
+  pagination: { page: number; limit: number; skip: number },
+) {
+  return {
+    items,
+    total,
+    page: pagination.page,
+    limit: pagination.limit,
+    hasNextPage: pagination.skip + items.length < total,
+  };
+}
+
+function mapCollectedPaymentResult(
+  payment: CollectedPaymentWithReceipt,
+  disposition: 'SUCCEEDED' | 'REPLAYED',
+) {
+  return {
+    paymentId: payment.id,
+    invoiceId: payment.invoiceId,
+    amount: Number(payment.amount),
+    method: payment.method,
+    paidAt: payment.paidAt,
+    disposition,
+    receiptNumber: payment.receipt?.receiptNumber ?? null,
+    receiptFileAssetId: payment.receipt?.fileAssetId ?? null,
+    receiptFileStatus:
+      payment.receipt?.fileStatus ?? ReceiptFileStatus.UNAVAILABLE,
+  };
 }
 
 export function resolveInvoiceStatusAfterAdjustment(

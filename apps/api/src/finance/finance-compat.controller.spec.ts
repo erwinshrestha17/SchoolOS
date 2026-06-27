@@ -1,4 +1,3 @@
-import { StreamableFile } from '@nestjs/common';
 import { PaymentMethod } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { FinanceCompatController } from './finance-compat.controller';
@@ -84,7 +83,10 @@ describe('FinanceCompatController', () => {
 
   it('maps payment reverse endpoint to reversal workflow', () => {
     const { controller, financeService } = createController();
-    const dto = { reason: 'Duplicate payment' };
+    const dto = {
+      reason: 'Duplicate payment',
+      idempotencyKey: 'reverse-payment-1',
+    };
     financeService.reversePayment.mockReturnValue({ id: 'reversal-1' });
 
     const result = controller.reversePayment('payment-1', dto as never, actor);
@@ -100,7 +102,11 @@ describe('FinanceCompatController', () => {
 
   it('maps payment correct endpoint to controlled correction workflow', () => {
     const { controller, financeService } = createController();
-    const dto = { amount: 500, reason: 'Cashier correction' };
+    const dto = {
+      amount: 500,
+      reason: 'Cashier correction',
+      idempotencyKey: 'correct-payment-1',
+    };
     financeService.refundPayment.mockReturnValue({ id: 'refund-2' });
 
     const result = controller.correctPayment('payment-1', dto as never, actor);
@@ -129,25 +135,33 @@ describe('FinanceCompatController', () => {
     expect(result).toEqual({ receiptId: 'receipt-1', items: [] });
   });
 
-  it('streams receipt reprint PDFs', async () => {
+  it('returns protected receipt reprint metadata', async () => {
     const { controller, financeService } = createController();
     financeService.reprintReceipt.mockResolvedValue({
-      pdf: Buffer.from('%PDF-1.4'),
+      receiptId: 'receipt-1',
+      reprintHistoryId: 'history-1',
+      fileAssetId: 'file-1',
       fileName: 'Receipt_R-001_Reprint.pdf',
+      disposition: 'SUCCEEDED',
     });
+    const dto = {
+      reason: 'Parent requested copy',
+      idempotencyKey: 'reprint-receipt-1',
+    };
 
-    const result = await controller.reprintReceipt(
-      'receipt-1',
-      { reason: 'Parent requested copy' },
-      actor,
-    );
+    const result = await controller.reprintReceipt('receipt-1', dto, actor);
 
     expect(financeService.reprintReceipt).toHaveBeenCalledWith(
       'receipt-1',
-      { reason: 'Parent requested copy' },
+      dto,
       actor,
     );
-    expect(result).toBeInstanceOf(StreamableFile);
+    expect(result).toEqual(
+      expect.objectContaining({
+        fileAssetId: 'file-1',
+        disposition: 'SUCCEEDED',
+      }),
+    );
   });
 
   it('exports student fee ledger CSV from compatibility service', () => {

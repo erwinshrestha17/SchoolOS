@@ -6,7 +6,6 @@ import {
   Param,
   Post,
   Query,
-  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
@@ -149,16 +148,7 @@ export class FinanceCompatController {
     @Body() dto: ReprintReceiptDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    const { pdf, fileName } = await this.financeService.reprintReceipt(
-      receiptId,
-      dto,
-      auth,
-    );
-
-    return new StreamableFile(pdf, {
-      type: 'application/pdf',
-      disposition: `attachment; filename="${safePdfFileName(fileName)}"`,
-    });
+    return this.financeService.reprintReceipt(receiptId, dto, auth);
   }
 
   @Get('students/:studentId/ledger/export.csv')
@@ -174,8 +164,4 @@ export class FinanceCompatController {
   ) {
     return this.financeCompatService.exportStudentFeeLedgerCsv(studentId, auth);
   }
-}
-
-function safePdfFileName(value: string) {
-  return value.replace(/[^a-zA-Z0-9._-]/g, '-');
 }

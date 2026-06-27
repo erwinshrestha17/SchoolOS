@@ -4,10 +4,16 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
 } from 'class-validator';
 
 export class CreatePaymentRefundDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(150)
+  idempotencyKey!: string;
+
   @IsOptional()
   @IsNumber()
   @Min(0.01)

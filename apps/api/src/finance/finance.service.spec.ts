@@ -299,6 +299,7 @@ describe('finance production controls', () => {
           amount: 100,
           method: PaymentMethod.BANK,
           referenceNumber: 'BANK-REF-001',
+          idempotencyKey: 'duplicate-reference-1',
         },
         actor,
       ),
@@ -338,6 +339,7 @@ describe('finance production controls', () => {
           invoiceId: invoice.id,
           amount: 20,
           method: PaymentMethod.CASH,
+          idempotencyKey: 'overpayment-1',
         },
         actor,
       ),
@@ -368,8 +370,10 @@ describe('finance production controls', () => {
       method: PaymentMethod.CASH,
       paidAt: new Date('2026-04-27T10:00:00.000Z'),
       receipt: {
+        id: 'receipt-1',
         receiptNumber: 'REC-2025-2026-00001',
-        pdfUrl: '/api/v1/receipts/REC-2025-2026-00001.pdf',
+        fileAssetId: null,
+        fileStatus: 'PENDING',
       },
     };
     const { service, eventEmitter } = buildService({
@@ -390,6 +394,7 @@ describe('finance production controls', () => {
         amount: 100,
         method: PaymentMethod.CASH,
         referenceNumber: 'COUNTER-001',
+        idempotencyKey: 'counter-event-1',
       },
       actor,
     );
@@ -427,8 +432,10 @@ describe('finance production controls', () => {
       method: PaymentMethod.CASH,
       paidAt: new Date('2026-04-27T10:00:00.000Z'),
       receipt: {
+        id: 'receipt-existing',
         receiptNumber: 'REC-2026-00001',
-        pdfUrl: '/api/v1/receipts/REC-2026-00001.pdf',
+        fileAssetId: 'file-existing',
+        fileStatus: 'AVAILABLE',
       },
     };
     const { service, prisma, auditService, eventEmitter } = buildService({
@@ -442,7 +449,7 @@ describe('finance production controls', () => {
       incomeAccount: { id: 'income' },
       createdPayment: null,
     });
-    prisma.payment.findFirst
+    prisma.payment.findUnique
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(existingPayment);
     prisma.payment.create.mockRejectedValueOnce({
@@ -466,8 +473,10 @@ describe('finance production controls', () => {
       amount: 100,
       method: PaymentMethod.CASH,
       paidAt: existingPayment.paidAt,
+      disposition: 'REPLAYED',
       receiptNumber: 'REC-2026-00001',
-      receiptPdfUrl: '/api/v1/receipts/REC-2026-00001.pdf',
+      receiptFileAssetId: 'file-existing',
+      receiptFileStatus: 'AVAILABLE',
     });
     expect(prisma.invoice.update).not.toHaveBeenCalled();
     expect(auditService.record).not.toHaveBeenCalledWith(
@@ -848,14 +857,23 @@ describe('finance production controls', () => {
       }),
     });
     const receipt = {
+      id: 'receipt-1',
       receiptNumber: 'REC-2026-00001',
       pdfUrl: '/api/v1/receipts/REC-2026-00001.pdf',
+      fileAssetId: null,
+      fileStatus: 'PENDING',
+      fileGeneratedAt: null,
+      paymentId: payment.id,
       payment,
+    };
+    const fileRegistryService = {
+      registerGeneratedFile: jest.fn().mockResolvedValue({ id: 'file-1' }),
     };
     const { service, prisma } = buildService({
       invoice: null,
       feeHead: null,
       receipt,
+      fileRegistryService,
     });
 
     const pdf = await service.getReceiptPdf(receipt.receiptNumber, actor);
@@ -893,6 +911,14 @@ describe('finance production controls', () => {
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
     expect(pdf.toString('latin1')).toContain('VERIFY RECEIPT');
     expect(pdf.toString('latin1')).toContain(receipt.receiptNumber);
+    expect(fileRegistryService.registerGeneratedFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: actor.tenantId,
+        module: 'fees',
+        entityId: receipt.id,
+        mimeType: 'application/pdf',
+      }),
+    );
   });
 
   it('returns parent-scoped receipt PDFs only for the requested student', async () => {
@@ -909,14 +935,22 @@ describe('finance production controls', () => {
       }),
     });
     const receipt = {
+      id: 'receipt-1',
       receiptNumber: 'REC-2026-00001',
       pdfUrl: '/api/v1/receipts/REC-2026-00001.pdf',
+      fileAssetId: null,
+      fileStatus: 'PENDING',
+      fileGeneratedAt: null,
+      paymentId: payment.id,
       payment,
     };
     const { service } = buildService({
       invoice: null,
       feeHead: null,
       receipt,
+      fileRegistryService: {
+        registerGeneratedFile: jest.fn().mockResolvedValue({ id: 'file-1' }),
+      },
     });
 
     const pdf = await service.getReceiptPdfForStudent(
@@ -1224,6 +1258,7 @@ describe('finance production controls', () => {
         amount: 200,
         reason: ' Parent requested correction ',
         refundDate: '2026-04-27',
+        idempotencyKey: 'refund-success-1',
       },
       actor,
     );
@@ -1243,6 +1278,7 @@ describe('finance production controls', () => {
       journalEntryNumber: createdRefundJournal.entryNumber,
       remainingRefundableAmount: 300,
       invoiceStatus: InvoiceStatus.PARTIAL,
+      disposition: 'SUCCEEDED',
     });
     expect(prisma.paymentRefund.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -1293,7 +1329,15 @@ describe('finance production controls', () => {
     });
 
     await expect(
-      service.refundPayment('payment-1', { amount: 100, reason: '   ' }, actor),
+      service.refundPayment(
+        'payment-1',
+        {
+          amount: 100,
+          reason: '   ',
+          idempotencyKey: 'refund-blank-reason',
+        },
+        actor,
+      ),
     ).rejects.toThrow('Refund reason is required');
     expect(prisma.payment.findFirst).not.toHaveBeenCalled();
   });
@@ -1324,7 +1368,11 @@ describe('finance production controls', () => {
     await expect(
       service.refundPayment(
         payment.id,
-        { amount: 150, reason: 'Too much originally charged' },
+        {
+          amount: 150,
+          reason: 'Too much originally charged',
+          idempotencyKey: 'refund-too-much',
+        },
         actor,
       ),
     ).rejects.toThrow('Refund exceeds the remaining refundable amount');
@@ -1345,7 +1393,10 @@ describe('finance production controls', () => {
     await expect(
       service.refundPayment(
         payment.id,
-        { reason: 'Duplicate counter entry' },
+        {
+          reason: 'Duplicate counter entry',
+          idempotencyKey: 'refund-fully-refunded',
+        },
         actor,
       ),
     ).rejects.toThrow('Payment has already been fully refunded');
@@ -1374,7 +1425,11 @@ describe('finance production controls', () => {
     await expect(
       service.refundPayment(
         payment.id,
-        { amount: 100, reason: 'Correction' },
+        {
+          amount: 100,
+          reason: 'Correction',
+          idempotencyKey: 'refund-voided',
+        },
         actor,
       ),
     ).rejects.toThrow('Voided invoices cannot be refunded');
@@ -1404,7 +1459,12 @@ describe('finance production controls', () => {
     await expect(
       service.refundPayment(
         payment.id,
-        { amount: 100, reason: 'Correction', refundDate: '2026-04-27' },
+        {
+          amount: 100,
+          reason: 'Correction',
+          refundDate: '2026-04-27',
+          idempotencyKey: 'refund-closed-period',
+        },
         actor,
       ),
     ).rejects.toThrow(ConflictException);
@@ -2058,6 +2118,15 @@ describe('finance production controls', () => {
           webhookSigningSecret: 'webhook-secret',
         },
       },
+      existingPaymentIntent: {
+        id: 'intent-1',
+        tenantId: actor.tenantId,
+        invoiceId: 'invoice-1',
+        provider: 'NEPAL_GATEWAY',
+        providerReference: 'INV-001',
+        amount: new Prisma.Decimal(500),
+        status: 'PENDING',
+      },
     });
 
     await expect(
@@ -2136,7 +2205,11 @@ describe('finance production controls', () => {
     await expect(
       missingJournalService.refundPayment(
         payment.id,
-        { amount: 50, reason: 'Correction' },
+        {
+          amount: 50,
+          reason: 'Correction',
+          idempotencyKey: 'refund-missing-journal',
+        },
         actor,
       ),
     ).rejects.toThrow(
@@ -2329,6 +2402,15 @@ function buildService(options: {
   fileRegistryService?: unknown;
   communicationsService?: unknown;
 }) {
+  const seededInvoices = (options.invoices ?? []) as Array<{
+    totalAmount?: Prisma.Decimal | number | string;
+    payments?: Array<{
+      amount?: Prisma.Decimal | number | string;
+      refunds?: Array<{
+        amount?: Prisma.Decimal | number | string;
+      }>;
+    }>;
+  }>;
   const prisma = {
     student: {
       findFirst: jest.fn().mockResolvedValue(options.student ?? null),
@@ -2336,7 +2418,21 @@ function buildService(options: {
     invoice: {
       findFirst: jest.fn().mockResolvedValue(options.invoice),
       findMany: jest.fn().mockResolvedValue(options.invoices ?? []),
-      count: jest.fn().mockResolvedValue(options.invoiceCount ?? 0),
+      count: jest
+        .fn()
+        .mockResolvedValue(
+          options.invoiceCount ?? options.invoices?.length ?? 0,
+        ),
+      aggregate: jest.fn().mockResolvedValue({
+        _sum: {
+          totalAmount: new Prisma.Decimal(
+            seededInvoices.reduce(
+              (sum, invoice) => sum + Number(invoice.totalAmount ?? 0),
+              0,
+            ),
+          ),
+        },
+      }),
       create: jest.fn().mockResolvedValue(options.createdInvoice),
       update: jest.fn().mockResolvedValue(options.updatedInvoice),
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -2369,6 +2465,7 @@ function buildService(options: {
       findFirst: jest.fn().mockResolvedValue(options.classroom ?? null),
     },
     payment: {
+      findUnique: jest.fn().mockResolvedValue(null),
       findFirst: jest
         .fn()
         .mockResolvedValue(options.duplicatePayment ?? options.payment ?? null),
@@ -2378,11 +2475,50 @@ function buildService(options: {
         .mockResolvedValue(
           options.cashierPayments ?? options.reconciliationPayments ?? [],
         ),
+      aggregate: jest.fn().mockResolvedValue({
+        _sum: {
+          amount: new Prisma.Decimal(
+            seededInvoices.reduce(
+              (sum, invoice) =>
+                sum +
+                (invoice.payments ?? []).reduce(
+                  (paymentSum, payment) =>
+                    paymentSum + Number(payment.amount ?? 0),
+                  0,
+                ),
+              0,
+            ),
+          ),
+        },
+      }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     paymentRefund: {
+      findFirst: jest.fn().mockResolvedValue(null),
       count: jest.fn().mockResolvedValue(options.paymentRefundCount ?? 0),
       create: jest.fn().mockResolvedValue(options.createdRefund),
       findMany: jest.fn().mockResolvedValue(options.cashierRefunds ?? []),
+      aggregate: jest.fn().mockResolvedValue({
+        _sum: {
+          amount: new Prisma.Decimal(
+            seededInvoices.reduce(
+              (sum, invoice) =>
+                sum +
+                (invoice.payments ?? []).reduce(
+                  (paymentSum, payment) =>
+                    paymentSum +
+                    (payment.refunds ?? []).reduce(
+                      (refundSum, refund) =>
+                        refundSum + Number(refund.amount ?? 0),
+                      0,
+                    ),
+                  0,
+                ),
+              0,
+            ),
+          ),
+        },
+      }),
     },
     cashierClose: {
       count: jest.fn().mockResolvedValue(options.cashierCloseCount ?? 0),
@@ -2435,6 +2571,7 @@ function buildService(options: {
     receipt: {
       count: jest.fn().mockResolvedValue(options.receiptCount ?? 0),
       findFirst: jest.fn().mockResolvedValue(options.receipt ?? null),
+      update: jest.fn(),
     },
     usageCounter: {
       upsert: jest.fn().mockResolvedValue(null),
@@ -2473,6 +2610,7 @@ function buildService(options: {
     accountingPeriod: {
       findFirst: jest.fn().mockResolvedValue(options.closedPeriod ?? null),
     },
+    $queryRaw: jest.fn().mockResolvedValue([]),
     $transaction: jest.fn(async (callback) => callback(prisma)),
   };
   const auditService = {

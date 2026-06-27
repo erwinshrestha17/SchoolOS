@@ -26,6 +26,13 @@ import { SendDefaulterRemindersDto } from './dto/send-defaulter-reminders.dto';
 import { VoidInvoiceDto } from './dto/void-invoice.dto';
 import { DuesQueryDto } from './dto/dues-query.dto';
 import { ListDefaultersDto } from './dto/list-defaulters.dto';
+import { FinanceDashboardSummaryQueryDto } from './dto/finance-dashboard-summary-query.dto';
+import {
+  ListBillingRunsQueryDto,
+  ListDiscountRulesQueryDto,
+  ListInvoicesQueryDto,
+  ListWaiversQueryDto,
+} from './dto/list-finance-records.query.dto';
 import { FinanceService } from './finance.service';
 
 @Controller('fees')
@@ -33,6 +40,14 @@ import { FinanceService } from './finance.service';
 @Entitlement('module.fees')
 export class FeesController {
   constructor(private readonly financeService: FinanceService) {}
+
+  @Get('dashboard-summary')
+  getDashboardSummary(
+    @Query() query: FinanceDashboardSummaryQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.getDashboardSummary(query, auth);
+  }
 
   @Get('heads')
   @Permissions('fees:manage')
@@ -66,8 +81,11 @@ export class FeesController {
 
   @Get('invoices')
   @Permissions('payments:collect')
-  listInvoices(@CurrentAuth() auth: AuthContext) {
-    return this.financeService.listInvoices(auth);
+  listInvoices(
+    @Query() query: ListInvoicesQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.listInvoices(query, auth);
   }
 
   @Get('invoices/:id')
@@ -119,8 +137,11 @@ export class FeesController {
 
   @Get('billing-runs')
   @Permissions('fees:bill')
-  listBillingRuns(@CurrentAuth() auth: AuthContext) {
-    return this.financeService.listBillingRuns(auth);
+  listBillingRuns(
+    @Query() query: ListBillingRunsQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.listBillingRuns(query, auth);
   }
 
   @Post('billing-runs')
@@ -198,8 +219,11 @@ export class FeesController {
 
   @Get('discounts')
   @Permissions('fees:discount')
-  listDiscounts(@CurrentAuth() auth: AuthContext) {
-    return this.financeService.listDiscountRules(auth);
+  listDiscounts(
+    @Query() query: ListDiscountRulesQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.listDiscountRules(query, auth);
   }
 
   @Post('discounts')
@@ -213,8 +237,11 @@ export class FeesController {
 
   @Get('waivers')
   @Permissions('fees:discount')
-  listWaivers(@CurrentAuth() auth: AuthContext) {
-    return this.financeService.listWaivers(auth);
+  listWaivers(
+    @Query() query: ListWaiversQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.listWaivers(query, auth);
   }
 
   @Post('waivers')

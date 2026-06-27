@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   UseGuards,
@@ -161,9 +162,15 @@ export class OperationalMobileSummaryController {
   @Get('student/summary')
   @Roles('student')
   @Entitlement(FEATURE_KEYS.MOBILE_FULL_ROLE)
-  @ApiOperation({ summary: 'Get a self-only student mobile summary' })
+  @ApiOperation({
+    summary:
+      'Fail-closed broad student mobile summary; students use controlled learning sessions',
+  })
   studentSummary(@CurrentAuth() auth: AuthContext) {
-    return this.service.getMobileSummary('student', auth);
+    void auth;
+    throw new ForbiddenException(
+      'Student mobile access is limited to controlled learning sessions.',
+    );
   }
 }
 

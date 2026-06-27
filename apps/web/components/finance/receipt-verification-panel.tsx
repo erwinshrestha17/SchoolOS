@@ -1,30 +1,34 @@
-'use client';
+"use client";
 
-import { FormEvent, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Loader2, QrCode, Search, XCircle } from 'lucide-react';
-import { api } from '@/lib/api';
-import type { ReceiptVerificationResult } from '@/lib/api/finance';
-import { Button } from '@/components/ui/button';
-import { SectionCard } from '@/components/ui/section-card';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { cn } from '@/lib/utils';
+import { FormEvent, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  QrCode,
+  Search,
+  XCircle,
+} from "lucide-react";
+import { api } from "@/lib/api";
+import type { ReceiptVerificationResult } from "@/lib/api/finance";
+import { Button } from "@/components/ui/button";
+import { SectionCard } from "@/components/ui/section-card";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { cn } from "@/lib/utils";
+import { formatBsDateTime } from "@schoolos/core";
 
 const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat('en-NP', {
-    style: 'currency',
-    currency: 'NPR',
+  new Intl.NumberFormat("en-NP", {
+    style: "currency",
+    currency: "NPR",
     maximumFractionDigits: 0,
   }).format(amount);
 
-const formatDateTime = (value: string) =>
-  new Intl.DateTimeFormat('en-NP', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
+const formatDateTime = (value: string) => formatBsDateTime(value);
 
 export function ReceiptVerificationPanel() {
-  const [receiptNumber, setReceiptNumber] = useState('');
+  const [receiptNumber, setReceiptNumber] = useState("");
   const verifyMutation = useMutation({
     mutationFn: (value: string) => api.verifyReceipt(value),
   });
@@ -50,7 +54,10 @@ export function ReceiptVerificationPanel() {
           </label>
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
-              <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <QrCode
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                size={16}
+              />
               <input
                 value={receiptNumber}
                 onChange={(event) => setReceiptNumber(event.target.value)}
@@ -77,7 +84,7 @@ export function ReceiptVerificationPanel() {
               <span>
                 {verifyMutation.error instanceof Error
                   ? verifyMutation.error.message
-                  : 'Receipt could not be verified.'}
+                  : "Receipt could not be verified."}
               </span>
             </div>
           )}
@@ -104,15 +111,16 @@ function VerificationResult({
     );
   }
 
-  const valid = result.status === 'VALID' || result.status === 'PARTIALLY_REFUNDED';
+  const valid =
+    result.status === "VALID" || result.status === "PARTIALLY_REFUNDED";
 
   return (
     <div
       className={cn(
-        'rounded-2xl border p-4',
+        "rounded-2xl border p-4",
         valid
-          ? 'border-success-100 bg-success-50/40'
-          : 'border-warning-100 bg-warning-50/50',
+          ? "border-success-100 bg-success-50/40"
+          : "border-warning-100 bg-warning-50/50",
       )}
       data-testid="receipt-verification-result"
     >
@@ -137,11 +145,23 @@ function VerificationResult({
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <VerificationField label="School" value={result.school.name} />
-        <VerificationField label="Student" value={`${result.student.name} (${result.student.studentSystemId})`} />
-        <VerificationField label="Invoice" value={result.invoice.invoiceNumber} />
+        <VerificationField
+          label="Student"
+          value={`${result.student.name} (${result.student.studentSystemId})`}
+        />
+        <VerificationField
+          label="Invoice"
+          value={result.invoice.invoiceNumber}
+        />
         <VerificationField label="Method" value={result.payment.method} />
-        <VerificationField label="Paid amount" value={formatCurrency(result.payment.amount)} />
-        <VerificationField label="Net amount" value={formatCurrency(result.payment.netAmount)} />
+        <VerificationField
+          label="Paid amount"
+          value={formatCurrency(result.payment.amount)}
+        />
+        <VerificationField
+          label="Net amount"
+          value={formatCurrency(result.payment.netAmount)}
+        />
       </div>
 
       {result.warnings.length > 0 && (

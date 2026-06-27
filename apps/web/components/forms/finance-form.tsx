@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import type {
   CashierClosePreview,
@@ -14,25 +14,31 @@ import type {
   PaymentGatewayReadiness,
   ReceiptView,
   WaiverRecord,
-} from '@schoolos/core';
-import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+} from "@schoolos/core";
+import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { api } from "../../lib/api";
 
 const today = new Date().toISOString().slice(0, 10);
 
 const financeSections = [
-  'Collection Counter',
-  'Fee Setup',
-  'Billing Runs',
-  'Discounts & Waivers',
-  'Defaulters',
-  'Cashier Close',
-  'Receipts & Ledger',
+  "Collection Counter",
+  "Fee Setup",
+  "Billing Runs",
+  "Discounts & Waivers",
+  "Defaulters",
+  "Cashier Close",
+  "Receipts & Ledger",
 ] as const;
 
-const paymentMethods = ['CASH', 'BANK', 'CHEQUE', 'TRANSFER', 'MOBILE'] as const;
+const paymentMethods = [
+  "CASH",
+  "BANK",
+  "CHEQUE",
+  "TRANSFER",
+  "MOBILE",
+] as const;
 
 type FinanceSection = (typeof financeSections)[number];
 type PaymentMethod = (typeof paymentMethods)[number];
@@ -44,40 +50,47 @@ const financeSectionMeta: Record<
     badge: string;
   }
 > = {
-  'Collection Counter': {
-    title: 'Collection Counter',
-    description: 'Search invoices, collect fees, and generate official receipts from one guided counter view.',
-    badge: 'Live Counter',
+  "Collection Counter": {
+    title: "Collection Counter",
+    description:
+      "Search invoices, collect fees, and generate official receipts from one guided counter view.",
+    badge: "Live Counter",
   },
-  'Fee Setup': {
-    title: 'Fee Setup',
-    description: 'Create fee heads and reusable fee plans for classes, academic years, and billing periods.',
-    badge: 'Configuration',
+  "Fee Setup": {
+    title: "Fee Setup",
+    description:
+      "Create fee heads and reusable fee plans for classes, academic years, and billing periods.",
+    badge: "Configuration",
   },
-  'Billing Runs': {
-    title: 'Billing Runs',
-    description: 'Generate monthly or term-based invoices from active fee plans with fewer manual steps.',
-    badge: 'Invoice Engine',
+  "Billing Runs": {
+    title: "Billing Runs",
+    description:
+      "Generate monthly or term-based invoices from active fee plans with fewer manual steps.",
+    badge: "Invoice Engine",
   },
-  'Discounts & Waivers': {
-    title: 'Discounts & Waivers',
-    description: 'Manage approved discounts, scholarships, and fee waivers with clear audit visibility.',
-    badge: 'Approvals',
+  "Discounts & Waivers": {
+    title: "Discounts & Waivers",
+    description:
+      "Manage approved discounts, scholarships, and fee waivers with clear audit visibility.",
+    badge: "Approvals",
   },
   Defaulters: {
-    title: 'Defaulters',
-    description: 'Track overdue balances, filter reminder queues, and follow up with guardians quickly.',
-    badge: 'Follow-up',
+    title: "Defaulters",
+    description:
+      "Track overdue balances, filter reminder queues, and follow up with guardians quickly.",
+    badge: "Follow-up",
   },
-  'Cashier Close': {
-    title: 'Cashier Close',
-    description: 'Preview, verify, and finalize day-end collection summaries before closing the counter.',
-    badge: 'Day Close',
+  "Cashier Close": {
+    title: "Cashier Close",
+    description:
+      "Preview, verify, and finalize day-end collection summaries before closing the counter.",
+    badge: "Day Close",
   },
-  'Receipts & Ledger': {
-    title: 'Receipts & Ledger',
-    description: 'Review receipts, invoices, journal entries, and finance audit trail from one place.',
-    badge: 'Audit Trail',
+  "Receipts & Ledger": {
+    title: "Receipts & Ledger",
+    description:
+      "Review receipts, invoices, journal entries, and finance audit trail from one place.",
+    badge: "Audit Trail",
   },
 };
 
@@ -85,7 +98,7 @@ type CashierCloseFilters = {
   openedAt: string;
   closedAt: string;
   collectorUserId: string;
-  paymentMethod: '' | PaymentMethod;
+  paymentMethod: "" | PaymentMethod;
 };
 
 type InvoiceLineForUi = {
@@ -108,7 +121,7 @@ type InvoiceLineForUi = {
 };
 
 type InvoiceForUi = InvoiceSummary & {
-  student?: InvoiceSummary['student'] & {
+  student?: InvoiceSummary["student"] & {
     studentSystemId?: string | null;
     className?: string | null;
     sectionName?: string | null;
@@ -138,16 +151,36 @@ type CollectPaymentPayload = Record<string, unknown> & {
   narration: string;
 };
 
-type JsonMutation = UseMutationResult<unknown, Error, Record<string, unknown>, unknown>;
-type DiscountMutation = UseMutationResult<DiscountRule, Error, Record<string, unknown>, unknown>;
-type WaiverMutation = UseMutationResult<WaiverRecord, Error, Record<string, unknown>, unknown>;
+type JsonMutation = UseMutationResult<
+  unknown,
+  Error,
+  Record<string, unknown>,
+  unknown
+>;
+type DiscountMutation = UseMutationResult<
+  DiscountRule,
+  Error,
+  Record<string, unknown>,
+  unknown
+>;
+type WaiverMutation = UseMutationResult<
+  WaiverRecord,
+  Error,
+  Record<string, unknown>,
+  unknown
+>;
 type ReminderMutation = UseMutationResult<
   DefaulterReminderResult,
   Error,
   Record<string, unknown>,
   unknown
 >;
-type PaymentMutation = UseMutationResult<PaymentCollectionResult, Error, CollectPaymentPayload, unknown>;
+type PaymentMutation = UseMutationResult<
+  PaymentCollectionResult,
+  Error,
+  CollectPaymentPayload,
+  unknown
+>;
 type MutationErrorState = {
   isError: boolean;
   error: Error | null;
@@ -155,110 +188,113 @@ type MutationErrorState = {
 
 export function FinanceForm() {
   const queryClient = useQueryClient();
-  const [activeSection, setActiveSection] = useState<FinanceSection>('Collection Counter');
-  const [invoiceSearch, setInvoiceSearch] = useState('');
+  const [activeSection, setActiveSection] =
+    useState<FinanceSection>("Collection Counter");
+  const [invoiceSearch, setInvoiceSearch] = useState("");
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [feeHead, setFeeHead] = useState({
-    code: '',
-    name: '',
-    frequency: 'MONTHLY',
+    code: "",
+    name: "",
+    frequency: "MONTHLY",
     defaultAmount: 0,
     vatApplicable: false,
   });
   const [feePlan, setFeePlan] = useState({
-    academicYearId: '',
-    classId: '',
-    feeHeadId: '',
-    code: '',
-    name: '',
+    academicYearId: "",
+    classId: "",
+    feeHeadId: "",
+    code: "",
+    name: "",
     amount: 0,
   });
   const [billingRun, setBillingRun] = useState({
-    academicYearId: '',
-    feePlanId: '',
+    academicYearId: "",
+    feePlanId: "",
     runMonth: new Date().getMonth() + 1,
     runYear: new Date().getFullYear(),
     dueDate: today,
   });
   const [payment, setPayment] = useState({
-    invoiceId: '',
+    invoiceId: "",
     amount: 0,
-    method: 'CASH' as PaymentMethod,
-    referenceNumber: '',
+    method: "CASH" as PaymentMethod,
+    referenceNumber: "",
   });
   const [discount, setDiscount] = useState({
-    name: '',
-    reason: '',
-    type: 'SIBLING',
-    feeHeadId: '',
-    classId: '',
-    feePlanId: '',
+    name: "",
+    reason: "",
+    type: "SIBLING",
+    feeHeadId: "",
+    classId: "",
+    feePlanId: "",
     percentOff: 0,
     amountOff: 0,
   });
   const [waiver, setWaiver] = useState({
-    invoiceId: '',
-    feeHeadId: '',
+    invoiceId: "",
+    feeHeadId: "",
     amount: 0,
-    reason: '',
+    reason: "",
   });
   const [defaulterFilters, setDefaulterFilters] = useState({
-    classId: '',
-    feeHeadId: '',
+    classId: "",
+    feeHeadId: "",
   });
-  const [selectedReminderInvoiceIds, setSelectedReminderInvoiceIds] = useState<string[]>([]);
+  const [selectedReminderInvoiceIds, setSelectedReminderInvoiceIds] = useState<
+    string[]
+  >([]);
   const [cashierClose, setCashierClose] = useState<CashierCloseFilters>(() => ({
     openedAt: `${today}T00:00`,
     closedAt: getLocalDateTimeValue(new Date()),
-    collectorUserId: '',
-    paymentMethod: '',
+    collectorUserId: "",
+    paymentMethod: "",
   }));
-  const [cashierCloseNotes, setCashierCloseNotes] = useState('');
-  const [cashierActualCashAmount, setCashierActualCashAmount] = useState('');
-  const [cashierVarianceReason, setCashierVarianceReason] = useState('');
-  const [cashierCloseConfirmation, setCashierCloseConfirmation] = useState('');
-  const [cashierCloseMessage, setCashierCloseMessage] = useState('');
+  const [cashierCloseNotes, setCashierCloseNotes] = useState("");
+  const [cashierActualCashAmount, setCashierActualCashAmount] = useState("");
+  const [cashierVarianceReason, setCashierVarianceReason] = useState("");
+  const [cashierCloseConfirmation, setCashierCloseConfirmation] = useState("");
+  const [cashierCloseMessage, setCashierCloseMessage] = useState("");
 
   const academicYearsQuery = useQuery({
-    queryKey: ['academic-years'],
+    queryKey: ["academic-years"],
     queryFn: api.listAcademicYears,
   });
   const classesQuery = useQuery({
-    queryKey: ['classes'],
+    queryKey: ["classes"],
     queryFn: api.listClasses,
   });
   const feeHeadsQuery = useQuery({
-    queryKey: ['fee-heads'],
+    queryKey: ["fee-heads"],
     queryFn: api.listFeeHeads,
   });
   const feePlansQuery = useQuery({
-    queryKey: ['fee-plans'],
+    queryKey: ["fee-plans"],
     queryFn: api.listFeePlans,
   });
   const invoicesQuery = useQuery({
-    queryKey: ['invoices'],
-    queryFn: api.listInvoices,
+    queryKey: ["invoices"],
+    queryFn: () => api.listInvoices(),
   });
   const invoiceDetailQuery = useQuery({
-    queryKey: ['invoice-detail', payment.invoiceId],
+    queryKey: ["invoice-detail", payment.invoiceId],
     queryFn: () => api.getInvoiceDetail(payment.invoiceId),
     enabled: Boolean(payment.invoiceId),
   });
   const receiptsQuery = useQuery({
-    queryKey: ['receipts'],
+    queryKey: ["receipts"],
     queryFn: api.listReceipts,
   });
   const gatewayReadinessQuery = useQuery({
-    queryKey: ['payment-gateway-readiness'],
+    queryKey: ["payment-gateway-readiness"],
     queryFn: api.getPaymentGatewayReadiness,
-    enabled: activeSection === 'Collection Counter',
+    enabled: activeSection === "Collection Counter",
   });
   const ledgerQuery = useQuery({
-    queryKey: ['ledger-entries'],
+    queryKey: ["ledger-entries"],
     queryFn: api.listLedgerEntries,
   });
   const defaultersQuery = useQuery({
-    queryKey: ['defaulters', defaulterFilters],
+    queryKey: ["defaulters", defaulterFilters],
     queryFn: () =>
       api.listDefaulters({
         classId: defaulterFilters.classId || null,
@@ -266,20 +302,23 @@ export function FinanceForm() {
       }),
   });
   const discountsQuery = useQuery({
-    queryKey: ['discounts'],
+    queryKey: ["discounts"],
     queryFn: api.listDiscounts,
   });
   const waiversQuery = useQuery({
-    queryKey: ['waivers'],
+    queryKey: ["waivers"],
     queryFn: api.listWaivers,
   });
   const cashierClosePreviewQuery = useQuery({
-    queryKey: ['cashier-close-preview', cashierClose],
-    queryFn: () => api.previewCashierClose(cashierCloseQueryParams(cashierClose)),
-    enabled: activeSection === 'Cashier Close' && Boolean(cashierClose.openedAt && cashierClose.closedAt),
+    queryKey: ["cashier-close-preview", cashierClose],
+    queryFn: () =>
+      api.previewCashierClose(cashierCloseQueryParams(cashierClose)),
+    enabled:
+      activeSection === "Cashier Close" &&
+      Boolean(cashierClose.openedAt && cashierClose.closedAt),
   });
   const cashierClosesQuery = useQuery({
-    queryKey: ['cashier-closes'],
+    queryKey: ["cashier-closes"],
     queryFn: () =>
       api.listCashierCloses({
         openedFrom: toIsoDateTime(cashierClose.openedAt),
@@ -287,19 +326,28 @@ export function FinanceForm() {
         collectorUserId: cashierClose.collectorUserId || null,
         paymentMethod: cashierClose.paymentMethod || null,
       }),
-    enabled: activeSection === 'Cashier Close' && Boolean(cashierClose.openedAt && cashierClose.closedAt),
+    enabled:
+      activeSection === "Cashier Close" &&
+      Boolean(cashierClose.openedAt && cashierClose.closedAt),
   });
 
   useEffect(() => {
-    const currentAcademicYear = academicYearsQuery.data?.find((year) => year.isCurrent);
-    const firstAcademicYear = currentAcademicYear ?? academicYearsQuery.data?.[0];
+    const currentAcademicYear = academicYearsQuery.data?.find(
+      (year) => year.isCurrent,
+    );
+    const firstAcademicYear =
+      currentAcademicYear ?? academicYearsQuery.data?.[0];
 
     if (firstAcademicYear) {
       setFeePlan((current) =>
-        current.academicYearId ? current : { ...current, academicYearId: firstAcademicYear.id },
+        current.academicYearId
+          ? current
+          : { ...current, academicYearId: firstAcademicYear.id },
       );
       setBillingRun((current) =>
-        current.academicYearId ? current : { ...current, academicYearId: firstAcademicYear.id },
+        current.academicYearId
+          ? current
+          : { ...current, academicYearId: firstAcademicYear.id },
       );
     }
   }, [academicYearsQuery.data]);
@@ -311,10 +359,16 @@ export function FinanceForm() {
       setFeePlan((current) =>
         current.feeHeadId
           ? current
-          : { ...current, feeHeadId: firstFeeHead.id, amount: Number(firstFeeHead.defaultAmount) },
+          : {
+              ...current,
+              feeHeadId: firstFeeHead.id,
+              amount: Number(firstFeeHead.defaultAmount),
+            },
       );
       setDiscount((current) =>
-        current.feeHeadId ? current : { ...current, feeHeadId: firstFeeHead.id },
+        current.feeHeadId
+          ? current
+          : { ...current, feeHeadId: firstFeeHead.id },
       );
     }
   }, [feeHeadsQuery.data]);
@@ -324,22 +378,28 @@ export function FinanceForm() {
 
     if (firstFeePlan) {
       setBillingRun((current) =>
-        current.feePlanId ? current : { ...current, feePlanId: firstFeePlan.id },
+        current.feePlanId
+          ? current
+          : { ...current, feePlanId: firstFeePlan.id },
       );
     }
   }, [feePlansQuery.data]);
 
   useEffect(() => {
-    const firstInvoice = (invoicesQuery.data as InvoiceForUi[] | undefined)?.find(
-      (invoice) => invoice.status !== 'PAID',
-    );
+    const firstInvoice = (
+      invoicesQuery.data as InvoiceForUi[] | undefined
+    )?.find((invoice) => invoice.status !== "PAID");
 
     if (firstInvoice) {
       const remaining = getOutstanding(firstInvoice);
       setPayment((current) =>
         current.invoiceId
           ? current
-          : { ...current, invoiceId: firstInvoice.id, amount: remaining || current.amount },
+          : {
+              ...current,
+              invoiceId: firstInvoice.id,
+              amount: remaining || current.amount,
+            },
       );
       setWaiver((current) =>
         current.invoiceId
@@ -358,50 +418,59 @@ export function FinanceForm() {
 
   const feeHeadMutation = useMutation({
     mutationFn: api.createFeeHead,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['fee-heads'] }),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ["fee-heads"] }),
   });
   const feePlanMutation = useMutation({
     mutationFn: api.createFeePlan,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['fee-plans'] }),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ["fee-plans"] }),
   });
   const billingRunMutation = useMutation({
     mutationFn: api.generateBillingRun,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      void queryClient.invalidateQueries({ queryKey: ['fee-plans'] });
+      void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      void queryClient.invalidateQueries({ queryKey: ["fee-plans"] });
     },
   });
-  const paymentMutation = useMutation<PaymentCollectionResult, Error, CollectPaymentPayload>({
-    mutationFn: async (payload) => (await api.collectPayment(payload)) as PaymentCollectionResult,
+  const paymentMutation = useMutation<
+    PaymentCollectionResult,
+    Error,
+    CollectPaymentPayload
+  >({
+    mutationFn: async (payload) =>
+      (await api.collectPayment(payload)) as PaymentCollectionResult,
     onSuccess: () => {
       setPaymentError(null);
-      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      void queryClient.invalidateQueries({ queryKey: ['receipts'] });
-      void queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
-      void queryClient.invalidateQueries({ queryKey: ['defaulters'] });
+      void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      void queryClient.invalidateQueries({ queryKey: ["receipts"] });
+      void queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
+      void queryClient.invalidateQueries({ queryKey: ["defaulters"] });
     },
     onError: (error) => setPaymentError(error.message),
   });
   const discountMutation = useMutation({
     mutationFn: api.createDiscount,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['discounts'] });
-      void queryClient.invalidateQueries({ queryKey: ['fee-plans'] });
+      void queryClient.invalidateQueries({ queryKey: ["discounts"] });
+      void queryClient.invalidateQueries({ queryKey: ["fee-plans"] });
     },
   });
   const waiverMutation = useMutation({
     mutationFn: api.createWaiver,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['waivers'] });
-      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      void queryClient.invalidateQueries({ queryKey: ['defaulters'] });
+      void queryClient.invalidateQueries({ queryKey: ["waivers"] });
+      void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      void queryClient.invalidateQueries({ queryKey: ["defaulters"] });
     },
   });
   const reminderMutation = useMutation({
     mutationFn: api.sendDefaulterReminders,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['defaulters'] });
-      void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
+      void queryClient.invalidateQueries({ queryKey: ["defaulters"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["notification-deliveries"],
+      });
       setSelectedReminderInvoiceIds([]);
     },
   });
@@ -410,45 +479,66 @@ export function FinanceForm() {
       api.finalizeCashierClose({
         ...cashierCloseQueryParams(cashierClose),
         actualCashAmount:
-          cashierActualCashAmount.trim() === '' ? null : Number(cashierActualCashAmount),
+          cashierActualCashAmount.trim() === ""
+            ? null
+            : Number(cashierActualCashAmount),
         varianceReason: cashierVarianceReason.trim() || null,
         notes: cashierCloseNotes.trim() || null,
       }),
     onSuccess: async (close) => {
       setCashierCloseMessage(`Cashier close ${close.closeNumber} finalized.`);
-      setCashierCloseConfirmation('');
-      setCashierActualCashAmount('');
-      setCashierVarianceReason('');
+      setCashierCloseConfirmation("");
+      setCashierActualCashAmount("");
+      setCashierVarianceReason("");
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['cashier-closes'] }),
-        queryClient.invalidateQueries({ queryKey: ['cashier-close-preview'] }),
-        queryClient.invalidateQueries({ queryKey: ['receipts'] }),
-        queryClient.invalidateQueries({ queryKey: ['ledger-entries'] }),
-        queryClient.invalidateQueries({ queryKey: ['invoices'] }),
+        queryClient.invalidateQueries({ queryKey: ["cashier-closes"] }),
+        queryClient.invalidateQueries({ queryKey: ["cashier-close-preview"] }),
+        queryClient.invalidateQueries({ queryKey: ["receipts"] }),
+        queryClient.invalidateQueries({ queryKey: ["ledger-entries"] }),
+        queryClient.invalidateQueries({ queryKey: ["invoices"] }),
       ]);
     },
   });
 
   const invoices = (invoicesQuery.data ?? []) as InvoiceForUi[];
-  const selectedInvoice = invoices.find((invoice) => invoice.id === payment.invoiceId);
+  const selectedInvoice = invoices.find(
+    (invoice) => invoice.id === payment.invoiceId,
+  );
   const selectedInvoiceDetail = invoiceDetailQuery.data;
-  const selectedWaiverInvoice = invoices.find((invoice) => invoice.id === waiver.invoiceId);
+  const selectedWaiverInvoice = invoices.find(
+    (invoice) => invoice.id === waiver.invoiceId,
+  );
   const outstanding =
     selectedInvoiceDetail?.outstandingAmount ??
     (selectedInvoice ? getOutstanding(selectedInvoice) : 0);
-  const selectedWaiverOutstanding = selectedWaiverInvoice ? getOutstanding(selectedWaiverInvoice) : 0;
-  const filteredInvoices = invoices.filter((invoice) => matchesInvoiceSearch(invoice, invoiceSearch));
-  const outstandingInvoices = filteredInvoices.filter((invoice) => getOutstanding(invoice) > 0);
+  const selectedWaiverOutstanding = selectedWaiverInvoice
+    ? getOutstanding(selectedWaiverInvoice)
+    : 0;
+  const filteredInvoices = invoices.filter((invoice) =>
+    matchesInvoiceSearch(invoice, invoiceSearch),
+  );
+  const outstandingInvoices = filteredInvoices.filter(
+    (invoice) => getOutstanding(invoice) > 0,
+  );
   const selectedInvoiceLines = (selectedInvoiceDetail?.lines ??
     selectedInvoice?.lines ??
     []) as InvoiceLineForUi[];
-  const overpaymentBlocked = Boolean(selectedInvoice && payment.amount > outstanding);
+  const overpaymentBlocked = Boolean(
+    selectedInvoice && payment.amount > outstanding,
+  );
   const invalidPaymentAmount = payment.amount <= 0 || overpaymentBlocked;
-  const requiresReference = payment.method !== 'CASH';
+  const requiresReference = payment.method !== "CASH";
   const defaulters = defaultersQuery.data?.items ?? [];
-  const totalOutstanding = invoices.reduce((sum, invoice) => sum + getOutstanding(invoice), 0);
-  const paidInvoices = invoices.filter((invoice) => invoice.status === 'PAID').length;
-  const overdueInvoices = invoices.filter((invoice) => getOutstanding(invoice) > 0).length;
+  const totalOutstanding = invoices.reduce(
+    (sum, invoice) => sum + getOutstanding(invoice),
+    0,
+  );
+  const paidInvoices = invoices.filter(
+    (invoice) => invoice.status === "PAID",
+  ).length;
+  const overdueInvoices = invoices.filter(
+    (invoice) => getOutstanding(invoice) > 0,
+  ).length;
   const activeMeta = financeSectionMeta[activeSection];
 
   function toggleReminderInvoice(invoiceId: string) {
@@ -465,28 +555,30 @@ export function FinanceForm() {
       ...current,
       invoiceId: invoice.id,
       amount: getOutstanding(invoice) || current.amount,
-      referenceNumber: '',
+      referenceNumber: "",
     }));
   }
 
   function submitPayment() {
     if (!selectedInvoice) {
-      setPaymentError('Select an outstanding invoice before collecting payment.');
+      setPaymentError(
+        "Select an outstanding invoice before collecting payment.",
+      );
       return;
     }
 
     if (payment.amount <= 0) {
-      setPaymentError('Payment amount must be greater than zero.');
+      setPaymentError("Payment amount must be greater than zero.");
       return;
     }
 
     if (payment.amount > outstanding) {
-      setPaymentError('Payment amount cannot exceed the outstanding balance.');
+      setPaymentError("Payment amount cannot exceed the outstanding balance.");
       return;
     }
 
     if (requiresReference && !payment.referenceNumber.trim()) {
-      setPaymentError('Reference number is required for non-cash payments.');
+      setPaymentError("Reference number is required for non-cash payments.");
       return;
     }
 
@@ -544,7 +636,10 @@ export function FinanceForm() {
       </section>
 
       <section className="sticky top-4 z-20 rounded-[28px] border border-[var(--line)] bg-white/85 p-3 shadow-sm backdrop-blur-xl">
-        <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Finance sections">
+        <div
+          className="flex gap-2 overflow-x-auto pb-1"
+          aria-label="Finance sections"
+        >
           {financeSections.map((section) => {
             const isActive = activeSection === section;
 
@@ -554,15 +649,17 @@ export function FinanceForm() {
                 type="button"
                 className={`group relative min-h-12 whitespace-nowrap rounded-2xl border px-4 text-sm font-semibold transition-all duration-200 ${
                   isActive
-                    ? 'border-gray-950 bg-gray-950 text-white shadow-md shadow-gray-900/20'
-                    : 'border-transparent bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-950'
+                    ? "border-gray-950 bg-gray-950 text-white shadow-md shadow-gray-900/20"
+                    : "border-transparent bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-950"
                 }`}
                 onClick={() => setActiveSection(section)}
               >
                 <span className="flex items-center gap-2">
                   <span
                     className={`h-2 w-2 rounded-full ${
-                      isActive ? 'bg-emerald-400' : 'bg-gray-300 group-hover:bg-gray-500'
+                      isActive
+                        ? "bg-emerald-400"
+                        : "bg-gray-300 group-hover:bg-gray-500"
                     }`}
                   />
                   {section}
@@ -573,7 +670,7 @@ export function FinanceForm() {
         </div>
       </section>
 
-      {activeSection === 'Collection Counter' ? (
+      {activeSection === "Collection Counter" ? (
         <CollectionCounterSection
           invoicesQuery={invoicesQuery}
           invoiceSearch={invoiceSearch}
@@ -599,7 +696,7 @@ export function FinanceForm() {
         />
       ) : null}
 
-      {activeSection === 'Fee Setup' ? (
+      {activeSection === "Fee Setup" ? (
         <FeeSetupSection
           feeHead={feeHead}
           setFeeHead={setFeeHead}
@@ -613,7 +710,7 @@ export function FinanceForm() {
         />
       ) : null}
 
-      {activeSection === 'Billing Runs' ? (
+      {activeSection === "Billing Runs" ? (
         <BillingRunsSection
           billingRun={billingRun}
           setBillingRun={setBillingRun}
@@ -623,7 +720,7 @@ export function FinanceForm() {
         />
       ) : null}
 
-      {activeSection === 'Discounts & Waivers' ? (
+      {activeSection === "Discounts & Waivers" ? (
         <DiscountsAndWaiversSection
           discount={discount}
           setDiscount={setDiscount}
@@ -642,7 +739,7 @@ export function FinanceForm() {
         />
       ) : null}
 
-      {activeSection === 'Defaulters' ? (
+      {activeSection === "Defaulters" ? (
         <DefaultersSection
           defaulters={defaulters}
           classes={classesQuery.data ?? []}
@@ -655,7 +752,7 @@ export function FinanceForm() {
         />
       ) : null}
 
-      {activeSection === 'Cashier Close' ? (
+      {activeSection === "Cashier Close" ? (
         <CashierCloseSection
           filters={cashierClose}
           setFilters={setCashierClose}
@@ -674,7 +771,7 @@ export function FinanceForm() {
         />
       ) : null}
 
-      {activeSection === 'Receipts & Ledger' ? (
+      {activeSection === "Receipts & Ledger" ? (
         <ReceiptsLedgerSection
           invoices={invoices}
           receipts={receiptsQuery.data ?? []}
@@ -763,9 +860,12 @@ function CollectionCounterSection({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="label">Collection Counter</p>
-              <h2 className="mt-2 text-xl font-bold text-gray-950">Find student or invoice</h2>
+              <h2 className="mt-2 text-xl font-bold text-gray-950">
+                Find student or invoice
+              </h2>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                Search by student name, school ID, or invoice number. No fake production IDs are used.
+                Search by student name, school ID, or invoice number. No fake
+                production IDs are used.
               </p>
             </div>
             <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -794,19 +894,21 @@ function CollectionCounterSection({
                   type="button"
                   className={`min-h-16 rounded-3xl border p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
                     selectedInvoice?.id === invoice.id
-                      ? 'border-emerald-500 bg-emerald-50 shadow-sm ring-2 ring-emerald-100'
-                      : 'border-[var(--line)] bg-white hover:border-emerald-400 hover:bg-emerald-50/40'
+                      ? "border-emerald-500 bg-emerald-50 shadow-sm ring-2 ring-emerald-100"
+                      : "border-[var(--line)] bg-white hover:border-emerald-400 hover:bg-emerald-50/40"
                   }`}
                   onClick={() => selectInvoice(invoice)}
                 >
                   <span className="flex items-start justify-between gap-3">
                     <span>
                       <span className="block font-semibold text-gray-950">
-                        {invoice.student?.name ?? 'Student'} / {invoice.invoiceNumber}
+                        {invoice.student?.name ?? "Student"} /{" "}
+                        {invoice.invoiceNumber}
                       </span>
                       <span className="mt-1 block text-sm text-[var(--muted)]">
-                        {invoice.student?.studentSystemId ?? 'School ID unavailable'} / due{' '}
-                        {formatDate(invoice.dueDate)}
+                        {invoice.student?.studentSystemId ??
+                          "School ID unavailable"}{" "}
+                        / due {formatDate(invoice.dueDate)}
                       </span>
                     </span>
                     <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
@@ -823,8 +925,8 @@ function CollectionCounterSection({
                 title="No outstanding invoices"
                 body={
                   filteredInvoices.length === 0
-                    ? 'No invoices match this search.'
-                    : 'All matching invoices are fully paid.'
+                    ? "No invoices match this search."
+                    : "All matching invoices are fully paid."
                 }
               />
             )}
@@ -833,7 +935,10 @@ function CollectionCounterSection({
       </div>
 
       <div className="space-y-6 xl:sticky xl:top-28 xl:self-start">
-        <InvoiceProfileCard invoice={selectedInvoice} outstanding={outstanding} />
+        <InvoiceProfileCard
+          invoice={selectedInvoice}
+          outstanding={outstanding}
+        />
         <OutstandingDuesTable
           invoice={selectedInvoice}
           lines={selectedInvoiceLines}
@@ -864,8 +969,15 @@ function CollectionCounterSection({
           submitPayment={submitPayment}
         />
         <GatewayReadinessNotice readiness={gatewayReadiness} />
-        <LedgerPreview invoice={selectedInvoice} amount={payment.amount} method={payment.method} />
-        <PaymentSuccessPanel result={paymentMutation.data} invoice={selectedInvoice} />
+        <LedgerPreview
+          invoice={selectedInvoice}
+          amount={payment.amount}
+          method={payment.method}
+        />
+        <PaymentSuccessPanel
+          result={paymentMutation.data}
+          invoice={selectedInvoice}
+        />
       </div>
     </section>
   );
@@ -898,10 +1010,11 @@ function InvoiceProfileCard({
         <div>
           <p className="label">Selected Student</p>
           <h2 className="mt-2 text-2xl font-bold text-gray-950">
-            {invoice.student?.name ?? 'Student'}
+            {invoice.student?.name ?? "Student"}
           </h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            {invoice.student?.studentSystemId ?? 'Student system ID unavailable'}
+            {invoice.student?.studentSystemId ??
+              "Student system ID unavailable"}
           </p>
         </div>
         <span className="rounded-full bg-gray-900 px-3 py-1 text-xs font-semibold text-white">
@@ -912,9 +1025,20 @@ function InvoiceProfileCard({
         <Fact label="Invoice" value={invoice.invoiceNumber} />
         <Fact label="Due Date" value={formatDate(invoice.dueDate)} />
         <Fact label="Class / Section" value={formatClassSection(invoice)} />
-        <Fact label="Guardian Phone" value={invoice.student?.guardianPhone ?? invoice.guardianPhone ?? 'Not available'} />
+        <Fact
+          label="Guardian Phone"
+          value={
+            invoice.student?.guardianPhone ??
+            invoice.guardianPhone ??
+            "Not available"
+          }
+        />
         <Fact label="Paid" value={formatCurrency(paidAmount)} />
-        <Fact label="Outstanding" value={formatCurrency(outstanding)} highlight />
+        <Fact
+          label="Outstanding"
+          value={formatCurrency(outstanding)}
+          highlight
+        />
       </div>
     </section>
   );
@@ -929,17 +1053,26 @@ function OutstandingDuesTable({
   lines: InvoiceLineForUi[];
   onQuickCollect: (amount: number) => void;
 }) {
-  const [feeHeadFilter, setFeeHeadFilter] = useState('');
-  const [periodFilter, setPeriodFilter] = useState('');
-  const feeHeadOptions = Array.from(new Set(lines.map(getLineFeeHeadLabel))).filter(Boolean);
-  const periodOptions = Array.from(new Set(lines.map(getLinePeriodLabel))).filter(Boolean);
+  const [feeHeadFilter, setFeeHeadFilter] = useState("");
+  const [periodFilter, setPeriodFilter] = useState("");
+  const feeHeadOptions = Array.from(
+    new Set(lines.map(getLineFeeHeadLabel)),
+  ).filter(Boolean);
+  const periodOptions = Array.from(
+    new Set(lines.map(getLinePeriodLabel)),
+  ).filter(Boolean);
   const visibleLines = lines.filter((line) => {
-    const feeHeadMatches = !feeHeadFilter || getLineFeeHeadLabel(line) === feeHeadFilter;
-    const periodMatches = !periodFilter || getLinePeriodLabel(line) === periodFilter;
+    const feeHeadMatches =
+      !feeHeadFilter || getLineFeeHeadLabel(line) === feeHeadFilter;
+    const periodMatches =
+      !periodFilter || getLinePeriodLabel(line) === periodFilter;
 
     return feeHeadMatches && periodMatches;
   });
-  const visibleNetDue = visibleLines.reduce((total, line) => total + getLineNetDue(line), 0);
+  const visibleNetDue = visibleLines.reduce(
+    (total, line) => total + getLineNetDue(line),
+    0,
+  );
 
   return (
     <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
@@ -948,7 +1081,8 @@ function OutstandingDuesTable({
           <p className="label">Outstanding Dues</p>
           {invoice && lines.length > 0 ? (
             <p className="mt-1 text-sm text-[var(--muted)]">
-              {visibleLines.length} of {lines.length} line items visible / {formatCurrency(visibleNetDue)} due in view
+              {visibleLines.length} of {lines.length} line items visible /{" "}
+              {formatCurrency(visibleNetDue)} due in view
             </p>
           ) : null}
         </div>
@@ -959,7 +1093,10 @@ function OutstandingDuesTable({
         ) : null}
       </div>
       {invoice && lines.length > 0 ? (
-        <div className="mt-4 space-y-4" data-testid="finance-dues-interaction-toolbar">
+        <div
+          className="mt-4 space-y-4"
+          data-testid="finance-dues-interaction-toolbar"
+        >
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
             <label>
               <span className="label mb-2 block">Fee Head</span>
@@ -971,7 +1108,9 @@ function OutstandingDuesTable({
               >
                 <option value="">All fee heads</option>
                 {feeHeadOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
                 ))}
               </select>
             </label>
@@ -985,15 +1124,17 @@ function OutstandingDuesTable({
               >
                 <option value="">All periods</option>
                 {periodOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
                 ))}
               </select>
             </label>
             <button
               type="button"
               onClick={() => {
-                setFeeHeadFilter('');
-                setPeriodFilter('');
+                setFeeHeadFilter("");
+                setPeriodFilter("");
               }}
               className="self-end rounded-2xl border border-[var(--line)] px-4 py-3 text-xs font-semibold text-[var(--muted)] transition hover:bg-gray-50 hover:text-gray-950"
             >
@@ -1021,14 +1162,33 @@ function OutstandingDuesTable({
                     const lineNetDue = getLineNetDue(line);
 
                     return (
-                      <tr key={line.id ?? index} className="border-t border-[var(--line)] transition hover:bg-gray-50/80">
-                        <td className="py-3 pr-4 font-semibold">{getLineFeeHeadLabel(line)}</td>
-                        <td className="py-3 pr-4 text-[var(--muted)]">{getLinePeriodLabel(line)}</td>
-                        <td className="py-3 pr-4">{formatCurrency(line.baseAmount ?? line.amount)}</td>
-                        <td className="py-3 pr-4">{formatCurrency(line.lateFeeAmount)}</td>
-                        <td className="py-3 pr-4">{formatCurrency(line.discountAmount ?? line.waiverAmount)}</td>
-                        <td className="py-3 pr-4">{formatCurrency(line.vatAmount)}</td>
-                        <td className="py-3 pr-4 font-semibold">{formatCurrency(lineNetDue)}</td>
+                      <tr
+                        key={line.id ?? index}
+                        className="border-t border-[var(--line)] transition hover:bg-gray-50/80"
+                      >
+                        <td className="py-3 pr-4 font-semibold">
+                          {getLineFeeHeadLabel(line)}
+                        </td>
+                        <td className="py-3 pr-4 text-[var(--muted)]">
+                          {getLinePeriodLabel(line)}
+                        </td>
+                        <td className="py-3 pr-4">
+                          {formatCurrency(line.baseAmount ?? line.amount)}
+                        </td>
+                        <td className="py-3 pr-4">
+                          {formatCurrency(line.lateFeeAmount)}
+                        </td>
+                        <td className="py-3 pr-4">
+                          {formatCurrency(
+                            line.discountAmount ?? line.waiverAmount,
+                          )}
+                        </td>
+                        <td className="py-3 pr-4">
+                          {formatCurrency(line.vatAmount)}
+                        </td>
+                        <td className="py-3 pr-4 font-semibold">
+                          {formatCurrency(lineNetDue)}
+                        </td>
                         <td className="py-3 pr-4">
                           <button
                             type="button"
@@ -1046,24 +1206,34 @@ function OutstandingDuesTable({
               </table>
             </div>
           ) : (
-            <EmptyState title="No dues in this filter" body="Clear fee-head or period filters to show invoice lines." />
+            <EmptyState
+              title="No dues in this filter"
+              body="Clear fee-head or period filters to show invoice lines."
+            />
           )}
         </div>
       ) : invoice ? (
         <div className="mt-4 rounded-2xl border border-dashed border-[var(--line)] bg-white/70 p-4">
           <p className="font-semibold text-gray-950">Invoice-level summary</p>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            The current invoice API does not expose line items to the web client yet, so this counter shows
-            the verified invoice-level balance only.
+            The current invoice API does not expose line items to the web client
+            yet, so this counter shows the verified invoice-level balance only.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <Fact label="Total" value={formatCurrency(invoice.totalAmount)} />
             <Fact label="Paid" value={formatCurrency(invoice.paidAmount)} />
-            <Fact label="Net Due" value={formatCurrency(getOutstanding(invoice))} highlight />
+            <Fact
+              label="Net Due"
+              value={formatCurrency(getOutstanding(invoice))}
+              highlight
+            />
           </div>
         </div>
       ) : (
-        <EmptyState title="No invoice selected" body="Select an outstanding invoice to review dues." />
+        <EmptyState
+          title="No invoice selected"
+          body="Select an outstanding invoice to review dues."
+        />
       )}
     </section>
   );
@@ -1079,42 +1249,63 @@ function InvoiceDetailPanel({
   invoice: InvoiceForUi | undefined;
 }) {
   const queryClient = useQueryClient();
-  const [refundPayment, setRefundPayment] = useState<InvoiceDetail['payments'][number] | null>(null);
+  const [refundPayment, setRefundPayment] = useState<
+    InvoiceDetail["payments"][number] | null
+  >(null);
   const [refundAmount, setRefundAmount] = useState(0);
-  const [refundReason, setRefundReason] = useState('');
-  const [refundReference, setRefundReference] = useState('');
-  const [refundConfirmation, setRefundConfirmation] = useState('');
-  const [refundMessage, setRefundMessage] = useState('');
+  const [refundReason, setRefundReason] = useState("");
+  const [refundReference, setRefundReference] = useState("");
+  const [refundConfirmation, setRefundConfirmation] = useState("");
+  const [refundMessage, setRefundMessage] = useState("");
+  const refundAttemptRef = useRef<{
+    fingerprint: string;
+    key: string;
+  } | null>(null);
   const refundMutation = useMutation({
     mutationFn: async () => {
       if (!refundPayment) {
-        throw new Error('Select a payment to reverse or refund.');
+        throw new Error("Select a payment to reverse or refund.");
       }
 
-      return api.refundPayment(refundPayment.id, {
+      const payload = {
         amount: refundAmount,
         reason: refundReason.trim(),
-        referenceNumber: refundReference.trim() || undefined,
-        narration: `Phase 1B correction for ${refundPayment.receipt?.receiptNumber ?? refundPayment.id}`,
+      };
+      const fingerprint = JSON.stringify({
+        paymentId: refundPayment.id,
+        ...payload,
+      });
+      if (refundAttemptRef.current?.fingerprint !== fingerprint) {
+        refundAttemptRef.current = {
+          fingerprint,
+          key: crypto.randomUUID(),
+        };
+      }
+      return api.requestPaymentRefund(refundPayment.id, {
+        ...payload,
+        idempotencyKey: refundAttemptRef.current.key,
       });
     },
-    onSuccess: async (result) => {
+    onSuccess: async () => {
       setRefundMessage(
-        `Refund ${result.refundNumber} created. Invoice status is now ${result.invoiceStatus}.`,
+        "Refund request submitted for independent approval. No confirmed payment was edited.",
       );
+      refundAttemptRef.current = null;
       setRefundPayment(null);
-      setRefundReason('');
-      setRefundReference('');
-      setRefundConfirmation('');
+      setRefundReason("");
+      setRefundReference("");
+      setRefundConfirmation("");
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['invoice-detail', invoice?.id] }),
-        queryClient.invalidateQueries({ queryKey: ['invoices'] }),
-        queryClient.invalidateQueries({ queryKey: ['receipts'] }),
-        queryClient.invalidateQueries({ queryKey: ['ledger-entries'] }),
-        queryClient.invalidateQueries({ queryKey: ['defaulters'] }),
+        queryClient.invalidateQueries({
+          queryKey: ["invoice-detail", invoice?.id],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["invoices"] }),
+        queryClient.invalidateQueries({ queryKey: ["receipts"] }),
+        queryClient.invalidateQueries({ queryKey: ["ledger-entries"] }),
+        queryClient.invalidateQueries({ queryKey: ["defaulters"] }),
         detail?.student.id
           ? queryClient.invalidateQueries({
-              queryKey: ['student-fee-ledger', detail.student.id],
+              queryKey: ["student-fee-ledger", detail.student.id],
             })
           : Promise.resolve(),
       ]);
@@ -1128,17 +1319,17 @@ function InvoiceDetailPanel({
     refundAmount <= 0 ||
     refundAmount > refundableAmount ||
     !refundReason.trim() ||
-    refundConfirmation !== 'REFUND';
+    refundConfirmation !== "REFUND";
 
-  function openRefundWorkflow(payment: InvoiceDetail['payments'][number]) {
+  function openRefundWorkflow(payment: InvoiceDetail["payments"][number]) {
     const refundable = getPaymentRefundableAmount(payment);
 
     setRefundPayment(payment);
     setRefundAmount(refundable);
-    setRefundReason('');
-    setRefundReference('');
-    setRefundConfirmation('');
-    setRefundMessage('');
+    setRefundReason("");
+    setRefundReference("");
+    setRefundConfirmation("");
+    setRefundMessage("");
     refundMutation.reset();
   }
 
@@ -1148,10 +1339,11 @@ function InvoiceDetailPanel({
         <div>
           <p className="label">Invoice Detail</p>
           <h3 className="mt-2 text-lg font-bold text-gray-950">
-            {invoice?.invoiceNumber ?? 'Select an invoice'}
+            {invoice?.invoiceNumber ?? "Select an invoice"}
           </h3>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            Official totals, line items, payments, receipts, and source metadata come from the backend.
+            Official totals, line items, payments, receipts, and source metadata
+            come from the backend.
           </p>
         </div>
         {detail ? (
@@ -1162,7 +1354,10 @@ function InvoiceDetailPanel({
       </div>
 
       {!invoice ? (
-        <EmptyState title="No invoice selected" body="Choose an invoice to open the detail view." />
+        <EmptyState
+          title="No invoice selected"
+          body="Choose an invoice to open the detail view."
+        />
       ) : detailQuery.isLoading ? (
         <InvoiceSkeleton />
       ) : detailQuery.isError ? (
@@ -1172,12 +1367,19 @@ function InvoiceDetailPanel({
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Fact label="Student" value={detail.student.name} />
             <Fact label="School ID" value={detail.student.studentSystemId} />
-            <Fact label="Guardian" value={detail.student.guardianPhone ?? 'Not recorded'} />
+            <Fact
+              label="Guardian"
+              value={detail.student.guardianPhone ?? "Not recorded"}
+            />
             <Fact label="Academic Year" value={detail.academicYear.name} />
             <Fact label="Subtotal" value={formatCurrency(detail.subtotal)} />
             <Fact label="VAT" value={formatCurrency(detail.vatAmount)} />
             <Fact label="Paid" value={formatCurrency(detail.paidAmount)} />
-            <Fact label="Outstanding" value={formatCurrency(detail.outstandingAmount)} highlight />
+            <Fact
+              label="Outstanding"
+              value={formatCurrency(detail.outstandingAmount)}
+              highlight
+            />
           </div>
 
           <div>
@@ -1197,20 +1399,38 @@ function InvoiceDetailPanel({
                   </thead>
                   <tbody>
                     {detail.lines.map((line) => (
-                      <tr key={line.id} className="border-t border-[var(--line)] transition hover:bg-gray-50/80">
-                        <td className="py-3 pr-4 font-semibold">{line.feeHeadName}</td>
-                        <td className="py-3 pr-4 text-[var(--muted)]">{line.periodLabel}</td>
-                        <td className="py-3 pr-4">{formatCurrency(line.baseAmount)}</td>
-                        <td className="py-3 pr-4">{formatCurrency(line.waiverAmount)}</td>
-                        <td className="py-3 pr-4">{formatCurrency(line.vatAmount)}</td>
-                        <td className="py-3 pr-4 font-semibold">{formatCurrency(line.netAmount)}</td>
+                      <tr
+                        key={line.id}
+                        className="border-t border-[var(--line)] transition hover:bg-gray-50/80"
+                      >
+                        <td className="py-3 pr-4 font-semibold">
+                          {line.feeHeadName}
+                        </td>
+                        <td className="py-3 pr-4 text-[var(--muted)]">
+                          {line.periodLabel}
+                        </td>
+                        <td className="py-3 pr-4">
+                          {formatCurrency(line.baseAmount)}
+                        </td>
+                        <td className="py-3 pr-4">
+                          {formatCurrency(line.waiverAmount)}
+                        </td>
+                        <td className="py-3 pr-4">
+                          {formatCurrency(line.vatAmount)}
+                        </td>
+                        <td className="py-3 pr-4 font-semibold">
+                          {formatCurrency(line.netAmount)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <EmptyState title="No line items" body="This invoice has no line item records." />
+              <EmptyState
+                title="No line items"
+                body="This invoice has no line item records."
+              />
             )}
           </div>
 
@@ -1226,13 +1446,14 @@ function InvoiceDetailPanel({
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="font-semibold text-gray-950">
-                          {formatPaymentMethod(payment.method)} / {formatCurrency(payment.netAmount)}
+                          {formatPaymentMethod(payment.method)} /{" "}
+                          {formatCurrency(payment.netAmount)}
                         </p>
                         <p className="mt-1 text-sm text-[var(--muted)]">
                           Paid {formatDate(payment.paidAt)}
                           {payment.journalEntryNumber
                             ? ` / Journal ${payment.journalEntryNumber}`
-                            : ''}
+                            : ""}
                         </p>
                         {payment.refundedAmount > 0 ? (
                           <p className="mt-1 text-sm text-amber-700">
@@ -1245,7 +1466,11 @@ function InvoiceDetailPanel({
                           <button
                             type="button"
                             className="min-h-11 rounded-full border border-[var(--line)] px-4 text-sm font-semibold text-gray-700"
-                            onClick={() => void api.openReceiptPdf(payment.receipt!.receiptNumber)}
+                            onClick={() =>
+                              void api.openReceiptPdf(
+                                payment.receipt!.receiptNumber,
+                              )
+                            }
                           >
                             Open receipt {payment.receipt.receiptNumber}
                           </button>
@@ -1278,14 +1503,20 @@ function InvoiceDetailPanel({
                 ))}
               </div>
             ) : (
-              <EmptyState title="No payments yet" body="Payments and receipt PDFs will appear after collection." />
+              <EmptyState
+                title="No payments yet"
+                body="Payments and receipt PDFs will appear after collection."
+              />
             )}
           </div>
           {refundPayment ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="font-semibold text-amber-950">Payment reversal / correction</p>
+              <p className="font-semibold text-amber-950">
+                Payment reversal / correction
+              </p>
               <p className="mt-1 text-sm text-amber-800">
-                This creates a reversal/refund record. It does not edit the original payment.
+                This creates a reversal/refund record. It does not edit the
+                original payment.
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <Fact
@@ -1303,12 +1534,16 @@ function InvoiceDetailPanel({
                     min={0.01}
                     max={refundableAmount}
                     value={refundAmount}
-                    onChange={(event) => setRefundAmount(Number(event.target.value))}
+                    onChange={(event) =>
+                      setRefundAmount(Number(event.target.value))
+                    }
                     className="min-h-11"
                   />
                 </label>
                 <label>
-                  <span className="label mb-2 block">Reference / correction note</span>
+                  <span className="label mb-2 block">
+                    Reference / correction note
+                  </span>
                   <input
                     value={refundReference}
                     onChange={(event) => setRefundReference(event.target.value)}
@@ -1327,10 +1562,14 @@ function InvoiceDetailPanel({
                   />
                 </label>
                 <label className="sm:col-span-2">
-                  <span className="label mb-2 block">Confirmation text: type REFUND</span>
+                  <span className="label mb-2 block">
+                    Confirmation text: type REFUND
+                  </span>
                   <input
                     value={refundConfirmation}
-                    onChange={(event) => setRefundConfirmation(event.target.value)}
+                    onChange={(event) =>
+                      setRefundConfirmation(event.target.value)
+                    }
                     className="min-h-11"
                   />
                 </label>
@@ -1348,7 +1587,9 @@ function InvoiceDetailPanel({
                   disabled={refundBlocked || refundMutation.isPending}
                   onClick={() => refundMutation.mutate()}
                 >
-                  {refundMutation.isPending ? 'Creating refund...' : 'Confirm refund / reversal'}
+                  {refundMutation.isPending
+                    ? "Creating refund..."
+                    : "Confirm refund / reversal"}
                 </button>
                 <button
                   type="button"
@@ -1421,7 +1662,10 @@ function PaymentPanel({
             value={payment.amount}
             onChange={(event) => {
               setPaymentError(null);
-              setPayment((current) => ({ ...current, amount: Number(event.target.value) }));
+              setPayment((current) => ({
+                ...current,
+                amount: Number(event.target.value),
+              }));
             }}
             disabled={!selectedInvoice}
             aria-label="Amount to collect"
@@ -1431,7 +1675,9 @@ function PaymentPanel({
         {overpaymentBlocked ? (
           <InlineError message="Payment amount cannot exceed the outstanding balance." />
         ) : null}
-        {payment.amount <= 0 ? <InlineError message="Payment amount must be greater than zero." /> : null}
+        {payment.amount <= 0 ? (
+          <InlineError message="Payment amount must be greater than zero." />
+        ) : null}
 
         <label>
           <span className="label mb-2 block">Payment Method</span>
@@ -1442,7 +1688,8 @@ function PaymentPanel({
               setPayment((current) => ({
                 ...current,
                 method: event.target.value as PaymentMethod,
-                referenceNumber: event.target.value === 'CASH' ? '' : current.referenceNumber,
+                referenceNumber:
+                  event.target.value === "CASH" ? "" : current.referenceNumber,
               }));
             }}
             disabled={!selectedInvoice}
@@ -1459,18 +1706,23 @@ function PaymentPanel({
         {requiresReference ? (
           <label>
             <span className="label mb-2 block">
-              {payment.method === 'CHEQUE' ? 'Cheque / Bank Reference Number' : 'Reference Number'}
+              {payment.method === "CHEQUE"
+                ? "Cheque / Bank Reference Number"
+                : "Reference Number"}
             </span>
             <input
               value={payment.referenceNumber}
               onChange={(event) => {
                 setPaymentError(null);
-                setPayment((current) => ({ ...current, referenceNumber: event.target.value }));
+                setPayment((current) => ({
+                  ...current,
+                  referenceNumber: event.target.value,
+                }));
               }}
               placeholder={
-                payment.method === 'CHEQUE'
-                  ? 'Cheque number, issuing bank, or counter reference'
-                  : 'Bank, transfer, or mobile reference'
+                payment.method === "CHEQUE"
+                  ? "Cheque number, issuing bank, or counter reference"
+                  : "Bank, transfer, or mobile reference"
               }
               disabled={!selectedInvoice}
               className="min-h-11"
@@ -1483,10 +1735,16 @@ function PaymentPanel({
         <button
           type="button"
           className="min-h-12 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!selectedInvoice || invalidPaymentAmount || paymentMutation.isPending}
+          disabled={
+            !selectedInvoice ||
+            invalidPaymentAmount ||
+            paymentMutation.isPending
+          }
           onClick={submitPayment}
         >
-          {paymentMutation.isPending ? 'Posting payment...' : 'Confirm Payment & Generate Receipt'}
+          {paymentMutation.isPending
+            ? "Posting payment..."
+            : "Confirm Payment & Generate Receipt"}
         </button>
       </div>
     </section>
@@ -1508,13 +1766,14 @@ function GatewayReadinessNotice({
       <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
         <p className="text-sm font-semibold text-amber-900">
           {readiness.enabled
-            ? 'Gateway readiness is configured. Payments are confirmed only after server-side verification.'
-            : 'Online payments are not enabled for this school.'}
+            ? "Gateway readiness is configured. Payments are confirmed only after server-side verification."
+            : "Online payments are not enabled for this school."}
         </p>
         <p className="mt-1 text-xs text-amber-800">
-          Webhook: {readiness.webhookReady ? 'ready' : 'not ready'} / payment intent:{' '}
-          {readiness.paymentIntentReady ? 'ready' : 'not ready'} / settlement:{' '}
-          {readiness.settlementTrackingReady ? 'ready' : 'not ready'}
+          Webhook: {readiness.webhookReady ? "ready" : "not ready"} / payment
+          intent: {readiness.paymentIntentReady ? "ready" : "not ready"} /
+          settlement:{" "}
+          {readiness.settlementTrackingReady ? "ready" : "not ready"}
         </p>
       </div>
     </section>
@@ -1530,8 +1789,13 @@ function LedgerPreview({
   amount: number;
   method: PaymentMethod;
 }) {
-  const debitAccount = method === 'CASH' ? 'Cash on Hand' : `${formatPaymentMethod(method)} Clearing`;
-  const creditAmount = invoice ? Math.min(Math.max(amount, 0), getOutstanding(invoice)) : 0;
+  const debitAccount =
+    method === "CASH"
+      ? "Cash on Hand"
+      : `${formatPaymentMethod(method)} Clearing`;
+  const creditAmount = invoice
+    ? Math.min(Math.max(amount, 0), getOutstanding(invoice))
+    : 0;
 
   return (
     <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
@@ -1540,8 +1804,16 @@ function LedgerPreview({
         Preview only - backend posts final ledger entry after confirmation.
       </p>
       <div className="mt-4 grid gap-3">
-        <LedgerPreviewRow side="Dr" account={debitAccount} amount={creditAmount} />
-        <LedgerPreviewRow side="Cr" account="Fee Income / VAT Payable" amount={creditAmount} />
+        <LedgerPreviewRow
+          side="Dr"
+          account={debitAccount}
+          amount={creditAmount}
+        />
+        <LedgerPreviewRow
+          side="Cr"
+          account="Fee Income / VAT Payable"
+          amount={creditAmount}
+        />
       </div>
     </section>
   );
@@ -1562,17 +1834,20 @@ function PaymentSuccessPanel({
     <section className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-6">
       <p className="label text-emerald-700">Receipt Generated</p>
       <h2 className="mt-2 text-xl font-bold text-emerald-950">
-        {result.receiptNumber ?? 'Receipt created'}
+        {result.receiptNumber ?? "Receipt created"}
       </h2>
       <p className="mt-2 text-sm text-emerald-800">
-        {formatCurrency(result.amount)} collected for {invoice?.invoiceNumber ?? 'invoice'} by{' '}
+        {formatCurrency(result.amount)} collected for{" "}
+        {invoice?.invoiceNumber ?? "invoice"} by{" "}
         {formatPaymentMethod(result.method)}.
       </p>
       {result.receiptNumber ? (
         <button
           type="button"
           className="mt-4 min-h-11 rounded-full bg-emerald-700 px-4 text-sm font-semibold text-white"
-          onClick={() => void api.openReceiptPdf(result.receiptNumber as string)}
+          onClick={() =>
+            void api.openReceiptPdf(result.receiptNumber as string)
+          }
         >
           Open receipt PDF
         </button>
@@ -1622,18 +1897,28 @@ function FeeSetupSection({
         <div className="grid gap-3">
           <input
             value={feeHead.code}
-            onChange={(event) => setFeeHead((current) => ({ ...current, code: event.target.value }))}
+            onChange={(event) =>
+              setFeeHead((current) => ({
+                ...current,
+                code: event.target.value,
+              }))
+            }
             placeholder="Code"
           />
           <input
             value={feeHead.name}
-            onChange={(event) => setFeeHead((current) => ({ ...current, name: event.target.value }))}
+            onChange={(event) =>
+              setFeeHead((current) => ({
+                ...current,
+                name: event.target.value,
+              }))
+            }
             placeholder="Name"
           />
           <div className="grid gap-3 sm:grid-cols-2">
             <input
               type="number"
-              value={feeHead.defaultAmount > 0 ? feeHead.defaultAmount : ''}
+              value={feeHead.defaultAmount > 0 ? feeHead.defaultAmount : ""}
               onChange={(event) =>
                 setFeeHead((current) => ({
                   ...current,
@@ -1647,7 +1932,10 @@ function FeeSetupSection({
                 type="checkbox"
                 checked={feeHead.vatApplicable}
                 onChange={(event) =>
-                  setFeeHead((current) => ({ ...current, vatApplicable: event.target.checked }))
+                  setFeeHead((current) => ({
+                    ...current,
+                    vatApplicable: event.target.checked,
+                  }))
                 }
               />
               VAT applicable
@@ -1655,7 +1943,11 @@ function FeeSetupSection({
           </div>
           <button
             className="rounded-2xl bg-[var(--accent)] px-5 py-3 font-semibold text-white disabled:opacity-50"
-            disabled={!feeHead.code.trim() || !feeHead.name.trim() || feeHeadMutation.isPending}
+            disabled={
+              !feeHead.code.trim() ||
+              !feeHead.name.trim() ||
+              feeHeadMutation.isPending
+            }
             onClick={() =>
               feeHeadMutation.mutate({
                 ...feeHead,
@@ -1664,7 +1956,7 @@ function FeeSetupSection({
               })
             }
           >
-            {feeHeadMutation.isPending ? 'Saving...' : 'Create fee head'}
+            {feeHeadMutation.isPending ? "Saving..." : "Create fee head"}
           </button>
         </div>
       </div>
@@ -1675,7 +1967,10 @@ function FeeSetupSection({
           <select
             value={feePlan.academicYearId}
             onChange={(event) =>
-              setFeePlan((current) => ({ ...current, academicYearId: event.target.value }))
+              setFeePlan((current) => ({
+                ...current,
+                academicYearId: event.target.value,
+              }))
             }
           >
             <option value="">Academic year</option>
@@ -1687,7 +1982,12 @@ function FeeSetupSection({
           </select>
           <select
             value={feePlan.classId}
-            onChange={(event) => setFeePlan((current) => ({ ...current, classId: event.target.value }))}
+            onChange={(event) =>
+              setFeePlan((current) => ({
+                ...current,
+                classId: event.target.value,
+              }))
+            }
           >
             <option value="">All classes</option>
             {classes.map((classroom) => (
@@ -1699,7 +1999,10 @@ function FeeSetupSection({
           <select
             value={feePlan.feeHeadId}
             onChange={(event) =>
-              setFeePlan((current) => ({ ...current, feeHeadId: event.target.value }))
+              setFeePlan((current) => ({
+                ...current,
+                feeHeadId: event.target.value,
+              }))
             }
           >
             <option value="">Fee head</option>
@@ -1712,37 +2015,58 @@ function FeeSetupSection({
           <div className="grid gap-3 md:grid-cols-3">
             <input
               value={feePlan.code}
-              onChange={(event) => setFeePlan((current) => ({ ...current, code: event.target.value }))}
+              onChange={(event) =>
+                setFeePlan((current) => ({
+                  ...current,
+                  code: event.target.value,
+                }))
+              }
               placeholder="Plan code"
             />
             <input
               value={feePlan.name}
-              onChange={(event) => setFeePlan((current) => ({ ...current, name: event.target.value }))}
+              onChange={(event) =>
+                setFeePlan((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
               placeholder="Plan name"
             />
             <input
               type="number"
-              value={feePlan.amount > 0 ? feePlan.amount : ''}
+              value={feePlan.amount > 0 ? feePlan.amount : ""}
               onChange={(event) =>
-                setFeePlan((current) => ({ ...current, amount: Number(event.target.value || 0) }))
+                setFeePlan((current) => ({
+                  ...current,
+                  amount: Number(event.target.value || 0),
+                }))
               }
               placeholder="Amount"
             />
           </div>
           <button
             className="rounded-2xl bg-[var(--teal)] px-5 py-3 font-semibold text-white disabled:opacity-50"
-            disabled={!feePlan.academicYearId || !feePlan.feeHeadId || !feePlan.code.trim() || !feePlan.name.trim() || feePlanMutation.isPending}
+            disabled={
+              !feePlan.academicYearId ||
+              !feePlan.feeHeadId ||
+              !feePlan.code.trim() ||
+              !feePlan.name.trim() ||
+              feePlanMutation.isPending
+            }
             onClick={() =>
               feePlanMutation.mutate({
                 academicYearId: feePlan.academicYearId,
                 classId: feePlan.classId || null,
                 code: feePlan.code.trim(),
                 name: feePlan.name.trim(),
-                items: [{ feeHeadId: feePlan.feeHeadId, amount: feePlan.amount }],
+                items: [
+                  { feeHeadId: feePlan.feeHeadId, amount: feePlan.amount },
+                ],
               })
             }
           >
-            {feePlanMutation.isPending ? 'Creating...' : 'Create fee plan'}
+            {feePlanMutation.isPending ? "Creating..." : "Create fee plan"}
           </button>
         </div>
       </div>
@@ -1776,7 +2100,10 @@ function BillingRunsSection({
         <select
           value={billingRun.academicYearId}
           onChange={(event) =>
-            setBillingRun((current) => ({ ...current, academicYearId: event.target.value }))
+            setBillingRun((current) => ({
+              ...current,
+              academicYearId: event.target.value,
+            }))
           }
         >
           <option value="">Academic year</option>
@@ -1789,7 +2116,10 @@ function BillingRunsSection({
         <select
           value={billingRun.feePlanId}
           onChange={(event) =>
-            setBillingRun((current) => ({ ...current, feePlanId: event.target.value }))
+            setBillingRun((current) => ({
+              ...current,
+              feePlanId: event.target.value,
+            }))
           }
         >
           <option value="">All active fee plans</option>
@@ -1805,7 +2135,10 @@ function BillingRunsSection({
           max={12}
           value={billingRun.runMonth}
           onChange={(event) =>
-            setBillingRun((current) => ({ ...current, runMonth: Number(event.target.value) }))
+            setBillingRun((current) => ({
+              ...current,
+              runMonth: Number(event.target.value),
+            }))
           }
           aria-label="Billing run month"
         />
@@ -1813,7 +2146,10 @@ function BillingRunsSection({
           type="number"
           value={billingRun.runYear}
           onChange={(event) =>
-            setBillingRun((current) => ({ ...current, runYear: Number(event.target.value) }))
+            setBillingRun((current) => ({
+              ...current,
+              runYear: Number(event.target.value),
+            }))
           }
           aria-label="Billing run year"
         />
@@ -1821,7 +2157,10 @@ function BillingRunsSection({
           type="date"
           value={billingRun.dueDate}
           onChange={(event) =>
-            setBillingRun((current) => ({ ...current, dueDate: event.target.value }))
+            setBillingRun((current) => ({
+              ...current,
+              dueDate: event.target.value,
+            }))
           }
           aria-label="Billing run due date"
         />
@@ -1836,7 +2175,7 @@ function BillingRunsSection({
             })
           }
         >
-          {billingRunMutation.isPending ? 'Generating...' : 'Generate invoices'}
+          {billingRunMutation.isPending ? "Generating..." : "Generate invoices"}
         </button>
       </div>
     </section>
@@ -1897,21 +2236,30 @@ function DiscountsAndWaiversSection({
             <input
               value={discount.name}
               onChange={(event) =>
-                setDiscount((current) => ({ ...current, name: event.target.value }))
+                setDiscount((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
               }
               placeholder="Discount name"
             />
             <input
               value={discount.reason}
               onChange={(event) =>
-                setDiscount((current) => ({ ...current, reason: event.target.value }))
+                setDiscount((current) => ({
+                  ...current,
+                  reason: event.target.value,
+                }))
               }
               placeholder="Approval reason"
             />
             <select
               value={discount.type}
               onChange={(event) =>
-                setDiscount((current) => ({ ...current, type: event.target.value }))
+                setDiscount((current) => ({
+                  ...current,
+                  type: event.target.value,
+                }))
               }
             >
               <option value="SIBLING">Sibling</option>
@@ -1924,7 +2272,10 @@ function DiscountsAndWaiversSection({
             <select
               value={discount.feeHeadId}
               onChange={(event) =>
-                setDiscount((current) => ({ ...current, feeHeadId: event.target.value }))
+                setDiscount((current) => ({
+                  ...current,
+                  feeHeadId: event.target.value,
+                }))
               }
             >
               <option value="">Any fee head</option>
@@ -1937,7 +2288,10 @@ function DiscountsAndWaiversSection({
             <select
               value={discount.classId}
               onChange={(event) =>
-                setDiscount((current) => ({ ...current, classId: event.target.value }))
+                setDiscount((current) => ({
+                  ...current,
+                  classId: event.target.value,
+                }))
               }
             >
               <option value="">Any class</option>
@@ -1950,7 +2304,10 @@ function DiscountsAndWaiversSection({
             <select
               value={discount.feePlanId}
               onChange={(event) =>
-                setDiscount((current) => ({ ...current, feePlanId: event.target.value }))
+                setDiscount((current) => ({
+                  ...current,
+                  feePlanId: event.target.value,
+                }))
               }
             >
               <option value="">Any plan</option>
@@ -1965,7 +2322,7 @@ function DiscountsAndWaiversSection({
             <input
               type="number"
               min={0}
-              value={discount.percentOff > 0 ? discount.percentOff : ''}
+              value={discount.percentOff > 0 ? discount.percentOff : ""}
               onChange={(event) =>
                 setDiscount((current) => ({
                   ...current,
@@ -1977,7 +2334,7 @@ function DiscountsAndWaiversSection({
             <input
               type="number"
               min={0}
-              value={discount.amountOff > 0 ? discount.amountOff : ''}
+              value={discount.amountOff > 0 ? discount.amountOff : ""}
               onChange={(event) =>
                 setDiscount((current) => ({
                   ...current,
@@ -1992,7 +2349,9 @@ function DiscountsAndWaiversSection({
             disabled={
               !discount.name.trim() ||
               !discount.reason.trim() ||
-              (!discount.feeHeadId && !discount.classId && !discount.feePlanId) ||
+              (!discount.feeHeadId &&
+                !discount.classId &&
+                !discount.feePlanId) ||
               (discount.percentOff <= 0 && discount.amountOff <= 0) ||
               discountMutation.isPending
             }
@@ -2004,16 +2363,18 @@ function DiscountsAndWaiversSection({
                 feeHeadId: discount.feeHeadId || null,
                 classId: discount.classId || null,
                 feePlanId: discount.feePlanId || null,
-                percentOff: discount.percentOff > 0 ? discount.percentOff : null,
+                percentOff:
+                  discount.percentOff > 0 ? discount.percentOff : null,
                 amountOff: discount.amountOff > 0 ? discount.amountOff : null,
               })
             }
           >
-            {discountMutation.isPending ? 'Saving...' : 'Create discount'}
+            {discountMutation.isPending ? "Saving..." : "Create discount"}
           </button>
           {!discount.feeHeadId && !discount.classId && !discount.feePlanId ? (
             <p className="text-sm text-[var(--accent-dark)]">
-              Choose at least one fee head, class, or plan so the rule can apply during billing.
+              Choose at least one fee head, class, or plan so the rule can apply
+              during billing.
             </p>
           ) : null}
         </div>
@@ -2025,8 +2386,12 @@ function DiscountsAndWaiversSection({
           <select
             value={waiver.invoiceId}
             onChange={(event) => {
-              const invoice = invoices.find((item) => item.id === event.target.value);
-              const remaining = invoice ? getOutstanding(invoice) : waiver.amount;
+              const invoice = invoices.find(
+                (item) => item.id === event.target.value,
+              );
+              const remaining = invoice
+                ? getOutstanding(invoice)
+                : waiver.amount;
               setWaiver((current) => ({
                 ...current,
                 invoiceId: event.target.value,
@@ -2040,14 +2405,17 @@ function DiscountsAndWaiversSection({
             <option value="">Select invoice</option>
             {invoices.map((invoice) => (
               <option key={invoice.id} value={invoice.id}>
-                {invoice.invoiceNumber} / {invoice.student?.name ?? 'Student'}
+                {invoice.invoiceNumber} / {invoice.student?.name ?? "Student"}
               </option>
             ))}
           </select>
           <select
             value={waiver.feeHeadId}
             onChange={(event) =>
-              setWaiver((current) => ({ ...current, feeHeadId: event.target.value }))
+              setWaiver((current) => ({
+                ...current,
+                feeHeadId: event.target.value,
+              }))
             }
           >
             <option value="">Whole invoice</option>
@@ -2060,9 +2428,12 @@ function DiscountsAndWaiversSection({
           <input
             type="number"
             min={1}
-            value={waiver.amount > 0 ? waiver.amount : ''}
+            value={waiver.amount > 0 ? waiver.amount : ""}
             onChange={(event) =>
-              setWaiver((current) => ({ ...current, amount: Number(event.target.value || 0) }))
+              setWaiver((current) => ({
+                ...current,
+                amount: Number(event.target.value || 0),
+              }))
             }
             placeholder="Waiver amount"
           />
@@ -2070,18 +2441,27 @@ function DiscountsAndWaiversSection({
             rows={3}
             value={waiver.reason}
             onChange={(event) =>
-              setWaiver((current) => ({ ...current, reason: event.target.value }))
+              setWaiver((current) => ({
+                ...current,
+                reason: event.target.value,
+              }))
             }
             placeholder="Reason"
           />
           {selectedWaiverInvoice ? (
             <p className="text-sm text-[var(--muted)]">
-              Selected outstanding balance: {formatCurrency(selectedWaiverOutstanding)}
+              Selected outstanding balance:{" "}
+              {formatCurrency(selectedWaiverOutstanding)}
             </p>
           ) : null}
           <button
             className="rounded-2xl bg-[var(--ink)] px-5 py-3 font-semibold text-white disabled:opacity-50"
-            disabled={!selectedWaiverInvoice?.student?.id || waiver.amount <= 0 || !waiver.reason.trim() || waiverMutation.isPending}
+            disabled={
+              !selectedWaiverInvoice?.student?.id ||
+              waiver.amount <= 0 ||
+              !waiver.reason.trim() ||
+              waiverMutation.isPending
+            }
             onClick={() =>
               waiverMutation.mutate({
                 studentId: selectedWaiverInvoice?.student?.id,
@@ -2092,7 +2472,7 @@ function DiscountsAndWaiversSection({
               })
             }
           >
-            {waiverMutation.isPending ? 'Approving...' : 'Approve waiver'}
+            {waiverMutation.isPending ? "Approving..." : "Approve waiver"}
           </button>
         </div>
       </div>
@@ -2143,8 +2523,8 @@ function DefaultersSection({
   const onExportAgingCsv = async () => {
     setIsExporting(true);
     try {
-      await api.exportReport('defaulter-aging-report', {
-        format: 'csv',
+      await api.exportReport("defaulter-aging-report", {
+        format: "csv",
         filters: {
           asOfDate: new Date().toISOString(),
           classId: defaulterFilters.classId || undefined,
@@ -2152,7 +2532,7 @@ function DefaultersSection({
         },
       });
     } catch (error) {
-      console.error('Export failed:', error);
+      console.error("Export failed:", error);
     } finally {
       setIsExporting(false);
     }
@@ -2226,10 +2606,10 @@ function DefaultersSection({
                   {defaulter.studentName}
                 </span>
                 <span className="block text-sm text-[var(--muted)]">
-                  {defaulter.invoiceNumber} / {defaulter.agingBucket} /{' '}
+                  {defaulter.invoiceNumber} / {defaulter.agingBucket} /{" "}
                   {formatCurrency(defaulter.outstanding)}
-                  {defaulter.reportCardBlocked ? ' / report card blocked' : ''}
-                  {defaulter.hallTicketBlocked ? ' / hall ticket blocked' : ''}
+                  {defaulter.reportCardBlocked ? " / report card blocked" : ""}
+                  {defaulter.hallTicketBlocked ? " / hall ticket blocked" : ""}
                 </span>
               </span>
             </span>
@@ -2250,7 +2630,7 @@ function DefaultersSection({
           disabled={isExporting}
           onClick={onExportAgingCsv}
         >
-          {isExporting ? 'Exporting...' : 'Export Defaulter Aging CSV'}
+          {isExporting ? "Exporting..." : "Export Defaulter Aging CSV"}
         </button>
         <button
           type="button"
@@ -2260,8 +2640,8 @@ function DefaultersSection({
             reminderMutation.mutate({
               classId: defaulterFilters.classId || null,
               feeHeadId: defaulterFilters.feeHeadId || null,
-              channels: ['EMAIL', 'SMS', 'PUSH'],
-              message: 'Fee payment reminder from SchoolOS.',
+              channels: ["EMAIL", "SMS", "PUSH"],
+              message: "Fee payment reminder from SchoolOS.",
             })
           }
         >
@@ -2270,12 +2650,15 @@ function DefaultersSection({
         <button
           type="button"
           className="min-h-11 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          disabled={selectedReminderInvoiceIds.length === 0 || reminderMutation.isPending}
+          disabled={
+            selectedReminderInvoiceIds.length === 0 ||
+            reminderMutation.isPending
+          }
           onClick={() =>
             reminderMutation.mutate({
               invoiceIds: selectedReminderInvoiceIds,
-              channels: ['EMAIL', 'SMS', 'PUSH'],
-              message: 'Fee payment reminder from SchoolOS.',
+              channels: ["EMAIL", "SMS", "PUSH"],
+              message: "Fee payment reminder from SchoolOS.",
             })
           }
         >
@@ -2284,8 +2667,9 @@ function DefaultersSection({
       </div>
       {reminderMutation.data ? (
         <p className="mt-3 text-sm text-[var(--teal)]">
-          Reminded {reminderMutation.data.reminded} of {reminderMutation.data.requested} invoices
-          across {reminderMutation.data.channels.join(', ')}.
+          Reminded {reminderMutation.data.reminded} of{" "}
+          {reminderMutation.data.requested} invoices across{" "}
+          {reminderMutation.data.channels.join(", ")}.
         </p>
       ) : null}
     </section>
@@ -2323,44 +2707,52 @@ function CashierCloseSection({
   setVarianceReason: (value: string) => void;
   varianceReason: string;
 }) {
-  const [openingClosePdfId, setOpeningClosePdfId] = useState<string | null>(null);
+  const [openingClosePdfId, setOpeningClosePdfId] = useState<string | null>(
+    null,
+  );
   const [closePdfError, setClosePdfError] = useState<string | null>(null);
   const preview = previewQuery.data;
   const methodNetTotal = (methods: string[]) =>
     preview?.methodBreakdown
       .filter((row) => methods.includes(row.method))
       .reduce((sum, row) => sum + row.netCollected, 0) ?? 0;
-  const parsedActualCash = actualCashAmount.trim() === '' ? null : Number(actualCashAmount);
+  const parsedActualCash =
+    actualCashAmount.trim() === "" ? null : Number(actualCashAmount);
   const variancePreview =
     preview && parsedActualCash !== null && Number.isFinite(parsedActualCash)
       ? parsedActualCash - preview.expectedCashAmount
       : null;
-  const needsVarianceReason = Boolean(variancePreview && Math.abs(variancePreview) > 0.004);
+  const needsVarianceReason = Boolean(
+    variancePreview && Math.abs(variancePreview) > 0.004,
+  );
   const closeDisabled =
     !preview ||
-    confirmation !== 'CLOSE' ||
+    confirmation !== "CLOSE" ||
     previewQuery.isError ||
     closeMutation.isPending ||
     (needsVarianceReason && !varianceReason.trim()) ||
-    (parsedActualCash !== null && (!Number.isFinite(parsedActualCash) || parsedActualCash < 0));
+    (parsedActualCash !== null &&
+      (!Number.isFinite(parsedActualCash) || parsedActualCash < 0));
 
   async function openClosePdf(close: CashierCloseSummary) {
     setClosePdfError(null);
 
     if (!close.closePdfFile) {
-      setClosePdfError('The protected day-end PDF is not available for this close yet.');
+      setClosePdfError(
+        "The protected day-end PDF is not available for this close yet.",
+      );
       return;
     }
 
     try {
       setOpeningClosePdfId(close.id);
       const view = await api.getFileView(close.closePdfFile.fileAssetId);
-      window.open(view.url, '_blank', 'noopener,noreferrer');
+      window.open(view.url, "_blank", "noopener,noreferrer");
     } catch (err: unknown) {
       setClosePdfError(
         err instanceof Error
           ? err.message
-          : 'Failed to open the day-end close PDF.',
+          : "Failed to open the day-end close PDF.",
       );
     } finally {
       setOpeningClosePdfId(null);
@@ -2377,9 +2769,12 @@ function CashierCloseSection({
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="label">Cashier Close / Day-End</p>
-              <h2 className="mt-2 text-xl font-bold text-gray-950">Preview close totals</h2>
+              <h2 className="mt-2 text-xl font-bold text-gray-950">
+                Preview close totals
+              </h2>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                Closing records the day-end cash position. It does not edit payments.
+                Closing records the day-end cash position. It does not edit
+                payments.
               </p>
             </div>
             <span className="rounded-full bg-gray-900 px-3 py-1 text-xs font-semibold text-white">
@@ -2394,7 +2789,10 @@ function CashierCloseSection({
                 type="datetime-local"
                 value={filters.openedAt}
                 onChange={(event) =>
-                  setFilters((current) => ({ ...current, openedAt: event.target.value }))
+                  setFilters((current) => ({
+                    ...current,
+                    openedAt: event.target.value,
+                  }))
                 }
                 className="min-h-11"
               />
@@ -2405,7 +2803,10 @@ function CashierCloseSection({
                 type="datetime-local"
                 value={filters.closedAt}
                 onChange={(event) =>
-                  setFilters((current) => ({ ...current, closedAt: event.target.value }))
+                  setFilters((current) => ({
+                    ...current,
+                    closedAt: event.target.value,
+                  }))
                 }
                 className="min-h-11"
               />
@@ -2417,7 +2818,8 @@ function CashierCloseSection({
                 onChange={(event) =>
                   setFilters((current) => ({
                     ...current,
-                    paymentMethod: event.target.value as CashierCloseFilters['paymentMethod'],
+                    paymentMethod: event.target
+                      .value as CashierCloseFilters["paymentMethod"],
                   }))
                 }
                 className="min-h-11"
@@ -2435,7 +2837,10 @@ function CashierCloseSection({
               <input
                 value={filters.collectorUserId}
                 onChange={(event) =>
-                  setFilters((current) => ({ ...current, collectorUserId: event.target.value }))
+                  setFilters((current) => ({
+                    ...current,
+                    collectorUserId: event.target.value,
+                  }))
                 }
                 placeholder="Optional user ID filter"
                 className="min-h-11"
@@ -2452,33 +2857,77 @@ function CashierCloseSection({
           ) : preview ? (
             <div className="mt-5 space-y-5">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <Fact label="Gross collected" value={formatCurrency(preview.grossCollected)} />
-                <Fact label="Refund / reversal total" value={formatCurrency(preview.totalRefunded)} />
-                <Fact label="Net collection" value={formatCurrency(preview.netCollected)} highlight />
-                <Fact label="Expected cash" value={formatCurrency(preview.expectedCashAmount)} />
-                <Fact label="Receipt count" value={String(preview.paymentCount)} />
-                <Fact label="Refund count" value={String(preview.refundCount)} />
-                <Fact label="First receipt" value={preview.firstReceiptNumber ?? 'None'} />
-                <Fact label="Last receipt" value={preview.lastReceiptNumber ?? 'None'} />
-                <Fact label="Method filter" value={filters.paymentMethod || 'All methods'} />
+                <Fact
+                  label="Gross collected"
+                  value={formatCurrency(preview.grossCollected)}
+                />
+                <Fact
+                  label="Refund / reversal total"
+                  value={formatCurrency(preview.totalRefunded)}
+                />
+                <Fact
+                  label="Net collection"
+                  value={formatCurrency(preview.netCollected)}
+                  highlight
+                />
+                <Fact
+                  label="Expected cash"
+                  value={formatCurrency(preview.expectedCashAmount)}
+                />
+                <Fact
+                  label="Receipt count"
+                  value={String(preview.paymentCount)}
+                />
+                <Fact
+                  label="Refund count"
+                  value={String(preview.refundCount)}
+                />
+                <Fact
+                  label="First receipt"
+                  value={preview.firstReceiptNumber ?? "None"}
+                />
+                <Fact
+                  label="Last receipt"
+                  value={preview.lastReceiptNumber ?? "None"}
+                />
+                <Fact
+                  label="Method filter"
+                  value={filters.paymentMethod || "All methods"}
+                />
               </div>
 
               <div className="rounded-2xl border border-[var(--line)] bg-white p-4">
                 <p className="label mb-3">Printable Day-End Summary</p>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <Fact label="Cash total" value={formatCurrency(methodNetTotal(['CASH']))} />
-                  <Fact label="Bank / transfer total" value={formatCurrency(methodNetTotal(['BANK', 'TRANSFER']))} />
-                  <Fact label="Cheque total" value={formatCurrency(methodNetTotal(['CHEQUE']))} />
-                  <Fact label="Wallet / mobile total" value={formatCurrency(methodNetTotal(['MOBILE']))} />
+                  <Fact
+                    label="Cash total"
+                    value={formatCurrency(methodNetTotal(["CASH"]))}
+                  />
+                  <Fact
+                    label="Bank / transfer total"
+                    value={formatCurrency(methodNetTotal(["BANK", "TRANSFER"]))}
+                  />
+                  <Fact
+                    label="Cheque total"
+                    value={formatCurrency(methodNetTotal(["CHEQUE"]))}
+                  />
+                  <Fact
+                    label="Wallet / mobile total"
+                    value={formatCurrency(methodNetTotal(["MOBILE"]))}
+                  />
                 </div>
                 <p className="mt-3 text-sm text-[var(--muted)]">
-                  Method-wise totals are calculated by the backend from the selected close window; finalized closes generate
-                  protected day-end PDFs in File Registry.
+                  Method-wise totals are calculated by the backend from the
+                  selected close window; finalized closes generate protected
+                  day-end PDFs in File Registry.
                 </p>
               </div>
 
               <div className="grid gap-3 md:grid-cols-3">
-                <Fact label="Expected cash amount" value={formatCurrency(preview.expectedCashAmount)} />
+                <Fact
+                  label="Expected cash amount"
+                  value={formatCurrency(preview.expectedCashAmount)}
+                />
                 <label>
                   <span className="label mb-2 block">Actual cash counted</span>
                   <input
@@ -2486,14 +2935,20 @@ function CashierCloseSection({
                     min="0"
                     step="0.01"
                     value={actualCashAmount}
-                    onChange={(event) => setActualCashAmount(event.target.value)}
+                    onChange={(event) =>
+                      setActualCashAmount(event.target.value)
+                    }
                     placeholder="Optional cash drawer count"
                     className="min-h-11"
                   />
                 </label>
                 <Fact
                   label="Cash variance"
-                  value={variancePreview === null ? 'Not counted' : formatCurrency(variancePreview)}
+                  value={
+                    variancePreview === null
+                      ? "Not counted"
+                      : formatCurrency(variancePreview)
+                  }
                 />
               </div>
 
@@ -2520,7 +2975,9 @@ function CashierCloseSection({
                 />
               </label>
               <label className="block">
-                <span className="label mb-2 block">Confirmation text: type CLOSE</span>
+                <span className="label mb-2 block">
+                  Confirmation text: type CLOSE
+                </span>
                 <input
                   value={confirmation}
                   onChange={(event) => setConfirmation(event.target.value)}
@@ -2528,7 +2985,9 @@ function CashierCloseSection({
                 />
               </label>
 
-              {closeMutation.error ? <InlineError message={closeMutation.error.message} /> : null}
+              {closeMutation.error ? (
+                <InlineError message={closeMutation.error.message} />
+              ) : null}
               {message ? (
                 <p className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
                   {message}
@@ -2541,11 +3000,16 @@ function CashierCloseSection({
                 disabled={closeDisabled}
                 onClick={() => closeMutation.mutate()}
               >
-                {closeMutation.isPending ? 'Finalizing close...' : 'Finalize day-end close'}
+                {closeMutation.isPending
+                  ? "Finalizing close..."
+                  : "Finalize day-end close"}
               </button>
             </div>
           ) : (
-            <EmptyState title="No close preview" body="Choose a valid window to preview day-end totals." />
+            <EmptyState
+              title="No close preview"
+              body="Choose a valid window to preview day-end totals."
+            />
           )}
         </section>
       </div>
@@ -2560,15 +3024,22 @@ function CashierCloseSection({
         ) : closesQuery.data && closesQuery.data.length > 0 ? (
           <div className="grid gap-3">
             {closesQuery.data.slice(0, 8).map((close) => (
-              <article key={close.id} className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">
+              <article
+                key={close.id}
+                className="rounded-2xl border border-[var(--line)] bg-white/70 p-4"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-gray-950">{close.closeNumber}</p>
-                    <p className="mt-1 text-sm text-[var(--muted)]">
-                      {formatDate(close.openedAt)} - {formatDate(close.closedAt)}
+                    <p className="font-semibold text-gray-950">
+                      {close.closeNumber}
                     </p>
                     <p className="mt-1 text-sm text-[var(--muted)]">
-                      Receipts {close.firstReceiptNumber ?? 'none'} to {close.lastReceiptNumber ?? 'none'}
+                      {formatDate(close.openedAt)} -{" "}
+                      {formatDate(close.closedAt)}
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--muted)]">
+                      Receipts {close.firstReceiptNumber ?? "none"} to{" "}
+                      {close.lastReceiptNumber ?? "none"}
                     </p>
                   </div>
                   <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -2578,14 +3049,25 @@ function CashierCloseSection({
                 <div className="mt-3 grid gap-2 text-sm text-[var(--muted)]">
                   <span>Gross: {formatCurrency(close.grossCollected)}</span>
                   <span>Refunds: {formatCurrency(close.totalRefunded)}</span>
-                  <span>Expected cash: {formatCurrency(close.expectedCashAmount)}</span>
-                  {close.actualCashAmount !== null && close.actualCashAmount !== undefined ? (
-                    <span>Actual cash: {formatCurrency(close.actualCashAmount)}</span>
+                  <span>
+                    Expected cash: {formatCurrency(close.expectedCashAmount)}
+                  </span>
+                  {close.actualCashAmount !== null &&
+                  close.actualCashAmount !== undefined ? (
+                    <span>
+                      Actual cash: {formatCurrency(close.actualCashAmount)}
+                    </span>
                   ) : null}
-                  {close.varianceAmount !== null && close.varianceAmount !== undefined ? (
-                    <span>Variance: {formatCurrency(close.varianceAmount)}</span>
+                  {close.varianceAmount !== null &&
+                  close.varianceAmount !== undefined ? (
+                    <span>
+                      Variance: {formatCurrency(close.varianceAmount)}
+                    </span>
                   ) : null}
-                  <span>Payments: {close.paymentCount} / Refunds: {close.refundCount}</span>
+                  <span>
+                    Payments: {close.paymentCount} / Refunds:{" "}
+                    {close.refundCount}
+                  </span>
                   {close.notes ? <span>Notes: {close.notes}</span> : null}
                 </div>
                 {close.closePdfFile ? (
@@ -2597,7 +3079,7 @@ function CashierCloseSection({
                     className="mt-4 inline-flex min-h-10 items-center justify-center rounded-xl border border-[var(--line)] bg-white px-4 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 disabled:cursor-wait disabled:opacity-60"
                   >
                     {openingClosePdfId === close.id
-                      ? 'Opening day-end PDF...'
+                      ? "Opening day-end PDF..."
                       : `Open ${close.closePdfFile.fileName}`}
                   </button>
                 ) : null}
@@ -2605,7 +3087,10 @@ function CashierCloseSection({
             ))}
           </div>
         ) : (
-          <EmptyState title="No cashier closes yet" body="Finalized day-end closes will appear here." />
+          <EmptyState
+            title="No cashier closes yet"
+            body="Finalized day-end closes will appear here."
+          />
         )}
       </section>
     </section>
@@ -2632,8 +3117,8 @@ function ReceiptsLedgerSection({
   const onExportCsv = async () => {
     setIsExporting(true);
     try {
-      await api.exportReport('fee-collection-report', {
-        format: 'csv',
+      await api.exportReport("fee-collection-report", {
+        format: "csv",
         filters: {
           fromDate: toIsoDateTime(filters.openedAt),
           toDate: toIsoDateTime(filters.closedAt),
@@ -2642,7 +3127,7 @@ function ReceiptsLedgerSection({
         },
       });
     } catch (error) {
-      console.error('Export failed:', error);
+      console.error("Export failed:", error);
     } finally {
       setIsExporting(false);
     }
@@ -2663,76 +3148,95 @@ function ReceiptsLedgerSection({
           disabled={isExporting}
           onClick={onExportCsv}
         >
-          {isExporting ? 'Exporting...' : 'Export Fee Collection CSV'}
+          {isExporting ? "Exporting..." : "Export Fee Collection CSV"}
         </button>
       </div>
 
       <section className="grid gap-6 xl:grid-cols-3">
-      <SummaryList
-        title="Invoices"
-        items={invoices.slice(0, 6).map((invoice) => ({
-          id: invoice.id,
-          primary: `${invoice.invoiceNumber} / ${invoice.status}`,
-          secondary: `${invoice.student?.name ?? 'Student'} / paid ${formatCurrency(invoice.paidAmount)} of ${formatCurrency(invoice.totalAmount)}`,
-        }))}
-      />
-      <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <p className="label mb-4">Receipts</p>
-        <div className="grid gap-3">
-          {receiptsLoading ? (
-            <InvoiceSkeleton />
-          ) : receipts.length > 0 ? (
-            receipts.slice(0, 6).map((receipt) => (
-              <div key={receipt.id} className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">
-                <p className="font-semibold">{receipt.receiptNumber}</p>
-                <p className="text-sm text-[var(--muted)]">
-                  {receipt.student?.name ?? 'Student'} / {formatCurrency(receipt.amount)}
-                </p>
-                <p className="mt-1 text-xs font-semibold text-[var(--muted)]">
-                  Issued {formatDate(receipt.issuedAt)} / reprinted {receipt.reprintCount ?? 0} time
-                  {(receipt.reprintCount ?? 0) === 1 ? '' : 's'}
-                </p>
-                {receipt.latestReprint ? (
-                  <p className="mt-1 text-xs text-[var(--muted)]">
-                    Latest reprint: {formatDate(receipt.latestReprint.reprintedAt)} by{' '}
-                    {receipt.latestReprint.reprintedBy?.email ?? 'SchoolOS'} / {receipt.latestReprint.reason}
-                  </p>
-                ) : null}
-                <button
-                  type="button"
-                  className="mt-3 min-h-10 rounded-full border border-[var(--line)] px-3 py-2 text-xs font-semibold"
-                  onClick={() => void api.openReceiptPdf(receipt.receiptNumber)}
+        <SummaryList
+          title="Invoices"
+          items={invoices.slice(0, 6).map((invoice) => ({
+            id: invoice.id,
+            primary: `${invoice.invoiceNumber} / ${invoice.status}`,
+            secondary: `${invoice.student?.name ?? "Student"} / paid ${formatCurrency(invoice.paidAmount)} of ${formatCurrency(invoice.totalAmount)}`,
+          }))}
+        />
+        <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+          <p className="label mb-4">Receipts</p>
+          <div className="grid gap-3">
+            {receiptsLoading ? (
+              <InvoiceSkeleton />
+            ) : receipts.length > 0 ? (
+              receipts.slice(0, 6).map((receipt) => (
+                <div
+                  key={receipt.id}
+                  className="rounded-2xl border border-[var(--line)] bg-white/70 p-4"
                 >
-                  Open receipt PDF
-                </button>
-              </div>
-            ))
-          ) : (
-            <EmptyState title="No receipts yet" body="Confirmed payments will generate receipts here." />
-          )}
-        </div>
+                  <p className="font-semibold">{receipt.receiptNumber}</p>
+                  <p className="text-sm text-[var(--muted)]">
+                    {receipt.student?.name ?? "Student"} /{" "}
+                    {formatCurrency(receipt.amount)}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-[var(--muted)]">
+                    Issued {formatDate(receipt.issuedAt)} / reprinted{" "}
+                    {receipt.reprintCount ?? 0} time
+                    {(receipt.reprintCount ?? 0) === 1 ? "" : "s"}
+                  </p>
+                  {receipt.latestReprint ? (
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      Latest reprint:{" "}
+                      {formatDate(receipt.latestReprint.reprintedAt)} by{" "}
+                      {receipt.latestReprint.reprintedBy?.email ?? "SchoolOS"} /{" "}
+                      {receipt.latestReprint.reason}
+                    </p>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="mt-3 min-h-10 rounded-full border border-[var(--line)] px-3 py-2 text-xs font-semibold"
+                    onClick={() =>
+                      void api.openReceiptPdf(receipt.receiptNumber)
+                    }
+                  >
+                    Open receipt PDF
+                  </button>
+                </div>
+              ))
+            ) : (
+              <EmptyState
+                title="No receipts yet"
+                body="Confirmed payments will generate receipts here."
+              />
+            )}
+          </div>
+        </section>
+        <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+          <p className="label mb-4">Ledger</p>
+          <div className="grid gap-3">
+            {ledgerLoading ? (
+              <InvoiceSkeleton />
+            ) : ledgerEntries.length > 0 ? (
+              ledgerEntries.slice(0, 6).map((entry) => (
+                <div
+                  key={entry.id}
+                  className="rounded-2xl border border-[var(--line)] bg-white/70 p-4"
+                >
+                  <p className="font-semibold">{entry.entryNumber}</p>
+                  <p className="text-sm text-[var(--muted)]">
+                    {entry.narration} / debit{" "}
+                    {formatCurrency(sumLedgerLines(entry, "DEBIT"))}, credit{" "}
+                    {formatCurrency(sumLedgerLines(entry, "CREDIT"))}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <EmptyState
+                title="No ledger entries yet"
+                body="Posted collections will appear after backend confirmation."
+              />
+            )}
+          </div>
+        </section>
       </section>
-      <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <p className="label mb-4">Ledger</p>
-        <div className="grid gap-3">
-          {ledgerLoading ? (
-            <InvoiceSkeleton />
-          ) : ledgerEntries.length > 0 ? (
-            ledgerEntries.slice(0, 6).map((entry) => (
-              <div key={entry.id} className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">
-                <p className="font-semibold">{entry.entryNumber}</p>
-                <p className="text-sm text-[var(--muted)]">
-                  {entry.narration} / debit {formatCurrency(sumLedgerLines(entry, 'DEBIT'))}, credit{' '}
-                  {formatCurrency(sumLedgerLines(entry, 'CREDIT'))}
-                </p>
-              </div>
-            ))
-          ) : (
-            <EmptyState title="No ledger entries yet" body="Posted collections will appear after backend confirmation." />
-          )}
-        </div>
-      </section>
-    </section>
     </div>
   );
 }
@@ -2750,7 +3254,10 @@ function SummaryList({
       <div className="grid gap-3">
         {items.length > 0 ? (
           items.map((item) => (
-            <div key={item.id} className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">
+            <div
+              key={item.id}
+              className="rounded-2xl border border-[var(--line)] bg-white/70 p-4"
+            >
               <p className="font-semibold">{item.primary}</p>
               <p className="text-sm text-[var(--muted)]">{item.secondary}</p>
             </div>
@@ -2763,21 +3270,20 @@ function SummaryList({
   );
 }
 
-
 function FinanceMetricCard({
   label,
   value,
-  tone = 'neutral',
+  tone = "neutral",
 }: {
   label: string;
   value: string;
-  tone?: 'neutral' | 'success' | 'warning' | 'danger';
+  tone?: "neutral" | "success" | "warning" | "danger";
 }) {
   const toneClass = {
-    neutral: 'bg-white/10 text-white ring-white/15',
-    success: 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/20',
-    warning: 'bg-amber-400/15 text-amber-100 ring-amber-300/20',
-    danger: 'bg-rose-400/15 text-rose-100 ring-rose-300/20',
+    neutral: "bg-white/10 text-white ring-white/15",
+    success: "bg-emerald-400/15 text-emerald-100 ring-emerald-300/20",
+    warning: "bg-amber-400/15 text-amber-100 ring-amber-300/20",
+    danger: "bg-rose-400/15 text-rose-100 ring-rose-300/20",
   }[tone];
 
   return (
@@ -2800,7 +3306,9 @@ function Fact({
   highlight?: boolean;
 }) {
   return (
-    <div className={`rounded-2xl border p-4 ${highlight ? 'border-emerald-200 bg-emerald-50' : 'border-[var(--line)] bg-white/70'}`}>
+    <div
+      className={`rounded-2xl border p-4 ${highlight ? "border-emerald-200 bg-emerald-50" : "border-[var(--line)] bg-white/70"}`}
+    >
       <p className="label">{label}</p>
       <p className="mt-1 font-semibold text-gray-950">{value}</p>
     </div>
@@ -2822,7 +3330,9 @@ function LedgerPreviewRow({
         <p className="font-semibold text-gray-950">
           {side} {account}
         </p>
-        <p className="text-sm text-[var(--muted)]">Accounting posts final balanced entry server-side.</p>
+        <p className="text-sm text-[var(--muted)]">
+          Accounting posts final balanced entry server-side.
+        </p>
       </div>
       <span className="font-semibold">{formatCurrency(amount)}</span>
     </div>
@@ -2850,7 +3360,10 @@ function InvoiceSkeleton() {
   return (
     <div className="grid gap-3">
       {[0, 1, 2].map((item) => (
-        <div key={item} className="h-20 animate-pulse rounded-2xl bg-gray-100" />
+        <div
+          key={item}
+          className="h-20 animate-pulse rounded-2xl bg-gray-100"
+        />
       ))}
     </div>
   );
@@ -2894,23 +3407,36 @@ function matchesInvoiceSearch(invoice: InvoiceForUi, search: string) {
 }
 
 function getOutstanding(invoice: InvoiceForUi) {
-  return Math.max(0, Number(invoice.totalAmount ?? 0) - Number(invoice.paidAmount ?? 0));
+  return Math.max(
+    0,
+    Number(invoice.totalAmount ?? 0) - Number(invoice.paidAmount ?? 0),
+  );
 }
 
 function getLineFeeHeadLabel(line: InvoiceLineForUi) {
-  return line.feeHead?.name ?? line.feeHeadName ?? line.description ?? 'Fee item';
+  return (
+    line.feeHead?.name ?? line.feeHeadName ?? line.description ?? "Fee item"
+  );
 }
 
 function getLinePeriodLabel(line: InvoiceLineForUi) {
-  return line.periodLabel ?? 'Invoice period';
+  return line.periodLabel ?? "Invoice period";
 }
 
 function getLineNetDue(line: InvoiceLineForUi) {
-  return Math.max(0, Number(line.netAmount ?? line.totalAmount ?? line.amount ?? 0));
+  return Math.max(
+    0,
+    Number(line.netAmount ?? line.totalAmount ?? line.amount ?? 0),
+  );
 }
 
-function getPaymentRefundableAmount(payment: InvoiceDetail['payments'][number]) {
-  return Math.max(0, Number(payment.amount ?? 0) - Number(payment.refundedAmount ?? 0));
+function getPaymentRefundableAmount(
+  payment: InvoiceDetail["payments"][number],
+) {
+  return Math.max(
+    0,
+    Number(payment.amount ?? 0) - Number(payment.refundedAmount ?? 0),
+  );
 }
 
 function cashierCloseQueryParams(filters: CashierCloseFilters) {
@@ -2933,26 +3459,26 @@ function getLocalDateTimeValue(value: Date) {
 }
 
 function formatCurrency(value: number | string | null | undefined) {
-  return `Rs. ${Number(value ?? 0).toLocaleString('en-NP', {
+  return `Rs. ${Number(value ?? 0).toLocaleString("en-NP", {
     maximumFractionDigits: 2,
   })}`;
 }
 
 function formatDate(value: string | Date | null | undefined) {
   if (!value) {
-    return 'Not available';
+    return "Not available";
   }
 
-  return new Intl.DateTimeFormat('en-NP', {
-    dateStyle: 'medium',
+  return new Intl.DateTimeFormat("en-NP", {
+    dateStyle: "medium",
   }).format(new Date(value));
 }
 
 function formatPaymentMethod(value: string) {
   return value
-    .split('_')
+    .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join(' ');
+    .join(" ");
 }
 
 function formatClassSection(invoice: InvoiceForUi) {
@@ -2960,13 +3486,13 @@ function formatClassSection(invoice: InvoiceForUi) {
   const sectionName = invoice.student?.sectionName ?? invoice.sectionName;
 
   if (!className && !sectionName) {
-    return 'Not available';
+    return "Not available";
   }
 
-  return [className, sectionName].filter(Boolean).join(' / ');
+  return [className, sectionName].filter(Boolean).join(" / ");
 }
 
-function sumLedgerLines(entry: JournalEntryView, side: 'DEBIT' | 'CREDIT') {
+function sumLedgerLines(entry: JournalEntryView, side: "DEBIT" | "CREDIT") {
   return (
     entry.lines
       ?.filter((line) => line.side === side)

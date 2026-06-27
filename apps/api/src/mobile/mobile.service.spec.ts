@@ -168,6 +168,36 @@ describe('MobileService', () => {
     expect(prisma.invoice.findMany).not.toHaveBeenCalled();
   });
 
+  it('denies student-only actors from generic parent mobile student surfaces', async () => {
+    const studentActor: AuthContext = {
+      ...actor,
+      userId: 'student-user',
+      email: 'student@school.test',
+      roles: ['student'],
+    };
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+
+    await expect(service.listMyStudents(studentActor)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    await expect(
+      service.getStudentAttendanceSummary('student-1', studentActor, {}),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      service.getStudentHomework('student-1', studentActor, '10'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      service.getStudentTimetable('student-1', studentActor),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      service.getStudentReportCards('student-1', studentActor),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(attendanceService.getParentSummary).not.toHaveBeenCalled();
+    expect(prisma.homeworkAssignment.findMany).not.toHaveBeenCalled();
+    expect(prisma.reportCard.findMany).not.toHaveBeenCalled();
+  });
+
   it('returns gateway readiness only after linked-child authorization', async () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.guardian.findFirst.mockResolvedValue({

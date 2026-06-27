@@ -4,9 +4,15 @@ import {
   IsOptional,
   IsNumber,
   Min,
+  MaxLength,
 } from 'class-validator';
 
 export class CreateFinanceRequestDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(150)
+  idempotencyKey!: string;
+
   @IsOptional()
   @IsNumber()
   @Min(0.01)

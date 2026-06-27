@@ -31,6 +31,7 @@ class AppRoutes {
   static const parentLibrary = '/parent/more/library';
   static const parentChat = '/parent/chat';
   static const parentMore = '/parent/more';
+  static const studentSession = '/student/session';
   static const studentHome = '/student/home';
   static const studentAttendance = '/student/attendance';
   static const studentHomework = '/student/homework';

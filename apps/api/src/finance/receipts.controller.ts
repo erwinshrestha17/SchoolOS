@@ -3,6 +3,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   StreamableFile,
   UseGuards,
   Body,
@@ -17,6 +18,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { FinanceService } from './finance.service';
 import { ReprintReceiptDto } from './dto/reprint-receipt.dto';
 import { FinanceCompatService } from './finance-compat.service';
+import { ListReceiptsQueryDto } from './dto/list-finance-records.query.dto';
 
 @Controller('receipts')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -29,8 +31,11 @@ export class ReceiptsController {
 
   @Get()
   @Permissions('receipts:read')
-  listReceipts(@CurrentAuth() auth: AuthContext) {
-    return this.financeService.listReceipts(auth);
+  listReceipts(
+    @Query() query: ListReceiptsQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.listReceipts(query, auth);
   }
 
   @Get('verify/:receiptNumber')
@@ -63,16 +68,7 @@ export class ReceiptsController {
     @Body() dto: ReprintReceiptDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    const { pdf, fileName } = await this.financeService.reprintReceipt(
-      receiptId,
-      dto,
-      auth,
-    );
-
-    return new StreamableFile(pdf, {
-      type: 'application/pdf',
-      disposition: `attachment; filename="${safePdfFileName(fileName)}"`,
-    });
+    return this.financeService.reprintReceipt(receiptId, dto, auth);
   }
 
   @Get(':id/reprint-history')

@@ -8,6 +8,7 @@ import { AccountingPostingService } from '../accounting/accounting-posting.servi
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuthMethod, Prisma, PaymentMethod } from '@prisma/client';
 import { NotFoundException } from '@nestjs/common';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 
 describe('FinanceService - Dues & Reprints', () => {
   let service: FinanceService;
@@ -33,7 +34,11 @@ describe('FinanceService - Dues & Reprints', () => {
               reprintHistory: { create: jest.fn() },
             },
             tenant: { findUnique: jest.fn() },
-            receiptReprintHistory: { create: jest.fn() },
+            receiptReprintHistory: {
+              findFirst: jest.fn().mockResolvedValue(null),
+              create: jest.fn(),
+              update: jest.fn(),
+            },
             invoice: { findMany: jest.fn(), count: jest.fn() },
             feeWaiver: { findMany: jest.fn() },
           },
@@ -41,6 +46,14 @@ describe('FinanceService - Dues & Reprints', () => {
         { provide: AuditService, useValue: { record: jest.fn() } },
         { provide: CommunicationsService, useValue: {} },
         { provide: AccountingPostingService, useValue: {} },
+        {
+          provide: FileRegistryService,
+          useValue: {
+            registerGeneratedFile: jest.fn().mockResolvedValue({
+              id: 'file-1',
+            }),
+          },
+        },
         { provide: EventEmitter2, useValue: {} },
         {
           provide: UsageService,
@@ -62,7 +75,11 @@ describe('FinanceService - Dues & Reprints', () => {
       (prisma.receipt.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(
-        service.reprintReceipt('r1', { reason: 'Lost' }, actor as any),
+        service.reprintReceipt(
+          'r1',
+          { reason: 'Lost', idempotencyKey: 'reprint-not-found' },
+          actor as any,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -100,19 +117,25 @@ describe('FinanceService - Dues & Reprints', () => {
       });
       (prisma.receiptReprintHistory.create as jest.Mock).mockResolvedValue({
         id: 'history-1',
+        receiptId: 'r1',
+        fileAssetId: null,
+      });
+      (prisma.receiptReprintHistory.update as jest.Mock).mockResolvedValue({
+        id: 'history-1',
+        receiptId: 'r1',
+        fileAssetId: 'file-1',
       });
 
       const result = await service.reprintReceipt(
         'r1',
-        { reason: 'Lost' },
+        { reason: 'Lost', idempotencyKey: 'reprint-valid' },
         actor as any,
       );
 
       expect(prisma.receiptReprintHistory.create).toHaveBeenCalled();
-      expect(result.pdf).toBeDefined();
       expect(result.fileName).toContain('REC-001');
-      expect(result.pdf.toString('latin1')).toContain('VERIFY RECEIPT');
-      expect(result.pdf.toString('latin1')).toContain('REC-001');
+      expect(result.fileAssetId).toBe('file-1');
+      expect(result.disposition).toBe('SUCCEEDED');
     });
   });
 

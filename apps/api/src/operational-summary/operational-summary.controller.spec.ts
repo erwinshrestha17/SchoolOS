@@ -93,7 +93,6 @@ describe('Operational summary controllers', () => {
     await mobile.principalSummary(actor);
     await mobile.driverSummary(actor);
     await mobile.staffSummary(actor);
-    await mobile.studentSummary(actor);
 
     expect(service.getMobileSummary).toHaveBeenNthCalledWith(
       1,
@@ -116,10 +115,15 @@ describe('Operational summary controllers', () => {
       actor,
     );
     expect(service.getMobileSummary).toHaveBeenNthCalledWith(5, 'staff', actor);
-    expect(service.getMobileSummary).toHaveBeenNthCalledWith(
-      6,
-      'student',
-      actor,
+    expect(service.getMobileSummary).toHaveBeenCalledTimes(5);
+  });
+
+  it('fails closed for broad student mobile summary', () => {
+    expect(() => {
+      mobile.studentSummary(actor);
+    }).toThrow(
+      'Student mobile access is limited to controlled learning sessions.',
     );
+    expect(service.getMobileSummary).not.toHaveBeenCalled();
   });
 });

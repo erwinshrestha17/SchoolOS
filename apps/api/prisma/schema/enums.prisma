@@ -74,6 +74,12 @@ enum PaymentStatus {
   FAILED
 }
 
+enum ReceiptFileStatus {
+  PENDING
+  AVAILABLE
+  UNAVAILABLE
+}
+
 enum OnlinePaymentIntentStatus {
   CREATED
   READY
@@ -807,8 +813,20 @@ enum FinanceRequestType {
 
 enum FinanceRequestStatus {
   PENDING
+  PROCESSING
   APPROVED
   REJECTED
+  EXECUTED
+  FAILED
+}
+
+enum FinanceRequestHistoryAction {
+  REQUESTED
+  REVIEW_STARTED
+  APPROVED
+  REJECTED
+  EXECUTED
+  EXECUTION_FAILED
 }
 
 enum ApprovalWorkflowType {

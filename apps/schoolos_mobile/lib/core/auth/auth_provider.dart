@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../storage/token_storage_service.dart';
 import '../storage/app_preferences_service.dart';
+import '../storage/private_data_cleanup_service.dart';
 import '../errors/app_exception.dart';
 import 'data/auth_repository.dart';
 import 'models/auth_user.dart';
@@ -51,8 +52,14 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
 });
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._tokenStorage, this._authRepository, this._appPrefs)
-    : super(AuthState(status: AuthStatus.unauthenticated)) {
+  AuthNotifier(
+    this._tokenStorage,
+    this._authRepository,
+    this._appPrefs, [
+    PrivateDataCleanupService? privateDataCleanup,
+  ]) : _privateDataCleanup =
+           privateDataCleanup ?? PrivateDataCleanupService(_appPrefs),
+       super(AuthState(status: AuthStatus.unauthenticated)) {
     _authRepository.client.onSessionExpired = () {
       logout();
     };
@@ -62,6 +69,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final TokenStorageService _tokenStorage;
   final AuthRepository _authRepository;
   final AppPreferencesService _appPrefs;
+  final PrivateDataCleanupService _privateDataCleanup;
 
   Future<void> loadSession() async {
     state = state.copyWith(status: AuthStatus.loading);
@@ -133,7 +141,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         ),
       );
 
-      await _appPrefs.clearPrivateData();
+      await _privateDataCleanup.clearPrivateData();
       await _tokenStorage.saveAccessToken(response.tokenPair.accessToken);
       await _tokenStorage.saveRefreshToken(response.tokenPair.refreshToken);
       await _tokenStorage.saveUserRole(response.user.role);
@@ -163,7 +171,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Ignore network errors during logout
     } finally {
       await _tokenStorage.clearTokens();
-      await _appPrefs.clearPrivateData();
+      await _privateDataCleanup.clearPrivateData();
       state = AuthState(status: AuthStatus.unauthenticated);
     }
   }

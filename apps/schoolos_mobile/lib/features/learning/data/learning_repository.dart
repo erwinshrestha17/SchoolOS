@@ -1,5 +1,6 @@
 import '../../../core/network/api_client.dart';
 import '../domain/learning_summary_models.dart';
+import '../domain/student_learning_session_models.dart';
 
 class LearningRepository {
   const LearningRepository(this._client);
@@ -27,5 +28,24 @@ class LearningRepository {
     final response = await _client.get('/learning/progress/student/$studentId');
     final data = response.data as Map<String, dynamic>;
     return LearningSummary.fromStudentProgressJson(data);
+  }
+
+  Future<StudentLearningSessionJoin> joinStudentSession({
+    String? sessionCode,
+    String? qrToken,
+  }) async {
+    final payload = <String, dynamic>{
+      if (sessionCode != null && sessionCode.trim().isNotEmpty)
+        'sessionCode': sessionCode.trim().toUpperCase(),
+      if (qrToken != null && qrToken.trim().isNotEmpty)
+        'qrToken': qrToken.trim(),
+    };
+    final response = await _client.post(
+      '/learning/sessions/join',
+      data: payload,
+    );
+    return StudentLearningSessionJoin.fromJson(
+      response.data as Map<String, dynamic>,
+    );
   }
 }

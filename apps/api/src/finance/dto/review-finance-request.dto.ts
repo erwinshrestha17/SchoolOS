@@ -1,8 +1,8 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsOptional, IsString } from 'class-validator';
 import { FinanceRequestStatus } from '@prisma/client';
 
 export class ReviewFinanceRequestDto {
-  @IsEnum(FinanceRequestStatus)
+  @IsIn([FinanceRequestStatus.APPROVED, FinanceRequestStatus.REJECTED])
   status!: FinanceRequestStatus;
 
   @IsOptional()

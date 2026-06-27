@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -39,8 +40,8 @@ export class CollectPaymentDto {
   @IsDateString()
   recognizedAt?: string;
 
-  @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(150)
-  idempotencyKey?: string;
+  idempotencyKey!: string;
 }

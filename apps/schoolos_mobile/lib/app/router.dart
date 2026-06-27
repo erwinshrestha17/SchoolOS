@@ -10,7 +10,6 @@ import '../features/dashboard/presentation/home_redirect_screen.dart';
 import '../features/dashboard/presentation/role_dashboards/admin_dashboard.dart';
 import '../features/dashboard/presentation/role_dashboards/driver_dashboard.dart';
 import '../features/dashboard/presentation/role_dashboards/staff_dashboard.dart';
-import '../features/dashboard/presentation/role_dashboards/student_dashboard.dart';
 import '../features/dashboard/presentation/role_dashboards/teacher_dashboard.dart';
 import '../features/attendance/presentation/screens/parent_attendance_screen.dart';
 import '../features/attendance/presentation/screens/teacher_classes_screen.dart';
@@ -21,6 +20,7 @@ import '../features/teacher/presentation/screens/teacher_messages_screen.dart';
 import '../features/teacher/presentation/screens/teacher_profile_screen.dart';
 import '../features/teacher/presentation/screens/teacher_timetable_screen.dart';
 import '../features/learning/presentation/screens/learning_summary_screen.dart';
+import '../features/learning/presentation/screens/student_learning_session_screen.dart';
 import '../features/notices/presentation/screens/notice_detail_screen.dart';
 import '../features/notices/presentation/screens/notice_list_screen.dart';
 import '../features/notices/presentation/screens/notification_center_screen.dart';
@@ -31,7 +31,6 @@ import '../features/parent/presentation/screens/parent_chat_screen.dart';
 import '../features/parent/presentation/screens/parent_consents_screen.dart';
 import '../features/parent/presentation/screens/parent_fees_screen.dart';
 import '../features/parent/presentation/screens/parent_fees_receipts_screen.dart';
-import '../features/parent/presentation/screens/parent_homework_screen.dart';
 import '../features/parent/presentation/screens/parent_library_screen.dart';
 import '../features/parent/presentation/screens/parent_portal_detail_screens.dart';
 import '../features/parent/presentation/screens/parent_report_cards_screen.dart';
@@ -189,36 +188,31 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SchoolOsAppShell(initialIndex: 4),
       ),
       GoRoute(
+        path: AppRoutes.studentSession,
+        builder: (context, state) => StudentLearningSessionScreen(
+          initialSessionCode: state.uri.queryParameters['code'],
+          initialQrToken: state.uri.queryParameters['qrToken'],
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.studentHome,
-        builder: (context, state) => const StudentDashboard(),
+        redirect: (context, state) => AppRoutes.studentSession,
       ),
       GoRoute(
         path: AppRoutes.studentAttendance,
-        builder: (context, state) => const StudentAttendanceScreen(),
+        redirect: (context, state) => AppRoutes.studentSession,
       ),
       GoRoute(
         path: AppRoutes.studentHomework,
-        builder: (context, state) => const ParentHomeworkScreen(
-          role: 'STUDENT',
-          selectedIndex: 1,
-          title: 'Homework',
-        ),
+        redirect: (context, state) => AppRoutes.studentSession,
       ),
       GoRoute(
         path: AppRoutes.studentTimetable,
-        builder: (context, state) => const ParentTimetableScreen(
-          role: 'STUDENT',
-          selectedIndex: 2,
-          title: 'Timetable',
-        ),
+        redirect: (context, state) => AppRoutes.studentSession,
       ),
       GoRoute(
         path: AppRoutes.studentLearning,
-        builder: (context, state) => const LearningSummaryScreen(
-          role: 'STUDENT',
-          selectedIndex: 4,
-          title: 'Learning',
-        ),
+        redirect: (context, state) => AppRoutes.studentSession,
       ),
       GoRoute(
         path: AppRoutes.teacherHome,
@@ -456,15 +450,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           roles: auth.user?.roles ?? const [],
         );
 
+        if (role == MobileRole.student &&
+            location != AppRoutes.home &&
+            location != AppRoutes.studentSession) {
+          return AppRoutes.studentSession;
+        }
         if (_isParentRoute(location) && role != MobileRole.parent) {
           return AppRoutes.home;
         }
-        if ((location == AppRoutes.studentHome ||
-                location == AppRoutes.studentAttendance ||
-                location == AppRoutes.studentHomework ||
-                location == AppRoutes.studentTimetable ||
-                location == AppRoutes.studentLearning) &&
-            role != MobileRole.student) {
+        if (_isStudentRoute(location) && role != MobileRole.student) {
           return AppRoutes.home;
         }
         if (_isTeacherRoute(location) && role != MobileRole.teacher) {
@@ -508,6 +502,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     },
   );
 });
+
+bool _isStudentRoute(String location) {
+  return location == AppRoutes.studentSession ||
+      location == AppRoutes.studentHome ||
+      location == AppRoutes.studentAttendance ||
+      location == AppRoutes.studentHomework ||
+      location == AppRoutes.studentTimetable ||
+      location == AppRoutes.studentLearning;
+}
 
 bool _isStaffRoute(String location) {
   return location == AppRoutes.staffHome ||

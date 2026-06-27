@@ -1,33 +1,46 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { Badge } from '@/components/ui/badge';
-import { SectionCard } from '@/components/ui/section-card';
-import { Loader2, Plus, Check, AlertCircle } from 'lucide-react';
-import type { DiscountRule, WaiverRecord, InvoiceSummary } from '@schoolos/core';
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
+import { api } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
+import { SectionCard } from "@/components/ui/section-card";
+import { Loader2, Plus, Check, AlertCircle } from "lucide-react";
 
 export function DiscountsWaiversTab() {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const discountPage = Math.max(
+    1,
+    Number(searchParams.get("discountPage") ?? "1") || 1,
+  );
+  const waiverPage = Math.max(
+    1,
+    Number(searchParams.get("waiverPage") ?? "1") || 1,
+  );
+  const discountSearch = searchParams.get("discountSearch") ?? "";
+  const waiverSearch = searchParams.get("waiverSearch") ?? "";
+  const waiverInvoiceSearch = searchParams.get("waiverInvoiceSearch") ?? "";
 
   // Form State
   const [discount, setDiscount] = useState({
-    name: '',
-    reason: '',
-    type: 'SIBLING',
-    feeHeadId: '',
-    classId: '',
-    feePlanId: '',
+    name: "",
+    reason: "",
+    type: "SIBLING",
+    feeHeadId: "",
+    classId: "",
+    feePlanId: "",
     percentOff: 0,
     amountOff: 0,
   });
 
   const [waiver, setWaiver] = useState({
-    invoiceId: '',
-    feeHeadId: '',
+    invoiceId: "",
+    feeHeadId: "",
     amount: 0,
-    reason: '',
+    reason: "",
   });
 
   // Success States
@@ -36,46 +49,74 @@ export function DiscountsWaiversTab() {
 
   // Queries
   const feeHeadsQuery = useQuery({
-    queryKey: ['fee-heads'],
+    queryKey: ["fee-heads"],
     queryFn: api.listFeeHeads,
   });
 
   const classesQuery = useQuery({
-    queryKey: ['classes'],
+    queryKey: ["classes"],
     queryFn: api.listClasses,
   });
 
   const feePlansQuery = useQuery({
-    queryKey: ['fee-plans'],
+    queryKey: ["fee-plans"],
     queryFn: api.listFeePlans,
   });
 
   const invoicesQuery = useQuery({
-    queryKey: ['invoices'],
-    queryFn: api.listInvoices,
+    queryKey: ["invoices", "waiver-selector", waiverInvoiceSearch],
+    queryFn: () =>
+      api.listInvoices({
+        limit: 25,
+        search: waiverInvoiceSearch || undefined,
+        outstandingOnly: true,
+      }),
   });
 
   const discountsQuery = useQuery({
-    queryKey: ['discounts'],
-    queryFn: api.listDiscounts,
+    queryKey: ["discounts", discountPage, discountSearch],
+    queryFn: () =>
+      api.listDiscountsPage({
+        page: discountPage,
+        limit: 25,
+        search: discountSearch || undefined,
+      }),
   });
 
   const waiversQuery = useQuery({
-    queryKey: ['waivers'],
-    queryFn: api.listWaivers,
+    queryKey: ["waivers", waiverPage, waiverSearch],
+    queryFn: () =>
+      api.listWaiversPage({
+        page: waiverPage,
+        limit: 25,
+        search: waiverSearch || undefined,
+      }),
   });
+
+  const updateUrl = (updates: Record<string, string | number>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(updates)) {
+      if (!value || value === 1) params.delete(key);
+      else params.set(key, String(value));
+    }
+    if ("discountSearch" in updates) params.delete("discountPage");
+    if ("waiverSearch" in updates) params.delete("waiverPage");
+    router.replace(`/dashboard/finance?${params.toString()}`, {
+      scroll: false,
+    });
+  };
 
   // Mutations
   const discountMutation = useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['discounts'] });
+      queryClient.invalidateQueries({ queryKey: ["discounts"] });
       setDiscount({
-        name: '',
-        reason: '',
-        type: 'SIBLING',
-        feeHeadId: '',
-        classId: '',
-        feePlanId: '',
+        name: "",
+        reason: "",
+        type: "SIBLING",
+        feeHeadId: "",
+        classId: "",
+        feePlanId: "",
         percentOff: 0,
         amountOff: 0,
       });
@@ -87,13 +128,13 @@ export function DiscountsWaiversTab() {
 
   const waiverMutation = useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['waivers'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ["waivers"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
       setWaiver({
-        invoiceId: '',
-        feeHeadId: '',
+        invoiceId: "",
+        feeHeadId: "",
         amount: 0,
-        reason: '',
+        reason: "",
       });
       setWaiverSuccess(true);
       setTimeout(() => setWaiverSuccess(false), 3000);
@@ -118,11 +159,13 @@ export function DiscountsWaiversTab() {
 
   const handleCreateWaiver = (e: React.FormEvent) => {
     e.preventDefault();
-    const selectedInvoice = invoicesQuery.data?.find((inv) => inv.id === waiver.invoiceId);
+    const selectedInvoice = invoicesQuery.data?.find(
+      (inv) => inv.id === waiver.invoiceId,
+    );
     if (!selectedInvoice || waiver.amount <= 0 || !waiver.reason) return;
 
     waiverMutation.mutate({
-      studentId: selectedInvoice.student?.id || '',
+      studentId: selectedInvoice.student?.id || "",
       invoiceId: waiver.invoiceId || null,
       feeHeadId: waiver.feeHeadId || null,
       amount: waiver.amount,
@@ -130,15 +173,17 @@ export function DiscountsWaiversTab() {
     });
   };
 
-  const selectedInvoiceObj = invoicesQuery.data?.find((inv) => inv.id === waiver.invoiceId);
+  const selectedInvoiceObj = invoicesQuery.data?.find(
+    (inv) => inv.id === waiver.invoiceId,
+  );
   const selectedWaiverOutstanding = selectedInvoiceObj
-    ? Math.max(0, (selectedInvoiceObj.totalAmount ?? 0) - (selectedInvoiceObj.paidAmount ?? 0))
+    ? (selectedInvoiceObj.outstandingAmount ?? 0)
     : 0;
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-NP', {
-      style: 'currency',
-      currency: 'NPR',
+    return new Intl.NumberFormat("en-NP", {
+      style: "currency",
+      currency: "NPR",
       maximumFractionDigits: 0,
     }).format(amount);
   };
@@ -162,32 +207,41 @@ export function DiscountsWaiversTab() {
             {discountMutation.isError && (
               <div className="flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700">
                 <AlertCircle size={14} />
-                {discountMutation.error.message || 'Failed to create discount rule.'}
+                {discountMutation.error.message ||
+                  "Failed to create discount rule."}
               </div>
             )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Rule Name</label>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  Rule Name
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. Sibling Discount 10%"
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={discount.name}
-                  onChange={(e) => setDiscount((prev) => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) =>
+                    setDiscount((prev) => ({ ...prev, name: e.target.value }))
+                  }
                   required
                   disabled={discountMutation.isPending}
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Reason / Policy</label>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  Reason / Policy
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. Approved board waiver policy"
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                   value={discount.reason}
-                  onChange={(e) => setDiscount((prev) => ({ ...prev, reason: e.target.value }))}
+                  onChange={(e) =>
+                    setDiscount((prev) => ({ ...prev, reason: e.target.value }))
+                  }
                   required
                   disabled={discountMutation.isPending}
                 />
@@ -196,11 +250,15 @@ export function DiscountsWaiversTab() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Type</label>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  Type
+                </label>
                 <select
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={discount.type}
-                  onChange={(e) => setDiscount((prev) => ({ ...prev, type: e.target.value }))}
+                  onChange={(e) =>
+                    setDiscount((prev) => ({ ...prev, type: e.target.value }))
+                  }
                   disabled={discountMutation.isPending}
                 >
                   <option value="SIBLING">Sibling</option>
@@ -211,11 +269,18 @@ export function DiscountsWaiversTab() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Applicable Plan</label>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  Applicable Plan
+                </label>
                 <select
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={discount.feePlanId}
-                  onChange={(e) => setDiscount((prev) => ({ ...prev, feePlanId: e.target.value }))}
+                  onChange={(e) =>
+                    setDiscount((prev) => ({
+                      ...prev,
+                      feePlanId: e.target.value,
+                    }))
+                  }
                   disabled={discountMutation.isPending}
                 >
                   <option value="">Any Plan</option>
@@ -230,11 +295,18 @@ export function DiscountsWaiversTab() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Class (Optional)</label>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  Class (Optional)
+                </label>
                 <select
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={discount.classId}
-                  onChange={(e) => setDiscount((prev) => ({ ...prev, classId: e.target.value }))}
+                  onChange={(e) =>
+                    setDiscount((prev) => ({
+                      ...prev,
+                      classId: e.target.value,
+                    }))
+                  }
                   disabled={discountMutation.isPending}
                 >
                   <option value="">Any Class</option>
@@ -247,11 +319,18 @@ export function DiscountsWaiversTab() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Fee Head (Optional)</label>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  Fee Head (Optional)
+                </label>
                 <select
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={discount.feeHeadId}
-                  onChange={(e) => setDiscount((prev) => ({ ...prev, feeHeadId: e.target.value }))}
+                  onChange={(e) =>
+                    setDiscount((prev) => ({
+                      ...prev,
+                      feeHeadId: e.target.value,
+                    }))
+                  }
                   disabled={discountMutation.isPending}
                 >
                   <option value="">Any Fee Head</option>
@@ -266,27 +345,45 @@ export function DiscountsWaiversTab() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Percent Off (%)</label>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  Percent Off (%)
+                </label>
                 <input
                   type="number"
                   min={0}
                   max={100}
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
-                  value={discount.percentOff || ''}
-                  onChange={(e) => setDiscount((prev) => ({ ...prev, percentOff: Number(e.target.value) }))}
-                  disabled={discountMutation.isPending || discount.amountOff > 0}
+                  value={discount.percentOff || ""}
+                  onChange={(e) =>
+                    setDiscount((prev) => ({
+                      ...prev,
+                      percentOff: Number(e.target.value),
+                    }))
+                  }
+                  disabled={
+                    discountMutation.isPending || discount.amountOff > 0
+                  }
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Amount Off (NPR)</label>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  Amount Off (NPR)
+                </label>
                 <input
                   type="number"
                   min={0}
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
-                  value={discount.amountOff || ''}
-                  onChange={(e) => setDiscount((prev) => ({ ...prev, amountOff: Number(e.target.value) }))}
-                  disabled={discountMutation.isPending || discount.percentOff > 0}
+                  value={discount.amountOff || ""}
+                  onChange={(e) =>
+                    setDiscount((prev) => ({
+                      ...prev,
+                      amountOff: Number(e.target.value),
+                    }))
+                  }
+                  disabled={
+                    discountMutation.isPending || discount.percentOff > 0
+                  }
                 />
               </div>
             </div>
@@ -294,7 +391,12 @@ export function DiscountsWaiversTab() {
             <button
               type="submit"
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 transition-all"
-              disabled={discountMutation.isPending || (!discount.feeHeadId && !discount.classId && !discount.feePlanId)}
+              disabled={
+                discountMutation.isPending ||
+                (!discount.feeHeadId &&
+                  !discount.classId &&
+                  !discount.feePlanId)
+              }
             >
               {discountMutation.isPending ? (
                 <>
@@ -308,11 +410,13 @@ export function DiscountsWaiversTab() {
                 </>
               )}
             </button>
-            {!discount.feeHeadId && !discount.classId && !discount.feePlanId && (
-              <p className="text-[10px] font-bold text-rose-500 uppercase text-center mt-1">
-                * Select at least one Fee Head, Class, or Plan to save.
-              </p>
-            )}
+            {!discount.feeHeadId &&
+              !discount.classId &&
+              !discount.feePlanId && (
+                <p className="text-[10px] font-bold text-rose-500 uppercase text-center mt-1">
+                  * Select at least one Fee Head, Class, or Plan to save.
+                </p>
+              )}
           </form>
         </SectionCard>
 
@@ -331,19 +435,29 @@ export function DiscountsWaiversTab() {
             {waiverMutation.isError && (
               <div className="flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700">
                 <AlertCircle size={14} />
-                {waiverMutation.error.message || 'Failed to apply waiver.'}
+                {waiverMutation.error.message || "Failed to apply waiver."}
               </div>
             )}
 
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Select Invoice</label>
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                Select Invoice
+              </label>
+              <input
+                value={waiverInvoiceSearch}
+                onChange={(event) =>
+                  updateUrl({ waiverInvoiceSearch: event.target.value })
+                }
+                placeholder="Search student or invoice"
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm"
+              />
               <select
                 className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                 value={waiver.invoiceId}
                 onChange={(e) => {
                   const val = e.target.value;
                   const inv = invoicesQuery.data?.find((i) => i.id === val);
-                  const rem = inv ? Math.max(0, (inv.totalAmount ?? 0) - (inv.paidAmount ?? 0)) : 0;
+                  const rem = inv?.outstandingAmount ?? 0;
                   setWaiver((prev) => ({
                     ...prev,
                     invoiceId: val,
@@ -355,10 +469,11 @@ export function DiscountsWaiversTab() {
               >
                 <option value="">Select Invoice</option>
                 {invoicesQuery.data
-                  ?.filter((inv) => (inv.totalAmount ?? 0) - (inv.paidAmount ?? 0) > 0)
+                  ?.filter((inv) => (inv.outstandingAmount ?? 0) > 0)
                   ?.map((inv) => (
                     <option key={inv.id} value={inv.id}>
-                      {inv.invoiceNumber} · {inv.student?.name ?? 'Student'} (Due: {formatCurrency(inv.totalAmount - (inv.paidAmount ?? 0))})
+                      {inv.invoiceNumber} · {inv.student?.name ?? "Student"}{" "}
+                      (Due: {formatCurrency(inv.outstandingAmount ?? 0)})
                     </option>
                   ))}
               </select>
@@ -366,11 +481,18 @@ export function DiscountsWaiversTab() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Fee Head Scope</label>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  Fee Head Scope
+                </label>
                 <select
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                   value={waiver.feeHeadId}
-                  onChange={(e) => setWaiver((prev) => ({ ...prev, feeHeadId: e.target.value }))}
+                  onChange={(e) =>
+                    setWaiver((prev) => ({
+                      ...prev,
+                      feeHeadId: e.target.value,
+                    }))
+                  }
                   disabled={waiverMutation.isPending}
                 >
                   <option value="">Whole Invoice</option>
@@ -383,15 +505,22 @@ export function DiscountsWaiversTab() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Waiver Amount (NPR)</label>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  Waiver Amount (NPR)
+                </label>
                 <input
                   type="number"
                   min={1}
                   max={selectedWaiverOutstanding || undefined}
                   placeholder="Waiver Amount"
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
-                  value={waiver.amount || ''}
-                  onChange={(e) => setWaiver((prev) => ({ ...prev, amount: Number(e.target.value) }))}
+                  value={waiver.amount || ""}
+                  onChange={(e) =>
+                    setWaiver((prev) => ({
+                      ...prev,
+                      amount: Number(e.target.value),
+                    }))
+                  }
                   required
                   disabled={waiverMutation.isPending}
                 />
@@ -399,13 +528,17 @@ export function DiscountsWaiversTab() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Waiver Reason</label>
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                Waiver Reason
+              </label>
               <textarea
                 rows={3}
                 placeholder="Detail approval reasons for audits..."
                 className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
                 value={waiver.reason}
-                onChange={(e) => setWaiver((prev) => ({ ...prev, reason: e.target.value }))}
+                onChange={(e) =>
+                  setWaiver((prev) => ({ ...prev, reason: e.target.value }))
+                }
                 required
                 disabled={waiverMutation.isPending}
               />
@@ -413,14 +546,22 @@ export function DiscountsWaiversTab() {
 
             {selectedInvoiceObj && (
               <p className="text-xs font-bold text-slate-400">
-                Outstanding Balance on Invoice: <span className="text-slate-800">{formatCurrency(selectedWaiverOutstanding)}</span>
+                Outstanding Balance on Invoice:{" "}
+                <span className="text-slate-800">
+                  {formatCurrency(selectedWaiverOutstanding)}
+                </span>
               </p>
             )}
 
             <button
               type="submit"
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 transition-all"
-              disabled={waiverMutation.isPending || waiver.amount <= 0 || !waiver.reason || !waiver.invoiceId}
+              disabled={
+                waiverMutation.isPending ||
+                waiver.amount <= 0 ||
+                !waiver.reason ||
+                !waiver.invoiceId
+              }
             >
               {waiverMutation.isPending ? (
                 <>
@@ -442,11 +583,23 @@ export function DiscountsWaiversTab() {
       <div className="space-y-8">
         {/* Discounts List */}
         <SectionCard title="Active Discount Rules">
+          <input
+            value={discountSearch}
+            onChange={(event) =>
+              updateUrl({ discountSearch: event.target.value })
+            }
+            placeholder="Search discount rules"
+            className="mb-4 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+          />
           {discountsQuery.isLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
             </div>
-          ) : !discountsQuery.data?.length ? (
+          ) : discountsQuery.isError ? (
+            <div className="py-8 text-center text-sm font-medium text-rose-600">
+              Discount rules could not be loaded.
+            </div>
+          ) : !discountsQuery.data?.items.length ? (
             <div className="py-8 text-center text-slate-400 text-sm font-medium">
               No discount rules created yet.
             </div>
@@ -462,38 +615,69 @@ export function DiscountsWaiversTab() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {discountsQuery.data.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-100/35 transition-colors">
+                    {discountsQuery.data.items.map((item) => (
+                      <tr
+                        key={item.id}
+                        className="hover:bg-slate-100/35 transition-colors"
+                      >
                         <td className="px-4 py-3">
                           <div className="flex flex-col">
-                            <span className="font-bold text-slate-900">{item.name}</span>
-                            <span className="text-[9px] text-slate-400 uppercase tracking-widest font-black mt-0.5">{item.type}</span>
+                            <span className="font-bold text-slate-900">
+                              {item.name}
+                            </span>
+                            <span className="text-[9px] text-slate-400 uppercase tracking-widest font-black mt-0.5">
+                              {item.type}
+                            </span>
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <Badge variant={item.isActive ? 'success' : 'neutral'} className="text-[9px] px-1.5 py-0">
-                            {item.isActive ? 'Active' : 'Inactive'}
+                          <Badge
+                            variant={item.isActive ? "success" : "neutral"}
+                            className="text-[9px] px-1.5 py-0"
+                          >
+                            {item.isActive ? "Active" : "Inactive"}
                           </Badge>
                         </td>
                         <td className="px-4 py-3 font-bold text-slate-800">
-                          {item.percentOff ? `${item.percentOff}% Off` : formatCurrency(item.amountOff ?? 0)}
+                          {item.percentOff
+                            ? `${item.percentOff}% Off`
+                            : formatCurrency(item.amountOff ?? 0)}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              <ListPager
+                page={discountPage}
+                total={discountsQuery.data.total}
+                limit={discountsQuery.data.limit}
+                hasNextPage={discountsQuery.data.hasNextPage}
+                onPageChange={(page) => updateUrl({ discountPage: page })}
+              />
             </div>
           )}
         </SectionCard>
 
         {/* Waivers List */}
         <SectionCard title="Recent Approved Waivers">
+          <input
+            value={waiverSearch}
+            onChange={(event) =>
+              updateUrl({ waiverSearch: event.target.value })
+            }
+            placeholder="Search waiver reason or student"
+            className="mb-4 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+          />
           {waiversQuery.isLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
             </div>
-          ) : !waiversQuery.data?.length ? (
+          ) : waiversQuery.isError ? (
+            <div className="py-8 text-center text-sm font-medium text-rose-600">
+              Waiver history could not be loaded.
+            </div>
+          ) : !waiversQuery.data?.items.length ? (
             <div className="py-8 text-center text-slate-400 text-sm font-medium">
               No fee waivers registered.
             </div>
@@ -509,19 +693,28 @@ export function DiscountsWaiversTab() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {waiversQuery.data.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-100/35 transition-colors">
+                    {waiversQuery.data.items.map((item) => (
+                      <tr
+                        key={item.id}
+                        className="hover:bg-slate-100/35 transition-colors"
+                      >
                         <td className="px-4 py-3">
                           <div className="flex flex-col">
                             <span className="font-bold text-slate-700">
-                              {item.invoiceId ? `Inv #${item.invoiceId.slice(0, 8)}` : 'Whole Invoice'}
+                              {item.invoiceId
+                                ? `Inv #${item.invoiceId.slice(0, 8)}`
+                                : "Whole Invoice"}
                             </span>
                             <span className="text-[10px] text-slate-500 font-semibold">
-                              {item.studentId ? `ID: ${item.studentId.slice(0, 8)}` : 'Student'}
+                              {item.studentId
+                                ? `ID: ${item.studentId.slice(0, 8)}`
+                                : "Student"}
                             </span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-500 font-medium">{item.reason}</td>
+                        <td className="px-4 py-3 text-slate-500 font-medium">
+                          {item.reason}
+                        </td>
                         <td className="px-4 py-3 text-right font-bold text-emerald-600">
                           -{formatCurrency(item.amount)}
                         </td>
@@ -530,9 +723,57 @@ export function DiscountsWaiversTab() {
                   </tbody>
                 </table>
               </div>
+              <ListPager
+                page={waiverPage}
+                total={waiversQuery.data.total}
+                limit={waiversQuery.data.limit}
+                hasNextPage={waiversQuery.data.hasNextPage}
+                onPageChange={(page) => updateUrl({ waiverPage: page })}
+              />
             </div>
           )}
         </SectionCard>
+      </div>
+    </div>
+  );
+}
+
+function ListPager({
+  page,
+  total,
+  limit,
+  hasNextPage,
+  onPageChange,
+}: {
+  page: number;
+  total: number;
+  limit: number;
+  hasNextPage: boolean;
+  onPageChange: (page: number) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs font-bold text-slate-500">
+      <span>
+        {Math.min((page - 1) * limit + 1, total)}–
+        {Math.min(page * limit, total)} of {total}
+      </span>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 disabled:opacity-40"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          disabled={!hasNextPage}
+          onClick={() => onPageChange(page + 1)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 disabled:opacity-40"
+        >
+          Next
+        </button>
       </div>
     </div>
   );

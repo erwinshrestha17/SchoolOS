@@ -3,12 +3,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { Student } from '@prisma/client';
+import { PaymentMethod, type Student } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
-import {
-  getParentStudentIds,
-  getStudentOwnId,
-} from '../common/security/parent-scope';
+import { getParentStudentIds } from '../common/security/parent-scope';
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { FinanceService } from '../finance/finance.service';
@@ -24,7 +21,6 @@ import {
   ParentSandboxCanteenTopUpDto,
   ParentSandboxFeePaymentDto,
 } from './dto/parent-sandbox-payment.dto';
-import { PaymentMethod } from '@prisma/client';
 
 interface MobileStudentRow extends Student {
   class: { id: string; name: string };
@@ -736,7 +732,7 @@ export class MobileService {
     await this.assertStudentAccess(studentId, actor);
     const readiness =
       await this.financeService.getParentPaymentGatewayReadiness();
-    if (!('sandbox' in readiness) || readiness.sandbox !== true) {
+    if (!('sandbox' in readiness) || !readiness.sandbox) {
       throw new ForbiddenException('Parent sandbox top-up is disabled.');
     }
     const result = await this.canteenService.topUpWallet(
@@ -1523,11 +1519,6 @@ export class MobileService {
     const parentStudentIds = await getParentStudentIds(this.prisma, actor);
     if (parentStudentIds !== null) {
       return parentStudentIds;
-    }
-
-    const ownStudentId = await getStudentOwnId(this.prisma, actor);
-    if (ownStudentId) {
-      return [ownStudentId];
     }
 
     throw new ForbiddenException('Mobile student scope is not available');

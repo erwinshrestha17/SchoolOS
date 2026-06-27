@@ -6,6 +6,14 @@ class Decimal {
       value instanceof Decimal ? value.numericValue : Number(value);
   }
 
+  static max(...values: Array<number | string | Decimal>) {
+    return new Decimal(Math.max(...values.map(decimalToNumber)));
+  }
+
+  static min(...values: Array<number | string | Decimal>) {
+    return new Decimal(Math.min(...values.map(decimalToNumber)));
+  }
+
   eq(value: number | string | Decimal) {
     const other = decimalToNumber(value);
     return Math.abs(this.numericValue - other) < 1e-10;
@@ -379,6 +387,21 @@ export const PaymentStatus = {
   FAILED: 'FAILED',
 } as const;
 
+export const ReceiptFileStatus = {
+  PENDING: 'PENDING',
+  AVAILABLE: 'AVAILABLE',
+  UNAVAILABLE: 'UNAVAILABLE',
+} as const;
+
+export const OnlinePaymentIntentStatus = {
+  CREATED: 'CREATED',
+  READY: 'READY',
+  PENDING: 'PENDING',
+  SUCCEEDED: 'SUCCEEDED',
+  FAILED: 'FAILED',
+  EXPIRED: 'EXPIRED',
+} as const;
+
 export const PaymentMethod = {
   CASH: 'CASH',
   BANK: 'BANK',
@@ -389,8 +412,20 @@ export const PaymentMethod = {
 
 export const FinanceRequestStatus = {
   PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
+  EXECUTED: 'EXECUTED',
+  FAILED: 'FAILED',
+} as const;
+
+export const FinanceRequestHistoryAction = {
+  REQUESTED: 'REQUESTED',
+  REVIEW_STARTED: 'REVIEW_STARTED',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  EXECUTED: 'EXECUTED',
+  EXECUTION_FAILED: 'EXECUTION_FAILED',
 } as const;
 
 export const FinanceRequestType = {

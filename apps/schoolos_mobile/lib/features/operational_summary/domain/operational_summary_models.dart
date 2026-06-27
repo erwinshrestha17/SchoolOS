@@ -1,11 +1,4 @@
-enum OperationalMobilePersona {
-  parent,
-  teacher,
-  principal,
-  driver,
-  staff,
-  student,
-}
+enum OperationalMobilePersona { parent, teacher, principal, driver, staff }
 
 enum OperationalSummaryStatus {
   ready,
@@ -71,9 +64,9 @@ class OperationalMobileSummary {
           : const {},
       attentionItems: rawAttention is List<dynamic>
           ? rawAttention
-              .whereType<Map<String, dynamic>>()
-              .map(OperationalSummaryAttentionItem.fromJson)
-              .toList(growable: false)
+                .whereType<Map<String, dynamic>>()
+                .map(OperationalSummaryAttentionItem.fromJson)
+                .toList(growable: false)
           : const [],
     );
   }

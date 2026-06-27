@@ -1,46 +1,79 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { Badge } from '@/components/ui/badge';
-import { SectionCard } from '@/components/ui/section-card';
-import { Loader2, Send, Download, Check, AlertCircle } from 'lucide-react';
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
+import { api } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
+import { SectionCard } from "@/components/ui/section-card";
+import { Loader2, Send, Download, Check, AlertCircle } from "lucide-react";
 
 export function DefaulterQueueTab() {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  // Filters State
-  const [classId, setClassId] = useState('');
-  const [feeHeadId, setFeeHeadId] = useState('');
+  const classId = searchParams.get("defaulterClassId") ?? "";
+  const feeHeadId = searchParams.get("defaulterFeeHeadId") ?? "";
+  const search = searchParams.get("defaulterSearch") ?? "";
+  const page = Math.max(
+    1,
+    Number(searchParams.get("defaulterPage") ?? "1") || 1,
+  );
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [isExporting, setIsExporting] = useState(false);
   const [reminderResult, setReminderResult] = useState<any | null>(null);
 
   // Queries
   const classesQuery = useQuery({
-    queryKey: ['classes'],
+    queryKey: ["classes"],
     queryFn: api.listClasses,
   });
 
   const feeHeadsQuery = useQuery({
-    queryKey: ['fee-heads'],
+    queryKey: ["fee-heads"],
     queryFn: api.listFeeHeads,
   });
 
   const defaultersQuery = useQuery({
-    queryKey: ['defaulters-queue', classId, feeHeadId],
+    queryKey: ["defaulters-queue", classId, feeHeadId, search, page],
     queryFn: () =>
       api.listDefaulters({
         classId: classId || null,
         feeHeadId: feeHeadId || null,
+        search: search || null,
+        page,
+        limit: 25,
       }),
   });
+
+  const updateFilters = (
+    updates: Partial<
+      Record<
+        | "defaulterClassId"
+        | "defaulterFeeHeadId"
+        | "defaulterSearch"
+        | "defaulterPage",
+        string | number
+      >
+    >,
+  ) => {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(updates)) {
+      if (!value || value === 1) params.delete(key);
+      else params.set(key, String(value));
+    }
+    if (!("defaulterPage" in updates)) params.delete("defaulterPage");
+    router.replace(`/dashboard/finance?${params.toString()}`, {
+      scroll: false,
+    });
+    setSelectedInvoiceIds([]);
+  };
 
   // Mutation
   const reminderMutation = useMutation({
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['defaulters-queue'] });
+      queryClient.invalidateQueries({ queryKey: ["defaulters-queue"] });
       setReminderResult(data);
       setSelectedInvoiceIds([]);
       setTimeout(() => setReminderResult(null), 5000);
@@ -51,8 +84,8 @@ export function DefaulterQueueTab() {
   const onExportAgingCsv = async () => {
     setIsExporting(true);
     try {
-      await api.downloadReport('defaulter-aging-report', {
-        format: 'csv',
+      await api.downloadReport("defaulter-aging-report", {
+        format: "csv",
         filters: {
           asOfDate: new Date().toISOString(),
           classId: classId || undefined,
@@ -60,7 +93,7 @@ export function DefaulterQueueTab() {
         },
       });
     } catch (error) {
-      console.error('Export failed:', error);
+      console.error("Export failed:", error);
     } finally {
       setIsExporting(false);
     }
@@ -68,7 +101,9 @@ export function DefaulterQueueTab() {
 
   const handleToggleSelect = (invoiceId: string) => {
     setSelectedInvoiceIds((prev) =>
-      prev.includes(invoiceId) ? prev.filter((id) => id !== invoiceId) : [...prev, invoiceId]
+      prev.includes(invoiceId)
+        ? prev.filter((id) => id !== invoiceId)
+        : [...prev, invoiceId],
     );
   };
 
@@ -82,9 +117,9 @@ export function DefaulterQueueTab() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-NP', {
-      style: 'currency',
-      currency: 'NPR',
+    return new Intl.NumberFormat("en-NP", {
+      style: "currency",
+      currency: "NPR",
       maximumFractionDigits: 0,
     }).format(amount);
   };
@@ -104,7 +139,7 @@ export function DefaulterQueueTab() {
             onClick={onExportAgingCsv}
           >
             <Download size={14} />
-            {isExporting ? 'Exporting...' : 'Export Aging CSV'}
+            {isExporting ? "Exporting..." : "Export Aging CSV"}
           </button>
         </div>
       }
@@ -112,15 +147,29 @@ export function DefaulterQueueTab() {
       <div className="space-y-6">
         {/* Filters */}
         <div className="flex flex-col gap-4 sm:flex-row justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 max-w-xl">
+          <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Class</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Search
+              </label>
+              <input
+                value={search}
+                onChange={(event) =>
+                  updateFilters({ defaulterSearch: event.target.value })
+                }
+                placeholder="Student or invoice"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Class
+              </label>
               <select
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                 value={classId}
                 onChange={(e) => {
-                  setClassId(e.target.value);
-                  setSelectedInvoiceIds([]);
+                  updateFilters({ defaulterClassId: e.target.value });
                 }}
               >
                 <option value="">All Classes</option>
@@ -132,13 +181,14 @@ export function DefaulterQueueTab() {
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fee Head</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Fee Head
+              </label>
               <select
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
                 value={feeHeadId}
                 onChange={(e) => {
-                  setFeeHeadId(e.target.value);
-                  setSelectedInvoiceIds([]);
+                  updateFilters({ defaulterFeeHeadId: e.target.value });
                 }}
               >
                 <option value="">All Fee Heads</option>
@@ -158,22 +208,26 @@ export function DefaulterQueueTab() {
               onClick={handleSelectAll}
               disabled={defaulters.length === 0}
             >
-              {selectedInvoiceIds.length === defaulters.length ? 'Deselect All' : 'Select All'}
+              {selectedInvoiceIds.length === defaulters.length
+                ? "Deselect All"
+                : "Select All"}
             </button>
             <button
               type="button"
               className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 transition-all"
-              disabled={selectedInvoiceIds.length === 0 || reminderMutation.isPending}
+              disabled={
+                selectedInvoiceIds.length === 0 || reminderMutation.isPending
+              }
               onClick={() =>
                 reminderMutation.mutate({
                   invoiceIds: selectedInvoiceIds,
-                  channels: ['EMAIL', 'SMS', 'PUSH'],
-                  message: 'Fee payment reminder from SchoolOS.',
+                  channels: ["EMAIL", "SMS", "PUSH"],
+                  message: "Fee payment reminder from SchoolOS.",
                 })
               }
             >
               <Send size={12} />
-              {reminderMutation.isPending ? 'Sending...' : 'Remind Selected'}
+              {reminderMutation.isPending ? "Sending..." : "Remind Selected"}
             </button>
           </div>
         </div>
@@ -181,7 +235,8 @@ export function DefaulterQueueTab() {
         {reminderResult && (
           <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700">
             <Check size={14} />
-            Reminders sent! Requested: {reminderResult.requested}, Dispatched: {reminderResult.reminded}.
+            Reminders sent! Requested: {reminderResult.requested}, Dispatched:{" "}
+            {reminderResult.reminded}.
           </div>
         )}
 
@@ -194,55 +249,100 @@ export function DefaulterQueueTab() {
             No overdue invoices found for the current selection.
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {defaulters.map((item) => {
-              const isChecked = selectedInvoiceIds.includes(item.invoiceId);
-              return (
-                <div
-                  key={item.invoiceId}
-                  onClick={() => handleToggleSelect(item.invoiceId)}
-                  className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 select-none ${
-                    isChecked
-                      ? 'border-[var(--color-mod-fees-accent)] bg-[var(--color-mod-fees-bg)] shadow-sm shadow-[var(--color-mod-fees-border)]/20'
-                      : 'border-slate-100 bg-white hover:border-slate-200'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={() => {}} // Controlled by outer click
-                    className="h-4 w-4 rounded border-slate-300 text-[var(--color-mod-fees-accent)] focus:ring-[var(--color-mod-fees-accent)] mt-0.5"
-                  />
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900">{item.studentName}</span>
-                      <Badge variant="neutral" className="text-[9px] font-black tracking-widest px-1.5 py-0">
-                        {item.agingBucket}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500">{item.invoiceNumber}</span>
-                      <span className="font-extrabold text-rose-600">{formatCurrency(item.outstanding)}</span>
-                    </div>
-                    {(item.reportCardBlocked || item.hallTicketBlocked) && (
-                      <div className="flex gap-1.5 pt-1">
-                        {item.reportCardBlocked && (
-                          <Badge variant="destructive" className="text-[8px] font-black px-1.5 py-0">
-                            Report Card Blocked
-                          </Badge>
-                        )}
-                        {item.hallTicketBlocked && (
-                          <Badge variant="destructive" className="text-[8px] font-black px-1.5 py-0">
-                            Hall Ticket Blocked
-                          </Badge>
-                        )}
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {defaulters.map((item) => {
+                const isChecked = selectedInvoiceIds.includes(item.invoiceId);
+                return (
+                  <div
+                    key={item.invoiceId}
+                    onClick={() => handleToggleSelect(item.invoiceId)}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 select-none ${
+                      isChecked
+                        ? "border-[var(--color-mod-fees-accent)] bg-[var(--color-mod-fees-bg)] shadow-sm shadow-[var(--color-mod-fees-border)]/20"
+                        : "border-slate-100 bg-white hover:border-slate-200"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => {}} // Controlled by outer click
+                      className="h-4 w-4 rounded border-slate-300 text-[var(--color-mod-fees-accent)] focus:ring-[var(--color-mod-fees-accent)] mt-0.5"
+                    />
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900">
+                          {item.studentName}
+                        </span>
+                        <Badge
+                          variant="neutral"
+                          className="text-[9px] font-black tracking-widest px-1.5 py-0"
+                        >
+                          {item.agingBucket}
+                        </Badge>
                       </div>
-                    )}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">
+                          {item.invoiceNumber}
+                        </span>
+                        <span className="font-extrabold text-rose-600">
+                          {formatCurrency(item.outstanding)}
+                        </span>
+                      </div>
+                      {(item.reportCardBlocked || item.hallTicketBlocked) && (
+                        <div className="flex gap-1.5 pt-1">
+                          {item.reportCardBlocked && (
+                            <Badge
+                              variant="destructive"
+                              className="text-[8px] font-black px-1.5 py-0"
+                            >
+                              Report Card Blocked
+                            </Badge>
+                          )}
+                          {item.hallTicketBlocked && (
+                            <Badge
+                              variant="destructive"
+                              className="text-[8px] font-black px-1.5 py-0"
+                            >
+                              Hall Ticket Blocked
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+            <div className="mt-5 flex items-center justify-between text-xs font-bold text-slate-500">
+              <span>
+                {Math.min(
+                  (page - 1) * 25 + 1,
+                  defaultersQuery.data?.total ?? 0,
+                )}
+                –{Math.min(page * 25, defaultersQuery.data?.total ?? 0)} of{" "}
+                {defaultersQuery.data?.total ?? 0}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => updateFilters({ defaulterPage: page - 1 })}
+                  className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={!defaultersQuery.data?.hasNextPage}
+                  onClick={() => updateFilters({ defaulterPage: page + 1 })}
+                  className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </SectionCard>

@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import React, { useRef, useState } from 'react';
-import { CollectionCounter } from './collection-counter';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import type { CollectedPaymentResult } from '@/lib/api/finance';
-import type { InvoiceSummary, StudentCollectionContext } from '@schoolos/core';
-import { CheckCircle2, AlertCircle, Printer, X } from 'lucide-react';
-import { ErrorState } from '@/components/ui/error-state';
+import React, { useRef, useState } from "react";
+import { CollectionCounter } from "./collection-counter";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import type { CollectedPaymentResult } from "@/lib/api/finance";
+import type { InvoiceSummary, StudentCollectionContext } from "@schoolos/core";
+import { CheckCircle2, AlertCircle, Printer, X } from "lucide-react";
+import { ErrorState } from "@/components/ui/error-state";
 
 interface CollectionSectionProps {
   invoices: InvoiceSummary[];
@@ -19,6 +19,12 @@ interface CollectionSectionProps {
   hasStudentCollectionContextRequest?: boolean;
   isStudentProfileSource?: boolean;
   onChangeStudent?: () => void;
+  searchQuery?: string;
+  onSearchChange?: (value: string) => void;
+  page?: number;
+  limit?: number;
+  total?: number;
+  onPageChange?: (page: number) => void;
 }
 
 type CollectionPaymentPayload = {
@@ -32,7 +38,7 @@ type CollectionPaymentPayload = {
 const getErrorMessage = (error: unknown) =>
   error instanceof Error
     ? error.message
-    : 'Payment could not be recorded. Please retry.';
+    : "Payment could not be recorded. Please retry.";
 
 export function CollectionSection({
   invoices,
@@ -44,13 +50,24 @@ export function CollectionSection({
   hasStudentCollectionContextRequest,
   isStudentProfileSource,
   onChangeStudent,
+  searchQuery = "",
+  onSearchChange,
+  page = 1,
+  limit = 25,
+  total = 0,
+  onPageChange,
 }: CollectionSectionProps) {
   const queryClient = useQueryClient();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [lastReceipt, setLastReceipt] = useState<CollectedPaymentResult | null>(null);
-  const paymentAttemptRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  const [lastReceipt, setLastReceipt] = useState<CollectedPaymentResult | null>(
+    null,
+  );
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+  const paymentAttemptRef = useRef<{ fingerprint: string; key: string } | null>(
+    null,
+  );
   const isStudentContextMode =
-    Boolean(studentCollectionContext) || Boolean(hasStudentCollectionContextRequest);
+    Boolean(studentCollectionContext) ||
+    Boolean(hasStudentCollectionContextRequest);
 
   const paymentMutation = useMutation({
     mutationFn: async (payload: CollectionPaymentPayload) => {
@@ -69,34 +86,37 @@ export function CollectionSection({
     onSuccess: (result) => {
       paymentAttemptRef.current = null;
       setLastReceipt(result);
-      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      void queryClient.invalidateQueries({ queryKey: ["invoices"] });
       if (studentCollectionContext?.student.id) {
         void queryClient.invalidateQueries({
           queryKey: [
-            'student-collection-context',
+            "student-collection-context",
             studentCollectionContext.student.id,
           ],
         });
       }
-      void queryClient.invalidateQueries({ queryKey: ['receipts'] });
-      void queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      void queryClient.invalidateQueries({ queryKey: ["receipts"] });
+      void queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     },
   });
 
-  const filteredInvoices = isStudentContextMode ? studentCollectionContext?.invoices ?? [] : invoices.filter(inv => {
-    if (!searchQuery) return inv.status !== 'PAID';
-    const q = searchQuery.toLowerCase();
-    return (
-      inv.invoiceNumber?.toLowerCase().includes(q) ||
-      inv.student?.name?.toLowerCase().includes(q) ||
-      inv.student?.studentSystemId?.toLowerCase().includes(q)
-    );
-  }).filter(inv => inv.status !== 'PAID');
+  const visibleInvoices = isStudentContextMode
+    ? (studentCollectionContext?.invoices ?? [])
+    : invoices;
 
   const handleOpenReceipt = async () => {
     if (!lastReceipt?.receiptNumber) return;
-    await api.openReceiptPdf(lastReceipt.receiptNumber);
+    setReceiptError(null);
+    try {
+      await api.openReceiptPdf(lastReceipt.receiptNumber);
+    } catch (error) {
+      setReceiptError(
+        error instanceof Error
+          ? error.message
+          : "The protected receipt is temporarily unavailable.",
+      );
+    }
   };
 
   if (isError) {
@@ -118,42 +138,67 @@ export function CollectionSection({
               <CheckCircle2 size={24} />
             </div>
             <div>
-               <p className="text-sm font-black tracking-tight text-success-900">Payment collected successfully</p>
-               <p className="mt-0.5 text-xs font-bold uppercase tracking-widest text-success-700">Receipt #{lastReceipt.receiptNumber} generated</p>
+              <p className="text-sm font-black tracking-tight text-success-900">
+                Payment collected successfully
+              </p>
+              <p className="mt-0.5 text-xs font-bold uppercase tracking-widest text-success-700">
+                {lastReceipt.disposition === "REPLAYED"
+                  ? `Existing payment returned safely · Receipt #${lastReceipt.receiptNumber}`
+                  : `Receipt #${lastReceipt.receiptNumber} confirmed`}
+              </p>
+              {lastReceipt.receiptFileStatus !== "AVAILABLE" ? (
+                <p className="mt-1 text-xs font-semibold text-warning-700">
+                  Payment succeeded. The protected PDF will be generated when
+                  opened.
+                </p>
+              ) : null}
             </div>
           </div>
           <div className="flex items-center gap-3">
-             <button 
+            <button
               onClick={handleOpenReceipt}
               className="flex items-center gap-2 rounded-xl border border-success-100 bg-white px-6 py-3 text-xs font-bold text-success-700 shadow-sm transition-all hover:bg-success-100 active:scale-95"
-             >
-               <Printer size={16} />
-               Open Receipt
-             </button>
-             <button 
+            >
+              <Printer size={16} />
+              Open Receipt
+            </button>
+            <button
               onClick={() => setLastReceipt(null)}
               className="p-3 text-success-400 transition-colors hover:text-success-600"
               aria-label="Dismiss receipt success message"
-             >
-               <X size={20} />
-             </button>
+            >
+              <X size={20} />
+            </button>
           </div>
         </div>
       )}
+
+      {receiptError ? (
+        <div
+          className="flex items-center gap-3 rounded-xl border border-warning-100 bg-warning-50 p-4 text-sm font-bold text-warning-800"
+          role="alert"
+        >
+          <AlertCircle size={20} />
+          {receiptError}
+        </div>
+      ) : null}
 
       {paymentMutation.isError && (
         <div className="animate-fade-in flex items-center gap-4 rounded-xl border border-danger-100 bg-danger-50 p-6 text-sm font-bold text-danger-800">
           <AlertCircle size={24} className="text-danger-500" />
           <div className="flex flex-col">
-             <span className="text-[0.65rem] uppercase tracking-widest text-danger-600 mb-1">Payment Failed</span>
-             {getErrorMessage(paymentMutation.error)}
+            <span className="text-[0.65rem] uppercase tracking-widest text-danger-600 mb-1">
+              Payment Failed
+            </span>
+            {getErrorMessage(paymentMutation.error)}
           </div>
         </div>
       )}
 
       <CollectionCounter
-        onSearch={setSearchQuery}
-        invoices={filteredInvoices}
+        onSearch={onSearchChange ?? (() => undefined)}
+        searchQuery={searchQuery}
+        invoices={visibleInvoices}
         isLoading={isLoading}
         isSubmitting={paymentMutation.isPending}
         initialInvoiceId={initialInvoiceId}
@@ -161,6 +206,10 @@ export function CollectionSection({
         isStudentProfileSource={isStudentProfileSource}
         onChangeStudent={onChangeStudent}
         disableSearch={isStudentContextMode}
+        page={page}
+        limit={limit}
+        total={isStudentContextMode ? visibleInvoices.length : total}
+        onPageChange={onPageChange}
         onCollect={(invoiceId, amount, method, reference, remarks) => {
           setLastReceipt(null);
           paymentMutation.mutate({
@@ -168,7 +217,7 @@ export function CollectionSection({
             amount,
             method,
             referenceNumber: reference || undefined,
-            narration: remarks || `Counter collection via Finance Dashboard`
+            narration: remarks || `Counter collection via Finance Dashboard`,
           });
         }}
       />

@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { getNepalSchoolDay } from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
-import {
-  getParentStudentIds,
-  getStudentOwnId,
-} from '../common/security/parent-scope';
+import { getParentStudentIds } from '../common/security/parent-scope';
 import { EntitlementsService } from '../plans/entitlements.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -215,13 +212,7 @@ export class OperationalSummaryService {
   }
 
   async getMobileSummary(
-    persona:
-      | 'parent'
-      | 'teacher'
-      | 'principal'
-      | 'driver'
-      | 'staff'
-      | 'student',
+    persona: 'parent' | 'teacher' | 'principal' | 'driver' | 'staff',
     actor: AuthContext,
   ) {
     const day = getNepalSchoolDay();
@@ -240,8 +231,6 @@ export class OperationalSummaryService {
         return this.driverMobileSummary(actor, day, modules);
       case 'staff':
         return this.staffMobileSummary(actor, day, modules);
-      case 'student':
-        return this.studentMobileSummary(actor, day, modules);
     }
   }
 
@@ -1086,50 +1075,6 @@ export class OperationalSummaryService {
     );
   }
 
-  private async studentMobileSummary(
-    actor: AuthContext,
-    day: Day,
-    modules: Set<string>,
-  ) {
-    const studentId = await getStudentOwnId(this.prisma, actor);
-    if (!studentId) return this.mobileSummary('student', day, 'empty');
-
-    const [attempts, reports, loans] = await Promise.all([
-      modules.has('learning')
-        ? this.safeCount('learningAttempt', {
-            tenantId: actor.tenantId,
-            studentId,
-            status: 'IN_PROGRESS',
-          })
-        : noMetric(),
-      modules.has('exams')
-        ? this.safeCount('reportCard', {
-            tenantId: actor.tenantId,
-            studentId,
-            publishedAt: { not: null },
-          })
-        : noMetric(),
-      modules.has('library')
-        ? this.safeCount('libraryIssue', {
-            tenantId: actor.tenantId,
-            borrowerStudentId: studentId,
-            status: { in: ['ISSUED', 'OVERDUE'] },
-          })
-        : noMetric(),
-    ]);
-
-    return this.mobileSummary(
-      'student',
-      day,
-      mobileStatus([attempts, reports, loans]),
-      {
-        activeLearningAttempts: attempts.value,
-        publishedReportCards: reports.value,
-        activeLibraryLoans: loans.value,
-      },
-    );
-  }
-
   private async teacherMobileSummary(
     actor: AuthContext,
     day: Day,
@@ -1448,7 +1393,6 @@ export class OperationalSummaryService {
     actor: AuthContext,
     permissions: string[],
   ) {
-    const roles = new Set(actor.roles.map((role) => role.toLowerCase()));
     if (this.isTeachingOnly(actor)) {
       return (
         TEACHER_MODULES.has(module) &&
