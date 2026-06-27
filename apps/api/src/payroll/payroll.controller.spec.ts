@@ -215,8 +215,10 @@ describe('PayrollController M7 contracts', () => {
     payrollService.getPayslipPdfForRunStaff.mockReturnValue(pdf);
     salarySlipService.getApprovedSalarySlipPdf.mockReturnValue(pdf);
 
-    expect(controller.listPayslips(actor)).toEqual([{ id: 'payslip-1' }]);
-    expect(controller.listMyPayslips(actor)).toEqual([{ id: 'my-payslip-1' }]);
+    expect(controller.listPayslips({}, actor)).toEqual([{ id: 'payslip-1' }]);
+    expect(controller.listMyPayslips({}, actor)).toEqual([
+      { id: 'my-payslip-1' },
+    ]);
     expect(controller.getMyPayslipPdf('PS-001', actor)).toBe(pdf);
     expect(controller.getPayslipPdf('PS-001', actor)).toBe(pdf);
     expect(controller.getStaffPayslipPdf('run-1', 'staff-1', actor)).toBe(pdf);

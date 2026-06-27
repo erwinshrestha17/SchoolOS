@@ -2,23 +2,28 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Download, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 import { useState } from 'react';
 
 export function PayslipList() {
   const [search, setSearch] = useState('');
-  const [openingPayslip, setOpeningPayslip] = useState<string | null>(null);
+  const [downloadingPayslip, setDownloadingPayslip] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  const { data: payslips, isLoading, error } = useQuery({
-    queryKey: ['payslips'],
-    queryFn: api.listPayslips,
+  const [page, setPage] = useState(1);
+  const limit = 10;
+  const { data: payslipPage, isLoading, error } = useQuery({
+    queryKey: ['payslips', page, limit, search],
+    queryFn: () =>
+      api.listPayslipsPage({
+        page,
+        limit,
+        search: search.trim() || undefined,
+      }),
   });
 
-  const filteredPayslips = payslips?.filter(p => 
-    p.payslipNumber.toLowerCase().includes(search.toLowerCase()) ||
-    p.staff?.fullName?.toLowerCase().includes(search.toLowerCase()) ||
-    p.staff?.employeeId?.toLowerCase().includes(search.toLowerCase())
-  );
+  const payslips = payslipPage?.items ?? [];
+  const totalItems = payslipPage?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / limit));
 
   const moneyFormatter = new Intl.NumberFormat('en-NP', {
     style: 'currency',
@@ -27,17 +32,17 @@ export function PayslipList() {
   });
 
   async function openPayslipPdf(payslipNumber: string) {
-    setOpeningPayslip(payslipNumber);
+    setDownloadingPayslip(payslipNumber);
     setDownloadError(null);
 
     try {
       await api.openPayslipPdf(payslipNumber);
     } catch {
       setDownloadError(
-        'Could not open this protected payslip. Check your permission and try again.',
+        'Could not download this protected payslip. Check your permission and try again.',
       );
     } finally {
-      setOpeningPayslip(null);
+      setDownloadingPayslip(null);
     }
   }
 
@@ -50,7 +55,10 @@ export function PayslipList() {
             type="text"
             placeholder="Search payslips by number or staff..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="w-full rounded-2xl border border-slate-200 py-3 pl-11 pr-4 text-sm transition-all focus:border-[var(--color-mod-hr-border)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-hr-border)]/50"
           />
         </div>
@@ -93,14 +101,14 @@ export function PayslipList() {
                     Failed to load payslips. Please check your permissions.
                   </td>
                 </tr>
-              ) : filteredPayslips?.length === 0 ? (
+              ) : payslips.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
                     No payslips found.
                   </td>
                 </tr>
               ) : (
-                filteredPayslips?.map((payslip) => (
+                payslips.map((payslip) => (
                   <tr key={payslip.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 font-bold text-[var(--color-mod-hr-text)]">
                       {payslip.payslipNumber}
@@ -113,16 +121,16 @@ export function PayslipList() {
                       {payslip.periodMonth}/{payslip.periodYear}
                     </td>
                     <td className="px-6 py-4 text-right font-black text-slate-900">
-                      {moneyFormatter.format(payslip.netAmount ?? 0)}
+                      {moneyFormatter.format(Number(payslip.netAmount ?? 0))}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button
                         onClick={() => void openPayslipPdf(payslip.payslipNumber)}
-                        disabled={openingPayslip === payslip.payslipNumber}
+                        disabled={downloadingPayslip === payslip.payslipNumber}
                         className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 font-bold text-slate-600 transition-all hover:bg-[var(--color-mod-hr-soft)] hover:text-[var(--color-mod-hr-text)]"
                       >
                         <Download size={14} />
-                        {openingPayslip === payslip.payslipNumber ? 'Opening...' : 'PDF'}
+                        {downloadingPayslip === payslip.payslipNumber ? 'Downloading...' : 'Download PDF'}
                       </button>
                     </td>
                   </tr>
@@ -131,6 +139,33 @@ export function PayslipList() {
             </tbody>
           </table>
         </div>
+        {totalItems > 0 && (
+          <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
+            <span className="text-xs font-bold text-slate-500">
+              Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} payslips
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page === 1}
+                className="p-2 border border-slate-200 rounded-xl bg-white text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
+                aria-label="Previous payslip page"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={page >= totalPages}
+                className="p-2 border border-slate-200 rounded-xl bg-white text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
+                aria-label="Next payslip page"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

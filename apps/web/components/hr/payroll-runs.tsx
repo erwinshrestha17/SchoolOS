@@ -115,17 +115,6 @@ function normalizeRun(run: PayrollRunSummary): PayrollRunView {
   return run as PayrollRunView;
 }
 
-function previewTotals(preview: PayrollPreviewResult[]) {
-  return preview.reduce(
-    (totals, row) => ({
-      grossPay: totals.grossPay + row.grossPay,
-      deductions: totals.deductions + row.deductions,
-      netPay: totals.netPay + row.netPay,
-    }),
-    { grossPay: 0, deductions: 0, netPay: 0 },
-  );
-}
-
 function getStaffName(line: PayrollLineView) {
   if (!line.staff) {
     return `Staff ${line.staffId?.slice(0, 8) ?? 'unknown'}`;
@@ -155,10 +144,12 @@ export function PayrollRuns() {
   const [salarySlipError, setSalarySlipError] = useState<string | null>(null);
   const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<PayrollActionType>('SUBMIT_REVIEW');
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
   const runsQuery = useQuery({
-    queryKey: ['payroll-runs'],
-    queryFn: api.listPayrollRuns,
+    queryKey: ['payroll-runs', page, limit],
+    queryFn: () => api.listPayrollRunsPage({ page, limit }),
     enabled: status === 'authenticated',
   });
 
@@ -169,11 +160,21 @@ export function PayrollRuns() {
   });
 
   const runs = useMemo(
-    () => (runsQuery.data ?? []).map(normalizeRun),
+    () => (runsQuery.data?.items ?? []).map(normalizeRun),
     [runsQuery.data],
   );
 
-  const selectedRun = runs.find((run) => run.id === selectedRunId) ?? runs[0] ?? null;
+  const selectedRunKey = selectedRunId ?? runs[0]?.id ?? null;
+  const selectedRunQuery = useQuery({
+    queryKey: ['payroll-run-detail', selectedRunKey],
+    queryFn: () => api.getPayrollRun(selectedRunKey!),
+    enabled: status === 'authenticated' && Boolean(selectedRunKey),
+  });
+  const selectedRun = selectedRunQuery.data
+    ? normalizeRun(selectedRunQuery.data)
+    : runs.find((run) => run.id === selectedRunKey) ?? null;
+  const totalItems = runsQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / limit));
 
   const createDraftMutation = useMutation({
     mutationFn: () =>
@@ -187,26 +188,9 @@ export function PayrollRuns() {
     onSuccess: (run) => {
       const savedRun = normalizeRun(run);
       void queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
+      void queryClient.invalidateQueries({ queryKey: ['payroll-dashboard-summary'] });
       setSelectedRunId(savedRun.id);
       setShowDraftWorkflow(false);
-    },
-  });
-
-  const approveMutation = useMutation({
-    mutationFn: (id: string) => api.approvePayrollRun(id),
-    onSuccess: (run) => {
-      const approvedRun = normalizeRun(run);
-      void queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
-      setSelectedRunId(approvedRun.id);
-    },
-  });
-
-  const postMutation = useMutation({
-    mutationFn: (id: string) => api.postPayrollRun(id),
-    onSuccess: (run) => {
-      const postedRun = normalizeRun(run);
-      void queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
-      setSelectedRunId(postedRun.id);
     },
   });
 
@@ -227,7 +211,10 @@ export function PayrollRuns() {
   });
 
   const previewRows = previewQuery.data ?? [];
-  const totals = previewTotals(previewRows);
+  const previewWarningCount = previewRows.reduce(
+    (total, row) => total + row.warnings.length,
+    0,
+  );
   const years = Array.from({ length: 5 }, (_, index) => currentYear - 2 + index);
 
   return (
@@ -348,16 +335,18 @@ export function PayrollRuns() {
 
           <div className="grid gap-3 md:grid-cols-3">
             <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Preview Gross</p>
-              <p className="mt-1 text-xl font-bold text-gray-900">{formatMoney(totals.grossPay)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Preview Rows</p>
+              <p className="mt-1 text-xl font-bold text-gray-900">{previewRows.length}</p>
             </div>
             <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Preview Deductions</p>
-              <p className="mt-1 text-xl font-bold text-danger-700">{formatMoney(totals.deductions)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Warnings</p>
+              <p className="mt-1 text-xl font-bold text-danger-700">{previewWarningCount}</p>
             </div>
             <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Preview Net</p>
-              <p className="mt-1 text-xl font-bold text-[var(--color-mod-hr-text)]">{formatMoney(totals.netPay)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Authoritative Totals</p>
+              <p className="mt-1 text-sm font-bold text-[var(--color-mod-hr-text)]">
+                Saved on backend run creation
+              </p>
             </div>
           </div>
 
@@ -463,7 +452,7 @@ export function PayrollRuns() {
                     <tr key={run.id} className="transition-colors hover:bg-gray-50/60">
                       <td className="px-5 py-4">
                         <p className="font-bold text-gray-900">{formatPeriod(run.periodMonth, run.periodYear)}</p>
-                        <p className="text-[10px] text-gray-500">{run.lines?.length ?? 0} staff lines</p>
+                        <p className="text-[10px] text-gray-500">{run.lineCount ?? 0} staff lines</p>
                       </td>
                       <td className="px-5 py-4">
                         <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${statusClasses(run.status)}`}>
@@ -494,6 +483,31 @@ export function PayrollRuns() {
               </tbody>
             </table>
           </div>
+          {totalItems > 0 && (
+            <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4">
+              <p className="text-xs font-semibold text-gray-500">
+                Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} runs
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page === 1}
+                  className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-600 disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={page >= totalPages}
+                  className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-600 disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -509,7 +523,15 @@ export function PayrollRuns() {
             )}
           </div>
 
-          {selectedRun ? (
+          {selectedRunQuery.isLoading ? (
+            <p className="rounded-xl bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+              Loading payroll run details...
+            </p>
+          ) : selectedRunQuery.isError ? (
+            <p className="rounded-xl bg-danger-50 px-4 py-8 text-center text-sm font-semibold text-danger-700">
+              Payroll run details could not be loaded. Check your permission and retry.
+            </p>
+          ) : selectedRun ? (
             <div className="space-y-4">
               <div className="rounded-2xl bg-gray-50/70 p-4">
                 <p className="text-sm font-bold text-gray-900">{formatPeriod(selectedRun.periodMonth, selectedRun.periodYear)}</p>
@@ -729,7 +751,7 @@ export function PayrollRuns() {
                           className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[var(--color-mod-hr-border)] px-3 py-1.5 text-xs font-bold text-[var(--color-mod-hr-text)] transition-colors hover:bg-[var(--color-mod-hr-soft)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {salarySlipMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                          Open Salary Slip PDF
+                          Download Salary Slip PDF
                         </button>
                       )}
                     </div>

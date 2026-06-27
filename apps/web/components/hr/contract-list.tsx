@@ -2,7 +2,8 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { FileText, Plus, Search } from 'lucide-react';
+import { formatBsDate } from '@schoolos/core';
+import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
@@ -21,13 +22,20 @@ export function ContractList() {
   const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const limit = 10;
   const canCreateContracts = hasPermissions(['hr:manage']);
   const canViewPayrollAmounts =
     hasPermissions(['payroll:read']) || hasPermissions(['payroll:manage']);
   
   const contractsQuery = useQuery({
-    queryKey: ['staff-contracts'],
-    queryFn: api.listStaffContracts,
+    queryKey: ['staff-contracts', page, limit, search],
+    queryFn: () =>
+      api.listStaffContractsPage({
+        page,
+        limit,
+        search: search.trim() || undefined,
+      }),
   });
 
   const [isCreating, setIsCreating] = useState(false);
@@ -63,9 +71,9 @@ export function ContractList() {
     },
   });
 
-  const filteredContracts = (contractsQuery.data ?? []).filter((c) =>
-    `${c.contractNumber} ${c.position}`.toLowerCase().includes(search.toLowerCase())
-  );
+  const contracts = contractsQuery.data?.items ?? [];
+  const totalItems = contractsQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / limit));
 
   return (
     <div className="space-y-6">
@@ -76,7 +84,10 @@ export function ContractList() {
             type="text"
             placeholder="Search contracts by number or position..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="pl-11"
           />
         </div>
@@ -206,26 +217,26 @@ export function ContractList() {
                     <LoadingState variant="spinner" label="Loading contracts..." />
                   </td>
                 </tr>
-              ) : filteredContracts.length > 0 ? (
-                filteredContracts.map((contract) => (
+              ) : contracts.length > 0 ? (
+                contracts.map((contract) => (
                   <tr key={contract.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-6 py-4 font-mono text-xs font-bold text-slate-500">{contract.contractNumber}</td>
                     <td className="px-6 py-4">
                       <div>
                         <p className="font-bold text-slate-900">{contract.position}</p>
                         <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                          Starts {new Date(contract.startDate).toLocaleDateString()}
+                          Starts {formatBsDate(contract.startDate)}
                         </p>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm font-bold text-slate-900">
                       {canViewPayrollAmounts
-                        ? moneyFormatter.format(contract.baseSalary)
+                        ? moneyFormatter.format(Number(contract.baseSalary))
                         : 'Restricted'}
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-slate-500">
                       {canViewPayrollAmounts
-                        ? moneyFormatter.format(contract.allowances)
+                        ? moneyFormatter.format(Number(contract.allowances))
                         : 'Restricted'}
                     </td>
                     <td className="px-6 py-4">
@@ -252,6 +263,33 @@ export function ContractList() {
             </tbody>
           </table>
         </div>
+        {totalItems > 0 && (
+          <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
+            <span className="text-xs font-bold text-slate-500">
+              Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} contracts
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page === 1}
+                className="p-2 border border-slate-200 rounded-xl bg-white text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
+                aria-label="Previous contract page"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={page >= totalPages}
+                className="p-2 border border-slate-200 rounded-xl bg-white text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
+                aria-label="Next contract page"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,8 @@
-import type { SalaryStructureSummary, PayrollLineSummary } from './payroll.js';
+import type {
+  PayrollLineSummary,
+  PayrollMoneyAmount,
+  SalaryStructureSummary,
+} from './payroll.js';
 
 export type StaffSummary = {
   id: string;
@@ -92,8 +96,8 @@ export type StaffContractSummary = {
   position: string;
   startDate: string;
   endDate: string | null;
-  baseSalary: number;
-  allowances: number;
-  deductions: number;
+  baseSalary: PayrollMoneyAmount;
+  allowances: PayrollMoneyAmount;
+  deductions: PayrollMoneyAmount;
   status: string;
 };

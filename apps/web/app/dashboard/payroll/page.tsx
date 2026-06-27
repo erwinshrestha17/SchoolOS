@@ -36,25 +36,21 @@ const moduleTabs = [
   { href: '/dashboard/hr/staff', label: 'Staff', icon: Wallet },
 ];
 
-function formatMoney(value?: number | null) {
+function formatMoney(value?: number | string | null) {
   if (value === undefined || value === null) return 'Unavailable';
-  return moneyFormatter.format(value);
+  return moneyFormatter.format(Number(value));
 }
 
 export default function PayrollDashboardPage() {
   const router = useRouter();
-  const runsQuery = useQuery({
-    queryKey: ['payroll-runs'],
-    queryFn: api.listPayrollRuns,
-  });
   const summaryQuery = useQuery({
-    queryKey: ['payroll-summary'],
-    queryFn: () => api.getPayrollReportSummary(),
+    queryKey: ['payroll-dashboard-summary'],
+    queryFn: () => api.getPayrollDashboardSummary(),
   });
 
-  const payrollRuns = runsQuery.data ?? [];
-  const latestRun = payrollRuns[0] ?? null;
-  const latestPostedRun = payrollRuns.find((run) => run.status === 'POSTED');
+  const summary = summaryQuery.data;
+  const selectedRun = summary?.selectedPayrollRun ?? null;
+  const latestRun = summary?.latestPayrollRun ?? null;
   const workflowSteps = [
     {
       label: 'Draft',
@@ -73,7 +69,10 @@ export default function PayrollDashboardPage() {
     },
   ].map((step) => ({
     ...step,
-    count: payrollRuns.filter((run) => step.statuses.includes(run.status)).length,
+    count: step.statuses.reduce(
+      (total, status) => total + (summary?.payrollRunsByStatus?.[status] ?? 0),
+      0,
+    ),
   }));
   const awaitingAction = workflowSteps
     .filter((step) => step.label !== 'Posted')
@@ -118,15 +117,15 @@ export default function PayrollDashboardPage() {
       <KpiGrid>
         <KpiCard
           title="Gross Pay"
-          value={formatMoney(summaryQuery.data?.gross)}
+          value={formatMoney(selectedRun?.totalGross)}
           icon={<Wallet className="h-5 w-5" />}
           loading={summaryQuery.isLoading}
           tone="neutral"
-          description="Official payroll report summary"
+          description="Selected run backend total"
         />
         <KpiCard
           title="Deductions"
-          value={formatMoney(summaryQuery.data?.deductions)}
+          value={formatMoney(selectedRun?.totalDeductions)}
           icon={<Calculator className="h-5 w-5" />}
           loading={summaryQuery.isLoading}
           tone="info"
@@ -134,18 +133,19 @@ export default function PayrollDashboardPage() {
         />
         <KpiCard
           title="Net Payable"
-          value={formatMoney(summaryQuery.data?.netPayable)}
+          value={formatMoney(selectedRun?.totalNet)}
           icon={<BadgeCheck className="h-5 w-5" />}
           loading={summaryQuery.isLoading}
           tone="success"
-          description="Backend-calculated report total"
+          description="Backend-calculated run total"
         />
         <KpiCard
           title="Approval Queue"
-          value="Unavailable"
+          value={summaryQuery.isError ? 'Unavailable' : awaitingAction}
           icon={<AlertCircle className="h-5 w-5" />}
-          tone="neutral"
-          description="Needs workflow summary endpoint"
+          loading={summaryQuery.isLoading}
+          tone={awaitingAction > 0 ? 'warning' : 'success'}
+          description="Runs awaiting review or posting"
         />
       </KpiGrid>
 
@@ -167,15 +167,15 @@ export default function PayrollDashboardPage() {
         </div>
 
         <div className="mt-5">
-          {runsQuery.isLoading ? (
+          {summaryQuery.isLoading ? (
             <LoadingState variant="spinner" label="Loading payroll workflow..." />
-          ) : runsQuery.isError ? (
+          ) : summaryQuery.isError ? (
             <ErrorState
               title="Payroll workflow unavailable"
               message="Payroll run statuses could not be loaded. Check your payroll permission and retry."
-              onRetry={() => void runsQuery.refetch()}
+              onRetry={() => void summaryQuery.refetch()}
             />
-          ) : payrollRuns.length ? (
+          ) : workflowSteps.some((step) => step.count > 0) ? (
             <div className="grid gap-3 md:grid-cols-3">
               {workflowSteps.map((step, index) => (
                 <div
@@ -219,9 +219,9 @@ export default function PayrollDashboardPage() {
                 tone: latestRun ? 'text-[var(--primary-dark)]' : 'text-slate-500',
               },
               {
-                label: 'Latest Posted Journal',
-                status: latestPostedRun?.journalEntryId ? 'Linked' : 'Not posted',
-                tone: latestPostedRun?.journalEntryId ? 'text-success-700' : 'text-warning-700',
+                label: 'Selected Run Journal',
+                status: selectedRun?.postingReadiness.accountingJournalId ? 'Linked' : 'Not posted',
+                tone: selectedRun?.postingReadiness.accountingJournalId ? 'text-success-700' : 'text-warning-700',
               },
               {
                 label: 'Runs Awaiting Review or Posting',

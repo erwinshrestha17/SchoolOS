@@ -150,11 +150,76 @@ describe('StaffService M7 HR hardening', () => {
 
     expect(prisma.staffAttendance.upsert).not.toHaveBeenCalled();
   });
+
+  it('returns a paginated tenant-scoped staff directory without sensitive payroll fields', async () => {
+    const { service, prisma } = buildService({
+      staffList: [
+        buildStaff({
+          id: 'staff-2',
+          employeeId: 'EMP-002',
+          firstName: 'Bina',
+          lastName: 'Accountant',
+          department: 'Finance',
+          designation: 'Accountant',
+          bankAccount: '9999999999',
+          panNumber: 'PAN-999',
+        }),
+      ],
+      staffCount: 13,
+    });
+
+    const result = await service.listStaffDirectory(
+      {
+        page: 2,
+        limit: 5,
+        search: 'bina',
+        status: StaffStatus.ACTIVE,
+        contractType: 'PERMANENT' as never,
+        department: 'Finance',
+      },
+      hrActor,
+    );
+
+    expect(prisma.staff.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: actor.tenantId,
+          status: StaffStatus.ACTIVE,
+          contractType: 'PERMANENT',
+          department: 'Finance',
+          OR: expect.any(Array),
+        }),
+        skip: 5,
+        take: 5,
+      }),
+    );
+    expect(prisma.staff.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({ tenantId: actor.tenantId }),
+    });
+    expect(result).toMatchObject({
+      total: 13,
+      page: 2,
+      limit: 5,
+      hasNextPage: true,
+      items: [
+        expect.objectContaining({
+          id: 'staff-2',
+          employeeId: 'EMP-002',
+          department: 'Finance',
+          designation: 'Accountant',
+        }),
+      ],
+    });
+    expect(result.items[0]).not.toHaveProperty('bankAccount');
+    expect(result.items[0]).not.toHaveProperty('panNumber');
+  });
 });
 
 function buildService(
   options: {
     staff?: Record<string, unknown> | null;
+    staffList?: Array<Record<string, unknown>>;
+    staffCount?: number;
     leaveBalances?: Array<Record<string, unknown>>;
     leaveRequest?: Record<string, unknown> | null;
     payrollRuns?: Array<Record<string, unknown>>;
@@ -163,6 +228,10 @@ function buildService(
   const prisma = {
     staff: {
       findFirst: jest.fn().mockResolvedValue(options.staff ?? buildStaff()),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.staffList ?? [buildStaff()]),
+      count: jest.fn().mockResolvedValue(options.staffCount ?? 1),
     },
     staffLeaveBalance: {
       findMany: jest.fn().mockResolvedValue(options.leaveBalances ?? []),

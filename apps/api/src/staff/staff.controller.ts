@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { StaffStatus } from '@prisma/client';
@@ -17,6 +18,7 @@ import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { StaffLifecycleDto } from './dto/staff-lifecycle.dto';
+import { ListStaffQueryDto } from './dto/list-staff-query.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { StaffService } from './staff.service';
 import {
@@ -34,6 +36,15 @@ export class StaffController {
   @Permissions('staff:read')
   listStaff(@CurrentAuth() auth: AuthContext) {
     return this.staffService.listStaff(auth);
+  }
+
+  @Get('directory')
+  @Permissions('staff:read')
+  listStaffDirectory(
+    @Query() query: ListStaffQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.staffService.listStaffDirectory(query, auth);
   }
 
   @Get('me')

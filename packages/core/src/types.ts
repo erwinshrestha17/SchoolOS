@@ -1318,7 +1318,7 @@ export type FinanceDashboardSummary = {
   };
   pendingApprovalCount: number;
   cashierClose: {
-    state: 'NOT_STARTED' | 'OPEN' | 'CLOSED';
+    state: "NOT_STARTED" | "OPEN" | "CLOSED";
     latestCloseId: string | null;
     latestCloseNumber: string | null;
     latestClosedAt: string | null;
@@ -1402,7 +1402,7 @@ export type InvoiceDetailPayment = {
     receiptNumber: string;
     issuedAt: string;
     fileAssetId: string | null;
-    fileStatus: 'PENDING' | 'AVAILABLE' | 'UNAVAILABLE';
+    fileStatus: "PENDING" | "AVAILABLE" | "UNAVAILABLE";
   } | null;
   refunds: Array<{
     id: string;
@@ -1474,7 +1474,7 @@ export type InvoiceDetail = {
 export type StudentFeeLedgerRow = {
   id: string;
   date: string;
-  type: 'INVOICE' | 'PAYMENT' | 'WAIVER' | 'REFUND';
+  type: "INVOICE" | "PAYMENT" | "WAIVER" | "REFUND";
   reference: string;
   description: string;
   debit: number;
@@ -1763,7 +1763,7 @@ export type ReceiptView = {
   id: string;
   receiptNumber: string;
   fileAssetId: string | null;
-  fileStatus: 'PENDING' | 'AVAILABLE' | 'UNAVAILABLE';
+  fileStatus: "PENDING" | "AVAILABLE" | "UNAVAILABLE";
   issuedAt: string;
   paymentId?: string;
   amount?: number;
@@ -1797,14 +1797,14 @@ export type ReceiptView = {
 
 export type FinanceApprovalRequestView = {
   id: string;
-  type: 'REFUND' | 'REVERSAL';
+  type: "REFUND" | "REVERSAL";
   status:
-    | 'PENDING'
-    | 'PROCESSING'
-    | 'APPROVED'
-    | 'REJECTED'
-    | 'EXECUTED'
-    | 'FAILED';
+    | "PENDING"
+    | "PROCESSING"
+    | "APPROVED"
+    | "REJECTED"
+    | "EXECUTED"
+    | "FAILED";
   paymentId: string;
   amount: number | null;
   reason: string;
@@ -1815,13 +1815,13 @@ export type FinanceApprovalRequestView = {
   history: Array<{
     id: string;
     action:
-      | 'REQUESTED'
-      | 'REVIEW_STARTED'
-      | 'APPROVED'
-      | 'REJECTED'
-      | 'EXECUTED'
-      | 'EXECUTION_FAILED';
-    status: FinanceApprovalRequestView['status'];
+      | "REQUESTED"
+      | "REVIEW_STARTED"
+      | "APPROVED"
+      | "REJECTED"
+      | "EXECUTED"
+      | "EXECUTION_FAILED";
+    status: FinanceApprovalRequestView["status"];
     actorUserId: string;
     note: string | null;
     createdAt: string;
@@ -1830,7 +1830,7 @@ export type FinanceApprovalRequestView = {
 
 export type FinancePaginatedResponse<T> = Omit<
   PaginatedResponse<T>,
-  'page' | 'limit' | 'hasNextPage'
+  "page" | "limit" | "hasNextPage"
 > & {
   page: number;
   limit: number;
@@ -2052,11 +2052,13 @@ export type SendParentTeacherMessageResult = {
 
 // ─── Compiled from types/payroll.ts ───
 
+export type PayrollMoneyAmount = string | number;
+
 export type SalaryComponentSummary = {
   id: string;
   name: string;
   componentType: string;
-  amount: number;
+  amount: PayrollMoneyAmount;
   taxable: boolean;
 };
 
@@ -2065,9 +2067,9 @@ export type SalaryStructureSummary = {
   staffId: string;
   effectiveFrom: string;
   effectiveTo: string | null;
-  basicSalary: number;
-  allowances: number;
-  deductions: number;
+  basicSalary: PayrollMoneyAmount;
+  allowances: PayrollMoneyAmount;
+  deductions: PayrollMoneyAmount;
   pfEnabled: boolean;
   tdsEnabled: boolean;
   paymentMethod: string;
@@ -2083,13 +2085,14 @@ export type PayrollRunSummary = {
   periodMonth: number;
   periodYear: number;
   status: string;
-  grossAmount: number;
-  deductionAmount: number;
-  netAmount: number;
-  pfEmployeeAmount?: number;
-  pfEmployerAmount?: number;
-  tdsAmount?: number;
+  grossAmount: PayrollMoneyAmount;
+  deductionAmount: PayrollMoneyAmount;
+  netAmount: PayrollMoneyAmount;
+  pfEmployeeAmount?: PayrollMoneyAmount;
+  pfEmployerAmount?: PayrollMoneyAmount;
+  tdsAmount?: PayrollMoneyAmount;
   lineCount?: number;
+  payslipCount?: number;
   journalEntryId: string | null;
   disbursementJournalEntryId?: string | null;
   lines?: PayrollLineSummary[];
@@ -2098,19 +2101,19 @@ export type PayrollRunSummary = {
 export type PayrollLineSummary = {
   id: string;
   staffId: string;
-  grossSalary: number;
-  basicSalary?: number;
-  earnings?: number;
-  allowances?: number;
-  leaveDeductions?: number;
-  pfEmployee?: number;
-  pfEmployer?: number;
-  tds?: number;
-  otherDeductions?: number;
-  deductions: number;
-  netSalary: number;
-  paidDays?: number;
-  unpaidDays?: number;
+  grossSalary: PayrollMoneyAmount;
+  basicSalary?: PayrollMoneyAmount;
+  earnings?: PayrollMoneyAmount;
+  allowances?: PayrollMoneyAmount;
+  leaveDeductions?: PayrollMoneyAmount;
+  pfEmployee?: PayrollMoneyAmount;
+  pfEmployer?: PayrollMoneyAmount;
+  tds?: PayrollMoneyAmount;
+  otherDeductions?: PayrollMoneyAmount;
+  deductions: PayrollMoneyAmount;
+  netSalary: PayrollMoneyAmount;
+  paidDays?: PayrollMoneyAmount;
+  unpaidDays?: PayrollMoneyAmount;
   attendanceDays: number;
   workingDays: number;
   paymentStatus?: string;
@@ -2130,9 +2133,9 @@ export type PayrollPreviewResult = {
   contractSummary?: {
     contractNumber: string;
     position: string;
-    baseSalary: number;
-    allowances: number;
-    deductions: number;
+    baseSalary: PayrollMoneyAmount;
+    allowances: PayrollMoneyAmount;
+    deductions: PayrollMoneyAmount;
   };
   periodMonth: number;
   periodYear: number;
@@ -2155,9 +2158,12 @@ export type PayslipSummary = {
   staffId: string;
   payslipNumber: string;
   status: string;
-  grossSalary: number;
-  deductionAmount: number;
-  netSalary: number;
+  grossSalary: PayrollMoneyAmount;
+  deductionAmount: PayrollMoneyAmount;
+  pfEmployee?: PayrollMoneyAmount;
+  pfEmployer?: PayrollMoneyAmount;
+  tds?: PayrollMoneyAmount;
+  netSalary: PayrollMoneyAmount;
   issuedAt: string | null;
   staff?: StaffSummary & { fullName?: string };
   payrollRun?: {
@@ -2168,7 +2174,71 @@ export type PayslipSummary = {
   };
   periodMonth?: number;
   periodYear?: number;
-  netAmount?: number;
+  netAmount?: PayrollMoneyAmount;
+};
+
+export type PayrollDashboardSummary = {
+  filters: {
+    periodMonth: number;
+    periodYear: number;
+    payrollRunId: string | null;
+    contractWindowDays: number;
+    timezone: 'Asia/Kathmandu';
+    windowStart: string;
+    windowEndExclusive: string;
+  };
+  activeStaffCount: number;
+  activeStaffWithoutActiveSalaryStructureCount: number;
+  contractsExpiringWithinWindow: number;
+  pendingLeaveRequests: number;
+  onLeaveTodayCount: number;
+  payrollRunsByStatus: Record<string, number>;
+  latestPayrollRun: Pick<
+    PayrollRunSummary,
+    | 'id'
+    | 'periodMonth'
+    | 'periodYear'
+    | 'status'
+    | 'journalEntryId'
+    | 'disbursementJournalEntryId'
+  > | null;
+  selectedPayrollRun: {
+    id: string;
+    periodMonth: number;
+    periodYear: number;
+    status: string;
+    employeeCount: number;
+    totalGross: PayrollMoneyAmount;
+    totalDeductions: PayrollMoneyAmount;
+    totalNet: PayrollMoneyAmount;
+    pfEmployeeAmount: PayrollMoneyAmount;
+    pfEmployerAmount: PayrollMoneyAmount;
+    tdsAmount: PayrollMoneyAmount;
+    approvalReadiness: {
+      canEdit: boolean;
+      canReview: boolean;
+      canApprove: boolean;
+      canPost: boolean;
+      canPay: boolean;
+      canReverse: boolean;
+      isLocked: boolean;
+    };
+    postingReadiness: {
+      canPost: boolean;
+      accountingJournalId: string | null;
+      disbursementJournalEntryId?: string | null;
+      createsAccountingAccrualOnly: boolean;
+      salaryDisbursementProviderSupported: boolean;
+    };
+    payslipGeneration: {
+      status: 'UNAVAILABLE' | 'PENDING' | 'PARTIAL' | 'COMPLETE';
+      total: number;
+      expected: number;
+      byStatus: Record<string, number>;
+    };
+    validationExceptionCount: number | null;
+    validationExceptionSource: string;
+  } | null;
 };
 
 
@@ -2801,9 +2871,9 @@ export type StaffContractSummary = {
   position: string;
   startDate: string;
   endDate: string | null;
-  baseSalary: number;
-  allowances: number;
-  deductions: number;
+  baseSalary: PayrollMoneyAmount;
+  allowances: PayrollMoneyAmount;
+  deductions: PayrollMoneyAmount;
   status: string;
 };
 

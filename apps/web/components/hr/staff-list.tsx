@@ -4,10 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Search, UserPlus, Mail, Briefcase, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
-import { LoadingState } from '../ui/loading-state';
 import { EmptyState } from '../ui/empty-state';
 import { StaffCreateDialog } from './staff-create-dialog';
 import { Badge } from '../ui/badge';
@@ -28,52 +27,31 @@ export function StaffList() {
     value?.trim() || fallback;
 
   const staffQuery = useQuery({
-    queryKey: ['staff'],
-    queryFn: api.listStaff,
+    queryKey: [
+      'staff-directory',
+      page,
+      limit,
+      search,
+      statusFilter,
+      contractFilter,
+      deptFilter,
+      desigFilter,
+    ],
+    queryFn: () =>
+      api.listStaffDirectory({
+        page,
+        limit,
+        search: search.trim() || undefined,
+        status: statusFilter === 'ALL' ? undefined : statusFilter,
+        contractType: contractFilter === 'ALL' ? undefined : contractFilter,
+        department: deptFilter.trim() || undefined,
+        designation: desigFilter.trim() || undefined,
+      }),
   });
 
-  const staff = useMemo(() => staffQuery.data ?? [], [staffQuery.data]);
-
-  // Derived filter options for dropdowns
-  const departments = useMemo(() => {
-    const set = new Set<string>();
-    staff.forEach((s) => s.department && set.add(s.department));
-    return Array.from(set);
-  }, [staff]);
-
-  const designations = useMemo(() => {
-    const set = new Set<string>();
-    staff.forEach((s) => s.designation && set.add(s.designation));
-    return Array.from(set);
-  }, [staff]);
-
-  // Apply filters
-  const filteredStaff = useMemo(() => {
-    return staff.filter((s) => {
-      const fullName = `${s.firstName} ${s.lastName} ${s.employeeId}`.toLowerCase();
-      const matchesSearch = fullName.includes(search.toLowerCase());
-      
-      const matchesStatus =
-        statusFilter === 'ALL' ||
-        (statusFilter === 'ACTIVE' && (s.status === 'ACTIVE' || !s.status)) ||
-        s.status === statusFilter;
-        
-      const matchesContract = contractFilter === 'ALL' || s.contractType === contractFilter;
-      
-      const matchesDept = !deptFilter || s.department === deptFilter;
-      const matchesDesig = !desigFilter || s.designation === desigFilter;
-
-      return matchesSearch && matchesStatus && matchesContract && matchesDept && matchesDesig;
-    });
-  }, [staff, search, statusFilter, contractFilter, deptFilter, desigFilter]);
-
-  // Paginated subset
-  const totalItems = filteredStaff.length;
+  const paginatedStaff = staffQuery.data?.items ?? [];
+  const totalItems = staffQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalItems / limit));
-  const paginatedStaff = useMemo(() => {
-    const start = (page - 1) * limit;
-    return filteredStaff.slice(start, start + limit);
-  }, [filteredStaff, page, limit]);
 
   const handlePrevPage = () => setPage((p) => Math.max(1, p - 1));
   const handleNextPage = () => setPage((p) => Math.min(totalPages, p + 1));
@@ -124,32 +102,37 @@ export function StaffList() {
           <Select value={contractFilter} onChange={(e) => { setContractFilter(e.target.value); setPage(1); }}>
             <option value="ALL">All Contracts</option>
             <option value="PERMANENT">Permanent</option>
-            <option value="CONTRACT">Contract</option>
-            <option value="PROBATION">Probation</option>
             <option value="TEMPORARY">Temporary</option>
+            <option value="PART_TIME">Part Time</option>
           </Select>
         </div>
         <div>
           <label className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 block mb-1.5 ml-1">
             Department
           </label>
-          <Select value={deptFilter} onChange={(e) => { setDeptFilter(e.target.value); setPage(1); }}>
-            <option value="">All Departments</option>
-            {departments.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </Select>
+          <Input
+            type="text"
+            placeholder="All Departments"
+            value={deptFilter}
+            onChange={(e) => {
+              setDeptFilter(e.target.value);
+              setPage(1);
+            }}
+          />
         </div>
         <div>
           <label className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 block mb-1.5 ml-1">
             Designation
           </label>
-          <Select value={desigFilter} onChange={(e) => { setDesigFilter(e.target.value); setPage(1); }}>
-            <option value="">All Designations</option>
-            {designations.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </Select>
+          <Input
+            type="text"
+            placeholder="All Designations"
+            value={desigFilter}
+            onChange={(e) => {
+              setDesigFilter(e.target.value);
+              setPage(1);
+            }}
+          />
         </div>
       </div>
 
@@ -266,7 +249,7 @@ export function StaffList() {
         </div>
 
         {/* Pagination Controls */}
-        {totalPages > 1 && (
+        {totalItems > 0 && (
           <div className="flex items-center justify-between border-t border-slate-100 px-8 py-4 bg-slate-50/50">
             <span className="text-xs font-bold text-slate-500">
               Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} members

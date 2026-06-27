@@ -2,6 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import {
   PayrollLineStatus,
   PayrollRunStatus,
+  PayslipStatus,
   Prisma,
   SalaryComponentType,
   SalaryStructureStatus,
@@ -289,17 +290,247 @@ describe('PayrollService hardening boundaries', () => {
     expect(pf).toMatchObject({
       payrollRunId: 'run-1',
       staffCount: 1,
-      employeeContribution: 1000,
-      employerContribution: 1000,
-      totalContribution: 2000,
+      employeeContribution: '1000.00',
+      employerContribution: '1000.00',
+      totalContribution: '2000.00',
     });
-    expect(tds).toMatchObject({ payrollRunId: 'run-1', totalTds: 500 });
+    expect(tds).toMatchObject({ payrollRunId: 'run-1', totalTds: '500.00' });
     expect(components).toMatchObject({
       payrollRunId: 'run-1',
       staffCount: 1,
-      grossSalary: 50000,
-      netPayable: 49000,
+      grossSalary: '50000.00',
+      netPayable: '49000.00',
     });
+  });
+
+  it('returns bounded backend-owned dashboard summary totals as serialized Decimal values', async () => {
+    const selectedRun = buildPayrollRun({
+      status: PayrollRunStatus.APPROVED,
+      grossAmount: new Prisma.Decimal('100000.25'),
+      deductionAmount: new Prisma.Decimal('12000.10'),
+      netAmount: new Prisma.Decimal('88000.15'),
+      pfEmployeeAmount: new Prisma.Decimal('5000.05'),
+      pfEmployerAmount: new Prisma.Decimal('5000.05'),
+      tdsAmount: new Prisma.Decimal('2000.00'),
+      _count: { lines: 2, payslips: 1 },
+    });
+    const { service, prisma } = buildService({
+      staffCountQueue: [12, 2],
+      staffContractCount: 3,
+      staffLeaveRequestCountQueue: [5, 1],
+      payrollRunFindFirstQueue: [
+        buildPayrollRun({ id: 'latest-run', status: PayrollRunStatus.POSTED }),
+        selectedRun,
+      ],
+      payrollRunStatusGroups: [
+        { status: PayrollRunStatus.APPROVED, _count: { _all: 1 } },
+        { status: PayrollRunStatus.GENERATED, _count: { _all: 2 } },
+      ],
+      payslipStatusGroups: [
+        { status: PayslipStatus.ISSUED, _count: { _all: 1 } },
+      ],
+    });
+
+    const summary = await service.getPayrollDashboardSummary(
+      {
+        payrollRunId: 'run-1',
+        month: 5,
+        year: 2026,
+        contractWindowDays: 45,
+      },
+      actor as never,
+    );
+
+    expect(summary).toMatchObject({
+      filters: {
+        periodMonth: 5,
+        periodYear: 2026,
+        payrollRunId: 'run-1',
+        contractWindowDays: 45,
+        timezone: 'Asia/Kathmandu',
+      },
+      activeStaffCount: 12,
+      activeStaffWithoutActiveSalaryStructureCount: 2,
+      contractsExpiringWithinWindow: 3,
+      pendingLeaveRequests: 5,
+      onLeaveTodayCount: 1,
+      payrollRunsByStatus: expect.objectContaining({
+        APPROVED: 1,
+        GENERATED: 2,
+      }),
+      selectedPayrollRun: expect.objectContaining({
+        employeeCount: 2,
+        totalGross: '100000.25',
+        totalDeductions: '12000.10',
+        totalNet: '88000.15',
+        pfEmployeeAmount: '5000.05',
+        postingReadiness: expect.objectContaining({
+          canPost: true,
+          createsAccountingAccrualOnly: true,
+          salaryDisbursementProviderSupported: false,
+        }),
+        payslipGeneration: expect.objectContaining({
+          status: 'PARTIAL',
+          total: 1,
+          expected: 2,
+          byStatus: expect.objectContaining({ ISSUED: 1 }),
+        }),
+      }),
+    });
+    expect(prisma.staff.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ tenantId: actor.tenantId }),
+      }),
+    );
+    expect(prisma.payrollRun.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId: actor.tenantId, id: 'run-1' },
+      }),
+    );
+  });
+
+  it('paginates payroll runs with tenant and lifecycle status filters', async () => {
+    const { service, prisma } = buildService({
+      payrollRuns: [
+        buildPayrollRun({
+          status: PayrollRunStatus.APPROVED,
+          _count: { lines: 3, payslips: 2 },
+        }),
+      ],
+      payrollRunCount: 21,
+    });
+
+    const result = await service.listPayrollRuns(
+      { page: 2, limit: 10, status: PayrollRunStatus.APPROVED },
+      actor as never,
+    );
+
+    expect(prisma.payrollRun.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: actor.tenantId,
+          status: PayrollRunStatus.APPROVED,
+        },
+        skip: 10,
+        take: 10,
+      }),
+    );
+    expect(result).toMatchObject({
+      total: 21,
+      page: 2,
+      limit: 10,
+      hasNextPage: true,
+      items: [
+        expect.objectContaining({
+          grossAmount: '50000.00',
+          netAmount: '49000.00',
+          lineCount: 3,
+          payslipCount: 2,
+        }),
+      ],
+    });
+  });
+
+  it('keeps staff self-service payslip lists scoped to the authenticated staff member', async () => {
+    const { service, prisma } = buildService({
+      staff: buildStaff({ id: 'own-staff', userId: actor.userId }),
+      payslips: [buildPayslip({ staffId: 'own-staff' })],
+      payslipCount: 1,
+    });
+
+    const result = await service.listMyPayslips(
+      { page: 1, limit: 5, staffId: 'other-staff' },
+      actor as never,
+    );
+
+    expect(prisma.staff.findFirst).toHaveBeenCalledWith({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+    });
+    expect(prisma.payslip.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: actor.tenantId,
+          staffId: 'own-staff',
+        }),
+        skip: 0,
+        take: 5,
+      }),
+    );
+    expect(result).toMatchObject({
+      total: 1,
+      items: [expect.objectContaining({ staffId: 'own-staff' })],
+    });
+  });
+
+  it('downloads payslips only through File Registry protected file access', async () => {
+    const content = Buffer.from('%PDF-1.4 protected');
+    const fileRegistryService = {
+      getFileMetadata: jest.fn().mockResolvedValue({
+        id: 'file-1',
+        tenantId: actor.tenantId,
+        module: 'payroll',
+        entityId: 'payslip-1',
+      }),
+      assertFileAccessForAuth: jest.fn().mockResolvedValue(undefined),
+      getProtectedDownload: jest.fn().mockResolvedValue({
+        asset: { id: 'file-1' },
+        content,
+      }),
+    };
+    const { service, prisma } = buildService({
+      payslip: buildPayslip({ id: 'payslip-1', payslipNumber: 'PS-001' }),
+      reportExports: [
+        {
+          fileAssetId: 'file-1',
+          filters: { payslipId: 'payslip-1', payslipNumber: 'PS-001' },
+        },
+      ],
+      fileRegistryService,
+    });
+
+    await expect(service.getPayslipPdf('PS-001', actor as never)).resolves.toBe(
+      content,
+    );
+    expect(prisma.reportExport.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: actor.tenantId,
+          reportKey: 'payroll.payslip',
+          format: 'pdf',
+          status: 'COMPLETED',
+          fileAssetId: { not: null },
+        }),
+      }),
+    );
+    expect(fileRegistryService.getFileMetadata).toHaveBeenCalledWith(
+      actor.tenantId,
+      'file-1',
+    );
+    expect(fileRegistryService.assertFileAccessForAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'file-1' }),
+      actor,
+    );
+    expect(fileRegistryService.getProtectedDownload).toHaveBeenCalledWith(
+      actor.tenantId,
+      'file-1',
+      actor.userId,
+    );
+  });
+
+  it('returns a safe unavailable state when a payslip has no registered protected file', async () => {
+    const { service } = buildService({
+      payslip: buildPayslip({ id: 'payslip-1', payslipNumber: 'PS-001' }),
+      reportExports: [],
+      fileRegistryService: {
+        getFileMetadata: jest.fn(),
+        assertFileAccessForAuth: jest.fn(),
+        getProtectedDownload: jest.fn(),
+      },
+    });
+
+    await expect(
+      service.getPayslipPdf('PS-001', actor as never),
+    ).rejects.toThrow('Protected payslip file is unavailable');
   });
 
   it('lists statutory deductions from tenant-scoped active salary structures only', async () => {
@@ -347,7 +578,7 @@ describe('PayrollService hardening boundaries', () => {
       expect.objectContaining({
         code: 'DEDUCTION_CIT_CONTRIBUTION',
         name: 'CIT contribution',
-        amount: 2500,
+        amount: '2500.00',
         configuredStructureCount: 2,
         source: 'salary_structure_component',
       }),
@@ -386,11 +617,30 @@ function buildService(options: {
   salaryStructures?: unknown[];
   payrollLineCount?: number;
   payrollRun?: unknown;
+  payrollRunFindFirstQueue?: unknown[];
   payrollRuns?: unknown[];
+  payrollRunCount?: number;
+  payrollRunStatusGroups?: unknown[];
   postedPayrollRun?: unknown;
+  staffCountQueue?: number[];
+  staffContractCount?: number;
+  staffLeaveRequestCountQueue?: number[];
+  payslips?: unknown[];
+  payslip?: unknown;
+  payslipCount?: number;
+  payslipStatusGroups?: unknown[];
+  reportExports?: unknown[];
+  fileRegistryService?: unknown;
 }) {
   const salaryStructureFindFirstQueue = [
     ...(options.salaryStructureFindFirstQueue ?? []),
+  ];
+  const payrollRunFindFirstQueue = [
+    ...(options.payrollRunFindFirstQueue ?? []),
+  ];
+  const staffCountQueue = [...(options.staffCountQueue ?? [])];
+  const staffLeaveRequestCountQueue = [
+    ...(options.staffLeaveRequestCountQueue ?? []),
   ];
 
   const tx = {
@@ -418,11 +668,17 @@ function buildService(options: {
           options.staff === null ? null : (options.staff ?? buildStaff()),
         ),
       findMany: jest.fn().mockResolvedValue([buildStaff()]),
+      count: jest
+        .fn()
+        .mockImplementation(async () =>
+          staffCountQueue.length > 0 ? staffCountQueue.shift() : 1,
+        ),
     },
     staffContract: {
       create: jest.fn().mockResolvedValue(buildStaffContract()),
       findFirst: jest.fn().mockResolvedValue(buildStaffContract()),
       findMany: jest.fn().mockResolvedValue([buildStaffContract()]),
+      count: jest.fn().mockResolvedValue(options.staffContractCount ?? 0),
     },
     salaryStructure: {
       findFirst: jest.fn().mockImplementation(async () => {
@@ -439,11 +695,19 @@ function buildService(options: {
     payrollRun: {
       findFirst: jest
         .fn()
-        .mockResolvedValue(options.payrollRun ?? buildPayrollRun()),
+        .mockImplementation(async () =>
+          payrollRunFindFirstQueue.length > 0
+            ? payrollRunFindFirstQueue.shift()
+            : (options.payrollRun ?? buildPayrollRun()),
+        ),
       findUnique: jest.fn().mockResolvedValue(null),
       findMany: jest
         .fn()
         .mockResolvedValue(options.payrollRuns ?? [buildPayrollRun()]),
+      count: jest.fn().mockResolvedValue(options.payrollRunCount ?? 1),
+      groupBy: jest
+        .fn()
+        .mockResolvedValue(options.payrollRunStatusGroups ?? []),
       create: jest.fn().mockResolvedValue(buildPayrollRun()),
       update: jest.fn().mockResolvedValue(buildPayrollRun()),
     },
@@ -455,12 +719,27 @@ function buildService(options: {
     payslip: {
       createMany: jest.fn().mockResolvedValue({ count: 1 }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findMany: jest.fn().mockResolvedValue(options.payslips ?? []),
+      findFirst: jest.fn().mockResolvedValue(options.payslip ?? buildPayslip()),
+      count: jest.fn().mockResolvedValue(options.payslipCount ?? 0),
+      groupBy: jest.fn().mockResolvedValue(options.payslipStatusGroups ?? []),
+    },
+    reportExport: {
+      findMany: jest.fn().mockResolvedValue(options.reportExports ?? []),
+      create: jest.fn(),
     },
     staffAttendance: {
       findMany: jest.fn().mockResolvedValue([]),
     },
     staffLeaveRequest: {
       findMany: jest.fn().mockResolvedValue([]),
+      count: jest
+        .fn()
+        .mockImplementation(async () =>
+          staffLeaveRequestCountQueue.length > 0
+            ? staffLeaveRequestCountQueue.shift()
+            : 0,
+        ),
     },
     journalEntry: {
       create: jest.fn(),
@@ -489,6 +768,7 @@ function buildService(options: {
       prisma as never,
       auditService as never,
       accountingPostingService as never,
+      options.fileRegistryService as never,
     ),
     prisma,
     tx,
@@ -588,6 +868,34 @@ function buildPayrollLine(overrides: Record<string, unknown> = {}) {
     netSalary: new Prisma.Decimal(49000),
     paidDays: new Prisma.Decimal(26),
     unpaidDays: new Prisma.Decimal(4),
+    ...overrides,
+  };
+}
+
+function buildPayslip(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'payslip-1',
+    tenantId: actor.tenantId,
+    payrollRunId: 'run-1',
+    payrollLineId: 'line-1',
+    staffId: 'staff-1',
+    payslipNumber: 'PS-001',
+    status: PayslipStatus.ISSUED,
+    grossSalary: new Prisma.Decimal(50000),
+    deductionAmount: new Prisma.Decimal(1000),
+    pfEmployee: new Prisma.Decimal(0),
+    pfEmployer: new Prisma.Decimal(0),
+    tds: new Prisma.Decimal(0),
+    netSalary: new Prisma.Decimal(49000),
+    paymentStatus: 'UNPAID',
+    issuedAt: new Date('2026-05-31T00:00:00.000Z'),
+    staff: buildStaff({ userId: actor.userId }),
+    payrollRun: {
+      id: 'run-1',
+      periodMonth: 5,
+      periodYear: 2026,
+      status: PayrollRunStatus.POSTED,
+    },
     ...overrides,
   };
 }
