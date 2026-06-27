@@ -17,6 +17,7 @@ import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { CreateStaffDto } from './dto/create-staff.dto';
+import { ListStaffQueryDto } from './dto/list-staff-query.dto';
 import { StaffLifecycleDto } from './dto/staff-lifecycle.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { StaffService } from './staff.service';
@@ -62,6 +63,15 @@ export class HrStaffController {
   @Permissions('hr:staff:read')
   listStaff(@CurrentAuth() auth: AuthContext) {
     return this.staffService.listStaff(auth);
+  }
+
+  @Get('directory')
+  @Permissions('hr:staff:read')
+  listStaffDirectory(
+    @Query() query: ListStaffQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.staffService.listStaffDirectory(query, auth);
   }
 
   @Post()

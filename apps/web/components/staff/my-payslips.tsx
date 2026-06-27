@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,40 +13,50 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Download, FileText, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { Toast } from '@/components/ui/toast';
 
 export function MyPayslips() {
-  const [payslips, setPayslips] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const limit = 10;
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloadingPayslip, setDownloadingPayslip] = useState<string | null>(null);
 
-  useEffect(() => {
-    api.listMyPayslips()
-      .then(data => {
-        setPayslips(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Failed to fetch payslips', err);
-        setLoading(false);
-      });
-  }, []);
+  const payslipQuery = useQuery({
+    queryKey: ['my-payslips', page, limit],
+    queryFn: () => api.listMyPayslipsPage({ page, limit }),
+  });
+  const payslips = payslipQuery.data?.items ?? [];
+  const totalItems = payslipQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / limit));
 
   const downloadPdf = async (payslipNumber: string) => {
+    setDownloadingPayslip(payslipNumber);
+    setDownloadError(null);
+
     try {
       await api.openMyPayslipPdf(payslipNumber);
     } catch (error) {
       console.error('Download failed', error);
       setDownloadError('Failed to download payslip. Please try again.');
+    } finally {
+      setDownloadingPayslip(null);
     }
   };
 
-  if (loading) return (
+  if (payslipQuery.isLoading) return (
     <div className="flex justify-center p-8">
       <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
     </div>
+  );
+
+  if (payslipQuery.isError) return (
+    <Card>
+      <CardContent className="p-8 text-center text-muted-foreground">
+        Payslips could not be loaded. Check your staff access and try again.
+      </CardContent>
+    </Card>
   );
 
   if (payslips.length === 0) return (
@@ -87,7 +98,9 @@ export function MyPayslips() {
             {payslips.map((slip) => (
               <TableRow key={slip.id}>
                 <TableCell className="font-medium">
-                  {slip.payrollRun.periodMonth}/{slip.payrollRun.periodYear}
+                  {slip.payrollRun
+                    ? `${slip.payrollRun.periodMonth}/${slip.payrollRun.periodYear}`
+                    : `${slip.periodMonth ?? 'Period'}/${slip.periodYear ?? 'Unavailable'}`}
                 </TableCell>
                 <TableCell>{slip.payslipNumber}</TableCell>
                 <TableCell>Rs {Number(slip.grossSalary).toLocaleString()}</TableCell>
@@ -104,16 +117,50 @@ export function MyPayslips() {
                   <Button 
                     variant="ghost" 
                     size="sm" 
+                    disabled={downloadingPayslip === slip.payslipNumber}
                     onClick={() => downloadPdf(slip.payslipNumber)}
                   >
-                    <Download className="w-4 h-4 mr-2" />
-                    PDF
+                    {downloadingPayslip === slip.payslipNumber ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4 mr-2" />
+                    )}
+                    Download PDF
                   </Button>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
+        {totalItems > 0 ? (
+          <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+            <p className="text-xs font-semibold text-slate-500">
+              Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} payslips
+            </p>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page === 1}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages}
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

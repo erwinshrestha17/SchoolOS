@@ -49,6 +49,8 @@ export function PayrollActionDialog({
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
+      void queryClient.invalidateQueries({ queryKey: ['payroll-run-detail', runId] });
+      void queryClient.invalidateQueries({ queryKey: ['payroll-dashboard-summary'] });
       onClose();
       setReason('');
     },

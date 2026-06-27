@@ -19,6 +19,13 @@ import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { CreateSalaryStructureDto } from './dto/create-salary-structure.dto';
 import { PayrollActionDto } from './dto/payroll-action.dto';
+import {
+  PayrollDashboardSummaryQueryDto,
+  PayrollRunListQueryDto,
+  PayslipListQueryDto,
+  SalaryStructureListQueryDto,
+  StaffContractListQueryDto,
+} from './dto/payroll-list-query.dto';
 import { PayrollPreviewQueryDto } from './dto/payroll-preview-query.dto';
 import { PayrollReportQueryDto } from './dto/payroll-report-query.dto';
 import { UpdateSalaryStructureDto } from './dto/update-salary-structure.dto';
@@ -77,8 +84,20 @@ export class PayrollController {
 
   @Get('runs')
   @Permissions('payroll:run:read')
-  listRuns(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.listPayrollRuns(auth);
+  listRuns(
+    @Query() query: PayrollRunListQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.listPayrollRuns(query, auth);
+  }
+
+  @Get('dashboard-summary')
+  @Permissions('payroll:run:read')
+  getDashboardSummary(
+    @Query() query: PayrollDashboardSummaryQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getPayrollDashboardSummary(query, auth);
   }
 
   @Get('runs/:id')
@@ -181,14 +200,20 @@ export class PayrollController {
 
   @Get('payslips')
   @Permissions('payroll:read')
-  listPayslips(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.listPayslips(auth);
+  listPayslips(
+    @Query() query: PayslipListQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.listPayslips(query, auth);
   }
 
   @Get('me/payslips')
   @Permissions('staff:read')
-  listMyPayslips(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.listMyPayslips(auth);
+  listMyPayslips(
+    @Query() query: PayslipListQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.listMyPayslips(query, auth);
   }
 
   @Get('me/payslips/:payslipNumber.pdf')
@@ -249,8 +274,11 @@ export class PayrollController {
 
   @Get('salary-structures')
   @Permissions('payroll:salary:read')
-  listSalaryStructures(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.listSalaryStructures(auth);
+  listSalaryStructures(
+    @Query() query: SalaryStructureListQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.listSalaryStructures(query, auth);
   }
 
   @Get('staff/:staffId/salary-structure')

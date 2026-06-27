@@ -10,11 +10,13 @@ import {
   PayrollLineStatus,
   PayrollPaymentStatus,
   PayrollRunStatus,
+  PayslipStatus,
   Prisma,
   SalaryComponentType,
   SalaryStructureStatus,
+  StaffStatus,
 } from '@prisma/client';
-import type { PayrollPreviewResult } from '@schoolos/core';
+import { getNepalSchoolDay, type PayrollPreviewResult } from '@schoolos/core';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -25,6 +27,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateSalaryStructureDto } from './dto/create-salary-structure.dto';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { PayrollActionDto } from './dto/payroll-action.dto';
+import type {
+  PayrollDashboardSummaryQueryDto,
+  PayrollPaginatedQueryDto,
+  PayrollRunListQueryDto,
+  PayslipListQueryDto,
+  SalaryStructureListQueryDto,
+  StaffContractListQueryDto,
+} from './dto/payroll-list-query.dto';
 import { PayrollPreviewQueryDto } from './dto/payroll-preview-query.dto';
 import { UpdateSalaryStructureDto } from './dto/update-salary-structure.dto';
 
@@ -39,6 +49,12 @@ interface PayrollReportFilters {
 
 type PayrollReportFilterInput = string | PayrollReportFilters;
 
+interface PaginationResult {
+  page: number;
+  limit: number;
+  skip: number;
+}
+
 @Injectable()
 export class PayrollService {
   constructor(
@@ -48,19 +64,82 @@ export class PayrollService {
     @Optional() private readonly fileRegistryService?: FileRegistryService,
   ) {}
 
-  async listContracts(actor: AuthContext) {
-    return this.prisma.staffContract.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        staff: {
-          include: {
-            user: true,
+  async listContracts(
+    query: StaffContractListQueryDto | undefined,
+    actor: AuthContext,
+  ) {
+    const { page, limit, skip } = getPagination(query);
+    const search = query?.search?.trim();
+    const department = query?.department?.trim();
+    const expiringCutoff =
+      query?.expiringWithinDays !== undefined
+        ? addDaysUtc(getNepalSchoolDay().startUtc, query.expiringWithinDays)
+        : null;
+    const where: Prisma.StaffContractWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query?.staffId ? { staffId: query.staffId } : {}),
+      ...(query?.status ? { status: query.status.trim().toUpperCase() } : {}),
+      ...(expiringCutoff
+        ? {
+            endDate: {
+              gte: getNepalSchoolDay().startUtc,
+              lte: expiringCutoff,
+            },
+          }
+        : {}),
+      ...(department ? { staff: { department: { equals: department } } } : {}),
+      ...(search
+        ? {
+            OR: [
+              { contractNumber: { contains: search, mode: 'insensitive' } },
+              { position: { contains: search, mode: 'insensitive' } },
+              {
+                staff: {
+                  OR: [
+                    { firstName: { contains: search, mode: 'insensitive' } },
+                    { lastName: { contains: search, mode: 'insensitive' } },
+                    { employeeId: { contains: search, mode: 'insensitive' } },
+                  ],
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.staffContract.findMany({
+        where,
+        include: {
+          staff: {
+            select: {
+              id: true,
+              employeeId: true,
+              firstName: true,
+              lastName: true,
+              department: true,
+              designation: true,
+            },
           },
         },
-      },
-      orderBy: [{ createdAt: 'desc' }],
-      take: 100,
-    });
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.staffContract.count({ where }),
+    ]);
+
+    return paginated(
+      items.map((contract) => ({
+        ...contract,
+        baseSalary: moneyString(contract.baseSalary),
+        allowances: moneyString(contract.allowances),
+        deductions: moneyString(contract.deductions),
+      })),
+      total,
+      page,
+      limit,
+    );
   }
 
   async createContract(dto: CreateStaffContractDto, actor: AuthContext) {
@@ -114,7 +193,7 @@ export class PayrollService {
       after: {
         staffId: contract.staffId,
         contractNumber: contract.contractNumber,
-        baseSalary: Number(contract.baseSalary),
+        baseSalary: contract.baseSalary.toString(),
       },
     });
 
@@ -181,13 +260,53 @@ export class PayrollService {
     return structure;
   }
 
-  async listSalaryStructures(actor: AuthContext) {
-    return this.prisma.salaryStructure.findMany({
-      where: { tenantId: actor.tenantId },
-      include: { staff: true, components: true },
-      orderBy: [{ effectiveFrom: 'desc' }],
-      take: 100,
-    });
+  async listSalaryStructures(
+    query: SalaryStructureListQueryDto | undefined,
+    actor: AuthContext,
+  ) {
+    const { page, limit, skip } = getPagination(query);
+    const search = query?.search?.trim();
+    const where: Prisma.SalaryStructureWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query?.staffId ? { staffId: query.staffId } : {}),
+      ...(query?.status ? { status: query.status } : {}),
+      ...(search
+        ? {
+            staff: {
+              OR: [
+                { firstName: { contains: search, mode: 'insensitive' } },
+                { lastName: { contains: search, mode: 'insensitive' } },
+                { employeeId: { contains: search, mode: 'insensitive' } },
+              ],
+            },
+          }
+        : {}),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.salaryStructure.findMany({
+        where,
+        include: {
+          staff: {
+            select: {
+              id: true,
+              employeeId: true,
+              firstName: true,
+              lastName: true,
+              department: true,
+              designation: true,
+            },
+          },
+          components: true,
+        },
+        orderBy: [{ effectiveFrom: 'desc' }, { id: 'asc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.salaryStructure.count({ where }),
+    ]);
+
+    return paginated(items.map(serializeSalaryStructure), total, page, limit);
   }
 
   async getActiveSalaryStructure(staffId: string, actor: AuthContext) {
@@ -401,20 +520,240 @@ export class PayrollService {
     return updated;
   }
 
-  async listPayrollRuns(actor: AuthContext) {
-    return this.prisma.payrollRun.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        lines: {
-          include: {
-            staff: true,
+  async listPayrollRuns(
+    query: PayrollRunListQueryDto | undefined,
+    actor: AuthContext,
+  ) {
+    const { page, limit, skip } = getPagination(query);
+    const where: Prisma.PayrollRunWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query?.month ? { periodMonth: query.month } : {}),
+      ...(query?.year ? { periodYear: query.year } : {}),
+      ...(query?.status ? { status: query.status } : {}),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.payrollRun.findMany({
+        where,
+        include: {
+          _count: { select: { lines: true, payslips: true } },
+        },
+        orderBy: [
+          { periodYear: 'desc' },
+          { periodMonth: 'desc' },
+          { createdAt: 'desc' },
+        ],
+        skip,
+        take: limit,
+      }),
+      this.prisma.payrollRun.count({ where }),
+    ]);
+
+    return paginated(items.map(serializePayrollRunSummary), total, page, limit);
+  }
+
+  async getPayrollDashboardSummary(
+    query: PayrollDashboardSummaryQueryDto | undefined,
+    actor: AuthContext,
+  ) {
+    const schoolDay = getNepalSchoolDay();
+    const [currentYear, currentMonth] = schoolDay.gregorianDate
+      .split('-')
+      .map(Number);
+    const periodYear = query?.year ?? currentYear;
+    const periodMonth = query?.month ?? currentMonth;
+    const contractWindowDays = clampInt(query?.contractWindowDays, 30, 1, 180);
+    const contractWindowEnd = addDaysUtc(
+      schoolDay.startUtc,
+      contractWindowDays,
+    );
+    const payrollRunWhere: Prisma.PayrollRunWhereInput = {
+      tenantId: actor.tenantId,
+      periodMonth,
+      periodYear,
+    };
+
+    const [
+      activeStaffCount,
+      activeStaffWithoutActiveSalaryStructureCount,
+      contractsExpiringCount,
+      pendingLeaveRequests,
+      onLeaveTodayCount,
+      payrollRunStatusGroups,
+      latestPayrollRun,
+      selectedRun,
+    ] = await Promise.all([
+      this.prisma.staff.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: { in: [StaffStatus.ACTIVE, StaffStatus.ON_LEAVE] },
+        },
+      }),
+      this.prisma.staff.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: { in: [StaffStatus.ACTIVE, StaffStatus.ON_LEAVE] },
+          salaryStructures: {
+            none: { status: SalaryStructureStatus.ACTIVE },
           },
         },
-        payslips: true,
+      }),
+      this.prisma.staffContract.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: 'ACTIVE',
+          endDate: {
+            gte: schoolDay.startUtc,
+            lte: contractWindowEnd,
+          },
+          staff: {
+            status: { in: [StaffStatus.ACTIVE, StaffStatus.ON_LEAVE] },
+          },
+        },
+      }),
+      this.prisma.staffLeaveRequest.count({
+        where: { tenantId: actor.tenantId, status: 'PENDING' },
+      }),
+      this.prisma.staffLeaveRequest.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: 'APPROVED',
+          startsOn: { lt: schoolDay.endExclusiveUtc },
+          endsOn: { gte: schoolDay.startUtc },
+        },
+      }),
+      this.prisma.payrollRun.groupBy({
+        by: ['status'],
+        where: payrollRunWhere,
+        _count: { _all: true },
+      }),
+      this.prisma.payrollRun.findFirst({
+        where: { tenantId: actor.tenantId },
+        orderBy: [
+          { periodYear: 'desc' },
+          { periodMonth: 'desc' },
+          { createdAt: 'desc' },
+        ],
+        select: {
+          id: true,
+          periodMonth: true,
+          periodYear: true,
+          status: true,
+          journalEntryId: true,
+          disbursementJournalEntryId: true,
+        },
+      }),
+      this.prisma.payrollRun.findFirst({
+        where: query?.payrollRunId
+          ? { tenantId: actor.tenantId, id: query.payrollRunId }
+          : payrollRunWhere,
+        include: {
+          _count: { select: { lines: true, payslips: true } },
+        },
+        orderBy: query?.payrollRunId
+          ? undefined
+          : [
+              { periodYear: 'desc' },
+              { periodMonth: 'desc' },
+              { createdAt: 'desc' },
+            ],
+      }),
+    ]);
+
+    const payslipsByStatus = selectedRun
+      ? await this.prisma.payslip.groupBy({
+          by: ['status'],
+          where: { tenantId: actor.tenantId, payrollRunId: selectedRun.id },
+          _count: { _all: true },
+        })
+      : [];
+
+    const runStatusCounts = Object.values(PayrollRunStatus).reduce<
+      Record<string, number>
+    >((acc, status) => {
+      acc[status] =
+        payrollRunStatusGroups.find((group) => group.status === status)?._count
+          ._all ?? 0;
+      return acc;
+    }, {});
+    const payslipStatusCounts = Object.values(PayslipStatus).reduce<
+      Record<string, number>
+    >((acc, status) => {
+      acc[status] =
+        payslipsByStatus.find((group) => group.status === status)?._count
+          ._all ?? 0;
+      return acc;
+    }, {});
+    const payslipCount = selectedRun?._count.payslips ?? 0;
+    const employeeCount = selectedRun?._count.lines ?? 0;
+
+    return {
+      filters: {
+        periodMonth,
+        periodYear,
+        payrollRunId: query?.payrollRunId ?? selectedRun?.id ?? null,
+        contractWindowDays,
+        timezone: 'Asia/Kathmandu',
+        windowStart: schoolDay.startUtc.toISOString(),
+        windowEndExclusive: contractWindowEnd.toISOString(),
       },
-      orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
-      take: 100,
-    });
+      activeStaffCount,
+      activeStaffWithoutActiveSalaryStructureCount,
+      contractsExpiringWithinWindow: contractsExpiringCount,
+      pendingLeaveRequests,
+      onLeaveTodayCount,
+      payrollRunsByStatus: runStatusCounts,
+      latestPayrollRun: latestPayrollRun
+        ? {
+            id: latestPayrollRun.id,
+            periodMonth: latestPayrollRun.periodMonth,
+            periodYear: latestPayrollRun.periodYear,
+            status: latestPayrollRun.status,
+            journalEntryId: latestPayrollRun.journalEntryId,
+            disbursementJournalEntryId:
+              latestPayrollRun.disbursementJournalEntryId,
+          }
+        : null,
+      selectedPayrollRun: selectedRun
+        ? {
+            id: selectedRun.id,
+            periodMonth: selectedRun.periodMonth,
+            periodYear: selectedRun.periodYear,
+            status: selectedRun.status,
+            employeeCount,
+            totalGross: moneyString(selectedRun.grossAmount),
+            totalDeductions: moneyString(selectedRun.deductionAmount),
+            totalNet: moneyString(selectedRun.netAmount),
+            pfEmployeeAmount: moneyString(selectedRun.pfEmployeeAmount),
+            pfEmployerAmount: moneyString(selectedRun.pfEmployerAmount),
+            tdsAmount: moneyString(selectedRun.tdsAmount),
+            approvalReadiness: getPayrollRunActions(selectedRun.status),
+            postingReadiness: {
+              canPost: getPayrollRunActions(selectedRun.status).canPost,
+              accountingJournalId: selectedRun.journalEntryId,
+              disbursementJournalEntryId:
+                selectedRun.disbursementJournalEntryId,
+              createsAccountingAccrualOnly: true,
+              salaryDisbursementProviderSupported: false,
+            },
+            payslipGeneration: {
+              status:
+                employeeCount === 0
+                  ? 'UNAVAILABLE'
+                  : payslipCount === 0
+                    ? 'PENDING'
+                    : payslipCount < employeeCount
+                      ? 'PARTIAL'
+                      : 'COMPLETE',
+              total: payslipCount,
+              expected: employeeCount,
+              byStatus: payslipStatusCounts,
+            },
+            validationExceptionCount: null,
+            validationExceptionSource: 'needs_exception_workflow_contract',
+          }
+        : null,
+    };
   }
 
   async createPayrollRun(dto: CreatePayrollRunDto, actor: AuthContext) {
@@ -510,7 +849,7 @@ export class PayrollService {
         periodMonth: run.periodMonth,
         periodYear: run.periodYear,
         lineCount: run.lines.length,
-        netAmount: Number(run.netAmount),
+        netAmount: run.netAmount.toString(),
       },
     });
 
@@ -951,8 +1290,8 @@ export class PayrollService {
       resourceId: run.id,
       after: {
         journalEntryId: posted.journalEntryId,
-        grossAmount: Number(posted.grossAmount),
-        netAmount: Number(posted.netAmount),
+        grossAmount: posted.grossAmount.toString(),
+        netAmount: posted.netAmount.toString(),
       },
     });
 
@@ -1265,22 +1604,84 @@ export class PayrollService {
   }
 
   async getPayrollRun(id: string, actor: AuthContext) {
-    return this.getPayrollRunOrThrow(id, actor);
+    const run = await this.getPayrollRunOrThrow(id, actor);
+    return serializePayrollRunDetail(run);
   }
 
-  async listPayslips(actor: AuthContext) {
-    return this.prisma.payslip.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        staff: true,
-        payrollRun: true,
-      },
-      orderBy: [{ createdAt: 'desc' }],
-      take: 100,
-    });
+  async listPayslips(
+    query: PayslipListQueryDto | undefined,
+    actor: AuthContext,
+  ) {
+    const { page, limit, skip } = getPagination(query);
+    const search = query?.search?.trim();
+    const where: Prisma.PayslipWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query?.payrollRunId ? { payrollRunId: query.payrollRunId } : {}),
+      ...(query?.staffId ? { staffId: query.staffId } : {}),
+      ...(query?.status ? { status: query.status } : {}),
+      ...(query?.month || query?.year
+        ? {
+            payrollRun: {
+              ...(query.month ? { periodMonth: query.month } : {}),
+              ...(query.year ? { periodYear: query.year } : {}),
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { payslipNumber: { contains: search, mode: 'insensitive' } },
+              {
+                staff: {
+                  OR: [
+                    { firstName: { contains: search, mode: 'insensitive' } },
+                    { lastName: { contains: search, mode: 'insensitive' } },
+                    { employeeId: { contains: search, mode: 'insensitive' } },
+                  ],
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.payslip.findMany({
+        where,
+        include: {
+          staff: {
+            select: {
+              id: true,
+              employeeId: true,
+              firstName: true,
+              lastName: true,
+              department: true,
+              designation: true,
+            },
+          },
+          payrollRun: {
+            select: {
+              id: true,
+              periodMonth: true,
+              periodYear: true,
+              status: true,
+            },
+          },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.payslip.count({ where }),
+    ]);
+
+    return paginated(items.map(serializePayslipSummary), total, page, limit);
   }
 
-  async listMyPayslips(actor: AuthContext) {
+  async listMyPayslips(
+    query: PayslipListQueryDto | undefined,
+    actor: AuthContext,
+  ) {
     const staff = await this.prisma.staff.findFirst({
       where: { tenantId: actor.tenantId, userId: actor.userId },
     });
@@ -1289,20 +1690,51 @@ export class PayrollService {
       throw new NotFoundException('Staff record not found');
     }
 
-    return this.prisma.payslip.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        staffId: staff.id,
-      },
-      include: {
-        payrollRun: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
+    const { page, limit, skip } = getPagination(query);
+    const where: Prisma.PayslipWhereInput = {
+      tenantId: actor.tenantId,
+      staffId: staff.id,
+      ...(query?.status ? { status: query.status } : {}),
+      ...(query?.month || query?.year
+        ? {
+            payrollRun: {
+              ...(query.month ? { periodMonth: query.month } : {}),
+              ...(query.year ? { periodYear: query.year } : {}),
+            },
+          }
+        : {}),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.payslip.findMany({
+        where,
+        include: {
+          payrollRun: {
+            select: {
+              id: true,
+              periodMonth: true,
+              periodYear: true,
+              status: true,
+            },
+          },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.payslip.count({ where }),
+    ]);
+
+    return paginated(items.map(serializePayslipSummary), total, page, limit);
   }
 
   async getPayslipPdf(payslipNumber: string, actor: AuthContext) {
+    if (!this.fileRegistryService) {
+      throw new ConflictException(
+        'Protected payslip files are unavailable. Regenerate payslips before downloading.',
+      );
+    }
+
     const payslip = await this.prisma.payslip.findFirst({
       where: {
         tenantId: actor.tenantId,
@@ -1310,10 +1742,6 @@ export class PayrollService {
       },
       include: {
         staff: true,
-        payrollRun: {
-          include: { tenant: true },
-        },
-        payrollLine: true,
       },
     });
 
@@ -1330,66 +1758,46 @@ export class PayrollService {
       );
     }
 
-    const monthLabels = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-
-    const canSeeSensitive =
-      actor.permissions.includes('hr:manage') ||
-      actor.permissions.includes('payroll:manage') ||
-      actor.userId === payslip.staff.userId;
-
-    const mask = (val: string | null | undefined) => {
-      if (!val) return val;
-      if (canSeeSensitive) return val;
-      if (val.length <= 4) return '****';
-      return val.substring(0, 2) + '****' + val.substring(val.length - 2);
-    };
-
-    return buildSalarySlipPdf({
-      schoolName: payslip.payrollRun.tenant.name,
-      payslipNumber: payslip.payslipNumber,
-      period: `${monthLabels[payslip.payrollRun.periodMonth - 1]} ${payslip.payrollRun.periodYear}`,
-      staff: {
-        name: `${payslip.staff.firstName} ${payslip.staff.lastName}`,
-        id: payslip.staff.employeeId,
-        bankAccount: mask(payslip.staff.bankAccount),
-        panNumber: mask(payslip.staff.panNumber),
+    const exports = await this.prisma.reportExport.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        reportKey: 'payroll.payslip',
+        format: 'pdf',
+        status: 'COMPLETED',
+        fileAssetId: { not: null },
       },
-      earnings: [
-        {
-          name: 'Basic Salary',
-          amount:
-            Number(payslip.payrollLine.grossSalary) -
-            Number(payslip.payrollLine.allowances),
-        },
-        { name: 'Allowances', amount: Number(payslip.payrollLine.allowances) },
-      ],
-      deductions: [
-        {
-          name: 'Statutory Deductions',
-          amount: Number(payslip.deductionAmount),
-        },
-      ],
-      grossSalary: Number(payslip.grossSalary),
-      totalDeductions: Number(payslip.deductionAmount),
-      netSalary: Number(payslip.netSalary),
-      attendance: {
-        present: payslip.payrollLine.attendanceDays,
-        working: payslip.payrollLine.workingDays,
+      select: {
+        fileAssetId: true,
+        filters: true,
       },
+      orderBy: [{ completedAt: 'desc' }, { createdAt: 'desc' }],
+      take: 1000,
     });
+    const exportRecord = exports.find((record) => {
+      return (
+        getJsonString(record.filters, 'payslipId') === payslip.id ||
+        getJsonString(record.filters, 'payslipNumber') === payslip.payslipNumber
+      );
+    });
+
+    if (!exportRecord?.fileAssetId) {
+      throw new ConflictException(
+        'Protected payslip file is unavailable. Regenerate payslips before downloading.',
+      );
+    }
+
+    const asset = await this.fileRegistryService.getFileMetadata(
+      actor.tenantId,
+      exportRecord.fileAssetId,
+    );
+    await this.fileRegistryService.assertFileAccessForAuth(asset, actor);
+    const protectedFile = await this.fileRegistryService.getProtectedDownload(
+      actor.tenantId,
+      asset.id,
+      actor.userId,
+    );
+
+    return protectedFile.content;
   }
 
   async getPayslipPdfForRunStaff(
@@ -1692,7 +2100,7 @@ export class PayrollService {
         .replace(/^_+|_+$/g, '')}`,
       name: component.name,
       ratePercent: null,
-      amount: Number(component.totalAmount),
+      amount: moneyString(component.totalAmount),
       activeStructureCount,
       configuredStructureCount: component.structureCount,
       taxable: component.taxable,
@@ -1771,15 +2179,15 @@ export class PayrollService {
         employeeId: line.staff.employeeId,
         staffName: `${line.staff.firstName} ${line.staff.lastName}`,
         department: line.staff.department,
-        grossSalary: Number(line.grossSalary),
-        deductions: Number(line.deductions),
-        leaveDeductions: Number(line.leaveDeductions),
-        pfEmployee: Number(line.pfEmployee),
-        pfEmployer: Number(line.pfEmployer),
-        tds: Number(line.tds),
-        netPayable: Number(line.netSalary),
-        paidDays: Number(line.paidDays),
-        unpaidDays: Number(line.unpaidDays),
+        grossSalary: moneyString(line.grossSalary),
+        deductions: moneyString(line.deductions),
+        leaveDeductions: moneyString(line.leaveDeductions),
+        pfEmployee: moneyString(line.pfEmployee),
+        pfEmployer: moneyString(line.pfEmployer),
+        tds: moneyString(line.tds),
+        netPayable: moneyString(line.netSalary),
+        paidDays: moneyString(line.paidDays),
+        unpaidDays: moneyString(line.unpaidDays),
       })),
     );
   }
@@ -1794,13 +2202,15 @@ export class PayrollService {
     return {
       runCount: runIds.size,
       staffCount: rows.length,
-      gross: decimalNumber(sumReportMoney(rows, (row) => row.grossSalary)),
-      deductions: decimalNumber(sumReportMoney(rows, (row) => row.deductions)),
-      netPayable: decimalNumber(sumReportMoney(rows, (row) => row.netPayable)),
-      pf: decimalNumber(
-        sumReportMoney(rows, (row) => row.pfEmployee + row.pfEmployer),
+      gross: moneyString(sumReportMoney(rows, (row) => row.grossSalary)),
+      deductions: moneyString(sumReportMoney(rows, (row) => row.deductions)),
+      netPayable: moneyString(sumReportMoney(rows, (row) => row.netPayable)),
+      pf: moneyString(
+        sumReportMoney(rows, (row) =>
+          new Prisma.Decimal(row.pfEmployee).add(row.pfEmployer),
+        ),
       ),
-      tds: decimalNumber(sumReportMoney(rows, (row) => row.tds)),
+      tds: moneyString(sumReportMoney(rows, (row) => row.tds)),
     };
   }
 
@@ -1811,20 +2221,23 @@ export class PayrollService {
     const filters = normalizePayrollReportFilters(filtersInput);
     const rows = await this.getPayrollRegister(actor, filters);
     const contributors = rows.filter(
-      (row) => row.pfEmployee > 0 || row.pfEmployer > 0,
+      (row) =>
+        isPositiveMoney(row.pfEmployee) || isPositiveMoney(row.pfEmployer),
     );
 
     return {
       payrollRunId: filters.payrollRunId ?? null,
       staffCount: contributors.length,
-      employeeContribution: decimalNumber(
+      employeeContribution: moneyString(
         sumReportMoney(contributors, (row) => row.pfEmployee),
       ),
-      employerContribution: decimalNumber(
+      employerContribution: moneyString(
         sumReportMoney(contributors, (row) => row.pfEmployer),
       ),
-      totalContribution: decimalNumber(
-        sumReportMoney(contributors, (row) => row.pfEmployee + row.pfEmployer),
+      totalContribution: moneyString(
+        sumReportMoney(contributors, (row) =>
+          new Prisma.Decimal(row.pfEmployee).add(row.pfEmployer),
+        ),
       ),
       rows: contributors.map((row) => ({
         payrollRunId: row.payrollRunId,
@@ -1844,12 +2257,12 @@ export class PayrollService {
   ) {
     const filters = normalizePayrollReportFilters(filtersInput);
     const rows = await this.getPayrollRegister(actor, filters);
-    const contributors = rows.filter((row) => row.tds > 0);
+    const contributors = rows.filter((row) => isPositiveMoney(row.tds));
 
     return {
       payrollRunId: filters.payrollRunId ?? null,
       staffCount: contributors.length,
-      totalTds: decimalNumber(sumReportMoney(contributors, (row) => row.tds)),
+      totalTds: moneyString(sumReportMoney(contributors, (row) => row.tds)),
       rows: contributors.map((row) => ({
         payrollRunId: row.payrollRunId,
         employeeId: row.employeeId,
@@ -1871,17 +2284,15 @@ export class PayrollService {
     return {
       payrollRunId: filters.payrollRunId ?? null,
       staffCount: rows.length,
-      grossSalary: decimalNumber(
-        sumReportMoney(rows, (row) => row.grossSalary),
-      ),
-      deductions: decimalNumber(sumReportMoney(rows, (row) => row.deductions)),
-      leaveDeductions: decimalNumber(
+      grossSalary: moneyString(sumReportMoney(rows, (row) => row.grossSalary)),
+      deductions: moneyString(sumReportMoney(rows, (row) => row.deductions)),
+      leaveDeductions: moneyString(
         sumReportMoney(rows, (row) => row.leaveDeductions),
       ),
-      pfEmployee: decimalNumber(sumReportMoney(rows, (row) => row.pfEmployee)),
-      pfEmployer: decimalNumber(sumReportMoney(rows, (row) => row.pfEmployer)),
-      tds: decimalNumber(sumReportMoney(rows, (row) => row.tds)),
-      netPayable: decimalNumber(sumReportMoney(rows, (row) => row.netPayable)),
+      pfEmployee: moneyString(sumReportMoney(rows, (row) => row.pfEmployee)),
+      pfEmployer: moneyString(sumReportMoney(rows, (row) => row.pfEmployer)),
+      tds: moneyString(sumReportMoney(rows, (row) => row.tds)),
+      netPayable: moneyString(sumReportMoney(rows, (row) => row.netPayable)),
     };
   }
 
@@ -1891,16 +2302,17 @@ export class PayrollService {
   ) {
     const filters = normalizePayrollReportFilters(filtersInput);
     const rows = (await this.getPayrollRegister(actor, filters)).filter(
-      (row) => row.leaveDeductions > 0 || row.unpaidDays > 0,
+      (row) =>
+        isPositiveMoney(row.leaveDeductions) || isPositiveMoney(row.unpaidDays),
     );
 
     return {
       payrollRunId: filters.payrollRunId ?? null,
       staffCount: rows.length,
-      leaveDeductions: decimalNumber(
+      leaveDeductions: moneyString(
         sumReportMoney(rows, (row) => row.leaveDeductions),
       ),
-      unpaidDays: decimalNumber(sumReportMoney(rows, (row) => row.unpaidDays)),
+      unpaidDays: moneyString(sumReportMoney(rows, (row) => row.unpaidDays)),
       rows: rows.map((row) => ({
         payrollRunId: row.payrollRunId,
         employeeId: row.employeeId,
@@ -1978,7 +2390,7 @@ export class PayrollService {
           row.staffName,
           row.pfEmployee,
           row.pfEmployer,
-          row.pfEmployee + row.pfEmployer,
+          moneyString(new Prisma.Decimal(row.pfEmployee).add(row.pfEmployer)),
         ]
           .map(csvCell)
           .join(','),
@@ -2020,7 +2432,23 @@ export class PayrollService {
     const run = await this.prisma.payrollRun.findFirst({
       where: { id, tenantId: actor.tenantId },
       include: {
-        lines: true,
+        lines: {
+          include: {
+            staff: {
+              select: {
+                id: true,
+                employeeId: true,
+                firstName: true,
+                lastName: true,
+                department: true,
+                designation: true,
+              },
+            },
+            payslip: true,
+          },
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        },
+        payslips: true,
       },
     });
 
@@ -2259,8 +2687,284 @@ function moneyDecimal(value: Prisma.Decimal) {
   return new Prisma.Decimal(value).toDecimalPlaces(2);
 }
 
-function decimalNumber(value: Prisma.Decimal | number | string) {
-  return Number(new Prisma.Decimal(value));
+function moneyString(
+  value: Prisma.Decimal | number | string | null | undefined,
+) {
+  return new Prisma.Decimal(value ?? 0).toDecimalPlaces(2).toFixed(2);
+}
+
+function isPositiveMoney(
+  value: Prisma.Decimal | number | string | null | undefined,
+) {
+  return new Prisma.Decimal(value ?? 0).gt(0);
+}
+
+function getPagination(query?: PayrollPaginatedQueryDto): PaginationResult {
+  const page = clampInt(query?.page, 1, 1, 10_000);
+  const limit = clampInt(query?.limit, 25, 1, 100);
+  return { page, limit, skip: (page - 1) * limit };
+}
+
+function paginated<T>(items: T[], total: number, page: number, limit: number) {
+  return {
+    items,
+    total,
+    page,
+    limit,
+    hasNextPage: page * limit < total,
+  };
+}
+
+function clampInt(
+  value: number | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+) {
+  const candidate =
+    value === undefined || !Number.isFinite(value)
+      ? fallback
+      : Math.trunc(value);
+  return Math.min(Math.max(candidate, min), max);
+}
+
+function addDaysUtc(date: Date, days: number) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+type MinimalStaff = {
+  id: string;
+  employeeId?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  department?: string | null;
+  designation?: string | null;
+};
+
+function serializeStaff(staff?: MinimalStaff | null) {
+  if (!staff) {
+    return null;
+  }
+
+  return {
+    id: staff.id,
+    employeeId: staff.employeeId ?? null,
+    firstName: staff.firstName ?? '',
+    lastName: staff.lastName ?? '',
+    firstNameEn: staff.firstName ?? '',
+    lastNameEn: staff.lastName ?? '',
+    fullName: `${staff.firstName ?? ''} ${staff.lastName ?? ''}`.trim(),
+    department: staff.department ?? null,
+    designation: staff.designation ?? null,
+  };
+}
+
+function serializeSalaryStructure(structure: {
+  id: string;
+  staffId: string;
+  effectiveFrom: Date;
+  effectiveTo: Date | null;
+  basicSalary: Prisma.Decimal;
+  allowances: Prisma.Decimal;
+  deductions: Prisma.Decimal;
+  pfEnabled: boolean;
+  tdsEnabled: boolean;
+  paymentMethod: string;
+  bankAccount?: string | null;
+  bankName?: string | null;
+  status: string;
+  notes?: string | null;
+  activatedAt?: Date | null;
+  archivedAt?: Date | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  staff?: MinimalStaff | null;
+  components?: Array<{
+    id: string;
+    name: string;
+    componentType: string;
+    amount: Prisma.Decimal;
+    taxable: boolean;
+  }>;
+}) {
+  return {
+    ...structure,
+    basicSalary: moneyString(structure.basicSalary),
+    allowances: moneyString(structure.allowances),
+    deductions: moneyString(structure.deductions),
+    staff: serializeStaff(structure.staff),
+    components: (structure.components ?? []).map((component) => ({
+      ...component,
+      amount: moneyString(component.amount),
+    })),
+  };
+}
+
+function serializePayrollRunSummary(run: {
+  id: string;
+  periodMonth: number;
+  periodYear: number;
+  periodStart?: Date | null;
+  periodEnd?: Date | null;
+  status: string;
+  grossAmount: Prisma.Decimal;
+  deductionAmount: Prisma.Decimal;
+  netAmount: Prisma.Decimal;
+  pfEmployeeAmount?: Prisma.Decimal;
+  pfEmployerAmount?: Prisma.Decimal;
+  tdsAmount?: Prisma.Decimal;
+  generatedById?: string | null;
+  approvedById?: string | null;
+  postedById?: string | null;
+  paidById?: string | null;
+  approvedAt?: Date | null;
+  postedAt?: Date | null;
+  paidAt?: Date | null;
+  journalEntryId?: string | null;
+  disbursementJournalEntryId?: string | null;
+  notes?: string | null;
+  reversalReason?: string | null;
+  reversalAt?: Date | null;
+  reversedById?: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  _count?: { lines?: number; payslips?: number };
+}) {
+  const { _count, ...rest } = run;
+  return {
+    ...rest,
+    grossAmount: moneyString(run.grossAmount),
+    deductionAmount: moneyString(run.deductionAmount),
+    netAmount: moneyString(run.netAmount),
+    pfEmployeeAmount: moneyString(run.pfEmployeeAmount),
+    pfEmployerAmount: moneyString(run.pfEmployerAmount),
+    tdsAmount: moneyString(run.tdsAmount),
+    lineCount: _count?.lines ?? 0,
+    payslipCount: _count?.payslips ?? 0,
+  };
+}
+
+function serializePayrollRunDetail(
+  run: Prisma.PayrollRunGetPayload<{
+    include: {
+      lines: {
+        include: {
+          staff: {
+            select: {
+              id: true;
+              employeeId: true;
+              firstName: true;
+              lastName: true;
+              department: true;
+              designation: true;
+            };
+          };
+          payslip: true;
+        };
+      };
+      payslips: true;
+    };
+  }>,
+) {
+  return {
+    ...serializePayrollRunSummary({
+      ...run,
+      _count: { lines: run.lines.length, payslips: run.payslips.length },
+    }),
+    lines: run.lines.map(serializePayrollLine),
+    payslips: run.payslips.map((payslip) =>
+      serializePayslipSummary({ ...payslip, payrollRun: run, staff: null }),
+    ),
+  };
+}
+
+function serializePayrollLine(line: {
+  id: string;
+  staffId: string;
+  payrollRunId: string;
+  contractId?: string | null;
+  salaryStructureId?: string | null;
+  basicSalary: Prisma.Decimal;
+  earnings: Prisma.Decimal;
+  grossSalary: Prisma.Decimal;
+  allowances: Prisma.Decimal;
+  leaveDeductions: Prisma.Decimal;
+  pfEmployee: Prisma.Decimal;
+  pfEmployer: Prisma.Decimal;
+  tds: Prisma.Decimal;
+  otherDeductions: Prisma.Decimal;
+  deductions: Prisma.Decimal;
+  netSalary: Prisma.Decimal;
+  paidDays: Prisma.Decimal;
+  unpaidDays: Prisma.Decimal;
+  attendanceDays: number;
+  workingDays: number;
+  paymentStatus: string;
+  status: string;
+  createdAt?: Date;
+  staff?: MinimalStaff | null;
+  payslip?: { payslipNumber: string } | null;
+}) {
+  return {
+    ...line,
+    basicSalary: moneyString(line.basicSalary),
+    earnings: moneyString(line.earnings),
+    grossSalary: moneyString(line.grossSalary),
+    allowances: moneyString(line.allowances),
+    leaveDeductions: moneyString(line.leaveDeductions),
+    pfEmployee: moneyString(line.pfEmployee),
+    pfEmployer: moneyString(line.pfEmployer),
+    tds: moneyString(line.tds),
+    otherDeductions: moneyString(line.otherDeductions),
+    deductions: moneyString(line.deductions),
+    netSalary: moneyString(line.netSalary),
+    paidDays: moneyString(line.paidDays),
+    unpaidDays: moneyString(line.unpaidDays),
+    staff: serializeStaff(line.staff),
+  };
+}
+
+function serializePayslipSummary(payslip: {
+  id: string;
+  payrollRunId: string;
+  payrollLineId: string;
+  staffId: string;
+  payslipNumber: string;
+  status: string;
+  grossSalary: Prisma.Decimal;
+  deductionAmount: Prisma.Decimal;
+  pfEmployee?: Prisma.Decimal;
+  pfEmployer?: Prisma.Decimal;
+  tds?: Prisma.Decimal;
+  netSalary: Prisma.Decimal;
+  paymentStatus?: string;
+  generatedAt?: Date;
+  issuedAt: Date | null;
+  createdAt?: Date;
+  staff?: MinimalStaff | null;
+  payrollRun?: {
+    id: string;
+    periodMonth: number;
+    periodYear: number;
+    status: string;
+  } | null;
+}) {
+  return {
+    ...payslip,
+    grossSalary: moneyString(payslip.grossSalary),
+    deductionAmount: moneyString(payslip.deductionAmount),
+    pfEmployee: moneyString(payslip.pfEmployee),
+    pfEmployer: moneyString(payslip.pfEmployer),
+    tds: moneyString(payslip.tds),
+    netSalary: moneyString(payslip.netSalary),
+    netAmount: moneyString(payslip.netSalary),
+    periodMonth: payslip.payrollRun?.periodMonth ?? null,
+    periodYear: payslip.payrollRun?.periodYear ?? null,
+    staff: serializeStaff(payslip.staff),
+    payrollRun: payslip.payrollRun ?? null,
+  };
 }
 
 function sumReportMoney<T>(

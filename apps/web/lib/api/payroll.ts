@@ -1,4 +1,6 @@
 import type {
+  PaginatedResponse,
+  PayrollDashboardSummary,
   PayrollPreviewResult,
   PayrollRunSummary,
   PayslipSummary,
@@ -12,8 +14,8 @@ import {
   API_BASE_URL,
   JsonBody,
   StaffLifecycleHistoryEvent,
+  downloadBlob,
   downloadCsv,
-  openPdfBlob,
   request,
   withQuery,
 } from './client';
@@ -68,15 +70,40 @@ export type LeaveQueueDepth = {
 export type PayrollReportSummary = {
   runCount: number;
   staffCount: number;
-  gross: number;
-  deductions: number;
-  netPayable: number;
-  pf: number;
-  tds: number;
+  gross: number | string;
+  deductions: number | string;
+  netPayable: number | string;
+  pf: number | string;
+  tds: number | string;
 };
+
+type M7ListParams = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  month?: number;
+  year?: number;
+  payrollRunId?: string;
+  staffId?: string;
+  department?: string;
+  designation?: string;
+  contractType?: string;
+  expiringWithinDays?: number;
+  contractWindowDays?: number;
+};
+
+function protectedPdfFileName(prefix: string, id: string) {
+  const safeId = id.replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '');
+  return `${prefix}-${safeId || 'file'}.pdf`;
+}
 
 export const payrollApi = {
   listStaff: () => request<StaffSummary[]>('/staff'),
+  listStaffDirectory: (params?: M7ListParams) =>
+    request<PaginatedResponse<StaffSummary>>(
+      withQuery('/staff/directory', params ?? {}),
+    ),
   getStaffDetail: (staffId: string) =>
     request<StaffDetail>(`/hr/staff/${encodeURIComponent(staffId)}`),
   listStaffHistory: (staffId: string) =>
@@ -96,7 +123,14 @@ export const payrollApi = {
   createStaff: (body: JsonBody) =>
     request<StaffSummary>('/staff', { method: 'POST', json: body }),
   listRoles: () => request<RoleSummary[]>('/roles'),
-  listStaffContracts: () => request<StaffContractSummary[]>('/hr/contracts'),
+  listStaffContractsPage: (params?: M7ListParams) =>
+    request<PaginatedResponse<StaffContractSummary>>(
+      withQuery('/hr/contracts', params ?? {}),
+    ),
+  listStaffContracts: async () => {
+    const page = await payrollApi.listStaffContractsPage();
+    return page.items;
+  },
   createStaffContract: (body: JsonBody) =>
     request<StaffContractSummary>('/hr/contracts', {
       method: 'POST',
@@ -110,7 +144,18 @@ export const payrollApi = {
     request<LeaveQueueDepth>(
       withQuery('/hr/leave-queue/depth', params ?? {}),
     ),
-  listPayrollRuns: () => request<PayrollRunSummary[]>('/payroll/runs'),
+  getPayrollDashboardSummary: (params?: M7ListParams) =>
+    request<PayrollDashboardSummary>(
+      withQuery('/payroll/dashboard-summary', params ?? {}),
+    ),
+  listPayrollRunsPage: (params?: M7ListParams) =>
+    request<PaginatedResponse<PayrollRunSummary>>(
+      withQuery('/payroll/runs', params ?? {}),
+    ),
+  listPayrollRuns: async () => {
+    const page = await payrollApi.listPayrollRunsPage();
+    return page.items;
+  },
   getPayrollRun: (id: string) =>
     request<PayrollRunSummary>(`/payroll/runs/${encodeURIComponent(id)}`),
   previewPayrollRun: (body: JsonBody) =>
@@ -145,8 +190,14 @@ export const payrollApi = {
       method: 'POST',
       json: body,
     }),
-  listSalaryStructures: () =>
-    request<SalaryStructureSummary[]>('/payroll/salary-structures'),
+  listSalaryStructuresPage: (params?: M7ListParams) =>
+    request<PaginatedResponse<SalaryStructureSummary>>(
+      withQuery('/payroll/salary-structures', params ?? {}),
+    ),
+  listSalaryStructures: async () => {
+    const page = await payrollApi.listSalaryStructuresPage();
+    return page.items;
+  },
   createSalaryStructure: (body: JsonBody) =>
     request<SalaryStructureSummary>('/payroll/salary-structures', {
       method: 'POST',
@@ -195,14 +246,21 @@ export const payrollApi = {
       withQuery('/payroll/reports/tds/export.csv', params ?? {}),
       `payroll-tds-${new Date().toISOString().slice(0, 10)}.csv`,
     ),
-  listPayslips: () => request<PayslipSummary[]>('/payroll/payslips'),
+  listPayslipsPage: (params?: M7ListParams) =>
+    request<PaginatedResponse<PayslipSummary>>(
+      withQuery('/payroll/payslips', params ?? {}),
+    ),
+  listPayslips: async () => {
+    const page = await payrollApi.listPayslipsPage();
+    return page.items;
+  },
   openPayrollRunStaffPayslipPdf: async (runId: string, staffId: string) => {
     const response = await fetch(
       `${API_BASE_URL}/payroll/runs/${encodeURIComponent(runId)}/staff/${encodeURIComponent(staffId)}/payslip.pdf`,
       { credentials: 'include' },
     );
 
-    await openPdfBlob(response);
+    await downloadBlob(response, protectedPdfFileName('payslip', staffId));
   },
   getPayrollPreview: (params: {
     year: number;
@@ -219,7 +277,14 @@ export const payrollApi = {
       }),
     ),
   getMyProfile: () => request<any>('/staff/me'),
-  listMyPayslips: () => request<any[]>('/payroll/me/payslips'),
+  listMyPayslipsPage: (params?: M7ListParams) =>
+    request<PaginatedResponse<PayslipSummary>>(
+      withQuery('/payroll/me/payslips', params ?? {}),
+    ),
+  listMyPayslips: async () => {
+    const page = await payrollApi.listMyPayslipsPage();
+    return page.items;
+  },
   openMyPayslipPdf: async (payslipNumber: string) => {
     const response = await fetch(
       `${API_BASE_URL}/payroll/me/payslips/${encodeURIComponent(payslipNumber)}.pdf`,
@@ -228,7 +293,7 @@ export const payrollApi = {
       },
     );
 
-    await openPdfBlob(response);
+    await downloadBlob(response, protectedPdfFileName('payslip', payslipNumber));
   },
   openPayslipPdf: async (payslipNumber: string) => {
     const response = await fetch(
@@ -238,7 +303,7 @@ export const payrollApi = {
       },
     );
 
-    await openPdfBlob(response);
+    await downloadBlob(response, protectedPdfFileName('payslip', payslipNumber));
   },
 
   // Accounting Verification
@@ -247,7 +312,7 @@ export const payrollApi = {
       `${API_BASE_URL}/payroll/runs/${encodeURIComponent(runId)}/lines/${encodeURIComponent(lineId)}/salary-slip.pdf`,
       { credentials: 'include' },
     );
-    await openPdfBlob(response);
+    await downloadBlob(response, protectedPdfFileName('salary-slip', lineId));
   },
 
   archiveStaff: (staffId: string, reason?: string) =>

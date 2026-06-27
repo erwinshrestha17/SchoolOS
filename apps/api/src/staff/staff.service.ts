@@ -32,6 +32,7 @@ import {
   requirePersonName,
   requireProfileEmail,
 } from '../common/validation/contact-profile';
+import { ListStaffQueryDto } from './dto/list-staff-query.dto';
 
 @Injectable()
 export class StaffService {
@@ -472,6 +473,86 @@ export class StaffService {
       joiningDate: member.joiningDate,
       contractType: member.contractType,
     }));
+  }
+
+  async listStaffDirectory(query: ListStaffQueryDto = {}, actor: AuthContext) {
+    const page = clampPage(query.page, 1, 10_000);
+    const limit = clampPage(query.limit, 25, 100);
+    const where: Prisma.StaffWhereInput = {
+      tenantId: actor.tenantId,
+    };
+
+    if (query.status) {
+      where.status = query.status;
+    }
+
+    if (query.contractType) {
+      where.contractType = query.contractType;
+    }
+
+    if (query.department) {
+      where.department = query.department.trim();
+    }
+
+    if (query.designation) {
+      where.designation = query.designation.trim();
+    }
+
+    const search = query.search?.trim();
+    if (search) {
+      where.OR = [
+        { employeeId: { contains: search, mode: 'insensitive' } },
+        { staffCode: { contains: search, mode: 'insensitive' } },
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { department: { contains: search, mode: 'insensitive' } },
+        { designation: { contains: search, mode: 'insensitive' } },
+        { user: { email: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.staff.findMany({
+        where,
+        include: {
+          user: {
+            include: {
+              userRoles: {
+                include: {
+                  role: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [{ joiningDate: 'desc' }, { employeeId: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.staff.count({ where }),
+    ]);
+
+    return {
+      items: items.map((member) => ({
+        id: member.id,
+        employeeId: member.employeeId,
+        staffCode: member.staffCode,
+        firstName: member.firstName,
+        lastName: member.lastName,
+        email: member.user.email,
+        roles: member.user.userRoles.map(({ role }) => role.name),
+        joiningDate: member.joiningDate,
+        contractType: member.contractType,
+        status: member.status,
+        department: member.department,
+        designation: member.designation,
+        photoUrl: member.photoUrl,
+      })),
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
   }
 
   async listContractExpiryReminders(
@@ -1173,6 +1254,14 @@ function daysBetween(from: Date, to: Date) {
 function clampReminderWindow(days: number | undefined) {
   if (!days || !Number.isFinite(days)) return 30;
   return Math.min(Math.max(Math.trunc(days), 1), 180);
+}
+
+function clampPage(value: number | undefined, fallback: number, max: number) {
+  const candidate =
+    value === undefined || !Number.isFinite(value)
+      ? fallback
+      : Math.trunc(value);
+  return Math.min(Math.max(candidate, 1), max);
 }
 
 function assertDateRange(startsOn: Date, endsOn: Date, message: string) {

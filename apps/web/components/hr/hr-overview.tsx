@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { formatBsDate } from '@schoolos/core';
 import { api } from '../../lib/api';
 import {
   Users,
@@ -15,73 +16,27 @@ import { Badge } from '../ui/badge';
 import Link from 'next/link';
 
 export function HROverview() {
+  const summaryQuery = useQuery({
+    queryKey: ['payroll-dashboard-summary', 'hr-overview'],
+    queryFn: () => api.getPayrollDashboardSummary({ contractWindowDays: 30 }),
+  });
+
   const staffQuery = useQuery({
-    queryKey: ['staff'],
-    queryFn: api.listStaff,
+    queryKey: ['staff-directory', 'hr-overview'],
+    queryFn: () => api.listStaffDirectory({ page: 1, limit: 5 }),
   });
 
-  const contractsQuery = useQuery({
-    queryKey: ['staff-contracts'],
-    queryFn: api.listStaffContracts,
-  });
-
-  const leavesQuery = useQuery({
-    queryKey: ['leave-requests'],
-    queryFn: api.listLeaveRequests,
-  });
-
-  const salaryQuery = useQuery({
-    queryKey: ['salary-structures'],
-    queryFn: api.listSalaryStructures,
-  });
-
-  const payrollQuery = useQuery({
-    queryKey: ['payroll-runs'],
-    queryFn: api.listPayrollRuns,
-  });
-
-  // Calculate Metrics
-  const staff = staffQuery.data ?? [];
-  const contracts = contractsQuery.data ?? [];
-  const leaves = leavesQuery.data ?? [];
-  const salaryStructures = salaryQuery.data ?? [];
-  const payrollRuns = payrollQuery.data ?? [];
-
-  const totalStaff = staff.length;
-  const activeStaff = staff.filter((s) => s.status === 'ACTIVE' || !s.status).length;
-  const inactiveStaff = staff.filter((s) => s.status === 'INACTIVE' || s.status === 'TERMINATED').length;
-  
-  const pendingLeaves = leaves.filter((l) => l.status === 'PENDING').length;
-  
-  const today = new Date().toISOString().slice(0, 10);
-  const onLeaveToday = leaves.filter((l) => {
-    if (l.status !== 'APPROVED') return false;
-    const start = new Date(l.startsOn).toISOString().slice(0, 10);
-    const end = new Date(l.endsOn).toISOString().slice(0, 10);
-    return start <= today && end >= today;
-  }).length;
-
-  const activeContracts = contracts.filter((c) => c.status === 'ACTIVE').length;
-
-  // Active staff with no active salary structure
-  const activeStaffIds = staff.filter((s) => s.status === 'ACTIVE' || !s.status).map((s) => s.id);
-  const activeStructuresStaffIds = salaryStructures
-    .filter((ss) => ss.status === 'ACTIVE')
-    .map((ss) => ss.staffId);
-  const missingSalaryStructures = activeStaffIds.filter(
-    (id) => !activeStructuresStaffIds.includes(id)
-  ).length;
-
-  const latestPayrollRun = payrollRuns[0] ?? null;
+  const summary = summaryQuery.data;
+  const staff = staffQuery.data?.items ?? [];
+  const latestPayrollRun = summary?.latestPayrollRun ?? null;
+  const runsPendingReview = ['GENERATED', 'UNDER_REVIEW', 'REVIEWED'].reduce(
+    (total, status) => total + (summary?.payrollRunsByStatus?.[status] ?? 0),
+    0,
+  );
   const formatAssignedText = (value: string | null | undefined, fallback: string) =>
     value?.trim() || fallback;
 
-  const isLoading =
-    staffQuery.isLoading ||
-    contractsQuery.isLoading ||
-    leavesQuery.isLoading ||
-    salaryQuery.isLoading ||
-    payrollQuery.isLoading;
+  const isLoading = summaryQuery.isLoading || staffQuery.isLoading;
 
   return (
     <div className="space-y-8">
@@ -89,28 +44,36 @@ export function HROverview() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Active Staff"
-          value={activeStaff}
-          description={`${inactiveStaff} Inactive/Terminated`}
+          value={summaryQuery.isError ? 'Unavailable' : summary?.activeStaffCount ?? 0}
+          description="Backend-owned staff count"
           icon={<UserCheck className="h-5 w-5 text-emerald-500" />}
           loading={isLoading}
         />
         <StatCard
-          title="Active Contracts"
-          value={activeContracts}
-          description="Awaiting renewals"
+          title="Contracts Expiring"
+          value={
+            summaryQuery.isError
+              ? 'Unavailable'
+              : summary?.contractsExpiringWithinWindow ?? 0
+          }
+          description="Within the next 30 days"
           icon={<Briefcase className="h-5 w-5 text-[var(--color-mod-hr-text)]" />}
           loading={isLoading}
         />
         <StatCard
           title="Pending Leaves"
-          value={pendingLeaves}
-          description={`${onLeaveToday} On leave today`}
+          value={summaryQuery.isError ? 'Unavailable' : summary?.pendingLeaveRequests ?? 0}
+          description={`${summary?.onLeaveTodayCount ?? 0} on leave today`}
           icon={<CalendarDays className="h-5 w-5 text-amber-500" />}
           loading={isLoading}
         />
         <StatCard
           title="Missing Salary Structure"
-          value={missingSalaryStructures}
+          value={
+            summaryQuery.isError
+              ? 'Unavailable'
+              : summary?.activeStaffWithoutActiveSalaryStructureCount ?? 0
+          }
           description="Active staff without structures"
           icon={<AlertCircle className="h-5 w-5 text-rose-500" />}
           loading={isLoading}
@@ -149,7 +112,7 @@ export function HROverview() {
               <div className="flex justify-between items-center py-2.5">
                 <span className="text-sm text-slate-600">Runs Pending Review</span>
                 <span className="font-bold text-amber-400">
-                  {payrollRuns.filter((r) => ['GENERATED', 'UNDER_REVIEW', 'REVIEWED'].includes(r.status)).length}
+                  {summaryQuery.isError ? 'Unavailable' : runsPendingReview}
                 </span>
               </div>
             </div>
@@ -205,7 +168,7 @@ export function HROverview() {
                           </p>
                         </td>
                         <td className="px-5 py-4 text-slate-500 font-medium">
-                          {new Date(item.joiningDate).toLocaleDateString()}
+                          {formatBsDate(item.joiningDate)}
                         </td>
                         <td className="px-5 py-4">
                           <Badge className={item.status === 'ACTIVE' || !item.status ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/10" : "bg-slate-100 text-slate-500"}>

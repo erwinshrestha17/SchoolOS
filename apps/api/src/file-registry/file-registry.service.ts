@@ -652,6 +652,7 @@ export class FileRegistryService {
     auth: AuthContext,
   ) {
     if (
+      auth.permissions.includes('payroll:payslip:read') ||
       auth.permissions.includes('payroll:read') ||
       auth.permissions.includes('payroll:manage')
     ) {

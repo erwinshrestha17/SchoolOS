@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import { formatBsDate } from '@schoolos/core';
 import {
   AlertCircle,
   ArrowRight,
@@ -36,11 +37,7 @@ const moduleTabs = [
 
 function formatDate(value?: string | null) {
   if (!value) return 'Not scheduled';
-  return new Intl.DateTimeFormat('en-NP', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(value));
+  return formatBsDate(value);
 }
 
 function unavailable(isError: boolean, value?: number | null) {
@@ -58,21 +55,23 @@ export default function HRDashboardPage() {
     queryKey: ['hr-contract-expiry-reminders', 30],
     queryFn: () => api.listContractExpiryReminders({ days: 30 }),
   });
-  const payrollRunsQuery = useQuery({
-    queryKey: ['payroll-runs', 'hr-overview'],
-    queryFn: api.listPayrollRuns,
+  const payrollSummaryQuery = useQuery({
+    queryKey: ['payroll-dashboard-summary', 'hr-page'],
+    queryFn: () => api.getPayrollDashboardSummary({ contractWindowDays: 30 }),
   });
 
   const leaveQueue = leaveQueueQuery.data;
   const reminders = contractRemindersQuery.data;
-  const payrollRuns = payrollRunsQuery.data ?? [];
-  const postingBacklog = payrollRuns.filter((run) =>
-    ['GENERATED', 'UNDER_REVIEW', 'REVIEWED', 'APPROVED'].includes(run.status),
+  const payrollSummary = payrollSummaryQuery.data;
+  const postingBacklog = ['GENERATED', 'UNDER_REVIEW', 'REVIEWED', 'APPROVED'].reduce(
+    (total, status) => total + (payrollSummary?.payrollRunsByStatus?.[status] ?? 0),
+    0,
   );
-  const latestRun = payrollRuns[0] ?? null;
+  const latestRun = payrollSummary?.latestPayrollRun ?? null;
+  const selectedRun = payrollSummary?.selectedPayrollRun ?? null;
   const remainingIssues = [
-    'Active staff and on-leave-today KPIs need a module-owned HR summary endpoint before they can be shown as official totals.',
-    'Payroll exception totals need a backend workflow summary before this overview can display them as official KPIs.',
+    'Payroll exception totals remain unavailable until the backend adds a dedicated exception workflow contract.',
+    'Payroll posting creates accounting accrual journals only; bank settlement remains intentionally unsupported.',
   ];
 
   return (
@@ -122,17 +121,27 @@ export default function HRDashboardPage() {
       <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
         <KpiCard
           title="Active Staff"
-          value="Unavailable"
+          value={
+            payrollSummaryQuery.isError
+              ? 'Unavailable'
+              : payrollSummary?.activeStaffCount ?? 0
+          }
           icon={<Users className="h-5 w-5" />}
+          loading={payrollSummaryQuery.isLoading}
           tone="neutral"
-          description="Awaiting official HR summary"
+          description="Backend-owned staff count"
         />
         <KpiCard
           title="On Leave Today"
-          value="Unavailable"
+          value={
+            payrollSummaryQuery.isError
+              ? 'Unavailable'
+              : payrollSummary?.onLeaveTodayCount ?? 0
+          }
           icon={<ClipboardCheck className="h-5 w-5" />}
+          loading={payrollSummaryQuery.isLoading}
           tone="neutral"
-          description="Awaiting official leave summary"
+          description="Approved leave scoped to today"
         />
         <KpiCard
           title="Pending Leave"
@@ -154,17 +163,29 @@ export default function HRDashboardPage() {
         />
         <KpiCard
           title="Payroll Exceptions"
-          value="Unavailable"
+          value={
+            payrollSummaryQuery.isError
+              ? 'Unavailable'
+              : payrollSummary?.selectedPayrollRun?.validationExceptionCount ?? 'Unavailable'
+          }
           icon={<BadgeCheck className="h-5 w-5" />}
+          loading={payrollSummaryQuery.isLoading}
           tone="neutral"
-          description="Awaiting workflow summary"
+          description="No exception workflow contract yet"
         />
         <KpiCard
           title="Payslips Generated"
-          value="Unavailable"
+          value={
+            payrollSummaryQuery.isError
+              ? 'Unavailable'
+              : selectedRun
+                ? `${selectedRun.payslipGeneration.total}/${selectedRun.payslipGeneration.expected}`
+                : 'Unavailable'
+          }
           icon={<FileText className="h-5 w-5" />}
+          loading={payrollSummaryQuery.isLoading}
           tone="neutral"
-          description="Awaiting bounded payroll summary"
+          description="Selected payroll run"
         />
       </KpiGrid>
 
@@ -329,13 +350,13 @@ export default function HRDashboardPage() {
           </div>
 
           <div className="mt-5 space-y-3">
-            {payrollRunsQuery.isLoading ? (
+            {payrollSummaryQuery.isLoading ? (
               <LoadingState variant="spinner" label="Loading payroll runs..." />
-            ) : payrollRunsQuery.isError ? (
+            ) : payrollSummaryQuery.isError ? (
               <ErrorState
                 title="Payroll runs unavailable"
                 message="Payroll run statuses could not be loaded. Check your payroll permission and retry."
-                onRetry={() => void payrollRunsQuery.refetch()}
+                onRetry={() => void payrollSummaryQuery.refetch()}
               />
             ) : (
               <>
@@ -358,15 +379,15 @@ export default function HRDashboardPage() {
                       Awaiting Action
                     </p>
                     <p className="mt-3 text-2xl font-black tabular-nums text-slate-950">
-                      {postingBacklog.length}
+                      {postingBacklog}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">Loaded review, approval, or posting statuses</p>
+                    <p className="mt-1 text-xs text-slate-500">Review, approval, or posting statuses</p>
                   </div>
                 </div>
-                {payrollRuns.length ? (
+                {selectedRun ? (
                   <div className="rounded-2xl border border-slate-200">
                     <div className="divide-y divide-slate-100">
-                      {payrollRuns.slice(0, 4).map((run) => (
+                      {[selectedRun].map((run) => (
                         <div
                           key={run.id}
                           className="flex flex-wrap items-center justify-between gap-3 p-4"
@@ -376,7 +397,7 @@ export default function HRDashboardPage() {
                               {run.periodMonth}/{run.periodYear}
                             </p>
                             <p className="text-xs text-slate-500">
-                              {run.journalEntryId ? 'Accounting journal linked' : 'No accounting journal linked'}
+                              {run.postingReadiness.accountingJournalId ? 'Accounting journal linked' : 'No accounting journal linked'}
                             </p>
                           </div>
                           <StatusBadge status={run.status} />

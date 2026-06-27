@@ -1,15 +1,25 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Archive } from 'lucide-react';
+import { formatBsDate } from '@schoolos/core';
+import { CheckCircle2, Archive, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
 import { api } from '../../lib/api';
 import { cn } from '../../lib/utils';
 
+const moneyFormatter = new Intl.NumberFormat('en-NP', {
+  style: 'currency',
+  currency: 'NPR',
+  maximumFractionDigits: 0,
+});
+
 export function SalaryStructureList() {
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const limit = 10;
   const structuresQuery = useQuery({
-    queryKey: ['salary-structures'],
-    queryFn: api.listSalaryStructures,
+    queryKey: ['salary-structures', page, limit],
+    queryFn: () => api.listSalaryStructuresPage({ page, limit }),
   });
   const activateMutation = useMutation({
     mutationFn: api.activateSalaryStructure,
@@ -19,6 +29,9 @@ export function SalaryStructureList() {
     mutationFn: api.archiveSalaryStructure,
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['salary-structures'] }),
   });
+  const structures = structuresQuery.data?.items ?? [];
+  const totalItems = structuresQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / limit));
 
   return (
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -40,24 +53,26 @@ export function SalaryStructureList() {
                     <td colSpan={5} className="px-6 py-4"><div className="h-4 w-full bg-slate-50 rounded" /></td>
                   </tr>
                 ))
-              ) : structuresQuery.data?.length === 0 ? (
+              ) : structures.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
                     No salary structures defined yet.
                   </td>
                 </tr>
               ) : (
-                structuresQuery.data?.map((structure) => (
+                structures.map((structure) => (
                   <tr key={structure.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 font-bold text-slate-900">
                       {structure.staff?.firstName} {structure.staff?.lastName}
                     </td>
                     <td className="px-6 py-4 text-xs font-medium text-slate-500">
-                      {new Date(structure.effectiveFrom).toLocaleDateString()}
+                      {formatBsDate(structure.effectiveFrom)}
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-1">
-                        <p className="font-black text-slate-900 text-sm">NPR {structure.basicSalary.toLocaleString()}</p>
+                        <p className="font-black text-slate-900 text-sm">
+                          {moneyFormatter.format(Number(structure.basicSalary))}
+                        </p>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                           {structure.pfEnabled ? 'PF Enabled' : 'No PF'} • {structure.tdsEnabled ? 'TDS Enabled' : 'No TDS'}
                         </p>
@@ -97,6 +112,33 @@ export function SalaryStructureList() {
             </tbody>
           </table>
         </div>
+        {totalItems > 0 && (
+          <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
+            <span className="text-xs font-bold text-slate-500">
+              Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} structures
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page === 1}
+                className="p-2 border border-slate-200 rounded-xl bg-white text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
+                aria-label="Previous salary structure page"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={page >= totalPages}
+                className="p-2 border border-slate-200 rounded-xl bg-white text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
+                aria-label="Next salary structure page"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
   );
 }
