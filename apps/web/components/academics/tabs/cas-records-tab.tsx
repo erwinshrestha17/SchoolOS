@@ -1,5 +1,6 @@
 'use client';
 
+import { formatBsDate } from '@schoolos/core';
 import type {
   AcademicYearSummary,
   CasRecordSummary,
@@ -568,7 +569,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
                     </td>
                     <td className="py-4 px-6">
                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{new Date(record.observedOn).toLocaleDateString()}</span>
+                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{formatBsDate(record.observedOn)}</span>
                           <span className="text-[8px] font-bold text-slate-300 uppercase tracking-[0.2em]">{record.note?.slice(0, 20) || 'No Note'}...</span>
                        </div>
                     </td>

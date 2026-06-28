@@ -1,5 +1,6 @@
 'use client';
 
+import { formatBsDate } from '@schoolos/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../../../lib/api';
@@ -254,11 +255,11 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
               <div className="flex items-center gap-2 mb-6">
                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-widest">
                     <Clock size={12} />
-                    {new Date(e.startsOn).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    {formatBsDate(e.startsOn)}
                  </div>
                  <div className="h-px w-3 bg-slate-200" />
                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    {new Date(e.endsOn).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    {formatBsDate(e.endsOn)}
                  </div>
                  <div className="ml-auto text-sm font-black text-indigo-600 tracking-tighter">
                    {e.weightPercent}%

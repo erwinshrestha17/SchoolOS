@@ -1,6 +1,6 @@
 'use client';
 
-import type { ExamTermSummary } from '@schoolos/core';
+import { formatBsDateTime, type ExamTermSummary } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { api, type MarkLockRequestSummary } from '../../../lib/api';
@@ -38,7 +38,7 @@ function actorLabel(actor?: MarkLockRequestSummary['requestedBy']) {
 
 function formatDate(value?: string | null) {
   if (!value) return '—';
-  return new Date(value).toLocaleString();
+  return formatBsDateTime(value);
 }
 
 export function MarksLockTab({ exams }: Props) {

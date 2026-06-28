@@ -1,5 +1,6 @@
 'use client';
 
+import { formatBsDate } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useSession } from '../session-provider';
@@ -33,9 +34,7 @@ export function TeacherDashboard() {
 
   const todayClasses = timetableQuery.data ?? [];
   const activeHomework = homeworkQuery.data ?? [];
-  const weekday = new Intl.DateTimeFormat('en', { weekday: 'long' }).format(
-    new Date(),
-  );
+  const weekday = formatBsDate(new Date(), { preset: 'long' }).split(',')[0];
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -155,8 +154,5 @@ export function TeacherDashboard() {
 }
 
 function formatShortDate(value: string | Date) {
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: 'numeric',
-  }).format(new Date(value));
+  return formatBsDate(value);
 }

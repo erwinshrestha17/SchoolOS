@@ -1,6 +1,6 @@
 'use client';
 
-import { ExamTermSummary } from '@schoolos/core';
+import { formatBsDate, type ExamTermSummary } from '@schoolos/core';
 import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Calendar, Lock, Unlock, MoreVertical, Edit2, Trash2, ListChecks } from 'lucide-react';
@@ -38,8 +38,8 @@ export function ExamList({
         <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
           <Calendar size={12} />
           <span>
-            {new Date(exam.startsOn).toLocaleDateString()} -{' '}
-            {new Date(exam.endsOn).toLocaleDateString()}
+            {formatBsDate(exam.startsOn)} -{' '}
+            {formatBsDate(exam.endsOn)}
           </span>
         </div>
       ),

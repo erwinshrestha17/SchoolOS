@@ -1,5 +1,6 @@
 'use client';
 
+import { formatBsDate } from '@schoolos/core';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
@@ -92,7 +93,7 @@ export function StaffAttendanceCorrectionDialog({
               Correct Attendance Record
             </DialogTitle>
             <p className="text-xs text-slate-500 mt-1">
-              Correcting entry for {fullName} on {new Date(record.attendanceDate).toLocaleDateString()}
+              Correcting entry for {fullName} on {formatBsDate(record.attendanceDate)}
             </p>
           </div>
           <button

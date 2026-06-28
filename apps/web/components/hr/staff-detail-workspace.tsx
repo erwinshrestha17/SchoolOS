@@ -1,5 +1,6 @@
 'use client';
 
+import { formatBsDate, formatNepalTime } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   Save, 
@@ -516,7 +517,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                         {(staff.attendanceRecords as any[]).slice(0, 15).map((item, idx) => (
                           <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
                             <td className="px-5 py-3.5 font-bold text-slate-900">
-                              {new Date(item.attendanceDate).toLocaleDateString()}
+                              {formatBsDate(item.attendanceDate)}
                             </td>
                             <td className="px-5 py-3.5">
                               <Badge variant="outline" className={cn(
@@ -529,7 +530,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                               </Badge>
                             </td>
                             <td className="px-5 py-3.5 text-slate-600 font-medium">
-                              {item.checkIn ? new Date(item.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                              {item.checkIn ? formatNepalTime(item.checkIn) : '-'}
                             </td>
                             <td className="px-5 py-3.5 text-slate-500 max-w-xs truncate">
                               {item.note || '-'}
@@ -644,7 +645,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                           <tr key={req.id} className="hover:bg-slate-50/30 transition-colors">
                             <td className="px-5 py-3.5 font-bold text-slate-900 uppercase tracking-tight">{req.leaveType.replace('_', ' ')}</td>
                             <td className="px-5 py-3.5 text-slate-500 font-medium">
-                              {new Date(req.startsOn).toLocaleDateString()} - {new Date(req.endsOn).toLocaleDateString()}
+                              {formatBsDate(req.startsOn)} - {formatBsDate(req.endsOn)}
                             </td>
                             <td className="px-5 py-3.5 text-center font-bold text-slate-700">{req.days}</td>
                             <td className="px-5 py-3.5">
@@ -721,8 +722,8 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                         {(staff.salaryStructures as any[]).map((structure) => (
                           <tr key={structure.id} className="hover:bg-slate-50/30 transition-colors">
                             <td className="px-5 py-3.5 font-bold text-slate-900">
-                              {new Date(structure.effectiveFrom).toLocaleDateString()}
-                              {structure.effectiveTo ? ` - ${new Date(structure.effectiveTo).toLocaleDateString()}` : ' - Present'}
+                              {formatBsDate(structure.effectiveFrom)}
+                              {structure.effectiveTo ? ` - ${formatBsDate(structure.effectiveTo)}` : ' - Present'}
                             </td>
                             <td className="px-5 py-3.5 text-slate-500">
                               {structure.pfEnabled ? 'PF' : 'No PF'} • {structure.tdsEnabled ? 'TDS' : 'No TDS'}
@@ -846,7 +847,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
               <div className="space-y-4">
                 <div className="flex justify-between items-center gap-4 py-2 border-b border-slate-100">
                   <span className="text-xs text-slate-400 font-medium">Joined Date</span>
-                  <span className="text-xs font-bold text-slate-900">{staff.employment?.joiningDate ? new Date(staff.employment.joiningDate).toLocaleDateString() : new Date(staff.joiningDate).toLocaleDateString()}</span>
+                  <span className="text-xs font-bold text-slate-900">{formatBsDate(staff.employment?.joiningDate ?? staff.joiningDate)}</span>
                 </div>
                 <div className="flex justify-between items-center gap-4 py-2 border-b border-slate-100">
                   <span className="text-xs text-slate-400 font-medium">Contract Type</span>
@@ -966,7 +967,7 @@ function LifecycleHistoryPanel({ events, loading, error }: { events: StaffLifecy
                     <p className="mt-2 text-sm font-bold text-slate-900">{event.reason || event.notes || 'Lifecycle record'}</p>
                     <p className="mt-1 text-xs font-medium text-slate-500">Performed by: {actorName}</p>
                   </div>
-                  <span className="text-xs font-bold text-slate-400">{new Date(event.eventDate).toLocaleDateString()}</span>
+                  <span className="text-xs font-bold text-slate-400">{formatBsDate(event.eventDate)}</span>
                 </div>
                 {event.metadata ? <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-medium text-slate-500">{formatMetadata(event.metadata)}</p> : null}
               </div>

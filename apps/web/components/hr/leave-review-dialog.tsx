@@ -1,5 +1,6 @@
 'use client';
 
+import { formatBsDate } from '@schoolos/core';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
@@ -135,7 +136,7 @@ export function LeaveReviewDialog({
             <div>
               <p className="text-slate-400 font-bold uppercase">Dates</p>
               <p className="font-bold text-slate-900 mt-1">
-                {new Date(leaveRequest.startsOn).toLocaleDateString()} - {new Date(leaveRequest.endsOn).toLocaleDateString()}
+                {formatBsDate(leaveRequest.startsOn)} - {formatBsDate(leaveRequest.endsOn)}
               </p>
             </div>
             <div>
@@ -152,7 +153,7 @@ export function LeaveReviewDialog({
               <ul className="list-disc pl-4 space-y-1">
                 {anomalies.map((anom, idx) => (
                   <li key={idx}>
-                    {new Date(anom.attendanceDate).toLocaleDateString()}: Proposed {anom.proposedStatus} overlaps with existing {anom.existingStatus}.
+                    {formatBsDate(anom.attendanceDate)}: Proposed {anom.proposedStatus} overlaps with existing {anom.existingStatus}.
                   </li>
                 ))}
               </ul>

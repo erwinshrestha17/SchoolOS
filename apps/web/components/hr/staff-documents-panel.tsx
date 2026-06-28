@@ -1,5 +1,6 @@
 'use client';
 
+import { formatBsDate } from '@schoolos/core';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
@@ -109,7 +110,7 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
                 <tr key={doc.id} className="hover:bg-slate-50/30 transition-all group">
                   <td className="px-6 py-4 font-bold text-slate-900">
                     <p className="font-bold text-slate-900">{doc.name}</p>
-                    <p className="text-[10px] text-slate-400 mt-1 font-medium">Uploaded {new Date(doc.createdAt).toLocaleDateString()}</p>
+                    <p className="text-[10px] text-slate-400 mt-1 font-medium">Uploaded {formatBsDate(doc.createdAt)}</p>
                   </td>
                   <td className="px-6 py-4">
                     <Badge variant="secondary" className="font-bold text-[9px] uppercase tracking-wider">

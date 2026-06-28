@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useMemo } from 'react';
 import { api } from '../../../lib/api';
-import type { ResultPublishingReadiness } from '@schoolos/core';
+import { formatBsDate, type ResultPublishingReadiness } from '@schoolos/core';
 import { 
   Megaphone, 
   Search, 
@@ -401,7 +401,7 @@ export function ResultPublishingTab({
                                 {r.publishStatus}
                              </div>
                              {r.publishedAt && (
-                               <span className="text-[7px] font-bold text-slate-300 uppercase tracking-widest">Released {new Date(r.publishedAt).toLocaleDateString()}</span>
+                               <span className="text-[7px] font-bold text-slate-300 uppercase tracking-widest">Released {formatBsDate(r.publishedAt)}</span>
                              )}
                           </div>
                        </td>

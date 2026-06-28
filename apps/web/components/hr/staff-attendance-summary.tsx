@@ -1,7 +1,11 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { StaffAttendanceMonthlySummary } from '@schoolos/core';
+import {
+  formatBsDateRange,
+  toBsDateFromGregorian,
+  type StaffAttendanceMonthlySummary,
+} from '@schoolos/core';
 import { api } from '../../lib/api';
 import { ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { useState } from 'react';
@@ -20,13 +24,17 @@ export function StaffAttendanceSummary() {
   const nextMonth = () => setDate(new Date(year, month, 1));
   const prevMonth = () => setDate(new Date(year, month - 2, 1));
 
-  const monthName = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(date);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const periodLabel = formatBsDateRange(
+    toBsDateFromGregorian({ year, month, day: 1 }),
+    toBsDateFromGregorian({ year, month, day: lastDay }),
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
-          <h3 className="text-lg font-bold text-gray-900">{monthName} {year}</h3>
+          <h3 className="text-lg font-bold text-gray-900">{periodLabel}</h3>
           <div className="flex items-center gap-1">
             <button 
               onClick={prevMonth}

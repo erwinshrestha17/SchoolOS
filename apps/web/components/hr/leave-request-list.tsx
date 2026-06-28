@@ -1,5 +1,6 @@
 'use client';
 
+import { formatBsDate } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { CalendarDays, ShieldCheck } from 'lucide-react';
@@ -83,11 +84,11 @@ export function LeaveRequestList() {
               <div className="mt-6 grid grid-cols-2 gap-4 rounded-2xl bg-slate-50/50 p-4 border border-slate-100/50">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Starts</p>
-                  <p className="text-sm font-bold text-slate-700 mt-1">{new Date(request.startsOn).toLocaleDateString()}</p>
+                  <p className="text-sm font-bold text-slate-700 mt-1">{formatBsDate(request.startsOn)}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ends</p>
-                  <p className="text-sm font-bold text-slate-700 mt-1">{new Date(request.endsOn).toLocaleDateString()}</p>
+                  <p className="text-sm font-bold text-slate-700 mt-1">{formatBsDate(request.endsOn)}</p>
                 </div>
                 <div className="col-span-2 pt-3 border-t border-slate-100 mt-1">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Duration</p>
