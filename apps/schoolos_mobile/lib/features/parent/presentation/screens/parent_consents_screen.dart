@@ -60,12 +60,22 @@ class ParentConsentsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 14),
               const _ConsentUnavailable(
-                title: 'Consent changes are not enabled in mobile',
+                title: 'Consent decisions are append-only',
                 message:
-                    'Current consent state is synced from school records. Changes still require the school approval workflow.',
+                    'Granting or declining creates a new consent record for your guardian account. Historic consent records are not edited.',
               ),
               const SizedBox(height: 12),
-              _ConsentStatusSection(consents: consents),
+              _ConsentStatusSection(
+                consents: consents,
+                onDecision: (consentType, version, granted) =>
+                    _submitConsentDecision(
+                      context,
+                      ref,
+                      consentType: consentType,
+                      version: version,
+                      granted: granted,
+                    ),
+              ),
               const SizedBox(height: 12),
               const _ReadOnlyPermissionCard(
                 icon: Icons.directions_bus_rounded,
@@ -94,12 +104,70 @@ class ParentConsentsScreen extends ConsumerWidget {
     if (names.length == 1) return names.first;
     return '${names.take(names.length - 1).join(', ')} and ${names.last}';
   }
+
+  Future<void> _submitConsentDecision(
+    BuildContext context,
+    WidgetRef ref, {
+    required String consentType,
+    required String version,
+    required bool granted,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(granted ? 'Grant consent?' : 'Decline consent?'),
+        content: Text(
+          'This will record your ${_labelFor(consentType).toLowerCase()} decision for version $version.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(granted ? 'Grant' : 'Decline'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await ref
+          .read(parentRepositoryProvider)
+          .decideMyConsent(
+            consentType: consentType,
+            version: version,
+            granted: granted,
+          );
+      ref.invalidate(parentConsentStatusProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Consent decision recorded.')),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Consent decision could not be saved. Please retry.'),
+          ),
+        );
+      }
+    }
+  }
 }
 
 class _ConsentStatusSection extends StatelessWidget {
-  const _ConsentStatusSection({required this.consents});
+  const _ConsentStatusSection({
+    required this.consents,
+    required this.onDecision,
+  });
 
   final AsyncValue<List<ParentConsentStatus>> consents;
+  final Future<void> Function(String consentType, String version, bool granted)
+  onDecision;
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +191,9 @@ class _ConsentStatusSection extends StatelessWidget {
                 _messageFor(items, 'PHOTO_USAGE') ??
                 'No media consent record is available yet.',
             statusLabel: _statusFor(items, 'PHOTO_USAGE'),
+            version: _find(items, 'PHOTO_USAGE')?.version,
+            onDecision: (version, granted) =>
+                onDecision('PHOTO_USAGE', version, granted),
           ),
           const SizedBox(height: 12),
           _ReadOnlyPermissionCard(
@@ -132,6 +203,9 @@ class _ConsentStatusSection extends StatelessWidget {
                 _messageFor(items, 'MESSAGING') ??
                 'No communication consent record is available yet.',
             statusLabel: _statusFor(items, 'MESSAGING'),
+            version: _find(items, 'MESSAGING')?.version,
+            onDecision: (version, granted) =>
+                onDecision('MESSAGING', version, granted),
           ),
           const SizedBox(height: 12),
           _ReadOnlyPermissionCard(
@@ -141,6 +215,9 @@ class _ConsentStatusSection extends StatelessWidget {
                 _messageFor(items, 'DATA_PROCESSING') ??
                 'No data-processing consent record is available yet.',
             statusLabel: _statusFor(items, 'DATA_PROCESSING'),
+            version: _find(items, 'DATA_PROCESSING')?.version,
+            onDecision: (version, granted) =>
+                onDecision('DATA_PROCESSING', version, granted),
           ),
         ],
       ),
@@ -190,54 +267,112 @@ class _ReadOnlyPermissionCard extends StatelessWidget {
     required this.title,
     required this.message,
     required this.statusLabel,
+    this.version,
+    this.onDecision,
   });
 
   final IconData icon;
   final String title;
   final String message;
   final String statusLabel;
+  final String? version;
+  final Future<void> Function(String version, bool granted)? onDecision;
 
   @override
   Widget build(BuildContext context) => PortalCard(
-    child: Row(
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        FeatureIcon(icon, color: ParentPortalColors.green),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            FeatureIcon(icon, color: ParentPortalColors.green),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    message,
+                    style: const TextStyle(
+                      color: ParentPortalColors.muted,
+                      height: 1.4,
+                    ),
+                  ),
+                  if (version != null && version!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Version $version',
+                      style: const TextStyle(
+                        color: ParentPortalColors.muted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                message,
-                style: const TextStyle(
-                  color: ParentPortalColors.muted,
-                  height: 1.4,
-                ),
+            ),
+            StatusBadge(
+              label: statusLabel,
+              color: statusLabel == 'Granted'
+                  ? ParentPortalColors.green
+                  : ParentPortalColors.orange,
+              background: statusLabel == 'Granted'
+                  ? ParentPortalColors.greenSoft
+                  : ParentPortalColors.orangeSoft,
+            ),
+          ],
+        ),
+        if (onDecision != null &&
+            version != null &&
+            version!.trim().isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => onDecision!(version!, false),
+                icon: const Icon(Icons.close_rounded),
+                label: const Text('Decline'),
+              ),
+              FilledButton.icon(
+                onPressed: () => onDecision!(version!, true),
+                icon: const Icon(Icons.check_rounded),
+                label: const Text('Grant'),
               ),
             ],
           ),
-        ),
-        StatusBadge(
-          label: statusLabel,
-          color: statusLabel == 'Granted'
-              ? ParentPortalColors.green
-              : ParentPortalColors.orange,
-          background: statusLabel == 'Granted'
-              ? ParentPortalColors.greenSoft
-              : ParentPortalColors.orangeSoft,
-        ),
+        ] else if (onDecision != null) ...[
+          const SizedBox(height: 12),
+          const Text(
+            'A school-published consent version is required before mobile decisions are enabled.',
+            style: TextStyle(
+              color: ParentPortalColors.muted,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ],
     ),
   );
+}
+
+String _labelFor(String type) {
+  return switch (type) {
+    'PHOTO_USAGE' => 'Media consent',
+    'MESSAGING' => 'Communication consent',
+    'DATA_PROCESSING' => 'Data processing consent',
+    _ => 'Consent',
+  };
 }
 
 class _ConsentUnavailable extends StatelessWidget {

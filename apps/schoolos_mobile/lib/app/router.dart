@@ -366,19 +366,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.principalEscalations,
-        builder: (context, state) => const PrincipalSnapshotScreen(
-          snapshotKey: 'escalations',
-          title: 'Escalations',
-          subtitle: 'Parent concerns and school issues needing follow-up',
-        ),
+        builder: (context, state) => const PrincipalEscalationsScreen(),
       ),
       GoRoute(
         path: AppRoutes.principalStudents,
-        builder: (context, state) => const PrincipalSnapshotScreen(
-          snapshotKey: 'students',
-          title: 'Students',
-          subtitle: 'Quick student lookup and safe snapshot',
-        ),
+        builder: (context, state) => const PrincipalStudentsScreen(),
       ),
       GoRoute(
         path: AppRoutes.principalReports,
@@ -390,19 +382,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.principalTasks,
-        builder: (context, state) => const PrincipalSnapshotScreen(
-          snapshotKey: 'tasks',
-          title: 'Tasks',
-          subtitle: 'Follow-ups, owners, and due dates',
-        ),
+        builder: (context, state) => const PrincipalTasksScreen(),
       ),
       GoRoute(
         path: AppRoutes.principalWalkthroughs,
-        builder: (context, state) => const PrincipalSnapshotScreen(
-          snapshotKey: 'walkthroughs',
-          title: 'Classroom Walkthroughs',
-          subtitle: 'Observations, follow-up, and classroom visits',
-        ),
+        builder: (context, state) => const PrincipalWalkthroughsScreen(),
       ),
       GoRoute(
         path: AppRoutes.principalCanteen,

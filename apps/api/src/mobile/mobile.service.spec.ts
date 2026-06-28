@@ -31,7 +31,10 @@ describe('MobileService', () => {
   let canteenService: { topUpWallet: jest.Mock };
   let entitlementsService: { getEntitlements: jest.Mock };
   let reportCardPdfService: { getReportCardPdf: jest.Mock };
-  let communicationsService: { getGuardianConsentStatus: jest.Mock };
+  let communicationsService: {
+    getGuardianConsentStatus: jest.Mock;
+    captureConsent: jest.Mock;
+  };
   let homeworkAttachmentAccessService: { getAttachmentAccessUrl: jest.Mock };
   let fileRegistryService: {
     listFilesByEntity: jest.Mock;
@@ -117,6 +120,7 @@ describe('MobileService', () => {
     };
     communicationsService = {
       getGuardianConsentStatus: jest.fn(),
+      captureConsent: jest.fn(),
     };
     homeworkAttachmentAccessService = {
       getAttachmentAccessUrl: jest.fn(),
@@ -1250,5 +1254,68 @@ describe('MobileService', () => {
       'guardian-1',
       actor,
     );
+  });
+
+  it('captures signed-in guardian consent decisions through the communications module', async () => {
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    communicationsService.captureConsent.mockResolvedValue({
+      consentType: 'MESSAGING',
+      granted: true,
+      version: 'policy-v2',
+      capturedAt: new Date('2026-06-20T00:00:00.000Z'),
+      revokedAt: null,
+    });
+
+    await expect(
+      service.decideMyConsent(
+        {
+          consentType: 'MESSAGING',
+          version: 'policy-v2',
+          granted: true,
+        },
+        actor,
+      ),
+    ).resolves.toEqual({
+      consentType: 'MESSAGING',
+      granted: true,
+      version: 'policy-v2',
+      capturedAt: '2026-06-20T00:00:00.000Z',
+      revokedAt: null,
+    });
+    expect(communicationsService.captureConsent).toHaveBeenCalledWith(
+      {
+        guardianId: 'guardian-1',
+        consentType: 'MESSAGING',
+        version: 'policy-v2',
+        granted: true,
+        metadata: {
+          source: 'mobile_guardian',
+          childLinkVerified: true,
+        },
+      },
+      actor,
+    );
+  });
+
+  it('denies guardian consent decisions without a linked child', async () => {
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [],
+    });
+
+    await expect(
+      service.decideMyConsent(
+        {
+          consentType: 'MESSAGING',
+          version: 'policy-v2',
+          granted: false,
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(communicationsService.captureConsent).not.toHaveBeenCalled();
   });
 });

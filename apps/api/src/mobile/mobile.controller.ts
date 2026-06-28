@@ -23,6 +23,7 @@ import {
   ParentSandboxCanteenTopUpDto,
   ParentSandboxFeePaymentDto,
 } from './dto/parent-sandbox-payment.dto';
+import { MobileParentConsentDecisionDto } from './dto/mobile-parent-consent.dto';
 
 @Controller('mobile')
 @UseGuards(JwtAuthGuard, EntitlementGuard)
@@ -194,6 +195,14 @@ export class MobileController {
   @Get('me/consents')
   getMyConsentStatus(@CurrentAuth() auth: AuthContext) {
     return this.mobileService.getMyConsentStatus(auth);
+  }
+
+  @Post('me/consents/decision')
+  decideMyConsent(
+    @Body() dto: MobileParentConsentDecisionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.decideMyConsent(dto, auth);
   }
 
   @Get('students/:id/activity-feed')

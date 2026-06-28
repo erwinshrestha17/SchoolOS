@@ -41,6 +41,28 @@ final principalApprovalsProvider = FutureProvider.autoDispose
       );
     });
 
+final principalEscalationsProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, String>((ref, status) async {
+      final isOnline = ref.watch(connectivityProvider);
+      return withConnectivityMeta(
+        await ref
+            .watch(principalRepositoryProvider)
+            .getEscalations(status: status),
+        isOnline,
+      );
+    });
+
+final principalStudentSearchProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, String>((ref, query) async {
+      final isOnline = ref.watch(connectivityProvider);
+      return withConnectivityMeta(
+        await ref
+            .watch(principalRepositoryProvider)
+            .searchStudents(query: query.trim().isEmpty ? null : query.trim()),
+        isOnline,
+      );
+    });
+
 final principalSnapshotProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, String>((ref, key) async {
       final repository = ref.watch(principalRepositoryProvider);

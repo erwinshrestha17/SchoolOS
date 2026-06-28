@@ -244,6 +244,21 @@ class ParentRepository {
         .toList();
   }
 
+  Future<void> decideMyConsent({
+    required String consentType,
+    required String version,
+    required bool granted,
+  }) async {
+    await _client.post(
+      '/mobile/me/consents/decision',
+      data: {
+        'consentType': consentType,
+        'version': version,
+        'granted': granted,
+      },
+    );
+  }
+
   Future<List<ParentHomeworkAttachment>> getHomeworkAttachments({
     required String childId,
     required String homeworkId,

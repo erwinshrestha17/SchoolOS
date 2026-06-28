@@ -142,6 +142,9 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                 for (final item in snapshot.items) ...[
                   _HomeworkCard(
                     item: item,
+                    onEdit: item.status == 'DRAFT'
+                        ? () => _showEditSheet(item)
+                        : null,
                     onPublish: item.status == 'DRAFT'
                         ? () => _publish(item)
                         : null,
@@ -385,6 +388,173 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
     instructions.dispose();
   }
 
+  Future<void> _showEditSheet(TeacherHomeworkItem item) async {
+    final title = TextEditingController(text: item.title);
+    final instructions = TextEditingController(text: item.instructions);
+    final formKey = GlobalKey<FormState>();
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    var dueDate = item.dueDate != null && item.dueDate!.isAfter(DateTime.now())
+        ? item.dueDate!
+        : tomorrow;
+    var submissionRequired = item.submissionRequired;
+    var saving = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.lg,
+            MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+          ),
+          child: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Edit homework draft',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    item.classLabel,
+                    style: const TextStyle(
+                      color: AppColors.slate500,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  TextFormField(
+                    controller: title,
+                    enabled: !saving,
+                    maxLength: 160,
+                    decoration: const InputDecoration(labelText: 'Title'),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Enter a homework title.'
+                        : null,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
+                    controller: instructions,
+                    enabled: !saving,
+                    minLines: 3,
+                    maxLines: 6,
+                    maxLength: 5000,
+                    decoration: const InputDecoration(
+                      labelText: 'Instructions',
+                    ),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Enter homework instructions.'
+                        : null,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.event_rounded),
+                    title: const Text('Due date'),
+                    subtitle: Text(DateFormat.yMMMd().format(dueDate)),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: saving
+                        ? null
+                        : () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: dueDate,
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
+                            );
+                            if (picked != null) {
+                              setSheetState(() => dueDate = picked);
+                            }
+                          },
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Student submission required'),
+                    value: submissionRequired,
+                    onChanged: saving
+                        ? null
+                        : (value) =>
+                              setSheetState(() => submissionRequired = value),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              if (!formKey.currentState!.validate()) return;
+                              setSheetState(() => saving = true);
+                              try {
+                                await ref
+                                    .read(teacherRepositoryProvider)
+                                    .updateHomeworkDraft(
+                                      homeworkId: item.id,
+                                      title: title.text,
+                                      instructions: instructions.text,
+                                      dueDate: dueDate,
+                                      submissionRequired: submissionRequired,
+                                    );
+                                ref.invalidate(teacherHomeworkProvider);
+                                if (sheetContext.mounted) {
+                                  Navigator.pop(sheetContext);
+                                }
+                                if (mounted) {
+                                  ScaffoldMessenger.of(
+                                    this.context,
+                                  ).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Homework draft updated.'),
+                                    ),
+                                  );
+                                }
+                              } catch (_) {
+                                setSheetState(() => saving = false);
+                                if (sheetContext.mounted) {
+                                  ScaffoldMessenger.of(
+                                    sheetContext,
+                                  ).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Draft could not be updated. Please retry.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                      icon: saving
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.save_outlined),
+                      label: Text(saving ? 'Saving' : 'Save changes'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    title.dispose();
+    instructions.dispose();
+  }
+
   Future<void> _showSubmissions(TeacherHomeworkItem item) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -418,9 +588,15 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _HomeworkCard extends StatelessWidget {
-  const _HomeworkCard({required this.item, this.onPublish, this.onReview});
+  const _HomeworkCard({
+    required this.item,
+    this.onEdit,
+    this.onPublish,
+    this.onReview,
+  });
 
   final TeacherHomeworkItem item;
+  final VoidCallback? onEdit;
   final VoidCallback? onPublish;
   final VoidCallback? onReview;
 
@@ -486,11 +662,17 @@ class _HomeworkCard extends StatelessWidget {
                 ),
             ],
           ),
-          if (onPublish != null || onReview != null) ...[
+          if (onEdit != null || onPublish != null || onReview != null) ...[
             const Divider(height: AppSpacing.xl),
             Wrap(
               spacing: AppSpacing.sm,
               children: [
+                if (onEdit != null)
+                  OutlinedButton.icon(
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Edit'),
+                  ),
                 if (onReview != null)
                   OutlinedButton.icon(
                     onPressed: onReview,

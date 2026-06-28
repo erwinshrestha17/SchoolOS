@@ -21,6 +21,7 @@ import {
   ParentSandboxCanteenTopUpDto,
   ParentSandboxFeePaymentDto,
 } from './dto/parent-sandbox-payment.dto';
+import { MobileParentConsentDecisionDto } from './dto/mobile-parent-consent.dto';
 
 interface MobileStudentRow extends Student {
   class: { id: string; name: string };
@@ -793,6 +794,49 @@ export class MobileService {
         capturedAt: toIso(item.capturedAt),
         revokedAt: toIso(item.revokedAt),
       })),
+    };
+  }
+
+  async decideMyConsent(
+    dto: MobileParentConsentDecisionDto,
+    actor: AuthContext,
+  ) {
+    const guardian = await this.prisma.guardian.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+      select: {
+        id: true,
+        studentLinks: {
+          select: { studentId: true },
+          take: 1,
+        },
+      },
+    });
+
+    if (!guardian || guardian.studentLinks.length === 0) {
+      throw new ForbiddenException('Parent consent decision is not available');
+    }
+
+    const consent = await this.communicationsService.captureConsent(
+      {
+        guardianId: guardian.id,
+        consentType: dto.consentType,
+        version: dto.version,
+        granted: dto.granted,
+        metadata: {
+          ...(dto.metadata ?? {}),
+          source: 'mobile_guardian',
+          childLinkVerified: true,
+        },
+      },
+      actor,
+    );
+
+    return {
+      consentType: consent.consentType,
+      granted: consent.granted,
+      version: consent.version,
+      capturedAt: toIso(consent.capturedAt),
+      revokedAt: toIso(consent.revokedAt),
     };
   }
 

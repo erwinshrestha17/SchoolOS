@@ -185,6 +185,24 @@ class TeacherRepository {
     );
   }
 
+  Future<void> updateHomeworkDraft({
+    required String homeworkId,
+    required String title,
+    required String instructions,
+    required DateTime dueDate,
+    required bool submissionRequired,
+  }) async {
+    await _client.patch(
+      '/mobile/teacher/homework/$homeworkId',
+      data: {
+        'title': title.trim(),
+        'instructions': instructions.trim(),
+        'dueDate': dueDate.toUtc().toIso8601String(),
+        'submissionRequired': submissionRequired,
+      },
+    );
+  }
+
   Future<void> publishHomework(String homeworkId) async {
     await _client.post('/mobile/teacher/homework/$homeworkId/publish');
   }
@@ -220,6 +238,41 @@ class TeacherRepository {
         if (correctionRemarks != null && correctionRemarks.trim().isNotEmpty)
           'correctionRemarks': correctionRemarks.trim(),
       },
+    );
+  }
+
+  Future<TeacherTimetableSnapshot> getTimetable({
+    DateTime? weekStart,
+    int days = 7,
+  }) async {
+    const cacheKey = 'teacher_timetable_week';
+    late Map<String, dynamic> data;
+    try {
+      final response = await _client.get(
+        '/mobile/teacher/timetable',
+        queryParameters: {
+          if (weekStart != null) 'weekStart': weekStart.toIso8601String(),
+          'days': days,
+        },
+      );
+      data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : const <String, dynamic>{};
+      data = {...data, '_mobileLastUpdated': DateTime.now().toIso8601String()};
+      await cache?.write(cacheKey, data);
+    } on AppException catch (error) {
+      if (error is! NetworkException && error is! TimeoutException) rethrow;
+      final cached = cache?.read(cacheKey);
+      if (cached == null) rethrow;
+      data = cached.withMetadata();
+    }
+
+    return TeacherTimetableSnapshot.fromJson(
+      data,
+      fromCache: data['_mobileFromCache'] as bool? ?? false,
+      lastUpdated:
+          DateTime.tryParse(data['_mobileLastUpdated'] as String? ?? '') ??
+          DateTime.now(),
     );
   }
 }

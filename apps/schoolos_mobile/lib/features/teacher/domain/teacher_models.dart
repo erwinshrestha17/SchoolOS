@@ -348,6 +348,169 @@ class TeacherHomeworkSubmission {
   }
 }
 
+class TeacherTimetableSnapshot {
+  const TeacherTimetableSnapshot({
+    required this.rangeStart,
+    required this.rangeEnd,
+    required this.items,
+    required this.substitutions,
+    required this.lastUpdated,
+    this.fromCache = false,
+  });
+
+  final DateTime? rangeStart;
+  final DateTime? rangeEnd;
+  final List<TeacherTimetableItem> items;
+  final List<TeacherTimetableSubstitution> substitutions;
+  final DateTime lastUpdated;
+  final bool fromCache;
+
+  List<TeacherTimetableSubstitution> get todayChanges {
+    final now = DateTime.now();
+    return substitutions.where((item) {
+      final date = item.date;
+      return date != null &&
+          date.year == now.year &&
+          date.month == now.month &&
+          date.day == now.day;
+    }).toList();
+  }
+
+  factory TeacherTimetableSnapshot.fromJson(
+    Map<String, dynamic> json, {
+    bool fromCache = false,
+    DateTime? lastUpdated,
+  }) {
+    final range = json['range'] is Map<String, dynamic>
+        ? json['range'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    return TeacherTimetableSnapshot(
+      rangeStart: DateTime.tryParse(range['startsOn'] as String? ?? ''),
+      rangeEnd: DateTime.tryParse(range['endsOn'] as String? ?? ''),
+      items: _asList(json['items'])
+          .whereType<Map<String, dynamic>>()
+          .map(TeacherTimetableItem.fromJson)
+          .toList(),
+      substitutions: _asList(json['substitutions'])
+          .whereType<Map<String, dynamic>>()
+          .map(TeacherTimetableSubstitution.fromJson)
+          .toList(),
+      lastUpdated: lastUpdated ?? DateTime.now(),
+      fromCache: fromCache,
+    );
+  }
+}
+
+class TeacherTimetableItem {
+  const TeacherTimetableItem({
+    required this.id,
+    this.date,
+    required this.className,
+    this.sectionName,
+    required this.subjectName,
+    this.room,
+    required this.startsAt,
+    required this.endsAt,
+    required this.status,
+    this.substitution,
+  });
+
+  final String id;
+  final DateTime? date;
+  final String className;
+  final String? sectionName;
+  final String subjectName;
+  final String? room;
+  final String startsAt;
+  final String endsAt;
+  final String status;
+  final TeacherTimetableSubstitution? substitution;
+
+  String get classLabel => [
+    className,
+    if (sectionName != null && sectionName!.isNotEmpty) sectionName!,
+  ].join(' • ');
+
+  factory TeacherTimetableItem.fromJson(Map<String, dynamic> json) {
+    return TeacherTimetableItem(
+      id: json['id'] as String? ?? '',
+      date: DateTime.tryParse(json['date'] as String? ?? ''),
+      className: json['className'] as String? ?? 'Class',
+      sectionName: json['sectionName'] as String?,
+      subjectName: json['subjectName'] as String? ?? 'Subject',
+      room: json['room'] as String?,
+      startsAt: json['startsAt'] as String? ?? '',
+      endsAt: json['endsAt'] as String? ?? '',
+      status: json['status'] as String? ?? 'SCHEDULED',
+      substitution: json['substitution'] is Map<String, dynamic>
+          ? TeacherTimetableSubstitution.fromJson(
+              json['substitution'] as Map<String, dynamic>,
+            )
+          : null,
+    );
+  }
+}
+
+class TeacherTimetableSubstitution {
+  const TeacherTimetableSubstitution({
+    required this.id,
+    this.date,
+    required this.status,
+    required this.reason,
+    required this.role,
+    required this.className,
+    this.sectionName,
+    required this.subjectName,
+    required this.startsAt,
+    required this.endsAt,
+    this.room,
+    this.absentTeacherName,
+    this.substituteTeacherName,
+  });
+
+  final String id;
+  final DateTime? date;
+  final String status;
+  final String reason;
+  final String role;
+  final String className;
+  final String? sectionName;
+  final String subjectName;
+  final String startsAt;
+  final String endsAt;
+  final String? room;
+  final String? absentTeacherName;
+  final String? substituteTeacherName;
+
+  String get classLabel => [
+    className,
+    if (sectionName != null && sectionName!.isNotEmpty) sectionName!,
+    subjectName,
+  ].join(' • ');
+
+  factory TeacherTimetableSubstitution.fromJson(Map<String, dynamic> json) {
+    return TeacherTimetableSubstitution(
+      id: json['id'] as String? ?? '',
+      date: DateTime.tryParse(json['date'] as String? ?? ''),
+      status: json['status'] as String? ?? 'PENDING',
+      reason: json['reason'] as String? ?? 'Schedule change',
+      role: json['role'] as String? ?? '',
+      className: json['className'] as String? ?? 'Class',
+      sectionName: json['sectionName'] as String?,
+      subjectName: json['subjectName'] as String? ?? 'Subject',
+      startsAt: json['startsAt'] as String? ?? '',
+      endsAt: json['endsAt'] as String? ?? '',
+      room: json['room'] as String?,
+      absentTeacherName: json['absentTeacherName'] as String?,
+      substituteTeacherName: json['substituteTeacherName'] as String?,
+    );
+  }
+}
+
+List<dynamic> _asList(Object? value) {
+  return value is List<dynamic> ? value : const [];
+}
+
 int _asInt(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();

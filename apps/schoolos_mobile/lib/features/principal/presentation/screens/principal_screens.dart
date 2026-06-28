@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -201,6 +203,231 @@ class _PrincipalApprovalsScreenState
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class PrincipalEscalationsScreen extends ConsumerStatefulWidget {
+  const PrincipalEscalationsScreen({super.key});
+
+  @override
+  ConsumerState<PrincipalEscalationsScreen> createState() =>
+      _PrincipalEscalationsScreenState();
+}
+
+class _PrincipalEscalationsScreenState
+    extends ConsumerState<PrincipalEscalationsScreen> {
+  String status = 'open';
+
+  @override
+  Widget build(BuildContext context) {
+    if (status == 'reopened') {
+      return PrincipalShell(
+        selectedIndex: 4,
+        title: 'Escalations',
+        subtitle: 'Parent concerns and school issues needing follow-up',
+        showBack: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SegmentedFilters(
+              values: const ['open', 'assigned', 'resolved', 'reopened'],
+              active: status,
+              labels: const {
+                'open': 'Open',
+                'assigned': 'Mine',
+                'resolved': 'Resolved',
+                'reopened': 'Reopened',
+              },
+              onChanged: (value) => setState(() => status = value),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            const AppAccessState(
+              title: 'Reopened escalations unavailable',
+              message:
+                  'The backend escalation contract currently supports open and resolved states only. Reopened cases will appear here after that state exists.',
+              icon: Icons.lock_outline_rounded,
+            ),
+          ],
+        ),
+      );
+    }
+
+    final provider = principalEscalationsProvider(status);
+    final asyncData = ref.watch(provider);
+    return PrincipalShell(
+      selectedIndex: 4,
+      title: 'Escalations',
+      subtitle: 'Parent concerns and school issues needing follow-up',
+      showBack: true,
+      child: asyncData.when(
+        loading: () => const _PrincipalLoading(),
+        error: (error, _) => AppExceptionView(
+          error: error,
+          onRetry: () => ref.invalidate(provider),
+        ),
+        data: (data) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _CacheBanner(data: data),
+            _SegmentedFilters(
+              values: const ['open', 'assigned', 'resolved', 'reopened'],
+              active: status,
+              labels: const {
+                'open': 'Open',
+                'assigned': 'Mine',
+                'resolved': 'Resolved',
+                'reopened': 'Reopened',
+              },
+              onChanged: (value) => setState(() => status = value),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _SummaryCards(
+              values: [
+                _SummaryValue(
+                  'Critical',
+                  _num(data, 'metrics.critical'),
+                  AppColors.danger,
+                  Icons.warning_rounded,
+                ),
+                _SummaryValue(
+                  'Due Today',
+                  _num(data, 'metrics.dueToday'),
+                  AppColors.warning,
+                  Icons.today_rounded,
+                ),
+                _SummaryValue(
+                  'Pending',
+                  _num(data, 'metrics.pendingResponse'),
+                  AppColors.info,
+                  Icons.mark_chat_unread_rounded,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _ItemList(items: _list(data['items'])),
+            const SizedBox(height: AppSpacing.md),
+            const _Callout(
+              icon: Icons.lock_rounded,
+              title: 'Escalation actions unavailable',
+              message:
+                  'Assign, resolve, and reopen actions need a backend escalation mutation contract with resolution notes and audit history before mobile can submit them.',
+              color: AppColors.info,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class PrincipalStudentsScreen extends ConsumerStatefulWidget {
+  const PrincipalStudentsScreen({super.key});
+
+  @override
+  ConsumerState<PrincipalStudentsScreen> createState() =>
+      _PrincipalStudentsScreenState();
+}
+
+class _PrincipalStudentsScreenState
+    extends ConsumerState<PrincipalStudentsScreen> {
+  final _controller = TextEditingController();
+  Timer? _debounce;
+  String query = '';
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) setState(() => query = value);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = principalStudentSearchProvider(query);
+    final asyncData = ref.watch(provider);
+    return PrincipalShell(
+      selectedIndex: 4,
+      title: 'Student Lookup',
+      subtitle: 'Permission-safe student summaries',
+      showBack: true,
+      child: asyncData.when(
+        loading: () => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _StudentSearchField(
+              controller: _controller,
+              onChanged: _onSearchChanged,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            const _PrincipalLoading(),
+          ],
+        ),
+        error: (error, _) => AppExceptionView(
+          error: error,
+          onRetry: () => ref.invalidate(provider),
+        ),
+        data: (data) => _StudentSearchBody(
+          data: data,
+          controller: _controller,
+          onChanged: _onSearchChanged,
+        ),
+      ),
+    );
+  }
+}
+
+class PrincipalTasksScreen extends ConsumerWidget {
+  const PrincipalTasksScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final provider = principalSnapshotProvider('tasks');
+    final asyncData = ref.watch(provider);
+    return PrincipalShell(
+      selectedIndex: 4,
+      title: 'Tasks',
+      subtitle: 'Assigned follow-ups, owners, and due dates',
+      showBack: true,
+      child: asyncData.when(
+        loading: () => const _PrincipalLoading(),
+        error: (error, _) => AppExceptionView(
+          error: error,
+          onRetry: () => ref.invalidate(provider),
+        ),
+        data: (data) => _TasksBody(data: data),
+      ),
+    );
+  }
+}
+
+class PrincipalWalkthroughsScreen extends ConsumerWidget {
+  const PrincipalWalkthroughsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final provider = principalSnapshotProvider('walkthroughs');
+    final asyncData = ref.watch(provider);
+    return PrincipalShell(
+      selectedIndex: 4,
+      title: 'Classroom Walkthroughs',
+      subtitle: 'Observation follow-ups and classroom visit status',
+      showBack: true,
+      child: asyncData.when(
+        loading: () => const _PrincipalLoading(),
+        error: (error, _) => AppExceptionView(
+          error: error,
+          onRetry: () => ref.invalidate(provider),
+        ),
+        data: (data) => _WalkthroughsBody(data: data),
       ),
     );
   }
@@ -742,6 +969,236 @@ class _StudentsBody extends StatelessWidget {
       ],
     );
   }
+}
+
+class _StudentSearchBody extends StatelessWidget {
+  const _StudentSearchBody({
+    required this.data,
+    required this.controller,
+    required this.onChanged,
+  });
+
+  final Map<String, dynamic> data;
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _list(data['items']);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _CacheBanner(data: data),
+        _StudentSearchField(controller: controller, onChanged: onChanged),
+        const SizedBox(height: AppSpacing.md),
+        const _Callout(
+          icon: Icons.filter_alt_off_rounded,
+          title: 'Class and section filters unavailable',
+          message:
+              'Student lookup is using the confirmed mobile search endpoint. Class and section filter controls need a safe mobile options contract before they appear here.',
+          color: AppColors.info,
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        SectionHeader(title: 'Results (${items.length})'),
+        const SizedBox(height: AppSpacing.sm),
+        if (items.isEmpty)
+          const AppAccessState(
+            title: 'No students found',
+            message:
+                'Try a student name, admission number, or guardian search term.',
+            icon: Icons.search_off_rounded,
+          )
+        else
+          for (final item in items) ...[
+            _StudentResultCard(item: item),
+            const SizedBox(height: AppSpacing.md),
+          ],
+        _ActionRow(
+          icon: Icons.person_add_alt_1_rounded,
+          title: 'Recent admissions',
+          subtitle:
+              '${data['recentAdmissions'] ?? 0} new students in the last 7 days',
+        ),
+      ],
+    );
+  }
+}
+
+class _StudentSearchField extends StatelessWidget {
+  const _StudentSearchField({
+    required this.controller,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        prefixIcon: const Icon(Icons.search_rounded),
+        hintText: 'Search name, admission no., guardian phone',
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+}
+
+class _StudentResultCard extends StatelessWidget {
+  const _StudentResultCard({required this.item});
+
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final guardianName = _string(item['guardianName'], fallback: 'Guardian');
+    final phone = _maskPhone(_string(item['guardianPhone']));
+    return AppCard(
+      onTap: () => _showStudentSummary(context, item),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _IconBubble(
+                icon: Icons.face_rounded,
+                color: AppColors.info,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _string(item['name'], fallback: 'Student'),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      _string(
+                        item['classLabel'],
+                        fallback: 'Class unavailable',
+                      ),
+                      style: const TextStyle(color: AppColors.slate500),
+                    ),
+                  ],
+                ),
+              ),
+              StatusChip(
+                status: _statusType(_string(item['feeRisk'])),
+                label: 'Fee ${_string(item['feeRisk'], fallback: 'Unknown')}',
+              ),
+            ],
+          ),
+          const Divider(height: AppSpacing.xl),
+          Wrap(
+            spacing: AppSpacing.md,
+            runSpacing: AppSpacing.sm,
+            children: [
+              _InlineMeta(
+                icon: Icons.fact_check_rounded,
+                label:
+                    'Attendance ${_string(item['attendanceSummary'], fallback: 'Unavailable')}',
+              ),
+              _InlineMeta(
+                icon: Icons.contact_phone_rounded,
+                label: phone.isEmpty ? guardianName : '$guardianName $phone',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineMeta extends StatelessWidget {
+  const _InlineMeta({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: AppColors.slate500),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+void _showStudentSummary(BuildContext context, Map<String, dynamic> item) {
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => Padding(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _string(item['name'], fallback: 'Student'),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            _string(item['classLabel'], fallback: 'Class unavailable'),
+            style: const TextStyle(color: AppColors.slate600),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _PlainCard(
+            title: 'Attendance risk',
+            body: _string(item['attendanceSummary'], fallback: 'Unavailable'),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _PlainCard(
+            title: 'Fee risk',
+            body: _string(item['feeRisk'], fallback: 'Unavailable'),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _PlainCard(
+            title: 'Guardian contact',
+            body: [
+              _string(item['guardianName'], fallback: 'Guardian unavailable'),
+              _maskPhone(_string(item['guardianPhone'])),
+            ].where((value) => value.isNotEmpty).join(' '),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const _Callout(
+            icon: Icons.lock_rounded,
+            title: 'Documents unavailable',
+            message:
+                'Student document browsing is hidden until File Registry authorization for this mobile route is confirmed.',
+            color: AppColors.info,
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _ReportsBody extends StatelessWidget {
@@ -1883,6 +2340,13 @@ String _string(Object? value, {String fallback = ''}) {
   if (value == null) return fallback;
   final string = '$value';
   return string.isEmpty ? fallback : string;
+}
+
+String _maskPhone(String value) {
+  final digits = value.replaceAll(RegExp(r'\D'), '');
+  if (digits.length < 4) return '';
+  final suffix = digits.substring(digits.length - 4);
+  return '••••••$suffix';
 }
 
 int _num(Map<String, dynamic> data, String path) {

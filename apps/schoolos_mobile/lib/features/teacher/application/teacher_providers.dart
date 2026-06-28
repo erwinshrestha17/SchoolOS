@@ -57,3 +57,19 @@ final teacherHomeworkSubmissionsProvider = FutureProvider.autoDispose
           .watch(teacherRepositoryProvider)
           .getHomeworkSubmissions(homeworkId);
     });
+
+final teacherTimetableProvider =
+    FutureProvider.autoDispose<TeacherTimetableSnapshot>((ref) async {
+      final snapshot = await ref
+          .watch(teacherRepositoryProvider)
+          .getTimetable();
+      final isOnline = ref.watch(connectivityProvider);
+      return TeacherTimetableSnapshot(
+        rangeStart: snapshot.rangeStart,
+        rangeEnd: snapshot.rangeEnd,
+        items: snapshot.items,
+        substitutions: snapshot.substitutions,
+        lastUpdated: snapshot.lastUpdated,
+        fromCache: snapshot.fromCache || !isOnline,
+      );
+    });

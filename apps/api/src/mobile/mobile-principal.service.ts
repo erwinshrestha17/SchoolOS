@@ -1021,8 +1021,9 @@ export class MobilePrincipalService {
           classLabel: classLabel(student.class?.name, student.sectionRef?.name),
           guardianName: student.guardianLinks[0]?.guardian.fullName ?? null,
           guardianPhoneAllowed: true,
-          guardianPhone:
+          guardianPhone: maskPhone(
             student.guardianLinks[0]?.guardian.primaryPhone ?? null,
+          ),
           attendanceSummary:
             total > 0
               ? `${Math.round((present / total) * 100)}%`
@@ -1592,6 +1593,12 @@ function nowIso() {
 
 function toIso(value?: Date | null) {
   return value ? value.toISOString() : null;
+}
+
+function maskPhone(value?: string | null) {
+  const digits = (value ?? '').replace(/\D/g, '');
+  if (digits.length < 4) return null;
+  return `******${digits.slice(-4)}`;
 }
 
 function parseDate(value?: string) {
