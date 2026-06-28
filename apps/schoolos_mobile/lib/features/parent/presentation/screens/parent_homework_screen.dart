@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../app/design_system/app_radius.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
@@ -164,7 +164,7 @@ class _HomeworkSummary extends StatelessWidget {
                 Text(
                   nextDue.isEmpty
                       ? 'No upcoming due date from school.'
-                      : 'Next due ${DateFormat('MMM d').format(nextDue.first)}.',
+                      : 'Next due ${NepaliBsCalendar.formatBsDate(nextDue.first)}.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.slate500,
                     fontWeight: FontWeight.w600,
@@ -391,5 +391,5 @@ String? _date(String? isoDate) {
   if (parsed == null) {
     return null;
   }
-  return DateFormat('MMM d, yyyy').format(parsed);
+  return NepaliBsCalendar.formatBsDate(parsed);
 }

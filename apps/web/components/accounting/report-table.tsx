@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
-import { cn } from '../../lib/utils';
-import { MoneyDisplay } from '../ui/money-display';
-import { Calculator } from 'lucide-react';
+import { cn } from "../../lib/utils";
+import { MoneyDisplay } from "../ui/money-display";
+import { Calculator } from "lucide-react";
+import { formatBsDate } from "@schoolos/core";
 
 interface ReportTableProps {
   headers: string[];
@@ -10,10 +11,10 @@ interface ReportTableProps {
     id: string;
     cells: Array<{
       value: any;
-      type?: 'text' | 'currency' | 'date';
+      type?: "text" | "currency" | "date";
       bold?: boolean;
       indent?: number;
-      align?: 'left' | 'right' | 'center';
+      align?: "left" | "right" | "center";
     }>;
     isHeader?: boolean;
     isFooter?: boolean;
@@ -32,7 +33,13 @@ export function ReportTable({ headers, rows }: ReportTableProps) {
                 key={header}
                 className={cn(
                   "border-b border-slate-200 px-4 py-3.5 text-[0.65rem] font-black uppercase tracking-widest text-slate-400 first:pl-6 last:pr-6 bg-slate-50/95 backdrop-blur-sm",
-                  index > 2 || header.toLowerCase().includes('debit') || header.toLowerCase().includes('credit') || header.toLowerCase().includes('balance') || header.toLowerCase().includes('amount') ? "text-right" : "text-left"
+                  index > 2 ||
+                    header.toLowerCase().includes("debit") ||
+                    header.toLowerCase().includes("credit") ||
+                    header.toLowerCase().includes("balance") ||
+                    header.toLowerCase().includes("amount")
+                    ? "text-right"
+                    : "text-left",
                 )}
               >
                 {header}
@@ -48,13 +55,17 @@ export function ReportTable({ headers, rows }: ReportTableProps) {
                 "group transition-colors hover:bg-slate-50/50",
                 row.isHeader && "bg-slate-50/40",
                 row.isFooter && "bg-slate-50/80 font-black text-slate-900",
-                row.className
+                row.className,
               )}
             >
               {row.cells.map((cell, index) => {
-                const isNumeric = cell.type === 'currency' || index > 2 || (typeof cell.value === 'number');
-                const isRightAligned = cell.align === 'right' || (!cell.align && isNumeric);
-                
+                const isNumeric =
+                  cell.type === "currency" ||
+                  index > 2 ||
+                  typeof cell.value === "number";
+                const isRightAligned =
+                  cell.align === "right" || (!cell.align && isNumeric);
+
                 return (
                   <td
                     key={index}
@@ -64,14 +75,27 @@ export function ReportTable({ headers, rows }: ReportTableProps) {
                       row.isFooter && "py-5 text-slate-900",
                       isRightAligned ? "text-right tabular-nums" : "text-left",
                     )}
-                    style={{ paddingLeft: cell.indent ? `${cell.indent * 1.5 + 1.5}rem` : undefined }}
+                    style={{
+                      paddingLeft: cell.indent
+                        ? `${cell.indent * 1.5 + 1.5}rem`
+                        : undefined,
+                    }}
                   >
-                    {cell.type === 'currency' ? (
-                      <MoneyDisplay amount={cell.value} className={cn("font-bold", cell.value < 0 && "text-rose-600")} mutedZero />
-                    ) : cell.type === 'date' ? (
-                      <span className="font-medium text-slate-500">{new Date(cell.value).toLocaleDateString()}</span>
+                    {cell.type === "currency" ? (
+                      <MoneyDisplay
+                        amount={cell.value}
+                        className={cn(
+                          "font-bold",
+                          cell.value < 0 && "text-rose-600",
+                        )}
+                        mutedZero
+                      />
+                    ) : cell.type === "date" ? (
+                      <span className="font-medium text-slate-500">
+                        {formatBsDate(cell.value)}
+                      </span>
                     ) : (
-                      String(cell.value ?? '')
+                      String(cell.value ?? "")
                     )}
                   </td>
                 );
@@ -83,10 +107,14 @@ export function ReportTable({ headers, rows }: ReportTableProps) {
       {rows.length === 0 && (
         <div className="py-20 text-center bg-white">
           <div className="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-[var(--color-mod-accounting-bg)] text-[var(--color-mod-accounting-accent)] mb-6 border border-[var(--color-mod-accounting-border)] shadow-sm">
-             <Calculator size={36} />
+            <Calculator size={36} />
           </div>
-          <p className="text-base font-black italic uppercase tracking-tight text-slate-900">No records found</p>
-          <p className="text-sm font-medium text-slate-400 mt-1 max-w-xs mx-auto">Try adjusting your filters or selecting a different fiscal period.</p>
+          <p className="text-base font-black italic uppercase tracking-tight text-slate-900">
+            No records found
+          </p>
+          <p className="text-sm font-medium text-slate-400 mt-1 max-w-xs mx-auto">
+            Try adjusting your filters or selecting a different fiscal period.
+          </p>
         </div>
       )}
     </div>

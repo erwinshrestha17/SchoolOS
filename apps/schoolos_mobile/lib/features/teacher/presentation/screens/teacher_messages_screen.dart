@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../app/constants/app_routes.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
@@ -239,7 +239,7 @@ class _ThreadCard extends StatelessWidget {
             : AppStatusType.pending,
         label: thread.updatedAt == null
             ? thread.status
-            : DateFormat.MMMd().format(thread.updatedAt!.toLocal()),
+            : NepaliBsCalendar.formatBsDate(thread.updatedAt!),
       ),
       onTap: () => context.go(AppRoutes.teacherMessageThreadDetail(thread.id)),
     );
@@ -278,7 +278,7 @@ class _MessageBubble extends StatelessWidget {
         Text(
           message.sentAt == null
               ? message.status
-              : DateFormat.jm().format(message.sentAt!.toLocal()),
+              : NepaliBsCalendar.formatNepalTime(message.sentAt!),
           style: Theme.of(
             context,
           ).textTheme.labelSmall?.copyWith(color: AppColors.slate400),

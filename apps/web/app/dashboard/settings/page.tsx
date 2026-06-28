@@ -1,10 +1,17 @@
-'use client';
+"use client";
 
-import { Suspense, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { LucideIcon } from 'lucide-react';
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { LucideIcon } from "lucide-react";
 import {
   AlertCircle,
   ArrowRight,
@@ -39,33 +46,46 @@ import {
   ChevronRight,
   Plus,
   Wallet,
-} from 'lucide-react';
+} from "lucide-react";
 
-import { Button } from '../../../components/ui/button';
-import { ConfirmDialog } from '../../../components/ui/confirm-dialog';
-import { SetupForm } from '../../../components/forms/setup-form';
-import { Badge } from '../../../components/ui/badge';
-import { PageHeader } from '../../../components/ui/page-header';
-import { useEntitlements } from '../../../components/entitlements-provider';
+import { Button } from "../../../components/ui/button";
+import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
+import { SetupForm } from "../../../components/forms/setup-form";
+import { Badge } from "../../../components/ui/badge";
+import { PageHeader } from "../../../components/ui/page-header";
+import { useEntitlements } from "../../../components/entitlements-provider";
 import {
   api,
   type PermissionCatalogItem,
   type SchoolUserSummary,
   type TenantLogoAccess,
   type TenantRoleSummary,
-} from '../../../lib/api';
-import { cn } from '../../../lib/utils';
-import { systemRoleDefinitions, systemRolePermissions } from '@schoolos/core';
+} from "../../../lib/api";
+import { cn } from "../../../lib/utils";
+import {
+  formatBsDate,
+  formatBsDateTime,
+  systemRoleDefinitions,
+  systemRolePermissions,
+} from "@schoolos/core";
 import type {
   PermissionKey,
   PlatformAuditLog,
   TenantSettingKey,
   TenantSettingSummary,
-} from '@schoolos/core';
+} from "@schoolos/core";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type FieldType = 'text' | 'email' | 'number' | 'select' | 'checkbox' | 'multi-check' | 'color' | 'time';
+type FieldType =
+  | "text"
+  | "email"
+  | "number"
+  | "select"
+  | "checkbox"
+  | "multi-check"
+  | "color"
+  | "time";
 
 type FieldOption = {
   label: string;
@@ -105,336 +125,614 @@ type NavGroup = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const TENANT_LOGO_MAX_BYTES = 1024 * 1024;
-const TENANT_LOGO_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const TENANT_LOGO_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 const workingDayOptions: FieldOption[] = [
-  'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
 ].map((day) => ({ label: day, value: day }));
 
-const paymentMethodOptions: FieldOption[] = ['Cash', 'Bank Transfer', 'eSewa', 'Khalti', 'Cheque'].map((method) => ({
+const paymentMethodOptions: FieldOption[] = [
+  "Cash",
+  "Bank Transfer",
+  "eSewa",
+  "Khalti",
+  "Cheque",
+].map((method) => ({
   label: method,
   value: method,
 }));
 
 const SETTINGS_SECTIONS: SettingSectionConfig[] = [
   {
-    id: 'profile',
-    eyebrow: 'Identity',
-    title: 'School Profile',
-    description: 'Official school details used on records, receipts, certificates, and reporting exports.',
+    id: "profile",
+    eyebrow: "Identity",
+    title: "School Profile",
+    description:
+      "Official school details used on records, receipts, certificates, and reporting exports.",
     icon: School,
-    tone: 'bg-blue-50 text-blue-700 border-blue-100',
+    tone: "bg-blue-50 text-blue-700 border-blue-100",
     fields: [
-      { key: 'school_name', label: 'School Name', type: 'text', placeholder: 'SchoolOS Academy' },
-      { key: 'school_address', label: 'School Address', type: 'text', placeholder: 'Kathmandu, Nepal' },
-      { key: 'school_phone', label: 'Contact Phone', type: 'text', placeholder: '+977-1-XXXXXXX' },
-      { key: 'school_email', label: 'Contact Email', type: 'email', placeholder: 'admin@school.edu.np' },
-      { key: 'school_pan_number', label: 'PAN / Registration Number', type: 'text' },
-      { key: 'principal_name', label: 'Principal Name', type: 'text' },
-      { key: 'municipality', label: 'Municipality', type: 'text' },
-      { key: 'ward_number', label: 'Ward Number', type: 'number' },
-      { key: 'district', label: 'District', type: 'text' },
-      { key: 'province', label: 'Province', type: 'text' },
       {
-        key: 'school_type',
-        label: 'School Type',
-        type: 'select',
+        key: "school_name",
+        label: "School Name",
+        type: "text",
+        placeholder: "SchoolOS Academy",
+      },
+      {
+        key: "school_address",
+        label: "School Address",
+        type: "text",
+        placeholder: "Kathmandu, Nepal",
+      },
+      {
+        key: "school_phone",
+        label: "Contact Phone",
+        type: "text",
+        placeholder: "+977-1-XXXXXXX",
+      },
+      {
+        key: "school_email",
+        label: "Contact Email",
+        type: "email",
+        placeholder: "admin@school.edu.np",
+      },
+      {
+        key: "school_pan_number",
+        label: "PAN / Registration Number",
+        type: "text",
+      },
+      { key: "principal_name", label: "Principal Name", type: "text" },
+      { key: "municipality", label: "Municipality", type: "text" },
+      { key: "ward_number", label: "Ward Number", type: "number" },
+      { key: "district", label: "District", type: "text" },
+      { key: "province", label: "Province", type: "text" },
+      {
+        key: "school_type",
+        label: "School Type",
+        type: "select",
         options: [
-          { label: 'Select...', value: '' },
-          { label: 'Private / Institutional', value: 'PRIVATE' },
-          { label: 'Community / Government', value: 'COMMUNITY' },
-          { label: 'Public Trust', value: 'TRUST' },
+          { label: "Select...", value: "" },
+          { label: "Private / Institutional", value: "PRIVATE" },
+          { label: "Community / Government", value: "COMMUNITY" },
+          { label: "Public Trust", value: "TRUST" },
         ],
       },
-      { key: 'iemis_school_code', label: 'iEMIS School Code', type: 'text' },
+      { key: "iemis_school_code", label: "iEMIS School Code", type: "text" },
     ],
   },
   {
-    id: 'branding',
-    eyebrow: 'Documents',
-    title: 'Branding & Documents',
-    description: 'Control the school logo, document copy, currency, date format, and default paper size.',
+    id: "branding",
+    eyebrow: "Documents",
+    title: "Branding & Documents",
+    description:
+      "Control the school logo, document copy, currency, date format, and default paper size.",
     icon: Palette,
-    tone: 'bg-violet-50 text-violet-700 border-violet-100',
+    tone: "bg-violet-50 text-violet-700 border-violet-100",
     fields: [
-      { key: 'branding_primary_color', label: 'Primary Color', type: 'color', defaultValue: '#6366f1' },
-      { key: 'receipt_header_text', label: 'Receipt Header', type: 'text' },
-      { key: 'receipt_footer_text', label: 'Receipt Footer', type: 'text' },
-      { key: 'id_card_footer_text', label: 'ID Card Footer', type: 'text' },
-      { key: 'payslip_footer_text', label: 'Payslip Footer', type: 'text' },
-      { key: 'certificate_footer_text', label: 'Certificate Footer', type: 'text' },
-      { key: 'report_card_footer_text', label: 'Report Card Footer', type: 'text' },
       {
-        key: 'default_paper_size',
-        label: 'Default Paper Size',
-        type: 'select',
-        defaultValue: 'A4',
+        key: "branding_primary_color",
+        label: "Primary Color",
+        type: "color",
+        defaultValue: "#6366f1",
+      },
+      { key: "receipt_header_text", label: "Receipt Header", type: "text" },
+      { key: "receipt_footer_text", label: "Receipt Footer", type: "text" },
+      { key: "id_card_footer_text", label: "ID Card Footer", type: "text" },
+      { key: "payslip_footer_text", label: "Payslip Footer", type: "text" },
+      {
+        key: "certificate_footer_text",
+        label: "Certificate Footer",
+        type: "text",
+      },
+      {
+        key: "report_card_footer_text",
+        label: "Report Card Footer",
+        type: "text",
+      },
+      {
+        key: "default_paper_size",
+        label: "Default Paper Size",
+        type: "select",
+        defaultValue: "A4",
         options: [
-          { label: 'A4', value: 'A4' },
-          { label: 'Letter', value: 'LETTER' },
-          { label: 'Legal', value: 'LEGAL' },
-          { label: 'Thermal 80mm', value: '80MM' },
+          { label: "A4", value: "A4" },
+          { label: "Letter", value: "LETTER" },
+          { label: "Legal", value: "LEGAL" },
+          { label: "Thermal 80mm", value: "80MM" },
         ],
       },
       {
-        key: 'timezone',
-        label: 'Timezone',
-        type: 'select',
-        defaultValue: 'Asia/Kathmandu',
+        key: "timezone",
+        label: "Timezone",
+        type: "select",
+        defaultValue: "Asia/Kathmandu",
         options: [
-          { label: 'Nepal (UTC+5:45)', value: 'Asia/Kathmandu' },
-          { label: 'UTC', value: 'UTC' },
+          { label: "Nepal (UTC+5:45)", value: "Asia/Kathmandu" },
+          { label: "UTC", value: "UTC" },
         ],
       },
       {
-        key: 'currency',
-        label: 'Currency',
-        type: 'select',
-        defaultValue: 'NPR',
+        key: "currency",
+        label: "Currency",
+        type: "select",
+        defaultValue: "NPR",
         options: [
-          { label: 'Nepalese Rupee (NPR)', value: 'NPR' },
-          { label: 'US Dollar (USD)', value: 'USD' },
+          { label: "Nepalese Rupee (NPR)", value: "NPR" },
+          { label: "US Dollar (USD)", value: "USD" },
         ],
       },
       {
-        key: 'date_format',
-        label: 'Date Format',
-        type: 'select',
-        defaultValue: 'YYYY-MM-DD',
+        key: "date_format",
+        label: "Date Format",
+        type: "select",
+        defaultValue: "YYYY-MM-DD",
         options: [
-          { label: 'YYYY-MM-DD', value: 'YYYY-MM-DD' },
-          { label: 'DD/MM/YYYY', value: 'DD/MM/YYYY' },
-          { label: 'MM/DD/YYYY', value: 'MM/DD/YYYY' },
+          { label: "YYYY-MM-DD", value: "YYYY-MM-DD" },
+          { label: "DD/MM/YYYY", value: "DD/MM/YYYY" },
+          { label: "MM/DD/YYYY", value: "MM/DD/YYYY" },
         ],
       },
     ],
   },
   {
-    id: 'academic',
-    eyebrow: 'Academic rules',
-    title: 'Academic Defaults',
-    description: 'Define academic-year labels, grading defaults, promotion behavior, and working days.',
+    id: "academic",
+    eyebrow: "Academic rules",
+    title: "Academic Defaults",
+    description:
+      "Define academic-year labels, grading defaults, promotion behavior, and working days.",
     icon: GraduationCap,
-    tone: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+    tone: "bg-indigo-50 text-indigo-700 border-indigo-100",
     featureLink: {
-      href: '/dashboard/settings?section=school-setup',
-      label: 'Open School Setup',
-      description: 'Create academic years, classes, and sections.',
+      href: "/dashboard/settings?section=school-setup",
+      label: "Open School Setup",
+      description: "Create academic years, classes, and sections.",
     },
     fields: [
-      { key: 'active_academic_year_label', label: 'Active Academic Year', type: 'text', placeholder: '2081/82' },
       {
-        key: 'default_calendar',
-        label: 'Default Calendar',
-        type: 'select',
-        defaultValue: 'BS',
+        key: "active_academic_year_label",
+        label: "Active Academic Year",
+        type: "text",
+        placeholder: "2081/82",
+      },
+      {
+        key: "default_calendar",
+        label: "Default Calendar",
+        type: "select",
+        defaultValue: "BS",
         options: [
-          { label: 'Bikram Sambat (BS)', value: 'BS' },
-          { label: 'Anno Domini (AD)', value: 'AD' },
+          { label: "Bikram Sambat (BS)", value: "BS" },
+          { label: "Anno Domini (AD)", value: "AD" },
         ],
       },
-      { key: 'grading_scheme_label', label: 'Grading Scheme', type: 'text', placeholder: 'Letter Grade 2078' },
       {
-        key: 'grading_scale',
-        label: 'Grading Scale',
-        description: 'Configure grade bands, minimum percentages, grade points, and outcomes.',
-        type: 'text',
+        key: "grading_scheme_label",
+        label: "Grading Scheme",
+        type: "text",
+        placeholder: "Letter Grade 2078",
+      },
+      {
+        key: "grading_scale",
+        label: "Grading Scale",
+        description:
+          "Configure grade bands, minimum percentages, grade points, and outcomes.",
+        type: "text",
         defaultValue: [],
       },
       {
-        key: 'grading_rounding_policy',
-        label: 'Rounding Policy',
-        description: 'Configure decimal rounding modes and decimal places for marks, GPAs, and percentages.',
-        type: 'text',
-        defaultValue: { mode: 'HALF_UP', percentageDecimals: 2, gpaDecimals: 2, marksDecimals: 2 },
+        key: "grading_rounding_policy",
+        label: "Rounding Policy",
+        description:
+          "Configure decimal rounding modes and decimal places for marks, GPAs, and percentages.",
+        type: "text",
+        defaultValue: {
+          mode: "HALF_UP",
+          percentageDecimals: 2,
+          gpaDecimals: 2,
+          marksDecimals: 2,
+        },
       },
       {
-        key: 'promotion_rule_mode',
-        label: 'Promotion Mode',
-        type: 'select',
-        defaultValue: 'MANUAL',
+        key: "promotion_rule_mode",
+        label: "Promotion Mode",
+        type: "select",
+        defaultValue: "MANUAL",
         options: [
-          { label: 'Manual Approval', value: 'MANUAL' },
-          { label: 'Auto-promote on Pass', value: 'AUTOMATIC' },
+          { label: "Manual Approval", value: "MANUAL" },
+          { label: "Auto-promote on Pass", value: "AUTOMATIC" },
         ],
       },
       {
-        key: 'attendance_working_days',
-        label: 'Working Days',
-        description: 'Used by attendance, calendar, and reporting workflows.',
-        type: 'multi-check',
-        defaultValue: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        key: "attendance_working_days",
+        label: "Working Days",
+        description: "Used by attendance, calendar, and reporting workflows.",
+        type: "multi-check",
+        defaultValue: [
+          "Sunday",
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+        ],
         options: workingDayOptions,
       },
     ],
   },
   {
-    id: 'fees',
-    eyebrow: 'Billing rules',
-    title: 'Fee & Payment Rules',
-    description: 'Configure receipt numbering, late fee behavior, approval requirements, and accepted payment methods.',
+    id: "fees",
+    eyebrow: "Billing rules",
+    title: "Fee & Payment Rules",
+    description:
+      "Configure receipt numbering, late fee behavior, approval requirements, and accepted payment methods.",
     icon: CreditCard,
-    tone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    tone: "bg-emerald-50 text-emerald-700 border-emerald-100",
     featureLink: {
-      href: '/dashboard/fees',
-      label: 'Open Fee Module',
-      description: 'Manage fee plans, invoices, ledgers, and receipts.',
+      href: "/dashboard/fees",
+      label: "Open Fee Module",
+      description: "Manage fee plans, invoices, ledgers, and receipts.",
     },
     fields: [
-      { key: 'receipt_number_prefix', label: 'Receipt Prefix', type: 'text', placeholder: 'REC-' },
-      { key: 'late_fee_grace_days', label: 'Late Fee Grace Days', type: 'number', defaultValue: 0 },
-      { key: 'active_fee_plan_required', label: 'Active Fee Plan Required', type: 'checkbox', defaultValue: true },
-      { key: 'late_fee_enabled', label: 'Enable Late Fees', type: 'checkbox' },
-      { key: 'waiver_approval_required', label: 'Require Waiver Approval', type: 'checkbox', defaultValue: true },
-      { key: 'discount_approval_required', label: 'Require Discount Approval', type: 'checkbox', defaultValue: true },
-      { key: 'cashier_close_required', label: 'Mandatory Cashier Close', type: 'checkbox', defaultValue: true },
       {
-        key: 'payment_methods_enabled',
-        label: 'Accepted Payment Methods',
-        type: 'multi-check',
-        defaultValue: ['Cash', 'Bank Transfer', 'eSewa'],
+        key: "receipt_number_prefix",
+        label: "Receipt Prefix",
+        type: "text",
+        placeholder: "REC-",
+      },
+      {
+        key: "late_fee_grace_days",
+        label: "Late Fee Grace Days",
+        type: "number",
+        defaultValue: 0,
+      },
+      {
+        key: "active_fee_plan_required",
+        label: "Active Fee Plan Required",
+        type: "checkbox",
+        defaultValue: true,
+      },
+      { key: "late_fee_enabled", label: "Enable Late Fees", type: "checkbox" },
+      {
+        key: "waiver_approval_required",
+        label: "Require Waiver Approval",
+        type: "checkbox",
+        defaultValue: true,
+      },
+      {
+        key: "discount_approval_required",
+        label: "Require Discount Approval",
+        type: "checkbox",
+        defaultValue: true,
+      },
+      {
+        key: "cashier_close_required",
+        label: "Mandatory Cashier Close",
+        type: "checkbox",
+        defaultValue: true,
+      },
+      {
+        key: "payment_methods_enabled",
+        label: "Accepted Payment Methods",
+        type: "multi-check",
+        defaultValue: ["Cash", "Bank Transfer", "eSewa"],
         options: paymentMethodOptions,
       },
     ],
   },
   {
-    id: 'attendance',
-    eyebrow: 'Daily operations',
-    title: 'Attendance Rules',
-    description: 'Set attendance lock windows, late thresholds, parent visibility, and correction policies.',
+    id: "attendance",
+    eyebrow: "Daily operations",
+    title: "Attendance Rules",
+    description:
+      "Set attendance lock windows, late thresholds, parent visibility, and correction policies.",
     icon: Clock,
-    tone: 'bg-amber-50 text-amber-700 border-amber-100',
+    tone: "bg-amber-50 text-amber-700 border-amber-100",
     fields: [
-      { key: 'attendance_lock_hours', label: 'Attendance Lock Window (Hours)', type: 'number', defaultValue: 24 },
-      { key: 'late_threshold_minutes', label: 'Late Threshold (Minutes)', type: 'number', defaultValue: 15 },
-      { key: 'half_day_threshold_minutes', label: 'Half-day Threshold (Minutes)', type: 'number', defaultValue: 180 },
-      { key: 'allow_teacher_correction_request', label: 'Allow Teacher Correction Request', type: 'checkbox', defaultValue: true },
-      { key: 'parent_attendance_visibility', label: 'Parent Attendance Visibility', type: 'checkbox', defaultValue: true },
       {
-        key: 'weekend_policy',
-        label: 'Weekend Policy',
-        type: 'select',
-        defaultValue: 'SATURDAY',
+        key: "attendance_lock_hours",
+        label: "Attendance Lock Window (Hours)",
+        type: "number",
+        defaultValue: 24,
+      },
+      {
+        key: "late_threshold_minutes",
+        label: "Late Threshold (Minutes)",
+        type: "number",
+        defaultValue: 15,
+      },
+      {
+        key: "half_day_threshold_minutes",
+        label: "Half-day Threshold (Minutes)",
+        type: "number",
+        defaultValue: 180,
+      },
+      {
+        key: "allow_teacher_correction_request",
+        label: "Allow Teacher Correction Request",
+        type: "checkbox",
+        defaultValue: true,
+      },
+      {
+        key: "parent_attendance_visibility",
+        label: "Parent Attendance Visibility",
+        type: "checkbox",
+        defaultValue: true,
+      },
+      {
+        key: "weekend_policy",
+        label: "Weekend Policy",
+        type: "select",
+        defaultValue: "SATURDAY",
         options: [
-          { label: 'Saturday only', value: 'SATURDAY' },
-          { label: 'Friday and Saturday', value: 'FRIDAY_SATURDAY' },
-          { label: 'Custom / school calendar', value: 'CUSTOM' },
+          { label: "Saturday only", value: "SATURDAY" },
+          { label: "Friday and Saturday", value: "FRIDAY_SATURDAY" },
+          { label: "Custom / school calendar", value: "CUSTOM" },
         ],
       },
     ],
   },
   {
-    id: 'communication',
-    eyebrow: 'Parent engagement',
-    title: 'Communication Rules',
-    description: 'Configure notification defaults, consent requirements, quiet hours, and teacher chat availability.',
+    id: "communication",
+    eyebrow: "Parent engagement",
+    title: "Communication Rules",
+    description:
+      "Configure notification defaults, consent requirements, quiet hours, and teacher chat availability.",
     icon: MessageSquare,
-    tone: 'bg-cyan-50 text-cyan-700 border-cyan-100',
+    tone: "bg-cyan-50 text-cyan-700 border-cyan-100",
     fields: [
       {
-        key: 'default_notice_channel',
-        label: 'Default Notice Channel',
-        type: 'select',
-        defaultValue: 'EMAIL',
+        key: "default_notice_channel",
+        label: "Default Notice Channel",
+        type: "select",
+        defaultValue: "EMAIL",
         options: [
-          { label: 'Email', value: 'EMAIL' },
-          { label: 'SMS', value: 'SMS' },
-          { label: 'Mobile App Push', value: 'APP' },
+          { label: "Email", value: "EMAIL" },
+          { label: "SMS", value: "SMS" },
+          { label: "Mobile App Push", value: "APP" },
         ],
       },
-      { key: 'parent_notification_enabled', label: 'Enable Parent Notifications', type: 'checkbox', defaultValue: true },
-      { key: 'consent_required_for_media', label: 'Media Consent Required', type: 'checkbox', defaultValue: true },
-      { key: 'quiet_hours_enabled', label: 'Enable Quiet Hours', type: 'checkbox' },
-      { key: 'chat_availability_enabled', label: 'Allow Parent-Teacher Chat', type: 'checkbox', defaultValue: true },
-      { key: 'chat_sunday_to_thursday_start', label: 'Sun–Thu Chat Start', type: 'time', defaultValue: '16:00' },
-      { key: 'chat_sunday_to_thursday_end', label: 'Sun–Thu Chat End', type: 'time', defaultValue: '19:00' },
-      { key: 'chat_friday_start', label: 'Friday Chat Start', type: 'time', defaultValue: '14:00' },
-      { key: 'chat_friday_end', label: 'Friday Chat End', type: 'time', defaultValue: '17:00' },
-      { key: 'chat_saturday_enabled', label: 'Enable Saturday Chat', type: 'checkbox' },
-      { key: 'emergency_override_requires_admin', label: 'Emergency Broadcasts Require Admin', type: 'checkbox', defaultValue: true },
+      {
+        key: "parent_notification_enabled",
+        label: "Enable Parent Notifications",
+        type: "checkbox",
+        defaultValue: true,
+      },
+      {
+        key: "consent_required_for_media",
+        label: "Media Consent Required",
+        type: "checkbox",
+        defaultValue: true,
+      },
+      {
+        key: "quiet_hours_enabled",
+        label: "Enable Quiet Hours",
+        type: "checkbox",
+      },
+      {
+        key: "chat_availability_enabled",
+        label: "Allow Parent-Teacher Chat",
+        type: "checkbox",
+        defaultValue: true,
+      },
+      {
+        key: "chat_sunday_to_thursday_start",
+        label: "Sun–Thu Chat Start",
+        type: "time",
+        defaultValue: "16:00",
+      },
+      {
+        key: "chat_sunday_to_thursday_end",
+        label: "Sun–Thu Chat End",
+        type: "time",
+        defaultValue: "19:00",
+      },
+      {
+        key: "chat_friday_start",
+        label: "Friday Chat Start",
+        type: "time",
+        defaultValue: "14:00",
+      },
+      {
+        key: "chat_friday_end",
+        label: "Friday Chat End",
+        type: "time",
+        defaultValue: "17:00",
+      },
+      {
+        key: "chat_saturday_enabled",
+        label: "Enable Saturday Chat",
+        type: "checkbox",
+      },
+      {
+        key: "emergency_override_requires_admin",
+        label: "Emergency Broadcasts Require Admin",
+        type: "checkbox",
+        defaultValue: true,
+      },
     ],
   },
   {
-    id: 'payroll',
-    eyebrow: 'Staff controls',
-    title: 'HR & Payroll Rules',
-    description: 'Configure leave approval, salary calculation defaults, PF/TDS readiness, and payroll approvals.',
+    id: "payroll",
+    eyebrow: "Staff controls",
+    title: "HR & Payroll Rules",
+    description:
+      "Configure leave approval, salary calculation defaults, PF/TDS readiness, and payroll approvals.",
     icon: Users,
-    tone: 'bg-sky-50 text-sky-700 border-sky-100',
+    tone: "bg-sky-50 text-sky-700 border-sky-100",
     featureLink: {
-      href: '/dashboard/hr',
-      label: 'Open HR Module',
-      description: 'Manage staff, leave, and payroll runs.',
+      href: "/dashboard/hr",
+      label: "Open HR Module",
+      description: "Manage staff, leave, and payroll runs.",
     },
     fields: [
-      { key: 'payroll_month_day', label: 'Payroll Day of Month', type: 'number', defaultValue: 28 },
-      { key: 'default_working_days_per_month', label: 'Default Working Days / Month', type: 'number', defaultValue: 26 },
-      { key: 'pf_enabled', label: 'Enable PF', type: 'checkbox' },
-      { key: 'tds_enabled', label: 'Enable TDS', type: 'checkbox' },
-      { key: 'leave_approval_required', label: 'Leave Approval Required', type: 'checkbox', defaultValue: true },
-      { key: 'unpaid_leave_affects_payroll', label: 'Unpaid Leave Affects Payroll', type: 'checkbox', defaultValue: true },
-      { key: 'payroll_approval_required', label: 'Payroll Approval Required', type: 'checkbox', defaultValue: true },
       {
-        key: 'salary_payment_methods',
-        label: 'Salary Payment Methods',
-        type: 'multi-check',
-        defaultValue: ['Bank Transfer'],
+        key: "payroll_month_day",
+        label: "Payroll Day of Month",
+        type: "number",
+        defaultValue: 28,
+      },
+      {
+        key: "default_working_days_per_month",
+        label: "Default Working Days / Month",
+        type: "number",
+        defaultValue: 26,
+      },
+      { key: "pf_enabled", label: "Enable PF", type: "checkbox" },
+      { key: "tds_enabled", label: "Enable TDS", type: "checkbox" },
+      {
+        key: "leave_approval_required",
+        label: "Leave Approval Required",
+        type: "checkbox",
+        defaultValue: true,
+      },
+      {
+        key: "unpaid_leave_affects_payroll",
+        label: "Unpaid Leave Affects Payroll",
+        type: "checkbox",
+        defaultValue: true,
+      },
+      {
+        key: "payroll_approval_required",
+        label: "Payroll Approval Required",
+        type: "checkbox",
+        defaultValue: true,
+      },
+      {
+        key: "salary_payment_methods",
+        label: "Salary Payment Methods",
+        type: "multi-check",
+        defaultValue: ["Bank Transfer"],
         options: [
-          { label: 'Bank Transfer', value: 'Bank Transfer' },
-          { label: 'Cash', value: 'Cash' },
-          { label: 'Cheque', value: 'Cheque' },
+          { label: "Bank Transfer", value: "Bank Transfer" },
+          { label: "Cash", value: "Cash" },
+          { label: "Cheque", value: "Cheque" },
         ],
       },
     ],
   },
   {
-    id: 'accounting',
-    eyebrow: 'Finance control',
-    title: 'Accounting Defaults',
-    description: 'Set fiscal labels, account mappings, voucher numbering, and period lock behavior.',
+    id: "accounting",
+    eyebrow: "Finance control",
+    title: "Accounting Defaults",
+    description:
+      "Set fiscal labels, account mappings, voucher numbering, and period lock behavior.",
     icon: Calculator,
-    tone: 'bg-rose-50 text-rose-700 border-rose-100',
+    tone: "bg-rose-50 text-rose-700 border-rose-100",
     featureLink: {
-      href: '/dashboard/accounting',
-      label: 'Open Accounting Module',
-      description: 'Manage journals, accounts, and fiscal periods.',
+      href: "/dashboard/accounting",
+      label: "Open Accounting Module",
+      description: "Manage journals, accounts, and fiscal periods.",
     },
     fields: [
-      { key: 'active_fiscal_year_label', label: 'Active Fiscal Year', type: 'text', placeholder: '2081/82' },
       {
-        key: 'fiscal_period_lock_policy',
-        label: 'Fiscal Period Lock Policy',
-        type: 'select',
-        defaultValue: 'MANUAL',
+        key: "active_fiscal_year_label",
+        label: "Active Fiscal Year",
+        type: "text",
+        placeholder: "2081/82",
+      },
+      {
+        key: "fiscal_period_lock_policy",
+        label: "Fiscal Period Lock Policy",
+        type: "select",
+        defaultValue: "MANUAL",
         options: [
-          { label: 'Manual close', value: 'MANUAL' },
-          { label: 'Monthly close', value: 'MONTHLY' },
-          { label: 'Quarterly close', value: 'QUARTERLY' },
+          { label: "Manual close", value: "MANUAL" },
+          { label: "Monthly close", value: "MONTHLY" },
+          { label: "Quarterly close", value: "QUARTERLY" },
         ],
       },
-      { key: 'default_cash_account_label', label: 'Default Cash Account', type: 'text' },
-      { key: 'default_bank_account_label', label: 'Default Bank Account', type: 'text' },
-      { key: 'salary_payable_account_label', label: 'Salary Payable Account', type: 'text' },
-      { key: 'tds_payable_account_label', label: 'TDS Payable Account', type: 'text' },
-      { key: 'pf_payable_account_label', label: 'PF Payable Account', type: 'text' },
-      { key: 'fee_income_account_label', label: 'Fee Income Account', type: 'text' },
-      { key: 'journal_number_prefix', label: 'Journal Number Prefix', type: 'text', placeholder: 'JV-' },
-      { key: 'voucher_number_prefix', label: 'Voucher Number Prefix', type: 'text', placeholder: 'VCH-' },
+      {
+        key: "default_cash_account_label",
+        label: "Default Cash Account",
+        type: "text",
+      },
+      {
+        key: "default_bank_account_label",
+        label: "Default Bank Account",
+        type: "text",
+      },
+      {
+        key: "salary_payable_account_label",
+        label: "Salary Payable Account",
+        type: "text",
+      },
+      {
+        key: "tds_payable_account_label",
+        label: "TDS Payable Account",
+        type: "text",
+      },
+      {
+        key: "pf_payable_account_label",
+        label: "PF Payable Account",
+        type: "text",
+      },
+      {
+        key: "fee_income_account_label",
+        label: "Fee Income Account",
+        type: "text",
+      },
+      {
+        key: "journal_number_prefix",
+        label: "Journal Number Prefix",
+        type: "text",
+        placeholder: "JV-",
+      },
+      {
+        key: "voucher_number_prefix",
+        label: "Voucher Number Prefix",
+        type: "text",
+        placeholder: "VCH-",
+      },
     ],
   },
   {
-    id: 'security',
-    eyebrow: 'Governance',
-    title: 'Security & Privacy',
-    description: 'Control export permissions, data masking, sensitive reveal reasons, and session timeout.',
+    id: "security",
+    eyebrow: "Governance",
+    title: "Security & Privacy",
+    description:
+      "Control export permissions, data masking, sensitive reveal reasons, and session timeout.",
     icon: Shield,
-    tone: 'bg-slate-100 text-slate-700 border-slate-200',
+    tone: "bg-slate-100 text-slate-700 border-slate-200",
     fields: [
-      { key: 'audit_log_retention_days', label: 'Audit Log Retention (Days)', type: 'number', defaultValue: 365 },
-      { key: 'session_timeout_minutes', label: 'Session Timeout (Minutes)', type: 'number', defaultValue: 60 },
-      { key: 'sensitive_staff_fields_masked', label: 'Mask Sensitive Staff Fields', type: 'checkbox', defaultValue: true },
-      { key: 'export_requires_permission', label: 'Exports Require Explicit Permission', type: 'checkbox', defaultValue: true },
-      { key: 'require_reason_for_sensitive_reveal', label: 'Require Reason for Sensitive Reveal', type: 'checkbox', defaultValue: true },
+      {
+        key: "audit_log_retention_days",
+        label: "Audit Log Retention (Days)",
+        type: "number",
+        defaultValue: 365,
+      },
+      {
+        key: "session_timeout_minutes",
+        label: "Session Timeout (Minutes)",
+        type: "number",
+        defaultValue: 60,
+      },
+      {
+        key: "sensitive_staff_fields_masked",
+        label: "Mask Sensitive Staff Fields",
+        type: "checkbox",
+        defaultValue: true,
+      },
+      {
+        key: "export_requires_permission",
+        label: "Exports Require Explicit Permission",
+        type: "checkbox",
+        defaultValue: true,
+      },
+      {
+        key: "require_reason_for_sensitive_reveal",
+        label: "Require Reason for Sensitive Reveal",
+        type: "checkbox",
+        defaultValue: true,
+      },
     ],
   },
 ];
@@ -443,109 +741,122 @@ const SETTINGS_SECTIONS: SettingSectionConfig[] = [
 
 const SPECIAL_SECTIONS = [
   {
-    id: 'overview',
-    eyebrow: 'Console',
-    title: 'Overview',
-    description: 'Settings readiness dashboard. Review and configure your school\'s core operational setup.',
+    id: "overview",
+    eyebrow: "Console",
+    title: "Overview",
+    description:
+      "Settings readiness dashboard. Review and configure your school's core operational setup.",
     icon: LayoutDashboard,
-    tone: 'bg-slate-100 text-slate-600 border-slate-200',
+    tone: "bg-slate-100 text-slate-600 border-slate-200",
   },
   {
-    id: 'school-setup',
-    eyebrow: 'Academic structure',
-    title: 'School Setup',
-    description: 'Configure academic years, classes, sections, and foundational academic structure.',
+    id: "school-setup",
+    eyebrow: "Academic structure",
+    title: "School Setup",
+    description:
+      "Configure academic years, classes, sections, and foundational academic structure.",
     icon: BookOpen,
-    tone: 'bg-green-50 text-green-700 border-green-100',
+    tone: "bg-green-50 text-green-700 border-green-100",
   },
   {
-    id: 'users-access',
-    eyebrow: 'Access control',
-    title: 'Users & Access',
-    description: 'Manage admin, staff, parent, and student access to SchoolOS.',
+    id: "users-access",
+    eyebrow: "Access control",
+    title: "Users & Access",
+    description: "Manage admin, staff, parent, and student access to SchoolOS.",
     icon: UserCog,
-    tone: 'bg-blue-50 text-blue-700 border-blue-100',
+    tone: "bg-blue-50 text-blue-700 border-blue-100",
   },
   {
-    id: 'roles-permissions',
-    eyebrow: 'Access control',
-    title: 'Roles & Permissions',
-    description: 'Review preset roles, permission coverage, and module-level access.',
+    id: "roles-permissions",
+    eyebrow: "Access control",
+    title: "Roles & Permissions",
+    description:
+      "Review preset roles, permission coverage, and module-level access.",
     icon: Key,
-    tone: 'bg-purple-50 text-purple-700 border-purple-100',
+    tone: "bg-purple-50 text-purple-700 border-purple-100",
   },
   {
-    id: 'fee-setup',
-    eyebrow: 'Billing structure',
-    title: 'Active Fee Plans',
-    description: 'Configure fee heads and class/year-specific fee plans.',
+    id: "fee-setup",
+    eyebrow: "Billing structure",
+    title: "Active Fee Plans",
+    description: "Configure fee heads and class/year-specific fee plans.",
     icon: Wallet,
-    tone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    tone: "bg-emerald-50 text-emerald-700 border-emerald-100",
   },
   {
-    id: 'data',
-    eyebrow: 'Data operations',
-    title: 'Import / Export',
-    description: 'Bulk data movement, official readiness, and migration workflows.',
+    id: "data",
+    eyebrow: "Data operations",
+    title: "Import / Export",
+    description:
+      "Bulk data movement, official readiness, and migration workflows.",
     icon: Database,
-    tone: 'bg-teal-50 text-teal-700 border-teal-100',
+    tone: "bg-teal-50 text-teal-700 border-teal-100",
   },
   {
-    id: 'audit',
-    eyebrow: 'Governance',
-    title: 'Audit Logs',
-    description: 'Track sensitive admin activity and request audit archives.',
+    id: "audit",
+    eyebrow: "Governance",
+    title: "Audit Logs",
+    description: "Track sensitive admin activity and request audit archives.",
     icon: FileText,
-    tone: 'bg-orange-50 text-orange-700 border-orange-100',
+    tone: "bg-orange-50 text-orange-700 border-orange-100",
   },
   {
-    id: 'subscription',
-    eyebrow: 'Plan',
-    title: 'Subscription',
-    description: 'View current SaaS tier, included modules, and add-on status.',
+    id: "subscription",
+    eyebrow: "Plan",
+    title: "Subscription",
+    description: "View current SaaS tier, included modules, and add-on status.",
     icon: CreditCard,
-    tone: 'bg-purple-50 text-purple-700 border-purple-100',
+    tone: "bg-purple-50 text-purple-700 border-purple-100",
   },
 ] as const;
 
-type SpecialSectionId = (typeof SPECIAL_SECTIONS)[number]['id'];
+type SpecialSectionId = (typeof SPECIAL_SECTIONS)[number]["id"];
 
 const ALL_SECTIONS = [...SPECIAL_SECTIONS, ...SETTINGS_SECTIONS] as const;
 
 // Left nav groups define the visual grouping in the sidebar
 const NAV_GROUPS: NavGroup[] = [
-  { label: 'School', items: ['overview', 'school-setup', 'profile', 'branding'] },
-  { label: 'Access Control', items: ['users-access', 'roles-permissions'] },
-  { label: 'Academic & Operations', items: ['academic', 'attendance', 'fee-setup', 'fees', 'communication'] },
-  { label: 'Staff & Finance', items: ['payroll', 'accounting'] },
-  { label: 'Security & Data', items: ['security', 'data', 'audit', 'subscription'] },
+  {
+    label: "School",
+    items: ["overview", "school-setup", "profile", "branding"],
+  },
+  { label: "Access Control", items: ["users-access", "roles-permissions"] },
+  {
+    label: "Academic & Operations",
+    items: ["academic", "attendance", "fee-setup", "fees", "communication"],
+  },
+  { label: "Staff & Finance", items: ["payroll", "accounting"] },
+  {
+    label: "Security & Data",
+    items: ["security", "data", "audit", "subscription"],
+  },
 ];
 
 // Map old/legacy tab/section values to new ids
 const SECTION_ALIASES: Record<string, string> = {
-  setup: 'school-setup',
-  'school-setup': 'school-setup',
-  branding: 'branding',
-  profile: 'profile',
-  academic: 'academic',
-  attendance: 'attendance',
-  fees: 'fees',
-  fee: 'fees',
-  'fee-setup': 'fee-setup',
-  'fee-plans': 'fee-setup',
-  'fee-plan': 'fee-setup',
-  communication: 'communication',
-  payroll: 'payroll',
-  hr: 'payroll',
-  accounting: 'accounting',
-  security: 'security',
-  data: 'data',
-  audit: 'audit',
-  subscription: 'subscription',
-  'users-access': 'users-access',
-  users: 'users-access',
-  'roles-permissions': 'roles-permissions',
-  roles: 'roles-permissions',
+  setup: "school-setup",
+  "school-setup": "school-setup",
+  branding: "branding",
+  profile: "profile",
+  academic: "academic",
+  attendance: "attendance",
+  fees: "fees",
+  fee: "fees",
+  "fee-setup": "fee-setup",
+  "fee-plans": "fee-setup",
+  "fee-plan": "fee-setup",
+  communication: "communication",
+  payroll: "payroll",
+  hr: "payroll",
+  accounting: "accounting",
+  security: "security",
+  data: "data",
+  audit: "audit",
+  subscription: "subscription",
+  "users-access": "users-access",
+  users: "users-access",
+  "roles-permissions": "roles-permissions",
+  roles: "roles-permissions",
 };
 
 const ALL_SECTION_IDS = ALL_SECTIONS.map((s) => s.id);
@@ -553,7 +864,7 @@ const ALL_SECTION_IDS = ALL_SECTIONS.map((s) => s.id);
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const formatFileSize = (sizeBytes: number) => {
-  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return '0 B';
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return "0 B";
   if (sizeBytes < 1024) return `${sizeBytes} B`;
   if (sizeBytes < 1024 * 1024) return `${(sizeBytes / 1024).toFixed(1)} KB`;
   return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -561,16 +872,16 @@ const formatFileSize = (sizeBytes: number) => {
 
 const defaultValueForField = (field: SettingFieldConfig) => {
   if (field.defaultValue !== undefined) return field.defaultValue;
-  if (field.type === 'checkbox') return false;
-  if (field.type === 'multi-check') return [];
-  if (field.type === 'number') return 0;
-  return '';
+  if (field.type === "checkbox") return false;
+  if (field.type === "multi-check") return [];
+  if (field.type === "number") return 0;
+  return "";
 };
 
 const normalizeFieldValue = (field: SettingFieldConfig, value: unknown) => {
   if (value === undefined || value === null) return defaultValueForField(field);
-  if (field.type === 'multi-check') return Array.isArray(value) ? value : [];
-  if (field.type === 'checkbox') return Boolean(value);
+  if (field.type === "multi-check") return Array.isArray(value) ? value : [];
+  if (field.type === "checkbox") return Boolean(value);
   return value;
 };
 
@@ -585,12 +896,13 @@ function buildInitialForm(settings: TenantSettingSummary[]) {
   return next;
 }
 
-const valuesEqual = (left: unknown, right: unknown) => JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+const valuesEqual = (left: unknown, right: unknown) =>
+  JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
 
 function resolveSection(raw: string | null): string {
-  if (!raw) return 'overview';
+  if (!raw) return "overview";
   const aliased = SECTION_ALIASES[raw.toLowerCase()] ?? raw;
-  return ALL_SECTION_IDS.includes(aliased) ? aliased : 'overview';
+  return ALL_SECTION_IDS.includes(aliased) ? aliased : "overview";
 }
 
 // ─── Page Entry ───────────────────────────────────────────────────────────────
@@ -608,7 +920,8 @@ export default function TenantSettingsPage() {
 function TenantSettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const requestedSection = searchParams.get('section') ?? searchParams.get('tab');
+  const requestedSection =
+    searchParams.get("section") ?? searchParams.get("tab");
   const activeSectionId = resolveSection(requestedSection);
 
   const [settings, setSettings] = useState<TenantSettingSummary[]>([]);
@@ -617,25 +930,39 @@ function TenantSettingsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [query, setQuery] = useState('');
+  const [notice, setNotice] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [query, setQuery] = useState("");
 
-  const activeSection = ALL_SECTIONS.find((s) => s.id === activeSectionId) ?? ALL_SECTIONS[0];
-  const activeEditableSection = SETTINGS_SECTIONS.find((s) => s.id === activeSectionId);
+  const activeSection =
+    ALL_SECTIONS.find((s) => s.id === activeSectionId) ?? ALL_SECTIONS[0];
+  const activeEditableSection = SETTINGS_SECTIONS.find(
+    (s) => s.id === activeSectionId,
+  );
 
   const initialForm = useMemo(() => buildInitialForm(settings), [settings]);
   const editableKeys = useMemo(
-    () => SETTINGS_SECTIONS.flatMap((section) => section.fields.map((field) => field.key)),
+    () =>
+      SETTINGS_SECTIONS.flatMap((section) =>
+        section.fields.map((field) => field.key),
+      ),
     [],
   );
-  const changedKeys = editableKeys.filter((key) => !valuesEqual(form[key], initialForm[key]));
+  const changedKeys = editableKeys.filter(
+    (key) => !valuesEqual(form[key], initialForm[key]),
+  );
   const sectionChangedCount = activeEditableSection
-    ? activeEditableSection.fields.filter((field) => changedKeys.includes(field.key)).length
+    ? activeEditableSection.fields.filter((field) =>
+        changedKeys.includes(field.key),
+      ).length
     : 0;
 
-  const logoSetting = settings.find((setting) => setting.key === 'school_logo');
-  const logoFileAssetId = typeof logoSetting?.value === 'string' ? logoSetting.value : null;
-  const schoolName = String(form['school_name'] ?? '');
+  const logoSetting = settings.find((setting) => setting.key === "school_logo");
+  const logoFileAssetId =
+    typeof logoSetting?.value === "string" ? logoSetting.value : null;
+  const schoolName = String(form["school_name"] ?? "");
 
   useEffect(() => {
     void fetchSettings();
@@ -663,7 +990,7 @@ function TenantSettingsContent() {
       setSettings(settingsData);
       setFeePlans(feePlansData);
     } catch {
-      setError('Failed to load school settings.');
+      setError("Failed to load school settings.");
     } finally {
       setLoading(false);
     }
@@ -671,7 +998,9 @@ function TenantSettingsContent() {
 
   function switchSection(sectionId: string) {
     setNotice(null);
-    router.replace(`/dashboard/settings?section=${sectionId}`, { scroll: false });
+    router.replace(`/dashboard/settings?section=${sectionId}`, {
+      scroll: false,
+    });
   }
 
   function setFieldValue(key: TenantSettingKey, value: unknown) {
@@ -702,10 +1031,13 @@ function TenantSettingsContent() {
         }
       }
 
-      setNotice({ type: 'success', text: `${activeEditableSection.title} saved successfully.` });
+      setNotice({
+        type: "success",
+        text: `${activeEditableSection.title} saved successfully.`,
+      });
       await fetchSettings();
     } catch {
-      setNotice({ type: 'error', text: 'Failed to save this settings group.' });
+      setNotice({ type: "error", text: "Failed to save this settings group." });
     } finally {
       setSaving(false);
     }
@@ -713,7 +1045,8 @@ function TenantSettingsContent() {
 
   const filteredSections = ALL_SECTIONS.filter((section) => {
     if (!query.trim()) return true;
-    const needle = `${section.title} ${section.description} ${section.eyebrow}`.toLowerCase();
+    const needle =
+      `${section.title} ${section.description} ${section.eyebrow}`.toLowerCase();
     return needle.includes(query.toLowerCase());
   });
 
@@ -730,7 +1063,12 @@ function TenantSettingsContent() {
             <span>Settings unavailable</span>
           </div>
           <p className="mt-1.5 text-sm text-rose-600">{error}</p>
-          <Button variant="outline" size="sm" className="mt-4 rounded-lg" onClick={() => void fetchSettings()}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4 rounded-lg"
+            onClick={() => void fetchSettings()}
+          >
             Retry
           </Button>
         </div>
@@ -746,15 +1084,15 @@ function TenantSettingsContent() {
         description="Manage school profile, rules, permissions, documents, and tenant configuration."
         actions={
           <>
-          <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500">
-            Tenant-scoped
-          </span>
-          {changedKeys.length > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-              {changedKeys.length} unsaved
+            <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500">
+              Tenant-scoped
             </span>
-          )}
+            {changedKeys.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                {changedKeys.length} unsaved
+              </span>
+            )}
           </>
         }
       />
@@ -792,15 +1130,23 @@ function TenantSettingsContent() {
           {notice && (
             <div
               className={cn(
-                'mb-4 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium',
-                notice.type === 'success'
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                  : 'border-rose-200 bg-rose-50 text-rose-700',
+                "mb-4 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium",
+                notice.type === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-rose-200 bg-rose-50 text-rose-700",
               )}
             >
-              {notice.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+              {notice.type === "success" ? (
+                <CheckCircle2 size={16} />
+              ) : (
+                <AlertCircle size={16} />
+              )}
               <span className="flex-1">{notice.text}</span>
-              <button type="button" onClick={() => setNotice(null)} className="opacity-60 hover:opacity-100">
+              <button
+                type="button"
+                onClick={() => setNotice(null)}
+                className="opacity-60 hover:opacity-100"
+              >
                 <X size={14} />
               </button>
             </div>
@@ -809,7 +1155,10 @@ function TenantSettingsContent() {
           {/* Section Content */}
           <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
             {/* Section Header */}
-            <SectionHeader section={activeSection} settingsSections={SETTINGS_SECTIONS} />
+            <SectionHeader
+              section={activeSection}
+              settingsSections={SETTINGS_SECTIONS}
+            />
 
             {/* Editable Settings Fields */}
             {activeEditableSection && (
@@ -823,40 +1172,54 @@ function TenantSettingsContent() {
             )}
 
             {/* Special Panels */}
-            {activeSectionId === 'overview' && (
+            {activeSectionId === "overview" && (
               <div className="p-6">
                 <OverviewPanel
                   settings={settings}
                   schoolName={schoolName}
                   logoFileAssetId={logoFileAssetId}
-                  activeFeePlanCount={feePlans.filter((p: any) => p.isActive).length}
+                  activeFeePlanCount={
+                    feePlans.filter((p: any) => p.isActive).length
+                  }
                   onSwitchSection={switchSection}
                 />
               </div>
             )}
-            {activeSectionId === 'school-setup' && (
+            {activeSectionId === "school-setup" && (
               <div className="p-6">
                 <SchoolSetupPanel />
               </div>
             )}
-            {activeSectionId === 'users-access' && (
+            {activeSectionId === "users-access" && (
               <div className="p-6">
                 <UsersAccessPanel />
               </div>
             )}
-            {activeSectionId === 'roles-permissions' && (
+            {activeSectionId === "roles-permissions" && (
               <div className="p-6">
                 <RolesPermissionsPanel />
               </div>
             )}
-            {activeSectionId === 'fee-setup' && (
+            {activeSectionId === "fee-setup" && (
               <div className="p-6">
                 <FeeSetupPanel onPlanCreated={fetchSettings} />
               </div>
             )}
-            {activeSectionId === 'data' && <div className="p-6"><DataOperations /></div>}
-            {activeSectionId === 'audit' && <div className="p-6"><AuditPanel /></div>}
-            {activeSectionId === 'subscription' && <div className="p-6"><SubscriptionPanel /></div>}
+            {activeSectionId === "data" && (
+              <div className="p-6">
+                <DataOperations />
+              </div>
+            )}
+            {activeSectionId === "audit" && (
+              <div className="p-6">
+                <AuditPanel />
+              </div>
+            )}
+            {activeSectionId === "subscription" && (
+              <div className="p-6">
+                <SubscriptionPanel />
+              </div>
+            )}
           </div>
         </main>
       </div>
@@ -864,7 +1227,7 @@ function TenantSettingsContent() {
       {/* ── Sticky Unsaved Changes Bar ───────────────────────── */}
       {sectionChangedCount > 0 && (
         <UnsavedBar
-          sectionTitle={activeEditableSection?.title ?? ''}
+          sectionTitle={activeEditableSection?.title ?? ""}
           changedCount={sectionChangedCount}
           saving={saving}
           onReset={resetSection}
@@ -912,7 +1275,7 @@ function SettingsSidebar({
         {query && (
           <button
             type="button"
-            onClick={() => onQueryChange('')}
+            onClick={() => onQueryChange("")}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
           >
             <X size={12} />
@@ -923,7 +1286,9 @@ function SettingsSidebar({
       {/* Nav Groups */}
       <nav className="space-y-4">
         {navGroups.map((group) => {
-          const visibleItems = group.items.filter((id) => filteredSectionIds.has(id));
+          const visibleItems = group.items.filter((id) =>
+            filteredSectionIds.has(id),
+          );
           if (visibleItems.length === 0) return null;
 
           return (
@@ -937,9 +1302,13 @@ function SettingsSidebar({
                   if (!section) return null;
                   const Icon = section.icon;
                   const isActive = sectionId === activeSectionId;
-                  const editableSection = settingsSections.find((s) => s.id === sectionId);
+                  const editableSection = settingsSections.find(
+                    (s) => s.id === sectionId,
+                  );
                   const dirtyCount = editableSection
-                    ? editableSection.fields.filter((f) => changedKeys.includes(f.key)).length
+                    ? editableSection.fields.filter((f) =>
+                        changedKeys.includes(f.key),
+                      ).length
                     : 0;
 
                   return (
@@ -948,25 +1317,31 @@ function SettingsSidebar({
                       type="button"
                       onClick={() => onSwitchSection(sectionId)}
                       className={cn(
-                        'group flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors',
+                        "group flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors",
                         isActive
-                          ? 'bg-[var(--color-mod-settings-accent)] text-white'
-                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                          ? "bg-[var(--color-mod-settings-accent)] text-white"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
                       )}
                     >
                       <Icon
                         size={14}
                         className={cn(
-                          'shrink-0',
-                          isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600',
+                          "shrink-0",
+                          isActive
+                            ? "text-white"
+                            : "text-slate-400 group-hover:text-slate-600",
                         )}
                       />
-                      <span className="flex-1 truncate font-medium leading-none">{section.title}</span>
+                      <span className="flex-1 truncate font-medium leading-none">
+                        {section.title}
+                      </span>
                       {dirtyCount > 0 && (
                         <span
                           className={cn(
-                            'flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-bold',
-                            isActive ? 'bg-amber-400 text-amber-900' : 'bg-amber-100 text-amber-700',
+                            "flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-bold",
+                            isActive
+                              ? "bg-amber-400 text-amber-900"
+                              : "bg-amber-100 text-amber-700",
                           )}
                         >
                           {dirtyCount}
@@ -1016,9 +1391,13 @@ function MobileSectionSelector({
                 const section = allSections.find((s) => s.id === sectionId);
                 if (!section) return null;
                 const isActive = sectionId === activeSectionId;
-                const editableSection = settingsSections.find((s) => s.id === sectionId);
+                const editableSection = settingsSections.find(
+                  (s) => s.id === sectionId,
+                );
                 const dirtyCount = editableSection
-                  ? editableSection.fields.filter((f) => changedKeys.includes(f.key)).length
+                  ? editableSection.fields.filter((f) =>
+                      changedKeys.includes(f.key),
+                    ).length
                   : 0;
                 const Icon = section.icon;
 
@@ -1028,10 +1407,10 @@ function MobileSectionSelector({
                     type="button"
                     onClick={() => onSwitchSection(sectionId)}
                     className={cn(
-                      'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition',
+                      "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition",
                       isActive
-                        ? 'bg-[var(--color-mod-settings-accent)] text-white'
-                        : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900',
+                        ? "bg-[var(--color-mod-settings-accent)] text-white"
+                        : "border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900",
                     )}
                   >
                     <Icon size={12} className="shrink-0" />
@@ -1039,8 +1418,10 @@ function MobileSectionSelector({
                     {dirtyCount > 0 && (
                       <span
                         className={cn(
-                          'flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-bold',
-                          isActive ? 'bg-amber-400 text-amber-900' : 'bg-amber-100 text-amber-700',
+                          "flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-bold",
+                          isActive
+                            ? "bg-amber-400 text-amber-900"
+                            : "bg-amber-100 text-amber-700",
                         )}
                       >
                         {dirtyCount}
@@ -1055,7 +1436,10 @@ function MobileSectionSelector({
       </div>
       {activeSection && (
         <p className="text-xs text-slate-400">
-          Viewing: <span className="font-medium text-slate-600">{activeSection.title}</span>
+          Viewing:{" "}
+          <span className="font-medium text-slate-600">
+            {activeSection.title}
+          </span>
         </p>
       )}
     </div>
@@ -1078,13 +1462,22 @@ function SectionHeader({
   return (
     <div className="border-b border-slate-100 px-6 py-5">
       <div className="flex items-start gap-3">
-        <span className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border', section.tone)}>
+        <span
+          className={cn(
+            "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+            section.tone,
+          )}
+        >
           <Icon size={15} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-semibold text-slate-900">{section.title}</h2>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{section.eyebrow}</span>
+            <h2 className="text-base font-semibold text-slate-900">
+              {section.title}
+            </h2>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              {section.eyebrow}
+            </span>
           </div>
           <p className="mt-0.5 text-sm text-slate-500">{section.description}</p>
         </div>
@@ -1094,7 +1487,10 @@ function SectionHeader({
             className="group ml-auto flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
           >
             {featureLink.label}
-            <ExternalLink size={11} className="text-slate-400 group-hover:text-slate-600" />
+            <ExternalLink
+              size={11}
+              className="text-slate-400 group-hover:text-slate-600"
+            />
           </Link>
         ) : null}
       </div>
@@ -1125,7 +1521,8 @@ function UnsavedBar({
             <span className="h-2 w-2 rounded-full bg-amber-500" />
           </span>
           <p className="truncate text-sm font-medium text-slate-700">
-            {changedCount} unsaved {changedCount === 1 ? 'change' : 'changes'} in{' '}
+            {changedCount} unsaved {changedCount === 1 ? "change" : "changes"}{" "}
+            in{" "}
             <span className="font-semibold text-slate-900">{sectionTitle}</span>
           </p>
         </div>
@@ -1148,8 +1545,12 @@ function UnsavedBar({
             disabled={saving}
             className="gap-1.5 rounded-lg bg-[var(--color-mod-settings-accent)] text-white hover:bg-[var(--color-mod-settings-text)]"
           >
-            {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-            {saving ? 'Saving…' : 'Save changes'}
+            {saving ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Save size={13} />
+            )}
+            {saving ? "Saving…" : "Save changes"}
           </Button>
         </div>
       </div>
@@ -1173,28 +1574,33 @@ function EditableSettingsSection({
   onLogoChanged: () => void;
 }) {
   const textLikeFields = section.fields.filter(
-    (f) => f.type !== 'checkbox' && f.type !== 'multi-check',
+    (f) => f.type !== "checkbox" && f.type !== "multi-check",
   );
-  const checkboxFields = section.fields.filter((f) => f.type === 'checkbox');
-  const multiCheckFields = section.fields.filter((f) => f.type === 'multi-check');
+  const checkboxFields = section.fields.filter((f) => f.type === "checkbox");
+  const multiCheckFields = section.fields.filter(
+    (f) => f.type === "multi-check",
+  );
 
   return (
     <div className="divide-y divide-slate-100">
       {/* Branding: Logo Panel */}
-      {section.id === 'branding' && (
+      {section.id === "branding" && (
         <div className="px-6 py-5">
-          <LogoPanel logoFileAssetId={logoFileAssetId} onLogoChanged={onLogoChanged} />
+          <LogoPanel
+            logoFileAssetId={logoFileAssetId}
+            onLogoChanged={onLogoChanged}
+          />
         </div>
       )}
 
       {/* Branding: Document preview */}
-      {section.id === 'branding' && (
+      {section.id === "branding" && (
         <div className="px-6 py-5">
           <BrandingPreview
-            schoolName={String(form['school_name'] ?? '')}
-            primaryColor={String(form['branding_primary_color'] ?? '#6366f1')}
-            headerText={String(form['receipt_header_text'] ?? '')}
-            footerText={String(form['receipt_footer_text'] ?? '')}
+            schoolName={String(form["school_name"] ?? "")}
+            primaryColor={String(form["branding_primary_color"] ?? "#6366f1")}
+            headerText={String(form["receipt_header_text"] ?? "")}
+            footerText={String(form["receipt_footer_text"] ?? "")}
             logoFileAssetId={logoFileAssetId}
           />
         </div>
@@ -1203,7 +1609,12 @@ function EditableSettingsSection({
       {textLikeFields.length > 0 && (
         <div className="divide-y divide-slate-100">
           {textLikeFields.map((field) => (
-            <FieldRow key={field.key} field={field} value={form[field.key]} onChange={(v) => onFieldChange(field.key, v)} />
+            <FieldRow
+              key={field.key}
+              field={field}
+              value={form[field.key]}
+              onChange={(v) => onFieldChange(field.key, v)}
+            />
           ))}
         </div>
       )}
@@ -1211,13 +1622,23 @@ function EditableSettingsSection({
       {checkboxFields.length > 0 && (
         <div className="divide-y divide-slate-100">
           {checkboxFields.map((field) => (
-            <ToggleRow key={field.key} field={field} value={form[field.key]} onChange={(v) => onFieldChange(field.key, v)} />
+            <ToggleRow
+              key={field.key}
+              field={field}
+              value={form[field.key]}
+              onChange={(v) => onFieldChange(field.key, v)}
+            />
           ))}
         </div>
       )}
 
       {multiCheckFields.map((field) => (
-        <MultiCheckRow key={field.key} field={field} value={form[field.key]} onChange={(v) => onFieldChange(field.key, v)} />
+        <MultiCheckRow
+          key={field.key}
+          field={field}
+          value={form[field.key]}
+          onChange={(v) => onFieldChange(field.key, v)}
+        />
       ))}
     </div>
   );
@@ -1232,8 +1653,13 @@ function GradingRoundingPolicyEditor({
   value: any;
   onChange: (v: any) => void;
 }) {
-  const policy = value || { mode: 'HALF_UP', percentageDecimals: 2, gpaDecimals: 2, marksDecimals: 2 };
-  
+  const policy = value || {
+    mode: "HALF_UP",
+    percentageDecimals: 2,
+    gpaDecimals: 2,
+    marksDecimals: 2,
+  };
+
   const updatePolicy = (key: string, val: any) => {
     onChange({
       ...policy,
@@ -1245,50 +1671,70 @@ function GradingRoundingPolicyEditor({
     <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6 space-y-6">
       <div className="grid gap-6 sm:grid-cols-2">
         <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rounding Mode</label>
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            Rounding Mode
+          </label>
           <select
-            value={policy.mode ?? 'HALF_UP'}
-            onChange={(e) => updatePolicy('mode', e.target.value)}
+            value={policy.mode ?? "HALF_UP"}
+            onChange={(e) => updatePolicy("mode", e.target.value)}
             className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
           >
-            <option value="HALF_UP">Half Up (Round half towards positive infinity)</option>
-            <option value="FLOOR">Floor (Round towards negative infinity)</option>
-            <option value="CEIL">Ceiling (Round towards positive infinity)</option>
+            <option value="HALF_UP">
+              Half Up (Round half towards positive infinity)
+            </option>
+            <option value="FLOOR">
+              Floor (Round towards negative infinity)
+            </option>
+            <option value="CEIL">
+              Ceiling (Round towards positive infinity)
+            </option>
           </select>
         </div>
 
         <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Percentage Decimals (0 - 4)</label>
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            Percentage Decimals (0 - 4)
+          </label>
           <input
             type="number"
             min={0}
             max={4}
             value={policy.percentageDecimals ?? 2}
-            onChange={(e) => updatePolicy('percentageDecimals', Number(e.target.value))}
+            onChange={(e) =>
+              updatePolicy("percentageDecimals", Number(e.target.value))
+            }
             className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
           />
         </div>
 
         <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">GPA Decimals (0 - 4)</label>
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            GPA Decimals (0 - 4)
+          </label>
           <input
             type="number"
             min={0}
             max={4}
             value={policy.gpaDecimals ?? 2}
-            onChange={(e) => updatePolicy('gpaDecimals', Number(e.target.value))}
+            onChange={(e) =>
+              updatePolicy("gpaDecimals", Number(e.target.value))
+            }
             className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
           />
         </div>
 
         <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Marks Decimals (0 - 4)</label>
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            Marks Decimals (0 - 4)
+          </label>
           <input
             type="number"
             min={0}
             max={4}
             value={policy.marksDecimals ?? 2}
-            onChange={(e) => updatePolicy('marksDecimals', Number(e.target.value))}
+            onChange={(e) =>
+              updatePolicy("marksDecimals", Number(e.target.value))
+            }
             className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
           />
         </div>
@@ -1312,7 +1758,7 @@ function GradingScaleEditor({
       ...next[index],
       [key]: val,
     };
-    if (key === 'minPercentage') {
+    if (key === "minPercentage") {
       next.sort((a, b) => (b.minPercentage || 0) - (a.minPercentage || 0));
     }
     onChange(next);
@@ -1327,18 +1773,18 @@ function GradingScaleEditor({
     const next = [
       ...bands,
       {
-        grade: 'New',
+        grade: "New",
         minPercentage: 0,
         maxPercentage: 100,
         gradePoint: 0,
-        label: 'Description',
+        label: "Description",
         passed: true,
       },
     ].sort((a, b) => b.minPercentage - a.minPercentage);
     onChange(next);
   };
 
-  const hasFailingBand = bands.some(b => !b.passed);
+  const hasFailingBand = bands.some((b) => !b.passed);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6 space-y-4">
@@ -1359,17 +1805,23 @@ function GradingScaleEditor({
             {bands.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-8 text-center text-slate-400">
-                  No grading bands configured. Click &quot;Add Grade Band&quot; to start.
+                  No grading bands configured. Click &quot;Add Grade Band&quot;
+                  to start.
                 </td>
               </tr>
             ) : (
               bands.map((band, index) => (
-                <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                <tr
+                  key={index}
+                  className="hover:bg-slate-50/50 transition-colors"
+                >
                   <td className="py-2.5 px-4 w-20">
                     <input
                       type="text"
-                      value={band.grade || ''}
-                      onChange={(e) => updateBand(index, 'grade', e.target.value)}
+                      value={band.grade || ""}
+                      onChange={(e) =>
+                        updateBand(index, "grade", e.target.value)
+                      }
                       placeholder="A+"
                       className="h-8 w-16 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-900 outline-none focus:border-indigo-400"
                     />
@@ -1381,7 +1833,13 @@ function GradingScaleEditor({
                       max={100}
                       step="any"
                       value={band.minPercentage ?? 0}
-                      onChange={(e) => updateBand(index, 'minPercentage', Number(e.target.value))}
+                      onChange={(e) =>
+                        updateBand(
+                          index,
+                          "minPercentage",
+                          Number(e.target.value),
+                        )
+                      }
                       placeholder="90"
                       className="h-8 w-20 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-900 outline-none focus:border-indigo-400"
                     />
@@ -1393,7 +1851,13 @@ function GradingScaleEditor({
                       max={100}
                       step="any"
                       value={band.maxPercentage ?? 100}
-                      onChange={(e) => updateBand(index, 'maxPercentage', Number(e.target.value))}
+                      onChange={(e) =>
+                        updateBand(
+                          index,
+                          "maxPercentage",
+                          Number(e.target.value),
+                        )
+                      }
                       placeholder="100"
                       className="h-8 w-20 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-900 outline-none focus:border-indigo-400"
                     />
@@ -1405,7 +1869,9 @@ function GradingScaleEditor({
                       max={4}
                       step="any"
                       value={band.gradePoint ?? 0}
-                      onChange={(e) => updateBand(index, 'gradePoint', Number(e.target.value))}
+                      onChange={(e) =>
+                        updateBand(index, "gradePoint", Number(e.target.value))
+                      }
                       placeholder="4.0"
                       className="h-8 w-20 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-900 outline-none focus:border-indigo-400"
                     />
@@ -1413,8 +1879,10 @@ function GradingScaleEditor({
                   <td className="py-2.5 px-4">
                     <input
                       type="text"
-                      value={band.label || ''}
-                      onChange={(e) => updateBand(index, 'label', e.target.value)}
+                      value={band.label || ""}
+                      onChange={(e) =>
+                        updateBand(index, "label", e.target.value)
+                      }
                       placeholder="Outstanding"
                       className="h-8 w-full min-w-[120px] rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-900 outline-none focus:border-indigo-400"
                     />
@@ -1424,11 +1892,13 @@ function GradingScaleEditor({
                       <input
                         type="checkbox"
                         checked={band.passed ?? true}
-                        onChange={(e) => updateBand(index, 'passed', e.target.checked)}
+                        onChange={(e) =>
+                          updateBand(index, "passed", e.target.checked)
+                        }
                         className="h-4 w-4 rounded border-slate-200 text-indigo-600 focus:ring-indigo-500"
                       />
                       <span className="text-[10px] uppercase font-bold text-slate-500">
-                        {band.passed ? 'Pass' : 'Fail'}
+                        {band.passed ? "Pass" : "Fail"}
                       </span>
                     </label>
                   </td>
@@ -1451,7 +1921,8 @@ function GradingScaleEditor({
       <div className="flex items-center justify-between">
         {!hasFailingBand && bands.length > 0 && (
           <p className="text-[11px] font-bold text-rose-600">
-            ⚠️ Warning: At least one band must be configured as a Failing band (Pass = false).
+            ⚠️ Warning: At least one band must be configured as a Failing band
+            (Pass = false).
           </p>
         )}
         <div className="flex-grow" />
@@ -1478,8 +1949,8 @@ function FieldRow({
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
-  const isCustomGradingScale = field.key === 'grading_scale';
-  const isCustomRoundingPolicy = field.key === 'grading_rounding_policy';
+  const isCustomGradingScale = field.key === "grading_scale";
+  const isCustomRoundingPolicy = field.key === "grading_rounding_policy";
 
   if (isCustomGradingScale) {
     return (
@@ -1487,7 +1958,9 @@ function FieldRow({
         <div>
           <p className="text-sm font-bold text-slate-800">{field.label}</p>
           {field.description && (
-            <p className="mt-1 text-xs leading-5 text-slate-500">{field.description}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              {field.description}
+            </p>
           )}
         </div>
         <div className="w-full">
@@ -1503,7 +1976,9 @@ function FieldRow({
         <div>
           <p className="text-sm font-bold text-slate-800">{field.label}</p>
           {field.description && (
-            <p className="mt-1 text-xs leading-5 text-slate-500">{field.description}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              {field.description}
+            </p>
           )}
         </div>
         <div className="w-full">
@@ -1518,15 +1993,20 @@ function FieldRow({
       <div className="sm:w-[240px] sm:shrink-0">
         <p className="text-sm font-medium text-slate-800">{field.label}</p>
         {field.description && (
-          <p className="mt-0.5 text-xs leading-5 text-slate-500">{field.description}</p>
+          <p className="mt-0.5 text-xs leading-5 text-slate-500">
+            {field.description}
+          </p>
         )}
       </div>
       <div className="w-full sm:max-w-sm">
-        {field.type === 'color' ? (
-          <ColorField value={String(value || field.defaultValue || '#6366f1')} onChange={onChange} />
-        ) : field.type === 'select' ? (
+        {field.type === "color" ? (
+          <ColorField
+            value={String(value || field.defaultValue || "#6366f1")}
+            onChange={onChange}
+          />
+        ) : field.type === "select" ? (
           <select
-            value={String(value ?? field.defaultValue ?? '')}
+            value={String(value ?? field.defaultValue ?? "")}
             onChange={(e) => onChange(e.target.value)}
             className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 disabled:opacity-50"
           >
@@ -1538,12 +2018,20 @@ function FieldRow({
           </select>
         ) : (
           <input
-            type={field.type === 'number' ? 'number' : field.type === 'email' ? 'email' : field.type === 'time' ? 'time' : 'text'}
-            value={String(value ?? '')}
+            type={
+              field.type === "number"
+                ? "number"
+                : field.type === "email"
+                  ? "email"
+                  : field.type === "time"
+                    ? "time"
+                    : "text"
+            }
+            value={String(value ?? "")}
             placeholder={field.placeholder}
             onChange={(e) => {
-              if (field.type === 'number') {
-                onChange(e.target.value === '' ? '' : Number(e.target.value));
+              if (field.type === "number") {
+                onChange(e.target.value === "" ? "" : Number(e.target.value));
                 return;
               }
               onChange(e.target.value);
@@ -1558,7 +2046,13 @@ function FieldRow({
 
 // ─── Color Field ──────────────────────────────────────────────────────────────
 
-function ColorField({ value, onChange }: { value: string; onChange: (v: unknown) => void }) {
+function ColorField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: unknown) => void;
+}) {
   return (
     <div className="flex items-center gap-2">
       <input
@@ -1579,7 +2073,10 @@ function ColorField({ value, onChange }: { value: string; onChange: (v: unknown)
         placeholder="#6366f1"
         className="h-9 w-[110px] rounded-lg border border-slate-200 bg-white px-3 font-mono text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
       />
-      <div className="h-9 w-14 rounded-lg border border-slate-200" style={{ backgroundColor: value }} />
+      <div
+        className="h-9 w-14 rounded-lg border border-slate-200"
+        style={{ backgroundColor: value }}
+      />
     </div>
   );
 }
@@ -1601,7 +2098,9 @@ function ToggleRow({
       <div>
         <p className="text-sm font-medium text-slate-800">{field.label}</p>
         {field.description && (
-          <p className="mt-0.5 text-xs leading-5 text-slate-500">{field.description}</p>
+          <p className="mt-0.5 text-xs leading-5 text-slate-500">
+            {field.description}
+          </p>
         )}
       </div>
       <button
@@ -1610,14 +2109,14 @@ function ToggleRow({
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={cn(
-          'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-settings-accent)] focus-visible:ring-offset-2',
-          checked ? 'bg-[var(--color-mod-settings-accent)]' : 'bg-slate-200',
+          "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-settings-accent)] focus-visible:ring-offset-2",
+          checked ? "bg-[var(--color-mod-settings-accent)]" : "bg-slate-200",
         )}
       >
         <span
           className={cn(
-            'pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
-            checked ? 'translate-x-4' : 'translate-x-0',
+            "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+            checked ? "translate-x-4" : "translate-x-0",
           )}
         />
       </button>
@@ -1643,7 +2142,9 @@ function MultiCheckRow({
       <div className="mb-3">
         <p className="text-sm font-medium text-slate-800">{field.label}</p>
         {field.description && (
-          <p className="mt-0.5 text-xs leading-5 text-slate-500">{field.description}</p>
+          <p className="mt-0.5 text-xs leading-5 text-slate-500">
+            {field.description}
+          </p>
         )}
       </div>
       <div className="flex flex-wrap gap-2">
@@ -1660,10 +2161,10 @@ function MultiCheckRow({
                 onChange(next);
               }}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition',
+                "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition",
                 isSelected
-                  ? 'border-[var(--color-mod-settings-accent)] bg-[var(--color-mod-settings-accent)] text-white'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900',
+                  ? "border-[var(--color-mod-settings-accent)] bg-[var(--color-mod-settings-accent)] text-white"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900",
               )}
             >
               {isSelected && <Check size={11} />}
@@ -1690,15 +2191,20 @@ function BrandingPreview({
   footerText: string;
   logoFileAssetId: string | null;
 }) {
-  const displayName = schoolName || 'Your School Name';
-  const displayHeader = headerText || 'Official Receipt';
-  const displayFooter = footerText || 'Thank you for your payment.';
+  const displayName = schoolName || "Your School Name";
+  const displayHeader = headerText || "Official Receipt";
+  const displayFooter = footerText || "Thank you for your payment.";
 
   return (
     <div>
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Document Branding Preview</p>
+      <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        Document Branding Preview
+      </p>
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: `3px solid ${primaryColor}` }}>
+        <div
+          className="flex items-center gap-3 px-4 py-3"
+          style={{ borderBottom: `3px solid ${primaryColor}` }}
+        >
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
             style={{ backgroundColor: `${primaryColor}18` }}
@@ -1706,20 +2212,31 @@ function BrandingPreview({
             <School size={18} style={{ color: primaryColor }} />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-slate-900">{displayName}</p>
+            <p className="truncate text-sm font-bold text-slate-900">
+              {displayName}
+            </p>
             <p className="text-xs text-slate-500">{displayHeader}</p>
           </div>
           <div className="ml-auto text-right">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Receipt</p>
-            <p className="font-mono text-xs font-semibold text-slate-700">REC-2081-0001</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              Receipt
+            </p>
+            <p className="font-mono text-xs font-semibold text-slate-700">
+              REC-2081-0001
+            </p>
           </div>
         </div>
         <div className="px-4 py-3">
           <div className="space-y-1.5">
-            {['Student Fee', 'Transport Fee', 'Exam Fee'].map((item, i) => (
-              <div key={item} className="flex justify-between text-xs text-slate-600">
+            {["Student Fee", "Transport Fee", "Exam Fee"].map((item, i) => (
+              <div
+                key={item}
+                className="flex justify-between text-xs text-slate-600"
+              >
                 <span>{item}</span>
-                <span className="font-medium text-slate-800">NPR {[5000, 1500, 800][i]?.toLocaleString()}</span>
+                <span className="font-medium text-slate-800">
+                  NPR {[5000, 1500, 800][i]?.toLocaleString()}
+                </span>
               </div>
             ))}
           </div>
@@ -1738,7 +2255,13 @@ function BrandingPreview({
 
 // ─── Logo Panel ───────────────────────────────────────────────────────────────
 
-function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string | null; onLogoChanged: () => void }) {
+function LogoPanel({
+  logoFileAssetId,
+  onLogoChanged,
+}: {
+  logoFileAssetId: string | null;
+  onLogoChanged: () => void;
+}) {
   const [preview, setPreview] = useState<TenantLogoAccess | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -1754,23 +2277,35 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
     if (!logoFileAssetId) {
       setPreview(null);
       setError(null);
-      return () => { active = false; };
+      return () => {
+        active = false;
+      };
     }
 
     setLoading(true);
     setError(null);
     api
       .getSchoolLogoPreview()
-      .then((access) => { if (active) setPreview(access); })
+      .then((access) => {
+        if (active) setPreview(access);
+      })
       .catch((err: unknown) => {
         if (active) {
           setPreview(null);
-          setError(err instanceof Error ? err.message : 'Failed to load school logo preview.');
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to load school logo preview.",
+          );
         }
       })
-      .finally(() => { if (active) setLoading(false); });
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [logoFileAssetId]);
 
   const busy = loading || uploading || removing || downloading;
@@ -1781,11 +2316,11 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
     if (!file) return;
 
     if (!TENANT_LOGO_MIME_TYPES.has(file.type)) {
-      setError('Use JPG, PNG, or WEBP for the school logo.');
+      setError("Use JPG, PNG, or WEBP for the school logo.");
       return;
     }
     if (file.size > TENANT_LOGO_MAX_BYTES) {
-      setError('School logo must be 1MB or smaller.');
+      setError("School logo must be 1MB or smaller.");
       return;
     }
 
@@ -1794,10 +2329,14 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
       await api.uploadSchoolLogo(file);
       const access = await api.getSchoolLogoPreview();
       setPreview(access);
-      setMessage('School logo uploaded through the private File Registry.');
+      setMessage("School logo uploaded through the private File Registry.");
       onLogoChanged();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to upload the school logo.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to upload the school logo.",
+      );
     } finally {
       setUploading(false);
     }
@@ -1808,9 +2347,11 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
       setDownloading(true);
       setError(null);
       const access = await api.getSchoolLogoDownload();
-      window.open(access.url, '_blank', 'noopener,noreferrer');
+      window.open(access.url, "_blank", "noopener,noreferrer");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to open logo download.');
+      setError(
+        err instanceof Error ? err.message : "Failed to open logo download.",
+      );
     } finally {
       setDownloading(false);
     }
@@ -1822,11 +2363,13 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
       setError(null);
       await api.removeSchoolLogo();
       setPreview(null);
-      setMessage('School logo removed.');
+      setMessage("School logo removed.");
       setRemoveOpen(false);
       onLogoChanged();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to remove school logo.');
+      setError(
+        err instanceof Error ? err.message : "Failed to remove school logo.",
+      );
     } finally {
       setRemoving(false);
     }
@@ -1835,14 +2378,20 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
   return (
     <>
       <div data-testid="school-logo-upload-panel">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">School Logo</p>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+          School Logo
+        </p>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
             {loading ? (
               <Loader2 size={20} className="animate-spin text-slate-300" />
             ) : preview?.url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={preview.url} alt="School logo" className="h-full w-full object-contain p-2" />
+              <img
+                src={preview.url}
+                alt="School logo"
+                className="h-full w-full object-contain p-2"
+              />
             ) : (
               <ImageUp className="h-7 w-7 text-slate-300" />
             )}
@@ -1852,13 +2401,13 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
             <div className="mb-2.5 flex flex-wrap gap-1.5">
               <span
                 className={cn(
-                  'inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold',
+                  "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold",
                   logoFileAssetId
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-slate-100 text-slate-500',
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-slate-100 text-slate-500",
                 )}
               >
-                {logoFileAssetId ? 'Logo configured' : 'No logo uploaded'}
+                {logoFileAssetId ? "Logo configured" : "No logo uploaded"}
               </span>
               <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
                 Private File Registry
@@ -1870,30 +2419,43 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
               )}
             </div>
             <p className="text-xs leading-5 text-slate-500">
-              Upload a JPG, PNG, or WEBP logo up to 1MB. Stored privately and served through signed links.
+              Upload a JPG, PNG, or WEBP logo up to 1MB. Stored privately and
+              served through signed links.
             </p>
             {preview && (
               <p className="mt-1 text-[11px] text-slate-400">
-                {preview.fileName} · Preview expires in {preview.expiresInSeconds}s
+                {preview.fileName} · Preview expires in{" "}
+                {preview.expiresInSeconds}s
               </p>
             )}
 
             <div className="mt-3 flex flex-wrap gap-2">
               <label
                 className={cn(
-                  'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--color-mod-settings-accent)] bg-[var(--color-mod-settings-accent)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--color-mod-settings-text)]',
-                  busy && 'cursor-not-allowed opacity-50',
+                  "inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--color-mod-settings-accent)] bg-[var(--color-mod-settings-accent)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--color-mod-settings-text)]",
+                  busy && "cursor-not-allowed opacity-50",
                 )}
               >
-                {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-                {uploading ? 'Uploading…' : logoFileAssetId ? 'Replace' : 'Upload logo'}
+                {uploading ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Upload size={12} />
+                )}
+                {uploading
+                  ? "Uploading…"
+                  : logoFileAssetId
+                    ? "Replace"
+                    : "Upload logo"}
                 <input
                   aria-label="Upload school logo"
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   className="sr-only"
                   disabled={busy}
-                  onChange={(e) => { void handleLogoSelection(e.target.files?.[0]); e.currentTarget.value = ''; }}
+                  onChange={(e) => {
+                    void handleLogoSelection(e.target.files?.[0]);
+                    e.currentTarget.value = "";
+                  }}
                 />
               </label>
               {logoFileAssetId && (
@@ -1904,7 +2466,11 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
                     onClick={() => void openLogoDownload()}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-50"
                   >
-                    {downloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                    {downloading ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Download size={12} />
+                    )}
                     Download
                   </button>
                   <button
@@ -1965,84 +2531,99 @@ function OverviewPanel({
 }) {
   function getSettingValue(key: TenantSettingKey): string | null {
     const s = settings.find((item) => item.key === key);
-    if (!s || s.value === null || s.value === undefined || s.value === '') return null;
+    if (!s || s.value === null || s.value === undefined || s.value === "")
+      return null;
     return String(s.value);
   }
 
-  const hasSchoolName = Boolean(getSettingValue('school_name'));
-  const hasSchoolPhone = Boolean(getSettingValue('school_phone'));
-  const hasAcademicYear = Boolean(getSettingValue('active_academic_year_label'));
-  const hasBranding = Boolean(logoFileAssetId) || Boolean(getSettingValue('branding_primary_color'));
+  const hasSchoolName = Boolean(getSettingValue("school_name"));
+  const hasSchoolPhone = Boolean(getSettingValue("school_phone"));
+  const hasAcademicYear = Boolean(
+    getSettingValue("active_academic_year_label"),
+  );
+  const hasBranding =
+    Boolean(logoFileAssetId) ||
+    Boolean(getSettingValue("branding_primary_color"));
 
   const readinessItems: Array<{
     label: string;
     description: string;
     sectionId: string;
-    status: 'ok' | 'review' | 'pending';
+    status: "ok" | "review" | "pending";
   }> = [
     {
-      label: 'School Profile',
-      description: hasSchoolName && hasSchoolPhone ? `${getSettingValue('school_name') ?? ''} · ${getSettingValue('school_phone') ?? ''}` : 'School name and contact not set',
-      sectionId: 'profile',
-      status: hasSchoolName ? 'ok' : 'review',
+      label: "School Profile",
+      description:
+        hasSchoolName && hasSchoolPhone
+          ? `${getSettingValue("school_name") ?? ""} · ${getSettingValue("school_phone") ?? ""}`
+          : "School name and contact not set",
+      sectionId: "profile",
+      status: hasSchoolName ? "ok" : "review",
     },
     {
-      label: 'Branding & Logo',
-      description: logoFileAssetId ? 'Logo uploaded, primary color configured' : 'No logo uploaded yet',
-      sectionId: 'branding',
-      status: hasBranding ? 'ok' : 'review',
+      label: "Branding & Logo",
+      description: logoFileAssetId
+        ? "Logo uploaded, primary color configured"
+        : "No logo uploaded yet",
+      sectionId: "branding",
+      status: hasBranding ? "ok" : "review",
     },
     {
-      label: 'Academic Setup',
-      description: hasAcademicYear ? `Active year: ${getSettingValue('active_academic_year_label') ?? ''}` : 'Set up academic years, classes, and sections',
-      sectionId: 'school-setup',
-      status: hasAcademicYear ? 'ok' : 'review',
+      label: "Academic Setup",
+      description: hasAcademicYear
+        ? `Active year: ${getSettingValue("active_academic_year_label") ?? ""}`
+        : "Set up academic years, classes, and sections",
+      sectionId: "school-setup",
+      status: hasAcademicYear ? "ok" : "review",
     },
     {
-      label: 'Academic Defaults',
-      description: 'Grading scheme, calendar, promotion mode',
-      sectionId: 'academic',
-      status: hasAcademicYear ? 'ok' : 'review',
+      label: "Academic Defaults",
+      description: "Grading scheme, calendar, promotion mode",
+      sectionId: "academic",
+      status: hasAcademicYear ? "ok" : "review",
     },
     {
-      label: 'Active Fee Plans',
-      description: activeFeePlanCount > 0 ? `${activeFeePlanCount} active fee plan(s) configured` : 'No active fee plans configured',
-      sectionId: 'fee-setup',
-      status: activeFeePlanCount > 0 ? 'ok' : 'review',
+      label: "Active Fee Plans",
+      description:
+        activeFeePlanCount > 0
+          ? `${activeFeePlanCount} active fee plan(s) configured`
+          : "No active fee plans configured",
+      sectionId: "fee-setup",
+      status: activeFeePlanCount > 0 ? "ok" : "review",
     },
     {
-      label: 'Fee & Payment Rules',
-      description: 'Receipt numbering, late fees, approval flow',
-      sectionId: 'fees',
-      status: getSettingValue('receipt_number_prefix') ? 'ok' : 'review',
+      label: "Fee & Payment Rules",
+      description: "Receipt numbering, late fees, approval flow",
+      sectionId: "fees",
+      status: getSettingValue("receipt_number_prefix") ? "ok" : "review",
     },
     {
-      label: 'Users & Access',
-      description: 'Tenant users connected to the Users API',
-      sectionId: 'users-access',
-      status: 'ok',
+      label: "Users & Access",
+      description: "Tenant users connected to the Users API",
+      sectionId: "users-access",
+      status: "ok",
     },
     {
-      label: 'Roles & Permissions',
-      description: 'Role catalog reviewed',
-      sectionId: 'roles-permissions',
-      status: 'review',
+      label: "Roles & Permissions",
+      description: "Role catalog reviewed",
+      sectionId: "roles-permissions",
+      status: "review",
     },
     {
-      label: 'Security & Privacy',
-      description: 'Session timeout, data masking',
-      sectionId: 'security',
-      status: getSettingValue('session_timeout_minutes') ? 'ok' : 'review',
+      label: "Security & Privacy",
+      description: "Session timeout, data masking",
+      sectionId: "security",
+      status: getSettingValue("session_timeout_minutes") ? "ok" : "review",
     },
     {
-      label: 'Subscription',
-      description: 'Plan and module entitlements',
-      sectionId: 'subscription',
-      status: 'ok',
+      label: "Subscription",
+      description: "Plan and module entitlements",
+      sectionId: "subscription",
+      status: "ok",
     },
   ];
 
-  const okCount = readinessItems.filter((i) => i.status === 'ok').length;
+  const okCount = readinessItems.filter((i) => i.status === "ok").length;
 
   return (
     <div className="space-y-5">
@@ -2050,13 +2631,19 @@ function OverviewPanel({
       <div className="flex items-center gap-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
         <div className="flex-1">
           <div className="mb-1.5 flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-700">Setup readiness</p>
-            <p className="text-xs font-semibold text-slate-500">{okCount} / {readinessItems.length} ready</p>
+            <p className="text-xs font-semibold text-slate-700">
+              Setup readiness
+            </p>
+            <p className="text-xs font-semibold text-slate-500">
+              {okCount} / {readinessItems.length} ready
+            </p>
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
             <div
               className="h-full rounded-full bg-emerald-500 transition-all"
-              style={{ width: `${Math.round((okCount / readinessItems.length) * 100)}%` }}
+              style={{
+                width: `${Math.round((okCount / readinessItems.length) * 100)}%`,
+              }}
             />
           </div>
         </div>
@@ -2073,29 +2660,47 @@ function OverviewPanel({
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                {item.status === 'ok' && <CheckCircle2 size={13} className="shrink-0 text-emerald-500" />}
-                {item.status === 'review' && <AlertCircle size={13} className="shrink-0 text-amber-500" />}
-                {item.status === 'pending' && <Clock size={13} className="shrink-0 text-slate-400" />}
-                <p className="truncate text-sm font-semibold text-slate-800">{item.label}</p>
+                {item.status === "ok" && (
+                  <CheckCircle2
+                    size={13}
+                    className="shrink-0 text-emerald-500"
+                  />
+                )}
+                {item.status === "review" && (
+                  <AlertCircle size={13} className="shrink-0 text-amber-500" />
+                )}
+                {item.status === "pending" && (
+                  <Clock size={13} className="shrink-0 text-slate-400" />
+                )}
+                <p className="truncate text-sm font-semibold text-slate-800">
+                  {item.label}
+                </p>
               </div>
-              <p className="mt-1 text-xs leading-5 text-slate-500">{item.description}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                {item.description}
+              </p>
             </div>
-            <ChevronRight size={14} className="mt-0.5 shrink-0 text-slate-300 group-hover:text-slate-500 transition" />
+            <ChevronRight
+              size={14}
+              className="mt-0.5 shrink-0 text-slate-300 group-hover:text-slate-500 transition"
+            />
           </button>
         ))}
       </div>
 
       {/* Quick actions */}
       <div>
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Quick Access</p>
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+          Quick Access
+        </p>
         <div className="flex flex-wrap gap-2">
           {[
-            { label: 'School Profile', id: 'profile' },
-            { label: 'School Setup', id: 'school-setup' },
-            { label: 'Branding', id: 'branding' },
-            { label: 'Users & Access', id: 'users-access' },
-            { label: 'Roles', id: 'roles-permissions' },
-            { label: 'Subscription', id: 'subscription' },
+            { label: "School Profile", id: "profile" },
+            { label: "School Setup", id: "school-setup" },
+            { label: "Branding", id: "branding" },
+            { label: "Users & Access", id: "users-access" },
+            { label: "Roles", id: "roles-permissions" },
+            { label: "Subscription", id: "subscription" },
           ].map((item) => (
             <button
               key={item.id}
@@ -2122,9 +2727,12 @@ function SchoolSetupPanel() {
       <div className="flex items-start gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
         <BookOpen size={15} className="mt-0.5 shrink-0 text-blue-600" />
         <p className="text-sm leading-6 text-blue-700">
-          <span className="font-semibold">Complete this before other workflows.</span>{' '}
-          Academic years, classes, and sections must be configured before admissions, attendance,
-          exams, fees, and timetable workflows can begin.
+          <span className="font-semibold">
+            Complete this before other workflows.
+          </span>{" "}
+          Academic years, classes, and sections must be configured before
+          admissions, attendance, exams, fees, and timetable workflows can
+          begin.
         </p>
       </div>
       {/* Render the existing SetupForm — it manages its own data fetching and mutations */}
@@ -2139,19 +2747,19 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
   const queryClient = useQueryClient();
 
   const [feeHead, setFeeHead] = useState({
-    code: '',
-    name: '',
-    frequency: 'MONTHLY',
+    code: "",
+    name: "",
+    frequency: "MONTHLY",
     defaultAmount: 0,
     vatApplicable: false,
   });
 
   const [feePlan, setFeePlan] = useState({
-    academicYearId: '',
-    classId: '',
-    feeHeadId: '',
-    code: '',
-    name: '',
+    academicYearId: "",
+    classId: "",
+    feeHeadId: "",
+    code: "",
+    name: "",
     amount: 0,
   });
 
@@ -2159,28 +2767,30 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
   const [planSuccess, setPlanSuccess] = useState(false);
 
   const academicYearsQuery = useQuery({
-    queryKey: ['academic-years'],
+    queryKey: ["academic-years"],
     queryFn: api.listAcademicYears,
   });
 
   const classesQuery = useQuery({
-    queryKey: ['classes'],
+    queryKey: ["classes"],
     queryFn: api.listClasses,
   });
 
   const feeHeadsQuery = useQuery({
-    queryKey: ['fee-heads'],
+    queryKey: ["fee-heads"],
     queryFn: api.listFeeHeads,
   });
 
   const feePlansQuery = useQuery({
-    queryKey: ['fee-plans'],
+    queryKey: ["fee-plans"],
     queryFn: api.listFeePlans,
   });
 
   useEffect(() => {
     if (academicYearsQuery.data && !feePlan.academicYearId) {
-      const currentYear = academicYearsQuery.data.find(y => y.isCurrent) ?? academicYearsQuery.data[0];
+      const currentYear =
+        academicYearsQuery.data.find((y) => y.isCurrent) ??
+        academicYearsQuery.data[0];
       if (currentYear) {
         setFeePlan((prev) => ({ ...prev, academicYearId: currentYear.id }));
       }
@@ -2190,11 +2800,11 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
   const feeHeadMutation = useMutation({
     mutationFn: api.createFeeHead,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['fee-heads'] });
+      queryClient.invalidateQueries({ queryKey: ["fee-heads"] });
       setFeeHead({
-        code: '',
-        name: '',
-        frequency: 'MONTHLY',
+        code: "",
+        name: "",
+        frequency: "MONTHLY",
         defaultAmount: 0,
         vatApplicable: false,
       });
@@ -2206,13 +2816,13 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
   const feePlanMutation = useMutation({
     mutationFn: api.createFeePlan,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['fee-plans'] });
+      queryClient.invalidateQueries({ queryKey: ["fee-plans"] });
       setFeePlan((prev) => ({
         ...prev,
-        classId: '',
-        feeHeadId: '',
-        code: '',
-        name: '',
+        classId: "",
+        feeHeadId: "",
+        code: "",
+        name: "",
         amount: 0,
       }));
       setPlanSuccess(true);
@@ -2229,7 +2839,13 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
 
   const handleCreateFeePlan = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!feePlan.academicYearId || !feePlan.feeHeadId || !feePlan.code || !feePlan.name) return;
+    if (
+      !feePlan.academicYearId ||
+      !feePlan.feeHeadId ||
+      !feePlan.code ||
+      !feePlan.name
+    )
+      return;
     feePlanMutation.mutate({
       academicYearId: feePlan.academicYearId,
       classId: feePlan.classId || null,
@@ -2240,9 +2856,9 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-NP', {
-      style: 'currency',
-      currency: 'NPR',
+    return new Intl.NumberFormat("en-NP", {
+      style: "currency",
+      currency: "NPR",
       maximumFractionDigits: 0,
     }).format(amount);
   };
@@ -2254,8 +2870,13 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
         {/* Create Fee Head Form */}
         <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">Create Fee Head</h3>
-            <p className="mt-0.5 text-xs text-slate-500">Define reusable heads of account like Tuition, Exam, or Transportation.</p>
+            <h3 className="text-sm font-semibold text-slate-900">
+              Create Fee Head
+            </h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Define reusable heads of account like Tuition, Exam, or
+              Transportation.
+            </p>
           </div>
 
           <form onSubmit={handleCreateFeeHead} className="space-y-4">
@@ -2268,31 +2889,42 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
             {feeHeadMutation.isError && (
               <div className="flex items-center gap-2 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
                 <AlertCircle size={14} />
-                {feeHeadMutation.error.message || 'Failed to create fee head.'}
+                {feeHeadMutation.error.message || "Failed to create fee head."}
               </div>
             )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Code</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Code
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. TUITION"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
                   value={feeHead.code}
-                  onChange={(e) => setFeeHead((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                  onChange={(e) =>
+                    setFeeHead((prev) => ({
+                      ...prev,
+                      code: e.target.value.toUpperCase(),
+                    }))
+                  }
                   required
                   disabled={feeHeadMutation.isPending}
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Name</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Name
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. Tuition Fee"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
                   value={feeHead.name}
-                  onChange={(e) => setFeeHead((prev) => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) =>
+                    setFeeHead((prev) => ({ ...prev, name: e.target.value }))
+                  }
                   required
                   disabled={feeHeadMutation.isPending}
                 />
@@ -2301,11 +2933,18 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Frequency</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Frequency
+                </label>
                 <select
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none bg-white disabled:bg-slate-50"
                   value={feeHead.frequency}
-                  onChange={(e) => setFeeHead((prev) => ({ ...prev, frequency: e.target.value }))}
+                  onChange={(e) =>
+                    setFeeHead((prev) => ({
+                      ...prev,
+                      frequency: e.target.value,
+                    }))
+                  }
                   disabled={feeHeadMutation.isPending}
                 >
                   <option value="DAILY">Daily</option>
@@ -2317,13 +2956,20 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
                 </select>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Default Amount</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Default Amount
+                </label>
                 <input
                   type="number"
                   placeholder="0"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
-                  value={feeHead.defaultAmount || ''}
-                  onChange={(e) => setFeeHead((prev) => ({ ...prev, defaultAmount: Number(e.target.value) }))}
+                  value={feeHead.defaultAmount || ""}
+                  onChange={(e) =>
+                    setFeeHead((prev) => ({
+                      ...prev,
+                      defaultAmount: Number(e.target.value),
+                    }))
+                  }
                   disabled={feeHeadMutation.isPending}
                 />
               </div>
@@ -2335,10 +2981,18 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
                 id="vatApplicable"
                 className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 checked={feeHead.vatApplicable}
-                onChange={(e) => setFeeHead((prev) => ({ ...prev, vatApplicable: e.target.checked }))}
+                onChange={(e) =>
+                  setFeeHead((prev) => ({
+                    ...prev,
+                    vatApplicable: e.target.checked,
+                  }))
+                }
                 disabled={feeHeadMutation.isPending}
               />
-              <label htmlFor="vatApplicable" className="text-xs font-medium text-slate-700 select-none">
+              <label
+                htmlFor="vatApplicable"
+                className="text-xs font-medium text-slate-700 select-none"
+              >
                 VAT / Taxes Applicable
               </label>
             </div>
@@ -2366,8 +3020,13 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
         {/* Create Fee Plan Form */}
         <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">Create Fee Plan</h3>
-            <p className="mt-0.5 text-xs text-slate-500">Map fee heads to specific academic years and classes with custom rates.</p>
+            <h3 className="text-sm font-semibold text-slate-900">
+              Create Fee Plan
+            </h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Map fee heads to specific academic years and classes with custom
+              rates.
+            </p>
           </div>
 
           <form onSubmit={handleCreateFeePlan} className="space-y-4">
@@ -2380,35 +3039,46 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
             {feePlanMutation.isError && (
               <div className="flex items-center gap-2 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
                 <AlertCircle size={14} />
-                {feePlanMutation.error.message || 'Failed to create fee plan.'}
+                {feePlanMutation.error.message || "Failed to create fee plan."}
               </div>
             )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Academic Year</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Academic Year
+                </label>
                 <select
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none bg-white disabled:bg-slate-50"
                   value={feePlan.academicYearId}
-                  onChange={(e) => setFeePlan((prev) => ({ ...prev, academicYearId: e.target.value }))}
+                  onChange={(e) =>
+                    setFeePlan((prev) => ({
+                      ...prev,
+                      academicYearId: e.target.value,
+                    }))
+                  }
                   required
                   disabled={feePlanMutation.isPending}
                 >
                   <option value="">Select Academic Year</option>
                   {academicYearsQuery.data?.map((y) => (
                     <option key={y.id} value={y.id}>
-                      {y.name} {y.isCurrent ? '(Current)' : ''}
+                      {y.name} {y.isCurrent ? "(Current)" : ""}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Class (Optional)</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Class (Optional)
+                </label>
                 <select
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none bg-white disabled:bg-slate-50"
                   value={feePlan.classId}
-                  onChange={(e) => setFeePlan((prev) => ({ ...prev, classId: e.target.value }))}
+                  onChange={(e) =>
+                    setFeePlan((prev) => ({ ...prev, classId: e.target.value }))
+                  }
                   disabled={feePlanMutation.isPending}
                 >
                   <option value="">All Classes</option>
@@ -2423,13 +3093,17 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Fee Head</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Fee Head
+                </label>
                 <select
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none bg-white disabled:bg-slate-50"
                   value={feePlan.feeHeadId}
                   onChange={(e) => {
                     const headId = e.target.value;
-                    const selectedHead = feeHeadsQuery.data?.find(h => h.id === headId);
+                    const selectedHead = feeHeadsQuery.data?.find(
+                      (h) => h.id === headId,
+                    );
                     setFeePlan((prev) => ({
                       ...prev,
                       feeHeadId: headId,
@@ -2449,13 +3123,20 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Plan Code</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Plan Code
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. PLAN-TUITION-GR1"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
                   value={feePlan.code}
-                  onChange={(e) => setFeePlan((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                  onChange={(e) =>
+                    setFeePlan((prev) => ({
+                      ...prev,
+                      code: e.target.value.toUpperCase(),
+                    }))
+                  }
                   required
                   disabled={feePlanMutation.isPending}
                 />
@@ -2464,26 +3145,37 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Plan Name</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Plan Name
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. Grade 1 Monthly Tuition Plan"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
                   value={feePlan.name}
-                  onChange={(e) => setFeePlan((prev) => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) =>
+                    setFeePlan((prev) => ({ ...prev, name: e.target.value }))
+                  }
                   required
                   disabled={feePlanMutation.isPending}
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Amount</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Amount
+                </label>
                 <input
                   type="number"
                   placeholder="0"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
-                  value={feePlan.amount || ''}
-                  onChange={(e) => setFeePlan((prev) => ({ ...prev, amount: Number(e.target.value) }))}
+                  value={feePlan.amount || ""}
+                  onChange={(e) =>
+                    setFeePlan((prev) => ({
+                      ...prev,
+                      amount: Number(e.target.value),
+                    }))
+                  }
                   required
                   disabled={feePlanMutation.isPending}
                 />
@@ -2515,7 +3207,9 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
       <div className="space-y-6">
         {/* Fee Heads List */}
         <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-slate-900">Active Fee Heads</h3>
+          <h3 className="text-sm font-semibold text-slate-900">
+            Active Fee Heads
+          </h3>
           {feeHeadsQuery.isLoading ? (
             <div className="flex justify-center py-6">
               <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
@@ -2537,11 +3231,19 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
                 </thead>
                 <tbody className="divide-y divide-slate-150 bg-white">
                   {feeHeadsQuery.data.map((head: any) => (
-                    <tr key={head.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-3 py-2 font-semibold text-slate-700">{head.code}</td>
+                    <tr
+                      key={head.id}
+                      className="hover:bg-slate-50 transition-colors"
+                    >
+                      <td className="px-3 py-2 font-semibold text-slate-700">
+                        {head.code}
+                      </td>
                       <td className="px-3 py-2 text-slate-900">{head.name}</td>
                       <td className="px-3 py-2">
-                        <Badge variant="neutral" className="uppercase tracking-wider text-[8px] font-black px-1.5 py-0.5">
+                        <Badge
+                          variant="neutral"
+                          className="uppercase tracking-wider text-[8px] font-black px-1.5 py-0.5"
+                        >
                           {head.frequency}
                         </Badge>
                       </td>
@@ -2558,7 +3260,9 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
 
         {/* Fee Plans List */}
         <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-slate-900">Active Fee Plans</h3>
+          <h3 className="text-sm font-semibold text-slate-900">
+            Active Fee Plans
+          </h3>
           {feePlansQuery.isLoading ? (
             <div className="flex justify-center py-6">
               <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
@@ -2579,17 +3283,27 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
                 </thead>
                 <tbody className="divide-y divide-slate-150 bg-white">
                   {feePlansQuery.data.map((plan: any) => (
-                    <tr key={plan.id} className="hover:bg-slate-50 transition-colors">
+                    <tr
+                      key={plan.id}
+                      className="hover:bg-slate-50 transition-colors"
+                    >
                       <td className="px-3 py-2">
                         <div className="flex flex-col">
-                          <span className="font-semibold text-slate-700">{plan.code}</span>
-                          <span className="text-[10px] text-slate-400">{plan.name}</span>
+                          <span className="font-semibold text-slate-700">
+                            {plan.code}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {plan.name}
+                          </span>
                         </div>
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-1 items-center">
-                          <Badge variant="phase2" className="text-[8px] font-black px-1 py-0">
-                            {plan.academicYear?.name || 'Current Year'}
+                          <Badge
+                            variant="phase2"
+                            className="text-[8px] font-black px-1 py-0"
+                          >
+                            {plan.academicYear?.name || "Current Year"}
                           </Badge>
                           {plan.class && (
                             <Badge className="bg-indigo-50 text-indigo-700 border-indigo-100 text-[8px] font-black px-1 py-0">
@@ -2599,7 +3313,9 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
                         </div>
                       </td>
                       <td className="px-3 py-2 text-right font-bold text-slate-700">
-                        {formatCurrency(plan.amount ?? plan.items?.[0]?.amount ?? 0)}
+                        {formatCurrency(
+                          plan.amount ?? plan.items?.[0]?.amount ?? 0,
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -2618,45 +3334,65 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
 function UsersAccessPanel() {
   const queryClient = useQueryClient();
   const [createDraft, setCreateDraft] = useState({
-    email: '',
-    phone: '',
-    password: '',
+    email: "",
+    phone: "",
+    password: "",
     roleIds: [] as string[],
   });
   const [resetUserId, setResetUserId] = useState<string | null>(null);
-  const [resetPassword, setResetPassword] = useState('');
-  const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [actionNotice, setActionNotice] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const usersQuery = useQuery({
-    queryKey: ['settings', 'users'],
+    queryKey: ["settings", "users"],
     queryFn: api.listUsers,
   });
   const rolesQuery = useQuery({
-    queryKey: ['settings', 'roles'],
+    queryKey: ["settings", "roles"],
     queryFn: api.listRoles,
   });
 
   const createUserMutation = useMutation({
     mutationFn: api.createUser,
     onSuccess: async () => {
-      setCreateDraft({ email: '', phone: '', password: '', roleIds: [] });
-      setActionNotice({ type: 'success', text: 'User account created and role assignments saved.' });
-      await queryClient.invalidateQueries({ queryKey: ['settings', 'users'] });
+      setCreateDraft({ email: "", phone: "", password: "", roleIds: [] });
+      setActionNotice({
+        type: "success",
+        text: "User account created and role assignments saved.",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["settings", "users"] });
     },
     onError: (error) => {
-      setActionNotice({ type: 'error', text: getActionError(error, 'Failed to create user account.') });
+      setActionNotice({
+        type: "error",
+        text: getActionError(error, "Failed to create user account."),
+      });
     },
   });
 
   const statusMutation = useMutation({
-    mutationFn: ({ userId, status }: { userId: string; status: 'ACTIVE' | 'SUSPENDED' }) =>
-      api.updateUserStatus(userId, { status }),
+    mutationFn: ({
+      userId,
+      status,
+    }: {
+      userId: string;
+      status: "ACTIVE" | "SUSPENDED";
+    }) => api.updateUserStatus(userId, { status }),
     onSuccess: async () => {
-      setActionNotice({ type: 'success', text: 'User status updated and active sessions were handled by the API.' });
-      await queryClient.invalidateQueries({ queryKey: ['settings', 'users'] });
+      setActionNotice({
+        type: "success",
+        text: "User status updated and active sessions were handled by the API.",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["settings", "users"] });
     },
     onError: (error) => {
-      setActionNotice({ type: 'error', text: getActionError(error, 'Failed to update user status.') });
+      setActionNotice({
+        type: "error",
+        text: getActionError(error, "Failed to update user status."),
+      });
     },
   });
 
@@ -2665,21 +3401,33 @@ function UsersAccessPanel() {
       api.resetUserPassword(userId, password),
     onSuccess: () => {
       setResetUserId(null);
-      setResetPassword('');
-      setActionNotice({ type: 'success', text: 'Password reset and existing sessions revoked.' });
+      setResetPassword("");
+      setActionNotice({
+        type: "success",
+        text: "Password reset and existing sessions revoked.",
+      });
     },
     onError: (error) => {
-      setActionNotice({ type: 'error', text: getActionError(error, 'Failed to reset password.') });
+      setActionNotice({
+        type: "error",
+        text: getActionError(error, "Failed to reset password."),
+      });
     },
   });
 
   const forceLogoutMutation = useMutation({
     mutationFn: api.forceLogoutUser,
     onSuccess: () => {
-      setActionNotice({ type: 'success', text: 'Active sessions revoked for this user.' });
+      setActionNotice({
+        type: "success",
+        text: "Active sessions revoked for this user.",
+      });
     },
     onError: (error) => {
-      setActionNotice({ type: 'error', text: getActionError(error, 'Failed to revoke sessions.') });
+      setActionNotice({
+        type: "error",
+        text: getActionError(error, "Failed to revoke sessions."),
+      });
     },
   });
 
@@ -2688,39 +3436,58 @@ function UsersAccessPanel() {
 
   const userCategories = [
     {
-      title: 'Admin & Staff',
-      description: 'School administrators, teachers, subject teachers, support staff, and accountants.',
+      title: "Admin & Staff",
+      description:
+        "School administrators, teachers, subject teachers, support staff, and accountants.",
       icon: UserCog,
-      accent: 'bg-blue-50 text-blue-700 border-blue-100',
-      count: users.filter((user) => user.profileType === 'staff' || hasAnyRole(user, ['admin', 'principal', 'teacher', 'subject_teacher', 'accountant', 'librarian', 'driver'])).length,
+      accent: "bg-blue-50 text-blue-700 border-blue-100",
+      count: users.filter(
+        (user) =>
+          user.profileType === "staff" ||
+          hasAnyRole(user, [
+            "admin",
+            "principal",
+            "teacher",
+            "subject_teacher",
+            "accountant",
+            "librarian",
+            "driver",
+          ]),
+      ).length,
     },
     {
-      title: 'Parent Accounts',
-      description: 'Parents and guardians with access to student records, notices, and messaging.',
+      title: "Parent Accounts",
+      description:
+        "Parents and guardians with access to student records, notices, and messaging.",
       icon: Users,
-      accent: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-      count: users.filter((user) => hasAnyRole(user, ['parent'])).length,
+      accent: "bg-emerald-50 text-emerald-700 border-emerald-100",
+      count: users.filter((user) => hasAnyRole(user, ["parent"])).length,
     },
     {
-      title: 'Student Accounts',
-      description: 'Students with portal access for timetable, homework, activity, and notices.',
+      title: "Student Accounts",
+      description:
+        "Students with portal access for timetable, homework, activity, and notices.",
       icon: BookOpen,
-      accent: 'bg-violet-50 text-violet-700 border-violet-100',
-      count: users.filter((user) => user.profileType === 'student' || hasAnyRole(user, ['student'])).length,
+      accent: "bg-violet-50 text-violet-700 border-violet-100",
+      count: users.filter(
+        (user) =>
+          user.profileType === "student" || hasAnyRole(user, ["student"]),
+      ).length,
     },
     {
-      title: 'Pending Invitations',
-      description: 'Accounts created but not activated yet.',
+      title: "Pending Invitations",
+      description: "Accounts created but not activated yet.",
       icon: Key,
-      accent: 'bg-amber-50 text-amber-700 border-amber-100',
-      count: users.filter((user) => user.status === 'PENDING').length,
+      accent: "bg-amber-50 text-amber-700 border-amber-100",
+      count: users.filter((user) => user.status === "PENDING").length,
     },
     {
-      title: 'Disabled Accounts',
-      description: 'Suspended accounts. Records preserved and sessions revoked.',
+      title: "Disabled Accounts",
+      description:
+        "Suspended accounts. Records preserved and sessions revoked.",
       icon: Lock,
-      accent: 'bg-rose-50 text-rose-700 border-rose-100',
-      count: users.filter((user) => user.status === 'SUSPENDED').length,
+      accent: "bg-rose-50 text-rose-700 border-rose-100",
+      count: users.filter((user) => user.status === "SUSPENDED").length,
     },
   ];
 
@@ -2738,7 +3505,10 @@ function UsersAccessPanel() {
     setActionNotice(null);
 
     if (createDraft.roleIds.length === 0) {
-      setActionNotice({ type: 'error', text: 'Select at least one tenant role before creating the account.' });
+      setActionNotice({
+        type: "error",
+        text: "Select at least one tenant role before creating the account.",
+      });
       return;
     }
 
@@ -2754,7 +3524,10 @@ function UsersAccessPanel() {
     setActionNotice(null);
 
     if (resetPassword.length < 8) {
-      setActionNotice({ type: 'error', text: 'New password must be at least 8 characters.' });
+      setActionNotice({
+        type: "error",
+        text: "New password must be at least 8 characters.",
+      });
       return;
     }
 
@@ -2766,9 +3539,13 @@ function UsersAccessPanel() {
       <div className="flex items-start gap-3 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3">
         <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600" />
         <div>
-          <p className="text-sm font-semibold text-emerald-800">Tenant-scoped user management is active</p>
+          <p className="text-sm font-semibold text-emerald-800">
+            Tenant-scoped user management is active
+          </p>
           <p className="mt-0.5 text-xs leading-5 text-emerald-700">
-            Reads and writes use the authenticated school tenant, RBAC permissions, backend validation, session revocation, and audit logging.
+            Reads and writes use the authenticated school tenant, RBAC
+            permissions, backend validation, session revocation, and audit
+            logging.
           </p>
         </div>
       </div>
@@ -2776,13 +3553,17 @@ function UsersAccessPanel() {
       {actionNotice && (
         <div
           className={cn(
-            'flex items-start gap-2 rounded-lg border px-3 py-2 text-xs font-semibold',
-            actionNotice.type === 'success'
-              ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-              : 'border-rose-100 bg-rose-50 text-rose-700',
+            "flex items-start gap-2 rounded-lg border px-3 py-2 text-xs font-semibold",
+            actionNotice.type === "success"
+              ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+              : "border-rose-100 bg-rose-50 text-rose-700",
           )}
         >
-          {actionNotice.type === 'success' ? <Check size={14} /> : <AlertCircle size={14} />}
+          {actionNotice.type === "success" ? (
+            <Check size={14} />
+          ) : (
+            <AlertCircle size={14} />
+          )}
           <span>{actionNotice.text}</span>
         </div>
       )}
@@ -2791,37 +3572,64 @@ function UsersAccessPanel() {
         {userCategories.map((cat) => {
           const Icon = cat.icon;
           return (
-            <div key={cat.title} className="rounded-xl border border-slate-200 bg-white p-4">
+            <div
+              key={cat.title}
+              className="rounded-xl border border-slate-200 bg-white p-4"
+            >
               <div className="mb-3 flex items-start gap-3">
-                <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border', cat.accent)}>
+                <span
+                  className={cn(
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+                    cat.accent,
+                  )}
+                >
                   <Icon size={15} />
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-800">{cat.title}</p>
-                  <p className="mt-0.5 text-xs leading-5 text-slate-500">{cat.description}</p>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {cat.title}
+                  </p>
+                  <p className="mt-0.5 text-xs leading-5 text-slate-500">
+                    {cat.description}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center justify-between rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2">
-                <span className="text-xs font-semibold text-slate-500">Live count</span>
-                <span className="text-lg font-black text-slate-900">{cat.count}</span>
+                <span className="text-xs font-semibold text-slate-500">
+                  Live count
+                </span>
+                <span className="text-lg font-black text-slate-900">
+                  {cat.count}
+                </span>
               </div>
             </div>
           );
         })}
       </div>
 
-      <form onSubmit={submitCreateUser} className="rounded-xl border border-slate-200 bg-white p-4">
+      <form
+        onSubmit={submitCreateUser}
+        className="rounded-xl border border-slate-200 bg-white p-4"
+      >
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-slate-800">Create Tenant User</p>
-            <p className="mt-0.5 text-xs text-slate-500">Assign one or more existing tenant roles at creation time.</p>
+            <p className="text-sm font-semibold text-slate-800">
+              Create Tenant User
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Assign one or more existing tenant roles at creation time.
+            </p>
           </div>
           <button
             type="submit"
             disabled={createUserMutation.isPending || rolesQuery.isLoading}
             className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-mod-settings-accent)] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[var(--color-mod-settings-text)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {createUserMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            {createUserMutation.isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Plus size={14} />
+            )}
             Create User
           </button>
         </div>
@@ -2833,7 +3641,12 @@ function UsersAccessPanel() {
               type="email"
               required
               value={createDraft.email}
-              onChange={(event) => setCreateDraft((current) => ({ ...current, email: event.target.value }))}
+              onChange={(event) =>
+                setCreateDraft((current) => ({
+                  ...current,
+                  email: event.target.value,
+                }))
+              }
               className="input-control"
               placeholder="user@school.edu.np"
             />
@@ -2843,19 +3656,31 @@ function UsersAccessPanel() {
             <input
               type="tel"
               value={createDraft.phone}
-              onChange={(event) => setCreateDraft((current) => ({ ...current, phone: event.target.value }))}
+              onChange={(event) =>
+                setCreateDraft((current) => ({
+                  ...current,
+                  phone: event.target.value,
+                }))
+              }
               className="input-control"
               placeholder="98XXXXXXXX"
             />
           </label>
           <label className="space-y-1">
-            <span className="text-xs font-semibold text-slate-600">Initial Password</span>
+            <span className="text-xs font-semibold text-slate-600">
+              Initial Password
+            </span>
             <input
               type="password"
               required
               minLength={8}
               value={createDraft.password}
-              onChange={(event) => setCreateDraft((current) => ({ ...current, password: event.target.value }))}
+              onChange={(event) =>
+                setCreateDraft((current) => ({
+                  ...current,
+                  password: event.target.value,
+                }))
+              }
               className="input-control"
               placeholder="Minimum 8 characters"
             />
@@ -2871,19 +3696,23 @@ function UsersAccessPanel() {
             </div>
           ) : roles.length === 0 ? (
             <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-              No tenant roles are available. Sync the seeded role catalog before creating users.
+              No tenant roles are available. Sync the seeded role catalog before
+              creating users.
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
               {roles.map((role) => (
-                <label key={role.id} className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white">
+                <label
+                  key={role.id}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white"
+                >
                   <input
                     type="checkbox"
                     checked={createDraft.roleIds.includes(role.id)}
                     onChange={() => toggleRole(role.id)}
                     className="h-3.5 w-3.5 rounded border-slate-300"
                   />
-                  {role.name.replace(/_/g, ' ')}
+                  {role.name.replace(/_/g, " ")}
                 </label>
               ))}
             </div>
@@ -2895,7 +3724,10 @@ function UsersAccessPanel() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
           <div>
             <p className="text-sm font-semibold text-slate-800">Tenant Users</p>
-            <p className="mt-0.5 text-xs text-slate-500">Status changes, password resets, and forced logout actions are persisted by the API.</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Status changes, password resets, and forced logout actions are
+              persisted by the API.
+            </p>
           </div>
           <button
             type="button"
@@ -2903,7 +3735,11 @@ function UsersAccessPanel() {
             disabled={usersQuery.isFetching}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {usersQuery.isFetching ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+            {usersQuery.isFetching ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <RotateCcw size={13} />
+            )}
             Refresh
           </button>
         </div>
@@ -2916,10 +3752,13 @@ function UsersAccessPanel() {
         ) : usersQuery.isError ? (
           <div className="flex items-start gap-2 px-4 py-6 text-sm font-semibold text-rose-700">
             <AlertCircle size={15} />
-            {getActionError(usersQuery.error, 'Failed to load tenant users.')}
+            {getActionError(usersQuery.error, "Failed to load tenant users.")}
           </div>
         ) : users.length === 0 ? (
-          <div className="px-4 py-6 text-sm text-slate-500">No tenant users exist yet. Create the first school admin account above.</div>
+          <div className="px-4 py-6 text-sm text-slate-500">
+            No tenant users exist yet. Create the first school admin account
+            above.
+          </div>
         ) : (
           <div className="divide-y divide-slate-100">
             {users.map((user) => (
@@ -2927,8 +3766,15 @@ function UsersAccessPanel() {
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate text-sm font-semibold text-slate-900">{user.email ?? 'No email on record'}</p>
-                      <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-bold uppercase', userStatusClass(user.status))}>
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {user.email ?? "No email on record"}
+                      </p>
+                      <span
+                        className={cn(
+                          "rounded px-1.5 py-0.5 text-[10px] font-bold uppercase",
+                          userStatusClass(user.status),
+                        )}
+                      >
                         {user.status}
                       </span>
                       <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-500">
@@ -2936,13 +3782,21 @@ function UsersAccessPanel() {
                       </span>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                      <span>{user.phone ?? 'No phone'}</span>
+                      <span>{user.phone ?? "No phone"}</span>
                       <span>Created {formatUserDate(user.createdAt)}</span>
-                      <span>Last login {user.lastLoginAt ? formatUserDate(user.lastLoginAt) : 'not recorded'}</span>
+                      <span>
+                        Last login{" "}
+                        {user.lastLoginAt
+                          ? formatUserDate(user.lastLoginAt)
+                          : "not recorded"}
+                      </span>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1">
                       {user.roles.map((role) => (
-                        <span key={role.id} className="rounded bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 ring-1 ring-slate-100">
+                        <span
+                          key={role.id}
+                          className="rounded bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 ring-1 ring-slate-100"
+                        >
                           {role.name}
                         </span>
                       ))}
@@ -2952,17 +3806,23 @@ function UsersAccessPanel() {
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => statusMutation.mutate({ userId: user.id, status: user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' })}
+                      onClick={() =>
+                        statusMutation.mutate({
+                          userId: user.id,
+                          status:
+                            user.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE",
+                        })
+                      }
                       disabled={statusMutation.isPending}
                       className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {user.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                      {user.status === "ACTIVE" ? "Suspend" : "Activate"}
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         setResetUserId(user.id);
-                        setResetPassword('');
+                        setResetPassword("");
                       }}
                       className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
                     >
@@ -2995,13 +3855,15 @@ function UsersAccessPanel() {
                       disabled={resetPasswordMutation.isPending}
                       className="rounded-lg bg-[var(--color-mod-settings-accent)] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[var(--color-mod-settings-text)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {resetPasswordMutation.isPending ? 'Resetting...' : 'Confirm Reset'}
+                      {resetPasswordMutation.isPending
+                        ? "Resetting..."
+                        : "Confirm Reset"}
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         setResetUserId(null);
-                        setResetPassword('');
+                        setResetPassword("");
                       }}
                       className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-50"
                     >
@@ -3016,16 +3878,40 @@ function UsersAccessPanel() {
       </div>
 
       <div>
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Security Readiness</p>
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+          Security Readiness
+        </p>
         <div className="grid gap-2 sm:grid-cols-2">
           {[
-            { label: 'Role assignments', value: roles.length > 0 ? `${roles.length} tenant role(s) available` : 'No roles loaded' },
-            { label: 'Last login review', value: users.some((user) => user.lastLoginAt) ? 'Login timestamps available' : 'No login timestamps yet' },
-            { label: 'Session timeout', value: 'Configured in Security & Privacy' },
-            { label: 'Sensitive field masking', value: 'Configured in Security & Privacy' },
+            {
+              label: "Role assignments",
+              value:
+                roles.length > 0
+                  ? `${roles.length} tenant role(s) available`
+                  : "No roles loaded",
+            },
+            {
+              label: "Last login review",
+              value: users.some((user) => user.lastLoginAt)
+                ? "Login timestamps available"
+                : "No login timestamps yet",
+            },
+            {
+              label: "Session timeout",
+              value: "Configured in Security & Privacy",
+            },
+            {
+              label: "Sensitive field masking",
+              value: "Configured in Security & Privacy",
+            },
           ].map((item) => (
-            <div key={item.label} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
-              <span className="text-xs font-medium text-slate-600">{item.label}</span>
+            <div
+              key={item.label}
+              className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5"
+            >
+              <span className="text-xs font-medium text-slate-600">
+                {item.label}
+              </span>
               <span className="text-xs text-slate-500">{item.value}</span>
             </div>
           ))}
@@ -3039,18 +3925,14 @@ function hasAnyRole(user: SchoolUserSummary, roleNames: string[]) {
   return user.roles.some((role) => roleNames.includes(role.name));
 }
 
-function userStatusClass(status: SchoolUserSummary['status']) {
-  if (status === 'ACTIVE') return 'bg-emerald-50 text-emerald-700';
-  if (status === 'SUSPENDED') return 'bg-rose-50 text-rose-700';
-  return 'bg-amber-50 text-amber-700';
+function userStatusClass(status: SchoolUserSummary["status"]) {
+  if (status === "ACTIVE") return "bg-emerald-50 text-emerald-700";
+  if (status === "SUSPENDED") return "bg-rose-50 text-rose-700";
+  return "bg-amber-50 text-amber-700";
 }
 
 function formatUserDate(value: string) {
-  return new Intl.DateTimeFormat('en', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  }).format(new Date(value));
+  return formatBsDate(value);
 }
 
 function getActionError(error: unknown, fallback: string) {
@@ -3060,40 +3942,47 @@ function getActionError(error: unknown, fallback: string) {
 // ─── Roles & Permissions Panel ────────────────────────────────────────────────
 
 // Build a role category map from systemRoleDefinitions
-const PLATFORM_ROLE_NAMES = new Set(['platform_super_admin', 'platform_support', 'platform_billing_admin']);
+const PLATFORM_ROLE_NAMES = new Set([
+  "platform_super_admin",
+  "platform_support",
+  "platform_billing_admin",
+]);
 
 const ROLE_MODULE_MAP: Record<string, string[]> = {
-  admin: ['Full tenant access'],
-  principal: ['Full tenant access'],
-  teacher: ['Academics', 'Attendance', 'Homework', 'Messaging', 'HR leave'],
-  subject_teacher: ['Academics', 'Homework', 'Messaging', 'Timetable'],
-  support_staff: ['Students (read)', 'Staff (read)', 'Notices'],
-  student: ['Timetable', 'Homework', 'Notices', 'Activity'],
-  parent: ['Students (read)', 'Messaging', 'Transport tracking'],
-  accountant: ['Fees', 'Payments', 'Accounting', 'Payroll', 'Reports'],
-  librarian: ['Library', 'Fees (manage)', 'Classes (read)'],
-  driver: ['Transport', 'Students (read)'],
-  platform_super_admin: ['All permissions'],
-  platform_support: ['Platform read', 'Tenant support'],
-  platform_billing_admin: ['Billing', 'Subscriptions', 'Plans'],
+  admin: ["Full tenant access"],
+  principal: ["Full tenant access"],
+  teacher: ["Academics", "Attendance", "Homework", "Messaging", "HR leave"],
+  subject_teacher: ["Academics", "Homework", "Messaging", "Timetable"],
+  support_staff: ["Students (read)", "Staff (read)", "Notices"],
+  student: ["Timetable", "Homework", "Notices", "Activity"],
+  parent: ["Students (read)", "Messaging", "Transport tracking"],
+  accountant: ["Fees", "Payments", "Accounting", "Payroll", "Reports"],
+  librarian: ["Library", "Fees (manage)", "Classes (read)"],
+  driver: ["Transport", "Students (read)"],
+  platform_super_admin: ["All permissions"],
+  platform_support: ["Platform read", "Tenant support"],
+  platform_billing_admin: ["Billing", "Subscriptions", "Plans"],
 };
 
 function RolesPermissionsPanel() {
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
-  const [permissionSearch, setPermissionSearch] = useState('');
+  const [permissionSearch, setPermissionSearch] = useState("");
 
   const roleCatalogQuery = useQuery({
-    queryKey: ['settings', 'role-catalog'],
+    queryKey: ["settings", "role-catalog"],
     queryFn: api.listRoleCatalog,
   });
   const permissionCatalogQuery = useQuery({
-    queryKey: ['settings', 'permission-catalog'],
+    queryKey: ["settings", "permission-catalog"],
     queryFn: api.listPermissionCatalog,
   });
 
   const permissionByKey = useMemo(() => {
     return new Map<string, PermissionCatalogItem>(
-      (permissionCatalogQuery.data ?? []).map((permission) => [permission.key, permission]),
+      (permissionCatalogQuery.data ?? []).map((permission) => [
+        permission.key,
+        permission,
+      ]),
     );
   }, [permissionCatalogQuery.data]);
 
@@ -3107,30 +3996,43 @@ function RolesPermissionsPanel() {
       name: role.name,
       description: role.description,
       isSystem: true,
-      permissions: (systemRolePermissions[role.name] ?? []).map((permission) => ({
-        id: `${role.name}:${permission}`,
-        key: permission as PermissionKey,
-      })),
+      permissions: (systemRolePermissions[role.name] ?? []).map(
+        (permission) => ({
+          id: `${role.name}:${permission}`,
+          key: permission as PermissionKey,
+        }),
+      ),
     }));
   }, [roleCatalogQuery.data]);
 
-  const tenantRoles = roles.filter((role) => !PLATFORM_ROLE_NAMES.has(role.name));
-  const platformRoles = roles.filter((role) => PLATFORM_ROLE_NAMES.has(role.name));
+  const tenantRoles = roles.filter(
+    (role) => !PLATFORM_ROLE_NAMES.has(role.name),
+  );
+  const platformRoles = roles.filter((role) =>
+    PLATFORM_ROLE_NAMES.has(role.name),
+  );
   const isUsingLiveCatalog = Boolean(roleCatalogQuery.data?.length);
 
-  function renderRoleCard(role: TenantRoleSummary, variant: 'tenant' | 'platform') {
+  function renderRoleCard(
+    role: TenantRoleSummary,
+    variant: "tenant" | "platform",
+  ) {
     const modules = ROLE_MODULE_MAP[role.name] ?? [];
     const isExpanded = expandedRole === role.name;
-    const permissionRows = getRolePermissionRows(role, permissionByKey, permissionSearch);
+    const permissionRows = getRolePermissionRows(
+      role,
+      permissionByKey,
+      permissionSearch,
+    );
     const permissionGroups = groupPermissionsByResource(permissionRows);
-    const isPlatform = variant === 'platform';
+    const isPlatform = variant === "platform";
 
     return (
       <div
         key={role.id}
         className={cn(
-          'overflow-hidden rounded-lg border bg-white',
-          isPlatform ? 'border-purple-100 bg-purple-50/40' : 'border-slate-200',
+          "overflow-hidden rounded-lg border bg-white",
+          isPlatform ? "border-purple-100 bg-purple-50/40" : "border-slate-200",
         )}
       >
         <button
@@ -3140,21 +4042,29 @@ function RolesPermissionsPanel() {
         >
           <div
             className={cn(
-              'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border',
-              isPlatform ? 'border-purple-100 bg-purple-50' : 'border-slate-100 bg-slate-100',
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+              isPlatform
+                ? "border-purple-100 bg-purple-50"
+                : "border-slate-100 bg-slate-100",
             )}
           >
-            {isPlatform ? <Shield size={13} className="text-purple-600" /> : <Key size={13} className="text-slate-500" />}
+            {isPlatform ? (
+              <Shield size={13} className="text-purple-600" />
+            ) : (
+              <Key size={13} className="text-slate-500" />
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold capitalize text-slate-800">
-                {role.name.replace(/_/g, ' ')}
+                {role.name.replace(/_/g, " ")}
               </p>
               <span
                 className={cn(
-                  'rounded px-1.5 py-0.5 font-mono text-[10px]',
-                  isPlatform ? 'bg-purple-50 text-purple-600' : 'bg-slate-100 text-slate-500',
+                  "rounded px-1.5 py-0.5 font-mono text-[10px]",
+                  isPlatform
+                    ? "bg-purple-50 text-purple-600"
+                    : "bg-slate-100 text-slate-500",
                 )}
               >
                 {role.name}
@@ -3165,16 +4075,23 @@ function RolesPermissionsPanel() {
                 </span>
               )}
             </div>
-            <p className="mt-0.5 text-xs text-slate-500">{role.description ?? 'Tenant role'}</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {role.description ?? "Tenant role"}
+            </p>
           </div>
           <div className="flex shrink-0 items-center gap-3 text-right">
             <div>
-              <p className="text-sm font-bold text-slate-900">{role.permissions.length}</p>
+              <p className="text-sm font-bold text-slate-900">
+                {role.permissions.length}
+              </p>
               <p className="text-[10px] text-slate-400">perms</p>
             </div>
             <ChevronRight
               size={14}
-              className={cn('text-slate-400 transition-transform', isExpanded && 'rotate-90')}
+              className={cn(
+                "text-slate-400 transition-transform",
+                isExpanded && "rotate-90",
+              )}
             />
           </div>
         </button>
@@ -3183,10 +4100,15 @@ function RolesPermissionsPanel() {
           <div className="border-t border-slate-100 px-4 py-3">
             {modules.length > 0 && (
               <div className="mb-3">
-                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Module Coverage</p>
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Module Coverage
+                </p>
                 <div className="flex flex-wrap gap-1.5">
                   {modules.map((mod) => (
-                    <span key={mod} className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                    <span
+                      key={mod}
+                      className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+                    >
                       <Check size={10} />
                       {mod}
                     </span>
@@ -3198,7 +4120,10 @@ function RolesPermissionsPanel() {
             <div>
               <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                 What this role can access ({permissionRows.length}
-                {permissionSearch.trim() ? ` of ${role.permissions.length}` : ''})
+                {permissionSearch.trim()
+                  ? ` of ${role.permissions.length}`
+                  : ""}
+                )
               </p>
               {permissionRows.length === 0 ? (
                 <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
@@ -3207,16 +4132,25 @@ function RolesPermissionsPanel() {
               ) : (
                 <div className="grid gap-2 md:grid-cols-2">
                   {permissionGroups.map((group) => (
-                    <div key={group.resource} className="rounded-lg border border-slate-100 bg-slate-50 p-2">
+                    <div
+                      key={group.resource}
+                      className="rounded-lg border border-slate-100 bg-slate-50 p-2"
+                    >
                       <p className="mb-1.5 text-xs font-black uppercase tracking-wide text-slate-600">
                         {formatPermissionLabel(group.resource)}
                       </p>
                       <div className="space-y-1">
                         {group.permissions.map((permission) => (
-                          <div key={permission.key} className="rounded-md bg-white px-2 py-1 ring-1 ring-slate-100">
-                            <p className="font-mono text-[10px] font-semibold text-slate-600">{permission.key}</p>
+                          <div
+                            key={permission.key}
+                            className="rounded-md bg-white px-2 py-1 ring-1 ring-slate-100"
+                          >
+                            <p className="font-mono text-[10px] font-semibold text-slate-600">
+                              {permission.key}
+                            </p>
                             <p className="text-[10px] leading-4 text-slate-500">
-                              {permission.description ?? formatPermissionLabel(permission.action)}
+                              {permission.description ??
+                                formatPermissionLabel(permission.action)}
                             </p>
                           </div>
                         ))}
@@ -3237,22 +4171,28 @@ function RolesPermissionsPanel() {
       {/* Notice */}
       <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
-        <Key size={15} className="mt-0.5 shrink-0 text-slate-500" />
-        <div>
-          <p className="text-sm font-semibold text-slate-700">Role access inspection</p>
-          <p className="mt-0.5 text-xs leading-5 text-slate-500">
-            Inspect what each role can access before assigning it. Live tenant roles are loaded from the RBAC API; the seeded catalog is used only when no tenant role data is returned.
-          </p>
-        </div>
+          <Key size={15} className="mt-0.5 shrink-0 text-slate-500" />
+          <div>
+            <p className="text-sm font-semibold text-slate-700">
+              Role access inspection
+            </p>
+            <p className="mt-0.5 text-xs leading-5 text-slate-500">
+              Inspect what each role can access before assigning it. Live tenant
+              roles are loaded from the RBAC API; the seeded catalog is used
+              only when no tenant role data is returned.
+            </p>
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <span
             className={cn(
-              'rounded px-2 py-1 text-[10px] font-bold uppercase',
-              isUsingLiveCatalog ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700',
+              "rounded px-2 py-1 text-[10px] font-bold uppercase",
+              isUsingLiveCatalog
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-amber-100 text-amber-700",
             )}
           >
-            {isUsingLiveCatalog ? 'Live tenant RBAC' : 'Seeded fallback'}
+            {isUsingLiveCatalog ? "Live tenant RBAC" : "Seeded fallback"}
           </span>
           <button
             type="button"
@@ -3272,15 +4212,21 @@ function RolesPermissionsPanel() {
         <div className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
           <AlertCircle size={14} />
           <span>
-            Live role inspection could not fully load. Showing any available seeded role coverage until the API is reachable.
+            Live role inspection could not fully load. Showing any available
+            seeded role coverage until the API is reachable.
           </span>
         </div>
       )}
 
       <label className="block">
-        <span className="mb-1 block text-xs font-semibold text-slate-600">Filter permissions</span>
+        <span className="mb-1 block text-xs font-semibold text-slate-600">
+          Filter permissions
+        </span>
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          />
           <input
             value={permissionSearch}
             onChange={(event) => setPermissionSearch(event.target.value)}
@@ -3302,7 +4248,7 @@ function RolesPermissionsPanel() {
               Loading live tenant roles...
             </div>
           ) : (
-            tenantRoles.map((role) => renderRoleCard(role, 'tenant'))
+            tenantRoles.map((role) => renderRoleCard(role, "tenant"))
           )}
         </div>
       </div>
@@ -3313,7 +4259,7 @@ function RolesPermissionsPanel() {
           Platform Roles ({platformRoles.length})
         </p>
         <div className="space-y-1.5">
-          {platformRoles.map((role) => renderRoleCard(role, 'platform'))}
+          {platformRoles.map((role) => renderRoleCard(role, "platform"))}
         </div>
       </div>
     </div>
@@ -3337,7 +4283,8 @@ function getRolePermissionRows(
   return role.permissions
     .map((permission) => {
       const catalogEntry = permissionByKey.get(permission.key);
-      const [fallbackResource, fallbackAction = 'access'] = permission.key.split(':');
+      const [fallbackResource, fallbackAction = "access"] =
+        permission.key.split(":");
 
       return {
         key: permission.key,
@@ -3352,8 +4299,10 @@ function getRolePermissionRows(
         permission.key,
         permission.resource,
         permission.action,
-        permission.description ?? '',
-      ].join(' ').toLowerCase();
+        permission.description ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
       return haystack.includes(normalizedSearch);
     });
 }
@@ -3362,19 +4311,24 @@ function groupPermissionsByResource(permissions: RolePermissionRow[]) {
   const groups = new Map<string, RolePermissionRow[]>();
 
   for (const permission of permissions) {
-    groups.set(permission.resource, [...(groups.get(permission.resource) ?? []), permission]);
+    groups.set(permission.resource, [
+      ...(groups.get(permission.resource) ?? []),
+      permission,
+    ]);
   }
 
   return Array.from(groups.entries())
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([resource, rows]) => ({
       resource,
-      permissions: rows.sort((left, right) => left.key.localeCompare(right.key)),
+      permissions: rows.sort((left, right) =>
+        left.key.localeCompare(right.key),
+      ),
     }));
 }
 
 function formatPermissionLabel(value: string) {
-  return value.replace(/[_:-]/g, ' ');
+  return value.replace(/[_:-]/g, " ");
 }
 
 // ─── Data Operations ──────────────────────────────────────────────────────────
@@ -3383,7 +4337,8 @@ function DataOperations() {
   return (
     <div className="space-y-6">
       <p className="text-xs text-slate-500">
-        Use the links below to navigate to the relevant module for bulk imports, exports, and integrations.
+        Use the links below to navigate to the relevant module for bulk imports,
+        exports, and integrations.
       </p>
       <div className="grid gap-4 sm:grid-cols-3">
         <DataOpColumn
@@ -3391,9 +4346,25 @@ function DataOperations() {
           icon={Upload}
           accent="bg-teal-50 text-teal-600 border-teal-100"
           items={[
-            { title: 'Student Import', description: 'Import students from CSV or iEMIS-ready source files.', href: '/dashboard/admissions', status: 'available' },
-            { title: 'Staff Import', description: 'Bulk upload staff records.', href: '/dashboard/hr/staff', status: 'available' },
-            { title: 'Fee Ledger Import', description: 'Import historic fee data before migration close.', href: '/dashboard/fees', status: 'available' },
+            {
+              title: "Student Import",
+              description:
+                "Import students from CSV or iEMIS-ready source files.",
+              href: "/dashboard/admissions",
+              status: "available",
+            },
+            {
+              title: "Staff Import",
+              description: "Bulk upload staff records.",
+              href: "/dashboard/hr/staff",
+              status: "available",
+            },
+            {
+              title: "Fee Ledger Import",
+              description: "Import historic fee data before migration close.",
+              href: "/dashboard/fees",
+              status: "available",
+            },
           ]}
         />
         <DataOpColumn
@@ -3401,10 +4372,30 @@ function DataOperations() {
           icon={Download}
           accent="bg-blue-50 text-blue-600 border-blue-100"
           items={[
-            { title: 'iEMIS Export', description: 'Prepare government-ready student data files.', href: '/dashboard/students', status: 'available' },
-            { title: 'Accounting Audit', description: 'Download journal trail and accounting reports.', href: '/dashboard/accounting', status: 'available' },
-            { title: 'Class Roster', description: 'Export student lists by class and section.', href: '/dashboard/students', status: 'available' },
-            { title: 'Payroll Register', description: 'Export approved payroll summaries.', href: '/dashboard/payroll/reports', status: 'available' },
+            {
+              title: "iEMIS Export",
+              description: "Prepare government-ready student data files.",
+              href: "/dashboard/students",
+              status: "available",
+            },
+            {
+              title: "Accounting Audit",
+              description: "Download journal trail and accounting reports.",
+              href: "/dashboard/accounting",
+              status: "available",
+            },
+            {
+              title: "Class Roster",
+              description: "Export student lists by class and section.",
+              href: "/dashboard/students",
+              status: "available",
+            },
+            {
+              title: "Payroll Register",
+              description: "Export approved payroll summaries.",
+              href: "/dashboard/payroll/reports",
+              status: "available",
+            },
           ]}
         />
         <DataOpColumn
@@ -3412,8 +4403,16 @@ function DataOperations() {
           icon={ExternalLink}
           accent="bg-purple-50 text-purple-600 border-purple-100"
           items={[
-            { title: 'Tenant API Access', description: 'API key management for tenant integrations.', status: 'pending' },
-            { title: 'Webhooks', description: 'Configure event webhooks for external systems.', status: 'pending' },
+            {
+              title: "Tenant API Access",
+              description: "API key management for tenant integrations.",
+              status: "pending",
+            },
+            {
+              title: "Webhooks",
+              description: "Configure event webhooks for external systems.",
+              status: "pending",
+            },
           ]}
         />
       </div>
@@ -3430,38 +4429,65 @@ function DataOpColumn({
   title: string;
   icon: LucideIcon;
   accent: string;
-  items: Array<{ title: string; description: string; href?: string; status: 'available' | 'pending' }>;
+  items: Array<{
+    title: string;
+    description: string;
+    href?: string;
+    status: "available" | "pending";
+  }>;
 }) {
   return (
     <div>
       <div className="mb-3 flex items-center gap-2">
-        <span className={cn('flex h-6 w-6 items-center justify-center rounded-md border', accent)}>
+        <span
+          className={cn(
+            "flex h-6 w-6 items-center justify-center rounded-md border",
+            accent,
+          )}
+        >
           <Icon size={13} />
         </span>
         <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
       </div>
       <div className="space-y-2">
         {items.map((item) =>
-          item.status === 'available' && item.href ? (
+          item.status === "available" && item.href ? (
             <Link
               key={item.title}
               href={item.href}
               className="group flex items-start justify-between rounded-lg border border-slate-200 bg-white p-3 transition hover:border-slate-300 hover:shadow-sm"
             >
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-slate-800">{item.title}</p>
-                <p className="mt-0.5 text-xs leading-5 text-slate-500">{item.description}</p>
+                <p className="truncate text-sm font-medium text-slate-800">
+                  {item.title}
+                </p>
+                <p className="mt-0.5 text-xs leading-5 text-slate-500">
+                  {item.description}
+                </p>
               </div>
-              <ExternalLink size={12} className="ml-2 mt-0.5 shrink-0 text-slate-300 transition group-hover:text-slate-500" />
+              <ExternalLink
+                size={12}
+                className="ml-2 mt-0.5 shrink-0 text-slate-300 transition group-hover:text-slate-500"
+              />
             </Link>
           ) : (
-            <div key={item.title} className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3">
+            <div
+              key={item.title}
+              className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3"
+            >
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-500">{item.title}</p>
-                  <p className="mt-0.5 text-xs leading-5 text-slate-400">{item.description}</p>
+                  <p className="text-sm font-medium text-slate-500">
+                    {item.title}
+                  </p>
+                  <p className="mt-0.5 text-xs leading-5 text-slate-400">
+                    {item.description}
+                  </p>
                 </div>
-                <Lock size={12} className="ml-2 mt-0.5 shrink-0 text-slate-300" />
+                <Lock
+                  size={12}
+                  className="ml-2 mt-0.5 shrink-0 text-slate-300"
+                />
               </div>
               <span className="mt-2 inline-flex items-center rounded-md bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                 Planned
@@ -3478,14 +4504,14 @@ function DataOpColumn({
 
 function AuditPanel() {
   const [filters, setFilters] = useState({
-    action: '',
-    resource: '',
-    startDate: '',
-    endDate: '',
+    action: "",
+    resource: "",
+    startDate: "",
+    endDate: "",
   });
 
   const auditQuery = useQuery({
-    queryKey: ['settings-audit-logs', filters],
+    queryKey: ["settings-audit-logs", filters],
     queryFn: () =>
       api.listTenantAuditLogs({
         limit: 25,
@@ -3505,9 +4531,12 @@ function AuditPanel() {
           <Shield size={18} />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">Audit Trail Active</h3>
+          <h3 className="text-sm font-semibold text-slate-900">
+            Audit Trail Active
+          </h3>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            Sensitive admin actions are recorded in the database and shown here from the tenant-scoped audit API.
+            Sensitive admin actions are recorded in the database and shown here
+            from the tenant-scoped audit API.
           </p>
         </div>
       </div>
@@ -3534,7 +4563,10 @@ function AuditPanel() {
             <input
               value={filters.resource}
               onChange={(event) =>
-                setFilters((prev) => ({ ...prev, resource: event.target.value }))
+                setFilters((prev) => ({
+                  ...prev,
+                  resource: event.target.value,
+                }))
               }
               className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
               placeholder="settings"
@@ -3548,7 +4580,10 @@ function AuditPanel() {
               type="date"
               value={filters.startDate}
               onChange={(event) =>
-                setFilters((prev) => ({ ...prev, startDate: event.target.value }))
+                setFilters((prev) => ({
+                  ...prev,
+                  startDate: event.target.value,
+                }))
               }
               className="mt-1 h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
             />
@@ -3570,7 +4605,12 @@ function AuditPanel() {
             variant="outline"
             className="h-10 rounded-lg"
             onClick={() =>
-              setFilters({ action: '', resource: '', startDate: '', endDate: '' })
+              setFilters({
+                action: "",
+                resource: "",
+                startDate: "",
+                endDate: "",
+              })
             }
           >
             Clear
@@ -3586,13 +4626,16 @@ function AuditPanel() {
           <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-sm font-medium text-red-700">
             {auditQuery.error instanceof Error
               ? auditQuery.error.message
-              : 'Failed to load audit logs.'}
+              : "Failed to load audit logs."}
           </div>
         ) : logs.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
-            <p className="text-sm font-semibold text-slate-700">No audit logs found.</p>
+            <p className="text-sm font-semibold text-slate-700">
+              No audit logs found.
+            </p>
             <p className="mt-1 text-xs text-slate-500">
-              Change filters or complete an audited action such as updating a school setting.
+              Change filters or complete an audited action such as updating a
+              school setting.
             </p>
           </div>
         ) : (
@@ -3634,7 +4677,8 @@ function AuditPanel() {
 
         <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
           <span>
-            Showing {logs.length} of {auditQuery.data?.total ?? 0} tenant audit logs.
+            Showing {logs.length} of {auditQuery.data?.total ?? 0} tenant audit
+            logs.
           </span>
           <Button
             variant="outline"
@@ -3650,18 +4694,15 @@ function AuditPanel() {
 }
 
 function formatAuditTimestamp(value: string) {
-  return new Intl.DateTimeFormat('en-NP', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
+  return formatBsDateTime(value);
 }
 
 function formatAuditActor(log: PlatformAuditLog) {
-  return log.user?.email ?? log.user?.phone ?? log.userId ?? 'System';
+  return log.user?.email ?? log.user?.phone ?? log.userId ?? "System";
 }
 
 function formatAuditResource(log: PlatformAuditLog) {
-  return log.resourceId ? `ID: ${log.resourceId}` : 'Tenant scoped';
+  return log.resourceId ? `ID: ${log.resourceId}` : "Tenant scoped";
 }
 
 // ─── Subscription Panel ───────────────────────────────────────────────────────
@@ -3684,36 +4725,44 @@ function SubscriptionPanel() {
           <AlertCircle size={18} />
           Error loading subscription details
         </div>
-        <p className="mt-1 text-sm text-rose-600">Please refresh the page or try again later.</p>
+        <p className="mt-1 text-sm text-rose-600">
+          Please refresh the page or try again later.
+        </p>
       </div>
     );
   }
 
   const moduleFriendlyNames: Record<string, string> = {
-    students: 'M1 Admissions & Student Profiles',
-    attendance: 'M2 Smart Attendance',
-    fees: 'M3 Fees & Receipts',
-    exams: 'M4 Exams, CAS & Report Cards',
-    activity: 'M5 Activity Feed & Milestones',
-    homework: 'M6 Homework & Timetable',
-    hr: 'M7 HR & Payroll',
-    library: 'M8 Library Management',
-    transport: 'M9 Transport Management',
-    canteen: 'M10 Canteen Management',
-    accounting: 'M11 Accounting & Finance',
-    notices: 'M12 Notices & Communication',
+    students: "M1 Admissions & Student Profiles",
+    attendance: "M2 Smart Attendance",
+    fees: "M3 Fees & Receipts",
+    exams: "M4 Exams, CAS & Report Cards",
+    activity: "M5 Activity Feed & Milestones",
+    homework: "M6 Homework & Timetable",
+    hr: "M7 HR & Payroll",
+    library: "M8 Library Management",
+    transport: "M9 Transport Management",
+    canteen: "M10 Canteen Management",
+    accounting: "M11 Accounting & Finance",
+    notices: "M12 Notices & Communication",
   };
 
   const activeModules = (entitlements.modules ?? []).filter(
-    (module) => module !== 'm0' && module !== 'platform' && !module.includes('m0') && !module.includes('platform'),
+    (module) =>
+      module !== "m0" &&
+      module !== "platform" &&
+      !module.includes("m0") &&
+      !module.includes("platform"),
   );
-  const tier = entitlements.tier?.toUpperCase() || 'STARTER';
+  const tier = entitlements.tier?.toUpperCase() || "STARTER";
 
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Current Plan</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Current Plan
+          </p>
           <div className="mt-1.5 flex items-center gap-2">
             <h3 className="text-xl font-bold text-slate-900">{tier}</h3>
             <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
@@ -3721,7 +4770,8 @@ function SubscriptionPanel() {
             </span>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            Your school has access to the {tier.toLowerCase()} tier features and included modules.
+            Your school has access to the {tier.toLowerCase()} tier features and
+            included modules.
           </p>
         </div>
         <a
@@ -3739,9 +4789,14 @@ function SubscriptionPanel() {
         </p>
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {activeModules.map((module) => (
-            <div key={module} className="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+            <div
+              key={module}
+              className="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5"
+            >
               <CheckCircle2 size={14} className="shrink-0 text-emerald-500" />
-              <span className="text-xs font-medium text-slate-700">{moduleFriendlyNames[module] || module}</span>
+              <span className="text-xs font-medium text-slate-700">
+                {moduleFriendlyNames[module] || module}
+              </span>
             </div>
           ))}
         </div>

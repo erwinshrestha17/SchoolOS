@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 
 class LastUpdatedLabel extends StatelessWidget {
   const LastUpdatedLabel({
@@ -17,7 +17,7 @@ class LastUpdatedLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final label = lastUpdated == null
         ? 'Not synced yet'
-        : 'Last updated ${DateFormat('h:mm a').format(lastUpdated!)}';
+        : 'Last updated ${NepaliBsCalendar.formatNepalTime(lastUpdated!)}';
 
     return Row(
       mainAxisSize: MainAxisSize.min,

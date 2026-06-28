@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/constants/app_routes.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_error_view.dart';
@@ -50,7 +51,7 @@ class TeacherClassesScreen extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.sm),
                   if (state.isOffline && state.lastUpdated != null) ...[
                     Text(
-                      'Offline data • Last updated ${TimeOfDay.fromDateTime(state.lastUpdated!.toLocal()).format(context)}',
+                      'Offline data • Last updated ${NepaliBsCalendar.formatNepalTime(state.lastUpdated!)}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.warning,
                         fontWeight: FontWeight.w700,

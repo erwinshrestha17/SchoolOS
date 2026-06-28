@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import type { ActivityPost } from '@schoolos/core';
-import { useQuery } from '@tanstack/react-query';
-import { Camera, Download, Eye, ShieldCheck } from 'lucide-react';
-import { api } from '../../lib/api';
-import { Badge } from '../ui/badge';
-import { Button } from '../ui/button';
-import { PageState } from '../ui/page-state';
+import { formatBsDateTime, type ActivityPost } from "@schoolos/core";
+import { useQuery } from "@tanstack/react-query";
+import { Camera, Download, Eye, ShieldCheck } from "lucide-react";
+import { api } from "../../lib/api";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
+import { PageState } from "../ui/page-state";
 
 export function ParentActivityView() {
   const postsQuery = useQuery({
-    queryKey: ['parent-activity-posts'],
+    queryKey: ["parent-activity-posts"],
     queryFn: () => api.listParentActivityPosts(),
   });
 
@@ -35,7 +35,7 @@ export function ParentActivityView() {
         description={
           postsQuery.error instanceof Error
             ? postsQuery.error.message
-            : 'Please try again after a moment.'
+            : "Please try again after a moment."
         }
       />
     );
@@ -76,14 +76,14 @@ function ParentActivityCard({ post }: { post: ActivityPost }) {
               {post.title}
             </h2>
             <p className="mt-1 text-xs font-bold uppercase tracking-widest text-slate-400">
-              {post.publishedAt ? formatDateTime(post.publishedAt) : 'Shared'}
+              {post.publishedAt ? formatDateTime(post.publishedAt) : "Shared"}
             </p>
           </div>
           <Badge variant="info">{formatLabel(post.category)}</Badge>
         </div>
 
         <p className="text-sm leading-6 text-slate-600">
-          {post.caption ?? post.body ?? 'No activity note was added.'}
+          {post.caption ?? post.body ?? "No activity note was added."}
         </p>
 
         {hiddenMediaCount > 0 ? (
@@ -163,12 +163,9 @@ function ParentActivityCard({ post }: { post: ActivityPost }) {
 }
 
 function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat('en-NP', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
+  return formatBsDateTime(value);
 }
 
 function formatLabel(value: string) {
-  return value.replaceAll('_', ' ').toLowerCase();
+  return value.replaceAll("_", " ").toLowerCase();
 }

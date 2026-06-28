@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import { api } from '../../lib/api';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { api } from "../../lib/api";
+import { formatBsDate } from "@schoolos/core";
 
 const currentYear = new Date().getFullYear();
 
@@ -15,21 +16,21 @@ export function AccountingForm() {
   });
 
   const periodsQuery = useQuery({
-    queryKey: ['accounting-periods'],
+    queryKey: ["accounting-periods"],
     queryFn: api.listAccountingPeriods,
   });
   const reportsQuery = useQuery({
-    queryKey: ['accounting-reports'],
+    queryKey: ["accounting-reports"],
     queryFn: api.listAccountingReports,
   });
   const ledgerQuery = useQuery({
-    queryKey: ['ledger-entries'],
+    queryKey: ["ledger-entries"],
     queryFn: api.listLedgerEntries,
   });
 
   const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: ['accounting-periods'] });
-    void queryClient.invalidateQueries({ queryKey: ['accounting-reports'] });
+    void queryClient.invalidateQueries({ queryKey: ["accounting-periods"] });
+    void queryClient.invalidateQueries({ queryKey: ["accounting-reports"] });
   };
   const periodMutation = useMutation({
     mutationFn: api.createAccountingPeriod,
@@ -50,18 +51,33 @@ export function AccountingForm() {
           <div className="grid gap-3">
             <input
               value={period.name}
-              onChange={(event) => setPeriod((current) => ({ ...current, name: event.target.value }))}
+              onChange={(event) =>
+                setPeriod((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
               placeholder="FY name"
             />
             <input
               type="date"
               value={period.startsOn}
-              onChange={(event) => setPeriod((current) => ({ ...current, startsOn: event.target.value }))}
+              onChange={(event) =>
+                setPeriod((current) => ({
+                  ...current,
+                  startsOn: event.target.value,
+                }))
+              }
             />
             <input
               type="date"
               value={period.endsOn}
-              onChange={(event) => setPeriod((current) => ({ ...current, endsOn: event.target.value }))}
+              onChange={(event) =>
+                setPeriod((current) => ({
+                  ...current,
+                  endsOn: event.target.value,
+                }))
+              }
             />
             <button
               type="button"
@@ -75,7 +91,7 @@ export function AccountingForm() {
                 })
               }
             >
-              {periodMutation.isPending ? 'Creating...' : 'Create period'}
+              {periodMutation.isPending ? "Creating..." : "Create period"}
             </button>
           </div>
         </section>
@@ -85,8 +101,11 @@ export function AccountingForm() {
           <div className="grid gap-4 md:grid-cols-4">
             <Metric label="Debit" value={`Rs ${report?.totals.debit ?? 0}`} />
             <Metric label="Credit" value={`Rs ${report?.totals.credit ?? 0}`} />
-            <Metric label="Net Income" value={`Rs ${report?.incomeStatement.netIncome ?? 0}`} />
-            <Metric label="Balanced" value={report?.balanced ? 'Yes' : 'No'} />
+            <Metric
+              label="Net Income"
+              value={`Rs ${report?.incomeStatement.netIncome ?? 0}`}
+            />
+            <Metric label="Balanced" value={report?.balanced ? "Yes" : "No"} />
           </div>
         </section>
       </div>
@@ -95,19 +114,22 @@ export function AccountingForm() {
         <p className="label mb-4">Periods</p>
         <div className="grid gap-3">
           {(periodsQuery.data ?? []).slice(0, 6).map((item) => (
-            <div key={item.id} className="grid gap-3 rounded-2xl border border-[var(--line)] bg-white/55 p-4 md:grid-cols-[1fr_auto] md:items-center">
+            <div
+              key={item.id}
+              className="grid gap-3 rounded-2xl border border-[var(--line)] bg-white/55 p-4 md:grid-cols-[1fr_auto] md:items-center"
+            >
               <div>
                 <p className="font-semibold">
                   {item.name} / {item.status}
                 </p>
                 <p className="text-sm text-[var(--muted)]">
-                  {new Date(item.startsOn).toLocaleDateString()} - {new Date(item.endsOn).toLocaleDateString()}
+                  {formatBsDate(item.startsOn)} - {formatBsDate(item.endsOn)}
                 </p>
               </div>
               <button
                 type="button"
                 className="rounded-full bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                disabled={item.status === 'CLOSED' || closeMutation.isPending}
+                disabled={item.status === "CLOSED" || closeMutation.isPending}
                 onClick={() => closeMutation.mutate(item.id)}
               >
                 Close period
@@ -172,7 +194,10 @@ function SummaryList({
       <div className="grid gap-3">
         {items.length > 0 ? (
           items.map((item) => (
-            <div key={item.id} className="rounded-2xl border border-[var(--line)] bg-white/55 p-4">
+            <div
+              key={item.id}
+              className="rounded-2xl border border-[var(--line)] bg-white/55 p-4"
+            >
               <p className="font-semibold">{item.primary}</p>
               <p className="text-sm text-[var(--muted)]">{item.secondary}</p>
             </div>

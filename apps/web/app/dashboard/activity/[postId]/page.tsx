@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import type { ActivityPost } from '@schoolos/core';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { formatBsDateTime, type ActivityPost } from "@schoolos/core";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Camera,
@@ -14,14 +14,14 @@ import {
   Sparkles,
   Star,
   UsersRound,
-} from 'lucide-react';
-import { api } from '../../../../lib/api';
-import { Badge } from '../../../../components/ui/badge';
-import { EmptyState } from '../../../../components/ui/empty-state';
-import { LoadingState } from '../../../../components/ui/loading-state';
-import { PageHeader } from '../../../../components/ui/page-header';
+} from "lucide-react";
+import { api } from "../../../../lib/api";
+import { Badge } from "../../../../components/ui/badge";
+import { EmptyState } from "../../../../components/ui/empty-state";
+import { LoadingState } from "../../../../components/ui/loading-state";
+import { PageHeader } from "../../../../components/ui/page-header";
 
-type ActivityPostStatus = NonNullable<ActivityPost['status']>;
+type ActivityPostStatus = NonNullable<ActivityPost["status"]>;
 
 export default function ActivityPostDetailRoute() {
   const queryClient = useQueryClient();
@@ -32,67 +32,67 @@ export default function ActivityPostDetailRoute() {
     : params.postId;
 
   const postQuery = useQuery({
-    queryKey: ['activity-post-detail', postId],
-    queryFn: () => api.getActivityPost(postId ?? ''),
+    queryKey: ["activity-post-detail", postId],
+    queryFn: () => api.getActivityPost(postId ?? ""),
     enabled: Boolean(postId),
   });
-  const [editTitle, setEditTitle] = useState('');
-  const [editCaption, setEditCaption] = useState('');
-  const [moderationReason, setModerationReason] = useState('');
-  const [deleteReason, setDeleteReason] = useState('');
+  const [editTitle, setEditTitle] = useState("");
+  const [editCaption, setEditCaption] = useState("");
+  const [moderationReason, setModerationReason] = useState("");
+  const [deleteReason, setDeleteReason] = useState("");
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const refreshPost = async () => {
     await Promise.all([
       queryClient.invalidateQueries({
-        queryKey: ['activity-post-detail', postId],
+        queryKey: ["activity-post-detail", postId],
       }),
-      queryClient.invalidateQueries({ queryKey: ['activity-posts'] }),
-      queryClient.invalidateQueries({ queryKey: ['activity-gallery'] }),
-      queryClient.invalidateQueries({ queryKey: ['parent-activity-posts'] }),
-      queryClient.invalidateQueries({ queryKey: ['dashboard-activity-posts'] }),
+      queryClient.invalidateQueries({ queryKey: ["activity-posts"] }),
+      queryClient.invalidateQueries({ queryKey: ["activity-gallery"] }),
+      queryClient.invalidateQueries({ queryKey: ["parent-activity-posts"] }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard-activity-posts"] }),
     ]);
   };
 
   const updateMutation = useMutation({
     mutationFn: () =>
-      api.updateActivityPost(postId ?? '', {
+      api.updateActivityPost(postId ?? "", {
         title: editTitle.trim() || undefined,
         caption: editCaption.trim() || undefined,
       }),
     onSuccess: async () => {
-      setActionMessage('Activity post draft updated.');
+      setActionMessage("Activity post draft updated.");
       await refreshPost();
     },
   });
   const moderateMutation = useMutation({
     mutationFn: (status: ActivityPostStatus) =>
-      api.moderateActivityPost(postId ?? '', {
+      api.moderateActivityPost(postId ?? "", {
         status,
         reason: moderationReason.trim() || undefined,
       }),
     onSuccess: async () => {
-      setActionMessage('Activity post moderation status updated.');
-      setModerationReason('');
+      setActionMessage("Activity post moderation status updated.");
+      setModerationReason("");
       await refreshPost();
     },
   });
   const deleteMutation = useMutation({
     mutationFn: () =>
-      api.deleteActivityPost(postId ?? '', {
+      api.deleteActivityPost(postId ?? "", {
         reason: deleteReason.trim(),
       }),
     onSuccess: async () => {
-      setActionMessage('Activity post removed from the feed.');
+      setActionMessage("Activity post removed from the feed.");
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['activity-posts'] }),
-        queryClient.invalidateQueries({ queryKey: ['activity-gallery'] }),
-        queryClient.invalidateQueries({ queryKey: ['parent-activity-posts'] }),
+        queryClient.invalidateQueries({ queryKey: ["activity-posts"] }),
+        queryClient.invalidateQueries({ queryKey: ["activity-gallery"] }),
+        queryClient.invalidateQueries({ queryKey: ["parent-activity-posts"] }),
         queryClient.invalidateQueries({
-          queryKey: ['dashboard-activity-posts'],
+          queryKey: ["dashboard-activity-posts"],
         }),
       ]);
-      router.push('/dashboard/activity');
+      router.push("/dashboard/activity");
     },
   });
 
@@ -101,7 +101,7 @@ export default function ActivityPostDetailRoute() {
   useEffect(() => {
     if (!post) return;
     setEditTitle(post.title);
-    setEditCaption(post.caption ?? post.body ?? '');
+    setEditCaption(post.caption ?? post.body ?? "");
   }, [post]);
 
   if (postQuery.isLoading) {
@@ -213,11 +213,11 @@ function ActivityPostDetail({
               <Badge variant="outline">{formatEnumLabel(post.status)}</Badge>
             ) : null}
             <Badge variant="outline">
-              {post.publishedAt ? formatDateTime(post.publishedAt) : 'Draft'}
+              {post.publishedAt ? formatDateTime(post.publishedAt) : "Draft"}
             </Badge>
           </div>
           <div className="mt-6 whitespace-pre-wrap text-sm leading-7 text-slate-700">
-            {post.caption ?? post.body ?? 'No caption was added.'}
+            {post.caption ?? post.body ?? "No caption was added."}
           </div>
         </article>
 
@@ -244,7 +244,7 @@ function ActivityPostDetail({
                 >
                   {tag.student
                     ? `${tag.student.firstNameEn} ${tag.student.lastNameEn}`
-                    : 'Student'}
+                    : "Student"}
                 </span>
               ))
             ) : (
@@ -294,12 +294,13 @@ function ActivityPostDetail({
                     <Camera size={28} />
                     <p className="mt-2 text-xs font-bold uppercase tracking-widest">
                       {attachment.accessBlockedReason
-                        ? 'Media hidden'
-                        : 'Private media'}
+                        ? "Media hidden"
+                        : "Private media"}
                     </p>
                     {attachment.accessBlockedReason ? (
                       <p className="mt-2 max-w-[15rem] text-center text-xs font-semibold leading-relaxed text-slate-500">
-                        Some media is hidden because of student photo consent settings.
+                        Some media is hidden because of student photo consent
+                        settings.
                       </p>
                     ) : null}
                   </div>
@@ -398,9 +399,9 @@ function LifecyclePanel({
 }) {
   const canEdit =
     !post.status ||
-    post.status === 'DRAFT' ||
-    post.status === 'PENDING_APPROVAL' ||
-    post.status === 'REJECTED';
+    post.status === "DRAFT" ||
+    post.status === "PENDING_APPROVAL" ||
+    post.status === "REJECTED";
   const needsRejectReason = moderationReason.trim().length >= 5;
   const canDelete = deleteReason.trim().length >= 5;
 
@@ -441,7 +442,7 @@ function LifecyclePanel({
             disabled={!canEdit || isSaving || editTitle.trim().length < 2}
             className="inline-flex h-10 items-center rounded-xl bg-[var(--color-mod-activity-accent)] px-4 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-activity-text)] disabled:opacity-50"
           >
-            {isSaving ? 'Saving...' : 'Save draft edit'}
+            {isSaving ? "Saving..." : "Save draft edit"}
           </button>
         </div>
       </div>
@@ -468,7 +469,7 @@ function LifecyclePanel({
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => onModerate('APPROVED')}
+            onClick={() => onModerate("APPROVED")}
             disabled={isModerating}
             className="h-10 rounded-xl bg-emerald-600 px-4 text-xs font-black uppercase tracking-widest text-white disabled:opacity-50"
           >
@@ -476,7 +477,7 @@ function LifecyclePanel({
           </button>
           <button
             type="button"
-            onClick={() => onModerate('REJECTED')}
+            onClick={() => onModerate("REJECTED")}
             disabled={isModerating || !needsRejectReason}
             className="h-10 rounded-xl bg-rose-600 px-4 text-xs font-black uppercase tracking-widest text-white disabled:opacity-50"
           >
@@ -484,7 +485,7 @@ function LifecyclePanel({
           </button>
           <button
             type="button"
-            onClick={() => onModerate('ARCHIVED')}
+            onClick={() => onModerate("ARCHIVED")}
             disabled={isModerating}
             className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-black uppercase tracking-widest text-slate-700 disabled:opacity-50"
           >
@@ -509,7 +510,7 @@ function LifecyclePanel({
           disabled={!canDelete || isDeleting}
           className="mt-3 h-10 rounded-xl bg-[var(--color-mod-activity-accent)] px-4 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-activity-text)] disabled:opacity-50"
         >
-          {isDeleting ? 'Removing...' : 'Remove post'}
+          {isDeleting ? "Removing..." : "Remove post"}
         </button>
 
         {post.moderationReason ? (
@@ -547,9 +548,9 @@ function BackLink() {
 function ReactionSummary({ post }: { post: ActivityPost }) {
   const reactions = post.reactions ?? [];
   const items = [
-    { key: 'HEART', icon: Heart },
-    { key: 'CLAP', icon: Sparkles },
-    { key: 'STAR', icon: Star },
+    { key: "HEART", icon: Heart },
+    { key: "CLAP", icon: Sparkles },
+    { key: "STAR", icon: Star },
   ] as const;
 
   return (
@@ -578,20 +579,17 @@ function ReactionSummary({ post }: { post: ActivityPost }) {
 function formatEnumLabel(value: string) {
   return value
     .toLowerCase()
-    .replace(/_/g, ' ')
+    .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat('en-NP', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
+  return formatBsDateTime(value);
 }
 
 function formatBytes(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
+  if (!Number.isFinite(value) || value <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
   const exponent = Math.min(
     Math.floor(Math.log(value) / Math.log(1024)),
     units.length - 1,

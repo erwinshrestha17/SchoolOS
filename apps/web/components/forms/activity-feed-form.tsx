@@ -1,26 +1,28 @@
-'use client';
+"use client";
 
-import type {
-  ActivityGalleryItem,
-  ActivityPost,
-  ActivityReaction,
-  DevelopmentalMilestone,
-  MoodLog,
-  NotificationDelivery,
-  StudentProfile,
-} from '@schoolos/core';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import Link from 'next/link';
-import type { Dispatch, SetStateAction } from 'react';
-import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
-import { filesToBase64Payloads } from '../../lib/files';
-import { cn } from '../../lib/utils';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
-import { Badge } from '../ui/badge';
-import { EmptyState } from '../ui/empty-state';
-import { LoadingState } from '../ui/loading-state';
-import { FormField, Input, Select, TextArea } from '../ui/form-field';
+import {
+  formatBsDate,
+  formatBsDateTime,
+  type ActivityGalleryItem,
+  type ActivityPost,
+  type ActivityReaction,
+  type DevelopmentalMilestone,
+  type MoodLog,
+  type NotificationDelivery,
+  type StudentProfile,
+} from "@schoolos/core";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import type { Dispatch, SetStateAction } from "react";
+import { useEffect, useState } from "react";
+import { api } from "../../lib/api";
+import { filesToBase64Payloads } from "../../lib/files";
+import { cn } from "../../lib/utils";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
+import { Badge } from "../ui/badge";
+import { EmptyState } from "../ui/empty-state";
+import { LoadingState } from "../ui/loading-state";
+import { FormField, Input, Select, TextArea } from "../ui/form-field";
 import {
   Heart,
   Download,
@@ -34,19 +36,19 @@ import {
   Target,
   Truck,
   Smile,
-} from 'lucide-react';
+} from "lucide-react";
 
 const today = new Date().toISOString().slice(0, 10);
 const maxImageBytes = 10 * 1024 * 1024;
 // AI captions later: explicit non-implementation marker for production contracts.
 
 const activitySections = [
-  'Create Post',
-  'Feed Preview',
-  'Media Gallery',
-  'Mood Logs',
-  'Milestones',
-  'Delivery Records',
+  "Create Post",
+  "Feed Preview",
+  "Media Gallery",
+  "Mood Logs",
+  "Milestones",
+  "Delivery Records",
 ] as const;
 
 const activitySectionMeta: Record<
@@ -57,60 +59,60 @@ const activitySectionMeta: Record<
     icon: any;
   }
 > = {
-  'Create Post': {
-    title: 'Activity Feed',
+  "Create Post": {
+    title: "Activity Feed",
     description:
-      'Capture classroom moments, tag students, and notify guardians with private media.',
+      "Capture classroom moments, tag students, and notify guardians with private media.",
     icon: Camera,
   },
-  'Feed Preview': {
-    title: 'Feed Preview',
+  "Feed Preview": {
+    title: "Feed Preview",
     description:
-      'Review recently published classroom posts, attachments, tags, and reactions.',
+      "Review recently published classroom posts, attachments, tags, and reactions.",
     icon: History,
   },
-  'Media Gallery': {
-    title: 'Media Gallery',
+  "Media Gallery": {
+    title: "Media Gallery",
     description:
-      'Browse activity media by class, section, student, and category.',
+      "Browse activity media by class, section, student, and category.",
     icon: Images,
   },
-  'Mood Logs': {
-    title: 'Mood Logs',
+  "Mood Logs": {
+    title: "Mood Logs",
     description:
-      'Record daily emotional context for whole classes, sections, or individual children.',
+      "Record daily emotional context for whole classes, sections, or individual children.",
     icon: Smile,
   },
   Milestones: {
-    title: 'Montessori / ECE Milestones',
+    title: "Montessori / ECE Milestones",
     description:
-      'Track Montessori and ECE observations with clear child-level progress evidence.',
+      "Track Montessori and ECE observations with clear child-level progress evidence.",
     icon: Target,
   },
-  'Delivery Records': {
-    title: 'Delivery Records',
+  "Delivery Records": {
+    title: "Delivery Records",
     description:
-      'Audit guardian notification delivery records generated from activity posts.',
+      "Audit guardian notification delivery records generated from activity posts.",
     icon: Truck,
   },
 };
 
 const activityCategories = [
-  'LEARNING',
-  'OUTDOOR_PLAY',
-  'ART_AND_CRAFT',
-  'CELEBRATION',
-  'SPORTS',
-  'GENERAL',
+  "LEARNING",
+  "OUTDOOR_PLAY",
+  "ART_AND_CRAFT",
+  "CELEBRATION",
+  "SPORTS",
+  "GENERAL",
 ] as const;
 
 const milestoneStatuses = [
-  'EMERGING',
-  'PROGRESSING',
-  'ACHIEVED',
-  'NEEDS_SUPPORT',
+  "EMERGING",
+  "PROGRESSING",
+  "ACHIEVED",
+  "NEEDS_SUPPORT",
 ] as const;
-const deliveryStatuses = ['QUEUED', 'SENT', 'FAILED', 'SKIPPED'] as const;
+const deliveryStatuses = ["QUEUED", "SENT", "FAILED", "SKIPPED"] as const;
 
 type ActivitySection = (typeof activitySections)[number];
 type ActivityCategory = (typeof activityCategories)[number];
@@ -136,7 +138,7 @@ type GalleryFiltersState = {
   classId: string;
   sectionId: string;
   studentId: string;
-  category: ActivityCategory | '';
+  category: ActivityCategory | "";
 };
 
 type MoodLogState = {
@@ -173,7 +175,7 @@ type ReactionMutation = ReturnType<
 >;
 
 export function ActivityFeedForm({
-  initialSection = 'Create Post',
+  initialSection = "Create Post",
 }: {
   initialSection?: ActivitySection;
 }) {
@@ -181,42 +183,42 @@ export function ActivityFeedForm({
   const [activeSection, setActiveSection] =
     useState<ActivitySection>(initialSection);
   const [post, setPost] = useState<CreatePostState>({
-    classId: '',
-    sectionId: '',
-    title: '',
-    caption: '',
-    category: 'LEARNING',
+    classId: "",
+    sectionId: "",
+    title: "",
+    caption: "",
+    category: "LEARNING",
     studentIds: [],
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileWarning, setFileWarning] = useState<string | null>(null);
   const [postSuccess, setPostSuccess] = useState<string | null>(null);
   const [galleryFilters, setGalleryFilters] = useState<GalleryFiltersState>({
-    classId: '',
-    sectionId: '',
-    studentId: '',
-    category: '',
+    classId: "",
+    sectionId: "",
+    studentId: "",
+    category: "",
   });
   const [moodLog, setMoodLog] = useState<MoodLogState>({
-    classId: '',
-    sectionId: '',
-    studentId: '',
-    mood: 'ENGAGED',
-    note: '',
+    classId: "",
+    sectionId: "",
+    studentId: "",
+    mood: "ENGAGED",
+    note: "",
     logDate: today,
   });
   const [milestone, setMilestone] = useState<MilestoneState>({
-    classId: '',
-    sectionId: '',
-    studentId: '',
-    domain: 'Motor skills',
-    milestone: 'Uses classroom materials independently',
-    status: 'PROGRESSING',
-    observationNote: '',
+    classId: "",
+    sectionId: "",
+    studentId: "",
+    domain: "Motor skills",
+    milestone: "Uses classroom materials independently",
+    status: "PROGRESSING",
+    observationNote: "",
     observedAt: today,
   });
   const [milestoneFilters, setMilestoneFilters] = useState({
-    studentId: '',
+    studentId: "",
     month: today.slice(0, 7),
   });
 
@@ -225,23 +227,23 @@ export function ActivityFeedForm({
   }, [initialSection]);
 
   const classesQuery = useQuery({
-    queryKey: ['classes'],
+    queryKey: ["classes"],
     queryFn: api.listClasses,
   });
   const sectionsQuery = useQuery({
-    queryKey: ['sections'],
+    queryKey: ["sections"],
     queryFn: api.listSections,
   });
   const studentsQuery = useQuery({
-    queryKey: ['students'],
+    queryKey: ["students"],
     queryFn: () => api.listStudents({ limit: 1000 }),
   });
   const postsQuery = useQuery({
-    queryKey: ['activity-posts'],
+    queryKey: ["activity-posts"],
     queryFn: () => api.listActivityPosts(),
   });
   const galleryQuery = useQuery({
-    queryKey: ['activity-gallery', galleryFilters],
+    queryKey: ["activity-gallery", galleryFilters],
     queryFn: () =>
       api.listActivityGallery({
         classId: galleryFilters.classId || null,
@@ -253,11 +255,11 @@ export function ActivityFeedForm({
       }),
   });
   const moodLogsQuery = useQuery({
-    queryKey: ['mood-logs'],
+    queryKey: ["mood-logs"],
     queryFn: api.listMoodLogs,
   });
   const milestonesQuery = useQuery({
-    queryKey: ['developmental-milestones', milestoneFilters],
+    queryKey: ["developmental-milestones", milestoneFilters],
     queryFn: () =>
       api.listDevelopmentalMilestones({
         studentId: milestoneFilters.studentId || null,
@@ -265,7 +267,7 @@ export function ActivityFeedForm({
       }),
   });
   const deliveriesQuery = useQuery({
-    queryKey: ['notification-deliveries'],
+    queryKey: ["notification-deliveries"],
     queryFn: api.listNotificationDeliveries,
   });
 
@@ -316,32 +318,34 @@ export function ActivityFeedForm({
     post.studentIds.includes(student.id),
   );
   const activityDeliveries = (deliveriesQuery.data ?? []).filter(
-    (delivery) => delivery.sourceType === 'activity_post',
+    (delivery) => delivery.sourceType === "activity_post",
   );
 
   const postMutation = useMutation({
     mutationFn: api.createActivityPost,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['activity-posts'] });
-      void queryClient.invalidateQueries({ queryKey: ['activity-gallery'] });
-      void queryClient.invalidateQueries({ queryKey: ['parent-activity-posts'] });
+      void queryClient.invalidateQueries({ queryKey: ["activity-posts"] });
+      void queryClient.invalidateQueries({ queryKey: ["activity-gallery"] });
       void queryClient.invalidateQueries({
-        queryKey: ['dashboard-activity-posts'],
+        queryKey: ["parent-activity-posts"],
       });
       void queryClient.invalidateQueries({
-        queryKey: ['notification-deliveries'],
+        queryKey: ["dashboard-activity-posts"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["notification-deliveries"],
       });
       setSelectedFiles([]);
       setFileWarning(null);
-      setPostSuccess('Activity posted. Guardian notifications queued.');
+      setPostSuccess("Activity posted. Guardian notifications queued.");
       setPost((current) => ({ ...current, studentIds: [] }));
-      setActiveSection('Feed Preview');
+      setActiveSection("Feed Preview");
     },
   });
   const moodMutation = useMutation({
     mutationFn: api.createMoodLog,
     onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ['mood-logs'] }),
+      void queryClient.invalidateQueries({ queryKey: ["mood-logs"] }),
   });
   const reactionMutation = useMutation({
     mutationFn: ({
@@ -361,10 +365,12 @@ export function ActivityFeedForm({
         studentId,
       }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['activity-posts'] });
-      void queryClient.invalidateQueries({ queryKey: ['parent-activity-posts'] });
+      void queryClient.invalidateQueries({ queryKey: ["activity-posts"] });
       void queryClient.invalidateQueries({
-        queryKey: ['dashboard-activity-posts'],
+        queryKey: ["parent-activity-posts"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["dashboard-activity-posts"],
       });
     },
   });
@@ -372,31 +378,31 @@ export function ActivityFeedForm({
     mutationFn: api.createDevelopmentalMilestone,
     onSuccess: () =>
       void queryClient.invalidateQueries({
-        queryKey: ['developmental-milestones'],
+        queryKey: ["developmental-milestones"],
       }),
   });
 
   function updateFiles(files: FileList | null) {
     const nextFiles = Array.from(files ?? []);
     const firstNonImage = nextFiles.find(
-      (file) => !file.type.startsWith('image/'),
+      (file) => !file.type.startsWith("image/"),
     );
     const firstLargeImage = nextFiles.find((file) => file.size > maxImageBytes);
 
     setSelectedFiles(nextFiles);
 
     if (nextFiles.length > 5) {
-      setFileWarning('Please attach 1 to 5 images only.');
+      setFileWarning("Please attach 1 to 5 images only.");
       return;
     }
 
     if (firstNonImage) {
-      setFileWarning('Activity attachments must be image files.');
+      setFileWarning("Activity attachments must be image files.");
       return;
     }
 
     if (firstLargeImage) {
-      setFileWarning('Each image should be 10MB or smaller.');
+      setFileWarning("Each image should be 10MB or smaller.");
       return;
     }
 
@@ -405,32 +411,32 @@ export function ActivityFeedForm({
 
   async function createPost() {
     if (!post.classId) {
-      setFileWarning('Select a class before publishing.');
+      setFileWarning("Select a class before publishing.");
       return;
     }
 
     if (post.title.trim().length < 2) {
-      setFileWarning('Title is required before publishing.');
+      setFileWarning("Title is required before publishing.");
       return;
     }
 
     if (post.caption.trim().length < 2) {
-      setFileWarning('Caption is required before publishing.');
+      setFileWarning("Caption is required before publishing.");
       return;
     }
 
     if (selectedFiles.length === 0 || selectedFiles.length > 5) {
-      setFileWarning('Please attach 1 to 5 images only.');
+      setFileWarning("Please attach 1 to 5 images only.");
       return;
     }
 
-    if (selectedFiles.some((file) => !file.type.startsWith('image/'))) {
-      setFileWarning('Activity attachments must be image files.');
+    if (selectedFiles.some((file) => !file.type.startsWith("image/"))) {
+      setFileWarning("Activity attachments must be image files.");
       return;
     }
 
     if (selectedFiles.some((file) => file.size > maxImageBytes)) {
-      setFileWarning('Each image should be 10MB or smaller.');
+      setFileWarning("Each image should be 10MB or smaller.");
       return;
     }
 
@@ -443,10 +449,10 @@ export function ActivityFeedForm({
       sectionId: post.sectionId || null,
       audienceType:
         post.studentIds.length > 0
-          ? 'ALL'
+          ? "ALL"
           : post.sectionId
-            ? 'SECTION'
-            : 'CLASS',
+            ? "SECTION"
+            : "CLASS",
       attachments,
     });
   }
@@ -640,10 +646,10 @@ function CreatePostSection({
   createPost: () => void;
 }) {
   const audienceLabel = post.studentIds.length
-    ? `${post.studentIds.length} specific student${post.studentIds.length === 1 ? '' : 's'}`
+    ? `${post.studentIds.length} specific student${post.studentIds.length === 1 ? "" : "s"}`
     : post.sectionId
-      ? 'Selected section'
-      : 'Whole class';
+      ? "Selected section"
+      : "Whole class";
 
   return (
     <div className="grid gap-8 xl:grid-cols-3">
@@ -669,7 +675,7 @@ function CreatePostSection({
                   setPost((current) => ({
                     ...current,
                     classId: event.target.value,
-                    sectionId: '',
+                    sectionId: "",
                     studentIds: [],
                   }))
                 }
@@ -715,10 +721,7 @@ function CreatePostSection({
                   exclusively.
                 </p>
               </div>
-              <Badge
-                variant="secondary"
-                className="text-xs font-bold"
-              >
+              <Badge variant="secondary" className="text-xs font-bold">
                 {post.studentIds.length} Selected
               </Badge>
             </div>
@@ -733,10 +736,10 @@ function CreatePostSection({
                       key={student.id}
                       type="button"
                       className={cn(
-                        'h-9 rounded-full px-4 text-xs font-bold transition-all',
+                        "h-9 rounded-full px-4 text-xs font-bold transition-all",
                         selected
-                          ? 'bg-[var(--color-mod-activity-accent)] text-white shadow-sm'
-                          : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300',
+                          ? "bg-[var(--color-mod-activity-accent)] text-white shadow-sm"
+                          : "bg-white border border-slate-200 text-slate-600 hover:border-slate-300",
                       )}
                       onClick={() => toggleStudent(student.id)}
                     >
@@ -816,7 +819,7 @@ function CreatePostSection({
                 </p>
                 <p className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">
                   {
-                    'Secure previews use signed access; permanent public URLs are not shown.'
+                    "Secure previews use signed access; permanent public URLs are not shown."
                   }
                 </p>
               </div>
@@ -869,7 +872,7 @@ function CreatePostSection({
               }
               onClick={() => void createPost()}
             >
-              {isPending ? 'Publishing...' : 'Publish Activity Post'}
+              {isPending ? "Publishing..." : "Publish Activity Post"}
             </button>
           </div>
         </div>
@@ -880,11 +883,11 @@ function CreatePostSection({
           audienceLabel={audienceLabel}
           selectedClassName={
             classes.find((item) => item.id === post.classId)?.name ??
-            'Not selected'
+            "Not selected"
           }
           selectedSectionName={
             sections.find((item) => item.id === post.sectionId)?.name ??
-            'Whole class'
+            "Whole class"
           }
           selectedStudents={selectedStudents}
           photoCount={selectedFiles.length}
@@ -913,9 +916,7 @@ function ReviewPanel({
   return (
     <div className="sticky top-28 space-y-6 rounded-2xl border border-[var(--line)] bg-white p-8 shadow-sm">
       <div>
-        <h3 className="text-lg font-bold text-slate-950">
-          Review Summary
-        </h3>
+        <h3 className="text-lg font-bold text-slate-950">Review Summary</h3>
         <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">
           Verify before publishing
         </p>
@@ -930,18 +931,16 @@ function ReviewPanel({
         <Fact label="Category" value={formatEnumLabel(category)} />
         <Fact
           label="Photos"
-          value={`${photoCount} image${photoCount === 1 ? '' : 's'}`}
+          value={`${photoCount} image${photoCount === 1 ? "" : "s"}`}
         />
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
-        <p className="mb-2 text-xs font-bold text-slate-500">
-          Tagged Students
-        </p>
+        <p className="mb-2 text-xs font-bold text-slate-500">Tagged Students</p>
         <p className="text-xs font-medium leading-relaxed text-slate-700">
           {selectedStudents.length > 0
-            ? selectedStudents.map(studentDisplayName).join(', ')
-            : 'No specific students tagged; audience follows class/section selection.'}
+            ? selectedStudents.map(studentDisplayName).join(", ")
+            : "No specific students tagged; audience follows class/section selection."}
         </p>
       </div>
 
@@ -1076,7 +1075,7 @@ function MediaGallerySection({
                 Teacher media gallery
               </h2>
               <p className="mt-1 text-xs font-semibold text-slate-500">
-                {items.length} media item{items.length === 1 ? '' : 's'} on this
+                {items.length} media item{items.length === 1 ? "" : "s"} on this
                 view
               </p>
             </div>
@@ -1088,10 +1087,10 @@ function MediaGallerySection({
               className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-widest text-slate-600 transition-colors hover:bg-slate-50"
               onClick={() =>
                 setFilters({
-                  classId: '',
-                  sectionId: '',
-                  studentId: '',
-                  category: '',
+                  classId: "",
+                  sectionId: "",
+                  studentId: "",
+                  category: "",
                 })
               }
             >
@@ -1108,8 +1107,8 @@ function MediaGallerySection({
                 setFilters((current) => ({
                   ...current,
                   classId: event.target.value,
-                  sectionId: '',
-                  studentId: '',
+                  sectionId: "",
+                  studentId: "",
                 }))
               }
             >
@@ -1129,7 +1128,7 @@ function MediaGallerySection({
                 setFilters((current) => ({
                   ...current,
                   sectionId: event.target.value,
-                  studentId: '',
+                  studentId: "",
                 }))
               }
             >
@@ -1167,7 +1166,7 @@ function MediaGallerySection({
               onChange={(event) =>
                 setFilters((current) => ({
                   ...current,
-                  category: event.target.value as ActivityCategory | '',
+                  category: event.target.value as ActivityCategory | "",
                 }))
               }
             >
@@ -1215,8 +1214,8 @@ function MediaGallerySection({
                       <Camera className="mb-2 h-6 w-6 text-slate-300" />
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                         {item.accessBlockedReason
-                          ? 'Media hidden'
-                          : 'Private media'}
+                          ? "Media hidden"
+                          : "Private media"}
                       </p>
                       {item.accessBlockedReason ? (
                         <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-500">
@@ -1346,7 +1345,7 @@ function PostCard({
               {post.title}
             </h3>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              {post.publishedAt ? formatDateTime(post.publishedAt) : 'Draft'}
+              {post.publishedAt ? formatDateTime(post.publishedAt) : "Draft"}
             </p>
           </div>
           <div className="flex flex-col items-end gap-1.5">
@@ -1360,7 +1359,7 @@ function PostCard({
         </div>
 
         <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">
-          {post.caption ?? post.body ?? 'No caption'}
+          {post.caption ?? post.body ?? "No caption"}
         </p>
 
         <div className="grid gap-3">
@@ -1401,8 +1400,8 @@ function PostCard({
                   <Camera className="h-6 w-6 text-slate-300 mb-2" />
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                     {attachment.accessBlockedReason
-                      ? 'Media hidden'
-                      : 'Private Media'}
+                      ? "Media hidden"
+                      : "Private Media"}
                   </p>
                   {attachment.accessBlockedReason ? (
                     <p className="mt-2 max-w-[14rem] text-xs font-semibold leading-relaxed text-slate-500">
@@ -1429,7 +1428,7 @@ function PostCard({
                 >
                   {tag.student
                     ? `${tag.student.firstNameEn} ${tag.student.lastNameEn}`
-                    : 'Student'}
+                    : "Student"}
                 </span>
               ))}
             </div>
@@ -1437,14 +1436,14 @@ function PostCard({
         )}
 
         <div className="pt-4 flex items-center gap-2">
-          {(['HEART', 'CLAP', 'STAR'] as const).map((reaction) => {
+          {(["HEART", "CLAP", "STAR"] as const).map((reaction) => {
             const count =
               post.reactions?.filter((entry) => entry.reaction === reaction)
                 .length ?? 0;
             const Icon =
-              reaction === 'HEART'
+              reaction === "HEART"
                 ? Heart
-                : reaction === 'CLAP'
+                : reaction === "CLAP"
                   ? Sparkles
                   : Star;
 
@@ -1465,10 +1464,10 @@ function PostCard({
               >
                 <Icon
                   className={cn(
-                    'h-3.5 w-3.5',
+                    "h-3.5 w-3.5",
                     count > 0
-                      ? 'text-emerald-500 fill-emerald-500'
-                      : 'text-slate-400',
+                      ? "text-emerald-500 fill-emerald-500"
+                      : "text-slate-400",
                   )}
                 />
                 <span className="text-[11px] font-black text-slate-900">
@@ -1534,8 +1533,8 @@ function MoodLogsSection({
                   setMoodLog((current) => ({
                     ...current,
                     classId: event.target.value,
-                    sectionId: '',
-                    studentId: '',
+                    sectionId: "",
+                    studentId: "",
                   }))
                 }
               >
@@ -1555,7 +1554,7 @@ function MoodLogsSection({
                   setMoodLog((current) => ({
                     ...current,
                     sectionId: event.target.value,
-                    studentId: '',
+                    studentId: "",
                   }))
                 }
               >
@@ -1644,7 +1643,7 @@ function MoodLogsSection({
               disabled={!moodLog.classId || isPending}
               onClick={saveMoodLog}
             >
-              {isPending ? 'Saving...' : 'Save Mood Log'}
+              {isPending ? "Saving..." : "Save Mood Log"}
             </button>
           </div>
         </div>
@@ -1665,7 +1664,7 @@ function MoodLogsSection({
                     <span className="ml-2 text-slate-600">
                       {item.student
                         ? `${item.student.firstNameEn} ${item.student.lastNameEn}`
-                        : 'Whole Class'}
+                        : "Whole Class"}
                     </span>
                   </p>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
@@ -1737,8 +1736,8 @@ function MilestonesSection({
                   setMilestone((current) => ({
                     ...current,
                     classId: event.target.value,
-                    sectionId: '',
-                    studentId: '',
+                    sectionId: "",
+                    studentId: "",
                   }))
                 }
               >
@@ -1758,7 +1757,7 @@ function MilestonesSection({
                   setMilestone((current) => ({
                     ...current,
                     sectionId: event.target.value,
-                    studentId: '',
+                    studentId: "",
                   }))
                 }
               >
@@ -1873,7 +1872,7 @@ function MilestonesSection({
               disabled={!milestone.classId || !milestone.studentId || isPending}
               onClick={saveMilestone}
             >
-              {isPending ? 'Saving...' : 'Save Milestone'}
+              {isPending ? "Saving..." : "Save Milestone"}
             </button>
           </div>
         </div>
@@ -1981,7 +1980,7 @@ function DeliveryRecordsSection({
                   {delivery.title}
                 </p>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  {delivery.channel} · {delivery.destination || 'Direct'} ·{' '}
+                  {delivery.channel} · {delivery.destination || "Direct"} ·{" "}
                   {formatDateTime(delivery.createdAt)}
                 </p>
               </div>
@@ -2031,27 +2030,29 @@ function Fact({ label, value }: { label: string; value: string }) {
       <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
         {label}
       </span>
-      <span className="text-right text-[11px] font-bold text-slate-800">{value}</span>
+      <span className="text-right text-[11px] font-bold text-slate-800">
+        {value}
+      </span>
     </div>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const isSent = status === 'SENT';
-  const isFailed = status === 'FAILED';
-  const isSkipped = status === 'SKIPPED';
+  const isSent = status === "SENT";
+  const isFailed = status === "FAILED";
+  const isSkipped = status === "SKIPPED";
 
   return (
     <span
       className={cn(
-        'px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest',
+        "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest",
         isSent
-          ? 'bg-emerald-100 text-emerald-700'
+          ? "bg-emerald-100 text-emerald-700"
           : isFailed
-            ? 'bg-red-100 text-red-700'
+            ? "bg-red-100 text-red-700"
             : isSkipped
-              ? 'bg-slate-100 text-slate-600'
-              : 'bg-amber-100 text-amber-700',
+              ? "bg-slate-100 text-slate-600"
+              : "bg-amber-100 text-amber-700",
       )}
     >
       {status}
@@ -2063,16 +2064,16 @@ function InlineMessage({
   tone,
   message,
 }: {
-  tone: 'success' | 'error';
+  tone: "success" | "error";
   message: string;
 }) {
   return (
     <p
       className={cn(
-        'rounded-2xl border px-5 py-4 text-[11px] font-black uppercase tracking-widest leading-relaxed',
-        tone === 'success'
-          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm shadow-emerald-100'
-          : 'border-red-200 bg-red-50 text-red-700 shadow-sm shadow-red-100',
+        "rounded-2xl border px-5 py-4 text-[11px] font-black uppercase tracking-widest leading-relaxed",
+        tone === "success"
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm shadow-emerald-100"
+          : "border-red-200 bg-red-50 text-red-700 shadow-sm shadow-red-100",
       )}
     >
       {message}
@@ -2112,7 +2113,7 @@ function filterStudentsForSectionWherePossible(
     };
     const maybeStudentSectionId =
       candidate.sectionId ??
-      (typeof candidate.section === 'object' && candidate.section !== null
+      (typeof candidate.section === "object" && candidate.section !== null
         ? candidate.section.id
         : null);
 
@@ -2139,16 +2140,16 @@ function findReactionActor(
 function studentDisplayName(student: StudentProfile) {
   return (
     student.fullNameEn ??
-    `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''}`.trim() ??
+    `${student.firstNameEn ?? ""} ${student.lastNameEn ?? ""}`.trim() ??
     student.studentSystemId
   );
 }
 
 function formatEnumLabel(value: string) {
   return value
-    .split('_')
+    .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join(' ');
+    .join(" ");
 }
 
 function formatFileSize(sizeBytes: number) {
@@ -2161,21 +2162,16 @@ function formatFileSize(sizeBytes: number) {
 
 function formatDate(value: string | Date | null | undefined) {
   if (!value) {
-    return 'Not available';
+    return "Not available";
   }
 
-  return new Intl.DateTimeFormat('en-NP', {
-    dateStyle: 'medium',
-  }).format(new Date(value));
+  return formatBsDate(value);
 }
 
 function formatDateTime(value: string | Date | null | undefined) {
   if (!value) {
-    return 'Not available';
+    return "Not available";
   }
 
-  return new Intl.DateTimeFormat('en-NP', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
+  return formatBsDateTime(value);
 }

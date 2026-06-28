@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import { loginSchema, type LoginInput } from '@schoolos/core';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation } from '@tanstack/react-query';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { api, isAuthSession } from '../../lib/api';
-import { useSession } from '../session-provider';
+import { formatNepalTime, loginSchema, type LoginInput } from "@schoolos/core";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { api, isAuthSession } from "../../lib/api";
+import { useSession } from "../session-provider";
 
 const PLATFORM_ROLES = [
-  'platform_super_admin',
-  'platform_support',
-  'platform_billing_admin',
+  "platform_super_admin",
+  "platform_support",
+  "platform_billing_admin",
 ];
 
 export function LoginForm() {
@@ -28,9 +28,9 @@ export function LoginForm() {
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      tenantSlug: '',
-      email: '',
-      password: '',
+      tenantSlug: "",
+      email: "",
+      password: "",
     },
   });
 
@@ -41,8 +41,10 @@ export function LoginForm() {
         const isPlatformUser = result.user.roles.some((role) =>
           PLATFORM_ROLES.includes(role),
         );
-        const defaultRedirect = isPlatformUser ? '/platform/dashboard' : '/dashboard';
-        const requestedRedirect = searchParams.get('next');
+        const defaultRedirect = isPlatformUser
+          ? "/platform/dashboard"
+          : "/dashboard";
+        const requestedRedirect = searchParams.get("next");
         const safeRedirect = resolvePostLoginRedirect(
           requestedRedirect,
           defaultRedirect,
@@ -56,9 +58,9 @@ export function LoginForm() {
       }
 
       setChallengeMessage(
-        `MFA challenge issued via ${result.delivery}. Expires at ${new Date(
+        `MFA challenge issued via ${result.delivery}. Expires at ${formatNepalTime(
           result.challengeExpiresAt,
-        ).toLocaleTimeString()}.`,
+        )}.`,
       );
     },
   });
@@ -70,9 +72,11 @@ export function LoginForm() {
       onSubmit={handleSubmit((values) => mutation.mutate(values))}
     >
       <div>
-        <label htmlFor="tenantSlug" className="label mb-2 block">School Code</label>
+        <label htmlFor="tenantSlug" className="label mb-2 block">
+          School Code
+        </label>
         <input
-          {...register('tenantSlug')}
+          {...register("tenantSlug")}
           id="tenantSlug"
           placeholder="e.g. green-valley-school"
           autoComplete="organization"
@@ -88,9 +92,11 @@ export function LoginForm() {
       </div>
 
       <div>
-        <label htmlFor="email" className="label mb-2 block">Email</label>
+        <label htmlFor="email" className="label mb-2 block">
+          Email
+        </label>
         <input
-          {...register('email')}
+          {...register("email")}
           id="email"
           type="email"
           placeholder="admin@school.edu.np"
@@ -104,11 +110,13 @@ export function LoginForm() {
       </div>
 
       <div>
-        <label htmlFor="password" className="label mb-2 block">Password</label>
+        <label htmlFor="password" className="label mb-2 block">
+          Password
+        </label>
         <input
           id="password"
           type="password"
-          {...register('password')}
+          {...register("password")}
           placeholder="Enter your password"
           autoComplete="current-password"
         />
@@ -124,7 +132,7 @@ export function LoginForm() {
         disabled={mutation.isPending}
         className="rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-600 px-5 py-3 font-semibold text-white shadow-md shadow-indigo-200 transition-all hover:from-indigo-600 hover:to-violet-700 hover:shadow-lg hover:shadow-indigo-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
       >
-        {mutation.isPending ? 'Signing in...' : 'Sign in'}
+        {mutation.isPending ? "Signing in..." : "Sign in"}
       </button>
 
       {mutation.isError ? (
@@ -149,15 +157,17 @@ function resolvePostLoginRedirect(
   defaultRedirect: string,
   isPlatformUser: boolean,
 ) {
-  if (!requestedRedirect?.startsWith('/')) {
+  if (!requestedRedirect?.startsWith("/")) {
     return defaultRedirect;
   }
 
   if (isPlatformUser) {
-    return requestedRedirect.startsWith('/platform')
+    return requestedRedirect.startsWith("/platform")
       ? requestedRedirect
       : defaultRedirect;
   }
 
-  return requestedRedirect.startsWith('/dashboard') ? requestedRedirect : defaultRedirect;
+  return requestedRedirect.startsWith("/dashboard")
+    ? requestedRedirect
+    : defaultRedirect;
 }

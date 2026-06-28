@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
@@ -298,7 +298,7 @@ Map<String, List<TeacherTimetableItem>> _groupByDay(
     final date = item.date;
     final key = date == null
         ? 'Published periods'
-        : DateFormat.EEEE().format(date);
+        : NepaliBsCalendar.formatBsDate(date, long: true);
     result.putIfAbsent(key, () => <TeacherTimetableItem>[]).add(item);
   }
   return result;
@@ -306,7 +306,10 @@ Map<String, List<TeacherTimetableItem>> _groupByDay(
 
 String _rangeLabel(DateTime? start, DateTime? end) {
   if (start == null || end == null) return 'Published teacher schedule';
-  return '${DateFormat.MMMd().format(start)} - ${DateFormat.MMMd().format(end)}';
+  return NepaliBsCalendar.formatDateRange(
+    NepaliBsCalendar.fromAd(start),
+    NepaliBsCalendar.fromAd(end),
+  );
 }
 
 String _statusLabel(String status) {

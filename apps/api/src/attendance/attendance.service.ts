@@ -1,10 +1,16 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import {
+  BS_MONTH_NAMES_EN,
+  daysInBsMonth,
+  toGregorianDateFromBs,
+} from '@schoolos/core';
 import {
   AttendanceConflictDecision,
   AttendanceConflictStatus,
@@ -1143,8 +1149,8 @@ export class AttendanceService {
   async getMonthlyRegister(dto: GetMonthlyRegisterDto, actor: AuthContext) {
     await this.checkTeacherAssignment(actor, dto.classId, dto.sectionId);
 
-    const startDate = new Date(dto.year, dto.month - 1, 1);
-    const endDate = new Date(dto.year, dto.month, 0);
+    const period = resolveMonthlyRegisterPeriod(dto);
+    const { startDate, endDate } = period;
 
     const [students, sessions, calendarDays, classroom, section] =
       await Promise.all([
@@ -1211,7 +1217,7 @@ export class AttendanceService {
       calendarDays.map((d) => [d.calendarDate.toISOString().split('T')[0], d]),
     );
 
-    const daysCount = endDate.getDate();
+    const daysCount = period.daysCount;
     const matrix = students.map((student) => {
       const row = {
         studentId: student.id,
@@ -1230,7 +1236,7 @@ export class AttendanceService {
       };
 
       for (let day = 1; day <= daysCount; day++) {
-        const date = new Date(dto.year, dto.month - 1, day);
+        const date = period.dateForDay(day);
         const dateKey = date.toISOString().split('T')[0];
         const session = sessionByDate.get(dateKey);
         const calendar = calendarByDate.get(dateKey);
@@ -1275,8 +1281,10 @@ export class AttendanceService {
     });
 
     return {
-      month: dto.month,
-      year: dto.year,
+      calendar: period.calendar,
+      month: period.month,
+      year: period.year,
+      periodLabel: period.label,
       className: classroom?.name ?? dto.classId,
       sectionName: section?.name ?? null,
       daysCount,
@@ -3253,8 +3261,8 @@ export class AttendanceService {
       });
     }
 
-    const fileName = `attendance-register-${dto.classId}-${dto.year}-${String(
-      dto.month,
+    const fileName = `attendance-register-${dto.classId}-${data.calendar.toLowerCase()}-${data.year}-${String(
+      data.month,
     ).padStart(2, '0')}.${format}`;
     const contentBuffer = Buffer.isBuffer(content)
       ? content
@@ -4656,6 +4664,72 @@ export class AttendanceService {
       ]),
     );
   }
+}
+
+function resolveMonthlyRegisterPeriod(dto: GetMonthlyRegisterDto) {
+  const hasBsPeriod = dto.bsMonth !== undefined || dto.bsYear !== undefined;
+  const hasGregorianPeriod = dto.month !== undefined || dto.year !== undefined;
+
+  if (hasBsPeriod && hasGregorianPeriod) {
+    throw new BadRequestException(
+      'Use either bsMonth/bsYear or legacy month/year, not both.',
+    );
+  }
+
+  if (hasBsPeriod) {
+    if (dto.bsMonth === undefined || dto.bsYear === undefined) {
+      throw new BadRequestException(
+        'Both bsMonth and bsYear are required for a BS attendance register.',
+      );
+    }
+
+    const month = dto.bsMonth;
+    const year = dto.bsYear;
+    const daysCount = daysInBsMonth(year, month);
+    const dateForDay = (day: number) => {
+      const gregorian = toGregorianDateFromBs({ year, month, day });
+      return new Date(
+        Date.UTC(gregorian.year, gregorian.month - 1, gregorian.day),
+      );
+    };
+
+    return {
+      calendar: 'BS' as const,
+      month,
+      year,
+      daysCount,
+      label: `${BS_MONTH_NAMES_EN[month - 1]} ${year} BS`,
+      startDate: dateForDay(1),
+      endDate: dateForDay(daysCount),
+      dateForDay,
+    };
+  }
+
+  if (
+    !hasGregorianPeriod ||
+    dto.month === undefined ||
+    dto.year === undefined
+  ) {
+    throw new BadRequestException(
+      'bsMonth and bsYear are required for a school-facing attendance register.',
+    );
+  }
+
+  const month = dto.month;
+  const year = dto.year;
+  const daysCount = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const dateForDay = (day: number) => new Date(Date.UTC(year, month - 1, day));
+
+  return {
+    calendar: 'AD' as const,
+    month,
+    year,
+    daysCount,
+    label: `${year}-${String(month).padStart(2, '0')} AD`,
+    startDate: dateForDay(1),
+    endDate: dateForDay(daysCount),
+    dateForDay,
+  };
 }
 
 function toIsoWeekday(date: Date) {

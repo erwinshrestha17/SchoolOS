@@ -1,25 +1,26 @@
-'use client';
+"use client";
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState, useMemo } from 'react';
-import Link from 'next/link';
-import { api } from '@/lib/api';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatNepalTime, toBsDateFromGregorian } from "@schoolos/core";
+import { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
+import { api } from "@/lib/api";
 import {
   clearAttendanceDraft,
   readAttendanceDraft,
   storeAttendanceDraft,
   type AttendanceDraftStorageValue,
-} from '@/lib/session';
-import { useSession } from '@/components/session-provider';
-import { SectionCard } from '@/components/ui/section-card';
-import { ActionMenu } from '@/components/ui/action-menu';
-import { AttendanceHeader } from '@/components/attendance/attendance-header';
-import { AttendanceRosterItem } from '@/components/attendance/attendance-roster-item';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState } from '@/components/ui/error-state';
-import { FilterBar } from '@/components/ui/filter-bar';
-import { LoadingState } from '@/components/ui/loading-state';
+} from "@/lib/session";
+import { useSession } from "@/components/session-provider";
+import { SectionCard } from "@/components/ui/section-card";
+import { ActionMenu } from "@/components/ui/action-menu";
+import { AttendanceHeader } from "@/components/attendance/attendance-header";
+import { AttendanceRosterItem } from "@/components/attendance/attendance-roster-item";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { FilterBar } from "@/components/ui/filter-bar";
+import { LoadingState } from "@/components/ui/loading-state";
 import {
   CheckCircle2,
   AlertCircle,
@@ -31,73 +32,73 @@ import {
   Info,
   WifiOff,
   MoreHorizontal,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const today = new Date().toISOString().slice(0, 10);
 
 type AttendanceStatus =
-  | 'PRESENT'
-  | 'ABSENT'
-  | 'LATE'
-  | 'SICK_LEAVE'
-  | 'EXCUSED_LEAVE'
-  | 'UNEXCUSED_LEAVE';
+  | "PRESENT"
+  | "ABSENT"
+  | "LATE"
+  | "SICK_LEAVE"
+  | "EXCUSED_LEAVE"
+  | "UNEXCUSED_LEAVE";
 type DraftSyncState =
-  | 'idle'
-  | 'saved_local'
-  | 'syncing'
-  | 'synced'
-  | 'conflict'
-  | 'failed';
+  | "idle"
+  | "saved_local"
+  | "syncing"
+  | "synced"
+  | "conflict"
+  | "failed";
 
 const statusCycle: AttendanceStatus[] = [
-  'PRESENT',
-  'ABSENT',
-  'LATE',
-  'SICK_LEAVE',
-  'EXCUSED_LEAVE',
-  'UNEXCUSED_LEAVE',
+  "PRESENT",
+  "ABSENT",
+  "LATE",
+  "SICK_LEAVE",
+  "EXCUSED_LEAVE",
+  "UNEXCUSED_LEAVE",
 ];
 
 export function AttendanceForm() {
   const { session } = useSession();
   const queryClient = useQueryClient();
-  const [academicYearId, setAcademicYearId] = useState('');
-  const [classId, setClassId] = useState('');
-  const [sectionId, setSectionId] = useState('');
+  const [academicYearId, setAcademicYearId] = useState("");
+  const [classId, setClassId] = useState("");
+  const [sectionId, setSectionId] = useState("");
   const [attendanceDate, setAttendanceDate] = useState(today);
-  const [statusFilter, setStatusFilter] = useState<'ALL' | AttendanceStatus>(
-    'ALL',
+  const [statusFilter, setStatusFilter] = useState<"ALL" | AttendanceStatus>(
+    "ALL",
   );
   const [exceptions, setExceptions] = useState<
     Record<string, AttendanceStatus>
   >({});
   const [remarks, setRemarks] = useState<Record<string, string>>({});
-  const [submitMessage, setSubmitMessage] = useState('');
-  const [draftSyncState, setDraftSyncState] = useState<DraftSyncState>('idle');
+  const [submitMessage, setSubmitMessage] = useState("");
+  const [draftSyncState, setDraftSyncState] = useState<DraftSyncState>("idle");
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
-  const [conflictMessage, setConflictMessage] = useState('');
+  const [conflictMessage, setConflictMessage] = useState("");
   const [hasDraftChanges, setHasDraftChanges] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   const academicYearsQuery = useQuery({
-    queryKey: ['academic-years'],
+    queryKey: ["academic-years"],
     queryFn: api.listAcademicYears,
   });
   const classesQuery = useQuery({
-    queryKey: ['classes'],
+    queryKey: ["classes"],
     queryFn: api.listClasses,
   });
   const sectionsQuery = useQuery({
-    queryKey: ['sections'],
+    queryKey: ["sections"],
     queryFn: api.listSections,
   });
 
   const rosterQuery = useQuery({
     queryKey: [
-      'attendance-roster',
+      "attendance-roster",
       academicYearId,
       classId,
       sectionId,
@@ -126,14 +127,14 @@ export function AttendanceForm() {
     }
 
     return [
-      'schoolos.attendance-draft',
+      "schoolos.attendance-draft",
       session.tenant.id,
       session.user.id,
       academicYearId,
       classId,
-      sectionId || 'all',
+      sectionId || "all",
       attendanceDate,
-    ].join(':');
+    ].join(":");
   }, [academicYearId, attendanceDate, classId, sectionId, session]);
 
   const availableSections = (sectionsQuery.data ?? []).filter(
@@ -144,9 +145,9 @@ export function AttendanceForm() {
     [rosterQuery.data?.students],
   );
   const visibleRoster = useMemo(() => {
-    if (statusFilter === 'ALL') return roster;
+    if (statusFilter === "ALL") return roster;
     return roster.filter(
-      (student) => (exceptions[student.id] ?? 'PRESENT') === statusFilter,
+      (student) => (exceptions[student.id] ?? "PRESENT") === statusFilter,
     );
   }, [exceptions, roster, statusFilter]);
 
@@ -174,12 +175,14 @@ export function AttendanceForm() {
       if (cancelled) return;
 
       if (localDraft) {
-        setExceptions(localDraft.exceptions as Record<string, AttendanceStatus>);
+        setExceptions(
+          localDraft.exceptions as Record<string, AttendanceStatus>,
+        );
         setRemarks(localDraft.remarks);
         setDraftSavedAt(localDraft.savedAt);
-        setDraftSyncState('saved_local');
+        setDraftSyncState("saved_local");
         setHasDraftChanges(true);
-        setSubmitMessage('Recovered a locally saved attendance draft.');
+        setSubmitMessage("Recovered a locally saved attendance draft.");
         return;
       }
 
@@ -187,14 +190,14 @@ export function AttendanceForm() {
       const nextRemarks: Record<string, string> = {};
       rosterQuery.data?.students.forEach((student) => {
         const normalized = normalizeStatus(student.status);
-        if (normalized !== 'PRESENT') nextExceptions[student.id] = normalized;
+        if (normalized !== "PRESENT") nextExceptions[student.id] = normalized;
         if (student.remark) nextRemarks[student.id] = student.remark;
       });
       setExceptions(nextExceptions);
       setRemarks(nextRemarks);
       setHasDraftChanges(false);
-      setSubmitMessage('');
-      setConflictMessage('');
+      setSubmitMessage("");
+      setConflictMessage("");
     }
 
     void loadDraftOrRoster();
@@ -231,8 +234,8 @@ export function AttendanceForm() {
 
     void storeAttendanceDraft(draftKey, draft);
     setDraftSavedAt(savedAt);
-    if (draftSyncState !== 'conflict') {
-      setDraftSyncState('saved_local');
+    if (draftSyncState !== "conflict") {
+      setDraftSyncState("saved_local");
     }
   }, [
     academicYearId,
@@ -254,50 +257,54 @@ export function AttendanceForm() {
       void saveDraftToServer();
     }
 
-    window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
   });
 
   const mutation = useMutation({
     mutationFn: api.submitAttendance,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['attendance-roster'] });
+      void queryClient.invalidateQueries({ queryKey: ["attendance-roster"] });
       void clearAttendanceDraft(draftKey);
-      setDraftSyncState('synced');
+      setDraftSyncState("synced");
       setHasDraftChanges(false);
       setSubmitMessage(
-        `Attendance submitted successfully at ${new Date().toLocaleTimeString()}.`,
+        `Attendance submitted successfully at ${formatNepalTime(new Date())}.`,
       );
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     },
   });
 
   const saveDraftMutation = useMutation({
     mutationFn: api.saveAttendanceDraft,
     onSuccess: () => {
-      setDraftSyncState('synced');
+      setDraftSyncState("synced");
       setHasDraftChanges(false);
-      setSubmitMessage(`Draft saved at ${new Date().toLocaleTimeString()}.`);
+      setSubmitMessage(`Draft saved at ${formatNepalTime(new Date())}.`);
     },
     onError: () => {
-      setDraftSyncState('failed');
+      setDraftSyncState("failed");
     },
   });
 
   const syncMutation = useMutation({
     mutationFn: api.syncAttendance,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['attendance-analytics'] });
-      void queryClient.invalidateQueries({ queryKey: ['attendance-conflicts'] });
+      void queryClient.invalidateQueries({
+        queryKey: ["attendance-analytics"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["attendance-conflicts"],
+      });
       void clearAttendanceDraft(draftKey);
-      setDraftSyncState('synced');
+      setDraftSyncState("synced");
       setHasDraftChanges(false);
       setSubmitMessage(
-        `Offline draft synchronized successfully at ${new Date().toLocaleTimeString()}.`,
+        `Offline draft synchronized successfully at ${formatNepalTime(new Date())}.`,
       );
     },
     onError: () => {
-      setDraftSyncState('failed');
+      setDraftSyncState("failed");
     },
   });
 
@@ -306,11 +313,11 @@ export function AttendanceForm() {
   const totals = useMemo(() => {
     return roster.reduce(
       (acc, s) => {
-        const status = exceptions[s.id] ?? 'PRESENT';
+        const status = exceptions[s.id] ?? "PRESENT";
         acc.total++;
-        if (status === 'PRESENT') acc.present++;
-        else if (status === 'ABSENT') acc.absent++;
-        else if (status === 'LATE') acc.late++;
+        if (status === "PRESENT") acc.present++;
+        else if (status === "ABSENT") acc.absent++;
+        else if (status === "LATE") acc.late++;
         else acc.leave++;
         return acc;
       },
@@ -320,7 +327,7 @@ export function AttendanceForm() {
 
   const presentPercent =
     totals.total > 0 ? Math.round((totals.present / totals.total) * 100) : 0;
-  const submissionStatus = rosterQuery.data?.status || 'NOT_STARTED';
+  const submissionStatus = rosterQuery.data?.status || "NOT_STARTED";
 
   const markAllPresent = () => {
     setExceptions({});
@@ -352,28 +359,28 @@ export function AttendanceForm() {
   const saveDraftToServer = async () => {
     if (!academicYearId || !classId || roster.length === 0) return;
     if (hasReconnectConflict(rosterQuery.data?.existingSession, draftSavedAt)) {
-      setDraftSyncState('conflict');
+      setDraftSyncState("conflict");
       setConflictMessage(
-        'Server attendance was submitted after this local draft. Review before syncing.',
+        "Server attendance was submitted after this local draft. Review before syncing.",
       );
       return;
     }
 
-    setDraftSyncState('syncing');
+    setDraftSyncState("syncing");
     await saveDraftMutation.mutateAsync(buildDraftPayload());
   };
 
   const syncDraftSubmission = async () => {
     if (!academicYearId || !classId || roster.length === 0) return;
     if (hasReconnectConflict(rosterQuery.data?.existingSession, draftSavedAt)) {
-      setDraftSyncState('conflict');
+      setDraftSyncState("conflict");
       setConflictMessage(
-        'Server attendance was submitted after this local draft. Review before syncing.',
+        "Server attendance was submitted after this local draft. Review before syncing.",
       );
       return;
     }
 
-    setDraftSyncState('syncing');
+    setDraftSyncState("syncing");
     await syncMutation.mutateAsync({
       clientSubmissionId: `web-draft-${draftKey ?? createDraftFallbackId()}`,
       deviceTimestamp: new Date().toISOString(),
@@ -391,9 +398,9 @@ export function AttendanceForm() {
 
   const keepServerVersion = () => {
     void clearAttendanceDraft(draftKey);
-    setDraftSyncState('synced');
-    setConflictMessage('');
-    void queryClient.invalidateQueries({ queryKey: ['attendance-roster'] });
+    setDraftSyncState("synced");
+    setConflictMessage("");
+    void queryClient.invalidateQueries({ queryKey: ["attendance-roster"] });
   };
 
   return (
@@ -407,15 +414,15 @@ export function AttendanceForm() {
         </div>
       )}
 
-      {draftSyncState !== 'idle' && (
+      {draftSyncState !== "idle" && (
         <div
           className={cn(
-            'flex items-center justify-between gap-4 rounded-xl border px-5 py-4 text-sm font-bold',
-            draftSyncState === 'conflict'
-              ? 'border-warning-200 bg-warning-50 text-warning-900'
-              : draftSyncState === 'failed'
-                ? 'border-danger-100 bg-danger-50 text-danger-800'
-                : 'border-info-100 bg-info-50 text-info-800',
+            "flex items-center justify-between gap-4 rounded-xl border px-5 py-4 text-sm font-bold",
+            draftSyncState === "conflict"
+              ? "border-warning-200 bg-warning-50 text-warning-900"
+              : draftSyncState === "failed"
+                ? "border-danger-100 bg-danger-50 text-danger-800"
+                : "border-info-100 bg-info-50 text-info-800",
           )}
         >
           <div className="flex items-center gap-3">
@@ -424,7 +431,7 @@ export function AttendanceForm() {
               {getDraftSyncLabel(draftSyncState, draftSavedAt, conflictMessage)}
             </span>
           </div>
-          {draftSyncState === 'conflict' ? (
+          {draftSyncState === "conflict" ? (
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -437,7 +444,7 @@ export function AttendanceForm() {
                 type="button"
                 onClick={() =>
                   setConflictMessage(
-                    'Review the local draft below, then request correction if attendance is submitted or locked.',
+                    "Review the local draft below, then request correction if attendance is submitted or locked.",
                   )
                 }
                 className="rounded-xl bg-warning-600 px-3 py-2 text-xs text-white"
@@ -482,7 +489,7 @@ export function AttendanceForm() {
               {academicYearsQuery.data?.map((y) => (
                 <option key={y.id} value={y.id}>
                   {y.name}
-                  {y.isCurrent ? ' (Current)' : ''}
+                  {y.isCurrent ? " (Current)" : ""}
                 </option>
               ))}
             </select>
@@ -496,7 +503,7 @@ export function AttendanceForm() {
               value={classId}
               onChange={(e) => {
                 setClassId(e.target.value);
-                setSectionId('');
+                setSectionId("");
               }}
               className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
               aria-label="Class"
@@ -550,7 +557,7 @@ export function AttendanceForm() {
             <select
               value={statusFilter}
               onChange={(e) =>
-                setStatusFilter(e.target.value as 'ALL' | AttendanceStatus)
+                setStatusFilter(e.target.value as "ALL" | AttendanceStatus)
               }
               className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
               aria-label="Status"
@@ -583,12 +590,12 @@ export function AttendanceForm() {
                 label="Open attendance roster actions"
                 items={[
                   {
-                    label: 'Mark all present',
+                    label: "Mark all present",
                     icon: <CheckSquare size={16} />,
                     onClick: markAllPresent,
                   },
                   {
-                    label: 'Clear exceptions',
+                    label: "Clear exceptions",
                     icon: <Eraser size={16} />,
                     onClick: clearAll,
                   },
@@ -626,12 +633,15 @@ export function AttendanceForm() {
             title="No Students Found"
             description={
               classId
-                ? 'The selected class/section appears to be empty.'
-                : 'Please select a class to view the roster.'
+                ? "The selected class/section appears to be empty."
+                : "Please select a class to view the roster."
             }
             action={
               !classId ? undefined : (
-                <Link href="/dashboard/students" className="text-sm font-bold text-[var(--color-mod-attendance-text)] hover:underline">
+                <Link
+                  href="/dashboard/students"
+                  className="text-sm font-bold text-[var(--color-mod-attendance-text)] hover:underline"
+                >
                   Manage Student Roster
                 </Link>
               )
@@ -682,13 +692,13 @@ export function AttendanceForm() {
                 <AttendanceRosterItem
                   key={student.id}
                   student={student}
-                  status={exceptions[student.id] ?? 'PRESENT'}
-                  remark={remarks[student.id] ?? ''}
+                  status={exceptions[student.id] ?? "PRESENT"}
+                  remark={remarks[student.id] ?? ""}
                   onStatusChange={(status) => {
                     setHasDraftChanges(true);
                     setExceptions((current) => {
                       const next = { ...current };
-                      if (status === 'PRESENT') {
+                      if (status === "PRESENT") {
                         delete next[student.id];
                       } else {
                         next[student.id] = status;
@@ -825,18 +835,19 @@ export function AttendanceForm() {
         </div>
         <button
           type="button"
-          onClick={() =>
+          onClick={() => {
+            const bsDate = toBsDateFromGregorian(attendanceDate);
             void api.exportAttendanceRegister(
               {
                 academicYearId,
                 classId,
                 sectionId: sectionId || null,
-                month: new Date(attendanceDate).getMonth() + 1,
-                year: new Date(attendanceDate).getFullYear(),
+                bsMonth: bsDate.month,
+                bsYear: bsDate.year,
               },
-              'csv',
-            )
-          }
+              "csv",
+            );
+          }}
           disabled={!academicYearId || !classId}
           className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
         >
@@ -848,7 +859,7 @@ export function AttendanceForm() {
       <ConfirmDialog
         isOpen={isConfirmOpen}
         title="Confirm Attendance Submission"
-        description={`Are you sure you want to submit attendance for Class ${classesQuery.data?.find(c => c.id === classId)?.name ?? ''}? This will lock today's records.`}
+        description={`Are you sure you want to submit attendance for Class ${classesQuery.data?.find((c) => c.id === classId)?.name ?? ""}? This will lock today's records.`}
         confirmLabel={mutation.isPending ? "Submitting..." : "Submit"}
         cancelLabel="Review"
         isConfirming={mutation.isPending}
@@ -888,7 +899,7 @@ function SummaryStat({
       <span className="text-[0.6rem] font-bold text-slate-500 uppercase tracking-[0.2em]">
         {label}
       </span>
-      <span className={cn('text-xl font-black', color)}>{value}</span>
+      <span className={cn("text-xl font-black", color)}>{value}</span>
     </div>
   );
 }
@@ -907,7 +918,7 @@ function SummaryPill({
       <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-slate-400">
         {label}
       </p>
-      <p className={cn('mt-1 text-2xl font-black tracking-tight', className)}>
+      <p className={cn("mt-1 text-2xl font-black tracking-tight", className)}>
         {value}
       </p>
     </div>
@@ -917,12 +928,12 @@ function SummaryPill({
 function normalizeStatus(status: string | null | undefined): AttendanceStatus {
   if (status && statusCycle.includes(status as AttendanceStatus))
     return status as AttendanceStatus;
-  if (status === 'A' || status === 'ABSENT') return 'ABSENT';
-  if (status === 'L' || status === 'LATE') return 'LATE';
-  if (status === 'LS' || status === 'SICK_LEAVE') return 'SICK_LEAVE';
-  if (status === 'LE' || status === 'EXCUSED_LEAVE') return 'EXCUSED_LEAVE';
-  if (status === 'LU' || status === 'UNEXCUSED_LEAVE') return 'UNEXCUSED_LEAVE';
-  return 'PRESENT';
+  if (status === "A" || status === "ABSENT") return "ABSENT";
+  if (status === "L" || status === "LATE") return "LATE";
+  if (status === "LS" || status === "SICK_LEAVE") return "SICK_LEAVE";
+  if (status === "LE" || status === "EXCUSED_LEAVE") return "EXCUSED_LEAVE";
+  if (status === "LU" || status === "UNEXCUSED_LEAVE") return "UNEXCUSED_LEAVE";
+  return "PRESENT";
 }
 
 function isFutureDate(value: string) {
@@ -949,12 +960,12 @@ function getDraftSyncLabel(
   savedAt: string | null,
   conflictMessage: string,
 ) {
-  if (state === 'syncing') return 'Syncing attendance draft...';
-  if (state === 'synced') return 'Draft synced with SchoolOS.';
-  if (state === 'conflict')
-    return conflictMessage || 'Conflict found. Review before syncing.';
-  if (state === 'failed') return 'Sync failed. Draft is still saved locally.';
-  if (!savedAt) return 'Draft saved locally.';
+  if (state === "syncing") return "Syncing attendance draft...";
+  if (state === "synced") return "Draft synced with SchoolOS.";
+  if (state === "conflict")
+    return conflictMessage || "Conflict found. Review before syncing.";
+  if (state === "failed") return "Sync failed. Draft is still saved locally.";
+  if (!savedAt) return "Draft saved locally.";
 
-  return `Saved locally at ${new Date(savedAt).toLocaleTimeString()}.`;
+  return `Saved locally at ${formatNepalTime(savedAt)}.`;
 }

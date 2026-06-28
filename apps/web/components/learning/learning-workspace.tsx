@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import Link from 'next/link';
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatBsDateTime } from "@schoolos/core";
+import Link from "next/link";
 import {
   Archive,
   BookOpenCheck,
@@ -12,8 +13,8 @@ import {
   Plus,
   Save,
   Users,
-} from 'lucide-react';
-import { learningApi } from '../../lib/api/learning';
+} from "lucide-react";
+import { learningApi } from "../../lib/api/learning";
 import type {
   LearningActivity,
   LearningActivityPayload,
@@ -24,25 +25,25 @@ import type {
   LearningMode,
   LearningQuestion,
   LearningQuestionType,
-} from '../../lib/api/learning';
-import { api } from '../../lib/api';
-import { cn } from '../../lib/utils';
-import { EmptyState } from '../ui/empty-state';
-import { LoadingState } from '../ui/loading-state';
-import { StatCard } from '../ui/stat-card';
-import { StatusBadge } from '../ui/status-badge';
-import { LearningResourcesPanel } from './learning-resources-panel';
-import { LearningSessionsPanel } from './learning-sessions-panel';
+} from "../../lib/api/learning";
+import { api } from "../../lib/api";
+import { cn } from "../../lib/utils";
+import { EmptyState } from "../ui/empty-state";
+import { LoadingState } from "../ui/loading-state";
+import { StatCard } from "../ui/stat-card";
+import { StatusBadge } from "../ui/status-badge";
+import { LearningResourcesPanel } from "./learning-resources-panel";
+import { LearningSessionsPanel } from "./learning-sessions-panel";
 
 type LearningTab =
-  | 'overview'
-  | 'activities'
-  | 'builder'
-  | 'resources'
-  | 'sessions'
-  | 'board'
-  | 'lab'
-  | 'progress';
+  | "overview"
+  | "activities"
+  | "builder"
+  | "resources"
+  | "sessions"
+  | "board"
+  | "lab"
+  | "progress";
 
 type LearningWorkspaceProps = {
   initialTab?: LearningTab;
@@ -50,69 +51,69 @@ type LearningWorkspaceProps = {
 };
 
 const activityTypes: LearningActivityType[] = [
-  'PRACTICE',
-  'QUIZ',
-  'EXPLANATION',
-  'REVISION',
-  'OBSERVATION',
+  "PRACTICE",
+  "QUIZ",
+  "EXPLANATION",
+  "REVISION",
+  "OBSERVATION",
 ];
-const difficulties: LearningDifficulty[] = ['EASY', 'MEDIUM', 'HARD'];
+const difficulties: LearningDifficulty[] = ["EASY", "MEDIUM", "HARD"];
 const modes: LearningMode[] = [
-  'SMART_BOARD',
-  'GROUP',
-  'COMPUTER_LAB',
-  'WORKSHEET',
-  'HYBRID',
+  "SMART_BOARD",
+  "GROUP",
+  "COMPUTER_LAB",
+  "WORKSHEET",
+  "HYBRID",
 ];
-const languageModes: LearningLanguageMode[] = ['ENGLISH', 'NEPALI', 'MIXED'];
-const statuses: LearningActivityStatus[] = ['DRAFT', 'READY'];
+const languageModes: LearningLanguageMode[] = ["ENGLISH", "NEPALI", "MIXED"];
+const statuses: LearningActivityStatus[] = ["DRAFT", "READY"];
 const questionTypes: LearningQuestionType[] = [
-  'MULTIPLE_CHOICE',
-  'TRUE_FALSE',
-  'SHORT_ANSWER',
-  'MATCHING',
-  'ORDERING',
+  "MULTIPLE_CHOICE",
+  "TRUE_FALSE",
+  "SHORT_ANSWER",
+  "MATCHING",
+  "ORDERING",
 ];
 
 const emptyQuestion: LearningQuestion = {
-  type: 'MULTIPLE_CHOICE',
-  prompt: '',
-  options: ['Option A', 'Option B'],
-  correctAnswer: 'Option A',
+  type: "MULTIPLE_CHOICE",
+  prompt: "",
+  options: ["Option A", "Option B"],
+  correctAnswer: "Option A",
   points: 1,
 };
 
 const emptyActivityForm: LearningActivityPayload = {
-  title: '',
-  description: '',
-  classId: '',
-  sectionId: '',
-  subjectId: '',
-  teacherId: '',
-  activityType: 'PRACTICE',
-  difficulty: 'EASY',
-  mode: 'SMART_BOARD',
-  accessType: 'SCHOOL_ONLY',
-  languageMode: 'ENGLISH',
+  title: "",
+  description: "",
+  classId: "",
+  sectionId: "",
+  subjectId: "",
+  teacherId: "",
+  activityType: "PRACTICE",
+  difficulty: "EASY",
+  mode: "SMART_BOARD",
+  accessType: "SCHOOL_ONLY",
+  languageMode: "ENGLISH",
   estimatedMinutes: 20,
-  status: 'DRAFT',
+  status: "DRAFT",
   questions: [{ ...emptyQuestion }],
 };
 
 export function LearningWorkspace({
-  initialTab = 'overview',
+  initialTab = "overview",
   activityId,
 }: LearningWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<LearningTab>(
-    activityId ? 'builder' : initialTab,
+    activityId ? "builder" : initialTab,
   );
   const [filters, setFilters] = useState({
-    classId: '',
-    sectionId: '',
-    subjectId: '',
-    difficulty: '',
-    mode: '',
-    status: '',
+    classId: "",
+    sectionId: "",
+    subjectId: "",
+    difficulty: "",
+    mode: "",
+    status: "",
   });
   const [form, setForm] = useState<LearningActivityPayload>({
     ...emptyActivityForm,
@@ -122,13 +123,13 @@ export function LearningWorkspace({
     activityId ?? null,
   );
   const [notice, setNotice] = useState<string | null>(null);
-  const [progressClassId, setProgressClassId] = useState('');
-  const [progressStudentId, setProgressStudentId] = useState('');
+  const [progressClassId, setProgressClassId] = useState("");
+  const [progressStudentId, setProgressStudentId] = useState("");
 
   const queryClient = useQueryClient();
 
   const activitiesQuery = useQuery({
-    queryKey: ['learning-activities', filters],
+    queryKey: ["learning-activities", filters],
     queryFn: () =>
       learningApi.listActivities({
         classId: filters.classId || undefined,
@@ -141,83 +142,99 @@ export function LearningWorkspace({
       }),
   });
   const activityDetailQuery = useQuery({
-    queryKey: ['learning-activity', editingActivityId],
+    queryKey: ["learning-activity", editingActivityId],
     queryFn: () => learningApi.getActivity(editingActivityId as string),
     enabled: Boolean(editingActivityId),
   });
   const liveSessionsQuery = useQuery({
-    queryKey: ['learning-sessions-live-count'],
-    queryFn: () => learningApi.listSessions({ status: 'LIVE', limit: 1 }),
+    queryKey: ["learning-sessions-live-count"],
+    queryFn: () => learningApi.listSessions({ status: "LIVE", limit: 1 }),
   });
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
-  const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
+  const classesQuery = useQuery({
+    queryKey: ["classes"],
+    queryFn: api.listClasses,
+  });
+  const sectionsQuery = useQuery({
+    queryKey: ["sections"],
+    queryFn: api.listSections,
+  });
   const subjectsQuery = useQuery({
-    queryKey: ['subjects', form.classId],
+    queryKey: ["subjects", form.classId],
     queryFn: () => api.listSubjects({ classId: form.classId || undefined }),
   });
-  const staffQuery = useQuery({ queryKey: ['staff'], queryFn: api.listStaff });
+  const staffQuery = useQuery({ queryKey: ["staff"], queryFn: api.listStaff });
   const studentsQuery = useQuery({
-    queryKey: ['students-for-learning'],
+    queryKey: ["students-for-learning"],
     queryFn: () => api.listStudents({ limit: 1000 }),
   });
   const classProgressQuery = useQuery({
-    queryKey: ['learning-class-progress', progressClassId],
+    queryKey: ["learning-class-progress", progressClassId],
     queryFn: () => learningApi.getClassProgress(progressClassId),
-    enabled: activeTab === 'progress' && Boolean(progressClassId),
+    enabled: activeTab === "progress" && Boolean(progressClassId),
   });
   const studentProgressQuery = useQuery({
-    queryKey: ['learning-student-progress', progressStudentId],
+    queryKey: ["learning-student-progress", progressStudentId],
     queryFn: () => learningApi.getStudentProgress(progressStudentId),
-    enabled: activeTab === 'progress' && Boolean(progressStudentId),
+    enabled: activeTab === "progress" && Boolean(progressStudentId),
   });
 
   const activities = activitiesQuery.data?.items ?? [];
   const students = studentsQuery.data?.items ?? [];
 
   const readyCount = activities.filter(
-    (activity) => activity.status === 'READY',
+    (activity) => activity.status === "READY",
   ).length;
   const liveSessionCount = liveSessionsQuery.data?.total ?? 0;
   const questionCount = activities.reduce(
-    (sum, activity) => sum + (activity._count?.questions ?? activity.questions?.length ?? 0),
+    (sum, activity) =>
+      sum + (activity._count?.questions ?? activity.questions?.length ?? 0),
     0,
   );
 
   const createActivityMutation = useMutation({
     mutationFn: learningApi.createActivity,
     onSuccess: (activity) => {
-      setNotice('Learning activity saved.');
+      setNotice("Learning activity saved.");
       setEditingActivityId(activity.id);
-      void queryClient.invalidateQueries({ queryKey: ['learning-activities'] });
-      void queryClient.invalidateQueries({ queryKey: ['learning-activity', activity.id] });
+      void queryClient.invalidateQueries({ queryKey: ["learning-activities"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["learning-activity", activity.id],
+      });
     },
   });
   const updateActivityMutation = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Partial<LearningActivityPayload> }) =>
-      learningApi.updateActivity(id, body),
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: Partial<LearningActivityPayload>;
+    }) => learningApi.updateActivity(id, body),
     onSuccess: (activity) => {
-      setNotice('Learning activity updated.');
-      void queryClient.invalidateQueries({ queryKey: ['learning-activities'] });
-      void queryClient.invalidateQueries({ queryKey: ['learning-activity', activity.id] });
+      setNotice("Learning activity updated.");
+      void queryClient.invalidateQueries({ queryKey: ["learning-activities"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["learning-activity", activity.id],
+      });
     },
   });
   const archiveActivityMutation = useMutation({
     mutationFn: learningApi.archiveActivity,
     onSuccess: () => {
-      setNotice('Learning activity archived.');
-      void queryClient.invalidateQueries({ queryKey: ['learning-activities'] });
+      setNotice("Learning activity archived.");
+      void queryClient.invalidateQueries({ queryKey: ["learning-activities"] });
     },
   });
   function selectActivity(activity: LearningActivity) {
     setEditingActivityId(activity.id);
     setForm(activityToForm(activity));
-    setActiveTab('builder');
+    setActiveTab("builder");
   }
 
   function resetBuilder() {
     setEditingActivityId(null);
     setForm({ ...emptyActivityForm, questions: [{ ...emptyQuestion }] });
-    setActiveTab('builder');
+    setActiveTab("builder");
   }
 
   function submitActivity(event: FormEvent<HTMLFormElement>) {
@@ -242,7 +259,9 @@ export function LearningWorkspace({
   function removeQuestion(index: number) {
     setForm((current) => ({
       ...current,
-      questions: (current.questions ?? []).filter((_, questionIndex) => questionIndex !== index),
+      questions: (current.questions ?? []).filter(
+        (_, questionIndex) => questionIndex !== index,
+      ),
     }));
   }
 
@@ -263,14 +282,17 @@ export function LearningWorkspace({
   }, [currentActivity]);
   const activityTabs = useMemo(
     () => [
-      { key: 'overview' as const, label: 'Overview' },
-      { key: 'activities' as const, label: 'Activities' },
-      { key: 'builder' as const, label: editingActivityId ? 'Edit activity' : 'Builder' },
-      { key: 'resources' as const, label: 'Resources' },
-      { key: 'sessions' as const, label: 'Sessions' },
-      { key: 'board' as const, label: 'Smart board' },
-      { key: 'lab' as const, label: 'Computer lab' },
-      { key: 'progress' as const, label: 'Progress' },
+      { key: "overview" as const, label: "Overview" },
+      { key: "activities" as const, label: "Activities" },
+      {
+        key: "builder" as const,
+        label: editingActivityId ? "Edit activity" : "Builder",
+      },
+      { key: "resources" as const, label: "Resources" },
+      { key: "sessions" as const, label: "Sessions" },
+      { key: "board" as const, label: "Smart board" },
+      { key: "lab" as const, label: "Computer lab" },
+      { key: "progress" as const, label: "Progress" },
     ],
     [editingActivityId],
   );
@@ -285,10 +307,10 @@ export function LearningWorkspace({
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={cn(
-              'shrink-0 rounded-xl border px-4 py-2 text-sm font-bold transition',
+              "shrink-0 rounded-xl border px-4 py-2 text-sm font-bold transition",
               activeTab === tab.key
-                ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800',
+                ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800",
             )}
           >
             {tab.label}
@@ -296,7 +318,7 @@ export function LearningWorkspace({
         ))}
       </div>
 
-      {activeTab === 'overview' && (
+      {activeTab === "overview" && (
         <section className="space-y-5">
           <div className="grid gap-4 md:grid-cols-4">
             <StatCard
@@ -331,19 +353,21 @@ export function LearningWorkspace({
             isLoading={activitiesQuery.isLoading}
             onSelect={selectActivity}
             onArchive={(id) => archiveActivityMutation.mutate(id)}
-            onLaunch={() => setActiveTab('sessions')}
+            onLaunch={() => setActiveTab("sessions")}
           />
         </section>
       )}
 
-      {activeTab === 'activities' && (
+      {activeTab === "activities" && (
         <section className="space-y-5">
           <div className="shell-card p-5">
             <div className="grid gap-3 md:grid-cols-6">
               <SelectField
                 label="Class"
                 value={filters.classId}
-                onChange={(value) => setFilters((current) => ({ ...current, classId: value }))}
+                onChange={(value) =>
+                  setFilters((current) => ({ ...current, classId: value }))
+                }
                 options={(classesQuery.data ?? []).map((item) => ({
                   value: item.id,
                   label: item.name,
@@ -352,7 +376,9 @@ export function LearningWorkspace({
               <SelectField
                 label="Section"
                 value={filters.sectionId}
-                onChange={(value) => setFilters((current) => ({ ...current, sectionId: value }))}
+                onChange={(value) =>
+                  setFilters((current) => ({ ...current, sectionId: value }))
+                }
                 options={(sectionsQuery.data ?? []).map((item) => ({
                   value: item.id,
                   label: item.name,
@@ -361,7 +387,9 @@ export function LearningWorkspace({
               <SelectField
                 label="Subject"
                 value={filters.subjectId}
-                onChange={(value) => setFilters((current) => ({ ...current, subjectId: value }))}
+                onChange={(value) =>
+                  setFilters((current) => ({ ...current, subjectId: value }))
+                }
                 options={(subjectsQuery.data ?? []).map((item) => ({
                   value: item.id,
                   label: item.name,
@@ -370,20 +398,32 @@ export function LearningWorkspace({
               <SelectField
                 label="Difficulty"
                 value={filters.difficulty}
-                onChange={(value) => setFilters((current) => ({ ...current, difficulty: value }))}
-                options={difficulties.map((value) => ({ value, label: labelize(value) }))}
+                onChange={(value) =>
+                  setFilters((current) => ({ ...current, difficulty: value }))
+                }
+                options={difficulties.map((value) => ({
+                  value,
+                  label: labelize(value),
+                }))}
               />
               <SelectField
                 label="Mode"
                 value={filters.mode}
-                onChange={(value) => setFilters((current) => ({ ...current, mode: value }))}
-                options={modes.map((value) => ({ value, label: labelize(value) }))}
+                onChange={(value) =>
+                  setFilters((current) => ({ ...current, mode: value }))
+                }
+                options={modes.map((value) => ({
+                  value,
+                  label: labelize(value),
+                }))}
               />
               <SelectField
                 label="Status"
                 value={filters.status}
-                onChange={(value) => setFilters((current) => ({ ...current, status: value }))}
-                options={['', ...statuses].filter(Boolean).map((value) => ({
+                onChange={(value) =>
+                  setFilters((current) => ({ ...current, status: value }))
+                }
+                options={["", ...statuses].filter(Boolean).map((value) => ({
                   value,
                   label: labelize(value),
                 }))}
@@ -395,20 +435,23 @@ export function LearningWorkspace({
             isLoading={activitiesQuery.isLoading}
             onSelect={selectActivity}
             onArchive={(id) => archiveActivityMutation.mutate(id)}
-            onLaunch={() => setActiveTab('sessions')}
+            onLaunch={() => setActiveTab("sessions")}
           />
         </section>
       )}
 
-      {activeTab === 'builder' && (
+      {activeTab === "builder" && (
         <section className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-black text-slate-950">
-                {editingActivityId ? 'Edit Learning Activity' : 'Teacher Activity Builder'}
+                {editingActivityId
+                  ? "Edit Learning Activity"
+                  : "Teacher Activity Builder"}
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Build school-only activities with Easy, Medium, or Hard difficulty.
+                Build school-only activities with Easy, Medium, or Hard
+                difficulty.
               </p>
             </div>
             <button
@@ -428,23 +471,28 @@ export function LearningWorkspace({
                 <InputField
                   label="Title"
                   value={form.title}
-                  onChange={(value) => setForm((current) => ({ ...current, title: value }))}
+                  onChange={(value) =>
+                    setForm((current) => ({ ...current, title: value }))
+                  }
                   required
                 />
                 <SelectField
                   label="Status"
-                  value={form.status ?? 'DRAFT'}
+                  value={form.status ?? "DRAFT"}
                   onChange={(value) =>
                     setForm((current) => ({
                       ...current,
                       status: value as LearningActivityStatus,
                     }))
                   }
-                  options={statuses.map((value) => ({ value, label: labelize(value) }))}
+                  options={statuses.map((value) => ({
+                    value,
+                    label: labelize(value),
+                  }))}
                 />
                 <TextAreaField
                   label="Description"
-                  value={form.description ?? ''}
+                  value={form.description ?? ""}
                   onChange={(value) =>
                     setForm((current) => ({ ...current, description: value }))
                   }
@@ -455,7 +503,11 @@ export function LearningWorkspace({
                   value={form.classId}
                   required
                   onChange={(value) =>
-                    setForm((current) => ({ ...current, classId: value, subjectId: '' }))
+                    setForm((current) => ({
+                      ...current,
+                      classId: value,
+                      subjectId: "",
+                    }))
                   }
                   options={(classesQuery.data ?? []).map((item) => ({
                     value: item.id,
@@ -464,8 +516,10 @@ export function LearningWorkspace({
                 />
                 <SelectField
                   label="Section"
-                  value={form.sectionId ?? ''}
-                  onChange={(value) => setForm((current) => ({ ...current, sectionId: value }))}
+                  value={form.sectionId ?? ""}
+                  onChange={(value) =>
+                    setForm((current) => ({ ...current, sectionId: value }))
+                  }
                   options={(sectionsQuery.data ?? []).map((item) => ({
                     value: item.id,
                     label: item.name,
@@ -475,7 +529,9 @@ export function LearningWorkspace({
                   label="Subject"
                   value={form.subjectId}
                   required
-                  onChange={(value) => setForm((current) => ({ ...current, subjectId: value }))}
+                  onChange={(value) =>
+                    setForm((current) => ({ ...current, subjectId: value }))
+                  }
                   options={(subjectsQuery.data ?? []).map((item) => ({
                     value: item.id,
                     label: item.name,
@@ -483,11 +539,18 @@ export function LearningWorkspace({
                 />
                 <SelectField
                   label="Teacher"
-                  value={form.teacherId ?? ''}
-                  onChange={(value) => setForm((current) => ({ ...current, teacherId: value }))}
+                  value={form.teacherId ?? ""}
+                  onChange={(value) =>
+                    setForm((current) => ({ ...current, teacherId: value }))
+                  }
                   options={(staffQuery.data ?? []).map((item) => ({
                     value: item.id,
-                    label: [item.firstName, item.lastName].filter(Boolean).join(' ') || item.employeeId || item.id,
+                    label:
+                      [item.firstName, item.lastName]
+                        .filter(Boolean)
+                        .join(" ") ||
+                      item.employeeId ||
+                      item.id,
                   }))}
                 />
                 <SelectField
@@ -499,7 +562,10 @@ export function LearningWorkspace({
                       activityType: value as LearningActivityType,
                     }))
                   }
-                  options={activityTypes.map((value) => ({ value, label: labelize(value) }))}
+                  options={activityTypes.map((value) => ({
+                    value,
+                    label: labelize(value),
+                  }))}
                 />
                 <SelectField
                   label="Difficulty"
@@ -510,31 +576,43 @@ export function LearningWorkspace({
                       difficulty: value as LearningDifficulty,
                     }))
                   }
-                  options={difficulties.map((value) => ({ value, label: labelize(value) }))}
+                  options={difficulties.map((value) => ({
+                    value,
+                    label: labelize(value),
+                  }))}
                 />
                 <SelectField
                   label="Mode"
                   value={form.mode}
                   onChange={(value) =>
-                    setForm((current) => ({ ...current, mode: value as LearningMode }))
+                    setForm((current) => ({
+                      ...current,
+                      mode: value as LearningMode,
+                    }))
                   }
-                  options={modes.map((value) => ({ value, label: labelize(value) }))}
+                  options={modes.map((value) => ({
+                    value,
+                    label: labelize(value),
+                  }))}
                 />
                 <SelectField
                   label="Language"
-                  value={form.languageMode ?? 'ENGLISH'}
+                  value={form.languageMode ?? "ENGLISH"}
                   onChange={(value) =>
                     setForm((current) => ({
                       ...current,
                       languageMode: value as LearningLanguageMode,
                     }))
                   }
-                  options={languageModes.map((value) => ({ value, label: labelize(value) }))}
+                  options={languageModes.map((value) => ({
+                    value,
+                    label: labelize(value),
+                  }))}
                 />
                 <InputField
                   label="Estimated minutes"
                   type="number"
-                  value={String(form.estimatedMinutes ?? '')}
+                  value={String(form.estimatedMinutes ?? "")}
                   onChange={(value) =>
                     setForm((current) => ({
                       ...current,
@@ -551,7 +629,8 @@ export function LearningWorkspace({
                       Questions
                     </h3>
                     <p className="mt-1 text-sm text-slate-500">
-                      Multiple choice, true/false, and normalized short answer are supported.
+                      Multiple choice, true/false, and normalized short answer
+                      are supported.
                     </p>
                   </div>
                   <button
@@ -584,17 +663,18 @@ export function LearningWorkspace({
                 <button
                   type="submit"
                   disabled={
-                    createActivityMutation.isPending || updateActivityMutation.isPending
+                    createActivityMutation.isPending ||
+                    updateActivityMutation.isPending
                   }
                   className="inline-flex h-11 items-center gap-2 rounded-xl bg-emerald-700 px-5 text-sm font-black text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Save size={17} />
-                  {editingActivityId ? 'Update activity' : 'Create activity'}
+                  {editingActivityId ? "Update activity" : "Create activity"}
                 </button>
                 {currentActivity && (
                   <button
                     type="button"
-                    onClick={() => setActiveTab('sessions')}
+                    onClick={() => setActiveTab("sessions")}
                     className="inline-flex h-11 items-center gap-2 rounded-xl border border-emerald-100 bg-white px-5 text-sm font-black text-emerald-800 hover:bg-emerald-50"
                   >
                     <MonitorPlay size={17} />
@@ -607,23 +687,17 @@ export function LearningWorkspace({
         </section>
       )}
 
-      {activeTab === 'sessions' && (
+      {activeTab === "sessions" && (
         <LearningSessionsPanel activities={activities} />
       )}
 
-      {activeTab === 'resources' && (
-        <LearningResourcesPanel />
-      )}
+      {activeTab === "resources" && <LearningResourcesPanel />}
 
-      {activeTab === 'board' && (
-        <BoardLaunchPanel />
-      )}
+      {activeTab === "board" && <BoardLaunchPanel />}
 
-      {activeTab === 'lab' && (
-        <LabPanel />
-      )}
+      {activeTab === "lab" && <LabPanel />}
 
-      {activeTab === 'progress' && (
+      {activeTab === "progress" && (
         <ProgressPanel
           classes={(classesQuery.data ?? []).map((item) => ({
             id: item.id,
@@ -632,7 +706,9 @@ export function LearningWorkspace({
           students={students.map((student) => ({
             id: student.id,
             name:
-              [student.firstNameEn, student.lastNameEn].filter(Boolean).join(' ') ||
+              [student.firstNameEn, student.lastNameEn]
+                .filter(Boolean)
+                .join(" ") ||
               student.studentSystemId ||
               student.id,
           }))}
@@ -642,7 +718,9 @@ export function LearningWorkspace({
           onStudentIdChange={setProgressStudentId}
           classProgress={classProgressQuery.data}
           studentProgress={studentProgressQuery.data}
-          isLoading={classProgressQuery.isLoading || studentProgressQuery.isLoading}
+          isLoading={
+            classProgressQuery.isLoading || studentProgressQuery.isLoading
+          }
         />
       )}
 
@@ -681,7 +759,9 @@ function ActivityList({
   onLaunch: (activityId: string) => void;
 }) {
   if (isLoading) {
-    return <LoadingState variant="skeleton" label="Loading learning activities" />;
+    return (
+      <LoadingState variant="skeleton" label="Loading learning activities" />
+    );
   }
 
   if (activities.length === 0) {
@@ -713,14 +793,18 @@ function ActivityList({
             onClick={() => onSelect(activity)}
             className="col-span-4 min-w-0 text-left"
           >
-            <p className="truncate text-sm font-black text-slate-950">{activity.title}</p>
+            <p className="truncate text-sm font-black text-slate-950">
+              {activity.title}
+            </p>
             <p className="mt-1 text-xs text-slate-500">
-              {labelize(activity.difficulty)} · {activity._count?.questions ?? activity.questions?.length ?? 0} questions
+              {labelize(activity.difficulty)} ·{" "}
+              {activity._count?.questions ?? activity.questions?.length ?? 0}{" "}
+              questions
             </p>
           </button>
           <div className="col-span-2 text-sm text-slate-600">
             {activity.class?.name ?? activity.classId}
-            {activity.section?.name ? ` / ${activity.section.name}` : ''}
+            {activity.section?.name ? ` / ${activity.section.name}` : ""}
           </div>
           <div className="col-span-2 text-sm font-semibold text-slate-600">
             {labelize(activity.mode)}
@@ -775,7 +859,8 @@ function LabPanel() {
     <div className="shell-card p-5">
       <h2 className="text-lg font-black text-slate-950">Computer Lab Access</h2>
       <p className="mt-1 text-sm text-slate-500">
-        Students join with the session code or QR token, then start an individual attempt.
+        Students join with the session code or QR token, then start an
+        individual attempt.
       </p>
       <div className="mt-5 flex flex-wrap gap-3">
         <Link
@@ -808,13 +893,19 @@ function ProgressPanel(props: {
           label="Class progress"
           value={props.classId}
           onChange={props.onClassIdChange}
-          options={props.classes.map((item) => ({ value: item.id, label: item.name }))}
+          options={props.classes.map((item) => ({
+            value: item.id,
+            label: item.name,
+          }))}
         />
         <SelectField
           label="Student progress"
           value={props.studentId}
           onChange={props.onStudentIdChange}
-          options={props.students.map((item) => ({ value: item.id, label: item.name }))}
+          options={props.students.map((item) => ({
+            value: item.id,
+            label: item.name,
+          }))}
         />
       </div>
       {props.isLoading ? <LoadingState variant="skeleton" /> : null}
@@ -829,16 +920,20 @@ function ProgressPanel(props: {
                 key={item.student.id}
                 className="rounded-xl border border-slate-100 bg-slate-50 p-4"
               >
-                <p className="text-sm font-black text-slate-900">{item.student.name}</p>
+                <p className="text-sm font-black text-slate-900">
+                  {item.student.name}
+                </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {item.progress.length === 0 ? (
-                    <span className="text-sm text-slate-500">No submitted activity yet.</span>
+                    <span className="text-sm text-slate-500">
+                      No submitted activity yet.
+                    </span>
                   ) : (
                     item.progress.map((progress) => (
                       <StatusBadge
                         key={progress.id}
                         status={progress.label}
-                        label={`${progress.subject?.name ?? 'Subject'} · ${progress.labelText}`}
+                        label={`${progress.subject?.name ?? "Subject"} · ${progress.labelText}`}
                         tone={progressTone(progress.label)}
                       />
                     ))
@@ -856,12 +951,18 @@ function ProgressPanel(props: {
           </h3>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {props.studentProgress.items.map((progress) => (
-              <div key={progress.id} className="rounded-xl border border-slate-100 p-4">
+              <div
+                key={progress.id}
+                className="rounded-xl border border-slate-100 p-4"
+              >
                 <p className="text-sm font-black text-slate-950">
-                  {progress.activity?.title ?? progress.subject?.name ?? 'Learning progress'}
+                  {progress.activity?.title ??
+                    progress.subject?.name ??
+                    "Learning progress"}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  {progress.completedCount} completed · {Math.round(progress.averageAccuracy)}%
+                  {progress.completedCount} completed ·{" "}
+                  {Math.round(progress.averageAccuracy)}%
                 </p>
                 <div className="mt-3">
                   <StatusBadge
@@ -891,16 +992,12 @@ function QuestionEditor({
   onRemove: () => void;
 }) {
   const optionsText = Array.isArray(question.options)
-    ? question.options.join('\n')
-    : '';
+    ? question.options.join("\n")
+    : "";
   const matchingPairsText =
-    question.type === 'MATCHING'
-      ? matchingPairsToText(question.options)
-      : '';
+    question.type === "MATCHING" ? matchingPairsToText(question.options) : "";
   const orderingItemsText =
-    question.type === 'ORDERING'
-      ? orderingItemsToText(question.options)
-      : '';
+    question.type === "ORDERING" ? orderingItemsToText(question.options) : "";
 
   return (
     <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
@@ -911,7 +1008,10 @@ function QuestionEditor({
           onChange={(value) =>
             onChange(questionDefaultsForType(value as LearningQuestionType))
           }
-          options={questionTypes.map((value) => ({ value, label: labelize(value) }))}
+          options={questionTypes.map((value) => ({
+            value,
+            label: labelize(value),
+          }))}
         />
         <InputField
           label="Prompt"
@@ -926,14 +1026,14 @@ function QuestionEditor({
           onChange={(value) => onChange({ points: Number(value || 1) })}
         />
       </div>
-      {question.type === 'MULTIPLE_CHOICE' && (
+      {question.type === "MULTIPLE_CHOICE" && (
         <TextAreaField
           label="Options, one per line"
           value={optionsText}
           onChange={(value) =>
             onChange({
               options: value
-                .split('\n')
+                .split("\n")
                 .map((item) => item.trim())
                 .filter(Boolean),
             })
@@ -941,7 +1041,7 @@ function QuestionEditor({
           className="mt-3"
         />
       )}
-      {question.type === 'MATCHING' && (
+      {question.type === "MATCHING" && (
         <TextAreaField
           label="Pairs: leftId | leftText | rightId | rightText"
           value={matchingPairsText}
@@ -958,7 +1058,7 @@ function QuestionEditor({
           className="mt-3"
         />
       )}
-      {question.type === 'ORDERING' && (
+      {question.type === "ORDERING" && (
         <TextAreaField
           label="Ordered items: id | text"
           value={orderingItemsText}
@@ -972,32 +1072,32 @@ function QuestionEditor({
           className="mt-3"
         />
       )}
-      {question.type === 'TRUE_FALSE' ? (
+      {question.type === "TRUE_FALSE" ? (
         <SelectField
           label="Correct answer"
-          value={String(question.correctAnswer ?? 'true')}
-          onChange={(value) => onChange({ correctAnswer: value === 'true' })}
+          value={String(question.correctAnswer ?? "true")}
+          onChange={(value) => onChange({ correctAnswer: value === "true" })}
           options={[
-            { value: 'true', label: 'True' },
-            { value: 'false', label: 'False' },
+            { value: "true", label: "True" },
+            { value: "false", label: "False" },
           ]}
           className="mt-3"
         />
-      ) : question.type === 'MATCHING' || question.type === 'ORDERING' ? (
+      ) : question.type === "MATCHING" || question.type === "ORDERING" ? (
         <p className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-500">
           Correct answer is derived from the ordered rows above.
         </p>
       ) : (
         <InputField
           label="Correct answer"
-          value={String(question.correctAnswer ?? '')}
+          value={String(question.correctAnswer ?? "")}
           onChange={(value) => onChange({ correctAnswer: value })}
           className="mt-3"
         />
       )}
       <InputField
         label="Explanation"
-        value={question.explanation ?? ''}
+        value={question.explanation ?? ""}
         onChange={(value) => onChange({ explanation: value })}
         className="mt-3"
       />
@@ -1016,7 +1116,7 @@ function InputField({
   label,
   value,
   onChange,
-  type = 'text',
+  type = "text",
   required = false,
   className,
 }: {
@@ -1028,7 +1128,7 @@ function InputField({
   className?: string;
 }) {
   return (
-    <label className={cn('block', className)}>
+    <label className={cn("block", className)}>
       <span className="text-xs font-black uppercase tracking-wide text-slate-500">
         {label}
       </span>
@@ -1055,7 +1155,7 @@ function TextAreaField({
   className?: string;
 }) {
   return (
-    <label className={cn('block', className)}>
+    <label className={cn("block", className)}>
       <span className="text-xs font-black uppercase tracking-wide text-slate-500">
         {label}
       </span>
@@ -1085,7 +1185,7 @@ function SelectField({
   className?: string;
 }) {
   return (
-    <label className={cn('block', className)}>
+    <label className={cn("block", className)}>
       <span className="text-xs font-black uppercase tracking-wide text-slate-500">
         {label}
       </span>
@@ -1116,7 +1216,11 @@ function Notice({
   return (
     <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
       <span>{message}</span>
-      <button type="button" className="text-xs font-black uppercase" onClick={onDismiss}>
+      <button
+        type="button"
+        className="text-xs font-black uppercase"
+        onClick={onDismiss}
+      >
         Dismiss
       </button>
     </div>
@@ -1126,7 +1230,7 @@ function Notice({
 function ErrorNotice({ error }: { error: unknown }) {
   return (
     <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
-      {error instanceof Error ? error.message : 'Learning request failed.'}
+      {error instanceof Error ? error.message : "Learning request failed."}
     </div>
   );
 }
@@ -1134,9 +1238,9 @@ function ErrorNotice({ error }: { error: unknown }) {
 function activityToForm(activity: LearningActivity): LearningActivityPayload {
   return {
     title: activity.title,
-    description: activity.description ?? '',
+    description: activity.description ?? "",
     classId: activity.classId,
-    sectionId: activity.sectionId ?? '',
+    sectionId: activity.sectionId ?? "",
     subjectId: activity.subjectId,
     teacherId: activity.teacherId,
     activityType: activity.activityType,
@@ -1145,7 +1249,7 @@ function activityToForm(activity: LearningActivity): LearningActivityPayload {
     accessType: activity.accessType,
     languageMode: activity.languageMode,
     estimatedMinutes: activity.estimatedMinutes ?? 20,
-    status: activity.status === 'ARCHIVED' ? 'DRAFT' : activity.status,
+    status: activity.status === "ARCHIVED" ? "DRAFT" : activity.status,
     questions: activity.questions?.length
       ? activity.questions.map((question, index) => ({
           ...question,
@@ -1164,7 +1268,7 @@ function normalizeActivityPayload(
     teacherId: payload.teacherId || undefined,
     description: payload.description || undefined,
     estimatedMinutes: payload.estimatedMinutes || undefined,
-    accessType: 'SCHOOL_ONLY',
+    accessType: "SCHOOL_ONLY",
     questions: (payload.questions ?? [])
       .filter((question) => question.prompt.trim())
       .map((question, index) => ({
@@ -1176,30 +1280,32 @@ function normalizeActivityPayload(
   };
 }
 
-function questionDefaultsForType(type: LearningQuestionType): Partial<LearningQuestion> {
-  if (type === 'MULTIPLE_CHOICE') {
+function questionDefaultsForType(
+  type: LearningQuestionType,
+): Partial<LearningQuestion> {
+  if (type === "MULTIPLE_CHOICE") {
     return {
       type,
-      options: ['Option A', 'Option B'],
-      correctAnswer: 'Option A',
+      options: ["Option A", "Option B"],
+      correctAnswer: "Option A",
     };
   }
-  if (type === 'TRUE_FALSE') {
+  if (type === "TRUE_FALSE") {
     return { type, options: undefined, correctAnswer: true };
   }
-  if (type === 'MATCHING') {
+  if (type === "MATCHING") {
     const pairs = [
       {
-        leftId: 'left-1',
-        leftText: 'Prompt 1',
-        rightId: 'right-1',
-        rightText: 'Match 1',
+        leftId: "left-1",
+        leftText: "Prompt 1",
+        rightId: "right-1",
+        rightText: "Match 1",
       },
       {
-        leftId: 'left-2',
-        leftText: 'Prompt 2',
-        rightId: 'right-2',
-        rightText: 'Match 2',
+        leftId: "left-2",
+        leftText: "Prompt 2",
+        rightId: "right-2",
+        rightText: "Match 2",
       },
     ];
     return {
@@ -1211,10 +1317,10 @@ function questionDefaultsForType(type: LearningQuestionType): Partial<LearningQu
       })),
     };
   }
-  if (type === 'ORDERING') {
+  if (type === "ORDERING") {
     const items = [
-      { id: 'item-1', text: 'First step' },
-      { id: 'item-2', text: 'Second step' },
+      { id: "item-1", text: "First step" },
+      { id: "item-2", text: "Second step" },
     ];
     return {
       type,
@@ -1222,13 +1328,13 @@ function questionDefaultsForType(type: LearningQuestionType): Partial<LearningQu
       correctAnswer: items.map((item) => item.id),
     };
   }
-  return { type, options: undefined, correctAnswer: '' };
+  return { type, options: undefined, correctAnswer: "" };
 }
 
 function parseMatchingPairs(value: string) {
   return value
-    .split('\n')
-    .map((line) => line.split('|').map((part) => part.trim()))
+    .split("\n")
+    .map((line) => line.split("|").map((part) => part.trim()))
     .filter((parts) => parts.length >= 4 && parts.every(Boolean))
     .map(([leftId, leftText, rightId, rightText]) => ({
       leftId,
@@ -1239,65 +1345,59 @@ function parseMatchingPairs(value: string) {
 }
 
 function matchingPairsToText(options: unknown) {
-  if (!isRecord(options) || !Array.isArray(options.pairs)) return '';
+  if (!isRecord(options) || !Array.isArray(options.pairs)) return "";
   return options.pairs
     .map((pair) => {
-      if (!isRecord(pair)) return '';
-      return [
-        pair.leftId,
-        pair.leftText,
-        pair.rightId,
-        pair.rightText,
-      ]
-        .map((value) => String(value ?? ''))
-        .join(' | ');
+      if (!isRecord(pair)) return "";
+      return [pair.leftId, pair.leftText, pair.rightId, pair.rightText]
+        .map((value) => String(value ?? ""))
+        .join(" | ");
     })
     .filter(Boolean)
-    .join('\n');
+    .join("\n");
 }
 
 function parseOrderingItems(value: string) {
   return value
-    .split('\n')
-    .map((line) => line.split('|').map((part) => part.trim()))
+    .split("\n")
+    .map((line) => line.split("|").map((part) => part.trim()))
     .filter((parts) => parts.length >= 2 && parts[0] && parts[1])
     .map(([id, text]) => ({ id, text }));
 }
 
 function orderingItemsToText(options: unknown) {
-  if (!isRecord(options) || !Array.isArray(options.items)) return '';
+  if (!isRecord(options) || !Array.isArray(options.items)) return "";
   return options.items
     .map((item) => {
-      if (!isRecord(item)) return '';
-      return [item.id, item.text].map((value) => String(value ?? '')).join(' | ');
+      if (!isRecord(item)) return "";
+      return [item.id, item.text]
+        .map((value) => String(value ?? ""))
+        .join(" | ");
     })
     .filter(Boolean)
-    .join('\n');
+    .join("\n");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function labelize(value: string) {
   return value
     .toLowerCase()
-    .split('_')
+    .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+    .join(" ");
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return 'not set';
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
+  if (!value) return "not set";
+  return formatBsDateTime(value);
 }
 
 function progressTone(label: string) {
-  if (label === 'STRONG') return 'approved';
-  if (label === 'READY') return 'published';
-  if (label === 'IMPROVING') return 'pending';
-  return 'conflict';
+  if (label === "STRONG") return "approved";
+  if (label === "READY") return "published";
+  if (label === "IMPROVING") return "pending";
+  return "conflict";
 }

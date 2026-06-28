@@ -1,64 +1,74 @@
-'use client';
+"use client";
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { api } from "../../lib/api";
+import { formatBsDateTime } from "@schoolos/core";
 
 const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
 
 export function TimetableHomeworkForm() {
   const queryClient = useQueryClient();
   const [slot, setSlot] = useState({
-    academicYearId: '',
-    classId: '',
-    sectionId: '',
-    subjectId: '',
-    staffId: '',
+    academicYearId: "",
+    classId: "",
+    sectionId: "",
+    subjectId: "",
+    staffId: "",
     dayOfWeek: 1,
-    startsAt: '09:00',
-    endsAt: '09:45',
-    room: 'Room 1',
+    startsAt: "09:00",
+    endsAt: "09:45",
+    room: "Room 1",
   });
   const [homework, setHomework] = useState({
-    academicYearId: '',
-    classId: '',
-    sectionId: '',
-    subjectId: '',
-    assignedByStaffId: '',
-    title: 'Reading practice',
-    instructions: 'Read the assigned page and bring two questions tomorrow.',
+    academicYearId: "",
+    classId: "",
+    sectionId: "",
+    subjectId: "",
+    assignedByStaffId: "",
+    title: "Reading practice",
+    instructions: "Read the assigned page and bring two questions tomorrow.",
     dueAt: `${tomorrow}T17:00`,
     maxScore: 10,
   });
   const [review, setReview] = useState({
-    submissionId: '',
-    status: 'REVIEWED',
+    submissionId: "",
+    status: "REVIEWED",
     score: 8,
-    feedback: 'Good effort',
+    feedback: "Good effort",
   });
 
   const academicYearsQuery = useQuery({
-    queryKey: ['academic-years'],
+    queryKey: ["academic-years"],
     queryFn: api.listAcademicYears,
   });
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
-  const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
-  const subjectsQuery = useQuery({ queryKey: ['subjects'], queryFn: () => api.listSubjects() });
-  const staffQuery = useQuery({ queryKey: ['staff'], queryFn: api.listStaff });
+  const classesQuery = useQuery({
+    queryKey: ["classes"],
+    queryFn: api.listClasses,
+  });
+  const sectionsQuery = useQuery({
+    queryKey: ["sections"],
+    queryFn: api.listSections,
+  });
+  const subjectsQuery = useQuery({
+    queryKey: ["subjects"],
+    queryFn: () => api.listSubjects(),
+  });
+  const staffQuery = useQuery({ queryKey: ["staff"], queryFn: api.listStaff });
   const timetableQuery = useQuery({
-    queryKey: ['timetable'],
+    queryKey: ["timetable"],
     queryFn: () => api.listTimetable(),
   });
   const workloadQuery = useQuery({
-    queryKey: ['teacher-workload'],
+    queryKey: ["teacher-workload"],
     queryFn: api.listTeacherWorkload,
   });
   const homeworkQuery = useQuery({
-    queryKey: ['homework'],
+    queryKey: ["homework"],
     queryFn: () => api.listHomework(),
   });
   const submissionsQuery = useQuery({
-    queryKey: ['homework-submissions'],
+    queryKey: ["homework-submissions"],
     queryFn: api.listHomeworkSubmissions,
   });
 
@@ -67,9 +77,15 @@ export function TimetableHomeworkForm() {
     const year = currentYear ?? academicYearsQuery.data?.[0];
 
     if (year) {
-      setSlot((current) => (current.academicYearId ? current : { ...current, academicYearId: year.id }));
+      setSlot((current) =>
+        current.academicYearId
+          ? current
+          : { ...current, academicYearId: year.id },
+      );
       setHomework((current) =>
-        current.academicYearId ? current : { ...current, academicYearId: year.id },
+        current.academicYearId
+          ? current
+          : { ...current, academicYearId: year.id },
       );
     }
   }, [academicYearsQuery.data]);
@@ -78,8 +94,12 @@ export function TimetableHomeworkForm() {
     const firstClass = classesQuery.data?.[0];
 
     if (firstClass) {
-      setSlot((current) => (current.classId ? current : { ...current, classId: firstClass.id }));
-      setHomework((current) => (current.classId ? current : { ...current, classId: firstClass.id }));
+      setSlot((current) =>
+        current.classId ? current : { ...current, classId: firstClass.id },
+      );
+      setHomework((current) =>
+        current.classId ? current : { ...current, classId: firstClass.id },
+      );
     }
   }, [classesQuery.data]);
 
@@ -90,12 +110,20 @@ export function TimetableHomeworkForm() {
       setSlot((current) =>
         current.subjectId
           ? current
-          : { ...current, subjectId: firstSubject.id, classId: firstSubject.classId },
+          : {
+              ...current,
+              subjectId: firstSubject.id,
+              classId: firstSubject.classId,
+            },
       );
       setHomework((current) =>
         current.subjectId
           ? current
-          : { ...current, subjectId: firstSubject.id, classId: firstSubject.classId },
+          : {
+              ...current,
+              subjectId: firstSubject.id,
+              classId: firstSubject.classId,
+            },
       );
     }
   }, [subjectsQuery.data]);
@@ -104,9 +132,13 @@ export function TimetableHomeworkForm() {
     const firstStaff = staffQuery.data?.[0];
 
     if (firstStaff) {
-      setSlot((current) => (current.staffId ? current : { ...current, staffId: firstStaff.id }));
+      setSlot((current) =>
+        current.staffId ? current : { ...current, staffId: firstStaff.id },
+      );
       setHomework((current) =>
-        current.assignedByStaffId ? current : { ...current, assignedByStaffId: firstStaff.id },
+        current.assignedByStaffId
+          ? current
+          : { ...current, assignedByStaffId: firstStaff.id },
       );
     }
   }, [staffQuery.data]);
@@ -116,17 +148,19 @@ export function TimetableHomeworkForm() {
 
     if (firstSubmission) {
       setReview((current) =>
-        current.submissionId ? current : { ...current, submissionId: firstSubmission.id },
+        current.submissionId
+          ? current
+          : { ...current, submissionId: firstSubmission.id },
       );
     }
   }, [submissionsQuery.data]);
 
   const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: ['timetable'] });
-    void queryClient.invalidateQueries({ queryKey: ['teacher-workload'] });
-    void queryClient.invalidateQueries({ queryKey: ['homework'] });
-    void queryClient.invalidateQueries({ queryKey: ['homework-submissions'] });
-    void queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+    void queryClient.invalidateQueries({ queryKey: ["timetable"] });
+    void queryClient.invalidateQueries({ queryKey: ["teacher-workload"] });
+    void queryClient.invalidateQueries({ queryKey: ["homework"] });
+    void queryClient.invalidateQueries({ queryKey: ["homework-submissions"] });
+    void queryClient.invalidateQueries({ queryKey: ["deliveries"] });
   };
   const slotMutation = useMutation({
     mutationFn: api.createTimetableSlot,
@@ -158,11 +192,18 @@ export function TimetableHomeworkForm() {
               <SelectAcademicYear
                 value={slot.academicYearId}
                 years={academicYearsQuery.data ?? []}
-                onChange={(value) => setSlot((current) => ({ ...current, academicYearId: value }))}
+                onChange={(value) =>
+                  setSlot((current) => ({ ...current, academicYearId: value }))
+                }
               />
               <select
                 value={slot.classId}
-                onChange={(event) => setSlot((current) => ({ ...current, classId: event.target.value }))}
+                onChange={(event) =>
+                  setSlot((current) => ({
+                    ...current,
+                    classId: event.target.value,
+                  }))
+                }
               >
                 <option value="">Class</option>
                 {(classesQuery.data ?? []).map((item) => (
@@ -173,7 +214,12 @@ export function TimetableHomeworkForm() {
               </select>
               <select
                 value={slot.sectionId}
-                onChange={(event) => setSlot((current) => ({ ...current, sectionId: event.target.value }))}
+                onChange={(event) =>
+                  setSlot((current) => ({
+                    ...current,
+                    sectionId: event.target.value,
+                  }))
+                }
               >
                 <option value="">Whole class</option>
                 {sectionsForSlotClass.map((item) => (
@@ -184,7 +230,12 @@ export function TimetableHomeworkForm() {
               </select>
               <select
                 value={slot.subjectId}
-                onChange={(event) => setSlot((current) => ({ ...current, subjectId: event.target.value }))}
+                onChange={(event) =>
+                  setSlot((current) => ({
+                    ...current,
+                    subjectId: event.target.value,
+                  }))
+                }
               >
                 <option value="">Subject</option>
                 {(subjectsQuery.data ?? []).map((item) => (
@@ -195,7 +246,12 @@ export function TimetableHomeworkForm() {
               </select>
               <select
                 value={slot.staffId}
-                onChange={(event) => setSlot((current) => ({ ...current, staffId: event.target.value }))}
+                onChange={(event) =>
+                  setSlot((current) => ({
+                    ...current,
+                    staffId: event.target.value,
+                  }))
+                }
               >
                 <option value="">Teacher</option>
                 {(staffQuery.data ?? []).map((item) => (
@@ -206,39 +262,74 @@ export function TimetableHomeworkForm() {
               </select>
               <select
                 value={slot.dayOfWeek}
-                onChange={(event) => setSlot((current) => ({ ...current, dayOfWeek: Number(event.target.value) }))}
+                onChange={(event) =>
+                  setSlot((current) => ({
+                    ...current,
+                    dayOfWeek: Number(event.target.value),
+                  }))
+                }
               >
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => (
-                  <option key={day} value={index + 1}>
-                    {day}
-                  </option>
-                ))}
+                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
+                  (day, index) => (
+                    <option key={day} value={index + 1}>
+                      {day}
+                    </option>
+                  ),
+                )}
               </select>
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               <input
                 type="time"
                 value={slot.startsAt}
-                onChange={(event) => setSlot((current) => ({ ...current, startsAt: event.target.value }))}
+                onChange={(event) =>
+                  setSlot((current) => ({
+                    ...current,
+                    startsAt: event.target.value,
+                  }))
+                }
               />
               <input
                 type="time"
                 value={slot.endsAt}
-                onChange={(event) => setSlot((current) => ({ ...current, endsAt: event.target.value }))}
+                onChange={(event) =>
+                  setSlot((current) => ({
+                    ...current,
+                    endsAt: event.target.value,
+                  }))
+                }
               />
               <input
                 value={slot.room}
-                onChange={(event) => setSlot((current) => ({ ...current, room: event.target.value }))}
+                onChange={(event) =>
+                  setSlot((current) => ({
+                    ...current,
+                    room: event.target.value,
+                  }))
+                }
                 placeholder="Room"
               />
             </div>
             <button
               type="button"
               className="rounded-2xl bg-[var(--ink)] px-5 py-3 font-semibold text-white disabled:opacity-50"
-              disabled={!slot.academicYearId || !slot.classId || !slot.subjectId || !slot.staffId || slotMutation.isPending}
-              onClick={() => slotMutation.mutate({ ...slot, sectionId: slot.sectionId || null })}
+              disabled={
+                !slot.academicYearId ||
+                !slot.classId ||
+                !slot.subjectId ||
+                !slot.staffId ||
+                slotMutation.isPending
+              }
+              onClick={() =>
+                slotMutation.mutate({
+                  ...slot,
+                  sectionId: slot.sectionId || null,
+                })
+              }
             >
-              {slotMutation.isPending ? 'Scheduling...' : 'Create timetable slot'}
+              {slotMutation.isPending
+                ? "Scheduling..."
+                : "Create timetable slot"}
             </button>
           </div>
         </section>
@@ -251,12 +342,20 @@ export function TimetableHomeworkForm() {
                 value={homework.academicYearId}
                 years={academicYearsQuery.data ?? []}
                 onChange={(value) =>
-                  setHomework((current) => ({ ...current, academicYearId: value }))
+                  setHomework((current) => ({
+                    ...current,
+                    academicYearId: value,
+                  }))
                 }
               />
               <select
                 value={homework.classId}
-                onChange={(event) => setHomework((current) => ({ ...current, classId: event.target.value }))}
+                onChange={(event) =>
+                  setHomework((current) => ({
+                    ...current,
+                    classId: event.target.value,
+                  }))
+                }
               >
                 <option value="">Class</option>
                 {(classesQuery.data ?? []).map((item) => (
@@ -268,7 +367,10 @@ export function TimetableHomeworkForm() {
               <select
                 value={homework.sectionId}
                 onChange={(event) =>
-                  setHomework((current) => ({ ...current, sectionId: event.target.value }))
+                  setHomework((current) => ({
+                    ...current,
+                    sectionId: event.target.value,
+                  }))
                 }
               >
                 <option value="">Whole class</option>
@@ -281,7 +383,10 @@ export function TimetableHomeworkForm() {
               <select
                 value={homework.subjectId}
                 onChange={(event) =>
-                  setHomework((current) => ({ ...current, subjectId: event.target.value }))
+                  setHomework((current) => ({
+                    ...current,
+                    subjectId: event.target.value,
+                  }))
                 }
               >
                 <option value="">Subject</option>
@@ -294,34 +399,55 @@ export function TimetableHomeworkForm() {
             </div>
             <input
               value={homework.title}
-              onChange={(event) => setHomework((current) => ({ ...current, title: event.target.value }))}
+              onChange={(event) =>
+                setHomework((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
+              }
               placeholder="Homework title"
             />
             <textarea
               rows={4}
               value={homework.instructions}
               onChange={(event) =>
-                setHomework((current) => ({ ...current, instructions: event.target.value }))
+                setHomework((current) => ({
+                  ...current,
+                  instructions: event.target.value,
+                }))
               }
             />
             <div className="grid gap-3 md:grid-cols-2">
               <input
                 type="datetime-local"
                 value={homework.dueAt}
-                onChange={(event) => setHomework((current) => ({ ...current, dueAt: event.target.value }))}
+                onChange={(event) =>
+                  setHomework((current) => ({
+                    ...current,
+                    dueAt: event.target.value,
+                  }))
+                }
               />
               <input
                 type="number"
                 value={homework.maxScore}
                 onChange={(event) =>
-                  setHomework((current) => ({ ...current, maxScore: Number(event.target.value) }))
+                  setHomework((current) => ({
+                    ...current,
+                    maxScore: Number(event.target.value),
+                  }))
                 }
               />
             </div>
             <button
               type="button"
               className="rounded-2xl bg-[var(--teal)] px-5 py-3 font-semibold text-white disabled:opacity-50"
-              disabled={!homework.academicYearId || !homework.classId || !homework.subjectId || homeworkMutation.isPending}
+              disabled={
+                !homework.academicYearId ||
+                !homework.classId ||
+                !homework.subjectId ||
+                homeworkMutation.isPending
+              }
               onClick={() =>
                 homeworkMutation.mutate({
                   ...homework,
@@ -331,7 +457,9 @@ export function TimetableHomeworkForm() {
                 })
               }
             >
-              {homeworkMutation.isPending ? 'Publishing...' : 'Publish homework'}
+              {homeworkMutation.isPending
+                ? "Publishing..."
+                : "Publish homework"}
             </button>
           </div>
         </section>
@@ -342,18 +470,28 @@ export function TimetableHomeworkForm() {
         <div className="grid gap-3 md:grid-cols-4">
           <select
             value={review.submissionId}
-            onChange={(event) => setReview((current) => ({ ...current, submissionId: event.target.value }))}
+            onChange={(event) =>
+              setReview((current) => ({
+                ...current,
+                submissionId: event.target.value,
+              }))
+            }
           >
             <option value="">Submission</option>
             {(submissionsQuery.data ?? []).map((item) => (
               <option key={item.id} value={item.id}>
-                {item.student?.studentSystemId ?? 'Student'} / {item.status}
+                {item.student?.studentSystemId ?? "Student"} / {item.status}
               </option>
             ))}
           </select>
           <select
             value={review.status}
-            onChange={(event) => setReview((current) => ({ ...current, status: event.target.value }))}
+            onChange={(event) =>
+              setReview((current) => ({
+                ...current,
+                status: event.target.value,
+              }))
+            }
           >
             <option value="SUBMITTED">Submitted</option>
             <option value="REVIEWED">Reviewed</option>
@@ -362,7 +500,12 @@ export function TimetableHomeworkForm() {
           <input
             type="number"
             value={review.score}
-            onChange={(event) => setReview((current) => ({ ...current, score: Number(event.target.value) }))}
+            onChange={(event) =>
+              setReview((current) => ({
+                ...current,
+                score: Number(event.target.value),
+              }))
+            }
           />
           <button
             type="button"
@@ -370,7 +513,7 @@ export function TimetableHomeworkForm() {
             disabled={!review.submissionId || reviewMutation.isPending}
             onClick={() => reviewMutation.mutate(review)}
           >
-            {reviewMutation.isPending ? 'Reviewing...' : 'Review submission'}
+            {reviewMutation.isPending ? "Reviewing..." : "Review submission"}
           </button>
         </div>
       </section>
@@ -381,7 +524,7 @@ export function TimetableHomeworkForm() {
           items={(timetableQuery.data ?? []).slice(0, 6).map((item) => ({
             id: item.id,
             primary: `Day ${item.dayOfWeek} / ${item.startsAt}-${item.endsAt}`,
-            secondary: `${item.subject?.name ?? 'Subject'} / ${item.staff?.firstName ?? 'Teacher'}`,
+            secondary: `${item.subject?.name ?? "Subject"} / ${item.staff?.firstName ?? "Teacher"}`,
           }))}
         />
         <SummaryList
@@ -389,15 +532,15 @@ export function TimetableHomeworkForm() {
           items={(homeworkQuery.data ?? []).slice(0, 6).map((item) => ({
             id: item.id,
             primary: item.title,
-            secondary: `${item.submissions?.length ?? 0} submissions / due ${new Date(item.dueAt).toLocaleString()}`,
+            secondary: `${item.submissions?.length ?? 0} submissions / due ${formatBsDateTime(item.dueAt)}`,
           }))}
         />
         <SummaryList
           title="Submissions"
           items={(submissionsQuery.data ?? []).slice(0, 6).map((item) => ({
             id: item.id,
-            primary: `${item.student?.studentSystemId ?? 'Student'} / ${item.status}`,
-            secondary: item.feedback ?? 'Awaiting feedback',
+            primary: `${item.student?.studentSystemId ?? "Student"} / ${item.status}`,
+            secondary: item.feedback ?? "Awaiting feedback",
           }))}
         />
         <SummaryList
@@ -456,7 +599,10 @@ function SummaryList({
       <div className="grid gap-3">
         {items.length > 0 ? (
           items.map((item) => (
-            <div key={item.id} className="rounded-2xl border border-[var(--line)] bg-white/55 p-4">
+            <div
+              key={item.id}
+              className="rounded-2xl border border-[var(--line)] bg-white/55 p-4"
+            >
               <p className="font-semibold">{item.primary}</p>
               <p className="text-sm text-[var(--muted)]">{item.secondary}</p>
             </div>

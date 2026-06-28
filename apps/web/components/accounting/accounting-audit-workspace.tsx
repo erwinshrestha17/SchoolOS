@@ -1,24 +1,25 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../../lib/api';
-import { SectionCard } from '../ui/section-card';
-import { ReportTable } from './report-table';
-import { Select } from '../ui/select';
-import { Search, History, Eye } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
-import { EmptyState } from '../ui/empty-state';
-import { LoadingState } from '../ui/loading-state';
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../../lib/api";
+import { SectionCard } from "../ui/section-card";
+import { ReportTable } from "./report-table";
+import { Select } from "../ui/select";
+import { Search, History, Eye } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import { EmptyState } from "../ui/empty-state";
+import { LoadingState } from "../ui/loading-state";
+import { formatBsDateTime } from "@schoolos/core";
 
 export function AccountingAuditWorkspace() {
-  const [resourceFilter, setResourceFilter] = useState<string>('');
-  const [actionFilter, setActionFilter] = useState<string>('');
+  const [resourceFilter, setResourceFilter] = useState<string>("");
+  const [actionFilter, setActionFilter] = useState<string>("");
   const [page, setPage] = useState(1);
   const [selectedLog, setSelectedLog] = useState<any>(null);
 
   const query = useQuery({
-    queryKey: ['accounting-audit-trail', resourceFilter, actionFilter, page],
+    queryKey: ["accounting-audit-trail", resourceFilter, actionFilter, page],
     queryFn: () =>
       api.getAccountingAuditTrail({
         resource: resourceFilter || undefined,
@@ -32,7 +33,7 @@ export function AccountingAuditWorkspace() {
   const activeFilterLabel =
     [resourceFilter || null, actionFilter || null]
       .filter(Boolean)
-      .join(' / ') || 'All accounting events';
+      .join(" / ") || "All accounting events";
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -101,31 +102,33 @@ export function AccountingAuditWorkspace() {
           <div className="space-y-4">
             <ReportTable
               headers={[
-                'Timestamp',
-                'Action',
-                'Resource',
-                'Actor ID',
-                'Details',
+                "Timestamp",
+                "Action",
+                "Resource",
+                "Actor ID",
+                "Details",
               ]}
               rows={(query.data?.items ?? []).map((log: any) => ({
                 id: log.id,
                 cells: [
                   {
-                    value: new Date(log.createdAt).toLocaleString(),
-                    type: 'date',
+                    value: formatBsDateTime(log.createdAt),
+                    type: "date",
                   },
                   {
                     value: log.action.toUpperCase(),
                     bold: true,
                     className:
-                      log.action === 'create'
-                        ? 'text-emerald-600'
-                        : log.action === 'delete'
-                          ? 'text-rose-600'
-                          : 'text-[var(--color-mod-accounting-accent)]',
+                      log.action === "create"
+                        ? "text-emerald-600"
+                        : log.action === "delete"
+                          ? "text-rose-600"
+                          : "text-[var(--color-mod-accounting-accent)]",
                   },
-                  { value: `${log.resource} (${log.resourceId || 'Resource ID not recorded'})` },
-                  { value: log.userId || 'System actor' },
+                  {
+                    value: `${log.resource} (${log.resourceId || "Resource ID not recorded"})`,
+                  },
+                  { value: log.userId || "System actor" },
                   {
                     value: (
                       <button
@@ -185,19 +188,19 @@ export function AccountingAuditWorkspace() {
                 />
                 <AuditDetailField
                   label="Resource ID"
-                  value={selectedLog.resourceId || 'Resource ID not recorded'}
+                  value={selectedLog.resourceId || "Resource ID not recorded"}
                 />
                 <AuditDetailField
                   label="Actor ID"
-                  value={selectedLog.userId || 'System actor'}
+                  value={selectedLog.userId || "System actor"}
                 />
                 <AuditDetailField
                   label="Timestamp"
-                  value={new Date(selectedLog.createdAt).toLocaleString()}
+                  value={formatBsDateTime(selectedLog.createdAt)}
                 />
                 <AuditDetailField
                   label="Tenant scope"
-                  value={selectedLog.tenantId || 'Tenant scope not recorded'}
+                  value={selectedLog.tenantId || "Tenant scope not recorded"}
                 />
               </div>
 
@@ -210,7 +213,7 @@ export function AccountingAuditWorkspace() {
                     <pre>
                       {selectedLog.before
                         ? JSON.stringify(selectedLog.before, null, 2)
-                        : 'No previous value recorded'}
+                        : "No previous value recorded"}
                     </pre>
                   </div>
                 </div>
@@ -222,7 +225,7 @@ export function AccountingAuditWorkspace() {
                     <pre>
                       {selectedLog.after
                         ? JSON.stringify(selectedLog.after, null, 2)
-                        : 'No updated value recorded'}
+                        : "No updated value recorded"}
                     </pre>
                   </div>
                 </div>
@@ -247,9 +250,7 @@ function AuditSummaryCard({
       <p className="text-[0.65rem] font-black uppercase tracking-wider text-slate-400">
         {label}
       </p>
-      <p className="mt-1 truncate text-lg font-black text-slate-950">
-        {value}
-      </p>
+      <p className="mt-1 truncate text-lg font-black text-slate-950">{value}</p>
     </div>
   );
 }

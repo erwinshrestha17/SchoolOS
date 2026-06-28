@@ -1,19 +1,20 @@
 "use client";
 
-import type {
-  CashierClosePreview,
-  CashierCloseSummary,
-  DefaulterReminderResult,
-  DefaulterSummary,
-  DiscountRule,
-  FeeHeadSummary,
-  FeePlanSummary,
-  InvoiceDetail,
-  InvoiceSummary,
-  JournalEntryView,
-  PaymentGatewayReadiness,
-  ReceiptView,
-  WaiverRecord,
+import {
+  formatBsDate,
+  type CashierClosePreview,
+  type CashierCloseSummary,
+  type DefaulterReminderResult,
+  type DefaulterSummary,
+  type DiscountRule,
+  type FeeHeadSummary,
+  type FeePlanSummary,
+  type InvoiceDetail,
+  type InvoiceSummary,
+  type JournalEntryView,
+  type PaymentGatewayReadiness,
+  type ReceiptView,
+  type WaiverRecord,
 } from "@schoolos/core";
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -3469,9 +3470,7 @@ function formatDate(value: string | Date | null | undefined) {
     return "Not available";
   }
 
-  return new Intl.DateTimeFormat("en-NP", {
-    dateStyle: "medium",
-  }).format(new Date(value));
+  return formatBsDate(value);
 }
 
 function formatPaymentMethod(value: string) {

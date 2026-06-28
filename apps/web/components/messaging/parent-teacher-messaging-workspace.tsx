@@ -1,14 +1,15 @@
-'use client';
+"use client";
 
-import type {
-  ParentTeacherMessageSummary,
-  ParentTeacherThreadSummary,
-} from '@schoolos/core';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import type { ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import {
+  formatBsDateTime,
+  type ParentTeacherMessageSummary,
+  type ParentTeacherThreadSummary,
+} from "@schoolos/core";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCheck,
@@ -18,20 +19,20 @@ import {
   MessageSquare,
   Send,
   ShieldCheck,
-} from 'lucide-react';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
-import { useSession } from '@/components/session-provider';
-import { EmptyState } from '@/components/ui/empty-state';
-import { FilterBar } from '@/components/ui/filter-bar';
-import { LoadingState } from '@/components/ui/loading-state';
-import { ModuleHeader } from '@/components/ui/module-header';
-import { ModuleTabs } from '@/components/ui/module-tabs';
-import { TablePagination } from '@/components/ui/table-pagination';
-import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
-import { SectionCard } from '@/components/ui/section-card';
+} from "lucide-react";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { useSession } from "@/components/session-provider";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FilterBar } from "@/components/ui/filter-bar";
+import { LoadingState } from "@/components/ui/loading-state";
+import { ModuleHeader } from "@/components/ui/module-header";
+import { ModuleTabs } from "@/components/ui/module-tabs";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { DashboardPageShell } from "@/components/dashboard/dashboard-page-shell";
+import { SectionCard } from "@/components/ui/section-card";
 
-type MessageStatusFilter = '' | 'OPEN' | 'ESCALATED' | 'CLOSED';
+type MessageStatusFilter = "" | "OPEN" | "ESCALATED" | "CLOSED";
 
 type Props = {
   threadId?: string;
@@ -40,27 +41,37 @@ type Props = {
 
 export function ParentTeacherMessagingWorkspace({
   threadId,
-  initialStatusFilter = '',
+  initialStatusFilter = "",
 }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { session } = useSession();
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [threadPage, setThreadPage] = useState(1);
-  const [studentId, setStudentId] = useState('');
-  const [message, setMessage] = useState('');
-  const [priority, setPriority] = useState<'NORMAL' | 'IMPORTANT' | 'EMERGENCY'>('NORMAL');
-  const [moderationReason, setModerationReason] = useState('');
-  const [reportReason, setReportReason] = useState('');
-  const [successNotice, setSuccessNotice] = useState('');
+  const [studentId, setStudentId] = useState("");
+  const [message, setMessage] = useState("");
+  const [priority, setPriority] = useState<
+    "NORMAL" | "IMPORTANT" | "EMERGENCY"
+  >("NORMAL");
+  const [moderationReason, setModerationReason] = useState("");
+  const [reportReason, setReportReason] = useState("");
+  const [successNotice, setSuccessNotice] = useState("");
 
   const roles = session?.user.roles ?? [];
-  const isModerator = roles.some((role) => ['super_admin', 'admin', 'principal'].includes(role));
+  const isModerator = roles.some((role) =>
+    ["super_admin", "admin", "principal"].includes(role),
+  );
   const isParentOnly =
-    roles.includes('parent') &&
+    roles.includes("parent") &&
     !roles.some((role) =>
-      ['super_admin', 'admin', 'principal', 'teacher', 'subject_teacher'].includes(role),
+      [
+        "super_admin",
+        "admin",
+        "principal",
+        "teacher",
+        "subject_teacher",
+      ].includes(role),
     );
 
   useEffect(() => {
@@ -73,33 +84,33 @@ export function ParentTeacherMessagingWorkspace({
   }, [search, statusFilter]);
 
   const availabilityQuery = useQuery({
-    queryKey: ['parent-teacher-availability-status'],
+    queryKey: ["parent-teacher-availability-status"],
     queryFn: api.getChatAvailabilityStatus,
   });
 
   const threadsQuery = useQuery({
-    queryKey: ['parent-teacher-threads', statusFilter, search, threadPage],
+    queryKey: ["parent-teacher-threads", statusFilter, search, threadPage],
     queryFn: () =>
       api.listParentTeacherThreads({
         status: statusFilter || undefined,
         search: search || undefined,
         page: String(threadPage),
-        limit: '20',
+        limit: "20",
       }),
   });
 
   const activeThreadId = threadId ?? threadsQuery.data?.items[0]?.id;
 
   const threadQuery = useQuery({
-    queryKey: ['parent-teacher-thread', activeThreadId],
+    queryKey: ["parent-teacher-thread", activeThreadId],
     queryFn: () => api.getParentTeacherThread(activeThreadId as string),
     enabled: Boolean(activeThreadId),
   });
 
   const messagesQuery = useQuery({
-    queryKey: ['parent-teacher-messages', activeThreadId],
+    queryKey: ["parent-teacher-messages", activeThreadId],
     queryFn: () =>
-      api.listParentTeacherMessages(activeThreadId as string, { limit: '100' }),
+      api.listParentTeacherMessages(activeThreadId as string, { limit: "100" }),
     enabled: Boolean(activeThreadId),
   });
 
@@ -112,8 +123,10 @@ export function ParentTeacherMessagingWorkspace({
   const createThreadMutation = useMutation({
     mutationFn: () => api.createParentTeacherThread({ studentId }),
     onSuccess: (result) => {
-      setStudentId('');
-      void queryClient.invalidateQueries({ queryKey: ['parent-teacher-threads'] });
+      setStudentId("");
+      void queryClient.invalidateQueries({
+        queryKey: ["parent-teacher-threads"],
+      });
       router.push(`/dashboard/messages/${result.thread.id}`);
     },
   });
@@ -125,11 +138,15 @@ export function ParentTeacherMessagingWorkspace({
         priority,
       }),
     onSuccess: (result) => {
-      setMessage('');
-      setPriority('NORMAL');
-      setSuccessNotice(result.queuedNotice ?? 'Message sent.');
-      void queryClient.invalidateQueries({ queryKey: ['parent-teacher-messages', activeThreadId] });
-      void queryClient.invalidateQueries({ queryKey: ['parent-teacher-threads'] });
+      setMessage("");
+      setPriority("NORMAL");
+      setSuccessNotice(result.queuedNotice ?? "Message sent.");
+      void queryClient.invalidateQueries({
+        queryKey: ["parent-teacher-messages", activeThreadId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["parent-teacher-threads"],
+      });
     },
   });
 
@@ -139,23 +156,31 @@ export function ParentTeacherMessagingWorkspace({
         reason: moderationReason,
       }),
     onSuccess: () => {
-      setModerationReason('');
-      setSuccessNotice('Thread closed with an audited moderation reason.');
-      void queryClient.invalidateQueries({ queryKey: ['parent-teacher-thread', activeThreadId] });
-      void queryClient.invalidateQueries({ queryKey: ['parent-teacher-threads'] });
+      setModerationReason("");
+      setSuccessNotice("Thread closed with an audited moderation reason.");
+      void queryClient.invalidateQueries({
+        queryKey: ["parent-teacher-thread", activeThreadId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["parent-teacher-threads"],
+      });
     },
   });
 
   const escalateMutation = useMutation({
     mutationFn: () =>
       api.escalateParentTeacherThread(activeThreadId as string, {
-        reason: moderationReason || 'Needs principal/admin review',
+        reason: moderationReason || "Needs principal/admin review",
       }),
     onSuccess: () => {
-      setModerationReason('');
-      setSuccessNotice('Thread escalated for school leadership review.');
-      void queryClient.invalidateQueries({ queryKey: ['parent-teacher-thread', activeThreadId] });
-      void queryClient.invalidateQueries({ queryKey: ['parent-teacher-threads'] });
+      setModerationReason("");
+      setSuccessNotice("Thread escalated for school leadership review.");
+      void queryClient.invalidateQueries({
+        queryKey: ["parent-teacher-thread", activeThreadId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["parent-teacher-threads"],
+      });
     },
   });
 
@@ -165,8 +190,8 @@ export function ParentTeacherMessagingWorkspace({
         reason: reportReason,
       }),
     onSuccess: () => {
-      setReportReason('');
-      setSuccessNotice('Report submitted for school review.');
+      setReportReason("");
+      setSuccessNotice("Report submitted for school review.");
     },
   });
 
@@ -177,14 +202,14 @@ export function ParentTeacherMessagingWorkspace({
     [messagesQuery.data?.items],
   );
   const isEscalationLocked = Boolean(
-    activeThread?.status === 'ESCALATED' && !isModerator,
+    activeThread?.status === "ESCALATED" && !isModerator,
   );
   const canSend = Boolean(
     activeThread &&
-      activeThread.status !== 'CLOSED' &&
-      !isEscalationLocked &&
-      message.trim().length > 0 &&
-      message.trim().length <= 2000,
+    activeThread.status !== "CLOSED" &&
+    !isEscalationLocked &&
+    message.trim().length > 0 &&
+    message.trim().length <= 2000,
   );
 
   return (
@@ -195,30 +220,30 @@ export function ParentTeacherMessagingWorkspace({
         description="Parent and class-teacher conversations with school moderation, reporting, escalation, and quiet-hours controls."
         moreActionItems={[
           {
-            label: 'Notices',
+            label: "Notices",
             icon: <MessageSquare size={16} />,
-            onClick: () => router.push('/dashboard/notices'),
+            onClick: () => router.push("/dashboard/notices"),
           },
           {
-            label: 'Delivery Logs',
+            label: "Delivery Logs",
             icon: <Clock size={16} />,
-            onClick: () => router.push('/dashboard/notices/deliveries'),
+            onClick: () => router.push("/dashboard/notices/deliveries"),
           },
           {
-            label: 'Escalated Chats',
+            label: "Escalated Chats",
             icon: <ShieldCheck size={16} />,
-            onClick: () => router.push('/dashboard/messages/moderation'),
+            onClick: () => router.push("/dashboard/messages/moderation"),
           },
         ]}
       />
 
       <ModuleTabs
         items={[
-          { href: '/dashboard/notices', label: 'Notices' },
-          { href: '/dashboard/notices/new', label: 'Compose' },
-          { href: '/dashboard/notices/deliveries', label: 'Delivery Logs' },
-          { href: '/dashboard/messages', label: 'Chat' },
-          { href: '/dashboard/messages/moderation', label: 'Escalations' },
+          { href: "/dashboard/notices", label: "Notices" },
+          { href: "/dashboard/notices/new", label: "Compose" },
+          { href: "/dashboard/notices/deliveries", label: "Delivery Logs" },
+          { href: "/dashboard/messages", label: "Chat" },
+          { href: "/dashboard/messages/moderation", label: "Escalations" },
         ]}
         accentColor="rose"
         variant="light"
@@ -234,241 +259,276 @@ export function ParentTeacherMessagingWorkspace({
         />
 
         <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
-        <SectionCard title="Inbox" description="Student-linked parent-teacher threads">
-          <div className="space-y-4">
-            <FilterBar label="Inbox Filters">
-              <select
-                value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(
-                    event.target.value as MessageStatusFilter,
-                  )
-                }
-                className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm"
-              >
-                <option value="">All status</option>
-                <option value="OPEN">Open</option>
-                <option value="ESCALATED">Escalated</option>
-                <option value="CLOSED">Closed</option>
-              </select>
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search student or guardian"
-                className="min-h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm"
-              />
-            </FilterBar>
-
-            {isParentOnly ? (
-              <form
-                className="rounded-2xl border border-slate-200 bg-white p-4"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (studentId.trim()) createThreadMutation.mutate();
-                }}
-              >
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Open child thread
-                </label>
-                <div className="mt-2 flex gap-2">
-                  <input
-                    value={studentId}
-                    onChange={(event) => setStudentId(event.target.value)}
-                    placeholder="Student ID"
-                    className="min-h-10 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 text-sm"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!studentId.trim() || createThreadMutation.isPending}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--color-mod-notices-accent)] px-4 text-sm font-semibold text-white hover:bg-[var(--color-mod-notices-text)] disabled:opacity-50"
-                  >
-                    <MessageSquare size={16} />
-                    Open
-                  </button>
-                </div>
-              </form>
-            ) : null}
-
-            {threadsQuery.isLoading ? (
-              <LoadingState label="Loading threads..." />
-            ) : threadsQuery.isError ? (
-              <EmptyState
-                title="Messages unavailable"
-                description="Parent-teacher threads could not be loaded. Check your permission and try again."
-                icon={<Lock size={24} />}
-              />
-            ) : threads.length === 0 ? (
-              <EmptyState
-                title="No parent communication yet"
-                description="Threads appear here only after a parent, assigned teacher, or school moderator opens one."
-                icon={<MessageSquare size={24} />}
-              />
-            ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-100">
-                <div className="space-y-2 p-2">
-                  {threads.map((thread) => (
-                    <ThreadListItem
-                      key={thread.id}
-                      thread={thread}
-                      active={thread.id === activeThreadId}
-                    />
-                  ))}
-                </div>
-                <TablePagination
-                  page={threadsQuery.data?.page ?? threadPage}
-                  pageSize={threadsQuery.data?.limit ?? 20}
-                  total={threadsQuery.data?.total ?? 0}
-                  onPageChange={setThreadPage}
+          <SectionCard
+            title="Inbox"
+            description="Student-linked parent-teacher threads"
+          >
+            <div className="space-y-4">
+              <FilterBar label="Inbox Filters">
+                <select
+                  value={statusFilter}
+                  onChange={(event) =>
+                    setStatusFilter(event.target.value as MessageStatusFilter)
+                  }
+                  className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                >
+                  <option value="">All status</option>
+                  <option value="OPEN">Open</option>
+                  <option value="ESCALATED">Escalated</option>
+                  <option value="CLOSED">Closed</option>
+                </select>
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search student or guardian"
+                  className="min-h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 />
-              </div>
-            )}
-          </div>
-        </SectionCard>
+              </FilterBar>
 
-        <SectionCard
-          title={activeThread ? getThreadTitle(activeThread) : 'Thread'}
-          description={activeThread ? getThreadSubtitle(activeThread) : 'Select a conversation'}
-          headerAction={activeThread ? <StatusBadge value={activeThread.status} /> : null}
-        >
-          {!activeThreadId ? (
-            <EmptyState
-              title="Select a thread"
-              description="Parent-teacher messages are intentionally tied to a student and assigned teacher."
-              icon={<MessageSquare size={24} />}
-            />
-          ) : threadQuery.isLoading || messagesQuery.isLoading ? (
-            <LoadingState label="Loading conversation..." />
-          ) : threadQuery.isError || messagesQuery.isError ? (
-            <EmptyState
-              title="Thread unavailable"
-              description={
-                'This conversation could not be loaded. It may be outside your assigned or linked scope.'
-              }
-              icon={<Lock size={24} />}
-            />
-          ) : activeThread ? (
-            <div className="space-y-5">
-              <ThreadContext thread={activeThread} />
-              <ModerationDecisionPanel
-                thread={activeThread}
-                messages={messages}
-                isModerator={isModerator}
-              />
-              <MessageTimeline messages={messages} currentUserId={session?.user.id ?? ''} />
-
-              {successNotice ? (
-                <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                  {successNotice}
-                </p>
-              ) : null}
-
-              {activeThread.status === 'CLOSED' ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                  This thread is closed. Normal replies are disabled for audit safety.
-                </div>
-              ) : isEscalationLocked ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  This escalated thread is locked until a school moderator resolves it.
-                </div>
-              ) : (
+              {isParentOnly ? (
                 <form
-                  className="space-y-3"
+                  className="rounded-2xl border border-slate-200 bg-white p-4"
                   onSubmit={(event) => {
                     event.preventDefault();
-                    if (canSend) sendMutation.mutate();
+                    if (studentId.trim()) createThreadMutation.mutate();
                   }}
                 >
-                  <textarea
-                    value={message}
-                    onChange={(event) => setMessage(event.target.value)}
-                    placeholder="Write a professional school message..."
-                    className="min-h-28 w-full resize-y rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-[var(--color-mod-notices-accent)] focus:ring-4 focus:ring-[var(--color-mod-notices-border)]/40"
-                    maxLength={2000}
-                  />
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <select
-                      value={priority}
-                      onChange={(event) =>
-                        setPriority(event.target.value as 'NORMAL' | 'IMPORTANT' | 'EMERGENCY')
-                      }
-                      className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm"
-                    >
-                      <option value="NORMAL">Normal</option>
-                      <option value="IMPORTANT">Important</option>
-                      {!isParentOnly ? <option value="EMERGENCY">Emergency</option> : null}
-                    </select>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Open child thread
+                  </label>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={studentId}
+                      onChange={(event) => setStudentId(event.target.value)}
+                      placeholder="Student ID"
+                      className="min-h-10 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 text-sm"
+                    />
                     <button
                       type="submit"
-                      disabled={!canSend || sendMutation.isPending}
+                      disabled={
+                        !studentId.trim() || createThreadMutation.isPending
+                      }
                       className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--color-mod-notices-accent)] px-4 text-sm font-semibold text-white hover:bg-[var(--color-mod-notices-text)] disabled:opacity-50"
                     >
-                      <Send size={16} />
-                      Send
+                      <MessageSquare size={16} />
+                      Open
                     </button>
                   </div>
-                  {sendMutation.isError ? (
-                    <p className="text-sm text-danger-700">
-                      This message could not be sent. Check the thread state and try again.
-                    </p>
-                  ) : null}
                 </form>
-              )}
-
-              {closeMutation.isError || escalateMutation.isError || reportMutation.isError ? (
-                <p className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">
-                  This review action could not be completed. Check your permission and try again.
-                </p>
               ) : null}
 
-              <div className="grid gap-4 lg:grid-cols-2">
-                <ActionPanel
-                  title="Report Concern"
-                  description="Create a school-reviewable abuse or safety report for this thread."
-                  icon={<Flag size={18} />}
-                  value={reportReason}
-                  onChange={setReportReason}
-                  onSubmit={() => reportMutation.mutate()}
-                  buttonLabel="Report"
-                  reasonLabel="Concern reason"
-                  placeholder="Describe the message or behavior that needs review."
-                  disabled={reportReason.trim().length < 3 || reportMutation.isPending}
+              {threadsQuery.isLoading ? (
+                <LoadingState label="Loading threads..." />
+              ) : threadsQuery.isError ? (
+                <EmptyState
+                  title="Messages unavailable"
+                  description="Parent-teacher threads could not be loaded. Check your permission and try again."
+                  icon={<Lock size={24} />}
+                />
+              ) : threads.length === 0 ? (
+                <EmptyState
+                  title="No parent communication yet"
+                  description="Threads appear here only after a parent, assigned teacher, or school moderator opens one."
+                  icon={<MessageSquare size={24} />}
+                />
+              ) : (
+                <div className="overflow-hidden rounded-2xl border border-slate-100">
+                  <div className="space-y-2 p-2">
+                    {threads.map((thread) => (
+                      <ThreadListItem
+                        key={thread.id}
+                        thread={thread}
+                        active={thread.id === activeThreadId}
+                      />
+                    ))}
+                  </div>
+                  <TablePagination
+                    page={threadsQuery.data?.page ?? threadPage}
+                    pageSize={threadsQuery.data?.limit ?? 20}
+                    total={threadsQuery.data?.total ?? 0}
+                    onPageChange={setThreadPage}
+                  />
+                </div>
+              )}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title={activeThread ? getThreadTitle(activeThread) : "Thread"}
+            description={
+              activeThread
+                ? getThreadSubtitle(activeThread)
+                : "Select a conversation"
+            }
+            headerAction={
+              activeThread ? <StatusBadge value={activeThread.status} /> : null
+            }
+          >
+            {!activeThreadId ? (
+              <EmptyState
+                title="Select a thread"
+                description="Parent-teacher messages are intentionally tied to a student and assigned teacher."
+                icon={<MessageSquare size={24} />}
+              />
+            ) : threadQuery.isLoading || messagesQuery.isLoading ? (
+              <LoadingState label="Loading conversation..." />
+            ) : threadQuery.isError || messagesQuery.isError ? (
+              <EmptyState
+                title="Thread unavailable"
+                description={
+                  "This conversation could not be loaded. It may be outside your assigned or linked scope."
+                }
+                icon={<Lock size={24} />}
+              />
+            ) : activeThread ? (
+              <div className="space-y-5">
+                <ThreadContext thread={activeThread} />
+                <ModerationDecisionPanel
+                  thread={activeThread}
+                  messages={messages}
+                  isModerator={isModerator}
+                />
+                <MessageTimeline
+                  messages={messages}
+                  currentUserId={session?.user.id ?? ""}
                 />
 
-                {isModerator ? (
-                  <ActionPanel
-                    title="Moderation"
-                    description="Close resolved threads or escalate unresolved safety concerns."
-                    icon={<ShieldCheck size={18} />}
-                    value={moderationReason}
-                    onChange={setModerationReason}
-                    onSubmit={() => {
-                      if (moderationReason.trim().length >= 3) closeMutation.mutate();
-                    }}
-                    secondaryAction={() => escalateMutation.mutate()}
-                    buttonLabel="Close"
-                    secondaryLabel="Escalate"
-                    reasonLabel="Moderation reason"
-                    placeholder="Record why this thread is being closed or escalated."
-                    disabled={moderationReason.trim().length < 3 || closeMutation.isPending || escalateMutation.isPending}
-                  />
+                {successNotice ? (
+                  <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                    {successNotice}
+                  </p>
+                ) : null}
+
+                {activeThread.status === "CLOSED" ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    This thread is closed. Normal replies are disabled for audit
+                    safety.
+                  </div>
+                ) : isEscalationLocked ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    This escalated thread is locked until a school moderator
+                    resolves it.
+                  </div>
                 ) : (
-                  <ActionPanel
-                    title="Escalation"
-                    description="Ask a school moderator to review this parent-teacher conversation."
-                    icon={<AlertTriangle size={18} />}
-                    value={moderationReason}
-                    onChange={setModerationReason}
-                    onSubmit={() => escalateMutation.mutate()}
-                    buttonLabel="Escalate"
-                    reasonLabel="Escalation reason"
-                    placeholder="Explain why this needs school leadership review."
-                    disabled={moderationReason.trim().length < 3 || escalateMutation.isPending}
-                  />
+                  <form
+                    className="space-y-3"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (canSend) sendMutation.mutate();
+                    }}
+                  >
+                    <textarea
+                      value={message}
+                      onChange={(event) => setMessage(event.target.value)}
+                      placeholder="Write a professional school message..."
+                      className="min-h-28 w-full resize-y rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-[var(--color-mod-notices-accent)] focus:ring-4 focus:ring-[var(--color-mod-notices-border)]/40"
+                      maxLength={2000}
+                    />
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <select
+                        value={priority}
+                        onChange={(event) =>
+                          setPriority(
+                            event.target.value as
+                              | "NORMAL"
+                              | "IMPORTANT"
+                              | "EMERGENCY",
+                          )
+                        }
+                        className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                      >
+                        <option value="NORMAL">Normal</option>
+                        <option value="IMPORTANT">Important</option>
+                        {!isParentOnly ? (
+                          <option value="EMERGENCY">Emergency</option>
+                        ) : null}
+                      </select>
+                      <button
+                        type="submit"
+                        disabled={!canSend || sendMutation.isPending}
+                        className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--color-mod-notices-accent)] px-4 text-sm font-semibold text-white hover:bg-[var(--color-mod-notices-text)] disabled:opacity-50"
+                      >
+                        <Send size={16} />
+                        Send
+                      </button>
+                    </div>
+                    {sendMutation.isError ? (
+                      <p className="text-sm text-danger-700">
+                        This message could not be sent. Check the thread state
+                        and try again.
+                      </p>
+                    ) : null}
+                  </form>
                 )}
+
+                {closeMutation.isError ||
+                escalateMutation.isError ||
+                reportMutation.isError ? (
+                  <p className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">
+                    This review action could not be completed. Check your
+                    permission and try again.
+                  </p>
+                ) : null}
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <ActionPanel
+                    title="Report Concern"
+                    description="Create a school-reviewable abuse or safety report for this thread."
+                    icon={<Flag size={18} />}
+                    value={reportReason}
+                    onChange={setReportReason}
+                    onSubmit={() => reportMutation.mutate()}
+                    buttonLabel="Report"
+                    reasonLabel="Concern reason"
+                    placeholder="Describe the message or behavior that needs review."
+                    disabled={
+                      reportReason.trim().length < 3 || reportMutation.isPending
+                    }
+                  />
+
+                  {isModerator ? (
+                    <ActionPanel
+                      title="Moderation"
+                      description="Close resolved threads or escalate unresolved safety concerns."
+                      icon={<ShieldCheck size={18} />}
+                      value={moderationReason}
+                      onChange={setModerationReason}
+                      onSubmit={() => {
+                        if (moderationReason.trim().length >= 3)
+                          closeMutation.mutate();
+                      }}
+                      secondaryAction={() => escalateMutation.mutate()}
+                      buttonLabel="Close"
+                      secondaryLabel="Escalate"
+                      reasonLabel="Moderation reason"
+                      placeholder="Record why this thread is being closed or escalated."
+                      disabled={
+                        moderationReason.trim().length < 3 ||
+                        closeMutation.isPending ||
+                        escalateMutation.isPending
+                      }
+                    />
+                  ) : (
+                    <ActionPanel
+                      title="Escalation"
+                      description="Ask a school moderator to review this parent-teacher conversation."
+                      icon={<AlertTriangle size={18} />}
+                      value={moderationReason}
+                      onChange={setModerationReason}
+                      onSubmit={() => escalateMutation.mutate()}
+                      buttonLabel="Escalate"
+                      reasonLabel="Escalation reason"
+                      placeholder="Explain why this needs school leadership review."
+                      disabled={
+                        moderationReason.trim().length < 3 ||
+                        escalateMutation.isPending
+                      }
+                    />
+                  )}
+                </div>
               </div>
-            </div>
-          ) : null}
-        </SectionCard>
+            ) : null}
+          </SectionCard>
         </div>
       </div>
     </DashboardPageShell>
@@ -491,18 +551,18 @@ function AvailabilityBanner({
   return (
     <div
       className={cn(
-        'flex flex-wrap items-center gap-3 rounded-2xl border px-4 py-3 text-sm',
+        "flex flex-wrap items-center gap-3 rounded-2xl border px-4 py-3 text-sm",
         isAvailable
-          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-          : 'border-amber-200 bg-amber-50 text-amber-900',
+          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+          : "border-amber-200 bg-amber-50 text-amber-900",
       )}
     >
       <Clock size={18} />
       <span>
         {isLoading
-          ? 'Checking school chat hours...'
+          ? "Checking school chat hours..."
           : isError
-            ? 'School chat hours are unavailable right now. The backend will still enforce message policy.'
+            ? "School chat hours are unavailable right now. The backend will still enforce message policy."
             : notice}
       </span>
       {sla ? <span className="font-semibold">{sla}</span> : null}
@@ -523,8 +583,10 @@ function ThreadListItem({
     <Link
       href={`/dashboard/messages/${thread.id}`}
       className={cn(
-        'block rounded-2xl border bg-white p-4 transition',
-        active ? 'border-[var(--color-mod-notices-border)] shadow-sm' : 'border-slate-200 hover:border-slate-300',
+        "block rounded-2xl border bg-white p-4 transition",
+        active
+          ? "border-[var(--color-mod-notices-border)] shadow-sm"
+          : "border-slate-200 hover:border-slate-300",
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -532,12 +594,16 @@ function ThreadListItem({
           <p className="truncate text-sm font-semibold text-slate-900">
             {getThreadTitle(thread)}
           </p>
-          <p className="mt-1 truncate text-xs text-slate-500">{getThreadSubtitle(thread)}</p>
+          <p className="mt-1 truncate text-xs text-slate-500">
+            {getThreadSubtitle(thread)}
+          </p>
         </div>
         <StatusBadge value={thread.status} />
       </div>
       {latest ? (
-        <p className="mt-3 line-clamp-2 text-sm text-slate-600">{latest.message}</p>
+        <p className="mt-3 line-clamp-2 text-sm text-slate-600">
+          {latest.message}
+        </p>
       ) : (
         <p className="mt-3 text-sm text-slate-400">No messages yet.</p>
       )}
@@ -549,7 +615,10 @@ function ThreadContext({ thread }: { thread: ParentTeacherThreadSummary }) {
   return (
     <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm md:grid-cols-3">
       <ContextItem label="Student" value={getStudentName(thread)} />
-      <ContextItem label="Guardian" value={thread.guardian?.fullName ?? 'Guardian'} />
+      <ContextItem
+        label="Guardian"
+        value={thread.guardian?.fullName ?? "Guardian"}
+      />
       <ContextItem label="Class Teacher" value={getTeacherName(thread)} />
     </div>
   );
@@ -558,7 +627,9 @@ function ThreadContext({ thread }: { thread: ParentTeacherThreadSummary }) {
 function ContextItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</p>
+      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        {label}
+      </p>
       <p className="mt-1 font-semibold text-slate-900">{value}</p>
     </div>
   );
@@ -574,8 +645,10 @@ function ModerationDecisionPanel({
   isModerator: boolean;
 }) {
   const latest = messages[messages.length - 1];
-  const importantCount = messages.filter((item) => item.priority !== 'NORMAL').length;
-  const unreadCount = messages.filter((item) => item.status !== 'READ').length;
+  const importantCount = messages.filter(
+    (item) => item.priority !== "NORMAL",
+  ).length;
+  const unreadCount = messages.filter((item) => item.status !== "READ").length;
   const decision = getModerationDecision(thread, messages);
 
   return (
@@ -588,16 +661,26 @@ function ModerationDecisionPanel({
           <p className="text-xs font-bold uppercase tracking-wider text-amber-700">
             Safety & Escalation Queue
           </p>
-          <h3 className="mt-1 text-sm font-bold text-amber-950">{decision.title}</h3>
-          <p className="mt-1 text-sm leading-6 text-amber-900">{decision.body}</p>
+          <h3 className="mt-1 text-sm font-bold text-amber-950">
+            {decision.title}
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-amber-900">
+            {decision.body}
+          </p>
         </div>
-        <StatusBadge value={isModerator ? 'MODERATOR' : 'SCHOOL_REVIEW'} />
+        <StatusBadge value={isModerator ? "MODERATOR" : "SCHOOL_REVIEW"} />
       </div>
 
       <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
         <ModerationFact label="Thread status" value={thread.status} />
-        <ModerationFact label="Latest priority" value={latest?.priority ?? 'No messages'} />
-        <ModerationFact label="Priority messages" value={String(importantCount)} />
+        <ModerationFact
+          label="Latest priority"
+          value={latest?.priority ?? "No messages"}
+        />
+        <ModerationFact
+          label="Priority messages"
+          value={String(importantCount)}
+        />
         <ModerationFact label="Unread messages" value={String(unreadCount)} />
       </div>
     </div>
@@ -607,7 +690,9 @@ function ModerationDecisionPanel({
 function ModerationFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-white px-3 py-2 shadow-sm">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        {label}
+      </p>
       <p className="mt-1 font-semibold text-slate-900">{value}</p>
     </div>
   );
@@ -637,16 +722,23 @@ function MessageTimeline({
         const mine = item.senderUserId === currentUserId;
 
         return (
-          <div key={item.id} className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
+          <div
+            key={item.id}
+            className={cn("flex", mine ? "justify-end" : "justify-start")}
+          >
             <div
               className={cn(
-                'max-w-[78%] rounded-2xl px-4 py-3 text-sm',
-                mine ? 'bg-[var(--color-mod-notices-accent)] text-white' : 'bg-slate-100 text-slate-800',
+                "max-w-[78%] rounded-2xl px-4 py-3 text-sm",
+                mine
+                  ? "bg-[var(--color-mod-notices-accent)] text-white"
+                  : "bg-slate-100 text-slate-800",
               )}
             >
               <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide opacity-75">
                 <span>{item.senderRole}</span>
-                {item.priority !== 'NORMAL' ? <span>{item.priority}</span> : null}
+                {item.priority !== "NORMAL" ? (
+                  <span>{item.priority}</span>
+                ) : null}
               </div>
               <p className="whitespace-pre-wrap leading-6">{item.message}</p>
               <div className="mt-2 flex items-center justify-end gap-1 text-xs opacity-75">
@@ -671,8 +763,8 @@ function ActionPanel({
   onSubmit,
   buttonLabel,
   disabled,
-  reasonLabel = 'Reason',
-  placeholder = 'Reason',
+  reasonLabel = "Reason",
+  placeholder = "Reason",
   secondaryAction,
   secondaryLabel,
 }: {
@@ -695,7 +787,9 @@ function ActionPanel({
         {icon}
         {title}
       </div>
-      {description ? <p className="mb-3 text-sm leading-6 text-slate-500">{description}</p> : null}
+      {description ? (
+        <p className="mb-3 text-sm leading-6 text-slate-500">{description}</p>
+      ) : null}
       <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
         {reasonLabel}
       </label>
@@ -733,55 +827,60 @@ function getModerationDecision(
   thread: ParentTeacherThreadSummary,
   messages: ParentTeacherMessageSummary[],
 ) {
-  const hasEmergency = messages.some((item) => item.priority === 'EMERGENCY');
-  const hasImportant = messages.some((item) => item.priority === 'IMPORTANT');
+  const hasEmergency = messages.some((item) => item.priority === "EMERGENCY");
+  const hasImportant = messages.some((item) => item.priority === "IMPORTANT");
 
-  if (thread.status === 'ESCALATED') {
+  if (thread.status === "ESCALATED") {
     return {
-      title: 'Escalated thread needs owner review',
-      body: 'Review the message history, record the decision reason, then close or keep the escalation active for leadership follow-up.',
+      title: "Escalated thread needs owner review",
+      body: "Review the message history, record the decision reason, then close or keep the escalation active for leadership follow-up.",
     };
   }
 
-  if (thread.status === 'CLOSED') {
+  if (thread.status === "CLOSED") {
     return {
-      title: 'Closed thread is audit-only',
-      body: 'Replies are disabled. Reopen is intentionally not available from this surface; use a new thread if communication must continue.',
+      title: "Closed thread is audit-only",
+      body: "Replies are disabled. Reopen is intentionally not available from this surface; use a new thread if communication must continue.",
     };
   }
 
   if (hasEmergency) {
     return {
-      title: 'Emergency message present',
-      body: 'Emergency messages should be reviewed by school staff immediately and escalated if the class teacher cannot resolve it.',
+      title: "Emergency message present",
+      body: "Emergency messages should be reviewed by school staff immediately and escalated if the class teacher cannot resolve it.",
     };
   }
 
   if (hasImportant) {
     return {
-      title: 'Important message needs timely response',
-      body: 'Monitor response progress and escalate if the conversation needs principal or administrator review.',
+      title: "Important message needs timely response",
+      body: "Monitor response progress and escalate if the conversation needs principal or administrator review.",
     };
   }
 
   return {
-    title: 'Standard monitored conversation',
-    body: 'Keep communication professional, student-linked, and within school chat-hour expectations.',
+    title: "Standard monitored conversation",
+    body: "Keep communication professional, student-linked, and within school chat-hour expectations.",
   };
 }
 
 function StatusBadge({ value }: { value: string }) {
   const tone =
-    value === 'OPEN'
-      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-      : value === 'ESCALATED' || value === 'EMERGENCY'
-        ? 'border-amber-200 bg-amber-50 text-amber-700'
-        : value === 'READ'
-          ? 'border-blue-200 bg-blue-50 text-blue-700'
-          : 'border-slate-200 bg-slate-50 text-slate-600';
+    value === "OPEN"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : value === "ESCALATED" || value === "EMERGENCY"
+        ? "border-amber-200 bg-amber-50 text-amber-700"
+        : value === "READ"
+          ? "border-blue-200 bg-blue-50 text-blue-700"
+          : "border-slate-200 bg-slate-50 text-slate-600";
 
   return (
-    <span className={cn('shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold', tone)}>
+    <span
+      className={cn(
+        "shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold",
+        tone,
+      )}
+    >
       {value}
     </span>
   );
@@ -792,28 +891,25 @@ function getThreadTitle(thread: ParentTeacherThreadSummary) {
 }
 
 function getThreadSubtitle(thread: ParentTeacherThreadSummary) {
-  const className = thread.student?.class?.name ?? 'Class';
+  const className = thread.student?.class?.name ?? "Class";
   const sectionName = thread.student?.sectionRef?.name
     ? ` ${thread.student.sectionRef.name}`
-    : '';
-  return `${className}${sectionName} | ${thread.guardian?.fullName ?? 'Guardian'} | ${thread.sla ?? 'Usually replies within 1 school day.'}`;
+    : "";
+  return `${className}${sectionName} | ${thread.guardian?.fullName ?? "Guardian"} | ${thread.sla ?? "Usually replies within 1 school day."}`;
 }
 
 function getStudentName(thread: ParentTeacherThreadSummary) {
-  const first = thread.student?.firstNameEn ?? 'Student';
-  const last = thread.student?.lastNameEn ?? '';
+  const first = thread.student?.firstNameEn ?? "Student";
+  const last = thread.student?.lastNameEn ?? "";
   return `${first} ${last}`.trim();
 }
 
 function getTeacherName(thread: ParentTeacherThreadSummary) {
-  const first = thread.classTeacher?.firstName ?? 'Class';
-  const last = thread.classTeacher?.lastName ?? 'Teacher';
+  const first = thread.classTeacher?.firstName ?? "Class";
+  const last = thread.classTeacher?.lastName ?? "Teacher";
   return `${first} ${last}`.trim();
 }
 
 function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat('en-NP', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
+  return formatBsDateTime(value);
 }

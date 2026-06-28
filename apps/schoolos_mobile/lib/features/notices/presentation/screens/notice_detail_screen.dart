@@ -5,6 +5,7 @@ import '../../../../core/platform/file_share_service.dart';
 import '../../../../features/parent/application/parent_portal_providers.dart';
 import '../../../../features/parent/presentation/widgets/parent_detail_widgets.dart';
 import '../../../../features/parent/presentation/widgets/parent_portal_widgets.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../application/notices_providers.dart';
 import '../../domain/notice_models.dart';
 
@@ -200,24 +201,7 @@ class NoticeDetailScreen extends ConsumerWidget {
   }
 
   String _formatDate(DateTime value) {
-    final local = value.toLocal();
-    final month = const [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ][local.month - 1];
-    final hour = local.hour.toString().padLeft(2, '0');
-    final minute = local.minute.toString().padLeft(2, '0');
-    return '$month ${local.day}, ${local.year} • $hour:$minute';
+    return NepaliBsCalendar.formatBsDateTime(value);
   }
 
   void _attachmentUnavailable(BuildContext context) {

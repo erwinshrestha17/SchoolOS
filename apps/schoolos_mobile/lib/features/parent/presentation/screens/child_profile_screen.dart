@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/design_system/app_radius.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_gradient_card.dart';
 import '../../../../shared/widgets/dashboard_card.dart';
@@ -276,7 +277,7 @@ String _formatDate(String? value) {
   if (parsed == null) {
     return '-';
   }
-  return '${_month(parsed.month)} ${parsed.day}, ${parsed.year}';
+  return NepaliBsCalendar.formatBsDate(parsed);
 }
 
 String _labelize(String value) {
@@ -289,27 +290,6 @@ String _labelize(String value) {
       .where((part) => part.isNotEmpty)
       .map((part) => part[0].toUpperCase() + part.substring(1).toLowerCase())
       .join(' ');
-}
-
-String _month(int month) {
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  if (month < 1 || month > 12) {
-    return 'Date';
-  }
-  return months[month - 1];
 }
 
 class _ProfileRow extends StatelessWidget {

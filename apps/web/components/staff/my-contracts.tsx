@@ -1,29 +1,31 @@
-'use client';
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { FileText } from 'lucide-react';
+import { formatBsDate } from "@schoolos/core";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { FileText } from "lucide-react";
 
 interface MyContractsProps {
   contracts: any[];
 }
 
 export function MyContracts({ contracts = [] }: MyContractsProps) {
-  if (contracts.length === 0) return (
-    <Card>
-      <CardContent className="p-8 text-center text-muted-foreground">
-        No contract history found.
-      </CardContent>
-    </Card>
-  );
+  if (contracts.length === 0)
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-muted-foreground">
+          No contract history found.
+        </CardContent>
+      </Card>
+    );
 
   return (
     <Card>
@@ -48,14 +50,32 @@ export function MyContracts({ contracts = [] }: MyContractsProps) {
           <TableBody>
             {contracts.map((contract) => (
               <TableRow key={contract.id}>
-                <TableCell className="font-medium">{contract.contractNumber}</TableCell>
+                <TableCell className="font-medium">
+                  {contract.contractNumber}
+                </TableCell>
                 <TableCell>{contract.position}</TableCell>
-                <TableCell>{new Date(contract.startDate).toLocaleDateString()}</TableCell>
-                <TableCell>{contract.endDate ? new Date(contract.endDate).toLocaleDateString() : 'Ongoing'}</TableCell>
-                <TableCell>Rs {Number(contract.baseSalary).toLocaleString()}</TableCell>
+                <TableCell>{formatBsDate(contract.startDate)}</TableCell>
                 <TableCell>
-                  <Badge variant={!contract.endDate || new Date(contract.endDate) > new Date() ? 'success' as any : 'secondary'}>
-                    {!contract.endDate || new Date(contract.endDate) > new Date() ? 'Active' : 'Expired'}
+                  {contract.endDate
+                    ? formatBsDate(contract.endDate)
+                    : "Ongoing"}
+                </TableCell>
+                <TableCell>
+                  Rs {Number(contract.baseSalary).toLocaleString()}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant={
+                      !contract.endDate ||
+                      new Date(contract.endDate) > new Date()
+                        ? ("success" as any)
+                        : "secondary"
+                    }
+                  >
+                    {!contract.endDate ||
+                    new Date(contract.endDate) > new Date()
+                      ? "Active"
+                      : "Expired"}
                   </Badge>
                 </TableCell>
               </TableRow>

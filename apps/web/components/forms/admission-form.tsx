@@ -1,7 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { admissionFormSchema, type AdmissionFormInput } from "@schoolos/core";
+import {
+  admissionFormSchema,
+  formatBsDate,
+  type AdmissionFormInput,
+} from "@schoolos/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useId, useState } from "react";
@@ -53,7 +57,11 @@ const workspaceTabs = [
   ["bulk", "Bulk Import"],
 ] as const;
 
-export function AdmissionForm({ defaultWorkspaceTab = "pipeline" }: { defaultWorkspaceTab?: (typeof workspaceTabs)[number][0] }) {
+export function AdmissionForm({
+  defaultWorkspaceTab = "pipeline",
+}: {
+  defaultWorkspaceTab?: (typeof workspaceTabs)[number][0];
+}) {
   const queryClient = useQueryClient();
   const [activeWorkspaceTab, setActiveWorkspaceTab] =
     useState<(typeof workspaceTabs)[number][0]>(defaultWorkspaceTab);
@@ -794,7 +802,7 @@ export function AdmissionForm({ defaultWorkspaceTab = "pipeline" }: { defaultWor
                         label="Date of Birth"
                         value={
                           watchedDateOfBirth
-                            ? new Date(watchedDateOfBirth).toLocaleDateString()
+                            ? formatBsDate(watchedDateOfBirth)
                             : "Date of birth not entered"
                         }
                       />
@@ -817,9 +825,7 @@ export function AdmissionForm({ defaultWorkspaceTab = "pipeline" }: { defaultWor
                       />
                       <SummaryItem
                         label="Admission Date"
-                        value={new Date(
-                          form.getValues("admissionDate"),
-                        ).toLocaleDateString()}
+                        value={formatBsDate(form.getValues("admissionDate"))}
                       />
                       <div className="my-2 h-px bg-slate-100" />
                       <SummaryItem
@@ -922,7 +928,12 @@ export function AdmissionForm({ defaultWorkspaceTab = "pipeline" }: { defaultWor
 
                   <button
                     type="button"
-                    onClick={() => void api.openStudentDocumentPdf(latestAdmission!.student.id, 'id-card')}
+                    onClick={() =>
+                      void api.openStudentDocumentPdf(
+                        latestAdmission!.student.id,
+                        "id-card",
+                      )
+                    }
                     className="group flex flex-col items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
                   >
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-[var(--color-mod-admissions-accent)] group-hover:text-white transition-colors">
@@ -979,8 +990,24 @@ export function AdmissionForm({ defaultWorkspaceTab = "pipeline" }: { defaultWor
               )}
             </div>
           )}
-          {draftMutation.isSuccess ? <p className="text-right text-xs font-bold text-success-700" role="status">Draft saved securely.</p> : null}
-          {draftMutation.isError ? <p className="text-right text-xs font-bold text-danger-700" role="alert">{draftMutation.error instanceof Error ? draftMutation.error.message : 'Draft could not be saved.'}</p> : null}
+          {draftMutation.isSuccess ? (
+            <p
+              className="text-right text-xs font-bold text-success-700"
+              role="status"
+            >
+              Draft saved securely.
+            </p>
+          ) : null}
+          {draftMutation.isError ? (
+            <p
+              className="text-right text-xs font-bold text-danger-700"
+              role="alert"
+            >
+              {draftMutation.error instanceof Error
+                ? draftMutation.error.message
+                : "Draft could not be saved."}
+            </p>
+          ) : null}
         </form>
       )}
 
@@ -1201,9 +1228,7 @@ function hasBulkDuplicateWarnings(
 
 function formatBulkImportDate(value: string | Date) {
   try {
-    return new Intl.DateTimeFormat("en-NP", { dateStyle: "medium" }).format(
-      new Date(value),
-    );
+    return formatBsDate(value);
   } catch {
     return String(value);
   }

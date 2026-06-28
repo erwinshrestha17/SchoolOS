@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   FormEvent,
@@ -6,9 +6,9 @@ import {
   useEffect,
   useMemo,
   useState,
-} from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
+} from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import {
   BookOpenCheck,
   CheckCircle2,
@@ -19,21 +19,21 @@ import {
   Save,
   Send,
   Users,
-} from 'lucide-react';
-import type { PermissionKey } from '@schoolos/core';
-import { learningApi } from '../../lib/api/learning';
+} from "lucide-react";
+import { formatBsDateTime, type PermissionKey } from "@schoolos/core";
+import { learningApi } from "../../lib/api/learning";
 import type {
   LearningAnswer,
   LearningAttempt,
   LearningQuestion,
   LearningSession,
-} from '../../lib/api/learning';
-import { useEntitlements } from '../entitlements-provider';
-import { useSession } from '../session-provider';
-import { EmptyState } from '../ui/empty-state';
-import { LoadingState } from '../ui/loading-state';
-import { PermissionDenied } from '../ui/permission-denied';
-import { StatusBadge } from '../ui/status-badge';
+} from "../../lib/api/learning";
+import { useEntitlements } from "../entitlements-provider";
+import { useSession } from "../session-provider";
+import { EmptyState } from "../ui/empty-state";
+import { LoadingState } from "../ui/loading-state";
+import { PermissionDenied } from "../ui/permission-denied";
+import { StatusBadge } from "../ui/status-badge";
 
 function LearningRouteGuard({
   children,
@@ -44,16 +44,16 @@ function LearningRouteGuard({
   const { session, status } = useSession();
   const { hasModule, loading: entitlementsLoading } = useEntitlements();
 
-  if (status === 'loading' || entitlementsLoading) {
+  if (status === "loading" || entitlementsLoading) {
     return <LoadingState variant="page" label="Checking learning access" />;
   }
 
   if (!session) {
-    router.replace('/login');
+    router.replace("/login");
     return <LoadingState variant="page" label="Redirecting to sign in" />;
   }
 
-  if (!hasModule('learning')) {
+  if (!hasModule("learning")) {
     return (
       <RuntimeShell title={title}>
         <PermissionDenied
@@ -75,7 +75,7 @@ function LearningRouteGuard({
           title="Learning access restricted"
           description="Your current role cannot open this learning view."
           resource="Learning"
-          action={permissions.join(' or ')}
+          action={permissions.join(" or ")}
         />
       </RuntimeShell>
     );
@@ -110,20 +110,22 @@ function RuntimeShell({
 
 export function SmartBoardSessionView({ sessionId }: { sessionId: string }) {
   const sessionQuery = useQuery({
-    queryKey: ['learning-board-session', sessionId],
+    queryKey: ["learning-board-session", sessionId],
     queryFn: () => learningApi.getSession(sessionId),
   });
 
   return (
     <LearningRouteGuard
       title="Smart Board Session"
-      permissions={['learning:read', 'learning:launch']}
+      permissions={["learning:read", "learning:launch"]}
     >
       <RuntimeShell
         title="Smart Board Session"
         description="Show safe activity prompts for a live classroom session."
       >
-        {sessionQuery.isLoading && <LoadingState variant="page" label="Loading board session" />}
+        {sessionQuery.isLoading && (
+          <LoadingState variant="page" label="Loading board session" />
+        )}
         {sessionQuery.error && <RuntimeError error={sessionQuery.error} />}
         {sessionQuery.data && <BoardSession session={sessionQuery.data} />}
       </RuntimeShell>
@@ -140,7 +142,7 @@ function BoardSession({ session }: { session: LearningSession }) {
   const currentQuestion = questions[questionIndex] ?? null;
 
   useEffect(() => {
-    if (session.status !== 'LIVE') return;
+    if (session.status !== "LIVE") return;
     sendHeartbeat();
     const interval = window.setInterval(() => {
       sendHeartbeat();
@@ -154,7 +156,9 @@ function BoardSession({ session }: { session: LearningSession }) {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-              {session.sessionCode ? `Code ${session.sessionCode}` : 'Learning session'}
+              {session.sessionCode
+                ? `Code ${session.sessionCode}`
+                : "Learning session"}
             </p>
             <h2 className="mt-2 text-3xl font-black text-slate-950">
               {session.activity.title}
@@ -176,12 +180,12 @@ function BoardSession({ session }: { session: LearningSession }) {
         </div>
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
           <p className="text-sm font-bold text-slate-600">
-            Expires {formatDateTime(session.expiresAt)} · Heartbeat{' '}
-            {heartbeatPending ? 'sending' : 'active'}
+            Expires {formatDateTime(session.expiresAt)} · Heartbeat{" "}
+            {heartbeatPending ? "sending" : "active"}
           </p>
           <p className="text-sm font-black text-slate-950">
             {questions.length === 0
-              ? 'No questions'
+              ? "No questions"
               : `${questionIndex + 1} of ${questions.length}`}
           </p>
         </div>
@@ -195,7 +199,9 @@ function BoardSession({ session }: { session: LearningSession }) {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setQuestionIndex((current) => Math.max(0, current - 1))}
+                onClick={() =>
+                  setQuestionIndex((current) => Math.max(0, current - 1))
+                }
                 disabled={questionIndex === 0}
                 className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -233,8 +239,8 @@ function BoardSession({ session }: { session: LearningSession }) {
 
 export function StudentLearningJoinView() {
   const router = useRouter();
-  const [sessionCode, setSessionCode] = useState('');
-  const [qrToken, setQrToken] = useState('');
+  const [sessionCode, setSessionCode] = useState("");
+  const [qrToken, setQrToken] = useState("");
   const joinMutation = useMutation({
     mutationFn: learningApi.joinSession,
     onSuccess: (result) => {
@@ -251,7 +257,10 @@ export function StudentLearningJoinView() {
   }
 
   return (
-    <LearningRouteGuard title="Join Learning Session" permissions={['learning:attempt']}>
+    <LearningRouteGuard
+      title="Join Learning Session"
+      permissions={["learning:attempt"]}
+    >
       <RuntimeShell
         title="Join Learning Session"
         description="Enter the school session code or QR token from your teacher."
@@ -266,7 +275,9 @@ export function StudentLearningJoinView() {
             </span>
             <input
               value={sessionCode}
-              onChange={(event) => setSessionCode(event.target.value.toUpperCase())}
+              onChange={(event) =>
+                setSessionCode(event.target.value.toUpperCase())
+              }
               className="mt-2 h-14 w-full rounded-xl border border-slate-200 px-4 text-center text-2xl font-black tracking-widest text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
               maxLength={24}
             />
@@ -283,7 +294,9 @@ export function StudentLearningJoinView() {
           </label>
           <button
             type="submit"
-            disabled={joinMutation.isPending || (!sessionCode.trim() && !qrToken.trim())}
+            disabled={
+              joinMutation.isPending || (!sessionCode.trim() && !qrToken.trim())
+            }
             className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 text-sm font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <LogIn size={18} />
@@ -296,7 +309,11 @@ export function StudentLearningJoinView() {
   );
 }
 
-export function StudentLearningSessionView({ sessionId }: { sessionId: string }) {
+export function StudentLearningSessionView({
+  sessionId,
+}: {
+  sessionId: string;
+}) {
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -305,7 +322,7 @@ export function StudentLearningSessionView({ sessionId }: { sessionId: string })
   const startedAt = useMemo(() => Date.now(), []);
 
   const sessionQuery = useQuery({
-    queryKey: ['student-learning-session', sessionId],
+    queryKey: ["student-learning-session", sessionId],
     queryFn: () => learningApi.getSession(sessionId),
   });
   const attemptMutation = useMutation({
@@ -313,7 +330,7 @@ export function StudentLearningSessionView({ sessionId }: { sessionId: string })
     onSuccess: (attempt) => {
       setAnswers(answersFromAttempt(attempt));
       setNotice(
-        attempt.answers?.length ? 'Attempt resumed.' : 'Attempt started.',
+        attempt.answers?.length ? "Attempt resumed." : "Attempt started.",
       );
     },
   });
@@ -325,8 +342,11 @@ export function StudentLearningSessionView({ sessionId }: { sessionId: string })
       }),
     onSuccess: (attempt) => {
       setLastSavedAt(new Date().toISOString());
-      setNotice('Attempt autosaved.');
-      void queryClient.setQueryData(['student-learning-attempt', attempt.id], attempt);
+      setNotice("Attempt autosaved.");
+      void queryClient.setQueryData(
+        ["student-learning-attempt", attempt.id],
+        attempt,
+      );
     },
   });
   const submitMutation = useMutation({
@@ -337,12 +357,16 @@ export function StudentLearningSessionView({ sessionId }: { sessionId: string })
       }),
     onSuccess: (attempt) => {
       setConfirmSubmit(false);
-      setNotice('Attempt submitted.');
-      void queryClient.setQueryData(['student-learning-attempt', attempt.id], attempt);
+      setNotice("Attempt submitted.");
+      void queryClient.setQueryData(
+        ["student-learning-attempt", attempt.id],
+        attempt,
+      );
     },
   });
 
-  const activeAttempt = submitMutation.data ?? autosaveMutation.data ?? attemptMutation.data;
+  const activeAttempt =
+    submitMutation.data ?? autosaveMutation.data ?? attemptMutation.data;
   const questions = sessionQuery.data?.activity.questions ?? [];
   const unansweredCount = questions.filter(
     (question) => question.id && !hasAnswer(answers[question.id]),
@@ -357,13 +381,16 @@ export function StudentLearningSessionView({ sessionId }: { sessionId: string })
     setConfirmSubmit(true);
     setNotice(
       unansweredCount > 0
-        ? `${unansweredCount} question${unansweredCount === 1 ? '' : 's'} still need an answer.`
-        : 'Review once before final submission.',
+        ? `${unansweredCount} question${unansweredCount === 1 ? "" : "s"} still need an answer.`
+        : "Review once before final submission.",
     );
   }
 
   return (
-    <LearningRouteGuard title="Learning Session" permissions={['learning:attempt']}>
+    <LearningRouteGuard
+      title="Learning Session"
+      permissions={["learning:attempt"]}
+    >
       <RuntimeShell
         title="Learning Session"
         description="Work through the activity. Autosave keeps your current answers on the server."
@@ -373,7 +400,9 @@ export function StudentLearningSessionView({ sessionId }: { sessionId: string })
             {notice}
           </div>
         )}
-        {sessionQuery.isLoading && <LoadingState variant="page" label="Loading session" />}
+        {sessionQuery.isLoading && (
+          <LoadingState variant="page" label="Loading session" />
+        )}
         {sessionQuery.error && <RuntimeError error={sessionQuery.error} />}
         {sessionQuery.data && (
           <div className="space-y-5">
@@ -384,10 +413,13 @@ export function StudentLearningSessionView({ sessionId }: { sessionId: string })
                     {sessionQuery.data.activity.title}
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    {sessionQuery.data.activity.estimatedMinutes ?? 0} minutes · {labelize(sessionQuery.data.activity.difficulty)}
+                    {sessionQuery.data.activity.estimatedMinutes ?? 0} minutes ·{" "}
+                    {labelize(sessionQuery.data.activity.difficulty)}
                   </p>
                 </div>
-                <StatusBadge status={activeAttempt?.status ?? sessionQuery.data.status} />
+                <StatusBadge
+                  status={activeAttempt?.status ?? sessionQuery.data.status}
+                />
               </div>
             </div>
             {!activeAttempt ? (
@@ -416,8 +448,10 @@ export function StudentLearningSessionView({ sessionId }: { sessionId: string })
                       </p>
                       <QuestionAnswerInput
                         question={question}
-                        value={answers[question.id ?? '']}
-                        onChange={(answer) => question.id && setAnswer(question.id, answer)}
+                        value={answers[question.id ?? ""]}
+                        onChange={(answer) =>
+                          question.id && setAnswer(question.id, answer)
+                        }
                       />
                     </div>
                   ))}
@@ -426,7 +460,10 @@ export function StudentLearningSessionView({ sessionId }: { sessionId: string })
                   <button
                     type="button"
                     onClick={() => autosaveMutation.mutate(activeAttempt)}
-                    disabled={autosaveMutation.isPending || activeAttempt.status === 'SUBMITTED'}
+                    disabled={
+                      autosaveMutation.isPending ||
+                      activeAttempt.status === "SUBMITTED"
+                    }
                     className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Save size={17} />
@@ -435,7 +472,10 @@ export function StudentLearningSessionView({ sessionId }: { sessionId: string })
                   <button
                     type="button"
                     onClick={requestSubmit}
-                    disabled={submitMutation.isPending || activeAttempt.status === 'SUBMITTED'}
+                    disabled={
+                      submitMutation.isPending ||
+                      activeAttempt.status === "SUBMITTED"
+                    }
                     className="inline-flex h-11 items-center gap-2 rounded-xl bg-emerald-700 px-5 text-sm font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Send size={17} />
@@ -447,10 +487,11 @@ export function StudentLearningSessionView({ sessionId }: { sessionId: string })
                     </span>
                   )}
                 </div>
-                {confirmSubmit && activeAttempt.status !== 'SUBMITTED' && (
+                {confirmSubmit && activeAttempt.status !== "SUBMITTED" && (
                   <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
                     <p className="text-sm font-bold text-amber-950">
-                      Submit this attempt now? Final submission cannot be edited.
+                      Submit this attempt now? Final submission cannot be
+                      edited.
                     </p>
                     <button
                       type="button"
@@ -463,22 +504,27 @@ export function StudentLearningSessionView({ sessionId }: { sessionId: string })
                     </button>
                   </div>
                 )}
-                {activeAttempt.status === 'SUBMITTED' && (
+                {activeAttempt.status === "SUBMITTED" && (
                   <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
                     <div className="flex items-center gap-3">
                       <CheckCircle2 className="text-emerald-700" size={22} />
                       <p className="text-sm font-black text-emerald-950">
-                        Submitted · Score {Math.round(activeAttempt.score ?? 0)} · Accuracy {Math.round(activeAttempt.accuracy ?? 0)}%
+                        Submitted · Score {Math.round(activeAttempt.score ?? 0)}{" "}
+                        · Accuracy {Math.round(activeAttempt.accuracy ?? 0)}%
                       </p>
                     </div>
                   </div>
                 )}
               </>
             )}
-            {(attemptMutation.error || autosaveMutation.error || submitMutation.error) && (
+            {(attemptMutation.error ||
+              autosaveMutation.error ||
+              submitMutation.error) && (
               <RuntimeError
                 error={
-                  attemptMutation.error ?? autosaveMutation.error ?? submitMutation.error
+                  attemptMutation.error ??
+                  autosaveMutation.error ??
+                  submitMutation.error
                 }
               />
             )}
@@ -490,9 +536,9 @@ export function StudentLearningSessionView({ sessionId }: { sessionId: string })
 }
 
 export function ParentLearningSummaryView() {
-  const [selectedChildId, setSelectedChildId] = useState('');
+  const [selectedChildId, setSelectedChildId] = useState("");
   const summaryQuery = useQuery({
-    queryKey: ['parent-learning-summary'],
+    queryKey: ["parent-learning-summary"],
     queryFn: () => learningApi.getParentSummary(),
   });
   const items = summaryQuery.data?.items ?? [];
@@ -502,13 +548,15 @@ export function ParentLearningSummaryView() {
   return (
     <LearningRouteGuard
       title="Parent Learning Summary"
-      permissions={['learning:progress']}
+      permissions={["learning:progress"]}
     >
       <RuntimeShell
         title="Parent Learning Summary"
         description="Child-scoped learning progress with supportive activity summaries."
       >
-        {summaryQuery.isLoading && <LoadingState variant="page" label="Loading child summaries" />}
+        {summaryQuery.isLoading && (
+          <LoadingState variant="page" label="Loading child summaries" />
+        )}
         {summaryQuery.error && <RuntimeError error={summaryQuery.error} />}
         {summaryQuery.data?.items.length === 0 && (
           <EmptyState
@@ -524,7 +572,7 @@ export function ParentLearningSummaryView() {
                 Child
               </span>
               <select
-                value={selectedItem?.child.id ?? ''}
+                value={selectedItem?.child.id ?? ""}
                 onChange={(event) => setSelectedChildId(event.target.value)}
                 className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 md:max-w-sm"
               >
@@ -549,7 +597,10 @@ export function ParentLearningSummaryView() {
                     {selectedItem.child.name}
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    {selectedItem.child.class?.name ?? 'Class'} {selectedItem.child.section?.name ? `· ${selectedItem.child.section.name}` : ''}
+                    {selectedItem.child.class?.name ?? "Class"}{" "}
+                    {selectedItem.child.section?.name
+                      ? `· ${selectedItem.child.section.name}`
+                      : ""}
                   </p>
                 </div>
                 <StatusBadge
@@ -576,8 +627,20 @@ export function ParentLearningSummaryView() {
                 />
               </div>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <TopicList title="Recent completed activities" items={selectedItem.recentCompletedActivities.map((activity) => `${activity.title} · ${Math.round(activity.accuracy ?? 0)}%`)} />
-                <TopicList title="Practice focus" items={selectedItem.needsPracticeTopics.map((topic) => `${topic.activity?.title ?? topic.subject?.name ?? 'Topic'} · ${topic.labelText}`)} />
+                <TopicList
+                  title="Recent completed activities"
+                  items={selectedItem.recentCompletedActivities.map(
+                    (activity) =>
+                      `${activity.title} · ${Math.round(activity.accuracy ?? 0)}%`,
+                  )}
+                />
+                <TopicList
+                  title="Practice focus"
+                  items={selectedItem.needsPracticeTopics.map(
+                    (topic) =>
+                      `${topic.activity?.title ?? topic.subject?.name ?? "Topic"} · ${topic.labelText}`,
+                  )}
+                />
               </div>
             </div>
           )}
@@ -594,17 +657,20 @@ function QuestionOptions({
   question: LearningQuestion;
   readOnly?: boolean;
 }) {
-  if (question.type !== 'MULTIPLE_CHOICE' || !Array.isArray(question.options)) {
-    if (question.type === 'MATCHING') {
+  if (question.type !== "MULTIPLE_CHOICE" || !Array.isArray(question.options)) {
+    if (question.type === "MATCHING") {
       const pairs = matchingPairs(question.options);
       return (
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <OptionList title="Left" items={pairs.map((pair) => pair.leftText)} />
-          <OptionList title="Right" items={pairs.map((pair) => pair.rightText).sort()} />
+          <OptionList
+            title="Right"
+            items={pairs.map((pair) => pair.rightText).sort()}
+          />
         </div>
       );
     }
-    if (question.type === 'ORDERING') {
+    if (question.type === "ORDERING") {
       return (
         <OptionList
           title="Items"
@@ -620,7 +686,7 @@ function QuestionOptions({
     <div className="mt-4 grid gap-3 md:grid-cols-2">
       {question.options.map((option, index) => (
         <div
-          key={`${question.id ?? 'question'}-${index}`}
+          key={`${question.id ?? "question"}-${index}`}
           className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700"
         >
           {readOnly ? `${index + 1}. ` : null}
@@ -640,18 +706,18 @@ function QuestionAnswerInput({
   value: unknown;
   onChange: (answer: unknown) => void;
 }) {
-  if (question.type === 'TRUE_FALSE') {
+  if (question.type === "TRUE_FALSE") {
     return (
       <div className="mt-4 flex flex-wrap gap-3">
-        {['true', 'false'].map((option) => (
+        {["true", "false"].map((option) => (
           <button
             key={option}
             type="button"
-            onClick={() => onChange(option === 'true')}
+            onClick={() => onChange(option === "true")}
             className={`rounded-xl border px-4 py-2 text-sm font-black ${
-              value === (option === 'true')
-                ? 'border-emerald-600 bg-emerald-600 text-white'
-                : 'border-slate-200 bg-white text-slate-700'
+              value === (option === "true")
+                ? "border-emerald-600 bg-emerald-600 text-white"
+                : "border-slate-200 bg-white text-slate-700"
             }`}
           >
             {labelize(option)}
@@ -661,18 +727,18 @@ function QuestionAnswerInput({
     );
   }
 
-  if (question.type === 'MULTIPLE_CHOICE' && Array.isArray(question.options)) {
+  if (question.type === "MULTIPLE_CHOICE" && Array.isArray(question.options)) {
     return (
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {question.options.map((option, index) => (
           <button
-            key={`${question.id ?? 'question'}-${index}`}
+            key={`${question.id ?? "question"}-${index}`}
             type="button"
             onClick={() => onChange(option)}
             className={`rounded-xl border px-4 py-3 text-left text-sm font-bold ${
               value === option
-                ? 'border-emerald-600 bg-emerald-600 text-white'
-                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                ? "border-emerald-600 bg-emerald-600 text-white"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
             }`}
           >
             {String(option)}
@@ -682,18 +748,29 @@ function QuestionAnswerInput({
     );
   }
 
-  if (question.type === 'MATCHING') {
+  if (question.type === "MATCHING") {
     const pairs = matchingPairs(question.options);
     const selected = Array.isArray(value) ? value : [];
     return (
       <div className="mt-4 grid gap-3">
         {pairs.map((pair) => (
-          <label key={pair.leftId} className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <span className="text-sm font-black text-slate-900">{pair.leftText}</span>
+          <label
+            key={pair.leftId}
+            className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+          >
+            <span className="text-sm font-black text-slate-900">
+              {pair.leftText}
+            </span>
             <select
               value={matchingAnswerFor(selected, pair.leftId)}
               onChange={(event) =>
-                onChange(upsertMatchingAnswer(selected, pair.leftId, event.target.value))
+                onChange(
+                  upsertMatchingAnswer(
+                    selected,
+                    pair.leftId,
+                    event.target.value,
+                  ),
+                )
               }
               className="h-10 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
             >
@@ -710,11 +787,12 @@ function QuestionAnswerInput({
     );
   }
 
-  if (question.type === 'ORDERING') {
+  if (question.type === "ORDERING") {
     const items = orderingItems(question.options);
-    const order = Array.isArray(value) && value.length
-      ? value.map(String)
-      : items.map((item) => item.id);
+    const order =
+      Array.isArray(value) && value.length
+        ? value.map(String)
+        : items.map((item) => item.id);
     const orderedItems = order
       .map((id) => items.find((item) => item.id === id))
       .filter(Boolean) as Array<{ id: string; text: string }>;
@@ -754,7 +832,7 @@ function QuestionAnswerInput({
 
   return (
     <textarea
-      value={typeof value === 'string' ? value : ''}
+      value={typeof value === "string" ? value : ""}
       onChange={(event) => onChange(event.target.value)}
       rows={4}
       className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
@@ -787,7 +865,9 @@ function TopicList({ title, items }: { title: string; items: string[] }) {
     <div className="rounded-2xl border border-slate-100 p-4">
       <p className="text-sm font-black text-slate-950">{title}</p>
       {items.length === 0 ? (
-        <p className="mt-2 text-sm text-slate-500">No submitted activity yet.</p>
+        <p className="mt-2 text-sm text-slate-500">
+          No submitted activity yet.
+        </p>
       ) : (
         <ul className="mt-3 space-y-2">
           {items.slice(0, 5).map((item) => (
@@ -829,7 +909,7 @@ function answersFromAttempt(attempt: LearningAttempt) {
 
 function hasAnswer(value: unknown) {
   if (Array.isArray(value)) return value.length > 0;
-  return value !== undefined && value !== null && String(value).trim() !== '';
+  return value !== undefined && value !== null && String(value).trim() !== "";
 }
 
 function matchingPairs(options: unknown) {
@@ -837,10 +917,10 @@ function matchingPairs(options: unknown) {
   return options.pairs
     .filter(isRecord)
     .map((pair) => ({
-      leftId: String(pair.leftId ?? ''),
-      leftText: String(pair.leftText ?? ''),
-      rightId: String(pair.rightId ?? ''),
-      rightText: String(pair.rightText ?? ''),
+      leftId: String(pair.leftId ?? ""),
+      leftText: String(pair.leftText ?? ""),
+      rightId: String(pair.rightId ?? ""),
+      rightText: String(pair.rightText ?? ""),
     }))
     .filter((pair) => pair.leftId && pair.rightId);
 }
@@ -850,28 +930,32 @@ function orderingItems(options: unknown) {
   return options.items
     .filter(isRecord)
     .map((item) => ({
-      id: String(item.id ?? ''),
-      text: String(item.text ?? ''),
+      id: String(item.id ?? ""),
+      text: String(item.text ?? ""),
     }))
     .filter((item) => item.id);
 }
 
 function matchingAnswerFor(value: unknown[], leftId: string) {
   const match = value.find(
-    (entry) => isRecord(entry) && String(entry.leftId ?? '') === leftId,
+    (entry) => isRecord(entry) && String(entry.leftId ?? "") === leftId,
   );
-  return isRecord(match) ? String(match.rightId ?? '') : '';
+  return isRecord(match) ? String(match.rightId ?? "") : "";
 }
 
-function upsertMatchingAnswer(value: unknown[], leftId: string, rightId: string) {
+function upsertMatchingAnswer(
+  value: unknown[],
+  leftId: string,
+  rightId: string,
+) {
   const next = value
     .filter(
-      (entry) => !isRecord(entry) || String(entry.leftId ?? '') !== leftId,
+      (entry) => !isRecord(entry) || String(entry.leftId ?? "") !== leftId,
     )
     .filter(isRecord)
     .map((entry) => ({
-      leftId: String(entry.leftId ?? ''),
-      rightId: String(entry.rightId ?? ''),
+      leftId: String(entry.leftId ?? ""),
+      rightId: String(entry.rightId ?? ""),
     }));
   if (rightId) {
     next.push({ leftId, rightId });
@@ -889,13 +973,13 @@ function moveOrderItem(order: string[], index: number, delta: number) {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function RuntimeError({ error }: { error: unknown }) {
   return (
     <div className="mt-4 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
-      {error instanceof Error ? error.message : 'Learning request failed.'}
+      {error instanceof Error ? error.message : "Learning request failed."}
     </div>
   );
 }
@@ -912,17 +996,14 @@ function elapsedSeconds(startedAt: number) {
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return 'not set';
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
+  if (!value) return "not set";
+  return formatBsDateTime(value);
 }
 
 function labelize(value: string) {
   return value
     .toLowerCase()
-    .split('_')
+    .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+    .join(" ");
 }

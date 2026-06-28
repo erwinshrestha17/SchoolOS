@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../app/design_system/app_radius.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../domain/notice_models.dart';
 import 'notice_helpers.dart';
@@ -83,9 +83,9 @@ class NoticeCard extends StatelessWidget {
                   runSpacing: AppSpacing.xs,
                   children: [
                     _MetaLabel(
-                      label: DateFormat(
-                        'MMM d, h:mm a',
-                      ).format(notice.publishedAt),
+                      label: NepaliBsCalendar.formatBsDateTime(
+                        notice.publishedAt,
+                      ),
                     ),
                     _MetaLabel(label: notice.audience),
                     if (notice.hasAttachment)

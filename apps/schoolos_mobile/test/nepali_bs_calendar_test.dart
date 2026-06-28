@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:schoolos_mobile/shared/utils/nepali_bs_calendar.dart';
 
@@ -63,6 +65,25 @@ void main() {
         () => NepaliBsCalendar.parseBsDateInput('2083-03-33'),
         throwsArgumentError,
       );
+    });
+
+    test('keeps mobile feature screens off device-local date rendering', () {
+      final files = Directory('lib')
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((file) => file.path.endsWith('.dart'));
+
+      for (final file in files) {
+        final source = file.readAsStringSync();
+        expect(source, isNot(contains('DateFormat')), reason: file.path);
+        expect(
+          source,
+          isNot(contains('TimeOfDay.fromDateTime')),
+          reason: file.path,
+        );
+        expect(source, isNot(contains('.toLocal()')), reason: file.path);
+        expect(source, isNot(contains('const months = [')), reason: file.path);
+      }
     });
   });
 }

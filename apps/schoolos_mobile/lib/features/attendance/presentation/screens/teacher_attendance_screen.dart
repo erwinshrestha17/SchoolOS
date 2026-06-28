@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
+import '../../../../shared/widgets/bs_date_picker.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
@@ -274,7 +275,7 @@ class _TeacherAttendanceHeader extends StatelessWidget {
                 child: Text(
                   state.date == null
                       ? 'Today'
-                      : DateFormat('EEE, MMM d').format(state.date!),
+                      : NepaliBsCalendar.formatBsDate(state.date!, long: true),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
@@ -282,7 +283,7 @@ class _TeacherAttendanceHeader extends StatelessWidget {
               ),
               TextButton.icon(
                 onPressed: () async {
-                  final picked = await showDatePicker(
+                  final picked = await showSchoolBsDatePicker(
                     context: context,
                     initialDate: state.date ?? DateTime.now(),
                     firstDate: DateTime(2024),
@@ -362,7 +363,7 @@ class _SyncBanner extends StatelessWidget {
                 Text(state.message!),
                 if (state.isOffline && state.lastUpdated != null)
                   Text(
-                    'Last updated ${TimeOfDay.fromDateTime(state.lastUpdated!.toLocal()).format(context)}',
+                    'Last updated ${NepaliBsCalendar.formatNepalTime(state.lastUpdated!)}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
               ],

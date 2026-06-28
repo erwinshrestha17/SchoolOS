@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/constants/app_routes.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_gradient_card.dart';
 import '../../../../shared/widgets/dashboard_card.dart';
@@ -260,26 +261,5 @@ String _date(String isoDate) {
   if (parsed == null) {
     return 'available soon';
   }
-  return '${_month(parsed.month)} ${parsed.day}';
-}
-
-String _month(int month) {
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  if (month < 1 || month > 12) {
-    return 'Date';
-  }
-  return months[month - 1];
+  return NepaliBsCalendar.formatBsDate(parsed);
 }

@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../../lib/api';
-import { 
-  BookOpen, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle, 
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "../../../lib/api";
+import {
+  BookOpen,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
   ChevronRight,
   Send,
   MessageSquare,
@@ -16,20 +16,20 @@ import {
   X,
   FileText,
   User,
-  GraduationCap
-} from 'lucide-react';
-import type { HomeworkSubmissionSummary } from '@schoolos/core';
-import { SectionCard } from '../../ui/section-card';
-import { StatCard } from '../../ui/stat-card';
-import { Badge } from '../../ui/badge';
-import { EmptyState } from '../../ui/empty-state';
-import { LoadingState } from '../../ui/loading-state';
-import { 
-  FormField, 
-  Input, 
-  TextArea 
-} from '../../ui/form-field';
-import { cn } from '../../../lib/utils';
+  GraduationCap,
+} from "lucide-react";
+import {
+  formatBsDate,
+  formatBsDateTime,
+  type HomeworkSubmissionSummary,
+} from "@schoolos/core";
+import { SectionCard } from "../../ui/section-card";
+import { StatCard } from "../../ui/stat-card";
+import { Badge } from "../../ui/badge";
+import { EmptyState } from "../../ui/empty-state";
+import { LoadingState } from "../../ui/loading-state";
+import { FormField, Input, TextArea } from "../../ui/form-field";
+import { cn } from "../../../lib/utils";
 
 type HomeworkAttachment = {
   id: string;
@@ -40,38 +40,50 @@ type HomeworkAttachment = {
     sizeBytes?: string | number;
   } | null;
 };
-type HomeworkStaff = NonNullable<NonNullable<HomeworkSubmissionSummary['homework']>['assignedByStaff']>;
+type HomeworkStaff = NonNullable<
+  NonNullable<HomeworkSubmissionSummary["homework"]>["assignedByStaff"]
+>;
 
 function formatHomeworkDate(
   value: string | null | undefined,
-  mode: 'date' | 'dateTime',
-  fallback = 'Date not set',
+  mode: "date" | "dateTime",
+  fallback = "Date not set",
 ) {
   if (!value) return fallback;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Date unavailable';
-  return mode === 'date' ? date.toLocaleDateString() : date.toLocaleString();
+  try {
+    return mode === "date" ? formatBsDate(value) : formatBsDateTime(value);
+  } catch {
+    return "Date unavailable";
+  }
 }
 
 function formatStaffName(staff: HomeworkStaff | null | undefined) {
-  return [staff?.firstName, staff?.lastName]
-    .map((part) => part?.trim())
-    .filter(Boolean)
-    .join(' ') || 'Teacher not assigned';
+  return (
+    [staff?.firstName, staff?.lastName]
+      .map((part) => part?.trim())
+      .filter(Boolean)
+      .join(" ") || "Teacher not assigned"
+  );
 }
 
 export function StudentHomeworkTab() {
   const queryClient = useQueryClient();
-  const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
-  const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
+  const [selectedSubmissionId, setSelectedSubmissionId] = useState<
+    string | null
+  >(null);
+  const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(
+    null,
+  );
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
   const { data: submissions, isLoading } = useQuery({
-    queryKey: ['my-homework'],
+    queryKey: ["my-homework"],
     queryFn: () => api.listHomeworkSubmissions(),
   });
 
-  const selectedSubmission = submissions?.find((s: HomeworkSubmissionSummary) => s.id === selectedSubmissionId);
+  const selectedSubmission = submissions?.find(
+    (s: HomeworkSubmissionSummary) => s.id === selectedSubmissionId,
+  );
 
   async function openAttachment(attachmentId: string) {
     setAttachmentError(null);
@@ -83,7 +95,7 @@ export function StudentHomeworkTab() {
       setAttachmentError(
         err instanceof Error
           ? err.message
-          : 'Failed to open the homework attachment.',
+          : "Failed to open the homework attachment.",
       );
     } finally {
       setOpeningAttachmentId(null);
@@ -94,10 +106,13 @@ export function StudentHomeworkTab() {
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 items-start">
       {/* Submissions List */}
       <div className="lg:col-span-4 space-y-6">
-        <SectionCard 
-          title="My Assignments" 
+        <SectionCard
+          title="My Assignments"
           headerAction={
-            <Badge variant="secondary" className="font-black uppercase tracking-widest text-[10px]">
+            <Badge
+              variant="secondary"
+              className="font-black uppercase tracking-widest text-[10px]"
+            >
               {submissions?.length ?? 0} Tasks
             </Badge>
           }
@@ -105,9 +120,9 @@ export function StudentHomeworkTab() {
           {isLoading ? (
             <LoadingState />
           ) : !submissions || submissions.length === 0 ? (
-            <EmptyState 
-              title="All caught up!" 
-              description="No homework assignments found for your account." 
+            <EmptyState
+              title="All caught up!"
+              description="No homework assignments found for your account."
               className="bg-slate-50/50"
               icon={<GraduationCap className="h-8 w-8 text-slate-300" />}
             />
@@ -115,8 +130,12 @@ export function StudentHomeworkTab() {
             <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
               {submissions.map((submission: HomeworkSubmissionSummary) => {
                 const isSelected = selectedSubmissionId === submission.id;
-                const subjectName = submission.homework?.subject?.name?.trim() || 'Subject not set';
-                const title = submission.homework?.title?.trim() || 'Assignment title not set';
+                const subjectName =
+                  submission.homework?.subject?.name?.trim() ||
+                  "Subject not set";
+                const title =
+                  submission.homework?.title?.trim() ||
+                  "Assignment title not set";
 
                 return (
                   <button
@@ -126,7 +145,7 @@ export function StudentHomeworkTab() {
                       "w-full rounded-2xl border p-5 text-left transition-colors group",
                       isSelected
                         ? "border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)] shadow-sm"
-                        : "border-slate-100 bg-white hover:border-[var(--color-mod-homework-border)] hover:bg-[var(--color-mod-homework-bg)]"
+                        : "border-slate-100 bg-white hover:border-[var(--color-mod-homework-border)] hover:bg-[var(--color-mod-homework-bg)]",
                     )}
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -134,15 +153,24 @@ export function StudentHomeworkTab() {
                         <p className="text-[9px] font-black uppercase tracking-widest text-[var(--color-mod-homework-text)]">
                           {subjectName}
                         </p>
-                        <h4 className="font-black uppercase tracking-tight text-base italic leading-tight text-slate-900">{title}</h4>
+                        <h4 className="font-black uppercase tracking-tight text-base italic leading-tight text-slate-900">
+                          {title}
+                        </h4>
                       </div>
-                      <StatusBadge status={submission.status} isSelected={isSelected} />
+                      <StatusBadge
+                        status={submission.status}
+                        isSelected={isSelected}
+                      />
                     </div>
 
                     <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
                       <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                         <Clock size={12} className="shrink-0" />
-                          {formatHomeworkDate(submission.homework?.dueAt, 'date', 'Due date not set')}
+                        {formatHomeworkDate(
+                          submission.homework?.dueAt,
+                          "date",
+                          "Due date not set",
+                        )}
                       </div>
                       {submission.score !== null && (
                         <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-emerald-600">
@@ -167,119 +195,162 @@ export function StudentHomeworkTab() {
               <div className="space-y-6">
                 <div>
                   <div className="flex items-center gap-3 mb-4">
-                    <Badge variant="outline" className="font-black uppercase tracking-widest text-[9px] py-0.5 border-[var(--color-mod-homework-border)] text-[var(--color-mod-homework-text)]">
-                      {selectedSubmission.homework?.subject?.name?.trim() || 'Subject not set'}
+                    <Badge
+                      variant="outline"
+                      className="font-black uppercase tracking-widest text-[9px] py-0.5 border-[var(--color-mod-homework-border)] text-[var(--color-mod-homework-text)]"
+                    >
+                      {selectedSubmission.homework?.subject?.name?.trim() ||
+                        "Subject not set"}
                     </Badge>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      By {formatStaffName(selectedSubmission.homework?.assignedByStaff)}
+                      By{" "}
+                      {formatStaffName(
+                        selectedSubmission.homework?.assignedByStaff,
+                      )}
                     </span>
                   </div>
                   <h2 className="text-3xl font-black text-slate-900 uppercase italic tracking-tight leading-none mb-4">
-                    {selectedSubmission.homework?.title?.trim() || 'Assignment title not set'}
+                    {selectedSubmission.homework?.title?.trim() ||
+                      "Assignment title not set"}
                   </h2>
                   <div className="rounded-2xl bg-slate-50 p-6 text-sm leading-relaxed text-slate-600 italic border border-slate-100 whitespace-pre-wrap">
-                    {selectedSubmission.homework?.instructions?.trim() || 'Instructions not set'}
+                    {selectedSubmission.homework?.instructions?.trim() ||
+                      "Instructions not set"}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-6 pt-2">
-                   <div className="space-y-1">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Due Date</p>
-                      <p className="text-sm font-bold text-slate-900 uppercase">
-                        {formatHomeworkDate(selectedSubmission.homework?.dueAt, 'dateTime', 'Due date not set')}
-                      </p>
-                   </div>
-                   <div className="h-8 w-px bg-slate-100" />
-                   <div className="space-y-1">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Max Points</p>
-                      <p className="text-sm font-bold text-slate-900 uppercase">
-                        {selectedSubmission.homework?.maxScore} Points
-                      </p>
-                   </div>
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                      Due Date
+                    </p>
+                    <p className="text-sm font-bold text-slate-900 uppercase">
+                      {formatHomeworkDate(
+                        selectedSubmission.homework?.dueAt,
+                        "dateTime",
+                        "Due date not set",
+                      )}
+                    </p>
+                  </div>
+                  <div className="h-8 w-px bg-slate-100" />
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                      Max Points
+                    </p>
+                    <p className="text-sm font-bold text-slate-900 uppercase">
+                      {selectedSubmission.homework?.maxScore} Points
+                    </p>
+                  </div>
                 </div>
               </div>
             </SectionCard>
 
-            {selectedSubmission.status === 'ASSIGNED' || selectedSubmission.status === 'LATE' ? (
-              <SectionCard 
-                title="Your Work" 
+            {selectedSubmission.status === "ASSIGNED" ||
+            selectedSubmission.status === "LATE" ? (
+              <SectionCard
+                title="Your Work"
                 description="Provide your answer and attach necessary files below."
               >
-                <SubmissionForm 
-                  submissionId={selectedSubmission.id} 
+                <SubmissionForm
+                  submissionId={selectedSubmission.id}
                   onSuccess={() => {
-                    queryClient.invalidateQueries({ queryKey: ['my-homework'] });
+                    queryClient.invalidateQueries({
+                      queryKey: ["my-homework"],
+                    });
                   }}
                 />
               </SectionCard>
             ) : (
               <div className="space-y-8">
-                <SectionCard 
+                <SectionCard
                   title="My Submission"
                   headerAction={
-                    <Badge variant="success" className="font-black uppercase tracking-widest text-[9px]">
-                       Submitted
+                    <Badge
+                      variant="success"
+                      className="font-black uppercase tracking-widest text-[9px]"
+                    >
+                      Submitted
                     </Badge>
                   }
                 >
                   <div className="space-y-6">
                     <div className="rounded-2xl border border-slate-100 bg-white p-6 text-sm text-slate-700 leading-relaxed shadow-sm whitespace-pre-wrap">
-                      {selectedSubmission.submissionContent || 'No text content provided.'}
+                      {selectedSubmission.submissionContent ||
+                        "No text content provided."}
                     </div>
 
-                    {selectedSubmission.attachments && selectedSubmission.attachments.length > 0 && (
-                      <div className="space-y-4">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900">Attachments</h4>
-                        {attachmentError ? (
-                          <div className="flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50 p-3 text-[11px] font-bold text-red-700">
-                            <AlertCircle size={14} />
-                            {attachmentError}
+                    {selectedSubmission.attachments &&
+                      selectedSubmission.attachments.length > 0 && (
+                        <div className="space-y-4">
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900">
+                            Attachments
+                          </h4>
+                          {attachmentError ? (
+                            <div className="flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50 p-3 text-[11px] font-bold text-red-700">
+                              <AlertCircle size={14} />
+                              {attachmentError}
+                            </div>
+                          ) : null}
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            {selectedSubmission.attachments.map(
+                              (a: HomeworkAttachment) => (
+                                <button
+                                  key={a.id}
+                                  type="button"
+                                  data-testid="student-homework-attachment-download"
+                                  disabled={openingAttachmentId === a.id}
+                                  onClick={() => void openAttachment(a.id)}
+                                  className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left text-[11px] font-black uppercase tracking-widest transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
+                                >
+                                  <FileText
+                                    size={16}
+                                    className="text-[var(--color-mod-homework-text)]"
+                                  />
+                                  <span className="truncate flex-1">
+                                    {openingAttachmentId === a.id
+                                      ? "Opening signed file..."
+                                      : a.fileAsset?.originalFilename?.trim() ||
+                                        "File name not set"}
+                                  </span>
+                                </button>
+                              ),
+                            )}
                           </div>
-                        ) : null}
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          {selectedSubmission.attachments.map((a: HomeworkAttachment) => (
-                            <button
-                              key={a.id}
-                              type="button"
-                              data-testid="student-homework-attachment-download"
-                              disabled={openingAttachmentId === a.id}
-                              onClick={() => void openAttachment(a.id)}
-                              className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left text-[11px] font-black uppercase tracking-widest transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
-                            >
-                              <FileText size={16} className="text-[var(--color-mod-homework-text)]" />
-                              <span className="truncate flex-1">
-                                {openingAttachmentId === a.id
-                                  ? 'Opening signed file...'
-                                  : a.fileAsset?.originalFilename?.trim() || 'File name not set'}
-                              </span>
-                            </button>
-                          ))}
                         </div>
-                      </div>
-                    )}
-                    
+                      )}
+
                     <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-t border-slate-50 pt-4">
                       <CheckCircle2 size={14} className="text-emerald-500" />
-                      Finalized on {formatHomeworkDate(selectedSubmission.submittedAt, 'dateTime', 'Submission date not set')}
+                      Finalized on{" "}
+                      {formatHomeworkDate(
+                        selectedSubmission.submittedAt,
+                        "dateTime",
+                        "Submission date not set",
+                      )}
                     </div>
                   </div>
                 </SectionCard>
 
                 {selectedSubmission.feedback && (
-                  <SectionCard 
-                    title="Teacher Feedback" 
+                  <SectionCard
+                    title="Teacher Feedback"
                     className="border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)]"
                   >
                     <div className="flex items-start gap-4">
                       <div className="h-10 w-10 rounded-2xl bg-white flex items-center justify-center shrink-0 ring-1 ring-[var(--color-mod-homework-border)]">
-                         <MessageSquare className="h-5 w-5 text-[var(--color-mod-homework-text)]" />
+                        <MessageSquare className="h-5 w-5 text-[var(--color-mod-homework-text)]" />
                       </div>
                       <div>
-                        <p className="text-sm italic leading-relaxed text-slate-700">&ldquo;{selectedSubmission.feedback}&rdquo;</p>
+                        <p className="text-sm italic leading-relaxed text-slate-700">
+                          &ldquo;{selectedSubmission.feedback}&rdquo;
+                        </p>
                         {selectedSubmission.score !== null && (
                           <div className="mt-4 flex items-center gap-2">
-                             <Trophy size={14} className="text-amber-400" />
-                             <span className="text-xs font-black uppercase tracking-[0.2em] text-[var(--color-mod-homework-text)]">Score: {selectedSubmission.score} / {selectedSubmission.homework?.maxScore}</span>
+                            <Trophy size={14} className="text-amber-400" />
+                            <span className="text-xs font-black uppercase tracking-[0.2em] text-[var(--color-mod-homework-text)]">
+                              Score: {selectedSubmission.score} /{" "}
+                              {selectedSubmission.homework?.maxScore}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -294,9 +365,12 @@ export function StudentHomeworkTab() {
             <div className="h-20 w-20 rounded-full bg-white flex items-center justify-center shadow-sm mb-8 ring-8 ring-slate-100/50">
               <BookOpen className="h-10 w-10 text-slate-300" />
             </div>
-            <h3 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">Assignment Portal</h3>
+            <h3 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">
+              Assignment Portal
+            </h3>
             <p className="mt-2 text-sm text-slate-500 max-w-xs text-center font-medium">
-              Select an active assignment from the sidebar to view details, instructions, and submit your work.
+              Select an active assignment from the sidebar to view details,
+              instructions, and submit your work.
             </p>
           </SectionCard>
         )}
@@ -305,42 +379,65 @@ export function StudentHomeworkTab() {
   );
 }
 
-function StatusBadge({ status, isSelected }: { status: string; isSelected: boolean }) {
-  const isAssigned = status === 'ASSIGNED';
-  const isSubmitted = status === 'SUBMITTED';
-  const isReviewed = status === 'REVIEWED';
-  const isLate = status === 'LATE';
+function StatusBadge({
+  status,
+  isSelected,
+}: {
+  status: string;
+  isSelected: boolean;
+}) {
+  const isAssigned = status === "ASSIGNED";
+  const isSubmitted = status === "SUBMITTED";
+  const isReviewed = status === "REVIEWED";
+  const isLate = status === "LATE";
 
   return (
-    <span className={cn(
-      "inline-flex items-center px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest",
-      isSelected 
-        ? "bg-white text-[var(--color-mod-homework-text)] ring-1 ring-[var(--color-mod-homework-border)]"
-        : isReviewed ? "bg-emerald-100 text-emerald-700" :
-          isSubmitted ? "bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)]" :
-          isLate ? "bg-amber-100 text-amber-700" :
-          "bg-slate-100 text-slate-500"
-    )}>
-      {isAssigned ? 'Pending' : status}
+    <span
+      className={cn(
+        "inline-flex items-center px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest",
+        isSelected
+          ? "bg-white text-[var(--color-mod-homework-text)] ring-1 ring-[var(--color-mod-homework-border)]"
+          : isReviewed
+            ? "bg-emerald-100 text-emerald-700"
+            : isSubmitted
+              ? "bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)]"
+              : isLate
+                ? "bg-amber-100 text-amber-700"
+                : "bg-slate-100 text-slate-500",
+      )}
+    >
+      {isAssigned ? "Pending" : status}
     </span>
   );
 }
 
-function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onSuccess: () => void }) {
-  const [content, setContent] = useState('');
+function SubmissionForm({
+  submissionId,
+  onSuccess,
+}: {
+  submissionId: string;
+  onSuccess: () => void;
+}) {
+  const [content, setContent] = useState("");
   const [error, setError] = useState<string | null>(null);
-  
-  const [attachments, setAttachments] = useState<{ id: string; fileName: string }[]>([]);
+
+  const [attachments, setAttachments] = useState<
+    { id: string; fileName: string }[]
+  >([]);
   const [isUploading, setIsUploading] = useState(false);
-  
+
   const mutation = useMutation({
-    mutationFn: (data: { submissionId: string; content: string; attachmentIds?: string[] }) => api.submitHomework(data),
+    mutationFn: (data: {
+      submissionId: string;
+      content: string;
+      attachmentIds?: string[];
+    }) => api.submitHomework(data),
     onSuccess: () => {
       onSuccess();
     },
     onError: (err: Error) => {
-      setError(err.message || 'Failed to submit homework');
-    }
+      setError(err.message || "Failed to submit homework");
+    },
   });
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -349,10 +446,13 @@ function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onS
 
     setIsUploading(true);
     try {
-      const result = await api.uploadFile(file, 'homework-submission');
-      setAttachments([...attachments, { id: result.id, fileName: result.fileName }]);
+      const result = await api.uploadFile(file, "homework-submission");
+      setAttachments([
+        ...attachments,
+        { id: result.id, fileName: result.fileName },
+      ]);
     } catch (err: any) {
-      setError(err.message || 'Failed to upload file');
+      setError(err.message || "Failed to upload file");
     } finally {
       setIsUploading(false);
     }
@@ -366,13 +466,13 @@ function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onS
     e.preventDefault();
     setError(null);
     if (!content.trim()) {
-      setError('Please enter your submission text');
+      setError("Please enter your submission text");
       return;
     }
-    mutation.mutate({ 
-      submissionId, 
+    mutation.mutate({
+      submissionId,
       content: content.trim(),
-      attachmentIds: attachments.map(a => a.id) 
+      attachmentIds: attachments.map((a) => a.id),
     });
   };
 
@@ -390,14 +490,16 @@ function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onS
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900">Supportive Files</h4>
+          <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900">
+            Supportive Files
+          </h4>
           <label className="cursor-pointer h-9 px-4 rounded-full border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)] text-[9px] font-black uppercase tracking-widest hover:bg-white transition-colors flex items-center gap-2">
             <Paperclip size={12} />
             Upload File
-            <input 
-              type="file" 
-              className="hidden" 
-              onChange={handleFileChange} 
+            <input
+              type="file"
+              className="hidden"
+              onChange={handleFileChange}
               disabled={mutation.isPending || isUploading}
             />
           </label>
@@ -405,11 +507,16 @@ function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onS
 
         <div className="grid gap-3 sm:grid-cols-2">
           {attachments.map((a) => (
-            <div key={a.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm group">
+            <div
+              key={a.id}
+              className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm group"
+            >
               <FileText size={16} className="text-slate-400" />
-              <span className="truncate flex-1 text-[11px] font-bold text-slate-700 uppercase tracking-tight">{a.fileName}</span>
-              <button 
-                type="button" 
+              <span className="truncate flex-1 text-[11px] font-bold text-slate-700 uppercase tracking-tight">
+                {a.fileName}
+              </span>
+              <button
+                type="button"
                 onClick={() => removeAttachment(a.id)}
                 className="h-8 w-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
               >
@@ -420,7 +527,9 @@ function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onS
           {isUploading && (
             <div className="flex items-center gap-3 rounded-2xl border border-dashed border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] p-4 animate-pulse">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-mod-homework-text)] border-t-transparent" />
-              <span className="text-[11px] font-bold text-[var(--color-mod-homework-text)] uppercase tracking-widest italic">Uploading...</span>
+              <span className="text-[11px] font-bold text-[var(--color-mod-homework-text)] uppercase tracking-widest italic">
+                Uploading...
+              </span>
             </div>
           )}
         </div>

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../../core/errors/app_exception.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_error_view.dart';
@@ -262,7 +263,7 @@ class _JoinedSessionCard extends StatelessWidget {
           if (expiresAt != null) ...[
             const SizedBox(height: AppSpacing.lg),
             Text(
-              'This session expires at ${TimeOfDay.fromDateTime(expiresAt.toLocal()).format(context)}.',
+              'This session expires at ${NepaliBsCalendar.formatNepalTime(expiresAt)}.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],

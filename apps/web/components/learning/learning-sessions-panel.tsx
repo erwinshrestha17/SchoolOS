@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import Link from 'next/link';
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatBsDateTime } from "@schoolos/core";
+import Link from "next/link";
 import {
   Archive,
   Clock,
@@ -11,24 +12,24 @@ import {
   Play,
   RotateCcw,
   Users,
-} from 'lucide-react';
-import { learningApi } from '../../lib/api/learning';
+} from "lucide-react";
+import { learningApi } from "../../lib/api/learning";
 import type {
   LearningActivity,
   LearningSession,
   LearningSessionStatus,
-} from '../../lib/api/learning';
-import { api } from '../../lib/api';
-import { EmptyState } from '../ui/empty-state';
-import { LoadingState } from '../ui/loading-state';
-import { StatusBadge } from '../ui/status-badge';
+} from "../../lib/api/learning";
+import { api } from "../../lib/api";
+import { EmptyState } from "../ui/empty-state";
+import { LoadingState } from "../ui/loading-state";
+import { StatusBadge } from "../ui/status-badge";
 
-const sessionStatuses: Array<'' | LearningSessionStatus> = [
-  '',
-  'LIVE',
-  'PAUSED',
-  'ENDED',
-  'EXPIRED',
+const sessionStatuses: Array<"" | LearningSessionStatus> = [
+  "",
+  "LIVE",
+  "PAUSED",
+  "ENDED",
+  "EXPIRED",
 ];
 
 export function LearningSessionsPanel({
@@ -37,26 +38,30 @@ export function LearningSessionsPanel({
   activities: LearningActivity[];
 }) {
   const [filters, setFilters] = useState({
-    classId: '',
-    subjectId: '',
-    status: '',
-    activityId: '',
+    classId: "",
+    subjectId: "",
+    status: "",
+    activityId: "",
   });
-  const [selectedSessionId, setSelectedSessionId] = useState('');
-  const [launchActivityId, setLaunchActivityId] = useState('');
+  const [selectedSessionId, setSelectedSessionId] = useState("");
+  const [launchActivityId, setLaunchActivityId] = useState("");
   const [expiresInMinutes, setExpiresInMinutes] = useState(45);
-  const [launchedSession, setLaunchedSession] =
-    useState<(LearningSession & { qrToken?: string }) | null>(null);
+  const [launchedSession, setLaunchedSession] = useState<
+    (LearningSession & { qrToken?: string }) | null
+  >(null);
   const [notice, setNotice] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
+  const classesQuery = useQuery({
+    queryKey: ["classes"],
+    queryFn: api.listClasses,
+  });
   const subjectsQuery = useQuery({
-    queryKey: ['subjects', filters.classId],
+    queryKey: ["subjects", filters.classId],
     queryFn: () => api.listSubjects({ classId: filters.classId || undefined }),
   });
   const sessionsQuery = useQuery({
-    queryKey: ['learning-sessions', filters],
+    queryKey: ["learning-sessions", filters],
     queryFn: () =>
       learningApi.listSessions({
         classId: filters.classId || undefined,
@@ -67,12 +72,12 @@ export function LearningSessionsPanel({
       }),
   });
   const selectedSessionQuery = useQuery({
-    queryKey: ['learning-session-detail', selectedSessionId],
+    queryKey: ["learning-session-detail", selectedSessionId],
     queryFn: () => learningApi.getSession(selectedSessionId),
     enabled: Boolean(selectedSessionId),
   });
   const participantsQuery = useQuery({
-    queryKey: ['learning-session-participants', selectedSessionId],
+    queryKey: ["learning-session-participants", selectedSessionId],
     queryFn: () => learningApi.listParticipants(selectedSessionId),
     enabled: Boolean(selectedSessionId),
   });
@@ -86,33 +91,33 @@ export function LearningSessionsPanel({
     onSuccess: (session) => {
       setLaunchedSession(session);
       setSelectedSessionId(session.id);
-      setNotice('Learning session launched.');
-      void queryClient.invalidateQueries({ queryKey: ['learning-sessions'] });
+      setNotice("Learning session launched.");
+      void queryClient.invalidateQueries({ queryKey: ["learning-sessions"] });
     },
   });
 
   const pauseMutation = useMutation({
     mutationFn: learningApi.pauseSession,
-    onSuccess: (session) => afterSessionChange(session, 'Session paused.'),
+    onSuccess: (session) => afterSessionChange(session, "Session paused."),
   });
   const resumeMutation = useMutation({
     mutationFn: learningApi.resumeSession,
-    onSuccess: (session) => afterSessionChange(session, 'Session resumed.'),
+    onSuccess: (session) => afterSessionChange(session, "Session resumed."),
   });
   const endMutation = useMutation({
     mutationFn: learningApi.endSession,
-    onSuccess: (session) => afterSessionChange(session, 'Session ended.'),
+    onSuccess: (session) => afterSessionChange(session, "Session ended."),
   });
   const heartbeatMutation = useMutation({
     mutationFn: learningApi.heartbeatSession,
-    onSuccess: (session) => afterSessionChange(session, 'Heartbeat recorded.'),
+    onSuccess: (session) => afterSessionChange(session, "Heartbeat recorded."),
   });
 
   const selectedSession = launchedSession ?? selectedSessionQuery.data ?? null;
   const selectedQrToken =
     selectedSession &&
-    'qrToken' in selectedSession &&
-    typeof selectedSession.qrToken === 'string'
+    "qrToken" in selectedSession &&
+    typeof selectedSession.qrToken === "string"
       ? selectedSession.qrToken
       : undefined;
 
@@ -120,12 +125,12 @@ export function LearningSessionsPanel({
     setLaunchedSession(session);
     setSelectedSessionId(session.id);
     setNotice(message);
-    void queryClient.invalidateQueries({ queryKey: ['learning-sessions'] });
+    void queryClient.invalidateQueries({ queryKey: ["learning-sessions"] });
     void queryClient.invalidateQueries({
-      queryKey: ['learning-session-detail', session.id],
+      queryKey: ["learning-session-detail", session.id],
     });
     void queryClient.invalidateQueries({
-      queryKey: ['learning-session-participants', session.id],
+      queryKey: ["learning-session-participants", session.id],
     });
   }
 
@@ -164,7 +169,9 @@ export function LearningSessionsPanel({
               min={5}
               max={480}
               value={expiresInMinutes}
-              onChange={(event) => setExpiresInMinutes(Number(event.target.value || 45))}
+              onChange={(event) =>
+                setExpiresInMinutes(Number(event.target.value || 45))
+              }
               className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
             />
           </label>
@@ -185,7 +192,11 @@ export function LearningSessionsPanel({
               label="Class"
               value={filters.classId}
               onChange={(classId) =>
-                setFilters((current) => ({ ...current, classId, subjectId: '' }))
+                setFilters((current) => ({
+                  ...current,
+                  classId,
+                  subjectId: "",
+                }))
               }
               options={(classesQuery.data ?? []).map((item) => ({
                 value: item.id,
@@ -249,7 +260,7 @@ export function LearningSessionsPanel({
               >
                 <div className="col-span-5 min-w-0">
                   <p className="truncate text-sm font-black text-slate-950">
-                    {session.activity?.title ?? 'Learning session'}
+                    {session.activity?.title ?? "Learning session"}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
                     {session.sessionCode} · {formatDateTime(session.startedAt)}
@@ -259,7 +270,8 @@ export function LearningSessionsPanel({
                   <StatusBadge status={session.status} />
                 </div>
                 <div className="col-span-3 text-sm text-slate-600">
-                  {session.participantCount ?? 0} joined · {session.submittedCount ?? 0} submitted
+                  {session.participantCount ?? 0} joined ·{" "}
+                  {session.submittedCount ?? 0} submitted
                 </div>
                 <div className="col-span-2 text-right text-xs font-bold text-slate-500">
                   {formatRelative(session.expiresAt)}
@@ -286,7 +298,7 @@ export function LearningSessionsPanel({
                     {selectedSession.sessionCode}
                   </p>
                   <h3 className="mt-1 text-lg font-black text-slate-950">
-                    {selectedSession.activity?.title ?? 'Learning session'}
+                    {selectedSession.activity?.title ?? "Learning session"}
                   </h3>
                 </div>
                 <StatusBadge status={selectedSession.status} />
@@ -302,12 +314,25 @@ export function LearningSessionsPanel({
                 </div>
               )}
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                <Metric label="Joined" value={selectedSession.participantCount ?? 0} />
-                <Metric label="Attempts" value={selectedSession.attemptCount ?? 0} />
-                <Metric label="Submitted" value={selectedSession.submittedCount ?? 0} />
+                <Metric
+                  label="Joined"
+                  value={selectedSession.participantCount ?? 0}
+                />
+                <Metric
+                  label="Attempts"
+                  value={selectedSession.attemptCount ?? 0}
+                />
+                <Metric
+                  label="Submitted"
+                  value={selectedSession.submittedCount ?? 0}
+                />
                 <Metric
                   label="Heartbeat"
-                  value={selectedSession.teacherHeartbeatAt ? formatRelative(selectedSession.teacherHeartbeatAt) : 'none'}
+                  value={
+                    selectedSession.teacherHeartbeatAt
+                      ? formatRelative(selectedSession.teacherHeartbeatAt)
+                      : "none"
+                  }
                 />
               </div>
             </div>
@@ -361,7 +386,10 @@ export function LearningSessionsPanel({
                   type="button"
                   onClick={() =>
                     void queryClient.invalidateQueries({
-                      queryKey: ['learning-session-participants', selectedSession.id],
+                      queryKey: [
+                        "learning-session-participants",
+                        selectedSession.id,
+                      ],
                     })
                   }
                   className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-600"
@@ -373,7 +401,9 @@ export function LearningSessionsPanel({
               {participantsQuery.isLoading ? (
                 <LoadingState label="Loading participants" />
               ) : participantsQuery.data?.items.length === 0 ? (
-                <p className="text-sm text-slate-500">No students have joined yet.</p>
+                <p className="text-sm text-slate-500">
+                  No students have joined yet.
+                </p>
               ) : (
                 <div className="space-y-2">
                   {participantsQuery.data?.items.map((item) => (
@@ -386,15 +416,21 @@ export function LearningSessionsPanel({
                           {item.student.name}
                         </p>
                         <StatusBadge
-                          status={item.attempt?.status ?? item.participant.status}
-                          tone={item.attempt?.status === 'SUBMITTED' ? 'approved' : 'pending'}
+                          status={
+                            item.attempt?.status ?? item.participant.status
+                          }
+                          tone={
+                            item.attempt?.status === "SUBMITTED"
+                              ? "approved"
+                              : "pending"
+                          }
                         />
                       </div>
                       <p className="mt-1 text-xs text-slate-500">
                         Joined {formatDateTime(item.participant.joinedAt)}
                         {item.attempt?.submittedAt
                           ? ` · Submitted ${formatDateTime(item.attempt.submittedAt)}`
-                          : ''}
+                          : ""}
                       </p>
                     </div>
                   ))}
@@ -452,15 +488,12 @@ function Metric({ label, value }: { label: string; value: string | number }) {
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return 'not set';
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
+  if (!value) return "not set";
+  return formatBsDateTime(value);
 }
 
 function formatRelative(value?: string | null) {
-  if (!value) return 'not set';
+  if (!value) return "not set";
   const diffMs = new Date(value).getTime() - Date.now();
   const minutes = Math.round(Math.abs(diffMs) / 60_000);
   if (diffMs < 0) return `${minutes}m ago`;
@@ -470,7 +503,7 @@ function formatRelative(value?: string | null) {
 function labelize(value: string) {
   return value
     .toLowerCase()
-    .split('_')
+    .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+    .join(" ");
 }

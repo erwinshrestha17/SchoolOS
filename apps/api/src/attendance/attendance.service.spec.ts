@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -93,6 +94,62 @@ describe('attendance production hardening', () => {
         status: AttendanceStatus.PRESENT,
       }),
     );
+  });
+
+  it('builds the school-facing monthly register from a BS month boundary', async () => {
+    const { service, prisma } = buildService({
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      students: [],
+      attendanceSessions: [],
+    });
+
+    await expect(
+      service.getMonthlyRegister(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          bsMonth: 1,
+          bsYear: 2081,
+        },
+        adminActor,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        calendar: 'BS',
+        month: 1,
+        year: 2081,
+        periodLabel: 'Baisakh 2081 BS',
+        daysCount: 31,
+      }),
+    );
+
+    expect(prisma.attendanceSession.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          attendanceDate: {
+            gte: new Date('2024-04-13T00:00:00.000Z'),
+            lte: new Date('2024-05-13T00:00:00.000Z'),
+          },
+        }),
+      }),
+    );
+  });
+
+  it('rejects an incomplete BS monthly register period', async () => {
+    const { service } = buildService({
+      classroom: { id: 'class-1', name: 'Grade 1' },
+    });
+
+    await expect(
+      service.getMonthlyRegister(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          bsMonth: 1,
+        },
+        adminActor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('returns no mobile teacher classes when the signed-in user is not tenant staff', async () => {

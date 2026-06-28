@@ -1,10 +1,15 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { SubstitutionSummaryPanel } from '../substitution-summary-panel';
-import { SubstitutionsList } from '../substitutions-list';
-import { Button } from '@/components/ui/button';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState } from "react";
+import { SubstitutionSummaryPanel } from "../substitution-summary-panel";
+import { SubstitutionsList } from "../substitutions-list";
+import { Button } from "@/components/ui/button";
+import {
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { formatBsDate } from "@schoolos/core";
 
 export function SubstitutionsTab() {
   const [date, setDate] = useState<Date>(new Date());
@@ -26,10 +31,15 @@ export function SubstitutionsTab() {
         </div>
 
         <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200">
-          <Button variant="ghost" size="icon" onClick={prevDay} className="rounded-xl h-10 w-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={prevDay}
+            className="rounded-xl h-10 w-10"
+          >
             <ChevronLeft className="h-5 w-5" />
           </Button>
-          
+
           <label className="flex h-10 w-[240px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-left text-xs font-black uppercase tracking-tight text-slate-700">
             <CalendarIcon className="h-4 w-4 text-[var(--color-mod-homework-text)]" />
             <input
@@ -37,11 +47,18 @@ export function SubstitutionsTab() {
               className="w-full bg-transparent text-xs font-black uppercase outline-none"
               type="date"
               value={dateStr}
-              onChange={(event) => setDate(fromDateInputValue(event.target.value))}
+              onChange={(event) =>
+                setDate(fromDateInputValue(event.target.value))
+              }
             />
           </label>
 
-          <Button variant="ghost" size="icon" onClick={nextDay} className="rounded-xl h-10 w-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={nextDay}
+            className="rounded-xl h-10 w-10"
+          >
             <ChevronRight className="h-5 w-5" />
           </Button>
         </div>
@@ -66,10 +83,5 @@ function fromDateInputValue(value: string) {
 }
 
 function formatDisplayDate(date: Date) {
-  return new Intl.DateTimeFormat('en', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date);
+  return formatBsDate(date, { preset: "long" });
 }

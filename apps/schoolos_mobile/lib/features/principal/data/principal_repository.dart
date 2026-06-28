@@ -25,6 +25,28 @@ class PrincipalRepository {
         queryParameters: {'status': status},
       );
 
+  Future<Map<String, dynamic>> getApprovalDetail(String approvalRequestId) =>
+      _getCached(
+        'principal_approval_$approvalRequestId',
+        '/mobile/principal/approvals/$approvalRequestId',
+      );
+
+  Future<Map<String, dynamic>> decideApproval({
+    required String approvalRequestId,
+    required String decision,
+    required String idempotencyKey,
+    String? reason,
+  }) {
+    return _postJson(
+      '/mobile/principal/approvals/$approvalRequestId/decisions',
+      {
+        'decision': decision,
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+        'idempotencyKey': idempotencyKey,
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> getAdmissionsSummary() => _getCached(
     'principal_admissions_summary',
     '/mobile/principal/admissions-summary',
@@ -58,6 +80,55 @@ class PrincipalRepository {
         queryParameters: {'status': status},
       );
 
+  Future<Map<String, dynamic>> getEscalationDetail(String escalationId) =>
+      _getCached(
+        'principal_escalation_$escalationId',
+        '/mobile/principal/escalations/$escalationId',
+      );
+
+  Future<Map<String, dynamic>> assignEscalationToSelf(String escalationId) {
+    return _postJson(
+      '/mobile/principal/escalations/$escalationId/assign-self',
+      const <String, dynamic>{},
+    );
+  }
+
+  Future<Map<String, dynamic>> assignEscalation({
+    required String escalationId,
+    required String assigneeUserId,
+  }) {
+    return _postJson('/mobile/principal/escalations/$escalationId/assign', {
+      'assigneeUserId': assigneeUserId,
+    });
+  }
+
+  Future<Map<String, dynamic>> addEscalationNote({
+    required String escalationId,
+    required String note,
+  }) {
+    return _postJson('/mobile/principal/escalations/$escalationId/notes', {
+      'note': note.trim(),
+    });
+  }
+
+  Future<Map<String, dynamic>> resolveEscalation({
+    required String escalationId,
+    required String resolutionReason,
+  }) {
+    return _postJson('/mobile/principal/escalations/$escalationId/resolve', {
+      'resolutionReason': resolutionReason.trim(),
+    });
+  }
+
+  Future<Map<String, dynamic>> reopenEscalation({
+    required String escalationId,
+    required String reason,
+  }) {
+    return _postJson('/mobile/principal/escalations/$escalationId/reopen', {
+      'reason': reason.trim(),
+    });
+  }
+
   Future<Map<String, dynamic>> searchStudents({String? query}) => _getCached(
     'principal_student_search_${query ?? 'initial'}',
     '/mobile/principal/student-search',
@@ -85,6 +156,57 @@ class PrincipalRepository {
     '/mobile/principal/emergency-notice',
   );
 
+  Future<Map<String, dynamic>> previewEmergencyNoticeRecipients({
+    required String title,
+    required String body,
+    required String priority,
+    required String audienceType,
+    String? classId,
+    String? sectionId,
+  }) {
+    return _postJson('/mobile/principal/emergency-notices/recipient-preview', {
+      'title': title.trim(),
+      'body': body.trim(),
+      'priority': priority,
+      'audienceType': audienceType,
+      if (classId != null && classId.trim().isNotEmpty) 'classId': classId,
+      if (sectionId != null && sectionId.trim().isNotEmpty)
+        'sectionId': sectionId,
+    });
+  }
+
+  Future<Map<String, dynamic>> submitEmergencyNotice({
+    required String title,
+    required String body,
+    required String priority,
+    required String audienceType,
+    required String sendMode,
+    required String idempotencyKey,
+    String? scheduledFor,
+    String? attachmentFileId,
+    String? reason,
+  }) {
+    return _postJson('/mobile/principal/emergency-notices', {
+      'title': title.trim(),
+      'body': body.trim(),
+      'priority': priority,
+      'audienceType': audienceType,
+      'sendMode': sendMode,
+      if (scheduledFor != null && scheduledFor.trim().isNotEmpty)
+        'scheduledFor': scheduledFor,
+      if (attachmentFileId != null && attachmentFileId.trim().isNotEmpty)
+        'attachmentFileId': attachmentFileId,
+      'idempotencyKey': idempotencyKey,
+      if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+    });
+  }
+
+  Future<Map<String, dynamic>> getEmergencyNoticeStatus(String noticeId) =>
+      _getCached(
+        'principal_emergency_notice_$noticeId',
+        '/mobile/principal/emergency-notices/$noticeId',
+      );
+
   Future<Map<String, dynamic>> _getCached(
     String cacheKey,
     String path, {
@@ -111,5 +233,15 @@ class PrincipalRepository {
       if (cached == null) rethrow;
       return cached.withMetadata();
     }
+  }
+
+  Future<Map<String, dynamic>> _postJson(
+    String path,
+    Map<String, dynamic> data,
+  ) async {
+    final response = await _client.post<dynamic>(path, data: data);
+    return response.data is Map<String, dynamic>
+        ? response.data as Map<String, dynamic>
+        : <String, dynamic>{};
   }
 }

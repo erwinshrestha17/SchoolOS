@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../app/design_system/app_radius.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
@@ -674,7 +674,7 @@ String _formatDateTime(String? value) {
   if (parsed == null) {
     return '';
   }
-  return DateFormat('MMM d, h:mm a').format(parsed.toLocal());
+  return NepaliBsCalendar.formatBsDateTime(parsed);
 }
 
 String _labelize(String value) {

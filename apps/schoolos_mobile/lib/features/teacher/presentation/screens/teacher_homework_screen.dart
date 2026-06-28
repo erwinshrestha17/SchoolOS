@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
+import '../../../../shared/widgets/bs_date_picker.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
@@ -294,12 +295,12 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.event_rounded),
                     title: const Text('Due date'),
-                    subtitle: Text(DateFormat.yMMMd().format(dueDate)),
+                    subtitle: Text(NepaliBsCalendar.formatBsDate(dueDate)),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: saving
                         ? null
                         : () async {
-                            final picked = await showDatePicker(
+                            final picked = await showSchoolBsDatePicker(
                               context: context,
                               initialDate: dueDate,
                               firstDate: DateTime.now(),
@@ -461,12 +462,12 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.event_rounded),
                     title: const Text('Due date'),
-                    subtitle: Text(DateFormat.yMMMd().format(dueDate)),
+                    subtitle: Text(NepaliBsCalendar.formatBsDate(dueDate)),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: saving
                         ? null
                         : () async {
-                            final picked = await showDatePicker(
+                            final picked = await showSchoolBsDatePicker(
                               context: context,
                               initialDate: dueDate,
                               firstDate: DateTime.now(),
@@ -649,7 +650,7 @@ class _HomeworkCard extends StatelessWidget {
                 icon: Icons.event_rounded,
                 label: item.dueDate == null
                     ? 'No due date'
-                    : 'Due ${DateFormat.MMMd().format(item.dueDate!.toLocal())}',
+                    : 'Due ${NepaliBsCalendar.formatBsDate(item.dueDate!)}',
               ),
               _Meta(
                 icon: Icons.upload_file_rounded,

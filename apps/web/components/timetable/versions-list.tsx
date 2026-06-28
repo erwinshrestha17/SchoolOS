@@ -1,26 +1,31 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { DataTable } from '@/components/ui/data-table';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { ActionMenu } from '@/components/ui/action-menu';
-import { LoadingState } from '@/components/ui/loading-state';
-import { EmptyState } from '@/components/ui/empty-state';
-import { Toast, type ToastTone } from '@/components/ui/toast';
-import { CheckCircle2, Lock, Archive, History } from 'lucide-react';
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { DataTable } from "@/components/ui/data-table";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { ActionMenu } from "@/components/ui/action-menu";
+import { LoadingState } from "@/components/ui/loading-state";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Toast, type ToastTone } from "@/components/ui/toast";
+import { CheckCircle2, Lock, Archive, History } from "lucide-react";
+import { formatBsDate } from "@schoolos/core";
 
-export function TimetableVersionsList({ academicYearId }: { academicYearId?: string }) {
+export function TimetableVersionsList({
+  academicYearId,
+}: {
+  academicYearId?: string;
+}) {
   const queryClient = useQueryClient();
   const [notice, setNotice] = useState<{
     title: string;
     description?: string;
     tone: ToastTone;
   } | null>(null);
-  
+
   const versionsQuery = useQuery({
-    queryKey: ['timetable-versions', academicYearId],
+    queryKey: ["timetable-versions", academicYearId],
     queryFn: () => api.listTimetableVersions({ academicYearId }),
     enabled: Boolean(academicYearId),
   });
@@ -29,17 +34,18 @@ export function TimetableVersionsList({ academicYearId }: { academicYearId?: str
     mutationFn: (id: string) => api.publishTimetableVersion(id),
     onSuccess: () => {
       setNotice({
-        title: 'Version published',
-        description: 'The selected timetable version is now active for school operations.',
-        tone: 'success',
+        title: "Version published",
+        description:
+          "The selected timetable version is now active for school operations.",
+        tone: "success",
       });
-      void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
+      void queryClient.invalidateQueries({ queryKey: ["timetable-versions"] });
     },
     onError: (error: Error) => {
       setNotice({
-        title: 'Publish failed',
+        title: "Publish failed",
         description: error.message,
-        tone: 'danger',
+        tone: "danger",
       });
     },
   });
@@ -48,17 +54,17 @@ export function TimetableVersionsList({ academicYearId }: { academicYearId?: str
     mutationFn: (id: string) => api.lockTimetableVersion(id),
     onSuccess: () => {
       setNotice({
-        title: 'Version locked',
-        description: 'The timetable version is locked for audit-safe changes.',
-        tone: 'success',
+        title: "Version locked",
+        description: "The timetable version is locked for audit-safe changes.",
+        tone: "success",
       });
-      void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
+      void queryClient.invalidateQueries({ queryKey: ["timetable-versions"] });
     },
     onError: (error: Error) => {
       setNotice({
-        title: 'Lock failed',
+        title: "Lock failed",
         description: error.message,
-        tone: 'danger',
+        tone: "danger",
       });
     },
   });
@@ -67,73 +73,80 @@ export function TimetableVersionsList({ academicYearId }: { academicYearId?: str
     mutationFn: (id: string) => api.archiveTimetableVersion(id),
     onSuccess: () => {
       setNotice({
-        title: 'Version archived',
-        description: 'The timetable version has been moved out of active use.',
-        tone: 'success',
+        title: "Version archived",
+        description: "The timetable version has been moved out of active use.",
+        tone: "success",
       });
-      void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
+      void queryClient.invalidateQueries({ queryKey: ["timetable-versions"] });
     },
     onError: (error: Error) => {
       setNotice({
-        title: 'Archive failed',
+        title: "Archive failed",
         description: error.message,
-        tone: 'danger',
+        tone: "danger",
       });
     },
   });
 
   if (!academicYearId) {
-    return <EmptyState title="Select academic year" description="Please select an academic year to view timetable versions." />;
+    return (
+      <EmptyState
+        title="Select academic year"
+        description="Please select an academic year to view timetable versions."
+      />
+    );
   }
 
   if (versionsQuery.isLoading) return <LoadingState />;
 
   const columns = [
     {
-      header: 'Version Name',
-      accessorKey: 'versionName',
-      cell: (row: any) => <span className="font-bold text-slate-900">{row.versionName}</span>,
+      header: "Version Name",
+      accessorKey: "versionName",
+      cell: (row: any) => (
+        <span className="font-bold text-slate-900">{row.versionName}</span>
+      ),
     },
     {
-      header: 'Effective From',
-      accessorKey: 'effectiveFrom',
-      cell: (row: any) => new Date(row.effectiveFrom).toLocaleDateString(),
+      header: "Effective From",
+      accessorKey: "effectiveFrom",
+      cell: (row: any) => formatBsDate(row.effectiveFrom),
     },
     {
-      header: 'Status',
-      accessorKey: 'status',
+      header: "Status",
+      accessorKey: "status",
       cell: (row: any) => <StatusBadge status={row.status} />,
     },
     {
-      header: 'Slots',
-      accessorKey: '_count.slots',
+      header: "Slots",
+      accessorKey: "_count.slots",
       cell: (row: any) => row.slots?.length || 0,
     },
     {
-      header: 'Actions',
+      header: "Actions",
       cell: (row: any) => (
         <ActionMenu
           items={[
             {
-              label: 'Publish',
+              label: "Publish",
               icon: <CheckCircle2 className="h-4 w-4" />,
               onClick: () => publishMutation.mutate(row.id),
-              disabled: row.status === 'PUBLISHED' || row.status === 'ARCHIVED',
+              disabled: row.status === "PUBLISHED" || row.status === "ARCHIVED",
             },
             {
-              label: 'Lock',
+              label: "Lock",
               icon: <Lock className="h-4 w-4" />,
               onClick: () => lockMutation.mutate(row.id),
-              disabled: row.status === 'LOCKED' || row.status === 'ARCHIVED',
+              disabled: row.status === "LOCKED" || row.status === "ARCHIVED",
             },
             {
-              label: 'Archive',
+              label: "Archive",
               icon: <Archive className="h-4 w-4" />,
               onClick: () => archiveMutation.mutate(row.id),
-              disabled: row.status === 'ARCHIVED',
+              disabled: row.status === "ARCHIVED",
             },
             {
-              label: 'Duplicate',
+              label: "Duplicate",
               icon: <History className="h-4 w-4" />,
               onClick: () => {},
               disabled: true,
@@ -157,8 +170,8 @@ export function TimetableVersionsList({ academicYearId }: { academicYearId?: str
       ) : null}
 
       {versionsQuery.data?.length === 0 ? (
-        <EmptyState 
-          title="No versions found" 
+        <EmptyState
+          title="No versions found"
           description="Create your first timetable version to start scheduling classes."
         />
       ) : (

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -195,7 +196,7 @@ class _PrincipalApprovalsScreenState
               actionBuilder: (item) => SizedBox(
                 width: 136,
                 child: OutlinedButton.icon(
-                  onPressed: () => _showReviewSheet(context, item),
+                  onPressed: () => _showReviewSheet(context, ref, item, tab),
                   icon: const Icon(Icons.visibility_rounded, size: 18),
                   label: const Text('Review'),
                 ),
@@ -222,38 +223,6 @@ class _PrincipalEscalationsScreenState
 
   @override
   Widget build(BuildContext context) {
-    if (status == 'reopened') {
-      return PrincipalShell(
-        selectedIndex: 4,
-        title: 'Escalations',
-        subtitle: 'Parent concerns and school issues needing follow-up',
-        showBack: true,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _SegmentedFilters(
-              values: const ['open', 'assigned', 'resolved', 'reopened'],
-              active: status,
-              labels: const {
-                'open': 'Open',
-                'assigned': 'Mine',
-                'resolved': 'Resolved',
-                'reopened': 'Reopened',
-              },
-              onChanged: (value) => setState(() => status = value),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            const AppAccessState(
-              title: 'Reopened escalations unavailable',
-              message:
-                  'The backend escalation contract currently supports open and resolved states only. Reopened cases will appear here after that state exists.',
-              icon: Icons.lock_outline_rounded,
-            ),
-          ],
-        ),
-      );
-    }
-
     final provider = principalEscalationsProvider(status);
     final asyncData = ref.watch(provider);
     return PrincipalShell(
@@ -306,13 +275,24 @@ class _PrincipalEscalationsScreenState
               ],
             ),
             const SizedBox(height: AppSpacing.lg),
-            _ItemList(items: _list(data['items'])),
+            _ItemList(
+              items: _list(data['items']),
+              actionBuilder: (item) => SizedBox(
+                width: 128,
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      _showEscalationSheet(context, ref, item, status),
+                  icon: const Icon(Icons.edit_note_rounded, size: 18),
+                  label: const Text('Manage'),
+                ),
+              ),
+            ),
             const SizedBox(height: AppSpacing.md),
             const _Callout(
-              icon: Icons.lock_rounded,
-              title: 'Escalation actions unavailable',
+              icon: Icons.verified_user_rounded,
+              title: 'Actions are audited',
               message:
-                  'Assign, resolve, and reopen actions need a backend escalation mutation contract with resolution notes and audit history before mobile can submit them.',
+                  'Assign, note, resolve, and reopen actions use principal-scoped backend contracts and audit history.',
               color: AppColors.info,
             ),
           ],
@@ -805,18 +785,20 @@ class _MoreBody extends StatelessWidget {
   }
 }
 
-class _SnapshotBody extends StatelessWidget {
+class _SnapshotBody extends ConsumerWidget {
   const _SnapshotBody({required this.snapshotKey, required this.data});
 
   final String snapshotKey;
   final Map<String, dynamic> data;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (snapshotKey == 'canteen' || snapshotKey == 'library') {
       return const ModuleLockedState();
     }
-    if (snapshotKey == 'notice') return _EmergencyNoticeBody(data: data);
+    if (snapshotKey == 'notice') {
+      return _EmergencyNoticeBody(data: data, ref: ref);
+    }
     if (snapshotKey == 'students') return _StudentsBody(data: data);
     if (snapshotKey == 'reports') return _ReportsBody(data: data);
     if (snapshotKey == 'tasks') return _TasksBody(data: data);
@@ -840,20 +822,35 @@ class _SnapshotBody extends StatelessWidget {
 }
 
 class _EmergencyNoticeBody extends StatelessWidget {
-  const _EmergencyNoticeBody({required this.data});
+  const _EmergencyNoticeBody({required this.data, required this.ref});
 
   final Map<String, dynamic> data;
+  final WidgetRef ref;
 
   @override
   Widget build(BuildContext context) {
     if (data['status'] == 'empty') {
-      return AppAccessState(
-        title: 'No urgent notice pending',
-        message: _string(
-          data['message'],
-          fallback: 'There is no high-impact notice awaiting principal review.',
-        ),
-        icon: Icons.campaign_outlined,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppAccessState(
+            title: 'No urgent notice pending',
+            message: _string(
+              data['message'],
+              fallback:
+                  'There is no high-impact notice awaiting principal review.',
+            ),
+            icon: Icons.campaign_outlined,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _ActionRow(
+            icon: Icons.campaign_rounded,
+            title: 'Compose emergency notice',
+            subtitle:
+                'Preview recipients first, then submit through the backend approval/delivery contract.',
+            onTap: () => _showEmergencyNoticeSheet(context, ref),
+          ),
+        ],
       );
     }
     return Column(
@@ -903,13 +900,21 @@ class _EmergencyNoticeBody extends StatelessWidget {
               'Total ${_num(data, 'recipients.total')} recipients. Counts are from backend preview/delivery data.',
         ),
         const SizedBox(height: AppSpacing.md),
+        _ActionRow(
+          icon: Icons.campaign_rounded,
+          title: 'Compose another emergency notice',
+          subtitle:
+              'Preview recipients before submitting a new urgent or emergency notice.',
+          onTap: () => _showEmergencyNoticeSheet(context, ref),
+        ),
+        const SizedBox(height: AppSpacing.md),
         _Callout(
-          icon: Icons.lock_rounded,
-          title: 'Sending disabled on mobile',
+          icon: Icons.verified_user_rounded,
+          title: 'Sending uses backend contracts',
           message: _string(
             data['actions'] is Map ? (data['actions'] as Map)['message'] : null,
             fallback:
-                'High-impact sends need a confirmed backend approval workflow.',
+                'High-impact sends are submitted through the backend preview, approval, and delivery workflow.',
           ),
           color: AppColors.info,
         ),
@@ -2286,39 +2291,623 @@ class _SummaryValue {
   final IconData icon;
 }
 
-void _showReviewSheet(BuildContext context, Map<String, dynamic> item) {
+void _showReviewSheet(
+  BuildContext context,
+  WidgetRef ref,
+  Map<String, dynamic> item,
+  String activeTab,
+) {
+  final parentContext = context;
+  final approvalRequestId = _approvalRequestIdFromItem(item);
+  final canDecide = activeTab == 'pending' && approvalRequestId.isNotEmpty;
+  final reasonController = TextEditingController();
+  var saving = false;
+  String? validationMessage;
+
   showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
-    builder: (context) => Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _string(item['title']),
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (context, setSheetState) {
+        Future<void> submit(String decision) async {
+          final reason = reasonController.text.trim();
+          if (decision == 'REJECT' && reason.isEmpty) {
+            setSheetState(
+              () => validationMessage = 'A rejection reason is required.',
+            );
+            return;
+          }
+          if (decision == 'APPROVE' &&
+              _string(item['severity']).toLowerCase() == 'critical' &&
+              reason.isEmpty) {
+            setSheetState(
+              () => validationMessage =
+                  'A reason is required for high-impact approvals.',
+            );
+            return;
+          }
+
+          setSheetState(() {
+            saving = true;
+            validationMessage = null;
+          });
+          try {
+            await ref
+                .read(principalRepositoryProvider)
+                .decideApproval(
+                  approvalRequestId: approvalRequestId,
+                  decision: decision,
+                  reason: reason.isEmpty ? null : reason,
+                  idempotencyKey: _newUuidV4(),
+                );
+            ref.invalidate(principalApprovalsProvider(activeTab));
+            ref.invalidate(principalApprovalsProvider('pending'));
+            ref.invalidate(principalDashboardProvider);
+            ref.invalidate(principalAttentionProvider('all'));
+            if (sheetContext.mounted) Navigator.pop(sheetContext);
+            if (!parentContext.mounted) return;
+            _showPrincipalSnack(
+              parentContext,
+              decision == 'APPROVE'
+                  ? 'Approval decision submitted.'
+                  : 'Rejection submitted.',
+            );
+          } catch (_) {
+            if (!sheetContext.mounted) return;
+            setSheetState(() => saving = false);
+            if (!parentContext.mounted) return;
+            _showPrincipalSnack(
+              parentContext,
+              'Approval decision could not be submitted. Please retry.',
+            );
+          }
+        }
+
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.lg,
+            MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            _itemSubtitle(item),
-            style: const TextStyle(color: AppColors.slate600),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _string(item['title']),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  _itemSubtitle(item),
+                  style: const TextStyle(color: AppColors.slate600),
+                ),
+                if (_string(item['detail']).isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  _PlainCard(title: 'Context', body: _string(item['detail'])),
+                ],
+                const SizedBox(height: AppSpacing.lg),
+                if (!canDecide)
+                  const _Callout(
+                    icon: Icons.lock_rounded,
+                    title: 'Decision unavailable here',
+                    message:
+                        'This item is read-only on mobile because it is not backed by the principal approval-decision contract.',
+                    color: AppColors.info,
+                  )
+                else ...[
+                  TextField(
+                    controller: reasonController,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      labelText: 'Decision reason',
+                      helperText:
+                          'Required for rejections and high-impact approvals.',
+                      errorText: validationMessage,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: saving ? null : () => submit('REJECT'),
+                        icon: const Icon(Icons.close_rounded),
+                        label: const Text('Reject'),
+                      ),
+                      FilledButton.icon(
+                        onPressed: saving ? null : () => submit('APPROVE'),
+                        icon: saving
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.check_rounded),
+                        label: Text(saving ? 'Submitting...' : 'Approve'),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          const _Callout(
-            icon: Icons.lock_rounded,
-            title: 'Decision disabled in mobile',
-            message:
-                'Approve/reject actions need a confirmed principal-safe mutation. Review is read-only here until that endpoint is available.',
-            color: AppColors.info,
-          ),
-        ],
-      ),
+        );
+      },
     ),
-  );
+  ).whenComplete(reasonController.dispose);
+}
+
+void _showEscalationSheet(
+  BuildContext context,
+  WidgetRef ref,
+  Map<String, dynamic> item,
+  String activeStatus,
+) {
+  final parentContext = context;
+  final escalationId = _string(item['id']);
+  final status = _string(item['status']).toUpperCase();
+  final isResolved = status == 'RESOLVED' || activeStatus == 'resolved';
+  final noteController = TextEditingController();
+  var saving = false;
+  String? validationMessage;
+
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (context, setSheetState) {
+        Future<void> runAction(String action) async {
+          final note = noteController.text.trim();
+          if (action != 'assign' && note.isEmpty) {
+            setSheetState(
+              () => validationMessage = action == 'reopen'
+                  ? 'A reopen reason is required.'
+                  : action == 'resolve'
+                  ? 'A resolution reason is required.'
+                  : 'A note is required.',
+            );
+            return;
+          }
+          setSheetState(() {
+            saving = true;
+            validationMessage = null;
+          });
+          try {
+            final repository = ref.read(principalRepositoryProvider);
+            if (action == 'assign') {
+              await repository.assignEscalationToSelf(escalationId);
+            } else if (action == 'note') {
+              await repository.addEscalationNote(
+                escalationId: escalationId,
+                note: note,
+              );
+            } else if (action == 'resolve') {
+              await repository.resolveEscalation(
+                escalationId: escalationId,
+                resolutionReason: note,
+              );
+            } else {
+              await repository.reopenEscalation(
+                escalationId: escalationId,
+                reason: note,
+              );
+            }
+            for (final tab in const [
+              'open',
+              'assigned',
+              'resolved',
+              'reopened',
+            ]) {
+              ref.invalidate(principalEscalationsProvider(tab));
+            }
+            ref.invalidate(principalDashboardProvider);
+            ref.invalidate(principalAttentionProvider('all'));
+            ref.invalidate(principalSnapshotProvider('escalations'));
+            if (sheetContext.mounted) Navigator.pop(sheetContext);
+            if (!parentContext.mounted) return;
+            _showPrincipalSnack(parentContext, 'Escalation action saved.');
+          } catch (_) {
+            if (!sheetContext.mounted) return;
+            setSheetState(() => saving = false);
+            if (!parentContext.mounted) return;
+            _showPrincipalSnack(
+              parentContext,
+              'Escalation action could not be saved. Please retry.',
+            );
+          }
+        }
+
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.lg,
+            MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _string(item['title'], fallback: 'Escalation'),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  _itemSubtitle(item),
+                  style: const TextStyle(color: AppColors.slate600),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _PlainCard(
+                  title: 'Reason',
+                  body: _string(
+                    item['detail'],
+                    fallback: 'No context provided.',
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: noteController,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    labelText: isResolved ? 'Reopen reason' : 'Note or reason',
+                    helperText: isResolved
+                        ? 'Required to reopen a resolved escalation.'
+                        : 'Required for notes and resolution.',
+                    errorText: validationMessage,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    if (!isResolved) ...[
+                      OutlinedButton.icon(
+                        onPressed: saving ? null : () => runAction('assign'),
+                        icon: const Icon(Icons.person_pin_circle_rounded),
+                        label: const Text('Assign to me'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: saving ? null : () => runAction('note'),
+                        icon: const Icon(Icons.edit_note_rounded),
+                        label: const Text('Add note'),
+                      ),
+                      FilledButton.icon(
+                        onPressed: saving ? null : () => runAction('resolve'),
+                        icon: const Icon(Icons.check_circle_rounded),
+                        label: const Text('Resolve'),
+                      ),
+                    ] else
+                      FilledButton.icon(
+                        onPressed: saving ? null : () => runAction('reopen'),
+                        icon: const Icon(Icons.replay_rounded),
+                        label: const Text('Reopen'),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  ).whenComplete(noteController.dispose);
+}
+
+void _showEmergencyNoticeSheet(BuildContext context, WidgetRef ref) {
+  final parentContext = context;
+  final formKey = GlobalKey<FormState>();
+  final titleController = TextEditingController();
+  final bodyController = TextEditingController();
+  final reasonController = TextEditingController();
+  var priority = 'EMERGENCY';
+  var previewing = false;
+  var submitting = false;
+  Map<String, dynamic>? preview;
+  String? formMessage;
+
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (context, setSheetState) {
+        Future<bool> previewRecipients() async {
+          if (formKey.currentState?.validate() != true) return false;
+          setSheetState(() {
+            previewing = true;
+            formMessage = null;
+          });
+          try {
+            final result = await ref
+                .read(principalRepositoryProvider)
+                .previewEmergencyNoticeRecipients(
+                  title: titleController.text,
+                  body: bodyController.text,
+                  priority: priority,
+                  audienceType: 'ALL',
+                );
+            setSheetState(() {
+              preview = result;
+              previewing = false;
+            });
+            return true;
+          } catch (_) {
+            setSheetState(() {
+              previewing = false;
+              formMessage = 'Recipient preview failed. Please retry.';
+            });
+            return false;
+          }
+        }
+
+        Future<void> submitNotice() async {
+          final reason = reasonController.text.trim();
+          if (priority == 'EMERGENCY' && reason.isEmpty) {
+            setSheetState(
+              () => formMessage = 'A reason is required for emergency notices.',
+            );
+            return;
+          }
+          final previewReady = preview != null || await previewRecipients();
+          if (!previewReady) return;
+          final canSubmit = preview?['canSubmit'] != false;
+          if (!canSubmit) {
+            setSheetState(
+              () => formMessage =
+                  'Backend preview says this notice cannot be submitted yet.',
+            );
+            return;
+          }
+          setSheetState(() {
+            submitting = true;
+            formMessage = null;
+          });
+          try {
+            final result = await ref
+                .read(principalRepositoryProvider)
+                .submitEmergencyNotice(
+                  title: titleController.text,
+                  body: bodyController.text,
+                  priority: priority,
+                  audienceType: 'ALL',
+                  sendMode: 'SEND_NOW',
+                  idempotencyKey: _newUuidV4(),
+                  reason: reason.isEmpty ? null : reason,
+                );
+            ref.invalidate(principalSnapshotProvider('notice'));
+            ref.invalidate(principalApprovalsProvider('pending'));
+            ref.invalidate(principalDashboardProvider);
+            ref.invalidate(principalAttentionProvider('all'));
+            if (sheetContext.mounted) Navigator.pop(sheetContext);
+            if (!parentContext.mounted) return;
+            _showPrincipalSnack(
+              parentContext,
+              'Emergency notice submitted (${_string(result['state'], fallback: 'queued')}).',
+            );
+          } catch (_) {
+            setSheetState(() {
+              submitting = false;
+              formMessage =
+                  'Emergency notice could not be submitted. Please retry.';
+            });
+          }
+        }
+
+        final previewData = preview;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.lg,
+            MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+          ),
+          child: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Compose emergency notice',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  const Text(
+                    'Audience is school-wide on mobile until class/section recipient pickers are backend-confirmed.',
+                    style: TextStyle(color: AppColors.slate600),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  DropdownButtonFormField<String>(
+                    initialValue: priority,
+                    decoration: InputDecoration(
+                      labelText: 'Priority',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                      ),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'URGENT', child: Text('Urgent')),
+                      DropdownMenuItem(
+                        value: 'EMERGENCY',
+                        child: Text('Emergency'),
+                      ),
+                    ],
+                    onChanged: submitting || previewing
+                        ? null
+                        : (value) {
+                            if (value == null) return;
+                            setSheetState(() {
+                              priority = value;
+                              preview = null;
+                            });
+                          },
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
+                    controller: titleController,
+                    maxLength: 120,
+                    decoration: InputDecoration(
+                      labelText: 'Title',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                      ),
+                    ),
+                    validator: (value) =>
+                        (value == null || value.trim().isEmpty)
+                        ? 'Title is required.'
+                        : null,
+                    onChanged: (_) => preview = null,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextFormField(
+                    controller: bodyController,
+                    minLines: 3,
+                    maxLines: 5,
+                    maxLength: 500,
+                    decoration: InputDecoration(
+                      labelText: 'Message',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                      ),
+                    ),
+                    validator: (value) =>
+                        (value == null || value.trim().isEmpty)
+                        ? 'Message is required.'
+                        : null,
+                    onChanged: (_) => preview = null,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextFormField(
+                    controller: reasonController,
+                    minLines: 2,
+                    maxLines: 3,
+                    maxLength: 500,
+                    decoration: InputDecoration(
+                      labelText: 'Emergency reason',
+                      helperText: 'Required when priority is Emergency.',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                      ),
+                    ),
+                  ),
+                  if (formMessage != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      formMessage!,
+                      style: const TextStyle(
+                        color: AppColors.danger,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                  if (previewData != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    _PlainCard(
+                      title: 'Recipient preview',
+                      body:
+                          '${_num(previewData, 'recipients.eligible')} eligible of ${_num(previewData, 'recipients.total')} recipients. Estimated deliveries: ${_num(previewData, 'recipients.estimatedDeliveries')}.',
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.md),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: previewing || submitting
+                            ? null
+                            : () => previewRecipients(),
+                        icon: const Icon(Icons.groups_rounded),
+                        label: Text(previewing ? 'Previewing...' : 'Preview'),
+                      ),
+                      FilledButton.icon(
+                        onPressed: submitting || previewing
+                            ? null
+                            : () => submitNotice(),
+                        icon: submitting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.send_rounded),
+                        label: Text(submitting ? 'Submitting...' : 'Submit'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    ),
+  ).whenComplete(() {
+    titleController.dispose();
+    bodyController.dispose();
+    reasonController.dispose();
+  });
+}
+
+String _approvalRequestIdFromItem(Map<String, dynamic> item) {
+  final route = _string(item['route']);
+  if (!route.startsWith('/principal/approvals/')) return '';
+  return _string(item['id']);
+}
+
+void _showPrincipalSnack(BuildContext context, String message) {
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
+String _newUuidV4() {
+  final random = Random.secure();
+  final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  final hex = bytes
+      .map((value) => value.toRadixString(16).padLeft(2, '0'))
+      .join();
+  return [
+    hex.substring(0, 8),
+    hex.substring(8, 12),
+    hex.substring(12, 16),
+    hex.substring(16, 20),
+    hex.substring(20),
+  ].join('-');
 }
 
 void _go(BuildContext context, String route) {

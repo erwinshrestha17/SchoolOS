@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../application/parent_providers.dart';
 import '../../domain/parent_models.dart';
 import '../widgets/parent_detail_widgets.dart';
@@ -432,9 +433,9 @@ class _TransactionTile extends StatelessWidget {
 String _money(num value) => 'NPR ${value.toStringAsFixed(0)}';
 
 String _dateLabel(String? value) {
-  final date = DateTime.tryParse(value ?? '')?.toLocal();
+  final date = DateTime.tryParse(value ?? '');
   if (date == null) return 'Date not recorded';
-  return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  return NepaliBsCalendar.formatBsDate(date);
 }
 
 String _label(String value) => value

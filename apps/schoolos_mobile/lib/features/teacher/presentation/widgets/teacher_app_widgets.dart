@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../app/design_system/app_radius.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/status_chip.dart';
 import '../../../../shared/widgets/user_avatar.dart';
@@ -271,7 +271,7 @@ class TeacherLastUpdatedLabel extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
         child: Text(
-          '${cached == true ? 'Cached' : 'Last synced'} • ${DateFormat.jm().format(value.toLocal())}',
+          '${cached == true ? 'Cached' : 'Last synced'} • ${NepaliBsCalendar.formatNepalTime(value)}',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: cached == true ? AppColors.warning : AppColors.slate500,
             fontWeight: FontWeight.w700,
