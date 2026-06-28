@@ -87,11 +87,27 @@ export function PayslipList() {
     currentRegenerationJob?.status === 'QUEUED' ||
     currentRegenerationJob?.status === 'PROCESSING';
 
+  function isRegenerationPendingFor(payslipId: string) {
+    return (
+      (regenerationMutation.isPending && regenerationTarget?.id === payslipId) ||
+      (currentRegenerationJob?.payslipId === payslipId &&
+        (currentRegenerationJob.status === 'QUEUED' ||
+          currentRegenerationJob.status === 'PROCESSING'))
+    );
+  }
+
   const moneyFormatter = new Intl.NumberFormat('en-NP', {
     style: 'currency',
     currency: 'NPR',
     maximumFractionDigits: 0,
   });
+
+  function queuePayslipRegeneration(target: PayslipRegenerationTarget) {
+    setRegenerationTarget(target);
+    setRegenerationJob(null);
+    setDownloadError(null);
+    regenerationMutation.mutate(target);
+  }
 
   async function openPayslipPdf(payslip: PayslipRegenerationTarget) {
     setDownloadingPayslip(payslip.payslipNumber);
@@ -152,9 +168,7 @@ export function PayslipList() {
           {regenerationTarget && canRegeneratePayslips ? (
             <button
               type="button"
-              onClick={() =>
-                regenerationMutation.mutate(regenerationTarget)
-              }
+              onClick={() => queuePayslipRegeneration(regenerationTarget)}
               disabled={regenerationInProgress}
               className="mt-3 inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -231,9 +245,7 @@ export function PayslipList() {
               canRegeneratePayslips ? (
               <button
                 type="button"
-                onClick={() =>
-                  regenerationMutation.mutate(regenerationTarget)
-                }
+                onClick={() => queuePayslipRegeneration(regenerationTarget)}
                 disabled={regenerationMutation.isPending}
                 className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-800 transition hover:bg-rose-100 disabled:opacity-60"
               >
@@ -297,14 +309,34 @@ export function PayslipList() {
                       {moneyFormatter.format(Number(payslip.netAmount ?? 0))}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => void openPayslipPdf(payslip)}
-                        disabled={downloadingPayslip === payslip.payslipNumber}
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 font-bold text-slate-600 transition-all hover:bg-[var(--color-mod-hr-soft)] hover:text-[var(--color-mod-hr-text)]"
-                      >
-                        <Download size={14} />
-                        {downloadingPayslip === payslip.payslipNumber ? 'Downloading...' : 'Download PDF'}
-                      </button>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {canRegeneratePayslips ? (
+                          <button
+                            type="button"
+                            onClick={() => queuePayslipRegeneration(payslip)}
+                            disabled={isRegenerationPendingFor(payslip.id)}
+                            className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 font-bold text-amber-800 transition-all hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {isRegenerationPendingFor(payslip.id) ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <RefreshCw size={14} />
+                            )}
+                            {isRegenerationPendingFor(payslip.id)
+                              ? 'Queued'
+                              : 'Regenerate'}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => void openPayslipPdf(payslip)}
+                          disabled={downloadingPayslip === payslip.payslipNumber}
+                          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 font-bold text-slate-600 transition-all hover:bg-[var(--color-mod-hr-soft)] hover:text-[var(--color-mod-hr-text)] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <Download size={14} />
+                          {downloadingPayslip === payslip.payslipNumber ? 'Downloading...' : 'Download PDF'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

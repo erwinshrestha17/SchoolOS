@@ -9,6 +9,15 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -28,10 +37,14 @@ import {
 } from './dto/payroll-list-query.dto';
 import { PayrollPreviewQueryDto } from './dto/payroll-preview-query.dto';
 import { PayrollReportQueryDto } from './dto/payroll-report-query.dto';
+import { PayslipRegenerationJobSummaryDto } from './dto/payslip-regeneration-job.dto';
 import { UpdateSalaryStructureDto } from './dto/update-salary-structure.dto';
 import { PayrollSalarySlipService } from './payroll-salary-slip.service';
 import { PayrollService } from './payroll.service';
 
+@ApiTags('Payroll')
+@ApiBearerAuth()
+@ApiCookieAuth()
 @Controller('payroll')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.payroll')
@@ -108,6 +121,19 @@ export class PayrollController {
 
   @Post('runs/:runId/payslips/:payslipId/regeneration-jobs')
   @Permissions('payroll:payslip:generate')
+  @ApiOperation({
+    summary: 'Queue or reuse a protected payslip regeneration job',
+    description:
+      'Requires payroll:payslip:generate. The response exposes only bounded job status and generation counts; queue payloads, storage keys, provider errors, and raw failure reasons are not returned.',
+  })
+  @ApiParam({ name: 'runId', description: 'Tenant-scoped payroll run id' })
+  @ApiParam({ name: 'payslipId', description: 'Payslip id within the run' })
+  @ApiResponse({
+    status: 201,
+    type: PayslipRegenerationJobSummaryDto,
+    description:
+      'Queued job summary, or the active tenant/run/payslip-scoped job if one is already running.',
+  })
   queuePayslipRegeneration(
     @Param('runId') runId: string,
     @Param('payslipId') payslipId: string,
@@ -122,6 +148,19 @@ export class PayrollController {
 
   @Get('runs/:runId/payslips/:payslipId/regeneration-jobs/:jobId')
   @Permissions('payroll:payslip:generate')
+  @ApiOperation({
+    summary: 'Read protected payslip regeneration job status',
+    description:
+      'Requires payroll:payslip:generate. Job lookup is scoped to the authenticated tenant, payroll run, payslip, and job id.',
+  })
+  @ApiParam({ name: 'runId', description: 'Tenant-scoped payroll run id' })
+  @ApiParam({ name: 'payslipId', description: 'Payslip id within the run' })
+  @ApiParam({ name: 'jobId', description: 'Payslip regeneration job id' })
+  @ApiOkResponse({
+    type: PayslipRegenerationJobSummaryDto,
+    description:
+      'Bounded regeneration status with QUEUED, PROCESSING, SUCCEEDED, or FAILED.',
+  })
   getPayslipRegenerationJob(
     @Param('runId') runId: string,
     @Param('payslipId') payslipId: string,

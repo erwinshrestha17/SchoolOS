@@ -2892,8 +2892,9 @@ describe("SchoolOS web production contracts", () => {
       /paymentAccountCode|Payment Disbursement Account Code|Mark Paid/,
     );
     assert.match(payslipList, /api\.openPayslipPdf/);
-    assert.match(payslipList, /openingPayslip/);
-    assert.match(payslipList, /Could not open this protected payslip/);
+    assert.match(payslipList, /downloadingPayslip/);
+    assert.match(payslipList, /Could not download this protected payslip/);
+    assert.match(payslipList, /Queue payslip regeneration/);
     assert.doesNotMatch(payslipList, /window\.open|signedUrl|objectKey|bucket/i);
 
     assert.doesNotMatch(hrWorkspace, /replace-me|demo-staff|fake-contract/i);

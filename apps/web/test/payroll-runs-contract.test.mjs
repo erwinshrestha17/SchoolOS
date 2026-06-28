@@ -145,6 +145,10 @@ describe('Payroll Runs UI contracts', () => {
   it('queues and tracks payslip regeneration behind the dedicated payroll permission', () => {
     const payrollApi = read('lib/api/payroll.ts');
     const adminPayslips = read('components/hr/payslip-list.tsx');
+    const payrollController = read('../api/src/payroll/payroll.controller.ts');
+    const regenerationDto = read(
+      '../api/src/payroll/dto/payslip-regeneration-job.dto.ts',
+    );
     const permissionCatalog = readMany([
       '../../packages/core/src/permissions/catalog/payroll.ts',
       '../../packages/core/src/permissions/roles.ts',
@@ -153,6 +157,27 @@ describe('Payroll Runs UI contracts', () => {
     assert.match(permissionCatalog, /resource: "payroll:payslip"/);
     assert.match(permissionCatalog, /action: "generate"/);
     assert.match(permissionCatalog, /"payroll:payslip:generate"/);
+    assert.match(
+      payrollController,
+      /@Post\('runs\/:runId\/payslips\/:payslipId\/regeneration-jobs'\)/,
+    );
+    assert.match(
+      payrollController,
+      /@Get\('runs\/:runId\/payslips\/:payslipId\/regeneration-jobs\/:jobId'\)/,
+    );
+    assert.match(
+      payrollController,
+      /@Permissions\('payroll:payslip:generate'\)/,
+    );
+    assert.match(payrollController, /PayslipRegenerationJobSummaryDto/);
+    assert.match(
+      regenerationDto,
+      /export class PayslipRegenerationJobSummaryDto/,
+    );
+    assert.match(regenerationDto, /QUEUED/);
+    assert.match(regenerationDto, /PROCESSING/);
+    assert.match(regenerationDto, /SUCCEEDED/);
+    assert.match(regenerationDto, /FAILED/);
     assert.match(payrollApi, /queuePayslipRegeneration:/);
     assert.match(payrollApi, /getPayslipRegenerationJob:/);
     assert.match(
@@ -161,13 +186,16 @@ describe('Payroll Runs UI contracts', () => {
     );
     assert.match(
       adminPayslips,
-      /hasPermissions\(\[\s*'payroll:payslip:generate'/,
+      /hasPermissions\(\[\s*["']payroll:payslip:generate["']/,
     );
     assert.match(adminPayslips, /api\.queuePayslipRegeneration/);
     assert.match(adminPayslips, /api\.getPayslipRegenerationJob/);
+    assert.match(adminPayslips, /function queuePayslipRegeneration/);
+    assert.match(adminPayslips, /isRegenerationPendingFor/);
+    assert.match(adminPayslips, /Regenerate/);
     assert.match(adminPayslips, /refetchInterval/);
     for (const status of ['QUEUED', 'PROCESSING', 'SUCCEEDED', 'FAILED']) {
-      assert.match(adminPayslips, new RegExp(`'${status}'`));
+      assert.match(adminPayslips, new RegExp(`["']${status}["']`));
     }
     assert.match(adminPayslips, /Download regenerated PDF/);
   });
