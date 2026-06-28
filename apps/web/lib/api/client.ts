@@ -401,7 +401,7 @@ export async function openPdfBlob(response: Response) {
 
   const header = await blob.slice(0, 5).text();
 
-  if (header !== "%PDF-") {
+  if (header !== '%PDF-') {
     throw new Error("The server returned an invalid PDF document.");
   }
 

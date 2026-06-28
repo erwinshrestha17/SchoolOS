@@ -58,8 +58,8 @@ class StaffRepository {
       throw StateError('Payslip PDF was empty.');
     }
 
-    final documentsDir = await getApplicationDocumentsDirectory();
-    final payslipDir = Directory('${documentsDir.path}/payslips');
+    final temporaryDir = await getTemporaryDirectory();
+    final payslipDir = Directory('${temporaryDir.path}/schoolos/payslips');
     if (!payslipDir.existsSync()) {
       await payslipDir.create(recursive: true);
     }

@@ -10,6 +10,7 @@ import {
 } from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
 import { validateImageUpload } from '../common/files/image-upload-validation';
+import { assertSchoolLogoFileAsset } from '../common/files/school-logo-file.policy';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { StorageService } from '../storage/storage.service';
 import { UploadTenantLogoDto } from './dto/upload-tenant-logo.dto';
@@ -273,6 +274,12 @@ export class SettingsService {
       throw new BadRequestException(`Invalid setting key: ${key}`);
     }
 
+    if (key === 'school_logo') {
+      throw new BadRequestException(
+        'School logo must be updated through the protected branding logo upload endpoint.',
+      );
+    }
+
     this.validateSettingValue(key as TenantSettingKey, value);
 
     const existing = await this.prisma.tenantSetting.findUnique({
@@ -415,9 +422,7 @@ export class SettingsService {
       fileAssetId,
     );
 
-    if (asset.module !== 'settings' || asset.entityId !== actor.tenantId) {
-      throw new BadRequestException('School logo is not linked to this tenant');
-    }
+    assertSchoolLogoFileAsset(asset, actor.tenantId);
 
     await this.fileRegistryService.auditAccess(
       actor.tenantId,
@@ -449,11 +454,23 @@ export class SettingsService {
       return { success: true, removed: false };
     }
 
-    await this.fileRegistryService.softDeleteFile(
-      actor.tenantId,
-      previousFileAssetId,
-      actor.userId,
-    );
+    let removedFileAsset = false;
+
+    try {
+      const asset = await this.fileRegistryService.getFileMetadata(
+        actor.tenantId,
+        previousFileAssetId,
+      );
+      assertSchoolLogoFileAsset(asset, actor.tenantId);
+      await this.fileRegistryService.softDeleteFile(
+        actor.tenantId,
+        previousFileAssetId,
+        actor.userId,
+      );
+      removedFileAsset = true;
+    } catch {
+      removedFileAsset = false;
+    }
 
     await this.prisma.tenantSetting.deleteMany({
       where: {
@@ -469,7 +486,7 @@ export class SettingsService {
       tenantId: actor.tenantId,
       userId: actor.userId,
       before: { fileAssetId: previousFileAssetId },
-      after: { fileAssetId: null },
+      after: { fileAssetId: null, fileAssetRemoved: removedFileAsset },
     });
 
     return { success: true, removed: true };

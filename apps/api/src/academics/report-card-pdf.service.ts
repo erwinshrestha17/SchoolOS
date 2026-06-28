@@ -16,6 +16,7 @@ import {
   buildReportCardPdf,
   getJpegDimensions,
 } from '../common/pdf/simple-pdf';
+import { assertSchoolLogoFileAsset } from '../common/files/school-logo-file.policy';
 
 type ReportCardWithRelations = Prisma.ReportCardGetPayload<{
   include: {
@@ -175,24 +176,16 @@ export class ReportCardPdfService {
     let logoBuffer: Buffer | null = null;
     let logoDimensions: { width: number; height: number } | null = null;
 
-    const logoSetting = settingMap.get('school_logo');
-    if (
-      logoSetting &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        String(logoSetting),
-      )
-    ) {
-      try {
-        const { content } = await this.fileRegistryService.getProtectedDownload(
-          actor.tenantId,
-          String(logoSetting),
-          actor.userId,
-        );
-        logoBuffer = content;
-        logoDimensions = getJpegDimensions(content);
-      } catch (e) {
-        // Silently fail logo load to prevent report card generation failure
-      }
+    const logo = await this.loadSchoolLogo(
+      settingMap.get('school_logo'),
+      actor,
+    );
+    if (logo) {
+      logoBuffer = logo.buffer;
+      logoDimensions = {
+        width: logo.width,
+        height: logo.height,
+      };
     }
 
     const gradingPolicy = await this.gradeCalculator.getTenantGradingPolicy(
@@ -307,6 +300,45 @@ export class ReportCardPdfService {
     });
 
     return pdf;
+  }
+
+  private async loadSchoolLogo(
+    logoSetting: string | undefined,
+    actor: AuthContext,
+  ): Promise<{
+    buffer: Buffer;
+    width: number;
+    height: number;
+  } | null> {
+    if (
+      !logoSetting ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        logoSetting,
+      )
+    ) {
+      return null;
+    }
+
+    try {
+      const asset = await this.fileRegistryService.getFileMetadata(
+        actor.tenantId,
+        logoSetting,
+      );
+      assertSchoolLogoFileAsset(asset, actor.tenantId);
+      const { content } = await this.fileRegistryService.getProtectedDownload(
+        actor.tenantId,
+        logoSetting,
+        actor.userId,
+      );
+      const dimensions = getJpegDimensions(content);
+      return {
+        buffer: content,
+        width: dimensions.width,
+        height: dimensions.height,
+      };
+    } catch {
+      return null;
+    }
   }
 
   private buildSubjectRows(

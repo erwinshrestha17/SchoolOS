@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { FinanceService } from '../finance/finance.service';
-import { AuthMethod } from '@prisma/client';
+import { AuthMethod, FileStatus } from '@prisma/client';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { FileRegistryService } from '../file-registry/file-registry.service';
@@ -61,6 +61,9 @@ describe('ReportsService', () => {
                   rollNumber: 1,
                 },
               ]),
+            },
+            tenantSetting: {
+              findMany: jest.fn().mockResolvedValue([]),
             },
             enrollment: {
               findMany: jest.fn().mockResolvedValue([
@@ -206,6 +209,7 @@ describe('ReportsService', () => {
             registerGeneratedFile: jest
               .fn()
               .mockResolvedValue({ id: 'file-1' }),
+            getFileMetadata: jest.fn(),
             getProtectedDownload: jest.fn(),
           },
         },
@@ -445,6 +449,32 @@ describe('ReportsService', () => {
         }),
       }),
     );
+  });
+
+  it('does not load report logos from non-branding file references', async () => {
+    (prisma.tenantSetting.findMany as jest.Mock).mockResolvedValueOnce([
+      { value: '11111111-1111-1111-1111-111111111111' },
+    ]);
+    (fileRegistry.getFileMetadata as jest.Mock).mockResolvedValueOnce({
+      id: '11111111-1111-1111-1111-111111111111',
+      tenantId: actor.tenantId,
+      module: 'students',
+      entityId: 'student-1',
+      status: FileStatus.UPLOADED,
+      originalFilename: 'student-photo.jpg',
+      mimeType: 'image/jpeg',
+      sizeBytes: BigInt(32),
+      metadata: { kind: 'STUDENT_PHOTO' },
+    });
+
+    const logo = await (
+      service as unknown as {
+        loadReportLogo(actor: AuthContext): Promise<unknown>;
+      }
+    ).loadReportLogo(actor);
+
+    expect(logo).toBeNull();
+    expect(fileRegistry.getProtectedDownload).not.toHaveBeenCalled();
   });
 
   it('lists export history with tenant scope and safe pagination bounds', async () => {

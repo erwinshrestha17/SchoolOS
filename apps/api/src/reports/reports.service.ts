@@ -25,6 +25,7 @@ import {
 import { FinanceService } from '../finance/finance.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PlansService } from '../plans/plans.service';
+import { assertSchoolLogoFileAsset } from '../common/files/school-logo-file.policy';
 import {
   buildTableReportPdf,
   getJpegDimensions,
@@ -2268,6 +2269,11 @@ export class ReportsService {
     }
 
     try {
+      const asset = await this.fileRegistryService.getFileMetadata(
+        actor.tenantId,
+        logoFileAssetId,
+      );
+      assertSchoolLogoFileAsset(asset, actor.tenantId);
       const { content } = await this.fileRegistryService.getProtectedDownload(
         actor.tenantId,
         logoFileAssetId,

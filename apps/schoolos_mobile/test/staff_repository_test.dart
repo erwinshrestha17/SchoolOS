@@ -29,6 +29,9 @@ void main() {
               if (call.method == 'getApplicationDocumentsDirectory') {
                 return tempDir.path;
               }
+              if (call.method == 'getTemporaryDirectory') {
+                return tempDir.path;
+              }
               return null;
             },
           );
@@ -161,6 +164,7 @@ void main() {
       final download = await repository.downloadPayslipPdf(payslip);
 
       expect(download.fileName, 'PAY-2026-05.pdf');
+      expect(download.filePath, contains('/schoolos/payslips/'));
       expect(File(download.filePath).existsSync(), isTrue);
       expect(File(download.filePath).readAsBytesSync(), [37, 80, 68, 70]);
       verify(

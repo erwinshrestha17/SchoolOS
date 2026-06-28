@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { FileStatus } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { SettingsService } from './settings.service';
 
@@ -94,6 +95,23 @@ describe('SettingsService school logo uploads', () => {
     expect(upsertArgs?.create.value).toBe('16:00');
   });
 
+  it('rejects generic school logo setting writes before persistence', async () => {
+    const { service, prisma, auditService } = buildService();
+
+    await expect(
+      service.updateSetting(
+        actor.tenantId,
+        'school_logo',
+        '11111111-1111-1111-1111-111111111111',
+        actor.userId,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prisma.tenantSetting.findUnique).not.toHaveBeenCalled();
+    expect(prisma.tenantSetting.upsert).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
   it('stores tenant logo through private storage and File Registry', async () => {
     const {
       service,
@@ -182,11 +200,14 @@ describe('SettingsService school logo uploads', () => {
     });
     fileRegistryService.getFileMetadata.mockResolvedValue({
       id: '11111111-1111-1111-1111-111111111111',
+      tenantId: actor.tenantId,
       module: 'settings',
       entityId: 'other-tenant',
+      status: FileStatus.UPLOADED,
       originalFilename: 'logo.png',
       mimeType: 'image/png',
       sizeBytes: BigInt(12),
+      metadata: { kind: 'SCHOOL_LOGO' },
     });
 
     await expect(
@@ -196,11 +217,57 @@ describe('SettingsService school logo uploads', () => {
     expect(fileRegistryService.auditAccess).not.toHaveBeenCalled();
   });
 
+  it('returns signed logo access only for uploaded branding logo assets', async () => {
+    const { service, prisma, fileRegistryService } = buildService();
+    prisma.tenantSetting.findUnique.mockResolvedValue({
+      value: '11111111-1111-1111-1111-111111111111',
+    });
+    fileRegistryService.getFileMetadata.mockResolvedValue({
+      id: '11111111-1111-1111-1111-111111111111',
+      tenantId: actor.tenantId,
+      module: 'settings',
+      entityId: actor.tenantId,
+      status: FileStatus.UPLOADED,
+      originalFilename: 'logo.png',
+      mimeType: 'image/png',
+      sizeBytes: BigInt(12),
+      metadata: { kind: 'SCHOOL_LOGO' },
+    });
+    fileRegistryService.getSignedUrl.mockResolvedValue(
+      'https://files.local/logo.png',
+    );
+
+    const result = await service.getSchoolLogoAccess(actor, 'preview');
+
+    expect(fileRegistryService.auditAccess).toHaveBeenCalledWith(
+      actor.tenantId,
+      '11111111-1111-1111-1111-111111111111',
+      actor.userId,
+      'preview',
+    );
+    expect(result).toMatchObject({
+      fileAssetId: '11111111-1111-1111-1111-111111111111',
+      url: 'https://files.local/logo.png',
+      expiresInSeconds: 60,
+    });
+  });
+
   it('soft-deletes logo assets and audits removal', async () => {
     const { service, prisma, fileRegistryService, auditService } =
       buildService();
     prisma.tenantSetting.findUnique.mockResolvedValue({
       value: '11111111-1111-1111-1111-111111111111',
+    });
+    fileRegistryService.getFileMetadata.mockResolvedValue({
+      id: '11111111-1111-1111-1111-111111111111',
+      tenantId: actor.tenantId,
+      module: 'settings',
+      entityId: actor.tenantId,
+      status: FileStatus.UPLOADED,
+      originalFilename: 'logo.png',
+      mimeType: 'image/png',
+      sizeBytes: BigInt(12),
+      metadata: { kind: 'SCHOOL_LOGO' },
     });
 
     const result = await service.removeSchoolLogo(actor);
@@ -215,6 +282,39 @@ describe('SettingsService school logo uploads', () => {
     });
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'school_logo_removed' }),
+    );
+    expect(result).toEqual({ success: true, removed: true });
+  });
+
+  it('clears unsafe stale logo settings without deleting unrelated files', async () => {
+    const { service, prisma, fileRegistryService, auditService } =
+      buildService();
+    prisma.tenantSetting.findUnique.mockResolvedValue({
+      value: '11111111-1111-1111-1111-111111111111',
+    });
+    fileRegistryService.getFileMetadata.mockResolvedValue({
+      id: '11111111-1111-1111-1111-111111111111',
+      tenantId: actor.tenantId,
+      module: 'students',
+      entityId: 'student-1',
+      status: FileStatus.UPLOADED,
+      originalFilename: 'student-photo.png',
+      mimeType: 'image/png',
+      sizeBytes: BigInt(12),
+      metadata: { kind: 'STUDENT_PHOTO' },
+    });
+
+    const result = await service.removeSchoolLogo(actor);
+
+    expect(fileRegistryService.softDeleteFile).not.toHaveBeenCalled();
+    expect(prisma.tenantSetting.deleteMany).toHaveBeenCalledWith({
+      where: { tenantId: actor.tenantId, key: 'school_logo' },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'school_logo_removed',
+        after: { fileAssetId: null, fileAssetRemoved: false },
+      }),
     );
     expect(result).toEqual({ success: true, removed: true });
   });

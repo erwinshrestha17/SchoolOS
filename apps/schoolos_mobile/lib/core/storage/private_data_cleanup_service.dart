@@ -14,6 +14,7 @@ class PrivateDataCleanupService {
     await Future.wait([
       _deleteSchoolOsDirectory(getTemporaryDirectory),
       _deleteSchoolOsDirectory(getApplicationDocumentsDirectory),
+      _deleteLegacyPayslipDirectory(),
     ]);
   }
 
@@ -23,11 +24,24 @@ class PrivateDataCleanupService {
     try {
       final baseDirectory = await resolveDirectory();
       final schoolOsDirectory = Directory('${baseDirectory.path}/schoolos');
-      if (schoolOsDirectory.existsSync()) {
-        await schoolOsDirectory.delete(recursive: true);
-      }
+      await _deleteDirectory(schoolOsDirectory);
     } catch (_) {
       // Filesystem cleanup must not block logout or session expiry.
+    }
+  }
+
+  Future<void> _deleteLegacyPayslipDirectory() async {
+    try {
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      await _deleteDirectory(Directory('${documentsDirectory.path}/payslips'));
+    } catch (_) {
+      // Filesystem cleanup must not block logout or session expiry.
+    }
+  }
+
+  Future<void> _deleteDirectory(Directory directory) async {
+    if (directory.existsSync()) {
+      await directory.delete(recursive: true);
     }
   }
 }
