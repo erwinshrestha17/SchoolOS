@@ -578,6 +578,7 @@ enum ChatAvailabilityAppliesToRole {
 
 enum ChatEscalationStatus {
   OPEN
+  REOPENED
   RESOLVED
 }
 
@@ -1752,6 +1753,7 @@ model ApprovalDecision {
   stepId    String?
   decision  ApprovalDecisionType
   reason    String?
+  idempotencyKey String?
   decidedById String
   context   Json?
   createdAt DateTime             @default(now())
@@ -1763,6 +1765,7 @@ model ApprovalDecision {
 
   @@index([tenantId, requestId, createdAt])
   @@index([tenantId, decidedById, createdAt])
+  @@unique([tenantId, idempotencyKey])
 }
 
 model ApprovalComment {
@@ -2920,6 +2923,7 @@ model Notice {
   priority      NoticePriority @default(NORMAL)
   audienceType  AudienceType   @default(ALL)
   attachmentUrl String?
+  idempotencyKey String?
   scheduledFor  DateTime?
   publishedAt   DateTime?
   createdAt     DateTime       @default(now())
@@ -2930,6 +2934,8 @@ model Notice {
   section    Section?               @relation(fields: [sectionId], references: [id])
   createdBy  User?                  @relation("CreatedNotices", fields: [createdById], references: [id])
   deliveries NotificationDelivery[]
+
+  @@unique([tenantId, idempotencyKey])
 }
 
 model Event {
@@ -4530,14 +4536,19 @@ model ChatEscalation {
   escalatedToUserId String?
   reason            String
   status            ChatEscalationStatus @default(OPEN)
+  resolutionNote    String?
+  assignedAt        DateTime?
   createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
   resolvedAt        DateTime?
   resolvedByUserId  String?
+  reopenedAt        DateTime?
 
   thread ParentTeacherThread @relation(fields: [threadId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, threadId, createdAt])
   @@index([tenantId, status, createdAt])
+  @@index([tenantId, escalatedToUserId, status, createdAt])
 }
 
 model ChatAbuseReport {
@@ -6419,5 +6430,3 @@ model TransportLocationPing {
   @@index([tenantId, tripId, recordedAt])
   @@index([tenantId, vehicleId, recordedAt])
 }
-
-

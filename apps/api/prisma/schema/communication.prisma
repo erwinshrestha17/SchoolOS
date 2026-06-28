@@ -9,6 +9,7 @@ model Notice {
   priority      NoticePriority @default(NORMAL)
   audienceType  AudienceType   @default(ALL)
   attachmentUrl String?
+  idempotencyKey String?
   scheduledFor  DateTime?
   publishedAt   DateTime?
   createdAt     DateTime       @default(now())
@@ -19,6 +20,8 @@ model Notice {
   section    Section?               @relation(fields: [sectionId], references: [id])
   createdBy  User?                  @relation("CreatedNotices", fields: [createdById], references: [id])
   deliveries NotificationDelivery[]
+
+  @@unique([tenantId, idempotencyKey])
 }
 
 model Event {

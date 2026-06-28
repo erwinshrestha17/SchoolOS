@@ -1,11 +1,46 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
+import {
+  ApprovalDecisionType,
+  ApprovalRequestStatus,
+  ApprovalStepStatus,
+  ApprovalWorkflowType,
+  AudienceType,
+  ChatEscalationStatus,
+  NoticePriority,
+  NotificationStatus,
+  Prisma,
+  UserStatus,
+} from '@prisma/client';
+import { FEATURE_KEYS } from '@schoolos/core';
+import { ApprovalWorkflowService } from '../advanced-operations/approval-workflow.service';
+import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import { CommunicationsService } from '../communications/communications.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { EntitlementsService } from '../plans/entitlements.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { MobilePrincipalApprovalDecisionDto } from './dto/mobile-principal-approval.dto';
+import {
+  MobilePrincipalEscalationAssignmentDto,
+  MobilePrincipalEscalationNoteDto,
+  MobilePrincipalEscalationReopenDto,
+  MobilePrincipalEscalationResolutionDto,
+} from './dto/mobile-principal-escalation.dto';
+import {
+  MobilePrincipalEmergencyNoticePreviewDto,
+  MobilePrincipalEmergencyNoticeSubmitDto,
+} from './dto/mobile-principal-emergency-notice.dto';
 
 type Severity = 'critical' | 'high' | 'medium' | 'low';
 
-type PrincipalMetric = {
+interface PrincipalMetric {
   key: string;
   label: string;
   value: number | string;
@@ -13,9 +48,9 @@ type PrincipalMetric = {
   tone?: 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'slate';
   route?: string;
   locked?: boolean;
-};
+}
 
-type PrincipalItem = {
+interface PrincipalItem {
   id: string;
   type: string;
   title: string;
@@ -27,14 +62,91 @@ type PrincipalItem = {
   nextAction?: string;
   timestamp?: string | null;
   route?: string;
-};
+}
+
+interface PrincipalNoticeDraft {
+  id: string;
+  title: string;
+  audienceType: AudienceType;
+  priority: NoticePriority;
+  createdAt: Date;
+}
+
+const MOBILE_APPROVAL_WORKFLOW_TYPES = [
+  ApprovalWorkflowType.MARKS_CORRECTION,
+  ApprovalWorkflowType.ATTENDANCE_CORRECTION,
+  ApprovalWorkflowType.LEAVE_REQUEST,
+  ApprovalWorkflowType.STUDENT_TRANSFER_WITHDRAWAL,
+  ApprovalWorkflowType.EMERGENCY_HIGH_IMPACT_NOTICE,
+] as const;
+
+const HIGH_IMPACT_MOBILE_APPROVAL_TYPES = new Set<ApprovalWorkflowType>([
+  ApprovalWorkflowType.STUDENT_TRANSFER_WITHDRAWAL,
+  ApprovalWorkflowType.EMERGENCY_HIGH_IMPACT_NOTICE,
+]);
+
+const MOBILE_APPROVAL_TARGETS = {
+  [ApprovalWorkflowType.MARKS_CORRECTION]: {
+    targetModule: 'academics',
+    targetType: 'mark_entry',
+  },
+  [ApprovalWorkflowType.ATTENDANCE_CORRECTION]: {
+    targetModule: 'attendance',
+    targetType: 'attendance_record',
+  },
+  [ApprovalWorkflowType.LEAVE_REQUEST]: {
+    targetModule: 'hr',
+    targetType: 'staff_leave_request',
+  },
+  [ApprovalWorkflowType.STUDENT_TRANSFER_WITHDRAWAL]: {
+    targetModule: 'students',
+    targetType: 'student',
+  },
+  [ApprovalWorkflowType.EMERGENCY_HIGH_IMPACT_NOTICE]: {
+    targetModule: 'communications',
+    targetType: 'notice',
+  },
+} as const;
+
+const MOBILE_APPROVAL_TARGET_FILTERS = MOBILE_APPROVAL_WORKFLOW_TYPES.map(
+  (workflowType) => ({
+    workflowType,
+    ...MOBILE_APPROVAL_TARGETS[workflowType],
+  }),
+);
 
 @Injectable()
-export class MobilePrincipalService {
+export class MobilePrincipalService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly entitlementsService: EntitlementsService,
+    private readonly approvalWorkflowService: ApprovalWorkflowService,
+    private readonly auditService: AuditService,
+    private readonly communicationsService: CommunicationsService,
+    private readonly fileRegistryService: FileRegistryService,
   ) {}
+
+  onModuleInit() {
+    this.approvalWorkflowService.registerFinalAction(
+      'communications.notice.publish_high_impact',
+      {
+        apply: async ({ tenantId, targetId, payload, actor }) => {
+          if (tenantId !== actor.tenantId) {
+            throw new ForbiddenException(
+              'Approval action is outside the active tenant.',
+            );
+          }
+          const finalActionPayload = asRecord(payload);
+          return this.communicationsService.publishNotice(targetId, actor, {
+            scheduledFor:
+              typeof finalActionPayload.scheduledFor === 'string'
+                ? finalActionPayload.scheduledFor
+                : null,
+          });
+        },
+      },
+    );
+  }
 
   async getDashboard(actor: AuthContext) {
     this.assertPrincipal(actor);
@@ -195,11 +307,31 @@ export class MobilePrincipalService {
     const pending = ['PENDING', 'SUBMITTED', 'REQUESTED'].includes(statusKey)
       ? 'PENDING'
       : statusKey;
+    const noticeDraftsPromise: Promise<PrincipalNoticeDraft[]> =
+      pending === 'PENDING'
+        ? this.prisma.notice.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              publishedAt: null,
+              priority: {
+                in: [NoticePriority.URGENT, NoticePriority.EMERGENCY],
+              },
+            },
+            select: {
+              id: true,
+              title: true,
+              audienceType: true,
+              priority: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+          })
+        : Promise.resolve([]);
 
     const [
       leaveRequests,
       attendanceCorrections,
-      financeApprovals,
       reportCardCorrections,
       workflowApprovals,
       noticeDrafts,
@@ -225,21 +357,6 @@ export class MobilePrincipalService {
         orderBy: { requestedAt: 'desc' },
         take: 20,
       }),
-      this.prisma.financeApprovalRequest.findMany({
-        where: { tenantId: actor.tenantId, status: pending as never },
-        include: {
-          payment: {
-            select: {
-              amount: true,
-              student: {
-                select: { firstNameEn: true, lastNameEn: true },
-              },
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-      }),
       this.prisma.reportCardCorrectionRequest.findMany({
         where: { tenantId: actor.tenantId, status: pending },
         include: {
@@ -254,23 +371,33 @@ export class MobilePrincipalService {
         take: 20,
       }),
       this.prisma.approvalRequest.findMany({
-        where: { tenantId: actor.tenantId, status: pending as never },
+        where: {
+          tenantId: actor.tenantId,
+          status: pending as never,
+          OR: [...MOBILE_APPROVAL_TARGET_FILTERS],
+        },
         orderBy: { createdAt: 'desc' },
         take: 20,
       }),
-      pending === 'PENDING'
-        ? this.prisma.notice.findMany({
-            where: {
-              tenantId: actor.tenantId,
-              publishedAt: null,
-              priority: { in: ['URGENT', 'EMERGENCY'] as never },
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 10,
-          })
-        : Promise.resolve([]),
+      noticeDraftsPromise,
     ]);
 
+    const approvalBackedNotices = noticeDrafts.length
+      ? await this.prisma.approvalRequest.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            workflowType: ApprovalWorkflowType.EMERGENCY_HIGH_IMPACT_NOTICE,
+            targetModule: 'communications',
+            targetType: 'notice',
+            targetId: { in: noticeDrafts.map((notice) => notice.id) },
+          },
+          select: { targetId: true },
+          take: noticeDrafts.length,
+        })
+      : [];
+    const approvalBackedNoticeIds = new Set(
+      approvalBackedNotices.map((request) => request.targetId),
+    );
     const items: PrincipalItem[] = [
       ...leaveRequests.map((request) => ({
         id: request.id,
@@ -298,20 +425,6 @@ export class MobilePrincipalService {
         timestamp: toIso(request.requestedAt),
         owner: 'Principal',
         nextAction: 'Review correction',
-      })),
-      ...financeApprovals.map((request) => ({
-        id: request.id,
-        type: 'finance',
-        title: financeApprovalTitle(request.type),
-        subtitle: studentName(request.payment.student),
-        detail: formatNpr(
-          decimalToNumber(request.amount ?? request.payment.amount),
-        ),
-        status: request.status,
-        severity: 'medium' as Severity,
-        timestamp: toIso(request.createdAt),
-        owner: 'Principal',
-        nextAction: 'Review finance request',
       })),
       ...reportCardCorrections.map((request) => ({
         id: request.id,
@@ -341,22 +454,25 @@ export class MobilePrincipalService {
         timestamp: toIso(request.createdAt),
         owner: 'Principal',
         nextAction: 'Review request',
+        route: `/principal/approvals/${request.id}`,
       })),
-      ...noticeDrafts.map((notice) => ({
-        id: notice.id,
-        type: 'notice',
-        title: 'High-impact Notice Approval',
-        subtitle: notice.title,
-        detail: audienceLabel(notice.audienceType),
-        status: 'PENDING',
-        severity: (notice.priority === 'EMERGENCY'
-          ? 'critical'
-          : 'medium') as Severity,
-        timestamp: toIso(notice.createdAt),
-        owner: 'Principal',
-        nextAction: 'Review notice',
-        route: '/principal/notices',
-      })),
+      ...noticeDrafts
+        .filter((notice) => !approvalBackedNoticeIds.has(notice.id))
+        .map((notice) => ({
+          id: notice.id,
+          type: 'notice',
+          title: 'High-impact Notice Approval',
+          subtitle: notice.title,
+          detail: audienceLabel(notice.audienceType),
+          status: 'PENDING',
+          severity: (notice.priority === 'EMERGENCY'
+            ? 'critical'
+            : 'medium') as Severity,
+          timestamp: toIso(notice.createdAt),
+          owner: 'Principal',
+          nextAction: 'Review notice',
+          route: '/principal/notices',
+        })),
     ].sort(compareAttention);
 
     return {
@@ -370,6 +486,319 @@ export class MobilePrincipalService {
       items,
       lastUpdated: nowIso(),
     };
+  }
+
+  async getApprovalDetail(actor: AuthContext, approvalRequestId: string) {
+    this.assertPrincipal(actor);
+    this.assertActorPermissions(actor, ['advanced:approvals:read']);
+    const request = await this.prisma.approvalRequest.findFirst({
+      where: {
+        id: approvalRequestId,
+        tenantId: actor.tenantId,
+        OR: [...MOBILE_APPROVAL_TARGET_FILTERS],
+      },
+      include: {
+        policy: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            isActive: true,
+            minApprovals: true,
+          },
+        },
+        requestedBy: {
+          select: {
+            id: true,
+            email: true,
+            staff: { select: safeStaffSelect },
+            guardian: { select: { fullName: true } },
+          },
+        },
+        steps: {
+          orderBy: { sequence: 'asc' },
+          select: {
+            id: true,
+            sequence: true,
+            name: true,
+            status: true,
+            approverRole: true,
+            approverPermission: true,
+            decidedAt: true,
+          },
+        },
+        decisions: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            decision: true,
+            reason: true,
+            createdAt: true,
+            decidedBy: {
+              select: {
+                id: true,
+                email: true,
+                staff: { select: safeStaffSelect },
+                guardian: { select: { fullName: true } },
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            attachments: true,
+            comments: true,
+          },
+        },
+      },
+    });
+
+    if (!request) {
+      throw new NotFoundException(
+        'Approval request not found or is not available on mobile.',
+      );
+    }
+
+    const pendingStep = request.steps.find(
+      (step) => step.status === ApprovalStepStatus.PENDING,
+    );
+    const actorCanDecide =
+      request.status === ApprovalRequestStatus.PENDING &&
+      request.requestedById !== actor.userId &&
+      Boolean(
+        pendingStep && this.canActorDecideApprovalStep(pendingStep, actor),
+      );
+    const approvalActionAvailable =
+      actorCanDecide &&
+      this.approvalWorkflowService.hasFinalActionExecutor(
+        request.finalActionKey,
+      );
+
+    return {
+      id: request.id,
+      requestType: request.workflowType,
+      title: request.title,
+      reason: request.reason,
+      target: {
+        module: request.targetModule,
+        type: request.targetType,
+      },
+      requester: {
+        id: request.requestedBy.id,
+        name: mobileUserLabel(request.requestedBy),
+      },
+      supportingContext: sanitizeMobileContext(request.safeContext),
+      policy: request.policy
+        ? {
+            id: request.policy.id,
+            name: request.policy.name,
+            description: request.policy.description,
+            isActive: request.policy.isActive,
+            minApprovals: request.policy.minApprovals,
+          }
+        : {
+            id: null,
+            name: 'Default approval policy',
+            description: null,
+            isActive: true,
+            minApprovals: 1,
+          },
+      status: request.status,
+      finalActionStatus: request.finalActionStatus,
+      timestamps: {
+        createdAt: toIso(request.createdAt),
+        updatedAt: toIso(request.updatedAt),
+        appliedAt: toIso(request.finalActionAppliedAt),
+      },
+      steps: request.steps.map((step) => ({
+        sequence: step.sequence,
+        name: step.name,
+        status: step.status,
+        decidedAt: toIso(step.decidedAt),
+      })),
+      history: [
+        {
+          id: `${request.id}:created`,
+          action: 'REQUESTED',
+          actor: mobileUserLabel(request.requestedBy),
+          reason: request.reason,
+          timestamp: toIso(request.createdAt),
+        },
+        ...request.decisions.map((decision) => ({
+          id: decision.id,
+          action: decision.decision,
+          actor: mobileUserLabel(decision.decidedBy),
+          reason: decision.reason,
+          timestamp: toIso(decision.createdAt),
+        })),
+      ],
+      attachmentCount: request._count.attachments,
+      commentCount: request._count.comments,
+      actions: {
+        approve: approvalActionAvailable,
+        reject: actorCanDecide,
+        requiresApprovalReason: HIGH_IMPACT_MOBILE_APPROVAL_TYPES.has(
+          request.workflowType,
+        ),
+        rejectionReasonRequired: true,
+        unavailableReason:
+          request.requestedById === actor.userId
+            ? 'Requesters cannot decide their own approval request.'
+            : !actorCanDecide
+              ? 'No permitted pending approval step is available.'
+              : approvalActionAvailable
+                ? null
+                : 'Approval is unavailable until the module final action is registered.',
+      },
+      lastUpdated: nowIso(),
+    };
+  }
+
+  async decideApproval(
+    actor: AuthContext,
+    approvalRequestId: string,
+    dto: MobilePrincipalApprovalDecisionDto,
+  ) {
+    this.assertPrincipal(actor);
+    this.assertActorPermissions(actor, ['advanced:approvals:decide']);
+    const replay = await this.prisma.approvalDecision.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        idempotencyKey: dto.idempotencyKey,
+      },
+      select: { requestId: true },
+    });
+    if (replay) {
+      if (replay.requestId !== approvalRequestId) {
+        throw new ConflictException(
+          'Approval decision idempotency key was already used.',
+        );
+      }
+      return this.getApprovalDetail(actor, approvalRequestId);
+    }
+    const request = await this.prisma.approvalRequest.findFirst({
+      where: {
+        id: approvalRequestId,
+        tenantId: actor.tenantId,
+        OR: [...MOBILE_APPROVAL_TARGET_FILTERS],
+      },
+      select: {
+        id: true,
+        requestedById: true,
+        workflowType: true,
+        targetModule: true,
+        targetType: true,
+        finalActionKey: true,
+        status: true,
+        steps: {
+          orderBy: { sequence: 'asc' },
+          select: {
+            id: true,
+            status: true,
+            approverRole: true,
+            approverPermission: true,
+          },
+        },
+      },
+    });
+
+    if (!request) {
+      throw new NotFoundException(
+        'Approval request not found or is not available on mobile.',
+      );
+    }
+    if (
+      !isMobileApprovalTarget(
+        request.workflowType,
+        request.targetModule,
+        request.targetType,
+      )
+    ) {
+      throw new NotFoundException(
+        'Approval request not found or is not available on mobile.',
+      );
+    }
+    if (request.requestedById === actor.userId) {
+      throw new ForbiddenException(
+        'You cannot decide your own approval request.',
+      );
+    }
+    if (request.status !== ApprovalRequestStatus.PENDING) {
+      throw new ConflictException('Approval request is not reviewable.');
+    }
+    if (
+      dto.decision === ApprovalDecisionType.APPROVE &&
+      !this.approvalWorkflowService.hasFinalActionExecutor(
+        request.finalActionKey,
+      )
+    ) {
+      throw new ConflictException(
+        'Approval is unavailable until the module final action is registered.',
+      );
+    }
+
+    const reason = dto.reason?.trim();
+    if (dto.decision === ApprovalDecisionType.REJECT && !reason) {
+      throw new BadRequestException('Rejection reason is required.');
+    }
+    if (
+      dto.decision === ApprovalDecisionType.APPROVE &&
+      HIGH_IMPACT_MOBILE_APPROVAL_TYPES.has(request.workflowType) &&
+      !reason
+    ) {
+      throw new BadRequestException(
+        'An approval reason is required for this high-impact request.',
+      );
+    }
+
+    const pendingStep = request.steps.find(
+      (step) => step.status === ApprovalStepStatus.PENDING,
+    );
+    if (!pendingStep) {
+      throw new ConflictException('No pending approval step remains.');
+    }
+    if (!this.canActorDecideApprovalStep(pendingStep, actor)) {
+      throw new ForbiddenException(
+        'You cannot decide the current approval step.',
+      );
+    }
+
+    let result: Awaited<ReturnType<ApprovalWorkflowService['decide']>>;
+    try {
+      result = await this.approvalWorkflowService.decide(
+        request.id,
+        {
+          decision: dto.decision,
+          reason,
+          context: { source: 'principal_mobile' },
+          idempotencyKey: dto.idempotencyKey,
+        },
+        actor,
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        return this.getApprovalDetail(actor, request.id);
+      }
+      throw error;
+    }
+
+    await this.auditService.record({
+      action: 'principal_mobile_approval_decided',
+      resource: 'approval_request',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: request.id,
+      after: {
+        decision: dto.decision,
+        workflowType: request.workflowType,
+        status: result.status,
+      },
+    });
+
+    return this.getApprovalDetail(actor, request.id);
   }
 
   async getAttendanceSummary(actor: AuthContext, dateInput?: string) {
@@ -893,9 +1322,19 @@ export class MobilePrincipalService {
     const statusKey = status.toUpperCase();
     const whereStatus =
       statusKey === 'ASSIGNED'
-        ? { escalatedToUserId: actor.userId }
+        ? {
+            escalatedToUserId: actor.userId,
+            status: {
+              in: [ChatEscalationStatus.OPEN, ChatEscalationStatus.REOPENED],
+            },
+          }
         : {
-            status: (statusKey === 'RESOLVED' ? 'RESOLVED' : 'OPEN') as never,
+            status:
+              statusKey === 'RESOLVED'
+                ? ChatEscalationStatus.RESOLVED
+                : statusKey === 'REOPENED'
+                  ? ChatEscalationStatus.REOPENED
+                  : ChatEscalationStatus.OPEN,
           };
     const escalations = await this.prisma.chatEscalation.findMany({
       where: {
@@ -912,23 +1351,298 @@ export class MobilePrincipalService {
       subtitle: 'Escalation context is restricted on mobile',
       detail: row.reason,
       status: row.status,
-      severity: (row.status === 'OPEN' ? 'high' : 'low') as Severity,
+      severity: (row.status === ChatEscalationStatus.RESOLVED
+        ? 'low'
+        : 'high') as Severity,
       timestamp: toIso(row.createdAt),
-      owner: row.escalatedToUserId ? 'Assigned owner' : 'Unassigned',
+      owner:
+        row.escalatedToUserId === actor.userId
+          ? 'Assigned to me'
+          : row.escalatedToUserId
+            ? 'Assigned owner'
+            : 'Unassigned',
       nextAction: 'Review escalation',
+      route: `/principal/escalations/${row.id}`,
     }));
     return {
-      tabs: ['open', 'assigned', 'resolved'],
+      tabs: ['open', 'assigned', 'resolved', 'reopened'],
       activeTab: status.toLowerCase(),
       metrics: {
         critical: items.filter((item) => item.severity === 'high').length,
         dueToday: countToday(items),
-        pendingResponse: items.filter((item) => item.status !== 'RESOLVED')
-          .length,
+        pendingResponse: items.filter(
+          (item) => item.status !== ChatEscalationStatus.RESOLVED,
+        ).length,
       },
       items,
       lastUpdated: nowIso(),
     };
+  }
+
+  async getEscalationDetail(actor: AuthContext, escalationId: string) {
+    this.assertPrincipal(actor);
+    this.assertActorPermissions(actor, ['messaging:manage']);
+    const escalation = await this.prisma.chatEscalation.findFirst({
+      where: {
+        id: escalationId,
+        tenantId: actor.tenantId,
+      },
+    });
+    if (!escalation) {
+      throw new NotFoundException('Escalation not found in the active tenant.');
+    }
+
+    const [assignee, auditHistory] = await Promise.all([
+      escalation.escalatedToUserId
+        ? this.prisma.user.findFirst({
+            where: {
+              id: escalation.escalatedToUserId,
+              tenantId: actor.tenantId,
+            },
+            select: {
+              id: true,
+              email: true,
+              staff: { select: safeStaffSelect },
+              guardian: { select: { fullName: true } },
+            },
+          })
+        : Promise.resolve(null),
+      this.prisma.auditLog.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          resource: 'chat_escalation',
+          resourceId: escalation.id,
+        },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          action: true,
+          userId: true,
+          createdAt: true,
+        },
+        take: 100,
+      }),
+    ]);
+    const isResolved = escalation.status === ChatEscalationStatus.RESOLVED;
+
+    return {
+      id: escalation.id,
+      status: escalation.status,
+      reason: escalation.reason,
+      resolutionNote: escalation.resolutionNote,
+      assignment: assignee
+        ? {
+            userId: assignee.id,
+            name: mobileUserLabel(assignee),
+            assignedToMe: assignee.id === actor.userId,
+            assignedAt: toIso(escalation.assignedAt),
+          }
+        : null,
+      timestamps: {
+        createdAt: toIso(escalation.createdAt),
+        updatedAt: toIso(escalation.updatedAt),
+        resolvedAt: toIso(escalation.resolvedAt),
+        reopenedAt: toIso(escalation.reopenedAt),
+      },
+      history: [
+        {
+          id: `${escalation.id}:created`,
+          action: 'ESCALATED',
+          actorUserId: escalation.escalatedByUserId,
+          timestamp: toIso(escalation.createdAt),
+        },
+        ...auditHistory.map((entry) => ({
+          id: entry.id,
+          action: entry.action,
+          actorUserId: entry.userId,
+          timestamp: toIso(entry.createdAt),
+        })),
+      ],
+      actions: {
+        assignToSelf: !isResolved,
+        assignToStaff: !isResolved,
+        addResolutionNote: !isResolved,
+        resolve: !isResolved,
+        reopen: isResolved,
+        resolutionReasonRequired: true,
+      },
+      lastUpdated: nowIso(),
+    };
+  }
+
+  async assignEscalationToSelf(actor: AuthContext, escalationId: string) {
+    this.assertActorPermissions(actor, ['messaging:manage']);
+    return this.assignPrincipalEscalation(
+      actor,
+      escalationId,
+      actor.userId,
+      'principal_mobile_escalation_assigned_to_self',
+    );
+  }
+
+  async assignEscalation(
+    actor: AuthContext,
+    escalationId: string,
+    dto: MobilePrincipalEscalationAssignmentDto,
+  ) {
+    this.assertPrincipal(actor);
+    this.assertActorPermissions(actor, ['messaging:manage']);
+    await this.assertPermittedEscalationAssignee(
+      actor.tenantId,
+      dto.assigneeUserId,
+    );
+    return this.assignPrincipalEscalation(
+      actor,
+      escalationId,
+      dto.assigneeUserId,
+      'principal_mobile_escalation_assigned',
+    );
+  }
+
+  async addEscalationNote(
+    actor: AuthContext,
+    escalationId: string,
+    dto: MobilePrincipalEscalationNoteDto,
+  ) {
+    this.assertPrincipal(actor);
+    this.assertActorPermissions(actor, ['messaging:manage']);
+    const note = dto.note.trim();
+    if (!note) {
+      throw new BadRequestException('Resolution note is required.');
+    }
+    await this.assertMutableEscalation(actor, escalationId);
+
+    const updated = await this.prisma.chatEscalation.updateMany({
+      where: {
+        id: escalationId,
+        tenantId: actor.tenantId,
+        status: {
+          in: [ChatEscalationStatus.OPEN, ChatEscalationStatus.REOPENED],
+        },
+      },
+      data: { resolutionNote: note },
+    });
+    if (updated.count !== 1) {
+      throw new ConflictException(
+        'Resolved escalations are locked and cannot be edited.',
+      );
+    }
+
+    await this.auditService.record({
+      action: 'principal_mobile_escalation_note_added',
+      resource: 'chat_escalation',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: escalationId,
+      after: { note },
+    });
+    return this.getEscalationDetail(actor, escalationId);
+  }
+
+  async resolveEscalation(
+    actor: AuthContext,
+    escalationId: string,
+    dto: MobilePrincipalEscalationResolutionDto,
+  ) {
+    this.assertPrincipal(actor);
+    this.assertActorPermissions(actor, ['messaging:manage']);
+    const reason = dto.resolutionReason.trim();
+    if (!reason) {
+      throw new BadRequestException('Resolution reason is required.');
+    }
+    await this.assertMutableEscalation(actor, escalationId);
+
+    const resolvedAt = new Date();
+    const updated = await this.prisma.chatEscalation.updateMany({
+      where: {
+        id: escalationId,
+        tenantId: actor.tenantId,
+        status: {
+          in: [ChatEscalationStatus.OPEN, ChatEscalationStatus.REOPENED],
+        },
+      },
+      data: {
+        status: ChatEscalationStatus.RESOLVED,
+        resolutionNote: reason,
+        resolvedAt,
+        resolvedByUserId: actor.userId,
+      },
+    });
+    if (updated.count !== 1) {
+      throw new ConflictException('Escalation is already resolved.');
+    }
+
+    await this.auditService.record({
+      action: 'principal_mobile_escalation_resolved',
+      resource: 'chat_escalation',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: escalationId,
+      after: {
+        status: ChatEscalationStatus.RESOLVED,
+        resolutionReason: reason,
+      },
+    });
+    return this.getEscalationDetail(actor, escalationId);
+  }
+
+  async reopenEscalation(
+    actor: AuthContext,
+    escalationId: string,
+    dto: MobilePrincipalEscalationReopenDto,
+  ) {
+    this.assertPrincipal(actor);
+    this.assertActorPermissions(actor, ['messaging:manage']);
+    const reason = dto.reason.trim();
+    if (!reason) {
+      throw new BadRequestException('Reopen reason is required.');
+    }
+    const escalation = await this.prisma.chatEscalation.findFirst({
+      where: {
+        id: escalationId,
+        tenantId: actor.tenantId,
+      },
+      select: { id: true, status: true },
+    });
+    if (!escalation) {
+      throw new NotFoundException('Escalation not found in the active tenant.');
+    }
+    if (escalation.status !== ChatEscalationStatus.RESOLVED) {
+      throw new ConflictException('Only resolved escalations can be reopened.');
+    }
+
+    const reopenedAt = new Date();
+    const updated = await this.prisma.chatEscalation.updateMany({
+      where: {
+        id: escalationId,
+        tenantId: actor.tenantId,
+        status: ChatEscalationStatus.RESOLVED,
+      },
+      data: {
+        status: ChatEscalationStatus.REOPENED,
+        resolvedAt: null,
+        resolvedByUserId: null,
+        reopenedAt,
+      },
+    });
+    if (updated.count !== 1) {
+      throw new ConflictException(
+        'Escalation state changed before it could be reopened.',
+      );
+    }
+
+    await this.auditService.record({
+      action: 'principal_mobile_escalation_reopened',
+      resource: 'chat_escalation',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: escalationId,
+      after: {
+        status: ChatEscalationStatus.REOPENED,
+        reason,
+      },
+    });
+    return this.getEscalationDetail(actor, escalationId);
   }
 
   async searchStudents(
@@ -1219,32 +1933,40 @@ export class MobilePrincipalService {
 
   async getEmergencyNotice(actor: AuthContext) {
     this.assertPrincipal(actor);
-    const notice = await this.prisma.notice.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        priority: { in: ['URGENT', 'EMERGENCY'] as never },
-        publishedAt: null,
-      },
-      include: {
-        deliveries: {
-          select: {
-            channel: true,
-            status: true,
-            recipientUserId: true,
-            guardianId: true,
+    const [notice, providerDiagnostics] = await Promise.all([
+      this.prisma.notice.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          priority: { in: ['URGENT', 'EMERGENCY'] as never },
+          publishedAt: null,
+        },
+        include: {
+          deliveries: {
+            select: {
+              channel: true,
+              status: true,
+              recipientUserId: true,
+              guardianId: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.communicationsService.getCommunicationProviderDiagnostics(actor),
+    ]);
     if (!notice) {
       return {
         status: 'empty',
         message: 'There is no high-impact notice awaiting principal review.',
+        providerState: mobileProviderState(
+          providerDiagnostics,
+          NoticePriority.EMERGENCY,
+        ),
         actions: {
           approveAndSend: false,
-          saveDraft: false,
-          editAudience: false,
+          compose: true,
+          previewRecipients: true,
+          submit: true,
         },
         lastUpdated: nowIso(),
       };
@@ -1258,6 +1980,16 @@ export class MobilePrincipalService {
     const failed = notice.deliveries.filter(
       (delivery) => delivery.status === 'FAILED',
     ).length;
+    const providerState = mobileProviderState(
+      providerDiagnostics,
+      notice.priority,
+    );
+    const pushProvider = providerState.channels.find(
+      (channel) => channel.channel === 'PUSH',
+    );
+    const smsProvider = providerState.channels.find(
+      (channel) => channel.channel === 'SMS',
+    );
     return {
       status: 'draft',
       id: notice.id,
@@ -1277,23 +2009,620 @@ export class MobilePrincipalService {
           .length,
       },
       deliveryReadiness: {
-        app: failed === 0,
-        sms: failed === 0,
-        email: failed === 0,
+        push: Boolean(pushProvider?.available),
+        sms: Boolean(smsProvider?.available),
+        liveDelivery: providerState.channels.some(
+          (channel) => channel.liveDelivery,
+        ),
         message:
           failed > 0
             ? 'Some deliveries failed readiness checks.'
-            : 'Delivery readiness is based on backend delivery records.',
+            : providerState.availableChannelCount > 0
+              ? 'Delivery readiness reflects backend provider modes. Mock and dev-log modes are not live delivery.'
+              : 'No configured delivery channel is currently available.',
       },
+      providerState,
       actions: {
         approveAndSend: false,
-        saveDraft: false,
-        editAudience: false,
+        compose: true,
+        previewRecipients: true,
+        submit: true,
         message:
-          'Mobile send is disabled until a high-impact notice approval endpoint is confirmed.',
+          'Use the controlled emergency-notice workflow to preview recipients and submit.',
       },
       lastUpdated: nowIso(),
     };
+  }
+
+  async previewEmergencyNoticeRecipients(
+    actor: AuthContext,
+    dto: MobilePrincipalEmergencyNoticePreviewDto,
+  ) {
+    this.assertPrincipal(actor);
+    this.assertActorPermissions(actor, [
+      'notices:create',
+      'advanced:approvals:manage',
+    ]);
+    await this.assertEmergencyNoticeEntitlements(actor.tenantId);
+    this.validateEmergencyAudience(dto);
+
+    const [preview, providerDiagnostics, approvalPolicy, settings] =
+      await Promise.all([
+        this.communicationsService.previewNoticeRecipients(
+          {
+            title: dto.title.trim(),
+            body: dto.body.trim(),
+            priority: dto.priority,
+            audienceType: dto.audienceType,
+            classId: dto.classId,
+            sectionId: dto.sectionId,
+          },
+          actor,
+        ),
+        this.communicationsService.getCommunicationProviderDiagnostics(actor),
+        this.getEmergencyApprovalPolicy(actor.tenantId),
+        this.getEmergencyNoticeSettings(actor.tenantId),
+      ]);
+    const providerState = mobileProviderState(
+      providerDiagnostics,
+      dto.priority,
+    );
+    const approval = emergencyApprovalState({
+      actor,
+      priority: dto.priority,
+      policy: approvalPolicy,
+      requiresAdmin: settings.emergencyOverrideRequiresAdmin,
+    });
+
+    return {
+      audience: {
+        type: preview.audienceType,
+        classId: preview.classId,
+        sectionId: preview.sectionId,
+      },
+      recipients: {
+        total: preview.recipientCount,
+        eligible: preview.allowedRecipientCount,
+        skipped: preview.skippedRecipientCount,
+        estimatedDeliveries: preview.estimatedDeliveryRows,
+      },
+      channels: preview.channels,
+      providerState,
+      quietHours: {
+        enabled: settings.quietHoursEnabled,
+        emergencyBypass: dto.priority === NoticePriority.EMERGENCY,
+        sendNowAllowed:
+          !settings.quietHoursEnabled ||
+          dto.priority === NoticePriority.EMERGENCY,
+        scheduleAllowed:
+          !settings.quietHoursEnabled ||
+          dto.priority === NoticePriority.EMERGENCY,
+      },
+      approval,
+      canSubmit:
+        preview.allowedRecipientCount > 0 &&
+        (!settings.quietHoursEnabled ||
+          dto.priority === NoticePriority.EMERGENCY) &&
+        (providerState.availableChannelCount > 0 || approval.required),
+      lastUpdated: nowIso(),
+    };
+  }
+
+  async submitEmergencyNotice(
+    actor: AuthContext,
+    dto: MobilePrincipalEmergencyNoticeSubmitDto,
+  ) {
+    this.assertPrincipal(actor);
+    this.assertActorPermissions(actor, [
+      'notices:create',
+      'advanced:approvals:manage',
+    ]);
+    await this.assertEmergencyNoticeEntitlements(actor.tenantId);
+    this.validateEmergencyAudience(dto);
+    const scheduledFor = this.validateEmergencySchedule(dto);
+    const reason = dto.reason?.trim();
+    if (dto.priority === NoticePriority.EMERGENCY && !reason) {
+      throw new BadRequestException(
+        'A reason is required for an emergency notice.',
+      );
+    }
+
+    const [recipientPreview, providerDiagnostics, approvalPolicy, settings] =
+      await Promise.all([
+        this.communicationsService.previewNoticeRecipients(
+          {
+            title: dto.title.trim(),
+            body: dto.body.trim(),
+            priority: dto.priority,
+            audienceType: dto.audienceType,
+            classId: dto.classId,
+            sectionId: dto.sectionId,
+          },
+          actor,
+        ),
+        this.communicationsService.getCommunicationProviderDiagnostics(actor),
+        this.getEmergencyApprovalPolicy(actor.tenantId),
+        this.getEmergencyNoticeSettings(actor.tenantId),
+      ]);
+    if (recipientPreview.allowedRecipientCount < 1) {
+      throw new ConflictException(
+        'No eligible recipients are available for this notice scope.',
+      );
+    }
+    if (
+      settings.quietHoursEnabled &&
+      dto.priority !== NoticePriority.EMERGENCY
+    ) {
+      throw new ConflictException(
+        'Urgent mobile dispatch is unavailable while quiet hours are enabled because no mobile-safe quiet-hours schedule contract exists.',
+      );
+    }
+
+    const approval = emergencyApprovalState({
+      actor,
+      priority: dto.priority,
+      policy: approvalPolicy,
+      requiresAdmin: settings.emergencyOverrideRequiresAdmin,
+    });
+    if (approval.required && !approvalPolicy) {
+      throw new ConflictException(
+        'Emergency notice approval is required but no active approval policy is configured.',
+      );
+    }
+
+    const providerState = mobileProviderState(
+      providerDiagnostics,
+      dto.priority,
+    );
+    if (
+      dto.sendMode === 'SEND_NOW' &&
+      !approval.required &&
+      providerState.availableChannelCount < 1
+    ) {
+      throw new ConflictException(
+        'No configured delivery channel is currently available.',
+      );
+    }
+
+    const notice = await this.communicationsService.createNoticeDraft(
+      {
+        title: dto.title.trim(),
+        body: dto.body.trim(),
+        priority: dto.priority,
+        audienceType: dto.audienceType,
+        classId: dto.classId,
+        sectionId: dto.sectionId,
+        attachmentFileId: dto.attachmentFileId,
+        scheduledFor: approval.required
+          ? undefined
+          : (scheduledFor ?? undefined),
+        idempotencyKey: dto.idempotencyKey,
+      },
+      actor,
+    );
+
+    let approvalRequestId: string | null = null;
+    if (approval.required && approvalPolicy) {
+      const approvalRequest = await this.approvalWorkflowService.createRequest(
+        {
+          workflowType: ApprovalWorkflowType.EMERGENCY_HIGH_IMPACT_NOTICE,
+          title: `Emergency notice: ${notice.title}`,
+          reason: reason ?? 'High-impact notice approval requested.',
+          targetModule: 'communications',
+          targetType: 'notice',
+          targetId: notice.id,
+          policyId: approvalPolicy.id,
+          safeContext: {
+            priority: notice.priority,
+            audienceType: notice.audienceType,
+            recipientCount: recipientPreview.allowedRecipientCount,
+            scheduledFor,
+          },
+          finalActionKey: 'communications.notice.publish_high_impact',
+          finalActionPayload: { scheduledFor },
+          idempotencyKey: `principal-mobile-notice:${dto.idempotencyKey}`,
+        },
+        actor,
+      );
+      approvalRequestId = approvalRequest.id;
+    } else {
+      await this.communicationsService.publishNotice(notice.id, actor, {
+        scheduledFor,
+      });
+    }
+
+    await this.auditService.record({
+      action: 'principal_mobile_emergency_notice_submitted',
+      resource: 'notice',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: notice.id,
+      after: {
+        priority: notice.priority,
+        audienceType: notice.audienceType,
+        sendMode: dto.sendMode,
+        approvalRequired: approval.required,
+        approvalRequestId,
+        attachmentFileId: dto.attachmentFileId ?? null,
+      },
+    });
+    return this.getEmergencyNoticeStatus(actor, notice.id);
+  }
+
+  async getEmergencyNoticeStatus(actor: AuthContext, noticeId: string) {
+    this.assertPrincipal(actor);
+    this.assertActorPermissions(actor, ['notices:read']);
+    await this.assertEmergencyNoticeEntitlements(actor.tenantId);
+
+    const notice = await this.prisma.notice.findFirst({
+      where: {
+        id: noticeId,
+        tenantId: actor.tenantId,
+        priority: {
+          in: [NoticePriority.URGENT, NoticePriority.EMERGENCY],
+        },
+      },
+      select: {
+        id: true,
+        title: true,
+        body: true,
+        priority: true,
+        audienceType: true,
+        classId: true,
+        sectionId: true,
+        scheduledFor: true,
+        publishedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    if (!notice) {
+      throw new NotFoundException(
+        'High-impact notice not found in the active tenant.',
+      );
+    }
+
+    const [deliveries, approvalRequest, linkedFiles, providerDiagnostics] =
+      await Promise.all([
+        this.prisma.notificationDelivery.groupBy({
+          by: ['status', 'channel'],
+          where: {
+            tenantId: actor.tenantId,
+            noticeId: notice.id,
+          },
+          _count: { status: true },
+        }),
+        this.prisma.approvalRequest.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            targetModule: 'communications',
+            targetType: 'notice',
+            targetId: notice.id,
+            workflowType: ApprovalWorkflowType.EMERGENCY_HIGH_IMPACT_NOTICE,
+          },
+          select: {
+            id: true,
+            status: true,
+            finalActionStatus: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        }),
+        this.fileRegistryService.listFilesByEntity(
+          actor.tenantId,
+          'notices',
+          notice.id,
+        ),
+        this.communicationsService.getCommunicationProviderDiagnostics(actor),
+      ]);
+    const delivery = summarizeMobileNoticeDeliveries(deliveries);
+    const providerState = mobileProviderState(
+      providerDiagnostics,
+      notice.priority,
+    );
+    const state = resolveMobileNoticeState({
+      approvalStatus: approvalRequest?.status ?? null,
+      scheduledFor: notice.scheduledFor,
+      publishedAt: notice.publishedAt,
+      delivery,
+    });
+    const attachment = linkedFiles[0];
+
+    return {
+      id: notice.id,
+      state,
+      title: notice.title,
+      body: notice.body,
+      priority: notice.priority,
+      audience: {
+        type: notice.audienceType,
+        classId: notice.classId,
+        sectionId: notice.sectionId,
+      },
+      schedule: {
+        scheduledFor: toIso(notice.scheduledFor),
+        publishedAt: toIso(notice.publishedAt),
+      },
+      approval: approvalRequest
+        ? {
+            requestId: approvalRequest.id,
+            status: approvalRequest.status,
+            finalActionStatus: approvalRequest.finalActionStatus,
+            updatedAt: toIso(approvalRequest.updatedAt),
+          }
+        : null,
+      delivery: {
+        ...delivery,
+        retryEligible:
+          (delivery.failed > 0 || delivery.retryPending > 0) &&
+          providerState.availableChannelCount > 0,
+      },
+      providerState,
+      attachment: attachment
+        ? {
+            fileAssetId: attachment.id,
+            fileName: attachment.originalFilename,
+            protected: true,
+          }
+        : null,
+      timestamps: {
+        createdAt: toIso(notice.createdAt),
+        updatedAt: toIso(notice.updatedAt),
+      },
+      lastUpdated: nowIso(),
+    };
+  }
+
+  private async assertEmergencyNoticeEntitlements(tenantId: string) {
+    await this.entitlementsService.assertModuleEnabled(tenantId, 'notices');
+    await this.entitlementsService.assertFeatureEnabled(
+      tenantId,
+      FEATURE_KEYS.NOTICES_FULL,
+    );
+  }
+
+  private async getEmergencyApprovalPolicy(tenantId: string) {
+    return this.prisma.approvalPolicy.findFirst({
+      where: {
+        tenantId,
+        workflowType: ApprovalWorkflowType.EMERGENCY_HIGH_IMPACT_NOTICE,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        minApprovals: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  private async getEmergencyNoticeSettings(tenantId: string) {
+    const settings = await this.prisma.tenantSetting.findMany({
+      where: {
+        tenantId,
+        key: {
+          in: ['quiet_hours_enabled', 'emergency_override_requires_admin'],
+        },
+      },
+      select: { key: true, value: true },
+    });
+    const byKey = new Map(
+      settings.map((setting) => [setting.key, setting.value]),
+    );
+    return {
+      quietHoursEnabled: byKey.get('quiet_hours_enabled') === true,
+      emergencyOverrideRequiresAdmin:
+        byKey.get('emergency_override_requires_admin') === true,
+    };
+  }
+
+  private validateEmergencyAudience(
+    dto: MobilePrincipalEmergencyNoticePreviewDto,
+  ) {
+    if (!dto.title.trim() || !dto.body.trim()) {
+      throw new BadRequestException('Notice title and body are required.');
+    }
+    if (
+      dto.audienceType === AudienceType.ALL &&
+      (dto.classId || dto.sectionId)
+    ) {
+      throw new BadRequestException(
+        'All-school notices cannot include class or section filters.',
+      );
+    }
+    if (
+      dto.audienceType === AudienceType.CLASS &&
+      (!dto.classId || dto.sectionId)
+    ) {
+      throw new BadRequestException(
+        'Class notices require one class and no section.',
+      );
+    }
+    if (
+      dto.audienceType === AudienceType.SECTION &&
+      (!dto.classId || !dto.sectionId)
+    ) {
+      throw new BadRequestException(
+        'Section notices require both class and section.',
+      );
+    }
+  }
+
+  private validateEmergencySchedule(
+    dto: MobilePrincipalEmergencyNoticeSubmitDto,
+  ) {
+    if (dto.sendMode === 'SEND_NOW') {
+      if (dto.scheduledFor) {
+        throw new BadRequestException(
+          'Send-now notices cannot include a scheduled time.',
+        );
+      }
+      return null;
+    }
+    if (!dto.scheduledFor) {
+      throw new BadRequestException(
+        'A scheduled time is required for scheduled notices.',
+      );
+    }
+    const scheduledFor = new Date(dto.scheduledFor);
+    if (Number.isNaN(scheduledFor.getTime()) || scheduledFor <= new Date()) {
+      throw new BadRequestException(
+        'Scheduled notice time must be in the future.',
+      );
+    }
+    return scheduledFor.toISOString();
+  }
+
+  private assertActorPermissions(
+    actor: AuthContext,
+    requiredPermissions: string[],
+  ) {
+    if (actor.roles.includes('platform_super_admin')) return;
+    if (
+      requiredPermissions.some(
+        (permission) => !actor.permissions.includes(permission),
+      )
+    ) {
+      throw new ForbiddenException(
+        'You do not have permission to perform this principal mobile action.',
+      );
+    }
+  }
+
+  private canActorDecideApprovalStep(
+    step: {
+      approverRole: string | null;
+      approverPermission: string | null;
+    },
+    actor: AuthContext,
+  ) {
+    if (actor.roles.includes('platform_super_admin')) {
+      return true;
+    }
+    if (!step.approverRole && !step.approverPermission) {
+      return actor.roles.includes('principal') || actor.roles.includes('admin');
+    }
+    return Boolean(
+      (step.approverRole && actor.roles.includes(step.approverRole)) ||
+      (step.approverPermission &&
+        actor.permissions.includes(step.approverPermission)),
+    );
+  }
+
+  private async assertMutableEscalation(
+    actor: AuthContext,
+    escalationId: string,
+  ) {
+    const escalation = await this.prisma.chatEscalation.findFirst({
+      where: {
+        id: escalationId,
+        tenantId: actor.tenantId,
+      },
+      select: { id: true, status: true },
+    });
+    if (!escalation) {
+      throw new NotFoundException('Escalation not found in the active tenant.');
+    }
+    if (escalation.status === ChatEscalationStatus.RESOLVED) {
+      throw new ConflictException(
+        'Resolved escalations are locked. Reopen before editing.',
+      );
+    }
+    return escalation;
+  }
+
+  private async assignPrincipalEscalation(
+    actor: AuthContext,
+    escalationId: string,
+    assigneeUserId: string,
+    auditAction: string,
+  ) {
+    this.assertPrincipal(actor);
+    await this.assertMutableEscalation(actor, escalationId);
+    const assignedAt = new Date();
+    const updated = await this.prisma.chatEscalation.updateMany({
+      where: {
+        id: escalationId,
+        tenantId: actor.tenantId,
+        status: {
+          in: [ChatEscalationStatus.OPEN, ChatEscalationStatus.REOPENED],
+        },
+      },
+      data: {
+        escalatedToUserId: assigneeUserId,
+        assignedAt,
+      },
+    });
+    if (updated.count !== 1) {
+      throw new ConflictException(
+        'Escalation state changed before assignment completed.',
+      );
+    }
+
+    await this.auditService.record({
+      action: auditAction,
+      resource: 'chat_escalation',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: escalationId,
+      after: { assigneeUserId },
+    });
+    return this.getEscalationDetail(actor, escalationId);
+  }
+
+  private async assertPermittedEscalationAssignee(
+    tenantId: string,
+    assigneeUserId: string,
+  ) {
+    const assignee = await this.prisma.user.findFirst({
+      where: {
+        id: assigneeUserId,
+        tenantId,
+        status: UserStatus.ACTIVE,
+      },
+      select: {
+        id: true,
+        staff: { select: { id: true } },
+        userRoles: {
+          where: { tenantId },
+          select: {
+            role: {
+              select: {
+                name: true,
+                rolePermissions: {
+                  select: {
+                    permission: {
+                      select: { resource: true, action: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!assignee?.staff) {
+      throw new NotFoundException(
+        'Permitted escalation assignee not found in the active tenant.',
+      );
+    }
+    const isPermitted = assignee.userRoles.some(({ role }) => {
+      if (['admin', 'principal'].includes(role.name)) {
+        return true;
+      }
+      return role.rolePermissions.some(
+        ({ permission }) =>
+          permission.resource === 'messaging' && permission.action === 'manage',
+      );
+    });
+    if (!isPermitted) {
+      throw new ForbiddenException(
+        'Selected staff member is not permitted to manage escalations.',
+      );
+    }
   }
 
   private async getModules(tenantId: string) {
@@ -1340,7 +2669,7 @@ export class MobilePrincipalService {
   }
 
   private async countAllPendingApprovals(tenantId: string) {
-    const [leave, attendance, finance, reportCard, workflow, notices] =
+    const [leave, attendance, reportCard, workflow, notices] =
       await Promise.all([
         this.prisma.staffLeaveRequest.count({
           where: { tenantId, status: 'PENDING' },
@@ -1348,24 +2677,41 @@ export class MobilePrincipalService {
         this.prisma.attendanceCorrectionRequest.count({
           where: { tenantId, status: 'PENDING' },
         }),
-        this.prisma.financeApprovalRequest.count({
-          where: { tenantId, status: 'PENDING' },
-        }),
         this.prisma.reportCardCorrectionRequest.count({
           where: { tenantId, status: 'PENDING' },
         }),
         this.prisma.approvalRequest.count({
-          where: { tenantId, status: 'PENDING' },
-        }),
-        this.prisma.notice.count({
           where: {
             tenantId,
-            publishedAt: null,
-            priority: { in: ['URGENT', 'EMERGENCY'] as never },
+            status: 'PENDING',
+            OR: [...MOBILE_APPROVAL_TARGET_FILTERS],
           },
         }),
+        this.countUnlinkedHighImpactNoticeDrafts(tenantId),
       ]);
-    return leave + attendance + finance + reportCard + workflow + notices;
+    return leave + attendance + reportCard + workflow + notices;
+  }
+
+  private async countUnlinkedHighImpactNoticeDrafts(tenantId: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ count: bigint }>>(
+      Prisma.sql`
+        SELECT COUNT(*)::bigint AS "count"
+        FROM "Notice" AS notice
+        WHERE notice."tenantId" = ${tenantId}
+          AND notice."publishedAt" IS NULL
+          AND notice."priority" IN ('URGENT', 'EMERGENCY')
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "ApprovalRequest" AS approval
+            WHERE approval."tenantId" = notice."tenantId"
+              AND approval."targetModule" = 'communications'
+              AND approval."targetType" = 'notice'
+              AND approval."targetId" = notice."id"
+              AND approval."workflowType" = 'EMERGENCY_HIGH_IMPACT_NOTICE'
+          )
+      `,
+    );
+    return Number(rows[0]?.count ?? 0n);
   }
 
   private async attendanceAttention(
@@ -1591,6 +2937,12 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
 function toIso(value?: Date | null) {
   return value ? value.toISOString() : null;
 }
@@ -1661,6 +3013,65 @@ function staffName(staff: {
   lastName?: string | null;
 }) {
   return [staff.firstName, staff.lastName].filter(Boolean).join(' ').trim();
+}
+
+function mobileUserLabel(user: {
+  email?: string | null;
+  staff?: { firstName?: string | null; lastName?: string | null } | null;
+  guardian?: { fullName?: string | null } | null;
+}) {
+  return (
+    (user.staff ? staffName(user.staff) : '') ||
+    user.guardian?.fullName?.trim() ||
+    user.email?.trim() ||
+    'School user'
+  );
+}
+
+function isMobileApprovalTarget(
+  workflowType: ApprovalWorkflowType,
+  targetModule: string,
+  targetType: string,
+) {
+  if (
+    !MOBILE_APPROVAL_WORKFLOW_TYPES.includes(
+      workflowType as (typeof MOBILE_APPROVAL_WORKFLOW_TYPES)[number],
+    )
+  ) {
+    return false;
+  }
+  const target =
+    MOBILE_APPROVAL_TARGETS[
+      workflowType as keyof typeof MOBILE_APPROVAL_TARGETS
+    ];
+  return (
+    target.targetModule === targetModule && target.targetType === targetType
+  );
+}
+
+function sanitizeMobileContext(value: unknown, depth = 0): unknown {
+  if (value == null || depth > 3) return null;
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return value.slice(0, 500);
+  }
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, 20)
+      .map((item) => sanitizeMobileContext(item, depth + 1));
+  }
+  if (typeof value !== 'object') return null;
+
+  const blockedKey =
+    /(salary|bank|account|payroll|password|secret|token|credential|object.?key|storage|provider|url)/i;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !blockedKey.test(key))
+      .slice(0, 30)
+      .map(([key, item]) => [key, sanitizeMobileContext(item, depth + 1)]),
+  );
 }
 
 function classLabel(className?: string | null, sectionName?: string | null) {
@@ -1742,4 +3153,141 @@ function protectedExport(id: string, title: string, subtitle: string) {
     protected: true,
     downloadSupported: false,
   };
+}
+
+function mobileProviderState(
+  diagnostics: {
+    channels: Array<{
+      channel: string;
+      mode: string;
+      health: string;
+      message: string;
+      dispatchAvailable?: boolean;
+      liveDelivery?: boolean;
+    }>;
+  },
+  priority: NoticePriority,
+) {
+  const requiredChannels =
+    priority === NoticePriority.EMERGENCY ? ['PUSH', 'SMS'] : ['PUSH'];
+  const channels = diagnostics.channels
+    .filter((channel) => requiredChannels.includes(channel.channel))
+    .map((channel) => ({
+      channel: channel.channel,
+      mode: channel.mode,
+      health: channel.health,
+      message: channel.message,
+      available:
+        channel.dispatchAvailable ??
+        (channel.health !== 'unavailable' && channel.mode !== 'disabled'),
+      liveDelivery: channel.liveDelivery ?? channel.mode === 'configured',
+    }));
+  const availableChannelCount = channels.filter(
+    (channel) => channel.available,
+  ).length;
+  return {
+    availableChannelCount,
+    requiredChannelCount: requiredChannels.length,
+    partial:
+      availableChannelCount > 0 &&
+      availableChannelCount < requiredChannels.length,
+    channels,
+  };
+}
+
+function emergencyApprovalState(input: {
+  actor: AuthContext;
+  priority: NoticePriority;
+  policy: {
+    id: string;
+    name: string;
+    minApprovals: number;
+  } | null;
+  requiresAdmin: boolean;
+}) {
+  const isEmergency = input.priority === NoticePriority.EMERGENCY;
+  const actorIsAdmin = input.actor.roles.some((role) =>
+    ['admin', 'platform_super_admin'].includes(role),
+  );
+  const required =
+    isEmergency &&
+    (Boolean(input.policy) || (input.requiresAdmin && !actorIsAdmin));
+  return {
+    required,
+    policyConfigured: Boolean(input.policy),
+    policyId: input.policy?.id ?? null,
+    policyName: input.policy?.name ?? null,
+    minApprovals: input.policy?.minApprovals ?? null,
+    reason: required
+      ? 'Emergency notice approval is required before dispatch.'
+      : null,
+  };
+}
+
+function summarizeMobileNoticeDeliveries(
+  deliveries: Array<{
+    status: NotificationStatus;
+    channel: string;
+    _count: { status: number };
+  }>,
+) {
+  const count = (status: NotificationStatus) =>
+    deliveries
+      .filter((item) => item.status === status)
+      .reduce((total, item) => total + item._count.status, 0);
+  return {
+    total: deliveries.reduce((total, item) => total + item._count.status, 0),
+    queued: count(NotificationStatus.QUEUED),
+    retryPending: count(NotificationStatus.RETRY_PENDING),
+    sent: count(NotificationStatus.SENT),
+    delivered: count(NotificationStatus.DELIVERED),
+    failed: count(NotificationStatus.FAILED),
+    skipped: count(NotificationStatus.SKIPPED),
+    cancelled: count(NotificationStatus.CANCELLED),
+    byChannel: deliveries.map((item) => ({
+      channel: item.channel,
+      status: item.status,
+      count: item._count.status,
+    })),
+  };
+}
+
+function resolveMobileNoticeState(input: {
+  approvalStatus: ApprovalRequestStatus | null;
+  scheduledFor: Date | null;
+  publishedAt: Date | null;
+  delivery: ReturnType<typeof summarizeMobileNoticeDeliveries>;
+}) {
+  if (input.approvalStatus === ApprovalRequestStatus.PENDING) {
+    return 'AWAITING_APPROVAL';
+  }
+  if (input.approvalStatus === ApprovalRequestStatus.REJECTED) {
+    return 'REJECTED';
+  }
+  if (input.approvalStatus === ApprovalRequestStatus.APPLY_FAILED) {
+    return 'FAILED';
+  }
+  if (
+    !input.publishedAt &&
+    input.scheduledFor &&
+    input.scheduledFor > new Date()
+  ) {
+    return 'SCHEDULED';
+  }
+  const accepted = input.delivery.sent + input.delivery.delivered;
+  const unsuccessful =
+    input.delivery.failed + input.delivery.skipped + input.delivery.cancelled;
+  if (accepted > 0 && unsuccessful > 0) {
+    return 'PARTIAL_FAILURE';
+  }
+  if (input.delivery.queued > 0 || input.delivery.retryPending > 0) {
+    return 'QUEUED';
+  }
+  if (accepted > 0) {
+    return 'SENT';
+  }
+  if (unsuccessful > 0 || input.publishedAt) {
+    return 'FAILED';
+  }
+  return 'DRAFT';
 }

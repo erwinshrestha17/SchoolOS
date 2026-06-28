@@ -53,6 +53,10 @@ export class ApprovalWorkflowService {
     this.finalActionExecutors.set(key, executor);
   }
 
+  hasFinalActionExecutor(key: string | null | undefined) {
+    return Boolean(key && this.finalActionExecutors.has(key));
+  }
+
   getWorkflowCatalog() {
     return approvalWorkflowCatalog;
   }
@@ -232,6 +236,7 @@ export class ApprovalWorkflowService {
           stepId: step.id,
           decision: dto.decision,
           reason: reason ?? null,
+          idempotencyKey: dto.idempotencyKey ?? null,
           decidedById: actor.userId,
           context: dto.context as Prisma.InputJsonValue | undefined,
         },

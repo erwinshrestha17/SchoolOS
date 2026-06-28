@@ -1,15 +1,43 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { FEATURE_KEYS } from '@schoolos/core';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
+import { RequiredFeature } from '../auth/decorators/required-feature.decorator';
+import { RequiredModule } from '../auth/decorators/required-module.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import {
+  MobilePrincipalApprovalDecisionDto,
+  MobilePrincipalApprovalQueryDto,
+} from './dto/mobile-principal-approval.dto';
+import {
+  MobilePrincipalEmergencyNoticePreviewDto,
+  MobilePrincipalEmergencyNoticeSubmitDto,
+} from './dto/mobile-principal-emergency-notice.dto';
+import {
+  MobilePrincipalEscalationAssignmentDto,
+  MobilePrincipalEscalationNoteDto,
+  MobilePrincipalEscalationQueryDto,
+  MobilePrincipalEscalationReopenDto,
+  MobilePrincipalEscalationResolutionDto,
+} from './dto/mobile-principal-escalation.dto';
 import { MobilePrincipalService } from './mobile-principal.service';
 
+@ApiTags('mobile-principal')
 @Controller('mobile/principal')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement(FEATURE_KEYS.MOBILE_FULL_ROLE)
@@ -36,9 +64,30 @@ export class MobilePrincipalController {
   @Permissions('advanced:approvals:read', 'hr:leave:approve')
   approvals(
     @CurrentAuth() auth: AuthContext,
-    @Query('status') status?: string,
+    @Query() query: MobilePrincipalApprovalQueryDto,
   ) {
-    return this.service.getApprovals(auth, status);
+    return this.service.getApprovals(auth, query.status);
+  }
+
+  @Get('approvals/:approvalRequestId')
+  @Permissions('advanced:approvals:read')
+  approvalDetail(
+    @CurrentAuth() auth: AuthContext,
+    @Param('approvalRequestId', new ParseUUIDPipe())
+    approvalRequestId: string,
+  ) {
+    return this.service.getApprovalDetail(auth, approvalRequestId);
+  }
+
+  @Post('approvals/:approvalRequestId/decisions')
+  @Permissions('advanced:approvals:decide')
+  decideApproval(
+    @CurrentAuth() auth: AuthContext,
+    @Param('approvalRequestId', new ParseUUIDPipe())
+    approvalRequestId: string,
+    @Body() dto: MobilePrincipalApprovalDecisionDto,
+  ) {
+    return this.service.decideApproval(auth, approvalRequestId, dto);
   }
 
   @Get('attendance-summary')
@@ -75,12 +124,70 @@ export class MobilePrincipalController {
   }
 
   @Get('escalations')
-  @Permissions('notices:read')
+  @Permissions('messaging:manage')
   escalations(
     @CurrentAuth() auth: AuthContext,
-    @Query('status') status?: string,
+    @Query() query: MobilePrincipalEscalationQueryDto,
   ) {
-    return this.service.getEscalations(auth, status);
+    return this.service.getEscalations(auth, query.status);
+  }
+
+  @Get('escalations/:escalationId')
+  @Permissions('messaging:manage')
+  escalationDetail(
+    @CurrentAuth() auth: AuthContext,
+    @Param('escalationId', new ParseUUIDPipe()) escalationId: string,
+  ) {
+    return this.service.getEscalationDetail(auth, escalationId);
+  }
+
+  @Post('escalations/:escalationId/assign-self')
+  @Permissions('messaging:manage')
+  assignEscalationToSelf(
+    @CurrentAuth() auth: AuthContext,
+    @Param('escalationId', new ParseUUIDPipe()) escalationId: string,
+  ) {
+    return this.service.assignEscalationToSelf(auth, escalationId);
+  }
+
+  @Post('escalations/:escalationId/assign')
+  @Permissions('messaging:manage')
+  assignEscalation(
+    @CurrentAuth() auth: AuthContext,
+    @Param('escalationId', new ParseUUIDPipe()) escalationId: string,
+    @Body() dto: MobilePrincipalEscalationAssignmentDto,
+  ) {
+    return this.service.assignEscalation(auth, escalationId, dto);
+  }
+
+  @Post('escalations/:escalationId/notes')
+  @Permissions('messaging:manage')
+  addEscalationNote(
+    @CurrentAuth() auth: AuthContext,
+    @Param('escalationId', new ParseUUIDPipe()) escalationId: string,
+    @Body() dto: MobilePrincipalEscalationNoteDto,
+  ) {
+    return this.service.addEscalationNote(auth, escalationId, dto);
+  }
+
+  @Post('escalations/:escalationId/resolve')
+  @Permissions('messaging:manage')
+  resolveEscalation(
+    @CurrentAuth() auth: AuthContext,
+    @Param('escalationId', new ParseUUIDPipe()) escalationId: string,
+    @Body() dto: MobilePrincipalEscalationResolutionDto,
+  ) {
+    return this.service.resolveEscalation(auth, escalationId, dto);
+  }
+
+  @Post('escalations/:escalationId/reopen')
+  @Permissions('messaging:manage')
+  reopenEscalation(
+    @CurrentAuth() auth: AuthContext,
+    @Param('escalationId', new ParseUUIDPipe()) escalationId: string,
+    @Body() dto: MobilePrincipalEscalationReopenDto,
+  ) {
+    return this.service.reopenEscalation(auth, escalationId, dto);
   }
 
   @Get('student-search')
@@ -114,7 +221,42 @@ export class MobilePrincipalController {
 
   @Get('emergency-notice')
   @Permissions('notices:read')
+  @RequiredModule('notices')
+  @RequiredFeature(FEATURE_KEYS.NOTICES_FULL)
   emergencyNotice(@CurrentAuth() auth: AuthContext) {
     return this.service.getEmergencyNotice(auth);
+  }
+
+  @Post('emergency-notices/recipient-preview')
+  @Permissions('notices:create', 'advanced:approvals:manage')
+  @RequiredModule('notices')
+  @RequiredFeature(FEATURE_KEYS.NOTICES_FULL)
+  previewEmergencyNoticeRecipients(
+    @CurrentAuth() auth: AuthContext,
+    @Body() dto: MobilePrincipalEmergencyNoticePreviewDto,
+  ) {
+    return this.service.previewEmergencyNoticeRecipients(auth, dto);
+  }
+
+  @Post('emergency-notices')
+  @Permissions('notices:create', 'advanced:approvals:manage')
+  @RequiredModule('notices')
+  @RequiredFeature(FEATURE_KEYS.NOTICES_FULL)
+  submitEmergencyNotice(
+    @CurrentAuth() auth: AuthContext,
+    @Body() dto: MobilePrincipalEmergencyNoticeSubmitDto,
+  ) {
+    return this.service.submitEmergencyNotice(auth, dto);
+  }
+
+  @Get('emergency-notices/:noticeId')
+  @Permissions('notices:read')
+  @RequiredModule('notices')
+  @RequiredFeature(FEATURE_KEYS.NOTICES_FULL)
+  emergencyNoticeStatus(
+    @CurrentAuth() auth: AuthContext,
+    @Param('noticeId', new ParseUUIDPipe()) noticeId: string,
+  ) {
+    return this.service.getEmergencyNoticeStatus(auth, noticeId);
   }
 }

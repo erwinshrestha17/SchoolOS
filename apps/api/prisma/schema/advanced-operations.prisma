@@ -89,6 +89,7 @@ model ApprovalDecision {
   stepId    String?
   decision  ApprovalDecisionType
   reason    String?
+  idempotencyKey String?
   decidedById String
   context   Json?
   createdAt DateTime             @default(now())
@@ -100,6 +101,7 @@ model ApprovalDecision {
 
   @@index([tenantId, requestId, createdAt])
   @@index([tenantId, decidedById, createdAt])
+  @@unique([tenantId, idempotencyKey])
 }
 
 model ApprovalComment {

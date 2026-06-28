@@ -40,6 +40,8 @@ describe('CommunicationsService', () => {
       notice: {
         create: jest.fn(),
         findMany: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
       },
       student: {
@@ -58,6 +60,7 @@ describe('CommunicationsService', () => {
         update: jest.fn(),
         findMany: jest.fn(),
         findFirst: jest.fn().mockResolvedValue(null),
+        groupBy: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
       },
       parentTeacherThread: {
@@ -486,6 +489,121 @@ describe('CommunicationsService', () => {
         attachmentUrl: 'http://localhost:4000/api/v1/files/file-1/preview',
       }),
     });
+  });
+
+  it('creates idempotent mobile notice drafts without storing or returning file URLs', async () => {
+    prisma.notice.findFirst.mockResolvedValue(null);
+    prisma.notice.create.mockResolvedValue({
+      id: 'notice-1',
+      tenantId: 'tenant-1',
+      title: 'Emergency circular',
+      body: 'School is closed today.',
+      priority: NoticePriority.EMERGENCY,
+      audienceType: AudienceType.ALL,
+      classId: null,
+      sectionId: null,
+      attachmentUrl: null,
+      idempotencyKey: '11111111-1111-4111-8111-111111111111',
+      scheduledFor: null,
+      publishedAt: null,
+    });
+    fileRegistryService.getFileMetadata.mockResolvedValue({
+      id: 'file-1',
+      tenantId: 'tenant-1',
+      module: 'notices',
+    });
+
+    const result = await service.createNoticeDraft(
+      {
+        title: 'Emergency circular',
+        body: 'School is closed today.',
+        priority: NoticePriority.EMERGENCY,
+        audienceType: AudienceType.ALL,
+        attachmentFileId: 'file-1',
+        idempotencyKey: '11111111-1111-4111-8111-111111111111',
+      },
+      actor,
+    );
+
+    expect(result.attachmentUrl).toBeNull();
+    expect(fileRegistryService.getSignedUrl).not.toHaveBeenCalled();
+    expect(prisma.notice.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: 'tenant-1',
+        attachmentUrl: null,
+        idempotencyKey: '11111111-1111-4111-8111-111111111111',
+        publishedAt: null,
+      }),
+    });
+    expect(fileRegistryService.linkToEntity).toHaveBeenCalledWith(
+      'tenant-1',
+      'file-1',
+      'notices',
+      'notice-1',
+      'admin-1',
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'draft',
+        resource: 'notice',
+        tenantId: 'tenant-1',
+        resourceId: 'notice-1',
+      }),
+    );
+  });
+
+  it('replays the original notice for a duplicate mobile idempotency key', async () => {
+    prisma.notice.findFirst.mockResolvedValue({
+      id: 'notice-existing',
+      tenantId: 'tenant-1',
+      idempotencyKey: '11111111-1111-4111-8111-111111111111',
+    });
+
+    await expect(
+      service.createNoticeDraft(
+        {
+          title: 'Emergency circular',
+          body: 'School is closed today.',
+          priority: NoticePriority.EMERGENCY,
+          audienceType: AudienceType.ALL,
+          idempotencyKey: '11111111-1111-4111-8111-111111111111',
+        },
+        actor,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'notice-existing' }));
+    expect(prisma.notice.create).not.toHaveBeenCalled();
+  });
+
+  it('does not publish a high-impact notice when delivery providers are disabled', async () => {
+    const previous = process.env.NOTIFICATIONS_DISABLED;
+    process.env.NOTIFICATIONS_DISABLED = 'disabled';
+    prisma.notice.findFirst.mockResolvedValue({
+      id: 'notice-1',
+      tenantId: 'tenant-1',
+      title: 'Emergency circular',
+      body: 'School is closed today.',
+      priority: NoticePriority.EMERGENCY,
+      audienceType: AudienceType.ALL,
+      classId: null,
+      sectionId: null,
+      scheduledFor: null,
+      publishedAt: null,
+    });
+
+    try {
+      await expect(service.publishNotice('notice-1', actor)).rejects.toThrow(
+        'No configured delivery channel is currently available',
+      );
+      expect(prisma.notice.update).not.toHaveBeenCalled();
+      expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
+      expect(notificationsService.sendSms).not.toHaveBeenCalled();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.NOTIFICATIONS_DISABLED;
+      } else {
+        process.env.NOTIFICATIONS_DISABLED = previous;
+      }
+    }
   });
 
   it('converts fee payment domain events into guardian receipt notifications', async () => {

@@ -75,6 +75,66 @@ describe('advanced operations services', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('persists approval decision idempotency keys inside the state transaction', async () => {
+    const request = {
+      id: 'approval-1',
+      tenantId: actor.tenantId,
+      status: ApprovalRequestStatus.PENDING,
+      policyId: null,
+      finalActionStatus: ApprovalFinalActionStatus.NOT_READY,
+      steps: [
+        {
+          id: 'step-1',
+          status: ApprovalStepStatus.PENDING,
+          approverRole: null,
+          approverPermission: null,
+        },
+      ],
+    };
+    const tx = {
+      approvalDecision: { create: jest.fn().mockResolvedValue({}) },
+      approvalStep: {
+        update: jest.fn().mockResolvedValue({}),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      approvalRequest: {
+        update: jest.fn().mockResolvedValue({
+          ...request,
+          status: ApprovalRequestStatus.REJECTED,
+          decisions: [],
+          comments: [],
+        }),
+      },
+    };
+    const prisma = {
+      approvalRequest: {
+        findFirst: jest.fn().mockResolvedValue(request),
+      },
+      $transaction: jest.fn(
+        (callback: (client: typeof tx) => Promise<unknown>) => callback(tx),
+      ),
+    };
+    const service = new ApprovalWorkflowService(prisma as any, audit as any);
+
+    await service.decide(
+      'approval-1',
+      {
+        decision: ApprovalDecisionType.REJECT,
+        reason: 'Policy requirements were not met.',
+        idempotencyKey: '11111111-1111-4111-8111-111111111111',
+      },
+      actor,
+    );
+
+    expect(tx.approvalDecision.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        requestId: 'approval-1',
+        idempotencyKey: '11111111-1111-4111-8111-111111111111',
+      }),
+    });
+  });
+
   it('applies approval final action idempotently', async () => {
     const executor = { apply: jest.fn().mockResolvedValue({ ok: true }) };
     const prisma = {

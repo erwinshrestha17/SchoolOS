@@ -14,6 +14,7 @@ import {
   EventType,
   NotificationChannel,
   NotificationStatus,
+  type Notice,
   NoticePriority,
   ParentTeacherThreadStatus,
   Prisma,
@@ -74,6 +75,18 @@ const PROVIDER_CHANNELS = [
     modeKey: 'push' as const,
   },
 ] as const;
+
+export interface NoticeDraftInput {
+  title: string;
+  body: string;
+  priority: NoticePriority;
+  audienceType: AudienceType;
+  classId?: string;
+  sectionId?: string;
+  attachmentFileId?: string;
+  scheduledFor?: string;
+  idempotencyKey: string;
+}
 
 @Injectable()
 export class CommunicationsService {
@@ -165,6 +178,206 @@ export class CommunicationsService {
     });
 
     return notice;
+  }
+
+  async createNoticeDraft(input: NoticeDraftInput, actor: AuthContext) {
+    await this.ensureAudienceRefs(actor, input.classId, input.sectionId);
+    await this.assertNoticeAttachmentFile(input.attachmentFileId, actor);
+
+    const existing = await this.prisma.notice.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        idempotencyKey: input.idempotencyKey,
+      },
+    });
+    if (existing) {
+      return existing;
+    }
+
+    let notice: Notice;
+    try {
+      notice = await this.prisma.notice.create({
+        data: {
+          tenantId: actor.tenantId,
+          createdById: actor.userId,
+          title: input.title.trim(),
+          body: input.body.trim(),
+          priority: input.priority,
+          audienceType: input.audienceType,
+          classId: input.classId ?? null,
+          sectionId: input.sectionId ?? null,
+          attachmentUrl: null,
+          idempotencyKey: input.idempotencyKey,
+          scheduledFor: input.scheduledFor
+            ? new Date(input.scheduledFor)
+            : null,
+          publishedAt: null,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const duplicate = await this.prisma.notice.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            idempotencyKey: input.idempotencyKey,
+          },
+        });
+        if (duplicate) return duplicate;
+      }
+      throw error;
+    }
+
+    if (input.attachmentFileId && this.fileRegistryService) {
+      await this.fileRegistryService.linkToEntity(
+        actor.tenantId,
+        input.attachmentFileId,
+        'notices',
+        notice.id,
+        actor.userId,
+      );
+    }
+
+    await this.auditService.record({
+      action: 'draft',
+      resource: 'notice',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: notice.id,
+      after: {
+        priority: notice.priority,
+        audienceType: notice.audienceType,
+        scheduledFor: notice.scheduledFor,
+        attachmentFileId: input.attachmentFileId ?? null,
+        source: 'principal_mobile',
+      },
+    });
+    return notice;
+  }
+
+  async publishNotice(
+    noticeId: string,
+    actor: AuthContext,
+    options: { scheduledFor?: string | null } = {},
+  ) {
+    const notice = await this.prisma.notice.findFirst({
+      where: {
+        id: noticeId,
+        tenantId: actor.tenantId,
+        priority: {
+          in: [NoticePriority.URGENT, NoticePriority.EMERGENCY],
+        },
+      },
+    });
+    if (!notice) {
+      throw new NotFoundException(
+        'High-impact notice not found in this tenant',
+      );
+    }
+
+    const requestedSchedule = options.scheduledFor
+      ? new Date(options.scheduledFor)
+      : notice.scheduledFor;
+    if (
+      requestedSchedule &&
+      !Number.isNaN(requestedSchedule.getTime()) &&
+      requestedSchedule > new Date()
+    ) {
+      const scheduled = await this.prisma.notice.update({
+        where: { id: notice.id },
+        data: {
+          scheduledFor: requestedSchedule,
+          publishedAt: null,
+        },
+      });
+      await this.auditService.record({
+        action: 'schedule',
+        resource: 'notice',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: notice.id,
+        after: {
+          scheduledFor: requestedSchedule,
+          priority: notice.priority,
+        },
+      });
+      return {
+        noticeId: scheduled.id,
+        state: 'SCHEDULED',
+        scheduledFor: scheduled.scheduledFor?.toISOString() ?? null,
+        delivery: await this.getNoticeDeliverySummary(actor, notice.id),
+      };
+    }
+
+    const providerDiagnostics =
+      await this.getCommunicationProviderDiagnostics(actor);
+    const requiredChannels: NotificationChannel[] =
+      notice.priority === NoticePriority.EMERGENCY
+        ? [NotificationChannel.PUSH, NotificationChannel.SMS]
+        : [NotificationChannel.PUSH];
+    const hasAvailableChannel = providerDiagnostics.channels.some(
+      (channel) =>
+        requiredChannels.includes(channel.channel) && channel.dispatchAvailable,
+    );
+    if (!hasAvailableChannel) {
+      throw new ConflictException(
+        'No configured delivery channel is currently available',
+      );
+    }
+
+    const delivery = await this.recordDeliveryRecords({
+      actor,
+      sourceType: 'notice',
+      sourceId: notice.id,
+      noticeId: notice.id,
+      audienceType: notice.audienceType,
+      classId: notice.classId,
+      sectionId: notice.sectionId,
+      title: notice.title,
+      body: notice.body,
+      channels:
+        notice.priority === NoticePriority.EMERGENCY
+          ? [NotificationChannel.PUSH, NotificationChannel.SMS]
+          : [NotificationChannel.PUSH],
+      requiredConsentTypes: [ConsentType.MESSAGING],
+      communicationCategory:
+        notice.priority === NoticePriority.EMERGENCY
+          ? 'ESSENTIAL'
+          : 'NON_ESSENTIAL',
+    });
+
+    const publishedAt = notice.publishedAt ?? new Date();
+    if (!notice.publishedAt) {
+      await this.prisma.notice.update({
+        where: { id: notice.id },
+        data: {
+          publishedAt,
+          scheduledFor: null,
+        },
+      });
+    }
+
+    await this.auditService.record({
+      action: 'publish_high_impact',
+      resource: 'notice',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: notice.id,
+      after: {
+        priority: notice.priority,
+        audienceType: notice.audienceType,
+        deliveryCount: delivery.count,
+        source: 'principal_mobile',
+      },
+    });
+    return {
+      noticeId: notice.id,
+      state: 'QUEUED',
+      publishedAt: publishedAt.toISOString(),
+      delivery,
+    };
   }
 
   async previewNoticeRecipients(dto: CreateNoticeDto, actor: AuthContext) {
@@ -562,6 +775,11 @@ export class CommunicationsService {
       lastEventAt: toIso(resolveDeliveryEventTime(latestDelivery)),
       callbackStatus,
       lastCallbackAt: toIso(resolveDeliveryEventTime(latestCallback)),
+      dispatchAvailable:
+        mode === 'dev-log' ||
+        mode === 'mock' ||
+        (mode === 'configured' && hasProvider && validationStatus !== 'FAILED'),
+      liveDelivery: mode === 'configured',
       message: providerDiagnosticMessage({
         label: channelConfig.label,
         mode,
@@ -1289,6 +1507,41 @@ export class CommunicationsService {
     }
 
     return this.fileRegistryService.getSignedUrl(actor.tenantId, asset.id);
+  }
+
+  private async assertNoticeAttachmentFile(
+    attachmentFileId: string | undefined,
+    actor: AuthContext,
+  ) {
+    if (!attachmentFileId) return;
+    if (!this.fileRegistryService) {
+      throw new NotFoundException('File Registry is not available');
+    }
+    const asset = await this.fileRegistryService.getFileMetadata(
+      actor.tenantId,
+      attachmentFileId,
+    );
+    if (asset.module && asset.module !== 'notices') {
+      throw new NotFoundException('Notice attachment file not found');
+    }
+  }
+
+  private async getNoticeDeliverySummary(actor: AuthContext, noticeId: string) {
+    const deliveries = await this.prisma.notificationDelivery.groupBy({
+      by: ['status'],
+      where: {
+        tenantId: actor.tenantId,
+        noticeId,
+      },
+      _count: { status: true },
+    });
+    return {
+      total: deliveries.reduce((total, item) => total + item._count.status, 0),
+      byStatus: deliveries.map((item) => ({
+        status: item.status,
+        count: item._count.status,
+      })),
+    };
   }
 
   private async ensureAudienceRefs(

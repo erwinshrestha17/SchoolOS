@@ -562,6 +562,7 @@ enum ChatAvailabilityAppliesToRole {
 
 enum ChatEscalationStatus {
   OPEN
+  REOPENED
   RESOLVED
 }
 

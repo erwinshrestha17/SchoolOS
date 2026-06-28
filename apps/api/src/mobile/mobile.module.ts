@@ -16,6 +16,7 @@ import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { StorageModule } from '../storage/storage.module';
 import { CanteenModule } from '../canteen/canteen.module';
 import { TimetableModule } from '../timetable/timetable.module';
+import { AdvancedOperationsModule } from '../advanced-operations/advanced-operations.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { TimetableModule } from '../timetable/timetable.module';
     StorageModule,
     CanteenModule,
     TimetableModule,
+    AdvancedOperationsModule,
   ],
   controllers: [
     MobileController,

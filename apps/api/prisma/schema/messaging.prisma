@@ -153,14 +153,19 @@ model ChatEscalation {
   escalatedToUserId String?
   reason            String
   status            ChatEscalationStatus @default(OPEN)
+  resolutionNote    String?
+  assignedAt        DateTime?
   createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
   resolvedAt        DateTime?
   resolvedByUserId  String?
+  reopenedAt        DateTime?
 
   thread ParentTeacherThread @relation(fields: [threadId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, threadId, createdAt])
   @@index([tenantId, status, createdAt])
+  @@index([tenantId, escalatedToUserId, status, createdAt])
 }
 
 model ChatAbuseReport {

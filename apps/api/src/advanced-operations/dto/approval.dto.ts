@@ -108,6 +108,10 @@ export class DecideApprovalRequestDto {
   @IsOptional()
   @IsObject()
   context?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string;
 }
 
 export class CreateApprovalCommentDto {
