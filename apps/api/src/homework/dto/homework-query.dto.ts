@@ -1,5 +1,15 @@
 import { HomeworkAssignmentStatus } from '@prisma/client';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsISO8601,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class HomeworkQueryDto {
@@ -30,6 +40,27 @@ export class HomeworkQueryDto {
   @IsOptional()
   @IsEnum(HomeworkAssignmentStatus)
   status?: HomeworkAssignmentStatus;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  search?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  dueFrom?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  dueTo?: string;
+
+  @IsOptional()
+  @IsIn(['dueDate', 'assignedDate', 'createdAt', 'title'])
+  sortBy?: 'dueDate' | 'assignedDate' | 'createdAt' | 'title';
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortOrder?: 'asc' | 'desc';
 
   @IsOptional()
   @Type(() => Number)

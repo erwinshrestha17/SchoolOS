@@ -140,6 +140,47 @@ export class TimetableVersionQueryDto extends PaginatedQueryDto {
   status?: TimetableVersionStatus;
 }
 
+export class TimetableQueryDto extends PaginatedQueryDto {
+  @IsOptional()
+  @IsString()
+  academicYearId?: string;
+
+  @IsOptional()
+  @IsString()
+  classId?: string;
+
+  @IsOptional()
+  @IsString()
+  sectionId?: string;
+
+  @IsOptional()
+  @IsString()
+  teacherId?: string;
+
+  @IsOptional()
+  @IsString()
+  subjectId?: string;
+
+  @IsOptional()
+  @IsString()
+  roomId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  @Min(1)
+  @Max(7)
+  dayOfWeek?: number;
+
+  @IsOptional()
+  @IsString()
+  versionId?: string;
+
+  @IsOptional()
+  @IsString()
+  studentId?: string;
+}
+
 export class CreateTimetableVersionDto {
   @IsString()
   academicYearId!: string;
@@ -356,6 +397,26 @@ export class ListTeacherWorkloadQueryDto extends PaginatedQueryDto {
   @IsOptional()
   @IsString()
   academicYearId?: string;
+
+  @IsOptional()
+  @IsString()
+  versionId?: string;
+
+  @IsOptional()
+  @IsString()
+  teacherId?: string;
+
+  @IsOptional()
+  @IsString()
+  classId?: string;
+
+  @IsOptional()
+  @IsString()
+  sectionId?: string;
+
+  @IsOptional()
+  @IsString()
+  subjectId?: string;
 }
 
 export class WorkloadQueryDto {
@@ -425,6 +486,29 @@ export class AssignSubstitutionDto {
   substituteTeacherId!: string;
 }
 
+export class CancelSubstitutionDto {
+  @IsString()
+  @MaxLength(500)
+  reason!: string;
+}
+
+export class SubstituteCandidateQueryDto extends PaginatedQueryDto {
+  @IsString()
+  timetableSlotId!: string;
+
+  @IsISO8601()
+  date!: string;
+
+  @IsOptional()
+  @IsString()
+  currentSubstitutionId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  search?: string;
+}
+
 export class CreateSubjectWeeklyRequirementDto {
   @IsString()
   academicYearId!: string;
@@ -467,4 +551,8 @@ export class ListSubjectWeeklyRequirementQueryDto extends PaginatedQueryDto {
   @IsOptional()
   @IsString()
   subjectId?: string;
+
+  @IsOptional()
+  @IsString()
+  versionId?: string;
 }

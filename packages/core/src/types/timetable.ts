@@ -1,5 +1,9 @@
 import type { ClassSummary, SectionSummary, SubjectSummary } from './academic.js';
-import type { TimetableVersionStatus, TimetableValidationIssue } from './common.js';
+import type {
+  StablePaginationMeta,
+  TimetableVersionStatus,
+  TimetableValidationIssue,
+} from './common.js';
 
 export type TimetableSlotSummary = {
   id: string;
@@ -121,4 +125,30 @@ export type TeacherWorkloadSummary = {
   teachingMinutes: number;
   weeklyHours: number;
   slots: TimetableSlotSummary[];
+};
+
+export type TimetableSlotPage = {
+  items: TimetableSlotSummary[];
+  meta: StablePaginationMeta;
+};
+
+export type TimetableVersionPage = {
+  items: TimetableVersionSummary[];
+  meta: StablePaginationMeta;
+};
+
+export type TimetableSubstitutionPage = {
+  items: TimetableSubstitutionSummary[];
+  meta: StablePaginationMeta;
+};
+
+export type TeacherWorkloadPage = {
+  items: TeacherWorkloadSummary[];
+  meta: StablePaginationMeta;
+  summary: {
+    teacherCount: number;
+    totalPeriods: number;
+    totalTeachingMinutes: number;
+    totalWeeklyHours: number;
+  };
 };

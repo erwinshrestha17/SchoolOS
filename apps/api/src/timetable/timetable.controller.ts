@@ -19,6 +19,7 @@ import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto';
 import {
   AssignSubstitutionDto,
+  CancelSubstitutionDto,
   CreateRoomDto,
   CreateSubjectWeeklyRequirementDto,
   CreateSubstitutionDto,
@@ -29,8 +30,10 @@ import {
   ListTeacherAvailabilityQueryDto,
   ListTeacherWorkloadQueryDto,
   SubstitutionQueryDto,
+  SubstituteCandidateQueryDto,
   TeacherAvailabilityDto,
   TimetableVersionQueryDto,
+  TimetableQueryDto,
   UpdateRoomDto,
   UpdateSubjectWeeklyRequirementDto,
   UpdateSubstitutionDto,
@@ -58,9 +61,9 @@ export class TimetableController {
   @Permissions('timetable:read')
   listTimetable(
     @CurrentAuth() auth: AuthContext,
-    @Query('classId') classId?: string,
+    @Query() query: TimetableQueryDto,
   ) {
-    return this.timetableService.listTimetable(auth, classId);
+    return this.timetableService.listTimetable(auth, query);
   }
 
   // --- Periods ---
@@ -390,8 +393,11 @@ export class TimetableController {
 
   @Get('workload')
   @Permissions('timetable:read')
-  listTeacherWorkload(@CurrentAuth() auth: AuthContext) {
-    return this.timetableService.listTeacherWorkload(auth);
+  listTeacherWorkload(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: ListTeacherWorkloadQueryDto,
+  ) {
+    return this.timetableService.listTeacherWorkload(auth, query);
   }
 
   @Get('teachers/:teacherId/workload')
@@ -450,6 +456,15 @@ export class TimetableController {
     return this.substitutionService.listSubstitutions(auth, query);
   }
 
+  @Get('substitutions/eligible-candidates')
+  @Permissions('timetable:substitute')
+  listEligibleSubstituteCandidates(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: SubstituteCandidateQueryDto,
+  ) {
+    return this.substitutionService.listEligibleCandidates(auth, query);
+  }
+
   @Post('substitutions')
   @Permissions('timetable:substitute')
   createSubstitution(
@@ -483,9 +498,10 @@ export class TimetableController {
   @Permissions('timetable:substitute')
   cancelSubstitution(
     @Param('id') id: string,
+    @Body() dto: CancelSubstitutionDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.substitutionService.cancelSubstitution(id, auth);
+    return this.substitutionService.cancelSubstitution(id, dto, auth);
   }
 
   @Patch('substitutions/:id/complete')

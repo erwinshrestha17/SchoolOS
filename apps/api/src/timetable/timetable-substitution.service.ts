@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -21,8 +22,10 @@ import { AttendanceService } from '../attendance/attendance.service';
 import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import {
   AssignSubstitutionDto,
+  CancelSubstitutionDto,
   CreateSubstitutionDto,
   SubstitutionQueryDto,
+  SubstituteCandidateQueryDto,
   UpdateSubstitutionDto,
 } from './dto/timetable-setup.dto';
 import { toTimetableDayOfWeek } from './timetable-calendar';
@@ -141,40 +144,46 @@ export class TimetableSubstitutionService {
   }
 
   async listSubstitutions(actor: AuthContext, query: SubstitutionQueryDto) {
+    await this.assertSubstitutionOperationalAccess(actor);
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 50, 100);
     const date = query.date ? parseDate(query.date, 'date') : null;
-
-    return this.prisma.timetableSubstitution.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        ...(date ? { date } : {}),
-        ...(query.teacherId
-          ? {
-              OR: [
-                { absentTeacherId: query.teacherId },
-                { substituteTeacherId: query.teacherId },
-              ],
-            }
-          : {}),
-        ...(query.status ? { status: query.status } : {}),
-        ...(query.classId || query.sectionId
-          ? {
-              timetableSlot: {
-                ...(query.classId ? { classId: query.classId } : {}),
-                ...(query.sectionId ? { sectionId: query.sectionId } : {}),
-              },
-            }
-          : {}),
-      },
-      include: substitutionInclude(),
-      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const where: Prisma.TimetableSubstitutionWhereInput = {
+      tenantId: actor.tenantId,
+      ...(date ? { date } : {}),
+      ...(query.teacherId
+        ? {
+            OR: [
+              { absentTeacherId: query.teacherId },
+              { substituteTeacherId: query.teacherId },
+            ],
+          }
+        : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.classId || query.sectionId
+        ? {
+            timetableSlot: {
+              ...(query.classId ? { classId: query.classId } : {}),
+              ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+            },
+          }
+        : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.timetableSubstitution.findMany({
+        where,
+        include: substitutionInclude(),
+        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.timetableSubstitution.count({ where }),
+    ]);
+    return { items, meta: buildPageMeta(total, page, limit) };
   }
 
   async getDailySubstitutionSummary(dateStr: string, actor: AuthContext) {
+    await this.assertSubstitutionOperationalAccess(actor);
     const date = stripTime(parseDate(dateStr, 'date'));
     const dayOfWeek = toTimetableDayOfWeek(date);
 
@@ -446,7 +455,11 @@ export class TimetableSubstitutionService {
     return updated;
   }
 
-  async cancelSubstitution(id: string, actor: AuthContext) {
+  async cancelSubstitution(
+    id: string,
+    dto: CancelSubstitutionDto,
+    actor: AuthContext,
+  ) {
     const substitution = await this.findSubstitutionOrThrow(id, actor);
     if (substitution.status === TimetableSubstitutionStatus.COMPLETED) {
       throw new ConflictException('Cannot cancel a completed substitution');
@@ -460,12 +473,118 @@ export class TimetableSubstitutionService {
       data: {
         status: TimetableSubstitutionStatus.CANCELLED,
         cancelledAt: new Date(),
+        cancellationReason: dto.reason,
       },
       include: substitutionInclude(),
     });
-    await this.audit('cancel', 'timetable_substitution', id, actor, updated);
+    await this.audit('cancel', 'timetable_substitution', id, actor, {
+      ...updated,
+      cancellationReason: dto.reason,
+    });
     await this.notifySubstitution(id, 'substitution_cancelled', actor);
     return updated;
+  }
+
+  async listEligibleCandidates(
+    actor: AuthContext,
+    query: SubstituteCandidateQueryDto,
+  ) {
+    await this.assertSubstitutionOperationalAccess(actor);
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 25, 100);
+    const date = stripTime(parseDate(query.date, 'date'));
+    const slot = await this.findSlotOrThrow(query.timetableSlotId, actor);
+    if (toTimetableDayOfWeek(date) !== slot.dayOfWeek) {
+      throw new ConflictException(
+        'Candidate date does not match the timetable slot day',
+      );
+    }
+    const staffWhere: Prisma.StaffWhereInput = {
+      tenantId: actor.tenantId,
+      id: { not: slot.staffId },
+      ...(query.search?.trim()
+        ? {
+            OR: [
+              {
+                firstName: {
+                  contains: query.search.trim(),
+                  mode: 'insensitive',
+                },
+              },
+              {
+                lastName: {
+                  contains: query.search.trim(),
+                  mode: 'insensitive',
+                },
+              },
+              {
+                employeeId: {
+                  contains: query.search.trim(),
+                  mode: 'insensitive',
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+    const [staff, total] = await Promise.all([
+      this.prisma.staff.findMany({
+        where: staffWhere,
+        select: {
+          id: true,
+          employeeId: true,
+          firstName: true,
+          lastName: true,
+        },
+        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.staff.count({ where: staffWhere }),
+    ]);
+    const items = await Promise.all(
+      staff.map(async (candidate) => {
+        const blockingReasons: string[] = [];
+        try {
+          await this.ensureSubstituteAllowed(
+            slot,
+            candidate.id,
+            date,
+            actor,
+            query.currentSubstitutionId,
+          );
+        } catch (error) {
+          blockingReasons.push(
+            error instanceof ConflictException
+              ? error.message
+              : 'Candidate availability could not be verified',
+          );
+        }
+        const weeklyPeriods = await this.prisma.timetableSlot.count({
+          where: {
+            tenantId: actor.tenantId,
+            academicYearId: slot.academicYearId,
+            staffId: candidate.id,
+            version: {
+              status: {
+                in: [
+                  TimetableVersionStatus.PUBLISHED,
+                  TimetableVersionStatus.LOCKED,
+                ],
+              },
+            },
+          },
+        });
+        return {
+          ...candidate,
+          staffName: `${candidate.firstName} ${candidate.lastName}`.trim(),
+          weeklyPeriods,
+          eligible: blockingReasons.length === 0,
+          blockingReasons,
+        };
+      }),
+    );
+    return { items, meta: buildPageMeta(total, page, limit) };
   }
 
   async completeSubstitution(id: string, actor: AuthContext) {
@@ -664,6 +783,20 @@ export class TimetableSubstitutionService {
     });
     if (!staff) throw new NotFoundException('Staff member not found');
     return staff;
+  }
+
+  private async assertSubstitutionOperationalAccess(actor: AuthContext) {
+    if (
+      actor.roles.includes('student') ||
+      actor.roles.includes('parent') ||
+      ((actor.roles.includes('teacher') ||
+        actor.roles.includes('subject_teacher')) &&
+        !actor.permissions.includes('timetable:substitute'))
+    ) {
+      throw new ForbiddenException(
+        'Substitution operations are limited to authorized coordinators',
+      );
+    }
   }
 
   private async audit(
