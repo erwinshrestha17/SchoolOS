@@ -10,8 +10,10 @@ import { StorageService } from '../storage/storage.service';
 import {
   FileStatus,
   FileVisibility,
+  HomeworkAssignmentStatus,
   Prisma,
   StorageProvider,
+  StudentLifecycleStatus,
 } from '@prisma/client';
 import { UsageService } from '../usage/usage.service';
 import { PlansService } from '../plans/plans.service';
@@ -349,6 +351,9 @@ export class FileRegistryService {
     if (asset.tenantId !== auth.tenantId) {
       throw new ForbiddenException('Access denied');
     }
+    if (asset.status !== FileStatus.UPLOADED) {
+      throw new NotFoundException('File is not available');
+    }
 
     if (asset.visibility === FileVisibility.OWNER) {
       await this.assertOwnerScopedAccess(asset, auth);
@@ -385,6 +390,14 @@ export class FileRegistryService {
 
     if (asset.module === 'payroll') {
       await this.assertPayrollFileAccess(asset, auth);
+      return;
+    }
+
+    if (
+      asset.module === 'homework' ||
+      asset.module === 'homework-submission'
+    ) {
+      await this.assertHomeworkFileAccess(asset, auth);
       return;
     }
 
@@ -644,6 +657,149 @@ export class FileRegistryService {
 
     throw new ForbiddenException(
       'You do not have permission to view student files',
+    );
+  }
+
+  private async assertHomeworkFileAccess(
+    asset: Awaited<ReturnType<FileRegistryService['getFileMetadata']>>,
+    auth: AuthContext,
+  ) {
+    const attachment = await this.prisma.homeworkAttachment.findFirst({
+      where: {
+        tenantId: auth.tenantId,
+        fileAssetId: asset.id,
+      },
+      select: {
+        submissionId: true,
+        submission: {
+          select: {
+            studentId: true,
+            homework: {
+              select: {
+                academicYearId: true,
+                classId: true,
+                sectionId: true,
+                subjectId: true,
+                status: true,
+              },
+            },
+          },
+        },
+        assignment: {
+          select: {
+            academicYearId: true,
+            classId: true,
+            sectionId: true,
+            subjectId: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (!attachment) {
+      if (asset.uploadedByUserId === auth.userId) {
+        return;
+      }
+      throw new ForbiddenException(
+        'Homework file is not linked to an authorized assignment',
+      );
+    }
+
+    if (auth.roles.some((role) => TENANT_FILE_ADMIN_ROLES.includes(role))) {
+      return;
+    }
+
+    const homework = attachment.submission?.homework ?? attachment.assignment;
+    if (!homework) {
+      throw new ForbiddenException(
+        'Homework file is not linked to an assignment',
+      );
+    }
+
+    if (
+      auth.roles.includes('teacher') ||
+      auth.roles.includes('subject_teacher')
+    ) {
+      const staff = await this.prisma.staff.findFirst({
+        where: { tenantId: auth.tenantId, userId: auth.userId },
+        select: { id: true },
+      });
+      const teacherAssignment = staff
+        ? await this.prisma.subjectTeacherAssignment.findFirst({
+            where: {
+              tenantId: auth.tenantId,
+              staffId: staff.id,
+              academicYearId: homework.academicYearId,
+              classId: homework.classId,
+              subjectId: homework.subjectId,
+              OR: homework.sectionId
+                ? [{ sectionId: homework.sectionId }, { sectionId: null }]
+                : [{ sectionId: null }],
+            },
+            select: { id: true },
+          })
+        : null;
+      if (teacherAssignment) return;
+      throw new ForbiddenException(
+        'Homework file is outside your teaching scope',
+      );
+    }
+
+    if (
+      ![
+        HomeworkAssignmentStatus.ASSIGNED,
+        HomeworkAssignmentStatus.CLOSED,
+      ].includes(homework.status)
+    ) {
+      throw new ForbiddenException('Homework file is not available');
+    }
+
+    if (auth.roles.includes('student')) {
+      const student = await this.prisma.student.findFirst({
+        where: {
+          tenantId: auth.tenantId,
+          userId: auth.userId,
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
+        select: { id: true, classId: true, sectionId: true },
+      });
+      if (
+        student &&
+        (!attachment.submissionId ||
+          attachment.submission?.studentId === student.id) &&
+        student.classId === homework.classId &&
+        (!homework.sectionId || student.sectionId === homework.sectionId)
+      ) {
+        return;
+      }
+      throw new ForbiddenException('Homework file is outside your scope');
+    }
+
+    if (auth.roles.includes('parent')) {
+      const link = await this.prisma.studentGuardian.findFirst({
+        where: {
+          tenantId: auth.tenantId,
+          guardian: { userId: auth.userId },
+          ...(attachment.submission?.studentId
+            ? { studentId: attachment.submission.studentId }
+            : {}),
+          student: {
+            lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+            classId: homework.classId,
+            ...(homework.sectionId ? { sectionId: homework.sectionId } : {}),
+          },
+        },
+        select: { id: true },
+      });
+      if (link) return;
+      throw new ForbiddenException(
+        'Homework file is outside your linked-child scope',
+      );
+    }
+
+    throw new ForbiddenException(
+      'You do not have permission to view this homework file',
     );
   }
 

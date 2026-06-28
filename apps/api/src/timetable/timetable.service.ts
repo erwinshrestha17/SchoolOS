@@ -32,6 +32,7 @@ import {
   CreateVersionSlotDto,
   SubstitutionQueryDto,
   TeacherAvailabilityDto,
+  TimetableQueryDto,
   TimetableVersionQueryDto,
   UpdateRoomDto,
   UpdateSubstitutionDto,
@@ -59,50 +60,106 @@ export class TimetableService {
     private readonly attendanceService: AttendanceService,
   ) {}
 
-  async listTimetable(actor: AuthContext, classId?: string) {
-    let effectiveClassId = classId;
+  async listTimetable(actor: AuthContext, query: TimetableQueryDto) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 50, 100);
+    const and: Prisma.TimetableSlotWhereInput[] = [];
+    const where: Prisma.TimetableSlotWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query.academicYearId
+        ? { academicYearId: query.academicYearId }
+        : {}),
+      ...(query.classId ? { classId: query.classId } : {}),
+      ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+      ...(query.teacherId ? { staffId: query.teacherId } : {}),
+      ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+      ...(query.roomId ? { roomId: query.roomId } : {}),
+      ...(query.dayOfWeek ? { dayOfWeek: query.dayOfWeek } : {}),
+      ...(query.versionId ? { versionId: query.versionId } : {}),
+    };
 
-    if (!effectiveClassId && actor.roles.includes('student')) {
+    const privileged = isPrivilegedTimetableActor(actor);
+    if (!privileged && isTeacherActor(actor)) {
+      const staff = await this.resolveActorStaff(actor);
+      if (!staff || (query.teacherId && query.teacherId !== staff.id)) {
+        return emptyPage(page, limit);
+      }
+      where.staffId = staff.id;
+      and.push(publishedTimetableScope());
+    } else if (actor.roles.includes('student')) {
       const student = await this.prisma.student.findFirst({
-        where: { tenantId: actor.tenantId, userId: actor.userId },
-        select: { classId: true },
+        where: {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          lifecycleStatus: 'ACTIVE',
+        },
+        select: { id: true, classId: true, sectionId: true },
       });
-      effectiveClassId = student?.classId;
-    }
-
-    if (!effectiveClassId && actor.roles.includes('parent')) {
+      if (
+        !student ||
+        (query.studentId && query.studentId !== student.id) ||
+        (query.classId && query.classId !== student.classId) ||
+        (query.sectionId && query.sectionId !== student.sectionId)
+      ) {
+        return emptyPage(page, limit);
+      }
+      where.classId = student.classId;
+      and.push(
+        student.sectionId
+          ? { OR: [{ sectionId: student.sectionId }, { sectionId: null }] }
+          : { sectionId: null },
+        publishedTimetableScope(),
+      );
+    } else if (actor.roles.includes('parent')) {
       const link = await this.prisma.studentGuardian.findFirst({
         where: {
           tenantId: actor.tenantId,
           guardian: { userId: actor.userId },
+          ...(query.studentId ? { studentId: query.studentId } : {}),
+          student: { lifecycleStatus: 'ACTIVE' },
         },
-        include: { student: true },
+        select: {
+          student: {
+            select: { id: true, classId: true, sectionId: true },
+          },
+        },
       });
-      effectiveClassId = link?.student.classId;
+      const student = link?.student;
+      if (
+        !student ||
+        (query.classId && query.classId !== student.classId) ||
+        (query.sectionId && query.sectionId !== student.sectionId)
+      ) {
+        return emptyPage(page, limit);
+      }
+      where.classId = student.classId;
+      and.push(
+        student.sectionId
+          ? { OR: [{ sectionId: student.sectionId }, { sectionId: null }] }
+          : { sectionId: null },
+        publishedTimetableScope(),
+      );
+    } else if (!query.versionId) {
+      and.push(publishedTimetableScope());
     }
 
-    return this.prisma.timetableSlot.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        ...(effectiveClassId ? { classId: effectiveClassId } : {}),
-        OR: [
-          { versionId: null },
-          {
-            version: {
-              status: {
-                in: [
-                  TimetableVersionStatus.PUBLISHED,
-                  TimetableVersionStatus.LOCKED,
-                ],
-              },
-            },
-          },
+    if (and.length) where.AND = and;
+    const [items, total] = await Promise.all([
+      this.prisma.timetableSlot.findMany({
+        where,
+        include: timetableSlotInclude(),
+        orderBy: [
+          { dayOfWeek: 'asc' },
+          { startsAt: 'asc' },
+          { id: 'asc' },
         ],
-      },
-      include: timetableSlotInclude(),
-      orderBy: [{ dayOfWeek: 'asc' }, { startsAt: 'asc' }],
-      take: 200,
-    });
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.timetableSlot.count({ where }),
+    ]);
+
+    return { items, meta: buildPageMeta(total, page, limit) };
   }
 
   async listPeriods(actor: AuthContext, academicYearId?: string) {
@@ -217,27 +274,52 @@ export class TimetableService {
   async listVersions(actor: AuthContext, query: TimetableVersionQueryDto) {
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 50, 100);
-
-    return this.prisma.timetableVersion.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        ...(query.academicYearId
-          ? { academicYearId: query.academicYearId }
-          : {}),
-        ...(query.classId ? { classId: query.classId } : {}),
-        ...(query.sectionId ? { sectionId: query.sectionId } : {}),
-        ...(query.status ? { status: query.status } : {}),
-      },
-      include: {
-        academicYear: true,
-        class: true,
-        section: true,
-        slots: { include: timetableSlotInclude() },
-      },
-      orderBy: [{ effectiveFrom: 'desc' }, { createdAt: 'desc' }],
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    this.assertOperationalTimetableRead(actor);
+    const staff = isTeacherActor(actor)
+      ? await this.resolveActorStaff(actor)
+      : null;
+    if (isTeacherActor(actor) && !staff) {
+      return emptyPage(page, limit);
+    }
+    const where: Prisma.TimetableVersionWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query.academicYearId
+        ? { academicYearId: query.academicYearId }
+        : {}),
+      ...(query.classId ? { classId: query.classId } : {}),
+      ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(staff
+        ? {
+            status: {
+              in: [
+                TimetableVersionStatus.PUBLISHED,
+                TimetableVersionStatus.LOCKED,
+              ],
+            },
+            slots: { some: { staffId: staff.id } },
+          }
+        : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.timetableVersion.findMany({
+        where,
+        include: {
+          academicYear: true,
+          class: true,
+          section: true,
+          slots: {
+            ...(staff ? { where: { staffId: staff.id } } : {}),
+            include: timetableSlotInclude(),
+          },
+        },
+        orderBy: [{ effectiveFrom: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.timetableVersion.count({ where }),
+    ]);
+    return { items, meta: buildPageMeta(total, page, limit) };
   }
 
   async createVersion(dto: CreateTimetableVersionDto, actor: AuthContext) {
@@ -413,7 +495,24 @@ export class TimetableService {
   }
 
   async getVersion(id: string, actor: AuthContext) {
-    return this.findVersionOrThrow(id, actor);
+    this.assertOperationalTimetableRead(actor);
+    const version = await this.findVersionOrThrow(id, actor);
+    if (!isTeacherActor(actor)) return version;
+    const staff = await this.resolveActorStaff(actor);
+    if (!staff) throw new NotFoundException('Timetable version not found');
+    const slots = version.slots.filter((slot) => slot.staffId === staff.id);
+    if (slots.length === 0) {
+      throw new NotFoundException('Timetable version not found');
+    }
+    if (
+      ![
+        TimetableVersionStatus.PUBLISHED,
+        TimetableVersionStatus.LOCKED,
+      ].includes(version.status)
+    ) {
+      throw new NotFoundException('Timetable version not found');
+    }
+    return { ...version, slots };
   }
 
   async createTimetableSlot(dto: CreateTimetableSlotDto, actor: AuthContext) {
@@ -664,13 +763,27 @@ export class TimetableService {
     actor: AuthContext,
     query: ListTeacherAvailabilityQueryDto,
   ) {
+    this.assertOperationalTimetableRead(actor);
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 50, 100);
+    const actorStaff = isTeacherActor(actor)
+      ? await this.resolveActorStaff(actor)
+      : null;
+    if (
+      (isTeacherActor(actor) && !actorStaff) ||
+      (actorStaff && query.staffId && query.staffId !== actorStaff.id)
+    ) {
+      return [];
+    }
 
     return this.prisma.teacherAvailability.findMany({
       where: {
         tenantId: actor.tenantId,
-        ...(query.staffId ? { staffId: query.staffId } : {}),
+        ...(actorStaff
+          ? { staffId: actorStaff.id }
+          : query.staffId
+            ? { staffId: query.staffId }
+            : {}),
         ...(query.academicYearId
           ? { academicYearId: query.academicYearId }
           : {}),
@@ -686,7 +799,7 @@ export class TimetableService {
   }
 
   async getTeacherAvailability(teacherId: string, actor: AuthContext) {
-    await this.ensureStaff(actor, teacherId);
+    await this.ensureStaffReadable(actor, teacherId);
     const [availability, limit] = await Promise.all([
       this.prisma.teacherAvailability.findMany({
         where: { tenantId: actor.tenantId, staffId: teacherId },
@@ -806,12 +919,18 @@ export class TimetableService {
     actor: AuthContext,
     query: ListTeacherWorkloadQueryDto,
   ) {
+    this.assertOperationalTimetableRead(actor);
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 50, 100);
+    const actorStaff = isTeacherActor(actor)
+      ? await this.resolveActorStaff(actor)
+      : null;
+    if (isTeacherActor(actor) && !actorStaff) return [];
 
     return this.prisma.teacherWorkloadLimit.findMany({
       where: {
         tenantId: actor.tenantId,
+        ...(actorStaff ? { staffId: actorStaff.id } : {}),
         ...(query.academicYearId
           ? { academicYearId: query.academicYearId }
           : {}),
@@ -829,7 +948,7 @@ export class TimetableService {
     actor: AuthContext,
     academicYearId?: string,
   ) {
-    await this.ensureStaff(actor, teacherId);
+    await this.ensureStaffReadable(actor, teacherId);
     return this.prisma.teacherWorkloadLimit.findFirst({
       where: {
         tenantId: actor.tenantId,
@@ -844,7 +963,7 @@ export class TimetableService {
     query: WorkloadQueryDto,
     actor: AuthContext,
   ) {
-    await this.ensureStaff(actor, teacherId);
+    await this.ensureStaffReadable(actor, teacherId);
     const [slots, rule] = await Promise.all([
       this.prisma.timetableSlot.findMany({
         where: {
@@ -972,10 +1091,15 @@ export class TimetableService {
     actor: AuthContext,
     query: ListSubjectWeeklyRequirementQueryDto,
   ) {
+    this.assertOperationalTimetableRead(actor);
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 50, 100);
+    const teacherScope = isTeacherActor(actor)
+      ? await this.getTeacherTimetableScope(actor)
+      : null;
+    if (teacherScope?.length === 0) return [];
 
-    return this.prisma.subjectWeeklyRequirement.findMany({
+    const requirements = await this.prisma.subjectWeeklyRequirement.findMany({
       where: {
         tenantId: actor.tenantId,
         ...(query.academicYearId
@@ -984,6 +1108,7 @@ export class TimetableService {
         ...(query.classId ? { classId: query.classId } : {}),
         ...(query.sectionId ? { sectionId: query.sectionId } : {}),
         ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+        ...(teacherScope ? { OR: teacherScope } : {}),
       },
       include: {
         academicYear: true,
@@ -993,6 +1118,57 @@ export class TimetableService {
       },
       skip: (page - 1) * limit,
       take: limit,
+    });
+    if (requirements.length === 0) return [];
+    const slots = await this.prisma.timetableSlot.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        academicYearId: {
+          in: Array.from(
+            new Set(requirements.map((item) => item.academicYearId)),
+          ),
+        },
+        ...(query.versionId
+          ? { versionId: query.versionId }
+          : {
+              version: {
+                status: {
+                  in: [
+                    TimetableVersionStatus.PUBLISHED,
+                    TimetableVersionStatus.LOCKED,
+                  ],
+                },
+              },
+            }),
+        OR: requirements.map((requirement) => ({
+          classId: requirement.classId,
+          sectionId: requirement.sectionId,
+          subjectId: requirement.subjectId,
+        })),
+      },
+      select: {
+        academicYearId: true,
+        classId: true,
+        sectionId: true,
+        subjectId: true,
+      },
+    });
+    return requirements.map((requirement) => {
+      const assignedPeriods = slots.filter(
+        (slot) =>
+          slot.academicYearId === requirement.academicYearId &&
+          slot.classId === requirement.classId &&
+          slot.sectionId === requirement.sectionId &&
+          slot.subjectId === requirement.subjectId,
+      ).length;
+      return {
+        ...requirement,
+        assignedPeriods,
+        gapPeriods: Math.max(
+          requirement.requiredPeriodsPerWeek - assignedPeriods,
+          0,
+        ),
+      };
     });
   }
 
@@ -1090,26 +1266,96 @@ export class TimetableService {
     return { deleted: true, id };
   }
 
-  async listTeacherWorkload(actor: AuthContext) {
-    const staff = await this.prisma.staff.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        timetableSlots: {
-          include: {
-            subject: true,
-            class: true,
-            section: true,
-            roomRef: true,
-            version: true,
-          },
+  async listTeacherWorkload(
+    actor: AuthContext,
+    query: ListTeacherWorkloadQueryDto,
+  ) {
+    this.assertOperationalTimetableRead(actor);
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 50, 100);
+    const actorStaff = isTeacherActor(actor)
+      ? await this.resolveActorStaff(actor)
+      : null;
+    if (
+      (isTeacherActor(actor) && !actorStaff) ||
+      (actorStaff && query.teacherId && query.teacherId !== actorStaff.id)
+    ) {
+      return { ...emptyPage(page, limit), summary: emptyWorkloadSummary() };
+    }
+
+    const slotFilters: Prisma.TimetableSlotWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query.academicYearId
+        ? { academicYearId: query.academicYearId }
+        : {}),
+      ...(query.versionId ? { versionId: query.versionId } : {}),
+      ...(query.classId ? { classId: query.classId } : {}),
+      ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+      ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+    };
+    const staffWhere: Prisma.StaffWhereInput = {
+      tenantId: actor.tenantId,
+      ...(actorStaff
+        ? { id: actorStaff.id }
+        : query.teacherId
+          ? { id: query.teacherId }
+          : {}),
+      timetableSlots: { some: slotFilters },
+    };
+    const [staff, total] = await Promise.all([
+      this.prisma.staff.findMany({
+        where: staffWhere,
+        select: {
+          id: true,
+          employeeId: true,
+          firstName: true,
+          lastName: true,
         },
-        homeworkAssignments: true,
-      },
-      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
-      take: 200, // Teacher workload can be larger but should be bounded
-    });
-    return staff.map((member) => {
-      const teachingMinutes = member.timetableSlots.reduce(
+        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.staff.count({ where: staffWhere }),
+    ]);
+    const staffIds = staff.map((member) => member.id);
+    if (staffIds.length === 0) {
+      return {
+        items: [],
+        meta: buildPageMeta(total, page, limit),
+        summary: emptyWorkloadSummary(total),
+      };
+    }
+
+    const [slots, homeworkCounts] = await Promise.all([
+      this.prisma.timetableSlot.findMany({
+        where: {
+          ...slotFilters,
+          staffId: { in: staffIds },
+        },
+        include: timetableSlotInclude(),
+        orderBy: [{ staffId: 'asc' }, { dayOfWeek: 'asc' }, { startsAt: 'asc' }],
+      }),
+      this.prisma.homeworkAssignment.groupBy({
+        by: ['assignedByStaffId'],
+        where: {
+          tenantId: actor.tenantId,
+          assignedByStaffId: { in: staffIds },
+          ...(query.academicYearId
+            ? { academicYearId: query.academicYearId }
+            : {}),
+          ...(query.classId ? { classId: query.classId } : {}),
+          ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+          ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+        },
+        _count: { _all: true },
+      }),
+    ]);
+    const homeworkCountByStaff = new Map(
+      homeworkCounts.map((row) => [row.assignedByStaffId, row._count._all]),
+    );
+    const items = staff.map((member) => {
+      const teacherSlots = slots.filter((slot) => slot.staffId === member.id);
+      const teachingMinutes = teacherSlots.reduce(
         (sum, slot) => sum + minutesBetween(slot.startsAt, slot.endsAt),
         0,
       );
@@ -1117,13 +1363,28 @@ export class TimetableService {
         staffId: member.id,
         employeeId: member.employeeId,
         staffName: `${member.firstName} ${member.lastName}`.trim(),
-        slotCount: member.timetableSlots.length,
-        homeworkCount: member.homeworkAssignments.length,
+        slotCount: teacherSlots.length,
+        homeworkCount: homeworkCountByStaff.get(member.id) ?? 0,
         teachingMinutes,
         weeklyHours: Math.round((teachingMinutes / 60) * 10) / 10,
-        slots: member.timetableSlots,
+        slots: teacherSlots,
       };
     });
+    const totalTeachingMinutes = items.reduce(
+      (sum, item) => sum + item.teachingMinutes,
+      0,
+    );
+    return {
+      items,
+      meta: buildPageMeta(total, page, limit),
+      summary: {
+        teacherCount: total,
+        totalPeriods: items.reduce((sum, item) => sum + item.slotCount, 0),
+        totalTeachingMinutes,
+        totalWeeklyHours:
+          Math.round((totalTeachingMinutes / 60) * 10) / 10,
+      },
+    };
   }
 
   async getTeacherTimetable(
@@ -1131,7 +1392,7 @@ export class TimetableService {
     query: WorkloadQueryDto,
     actor: AuthContext,
   ) {
-    await this.ensureStaff(actor, teacherId);
+    await this.ensureStaffReadable(actor, teacherId);
     return this.prisma.timetableSlot.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -1570,6 +1831,79 @@ export class TimetableService {
     return staff;
   }
 
+  private async resolveActorStaff(actor: AuthContext) {
+    return this.prisma.staff.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+      select: { id: true },
+    });
+  }
+
+  private assertOperationalTimetableRead(actor: AuthContext) {
+    if (
+      actor.roles.includes('student') ||
+      actor.roles.includes('parent')
+    ) {
+      throw new ForbiddenException(
+        'Operational timetable data is limited to authorized staff',
+      );
+    }
+    if (
+      isPrivilegedTimetableActor(actor) ||
+      isTeacherActor(actor) ||
+      actor.permissions.some((permission) =>
+        [
+          'timetable:manage',
+          'timetable:publish',
+          'timetable:substitute',
+        ].includes(permission),
+      )
+    ) {
+      return;
+    }
+    throw new ForbiddenException(
+      'Operational timetable data is limited to authorized staff',
+    );
+  }
+
+  private async ensureStaffReadable(actor: AuthContext, staffId: string) {
+    this.assertOperationalTimetableRead(actor);
+    const staff = await this.ensureStaff(actor, staffId);
+    if (isTeacherActor(actor) && !isPrivilegedTimetableActor(actor)) {
+      const actorStaff = await this.resolveActorStaff(actor);
+      if (!actorStaff || actorStaff.id !== staffId) {
+        throw new ForbiddenException(
+          'Teachers can only view their own timetable workload',
+        );
+      }
+    }
+    return staff;
+  }
+
+  private async getTeacherTimetableScope(
+    actor: AuthContext,
+  ): Promise<Prisma.SubjectWeeklyRequirementWhereInput[]> {
+    const staff = await this.resolveActorStaff(actor);
+    if (!staff) return [];
+    const assignments = await this.prisma.subjectTeacherAssignment.findMany({
+      where: { tenantId: actor.tenantId, staffId: staff.id },
+      select: {
+        academicYearId: true,
+        classId: true,
+        sectionId: true,
+        subjectId: true,
+      },
+      take: 200,
+    });
+    return assignments.map((assignment) => ({
+      academicYearId: assignment.academicYearId,
+      classId: assignment.classId,
+      subjectId: assignment.subjectId,
+      OR: assignment.sectionId
+        ? [{ sectionId: assignment.sectionId }, { sectionId: null }]
+        : [{ sectionId: null }],
+    }));
+  }
+
   private async ensureVersionRefs(
     actor: AuthContext,
     academicYearId: string,
@@ -1698,6 +2032,64 @@ function assertTimeRange(startsAt: string, endsAt: string) {
   if (startsAt >= endsAt) {
     throw new ConflictException('Start time must be before end time');
   }
+}
+
+function isTeacherActor(actor: AuthContext) {
+  return (
+    actor.roles.includes('teacher') || actor.roles.includes('subject_teacher')
+  );
+}
+
+function isPrivilegedTimetableActor(actor: AuthContext) {
+  return actor.roles.some((role) =>
+    ['admin', 'principal', 'platform_super_admin'].includes(role),
+  );
+}
+
+function publishedTimetableScope(): Prisma.TimetableSlotWhereInput {
+  return {
+    OR: [
+      { versionId: null },
+      {
+        version: {
+          status: {
+            in: [
+              TimetableVersionStatus.PUBLISHED,
+              TimetableVersionStatus.LOCKED,
+            ],
+          },
+        },
+      },
+    ],
+  };
+}
+
+function buildPageMeta(total: number, page: number, limit: number) {
+  const totalPages = Math.ceil(total / limit);
+  return {
+    total,
+    page,
+    limit,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPreviousPage: page > 1,
+  };
+}
+
+function emptyPage(page: number, limit: number) {
+  return {
+    items: [],
+    meta: buildPageMeta(0, page, limit),
+  };
+}
+
+function emptyWorkloadSummary(teacherCount = 0) {
+  return {
+    teacherCount,
+    totalPeriods: 0,
+    totalTeachingMinutes: 0,
+    totalWeeklyHours: 0,
+  };
 }
 
 function parseDate(value: string, fieldName: string) {

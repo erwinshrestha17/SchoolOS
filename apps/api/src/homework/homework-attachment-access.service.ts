@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -77,14 +78,22 @@ export class HomeworkAttachmentAccessService {
       );
     }
 
-    if (attachment.fileAsset.status !== 'UPLOADED') {
-      throw new NotFoundException('Homework attachment file is not uploaded');
+    if (attachment.fileAsset.status === 'PENDING') {
+      throw new ConflictException('Homework attachment is still processing');
     }
 
-    if (
-      attachment.fileAsset.module &&
-      attachment.fileAsset.module !== 'homework'
-    ) {
+    if (attachment.fileAsset.status === 'FAILED') {
+      throw new ConflictException('Homework attachment upload failed');
+    }
+
+    if (attachment.fileAsset.status !== 'UPLOADED') {
+      throw new NotFoundException('Homework attachment file was removed');
+    }
+
+    const expectedModule = attachment.submissionId
+      ? 'homework-submission'
+      : 'homework';
+    if (attachment.fileAsset.module !== expectedModule) {
       throw new ForbiddenException(
         'Homework attachment file module is invalid',
       );
@@ -139,7 +148,52 @@ export class HomeworkAttachmentAccessService {
     actor: AuthContext,
     attachment: FullAttachment,
   ) {
-    if (!actor.roles.includes('student') && !actor.roles.includes('parent')) {
+    if (
+      actor.roles.some((role) =>
+        ['admin', 'principal', 'platform_super_admin'].includes(role),
+      )
+    ) {
+      return;
+    }
+
+    const assignment =
+      attachment.submission?.homework ?? attachment.assignment;
+    if (!assignment) {
+      throw new ForbiddenException(
+        'Homework attachment is outside your scope',
+      );
+    }
+
+    if (
+      actor.roles.includes('teacher') ||
+      actor.roles.includes('subject_teacher')
+    ) {
+      const staff = await this.prisma.staff.findFirst({
+        where: { tenantId: actor.tenantId, userId: actor.userId },
+        select: { id: true },
+      });
+      if (!staff) {
+        throw new ForbiddenException('Active teacher profile is required');
+      }
+      const teacherAssignment =
+        await this.prisma.subjectTeacherAssignment.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            staffId: staff.id,
+            academicYearId: assignment.academicYearId,
+            classId: assignment.classId,
+            subjectId: assignment.subjectId,
+            OR: assignment.sectionId
+              ? [{ sectionId: assignment.sectionId }, { sectionId: null }]
+              : [{ sectionId: null }],
+          },
+          select: { id: true },
+        });
+      if (!teacherAssignment) {
+        throw new ForbiddenException(
+          'Homework attachment is outside your teaching scope',
+        );
+      }
       return;
     }
 
@@ -171,8 +225,6 @@ export class HomeworkAttachmentAccessService {
         );
       }
 
-      const assignment =
-        attachment.submission?.homework ?? attachment.assignment;
       if (
         assignment &&
         (assignment.classId !== student.classId ||
@@ -186,6 +238,12 @@ export class HomeworkAttachmentAccessService {
       return;
     }
 
+    if (!actor.roles.includes('parent')) {
+      throw new ForbiddenException(
+        'Homework attachment is outside your permitted scope',
+      );
+    }
+
     const link = await this.prisma.studentGuardian.findFirst({
       where: {
         tenantId: actor.tenantId,
@@ -195,6 +253,10 @@ export class HomeworkAttachmentAccessService {
           : {}),
         student: {
           lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+          classId: assignment.classId,
+          ...(assignment.sectionId
+            ? { sectionId: assignment.sectionId }
+            : {}),
         },
       },
       include: {
@@ -215,7 +277,6 @@ export class HomeworkAttachmentAccessService {
       );
     }
 
-    const assignment = attachment.submission?.homework ?? attachment.assignment;
     if (
       assignment &&
       (assignment.classId !== link.student.classId ||
@@ -226,5 +287,6 @@ export class HomeworkAttachmentAccessService {
         'Homework attachment is outside your child class scope',
       );
     }
+
   }
 }

@@ -3,6 +3,7 @@ import {
   ConsentType,
   HomeworkAssignmentStatus,
   HomeworkSubmissionStatus,
+  FileStatus,
   NotificationChannel,
   Prisma,
   HomeworkAssignment,
@@ -61,9 +62,12 @@ export class HomeworkService {
   ) {}
 
   async listAssignments(actor: AuthContext, query: HomeworkQueryDto) {
-    const skip = ((query.page ?? 1) - 1) * (query.limit ?? 20);
-    const take = query.limit ?? 20;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+    const take = limit;
     let scopedStudentId: string | null = null;
+    const and: Prisma.HomeworkAssignmentWhereInput[] = [];
 
     const where: Prisma.HomeworkAssignmentWhereInput = {
       tenantId: actor.tenantId,
@@ -73,25 +77,59 @@ export class HomeworkService {
       ...(query.subjectId ? { subjectId: query.subjectId } : {}),
       ...(query.teacherId ? { assignedByStaffId: query.teacherId } : {}),
       ...(query.status ? { status: query.status } : {}),
+      ...(query.dueFrom || query.dueTo
+        ? {
+            dueDate: {
+              ...(query.dueFrom ? { gte: new Date(query.dueFrom) } : {}),
+              ...(query.dueTo ? { lte: new Date(query.dueTo) } : {}),
+            },
+          }
+        : {}),
     };
 
-    // Scoping for students/guardians
+    if (query.search?.trim()) {
+      const search = query.search.trim();
+      and.push({
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { instructions: { contains: search, mode: 'insensitive' } },
+          { subject: { name: { contains: search, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    // Persona scope remains backend-owned even when broader filters are sent.
     if (actor.roles.includes('student')) {
       const student = await this.prisma.student.findFirst({
-        where: { tenantId: actor.tenantId, userId: actor.userId },
+        where: {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
         select: { id: true, classId: true, sectionId: true },
       });
       if (!student) {
-        return { items: [], total: 0 };
+        return emptyPage(page, limit);
       }
       scopedStudentId = student.id;
-      if (student) {
-        where.classId = student.classId;
-        if (student.sectionId) {
-          where.OR = [{ sectionId: student.sectionId }, { sectionId: null }];
-        } else {
-          where.sectionId = null;
-        }
+      where.classId = student.classId;
+      where.status =
+        query.status &&
+        [
+          HomeworkAssignmentStatus.ASSIGNED,
+          HomeworkAssignmentStatus.CLOSED,
+        ].includes(query.status)
+          ? query.status
+          : {
+              in: [
+                HomeworkAssignmentStatus.ASSIGNED,
+                HomeworkAssignmentStatus.CLOSED,
+              ],
+            };
+      if (student.sectionId) {
+        where.OR = [{ sectionId: student.sectionId }, { sectionId: null }];
+      } else {
+        where.sectionId = null;
       }
     } else if (actor.roles.includes('parent')) {
       const studentId = await this.resolveVisibleStudentId(
@@ -104,43 +142,73 @@ export class HomeworkService {
           select: { classId: true, sectionId: true },
         });
         if (!student) {
-          return { items: [], total: 0 };
+          return emptyPage(page, limit);
         }
         scopedStudentId = studentId;
-        if (student) {
-          where.classId = student.classId;
-          if (student.sectionId) {
-            where.OR = [{ sectionId: student.sectionId }, { sectionId: null }];
-          } else {
-            where.sectionId = null;
-          }
+        where.classId = student.classId;
+        where.status =
+          query.status &&
+          [
+            HomeworkAssignmentStatus.ASSIGNED,
+            HomeworkAssignmentStatus.CLOSED,
+          ].includes(query.status)
+            ? query.status
+            : {
+                in: [
+                  HomeworkAssignmentStatus.ASSIGNED,
+                  HomeworkAssignmentStatus.CLOSED,
+                ],
+              };
+        if (student.sectionId) {
+          where.OR = [{ sectionId: student.sectionId }, { sectionId: null }];
+        } else {
+          where.sectionId = null;
         }
       } else {
-        return { items: [], total: 0 };
+        return emptyPage(page, limit);
       }
+    } else if (isTeacherActor(actor)) {
+      const staffId = await this.resolveActorStaffId(actor);
+      if (!staffId) {
+        return emptyPage(page, limit);
+      }
+      const scope = await this.getTeacherHomeworkScopeWhere(actor, staffId);
+      if (scope.length === 0) {
+        return emptyPage(page, limit);
+      }
+      and.push({ OR: scope });
     }
 
     if (query.studentId) {
       if (scopedStudentId && query.studentId !== scopedStudentId) {
-        return { items: [], total: 0 };
+        return emptyPage(page, limit);
       }
       where.submissions = {
         some: { studentId: query.studentId },
       };
     }
 
+    if (and.length) {
+      where.AND = and;
+    }
+
+    const sortBy = query.sortBy ?? 'dueDate';
+    const sortOrder = query.sortOrder ?? 'desc';
     const [items, total] = await Promise.all([
       this.prisma.homeworkAssignment.findMany({
         where,
-        include: homeworkAssignmentInclude(),
-        orderBy: { dueDate: 'desc' },
+        include: homeworkAssignmentListInclude(),
+        orderBy: [{ [sortBy]: sortOrder }, { id: 'asc' }],
         skip,
         take,
       }),
       this.prisma.homeworkAssignment.count({ where }),
     ]);
 
-    return { items, total };
+    return {
+      items: items.map(mapHomeworkAssignmentListItem),
+      meta: buildPageMeta(total, page, limit),
+    };
   }
 
   async listTeacherMobileHomework(actor: AuthContext, query: HomeworkQueryDto) {
@@ -281,8 +349,10 @@ export class HomeworkService {
       assignment,
       await this.resolveActorStaffId(actor),
     );
-    const updated = await this.assignHomework(id, actor);
-    return this.mapTeacherMobileHomework(updated);
+    await this.assignHomework(id, actor);
+    return this.mapTeacherMobileHomework(
+      await this.findAssignmentOrThrow(actor, id),
+    );
   }
 
   async listTeacherMobileHomeworkSubmissions(
@@ -326,8 +396,10 @@ export class HomeworkService {
     submissionId: string,
     dto: ReviewHomeworkSubmissionDto,
   ) {
-    const updated = await this.reviewSubmission(submissionId, dto, actor);
-    return this.mapTeacherMobileSubmission(updated);
+    await this.reviewSubmission(submissionId, dto, actor);
+    return this.mapTeacherMobileSubmission(
+      await this.findSubmissionOrThrow(actor, submissionId),
+    );
   }
 
   async markAsReviewed(
@@ -340,6 +412,18 @@ export class HomeworkService {
       include: { homework: true },
     });
     if (!submission) throw new NotFoundException('Submission not found');
+    await this.ensureSubjectTeacherScopeForRead(actor, submission.homework);
+    if (
+      ![
+        HomeworkSubmissionStatus.SUBMITTED,
+        HomeworkSubmissionStatus.LATE,
+        HomeworkSubmissionStatus.NEEDS_CORRECTION,
+      ].includes(submission.status)
+    ) {
+      throw new ConflictException(
+        `Cannot review a submission in ${submission.status} status`,
+      );
+    }
 
     const updated = await this.prisma.homeworkSubmission.update({
       where: { id: submissionId },
@@ -360,19 +444,34 @@ export class HomeworkService {
       after: updated,
     });
 
-    return updated;
+    return mapHomeworkSubmission(
+      await this.findSubmissionOrThrow(actor, submissionId),
+    );
   }
 
   async getAssignment(actor: AuthContext, id: string) {
     const assignment = await this.findAssignmentOrThrow(actor, id);
     await this.ensureAssignmentVisibleToActor(actor, assignment);
-    return assignment;
+    await this.ensureSubjectTeacherScopeForRead(actor, assignment);
+    return mapHomeworkAssignmentDetail(assignment);
   }
 
   async listTemplates(
     actor: AuthContext,
     query: HomeworkTemplateQueryDto = {},
   ) {
+    if (
+      actor.roles.includes('student') ||
+      actor.roles.includes('parent')
+    ) {
+      throw new ForbiddenException(
+        'Homework templates are limited to authorized staff',
+      );
+    }
+    const teacherScope = isTeacherActor(actor)
+      ? await this.getTeacherScopeForActor(actor)
+      : null;
+    if (teacherScope?.length === 0) return [];
     const candidates = await this.prisma.homeworkAssignment.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -392,15 +491,18 @@ export class HomeworkService {
             }
           : {}),
         attachmentMetadata: { not: Prisma.JsonNull },
+        ...(teacherScope ? { AND: [{ OR: teacherScope }] } : {}),
       },
-      include: homeworkAssignmentInclude(),
+      include: homeworkAssignmentListInclude(),
       orderBy: [{ updatedAt: 'desc' }],
       take: query.limit ?? 100,
     });
 
-    return candidates.filter((assignment) =>
-      isHomeworkTemplateMetadata(assignment.attachmentMetadata),
-    );
+    return candidates
+      .filter((assignment) =>
+        isHomeworkTemplateMetadata(assignment.attachmentMetadata),
+      )
+      .map(mapHomeworkAssignmentListItem);
   }
 
   async getSubmission(actor: AuthContext, id: string) {
@@ -420,7 +522,8 @@ export class HomeworkService {
       include: homeworkSubmissionInclude(),
     });
     if (!submission) throw new NotFoundException('Submission not found');
-    return submission;
+    await this.ensureSubjectTeacherScopeForRead(actor, submission.homework);
+    return mapHomeworkSubmission(submission);
   }
 
   async createAssignment(dto: CreateHomeworkDto, actor: AuthContext) {
@@ -592,6 +695,7 @@ export class HomeworkService {
     actor: AuthContext,
   ) {
     const assignment = await this.findAssignmentOrThrow(actor, id);
+    await this.ensureSubjectTeacherScopeForRead(actor, assignment);
 
     if (EDIT_BLOCKED_ASSIGNMENT_STATUSES.includes(assignment.status)) {
       throw new ConflictException(
@@ -635,7 +739,7 @@ export class HomeworkService {
       return result;
     });
 
-    await this.findAssignmentOrThrow(actor, updated.id);
+    const refreshed = await this.findAssignmentOrThrow(actor, updated.id);
 
     await this.auditService.record({
       action: 'update',
@@ -658,11 +762,12 @@ export class HomeworkService {
       },
     });
 
-    return updated;
+    return mapHomeworkAssignmentDetail(refreshed);
   }
 
   async assignHomework(homeworkId: string, actor: AuthContext) {
     const assignment = await this.findAssignmentOrThrow(actor, homeworkId);
+    await this.ensureSubjectTeacherScopeForRead(actor, assignment);
     if (assignment.status !== HomeworkAssignmentStatus.DRAFT) {
       throw new ConflictException('Only draft homework can be assigned');
     }
@@ -699,7 +804,7 @@ export class HomeworkService {
       },
     );
 
-    return updated;
+    return mapHomeworkAssignmentDetail(updated);
   }
 
   async closeHomework(homeworkId: string, actor: AuthContext) {
@@ -720,6 +825,7 @@ export class HomeworkService {
 
   async deleteOrCancelHomework(id: string, actor: AuthContext) {
     const assignment = await this.findAssignmentOrThrow(actor, id);
+    await this.ensureSubjectTeacherScopeForRead(actor, assignment);
     if (assignment.status === HomeworkAssignmentStatus.DRAFT) {
       await this.prisma.homeworkAssignment.delete({
         where: { id: assignment.id, tenantId: actor.tenantId },
@@ -735,6 +841,24 @@ export class HomeworkService {
     actor: AuthContext,
   ) {
     const assignment = await this.findAssignmentOrThrow(actor, id);
+    await this.ensureSubjectTeacherScopeForRead(actor, assignment);
+    if (
+      status === HomeworkAssignmentStatus.CLOSED &&
+      assignment.status !== HomeworkAssignmentStatus.ASSIGNED
+    ) {
+      throw new ConflictException('Only assigned homework can be closed');
+    }
+    if (
+      status === HomeworkAssignmentStatus.CANCELLED &&
+      ![
+        HomeworkAssignmentStatus.DRAFT,
+        HomeworkAssignmentStatus.ASSIGNED,
+      ].includes(assignment.status)
+    ) {
+      throw new ConflictException(
+        `Cannot cancel homework in ${assignment.status} status`,
+      );
+    }
     const updated = await this.prisma.homeworkAssignment.update({
       where: { id },
       data: { status },
@@ -751,20 +875,28 @@ export class HomeworkService {
       after: { status: updated.status },
     });
 
-    return updated;
+    return mapHomeworkAssignmentDetail(updated);
   }
 
   async listSubmissions(
     actor: AuthContext,
-    assignmentId: string | undefined,
+    assignmentId: string,
     query: HomeworkSubmissionQueryDto,
   ) {
-    const skip = ((query.page ?? 1) - 1) * (query.limit ?? 20);
-    const take = query.limit ?? 20;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+    const take = limit;
+    const assignment = await this.findAssignmentOrThrow(actor, assignmentId);
+    await this.ensureAssignmentVisibleToActor(actor, assignment);
+    await this.ensureSubjectTeacherScopeForRead(actor, assignment);
     const studentScope = await this.resolveVisibleStudentIdsForRead(actor);
 
     if (studentScope?.length === 0) {
-      return { items: [], total: 0 };
+      return {
+        ...emptyPage(page, limit),
+        summary: emptySubmissionSummary(),
+      };
     }
 
     if (
@@ -772,13 +904,15 @@ export class HomeworkService {
       query.studentId &&
       !studentScope.includes(query.studentId)
     ) {
-      return { items: [], total: 0 };
+      return {
+        ...emptyPage(page, limit),
+        summary: emptySubmissionSummary(),
+      };
     }
 
-    const where: Prisma.HomeworkSubmissionWhereInput = {
+    const scopeWhere: Prisma.HomeworkSubmissionWhereInput = {
       tenantId: actor.tenantId,
-      ...(assignmentId ? { homeworkId: assignmentId } : {}),
-      ...(query.status ? { status: query.status } : {}),
+      homeworkId: assignment.id,
       ...(studentScope
         ? { studentId: query.studentId ?? { in: studentScope } }
         : query.studentId
@@ -786,18 +920,130 @@ export class HomeworkService {
           : {}),
     };
 
-    const [items, total] = await Promise.all([
+    const submittedAtFilter: Prisma.DateTimeNullableFilter = {};
+    if (query.timing === 'LATE') {
+      submittedAtFilter.gt = assignment.dueDate;
+    } else if (query.timing === 'ON_TIME') {
+      submittedAtFilter.not = null;
+      submittedAtFilter.lte = assignment.dueDate;
+    }
+    if (query.submittedFrom) {
+      submittedAtFilter.gte = new Date(query.submittedFrom);
+    }
+    if (query.submittedTo) {
+      submittedAtFilter.lte = new Date(query.submittedTo);
+    }
+
+    const where: Prisma.HomeworkSubmissionWhereInput = {
+      ...scopeWhere,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.reviewState === 'REVIEWED'
+        ? { reviewedAt: { not: null } }
+        : query.reviewState === 'UNREVIEWED'
+          ? { reviewedAt: null, submittedAt: { not: null } }
+          : {}),
+      ...(Object.keys(submittedAtFilter).length
+        ? { submittedAt: submittedAtFilter }
+        : {}),
+      ...(query.classId || query.sectionId || query.subjectId
+        ? {
+            homework: {
+              ...(query.classId ? { classId: query.classId } : {}),
+              ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+              ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+            },
+          }
+        : {}),
+      ...(query.search?.trim()
+        ? {
+            student: {
+              OR: [
+                {
+                  firstNameEn: {
+                    contains: query.search.trim(),
+                    mode: 'insensitive',
+                  },
+                },
+                {
+                  lastNameEn: {
+                    contains: query.search.trim(),
+                    mode: 'insensitive',
+                  },
+                },
+                {
+                  studentSystemId: {
+                    contains: query.search.trim(),
+                    mode: 'insensitive',
+                  },
+                },
+              ],
+            },
+          }
+        : {}),
+    };
+
+    const sortOrder = query.sortOrder ?? 'desc';
+    const orderBy: Prisma.HomeworkSubmissionOrderByWithRelationInput[] =
+      query.sortBy === 'studentName'
+        ? [
+            { student: { firstNameEn: sortOrder } },
+            { student: { lastNameEn: sortOrder } },
+            { id: 'asc' },
+          ]
+        : [
+            { [query.sortBy ?? 'submittedAt']: sortOrder },
+            { id: 'asc' },
+          ];
+
+    const [
+      items,
+      total,
+      summaryTotal,
+      submitted,
+      late,
+      reviewed,
+      needsCorrection,
+    ] = await Promise.all([
       this.prisma.homeworkSubmission.findMany({
         where,
         include: homeworkSubmissionInclude(),
-        orderBy: { submittedAt: 'desc' },
+        orderBy,
         skip,
         take,
       }),
       this.prisma.homeworkSubmission.count({ where }),
+      this.prisma.homeworkSubmission.count({ where: scopeWhere }),
+      this.prisma.homeworkSubmission.count({
+        where: { ...scopeWhere, submittedAt: { not: null } },
+      }),
+      this.prisma.homeworkSubmission.count({
+        where: { ...scopeWhere, submittedAt: { gt: assignment.dueDate } },
+      }),
+      this.prisma.homeworkSubmission.count({
+        where: { ...scopeWhere, reviewedAt: { not: null } },
+      }),
+      this.prisma.homeworkSubmission.count({
+        where: {
+          ...scopeWhere,
+          status: HomeworkSubmissionStatus.NEEDS_CORRECTION,
+        },
+      }),
     ]);
 
-    return { items, total };
+    return {
+      items: items.map(mapHomeworkSubmission),
+      meta: buildPageMeta(total, page, limit),
+      summary: {
+        total: summaryTotal,
+        submitted,
+        onTime: Math.max(submitted - late, 0),
+        late,
+        reviewed,
+        unreviewed: Math.max(submitted - reviewed, 0),
+        needsCorrection,
+        notSubmitted: Math.max(summaryTotal - submitted, 0),
+      },
+    };
   }
 
   async createSubmission(
@@ -840,8 +1086,11 @@ export class HomeworkService {
           homeworkId: assignmentId,
           studentId,
           status,
+          submissionText: dto.submissionText,
           studentRemarks: dto.studentRemarks,
-          submittedAt: new Date(),
+          submittedAt: dto.submittedAt
+            ? new Date(dto.submittedAt)
+            : new Date(),
         },
       });
 
@@ -866,7 +1115,7 @@ export class HomeworkService {
       attachmentCount: dto.attachmentFileIds?.length ?? 0,
     });
 
-    return submission;
+    return mapHomeworkSubmission(submission);
   }
 
   async updateSubmission(
@@ -886,6 +1135,7 @@ export class HomeworkService {
       const result = await tx.homeworkSubmission.update({
         where: { id: submissionId },
         data: {
+          submissionText: dto.submissionText,
           studentRemarks: dto.studentRemarks,
           submittedAt: new Date(),
         },
@@ -915,7 +1165,9 @@ export class HomeworkService {
         dto.attachmentFileIds?.length ?? submission.attachments.length,
     });
 
-    return this.findSubmissionOrThrow(actor, updated.id);
+    return mapHomeworkSubmission(
+      await this.findSubmissionOrThrow(actor, updated.id),
+    );
   }
 
   async updateSubmissionStatus(
@@ -942,7 +1194,7 @@ export class HomeworkService {
       after: updated.status,
     });
 
-    return updated;
+    return mapHomeworkSubmission(updated);
   }
 
   async reviewSubmission(
@@ -956,6 +1208,17 @@ export class HomeworkService {
       submission.homework,
       await this.resolveActorStaffId(actor),
     );
+    if (
+      ![
+        HomeworkSubmissionStatus.SUBMITTED,
+        HomeworkSubmissionStatus.LATE,
+        HomeworkSubmissionStatus.NEEDS_CORRECTION,
+      ].includes(submission.status)
+    ) {
+      throw new ConflictException(
+        `Cannot review a submission in ${submission.status} status`,
+      );
+    }
 
     const updated = await this.prisma.homeworkSubmission.update({
       where: { id: submission.id },
@@ -996,7 +1259,7 @@ export class HomeworkService {
       status: updated.status,
     });
 
-    return updated;
+    return mapHomeworkSubmission(updated);
   }
 
   async legacyReview(
@@ -1030,7 +1293,7 @@ export class HomeworkService {
     return this.updateSubmission(
       submission.id,
       {
-        studentRemarks: dto.content,
+        submissionText: dto.content,
         attachmentFileIds: dto.attachmentIds,
       },
       actor,
@@ -1149,7 +1412,11 @@ export class HomeworkService {
     },
     staffId: string | null,
   ) {
-    if (actor.roles.includes('admin') || actor.roles.includes('principal')) {
+    if (
+      actor.roles.some((role) =>
+        ['admin', 'principal', 'platform_super_admin'].includes(role),
+      )
+    ) {
       return;
     }
 
@@ -1179,6 +1446,25 @@ export class HomeworkService {
     }
   }
 
+  private async ensureSubjectTeacherScopeForRead(
+    actor: AuthContext,
+    homework: {
+      academicYearId?: string;
+      classId: string;
+      sectionId: string | null;
+      subjectId: string;
+    },
+  ) {
+    if (!isTeacherActor(actor)) {
+      return;
+    }
+    await this.ensureSubjectTeacherScope(
+      actor,
+      homework,
+      await this.resolveActorStaffId(actor),
+    );
+  }
+
   private async auditSubmission(
     action: string,
     submissionId: string,
@@ -1204,7 +1490,8 @@ export class HomeworkService {
   ) {
     const prisma = tx || this.prisma;
 
-    // 1. Validate files belong to tenant
+    // 1. Validate files belong to this tenant and were uploaded for this M6
+    // workflow by the current actor (tenant file admins may link reviewed files).
     const uniqueFileAssetIds = Array.from(new Set(fileAssetIds));
     if (uniqueFileAssetIds.length !== fileAssetIds.length) {
       throw new ConflictException(
@@ -1214,12 +1501,40 @@ export class HomeworkService {
 
     const fileAssets = await prisma.fileAsset.findMany({
       where: { id: { in: uniqueFileAssetIds }, tenantId: actor.tenantId },
-      select: { id: true },
+      select: {
+        id: true,
+        module: true,
+        entityId: true,
+        uploadedByUserId: true,
+        status: true,
+        softDeletedAt: true,
+        deletedAt: true,
+      },
     });
 
     if (fileAssets.length !== uniqueFileAssetIds.length) {
       throw new ConflictException(
         'Some attachment files were not found or do not belong to this tenant',
+      );
+    }
+
+    const expectedModule = submissionId ? 'homework-submission' : 'homework';
+    const expectedEntityId = submissionId ?? assignmentId;
+    const canLinkOtherUploader = actor.roles.some((role) =>
+      ['admin', 'principal', 'platform_super_admin'].includes(role),
+    );
+    const invalidFile = fileAssets.find(
+      (asset) =>
+        asset.status !== FileStatus.UPLOADED ||
+        asset.softDeletedAt !== null ||
+        asset.deletedAt !== null ||
+        asset.module !== expectedModule ||
+        (asset.entityId !== null && asset.entityId !== expectedEntityId) ||
+        (!canLinkOtherUploader && asset.uploadedByUserId !== actor.userId),
+    );
+    if (invalidFile) {
+      throw new ForbiddenException(
+        'Attachment is unavailable or was not uploaded for this homework workflow',
       );
     }
 
@@ -1234,15 +1549,27 @@ export class HomeworkService {
       skipDuplicates: true,
     });
 
-    // 3. Update FileAsset entity reference via Registry for consistency/auditing
+    // 3. Update FileAsset entity reference via Registry for consistency/auditing.
     for (const assetId of uniqueFileAssetIds) {
-      await this.fileRegistry.linkToEntity(
-        actor.tenantId,
-        assetId,
-        'homework',
-        submissionId ?? assignmentId,
-        actor.userId,
-      );
+      if (tx) {
+        await this.fileRegistry.linkToEntityInTransaction(tx, {
+          tenantId: actor.tenantId,
+          assetId,
+          module: expectedModule,
+          entityId: expectedEntityId,
+          userId: actor.userId,
+          ownerType: expectedModule,
+          ownerId: expectedEntityId,
+        });
+      } else {
+        await this.fileRegistry.linkToEntity(
+          actor.tenantId,
+          assetId,
+          expectedModule,
+          expectedEntityId,
+          actor.userId,
+        );
+      }
     }
   }
 
@@ -1252,6 +1579,7 @@ export class HomeworkService {
     actor: AuthContext,
   ) {
     const homework = await this.findAssignmentOrThrow(actor, homeworkId);
+    await this.ensureSubjectTeacherScopeForRead(actor, homework);
     if (
       homework.status !== HomeworkAssignmentStatus.ASSIGNED &&
       dto.reminderType !== HomeworkReminderType.HOMEWORK_RETURNED_FOR_CORRECTION
@@ -1271,12 +1599,19 @@ export class HomeworkService {
       where: {
         tenantId: actor.tenantId,
         idempotencyKey,
-        status: 'COMPLETED',
       },
     });
 
-    if (existingBatch && !dto.force) {
-      return existingBatch;
+    if (existingBatch?.status === 'COMPLETED') {
+      return { ...existingBatch, replayed: true };
+    }
+    if (existingBatch?.status === 'PROCESSING') {
+      return { ...existingBatch, queued: true, replayed: true };
+    }
+    if (existingBatch?.status === 'FAILED' && !dto.force) {
+      throw new ConflictException(
+        'The previous reminder attempt failed. Retry the failed batch instead of sending a duplicate.',
+      );
     }
 
     let batch = await this.createOrReuseReminderBatch(
@@ -1344,6 +1679,7 @@ export class HomeworkService {
 
   async previewReminders(id: string, actor: AuthContext) {
     const homework = await this.findAssignmentOrThrow(actor, id);
+    await this.ensureSubjectTeacherScopeForRead(actor, homework);
     const targets = await this.resolveHomeworkReminderTargets(
       actor,
       homework,
@@ -1368,28 +1704,46 @@ export class HomeworkService {
     actor: AuthContext,
     query: HomeworkReminderQueryDto,
   ) {
-    const skip = ((query.page ?? 1) - 1) * (query.limit ?? 20);
-    const take = query.limit ?? 20;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const teacherScope = isTeacherActor(actor)
+      ? await this.getTeacherScopeForActor(actor)
+      : null;
+    if (teacherScope?.length === 0) {
+      return emptyPage(page, limit);
+    }
+    const where: Prisma.HomeworkReminderBatchWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query.homeworkId ? { homeworkId: query.homeworkId } : {}),
+      ...(query.reminderType ? { reminderType: query.reminderType } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.fromDate || query.toDate
+        ? {
+            createdAt: {
+              ...(query.fromDate ? { gte: new Date(query.fromDate) } : {}),
+              ...(query.toDate ? { lte: new Date(query.toDate) } : {}),
+            },
+          }
+        : {}),
+      ...(teacherScope ? { homework: { OR: teacherScope } } : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.homeworkReminderBatch.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.homeworkReminderBatch.count({ where }),
+    ]);
 
-    return this.prisma.homeworkReminderBatch.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        ...(query.homeworkId ? { homeworkId: query.homeworkId } : {}),
-        ...(query.reminderType ? { reminderType: query.reminderType } : {}),
-        ...(query.status ? { status: query.status } : {}),
-        ...(query.fromDate || query.toDate
-          ? {
-              createdAt: {
-                ...(query.fromDate ? { gte: new Date(query.fromDate) } : {}),
-                ...(query.toDate ? { lte: new Date(query.toDate) } : {}),
-              },
-            }
-          : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take,
-    });
+    return {
+      items: items.map((item) => ({
+        ...item,
+        failedReason: item.failedReason ? 'Delivery attempt failed' : null,
+      })),
+      meta: buildPageMeta(total, page, limit),
+    };
   }
 
   async retryHomeworkReminderBatch(batchId: string, actor: AuthContext) {
@@ -1399,6 +1753,18 @@ export class HomeworkService {
 
     if (!batch) {
       throw new NotFoundException('Reminder batch not found');
+    }
+    if (batch.status === 'COMPLETED' || batch.status === 'PROCESSING') {
+      return {
+        ...batch,
+        queued: batch.status === 'PROCESSING',
+        replayed: true,
+      };
+    }
+    if (batch.status !== 'FAILED') {
+      throw new ConflictException(
+        `Reminder batch in ${batch.status} status cannot be retried`,
+      );
     }
 
     return this.sendHomeworkReminder(
@@ -1721,6 +2087,12 @@ export class HomeworkService {
     }));
   }
 
+  private async getTeacherScopeForActor(actor: AuthContext) {
+    const staffId = await this.resolveActorStaffId(actor);
+    if (!staffId) return [];
+    return this.getTeacherHomeworkScopeWhere(actor, staffId);
+  }
+
   private mapTeacherMobileHomework(
     assignment: Prisma.HomeworkAssignmentGetPayload<{
       include: ReturnType<typeof homeworkAssignmentInclude>;
@@ -1885,8 +2257,20 @@ export class HomeworkService {
     assignment: {
       classId: string;
       sectionId: string | null;
+      status?: HomeworkAssignmentStatus;
     },
   ) {
+    if (
+      (actor.roles.includes('student') || actor.roles.includes('parent')) &&
+      assignment.status &&
+      ![
+        HomeworkAssignmentStatus.ASSIGNED,
+        HomeworkAssignmentStatus.CLOSED,
+      ].includes(assignment.status)
+    ) {
+      throw new NotFoundException('Homework assignment not found');
+    }
+
     if (actor.roles.includes('student')) {
       const student = await this.prisma.student.findFirst({
         where: {
@@ -1952,12 +2336,25 @@ export class HomeworkService {
     classId?: string,
     sectionId?: string,
   ) {
+    if (
+      actor.roles.includes('student') ||
+      actor.roles.includes('parent')
+    ) {
+      throw new ForbiddenException(
+        'Homework completion reports are limited to authorized staff',
+      );
+    }
+    const teacherScope = isTeacherActor(actor)
+      ? await this.getTeacherScopeForActor(actor)
+      : null;
+    if (teacherScope?.length === 0) return [];
     const assignments = await this.prisma.homeworkAssignment.findMany({
       where: {
         tenantId: actor.tenantId,
         academicYearId,
         ...(classId ? { classId } : {}),
         ...(sectionId ? { sectionId } : {}),
+        ...(teacherScope ? { AND: [{ OR: teacherScope }] } : {}),
       },
       include: {
         submissions: {
@@ -1996,12 +2393,25 @@ export class HomeworkService {
     academicYearId: string,
     classId?: string,
   ) {
+    if (
+      actor.roles.includes('student') ||
+      actor.roles.includes('parent')
+    ) {
+      throw new ForbiddenException(
+        'Homework completion reports are limited to authorized staff',
+      );
+    }
+    const teacherScope = isTeacherActor(actor)
+      ? await this.getTeacherScopeForActor(actor)
+      : null;
+    if (teacherScope?.length === 0) return [];
     const submissions = await this.prisma.homeworkSubmission.findMany({
       where: {
         tenantId: actor.tenantId,
         homework: {
           academicYearId,
           ...(classId ? { classId } : {}),
+          ...(teacherScope ? { OR: teacherScope } : {}),
         },
         status: {
           in: [
@@ -2214,17 +2624,50 @@ function homeworkAssignmentInclude() {
     class: true,
     section: true,
     subject: true,
-    assignedByStaff: true,
+    assignedByStaff: {
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        employeeId: true,
+      },
+    },
     submissions: {
       include: {
-        student: true,
+        student: { select: homeworkStudentSelect() },
         attachments: {
-          include: { fileAsset: true },
+          include: { fileAsset: { select: homeworkFileAssetSelect() } },
         },
       },
     },
     attachments: {
-      include: { fileAsset: true },
+      include: { fileAsset: { select: homeworkFileAssetSelect() } },
+    },
+  } satisfies Prisma.HomeworkAssignmentInclude;
+}
+
+function homeworkAssignmentListInclude() {
+  return {
+    academicYear: true,
+    class: true,
+    section: true,
+    subject: true,
+    assignedByStaff: {
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        employeeId: true,
+      },
+    },
+    attachments: {
+      include: { fileAsset: { select: homeworkFileAssetSelect() } },
+    },
+    _count: {
+      select: {
+        submissions: true,
+        attachments: true,
+      },
     },
   } satisfies Prisma.HomeworkAssignmentInclude;
 }
@@ -2236,12 +2679,179 @@ function homeworkSubmissionInclude() {
         subject: true,
         class: true,
         section: true,
-        assignedByStaff: true,
+        assignedByStaff: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            employeeId: true,
+          },
+        },
       },
     },
-    student: true,
+    student: { select: homeworkStudentSelect() },
     attachments: {
-      include: { fileAsset: true },
+      include: { fileAsset: { select: homeworkFileAssetSelect() } },
     },
   } satisfies Prisma.HomeworkSubmissionInclude;
+}
+
+function homeworkStudentSelect() {
+  return {
+    id: true,
+    studentSystemId: true,
+    firstNameEn: true,
+    lastNameEn: true,
+    rollNumber: true,
+    classId: true,
+    sectionId: true,
+    lifecycleStatus: true,
+  } satisfies Prisma.StudentSelect;
+}
+
+function homeworkFileAssetSelect() {
+  return {
+    id: true,
+    originalFilename: true,
+    mimeType: true,
+    sizeBytes: true,
+    status: true,
+    softDeletedAt: true,
+    deletedAt: true,
+  } satisfies Prisma.FileAssetSelect;
+}
+
+function mapHomeworkAssignmentListItem(
+  assignment: Prisma.HomeworkAssignmentGetPayload<{
+    include: ReturnType<typeof homeworkAssignmentListInclude>;
+  }>,
+) {
+  const { _count, ...rest } = assignment;
+  return {
+    ...rest,
+    attachments: rest.attachments.map(mapHomeworkAttachment),
+    attachmentCount: _count.attachments,
+    submissionSummary: {
+      total: _count.submissions,
+    },
+  };
+}
+
+function mapHomeworkAssignmentDetail(
+  assignment: Prisma.HomeworkAssignmentGetPayload<{
+    include: ReturnType<typeof homeworkAssignmentInclude>;
+  }>,
+) {
+  const { submissions, ...rest } = assignment;
+  const submitted = submissions.filter(
+    (submission) => submission.submittedAt !== null,
+  ).length;
+  const late = submissions.filter(
+    (submission) =>
+      submission.submittedAt !== null &&
+      submission.submittedAt > assignment.dueDate,
+  ).length;
+  const reviewed = submissions.filter(
+    (submission) => submission.reviewedAt !== null,
+  ).length;
+  return {
+    ...rest,
+    attachments: rest.attachments.map(mapHomeworkAttachment),
+    submissionSummary: {
+      total: submissions.length,
+      submitted,
+      onTime: Math.max(submitted - late, 0),
+      late,
+      reviewed,
+      unreviewed: Math.max(submitted - reviewed, 0),
+      needsCorrection: submissions.filter(
+        (submission) =>
+          submission.status === HomeworkSubmissionStatus.NEEDS_CORRECTION,
+      ).length,
+      notSubmitted: Math.max(submissions.length - submitted, 0),
+    },
+  };
+}
+
+function mapHomeworkSubmission(
+  submission: Prisma.HomeworkSubmissionGetPayload<{
+    include: ReturnType<typeof homeworkSubmissionInclude>;
+  }>,
+) {
+  return {
+    ...submission,
+    student: {
+      ...submission.student,
+      fullNameEn:
+        `${submission.student.firstNameEn} ${submission.student.lastNameEn}`.trim(),
+    },
+    attachments: submission.attachments.map(mapHomeworkAttachment),
+  };
+}
+
+function mapHomeworkAttachment(attachment: {
+  id: string;
+  fileAssetId: string;
+  fileAsset: {
+    id: string;
+    originalFilename: string;
+    mimeType: string;
+    sizeBytes: bigint;
+    status: FileStatus;
+    softDeletedAt: Date | null;
+    deletedAt: Date | null;
+  };
+}) {
+  return {
+    id: attachment.id,
+    fileAssetId: attachment.fileAssetId,
+    fileAsset: {
+      id: attachment.fileAsset.id,
+      originalFilename: attachment.fileAsset.originalFilename,
+      mimeType: attachment.fileAsset.mimeType,
+      sizeBytes: Number(attachment.fileAsset.sizeBytes),
+      status:
+        attachment.fileAsset.deletedAt || attachment.fileAsset.softDeletedAt
+          ? FileStatus.DELETED
+          : attachment.fileAsset.status,
+    },
+  };
+}
+
+function buildPageMeta(total: number, page: number, limit: number) {
+  const totalPages = Math.ceil(total / limit);
+  return {
+    total,
+    page,
+    limit,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPreviousPage: page > 1,
+  };
+}
+
+function emptyPage(page: number, limit: number) {
+  return {
+    items: [],
+    meta: buildPageMeta(0, page, limit),
+  };
+}
+
+function emptySubmissionSummary() {
+  return {
+    total: 0,
+    submitted: 0,
+    onTime: 0,
+    late: 0,
+    reviewed: 0,
+    unreviewed: 0,
+    needsCorrection: 0,
+    notSubmitted: 0,
+  };
+}
+
+function isTeacherActor(actor: AuthContext) {
+  return (
+    actor.roles.includes('teacher') || actor.roles.includes('subject_teacher')
+  );
 }

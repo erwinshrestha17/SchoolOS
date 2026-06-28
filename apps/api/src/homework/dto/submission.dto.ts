@@ -2,6 +2,7 @@ import { HomeworkSubmissionStatus } from '@prisma/client';
 import {
   IsArray,
   IsEnum,
+  IsIn,
   IsISO8601,
   IsNumber,
   IsObject,
@@ -67,6 +68,11 @@ export class UpdateHomeworkSubmissionStatusDto {
 
 export class ReviewHomeworkSubmissionDto {
   @IsEnum(HomeworkSubmissionStatus)
+  @IsIn([
+    HomeworkSubmissionStatus.REVIEWED,
+    HomeworkSubmissionStatus.NEEDS_CORRECTION,
+    HomeworkSubmissionStatus.EXCUSED,
+  ])
   status!: HomeworkSubmissionStatus;
 
   @IsOptional()
