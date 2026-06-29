@@ -6273,6 +6273,7 @@ model TimetableSubstitution {
   approvedById        String?
   assignedAt          DateTime?
   cancelledAt         DateTime?
+  cancellationReason  String?
   completedAt         DateTime?
   createdAt           DateTime                    @default(now())
   updatedAt           DateTime                    @updatedAt

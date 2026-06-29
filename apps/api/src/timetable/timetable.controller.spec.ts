@@ -247,6 +247,7 @@ describe('TimetableController M6 contracts', () => {
       reason: 'Absent on leave',
     };
     const assignDto = { substituteTeacherId: 'teacher-2' };
+    const cancelDto = { reason: 'Teacher returned to class' };
     substitutionService.createSubstitution.mockReturnValue({
       status: 'ASSIGNED',
     });
@@ -270,7 +271,7 @@ describe('TimetableController M6 contracts', () => {
     expect(controller.assignSubstitution('sub-1', assignDto, actor)).toEqual({
       status: 'ASSIGNED',
     });
-    expect(controller.cancelSubstitution('sub-1', actor)).toEqual({
+    expect(controller.cancelSubstitution('sub-1', cancelDto, actor)).toEqual({
       status: 'CANCELLED',
     });
     expect(controller.completeSubstitution('sub-1', actor)).toEqual({
@@ -292,6 +293,7 @@ describe('TimetableController M6 contracts', () => {
     );
     expect(substitutionService.cancelSubstitution).toHaveBeenCalledWith(
       'sub-1',
+      cancelDto,
       actor,
     );
     expect(substitutionService.completeSubstitution).toHaveBeenCalledWith(

@@ -350,6 +350,18 @@ class TeacherHomeworkSubmission {
   }
 }
 
+class TeacherHomeworkDraftAttachment {
+  const TeacherHomeworkDraftAttachment({
+    required this.fileName,
+    required this.contentType,
+    required this.bytes,
+  });
+
+  final String fileName;
+  final String contentType;
+  final Uint8List bytes;
+}
+
 class TeacherTimetableSnapshot {
   const TeacherTimetableSnapshot({
     required this.rangeStart,

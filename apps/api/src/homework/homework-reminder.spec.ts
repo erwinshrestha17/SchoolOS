@@ -36,6 +36,7 @@ describe('Homework Reminders', () => {
     title: 'Math HW',
     status: HomeworkAssignmentStatus.ASSIGNED,
     dueDate: new Date('2026-12-31'),
+    academicYearId: 'year-1',
     subjectId: 'sub-1',
     classId: 'class-1',
     sectionId: 'section-1',
@@ -62,7 +63,10 @@ describe('Homework Reminders', () => {
         findMany: jest.fn(),
       },
       staff: {
-        findFirst: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue({ id: 'staff-1' }),
+      },
+      subjectTeacherAssignment: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'subject-teacher-1' }),
       },
       $transaction: jest.fn((cb) => cb(prisma)),
     };
@@ -127,6 +131,7 @@ describe('Homework Reminders', () => {
       prisma.homeworkAssignment.findFirst.mockResolvedValue(mockHomework);
       prisma.homeworkReminderBatch.findFirst.mockResolvedValue({
         id: 'existing-batch',
+        status: 'COMPLETED',
       });
 
       const result = await service.sendHomeworkReminder(

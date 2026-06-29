@@ -170,7 +170,13 @@ class TeacherRepository {
     required String instructions,
     required DateTime dueDate,
     required bool submissionRequired,
+    List<TeacherHomeworkDraftAttachment> attachments = const [],
   }) async {
+    final attachmentFileIds = <String>[];
+    for (final attachment in attachments) {
+      attachmentFileIds.add(await _uploadHomeworkAttachment(attachment));
+    }
+
     await _client.post(
       '/mobile/teacher/homework',
       data: {
@@ -183,7 +189,48 @@ class TeacherRepository {
         'dueDate': dueDate.toUtc().toIso8601String(),
         'status': 'DRAFT',
         'submissionRequired': submissionRequired,
+        if (attachmentFileIds.isNotEmpty)
+          'attachmentFileIds': attachmentFileIds,
       },
+    );
+  }
+
+  Future<String> _uploadHomeworkAttachment(
+    TeacherHomeworkDraftAttachment attachment,
+  ) async {
+    final data = {
+      'fileName': attachment.fileName,
+      'contentType': attachment.contentType,
+      'base64Content': base64Encode(attachment.bytes),
+      'module': 'homework',
+    };
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final response = await _client.post<dynamic>(
+          '/files/upload',
+          data: data,
+        );
+        final body = response.data is Map<String, dynamic>
+            ? response.data as Map<String, dynamic>
+            : const <String, dynamic>{};
+        final id = body['id'] as String?;
+        if (id == null || id.isEmpty) {
+          throw StateError(
+            'Homework attachment upload did not return a file id.',
+          );
+        }
+        return id;
+      } on AppException catch (error) {
+        final retryable =
+            error is NetworkException || error is TimeoutException;
+        if (!retryable || attempt == 1) rethrow;
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+      }
+    }
+
+    throw const NetworkException(
+      'Homework attachment upload did not complete.',
     );
   }
 

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -87,6 +89,14 @@ void main() {
   test('creates a safe draft and publishes through mobile endpoints', () async {
     const scope = schoolosScope;
     when(
+      () => apiClient.post<dynamic>('/files/upload', data: any(named: 'data')),
+    ).thenAnswer(
+      (_) async => Response(
+        requestOptions: RequestOptions(path: '/files/upload'),
+        data: {'id': 'file-1', 'fileName': 'worksheet.jpg'},
+      ),
+    );
+    when(
       () => apiClient.post<dynamic>(
         '/mobile/teacher/homework',
         data: any(named: 'data'),
@@ -115,6 +125,13 @@ void main() {
       instructions: 'Complete exercise 2.',
       dueDate: DateTime.utc(2026, 6, 20),
       submissionRequired: true,
+      attachments: [
+        TeacherHomeworkDraftAttachment(
+          fileName: 'worksheet.jpg',
+          contentType: 'image/jpeg',
+          bytes: Uint8List.fromList([1, 2, 3]),
+        ),
+      ],
     );
     await repository.publishHomework('homework-1');
 
@@ -129,6 +146,17 @@ void main() {
     expect(captured['classId'], 'class-1');
     expect(captured['subjectId'], 'subject-1');
     expect(captured['status'], 'DRAFT');
+    expect(captured['attachmentFileIds'], ['file-1']);
+    final upload =
+        verify(
+              () => apiClient.post<dynamic>(
+                '/files/upload',
+                data: captureAny(named: 'data'),
+              ),
+            ).captured.single
+            as Map<String, dynamic>;
+    expect(upload['module'], 'homework');
+    expect(upload['base64Content'], 'AQID');
     verify(
       () => apiClient.post<dynamic>(
         '/mobile/teacher/homework/homework-1/publish',

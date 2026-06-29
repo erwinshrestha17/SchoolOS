@@ -1,5 +1,10 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { FileStatus, FileVisibility, StorageProvider } from '@prisma/client';
+import {
+  FileStatus,
+  FileVisibility,
+  HomeworkAssignmentStatus,
+  StorageProvider,
+} from '@prisma/client';
 import { FileRegistryService } from './file-registry.service';
 import { UsageService } from '../usage/usage.service';
 
@@ -53,7 +58,13 @@ describe('FileRegistryService tenant scoping', () => {
       activityAttachment: {
         findFirst: jest.fn(),
       },
+      homeworkAttachment: {
+        findFirst: jest.fn(),
+      },
       parentTeacherThread: {
+        findFirst: jest.fn(),
+      },
+      subjectTeacherAssignment: {
         findFirst: jest.fn(),
       },
       guardian: {
@@ -283,6 +294,21 @@ describe('FileRegistryService tenant scoping', () => {
       module: 'homework',
       entityId: 'homework-1',
       metadata: {},
+    });
+    prisma.homeworkAttachment.findFirst.mockResolvedValue({
+      submissionId: null,
+      submission: null,
+      assignment: {
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        subjectId: 'sub-1',
+        status: HomeworkAssignmentStatus.ASSIGNED,
+      },
+    });
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue({
+      id: 'subject-teacher-1',
     });
 
     await expect(

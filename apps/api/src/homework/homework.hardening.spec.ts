@@ -27,6 +27,17 @@ describe('Homework Hardening', () => {
     roles: ['teacher'],
     permissions: ['homework:create', 'homework:review'],
   };
+  const emptyAssignmentPage = {
+    items: [],
+    meta: {
+      total: 0,
+      page: 1,
+      limit: 20,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    },
+  };
 
   beforeEach(async () => {
     prisma = createPrismaMock();
@@ -226,7 +237,7 @@ describe('Homework Hardening', () => {
 
       await expect(
         homeworkService.listAssignments(parentActor, {}),
-      ).resolves.toEqual({ items: [], total: 0 });
+      ).resolves.toEqual(emptyAssignmentPage);
 
       expect(p.homeworkAssignment.findMany).not.toHaveBeenCalled();
       expect(p.homeworkAssignment.count).not.toHaveBeenCalled();
@@ -246,7 +257,7 @@ describe('Homework Hardening', () => {
         homeworkService.listAssignments(parentActor, {
           studentId: 'other-student',
         }),
-      ).resolves.toEqual({ items: [], total: 0 });
+      ).resolves.toEqual(emptyAssignmentPage);
 
       expect(p.studentGuardian.findFirst).toHaveBeenCalledWith({
         where: {
@@ -278,7 +289,7 @@ describe('Homework Hardening', () => {
         homeworkService.listAssignments(studentActor, {
           studentId: 'student-2',
         }),
-      ).resolves.toEqual({ items: [], total: 0 });
+      ).resolves.toEqual(emptyAssignmentPage);
 
       expect(p.homeworkAssignment.findMany).not.toHaveBeenCalled();
       expect(p.homeworkAssignment.count).not.toHaveBeenCalled();
@@ -295,6 +306,19 @@ describe('Homework Hardening', () => {
       p.studentGuardian.findMany.mockResolvedValue([
         { studentId: 'student-1' },
       ]);
+      p.studentGuardian.findFirst.mockResolvedValue({ id: 'guardian-link-1' });
+      p.homeworkAssignment.findFirst.mockResolvedValue({
+        id: 'hw-1',
+        tenantId: 'tenant-a',
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        subjectId: 'sub-1',
+        status: HomeworkAssignmentStatus.ASSIGNED,
+        dueDate: new Date('2026-12-31T00:00:00.000Z'),
+        attachments: [],
+        submissions: [],
+      });
       p.homeworkSubmission.findMany.mockResolvedValue([]);
       p.homeworkSubmission.count.mockResolvedValue(0);
 

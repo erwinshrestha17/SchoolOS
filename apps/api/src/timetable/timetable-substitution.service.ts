@@ -844,6 +844,18 @@ function parseDate(value: string, fieldName: string) {
   return parsed;
 }
 
+function buildPageMeta(total: number, page: number, limit: number) {
+  const totalPages = Math.ceil(total / limit);
+  return {
+    total,
+    page,
+    limit,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPreviousPage: page > 1,
+  };
+}
+
 function timetableSlotInclude() {
   return {
     academicYear: true,

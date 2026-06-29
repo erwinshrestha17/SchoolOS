@@ -6,6 +6,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   AuthMethod,
+  FileStatus,
   HomeworkAssignmentStatus,
   HomeworkSubmissionStatus,
 } from '@prisma/client';
@@ -47,6 +48,11 @@ describe('Homework Workflow', () => {
     attachments: [],
     submissions: [],
     subject: { name: 'Mathematics' },
+  };
+  const mockSubmissionStudent = {
+    id: 'student-1',
+    firstNameEn: 'Asha',
+    lastNameEn: 'Rai',
   };
 
   beforeEach(async () => {
@@ -105,6 +111,14 @@ describe('Homework Workflow', () => {
       student: { findFirst: jest.fn(), findMany: jest.fn() },
       subjectTeacherAssignment: {
         findFirst: jest.fn().mockResolvedValue({ id: 'assign-1' }),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            academicYearId: 'year-1',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            subjectId: 'sub-1',
+          },
+        ]),
       },
       homeworkReminderBatch: {
         findFirst: jest.fn(),
@@ -135,7 +149,10 @@ describe('Homework Workflow', () => {
         },
         {
           provide: FileRegistryService,
-          useValue: { linkToEntity: jest.fn().mockResolvedValue(undefined) },
+          useValue: {
+            linkToEntity: jest.fn().mockResolvedValue(undefined),
+            linkToEntityInTransaction: jest.fn().mockResolvedValue(undefined),
+          },
         },
         {
           provide: getQueueToken('homework'),
@@ -158,6 +175,8 @@ describe('Homework Workflow', () => {
           name: 'Fractions practice',
         },
       },
+      attachments: [],
+      _count: { attachments: 0, submissions: 0 },
       updatedAt: new Date('2026-06-01T00:00:00.000Z'),
     };
     prisma.homeworkAssignment.findMany.mockResolvedValue([
@@ -166,6 +185,7 @@ describe('Homework Workflow', () => {
         ...mockAssignment,
         id: 'hw-normal-1',
         attachmentMetadata: { homeworkTemplate: { isTemplate: false } },
+        _count: { attachments: 0, submissions: 0 },
       },
     ]);
 
@@ -195,7 +215,14 @@ describe('Homework Workflow', () => {
         take: 20,
       }),
     );
-    expect(result).toEqual([template]);
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: template.id,
+        title: template.title,
+        attachmentCount: 0,
+        submissionSummary: { total: 0 },
+      }),
+    ]);
   });
 
   describe('Assignment Lifecycle', () => {
@@ -204,7 +231,17 @@ describe('Homework Workflow', () => {
       prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
       prisma.subject.findFirst.mockResolvedValue({ id: 'sub-1' });
       prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
-      prisma.fileAsset.findMany.mockResolvedValue([{ id: 'file-1' }]);
+      prisma.fileAsset.findMany.mockResolvedValue([
+        {
+          id: 'file-1',
+          status: FileStatus.UPLOADED,
+          softDeletedAt: null,
+          deletedAt: null,
+          module: 'homework',
+          entityId: null,
+          uploadedByUserId: mockActor.userId,
+        },
+      ]);
       prisma.homeworkAssignment.create.mockResolvedValue({
         ...mockAssignment,
         id: 'new-hw',
@@ -301,7 +338,12 @@ describe('Homework Workflow', () => {
         .mockResolvedValueOnce(null)
         .mockResolvedValue({
           id: 'sub-1',
+          homeworkId: 'hw-1',
+          studentId: 'student-1',
           status: HomeworkSubmissionStatus.LATE,
+          homework: pastAssignment,
+          student: mockSubmissionStudent,
+          attachments: [],
         });
 
       const result = await service.createSubmission(
@@ -342,7 +384,10 @@ describe('Homework Workflow', () => {
         id: 'sub-1',
         tenantId: 'tenant-1',
         homeworkId: 'hw-1',
+        studentId: 'student-1',
         homework: mockAssignment,
+        student: mockSubmissionStudent,
+        attachments: [],
         status: HomeworkSubmissionStatus.SUBMITTED,
       };
       prisma.homeworkSubmission.findFirst.mockResolvedValue(submission);
@@ -380,6 +425,8 @@ describe('Homework Workflow', () => {
         homework: mockAssignment,
         status: HomeworkSubmissionStatus.SUBMITTED,
         studentId: 'student-1',
+        student: mockSubmissionStudent,
+        attachments: [],
       };
       prisma.homeworkSubmission.findFirst.mockResolvedValue(submission);
       prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });

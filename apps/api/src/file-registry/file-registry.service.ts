@@ -26,6 +26,11 @@ import {
 import { MAX_SIGNED_URL_TTL_SECONDS } from '../storage/storage.types';
 import { buildObjectKey } from '../storage/storage.utils';
 
+const FAMILY_VISIBLE_HOMEWORK_STATUSES: readonly HomeworkAssignmentStatus[] = [
+  HomeworkAssignmentStatus.ASSIGNED,
+  HomeworkAssignmentStatus.CLOSED,
+] as const;
+
 @Injectable()
 export class FileRegistryService {
   constructor(
@@ -393,10 +398,7 @@ export class FileRegistryService {
       return;
     }
 
-    if (
-      asset.module === 'homework' ||
-      asset.module === 'homework-submission'
-    ) {
+    if (asset.module === 'homework' || asset.module === 'homework-submission') {
       await this.assertHomeworkFileAccess(asset, auth);
       return;
     }
@@ -746,12 +748,7 @@ export class FileRegistryService {
       );
     }
 
-    if (
-      ![
-        HomeworkAssignmentStatus.ASSIGNED,
-        HomeworkAssignmentStatus.CLOSED,
-      ].includes(homework.status)
-    ) {
+    if (!FAMILY_VISIBLE_HOMEWORK_STATUSES.includes(homework.status)) {
       throw new ForbiddenException('Homework file is not available');
     }
 

@@ -50,6 +50,17 @@ const EDIT_BLOCKED_ASSIGNMENT_STATUSES: readonly HomeworkAssignmentStatus[] = [
   HomeworkAssignmentStatus.CLOSED,
   HomeworkAssignmentStatus.CANCELLED,
 ] as const;
+const FAMILY_VISIBLE_ASSIGNMENT_STATUSES: readonly HomeworkAssignmentStatus[] =
+  [HomeworkAssignmentStatus.ASSIGNED, HomeworkAssignmentStatus.CLOSED] as const;
+const CANCELLABLE_ASSIGNMENT_STATUSES: readonly HomeworkAssignmentStatus[] = [
+  HomeworkAssignmentStatus.DRAFT,
+  HomeworkAssignmentStatus.ASSIGNED,
+] as const;
+const REVIEWABLE_SUBMISSION_STATUSES: readonly HomeworkSubmissionStatus[] = [
+  HomeworkSubmissionStatus.SUBMITTED,
+  HomeworkSubmissionStatus.LATE,
+  HomeworkSubmissionStatus.NEEDS_CORRECTION,
+] as const;
 
 @Injectable()
 export class HomeworkService {
@@ -115,17 +126,9 @@ export class HomeworkService {
       where.classId = student.classId;
       where.status =
         query.status &&
-        [
-          HomeworkAssignmentStatus.ASSIGNED,
-          HomeworkAssignmentStatus.CLOSED,
-        ].includes(query.status)
+        FAMILY_VISIBLE_ASSIGNMENT_STATUSES.includes(query.status)
           ? query.status
-          : {
-              in: [
-                HomeworkAssignmentStatus.ASSIGNED,
-                HomeworkAssignmentStatus.CLOSED,
-              ],
-            };
+          : { in: [...FAMILY_VISIBLE_ASSIGNMENT_STATUSES] };
       if (student.sectionId) {
         where.OR = [{ sectionId: student.sectionId }, { sectionId: null }];
       } else {
@@ -148,17 +151,9 @@ export class HomeworkService {
         where.classId = student.classId;
         where.status =
           query.status &&
-          [
-            HomeworkAssignmentStatus.ASSIGNED,
-            HomeworkAssignmentStatus.CLOSED,
-          ].includes(query.status)
+          FAMILY_VISIBLE_ASSIGNMENT_STATUSES.includes(query.status)
             ? query.status
-            : {
-                in: [
-                  HomeworkAssignmentStatus.ASSIGNED,
-                  HomeworkAssignmentStatus.CLOSED,
-                ],
-              };
+            : { in: [...FAMILY_VISIBLE_ASSIGNMENT_STATUSES] };
         if (student.sectionId) {
           where.OR = [{ sectionId: student.sectionId }, { sectionId: null }];
         } else {
@@ -413,13 +408,7 @@ export class HomeworkService {
     });
     if (!submission) throw new NotFoundException('Submission not found');
     await this.ensureSubjectTeacherScopeForRead(actor, submission.homework);
-    if (
-      ![
-        HomeworkSubmissionStatus.SUBMITTED,
-        HomeworkSubmissionStatus.LATE,
-        HomeworkSubmissionStatus.NEEDS_CORRECTION,
-      ].includes(submission.status)
-    ) {
+    if (!REVIEWABLE_SUBMISSION_STATUSES.includes(submission.status)) {
       throw new ConflictException(
         `Cannot review a submission in ${submission.status} status`,
       );
@@ -460,10 +449,7 @@ export class HomeworkService {
     actor: AuthContext,
     query: HomeworkTemplateQueryDto = {},
   ) {
-    if (
-      actor.roles.includes('student') ||
-      actor.roles.includes('parent')
-    ) {
+    if (actor.roles.includes('student') || actor.roles.includes('parent')) {
       throw new ForbiddenException(
         'Homework templates are limited to authorized staff',
       );
@@ -850,10 +836,7 @@ export class HomeworkService {
     }
     if (
       status === HomeworkAssignmentStatus.CANCELLED &&
-      ![
-        HomeworkAssignmentStatus.DRAFT,
-        HomeworkAssignmentStatus.ASSIGNED,
-      ].includes(assignment.status)
+      !CANCELLABLE_ASSIGNMENT_STATUSES.includes(assignment.status)
     ) {
       throw new ConflictException(
         `Cannot cancel homework in ${assignment.status} status`,
@@ -990,10 +973,7 @@ export class HomeworkService {
             { student: { lastNameEn: sortOrder } },
             { id: 'asc' },
           ]
-        : [
-            { [query.sortBy ?? 'submittedAt']: sortOrder },
-            { id: 'asc' },
-          ];
+        : [{ [query.sortBy ?? 'submittedAt']: sortOrder }, { id: 'asc' }];
 
     const [
       items,
@@ -1088,9 +1068,7 @@ export class HomeworkService {
           status,
           submissionText: dto.submissionText,
           studentRemarks: dto.studentRemarks,
-          submittedAt: dto.submittedAt
-            ? new Date(dto.submittedAt)
-            : new Date(),
+          submittedAt: dto.submittedAt ? new Date(dto.submittedAt) : new Date(),
         },
       });
 
@@ -1208,13 +1186,7 @@ export class HomeworkService {
       submission.homework,
       await this.resolveActorStaffId(actor),
     );
-    if (
-      ![
-        HomeworkSubmissionStatus.SUBMITTED,
-        HomeworkSubmissionStatus.LATE,
-        HomeworkSubmissionStatus.NEEDS_CORRECTION,
-      ].includes(submission.status)
-    ) {
+    if (!REVIEWABLE_SUBMISSION_STATUSES.includes(submission.status)) {
       throw new ConflictException(
         `Cannot review a submission in ${submission.status} status`,
       );
@@ -2263,10 +2235,7 @@ export class HomeworkService {
     if (
       (actor.roles.includes('student') || actor.roles.includes('parent')) &&
       assignment.status &&
-      ![
-        HomeworkAssignmentStatus.ASSIGNED,
-        HomeworkAssignmentStatus.CLOSED,
-      ].includes(assignment.status)
+      !FAMILY_VISIBLE_ASSIGNMENT_STATUSES.includes(assignment.status)
     ) {
       throw new NotFoundException('Homework assignment not found');
     }
@@ -2336,10 +2305,7 @@ export class HomeworkService {
     classId?: string,
     sectionId?: string,
   ) {
-    if (
-      actor.roles.includes('student') ||
-      actor.roles.includes('parent')
-    ) {
+    if (actor.roles.includes('student') || actor.roles.includes('parent')) {
       throw new ForbiddenException(
         'Homework completion reports are limited to authorized staff',
       );
@@ -2393,10 +2359,7 @@ export class HomeworkService {
     academicYearId: string,
     classId?: string,
   ) {
-    if (
-      actor.roles.includes('student') ||
-      actor.roles.includes('parent')
-    ) {
+    if (actor.roles.includes('student') || actor.roles.includes('parent')) {
       throw new ForbiddenException(
         'Homework completion reports are limited to authorized staff',
       );

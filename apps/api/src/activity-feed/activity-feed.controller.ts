@@ -330,6 +330,7 @@ export class ActivityFeedController {
     res.setHeader('Content-Type', media.contentType);
     res.setHeader('Content-Length', String(media.sizeBytes));
     res.setHeader('Cache-Control', 'private, max-age=60');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
     res.setHeader(
       'Content-Disposition',
       `inline; filename="${sanitizeFileName(media.fileName)}"`,
@@ -359,6 +360,7 @@ export class ActivityFeedController {
 
     res.setHeader('Content-Type', media.contentType);
     res.setHeader('Content-Length', String(media.sizeBytes));
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
     res.setHeader(
       'Content-Disposition',
       `attachment; filename="${sanitizeFileName(media.fileName)}"`,

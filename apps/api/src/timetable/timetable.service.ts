@@ -50,6 +50,9 @@ import {
   UpdateTeacherAvailabilityDto,
 } from './dto/timetable-setup.dto';
 
+const TEACHER_VISIBLE_TIMETABLE_VERSION_STATUSES: readonly TimetableVersionStatus[] =
+  [TimetableVersionStatus.PUBLISHED, TimetableVersionStatus.LOCKED] as const;
+
 @Injectable()
 export class TimetableService {
   constructor(
@@ -66,9 +69,7 @@ export class TimetableService {
     const and: Prisma.TimetableSlotWhereInput[] = [];
     const where: Prisma.TimetableSlotWhereInput = {
       tenantId: actor.tenantId,
-      ...(query.academicYearId
-        ? { academicYearId: query.academicYearId }
-        : {}),
+      ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
       ...(query.classId ? { classId: query.classId } : {}),
       ...(query.sectionId ? { sectionId: query.sectionId } : {}),
       ...(query.teacherId ? { staffId: query.teacherId } : {}),
@@ -148,11 +149,7 @@ export class TimetableService {
       this.prisma.timetableSlot.findMany({
         where,
         include: timetableSlotInclude(),
-        orderBy: [
-          { dayOfWeek: 'asc' },
-          { startsAt: 'asc' },
-          { id: 'asc' },
-        ],
+        orderBy: [{ dayOfWeek: 'asc' }, { startsAt: 'asc' }, { id: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -283,9 +280,7 @@ export class TimetableService {
     }
     const where: Prisma.TimetableVersionWhereInput = {
       tenantId: actor.tenantId,
-      ...(query.academicYearId
-        ? { academicYearId: query.academicYearId }
-        : {}),
+      ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
       ...(query.classId ? { classId: query.classId } : {}),
       ...(query.sectionId ? { sectionId: query.sectionId } : {}),
       ...(query.status ? { status: query.status } : {}),
@@ -504,12 +499,7 @@ export class TimetableService {
     if (slots.length === 0) {
       throw new NotFoundException('Timetable version not found');
     }
-    if (
-      ![
-        TimetableVersionStatus.PUBLISHED,
-        TimetableVersionStatus.LOCKED,
-      ].includes(version.status)
-    ) {
+    if (!TEACHER_VISIBLE_TIMETABLE_VERSION_STATUSES.includes(version.status)) {
       throw new NotFoundException('Timetable version not found');
     }
     return { ...version, slots };
@@ -1285,9 +1275,7 @@ export class TimetableService {
 
     const slotFilters: Prisma.TimetableSlotWhereInput = {
       tenantId: actor.tenantId,
-      ...(query.academicYearId
-        ? { academicYearId: query.academicYearId }
-        : {}),
+      ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
       ...(query.versionId ? { versionId: query.versionId } : {}),
       ...(query.classId ? { classId: query.classId } : {}),
       ...(query.sectionId ? { sectionId: query.sectionId } : {}),
@@ -1333,7 +1321,11 @@ export class TimetableService {
           staffId: { in: staffIds },
         },
         include: timetableSlotInclude(),
-        orderBy: [{ staffId: 'asc' }, { dayOfWeek: 'asc' }, { startsAt: 'asc' }],
+        orderBy: [
+          { staffId: 'asc' },
+          { dayOfWeek: 'asc' },
+          { startsAt: 'asc' },
+        ],
       }),
       this.prisma.homeworkAssignment.groupBy({
         by: ['assignedByStaffId'],
@@ -1381,8 +1373,7 @@ export class TimetableService {
         teacherCount: total,
         totalPeriods: items.reduce((sum, item) => sum + item.slotCount, 0),
         totalTeachingMinutes,
-        totalWeeklyHours:
-          Math.round((totalTeachingMinutes / 60) * 10) / 10,
+        totalWeeklyHours: Math.round((totalTeachingMinutes / 60) * 10) / 10,
       },
     };
   }
@@ -1839,10 +1830,7 @@ export class TimetableService {
   }
 
   private assertOperationalTimetableRead(actor: AuthContext) {
-    if (
-      actor.roles.includes('student') ||
-      actor.roles.includes('parent')
-    ) {
+    if (actor.roles.includes('student') || actor.roles.includes('parent')) {
       throw new ForbiddenException(
         'Operational timetable data is limited to authorized staff',
       );

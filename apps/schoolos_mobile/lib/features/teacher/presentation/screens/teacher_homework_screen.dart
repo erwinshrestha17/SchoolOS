@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
@@ -24,6 +25,10 @@ class TeacherHomeworkScreen extends ConsumerStatefulWidget {
 }
 
 class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
+  static const _maxHomeworkAttachmentCount = 3;
+  static const _maxHomeworkAttachmentBytes = 8 * 1024 * 1024;
+
+  final _picker = ImagePicker();
   String? _status;
 
   @override
@@ -210,6 +215,7 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
     final title = TextEditingController();
     final instructions = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    final attachments = <TeacherHomeworkDraftAttachment>[];
     var selectedScope = scopes.first;
     var dueDate = DateTime.now().add(const Duration(days: 1));
     var submissionRequired = true;
@@ -323,6 +329,26 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                               setSheetState(() => submissionRequired = value),
                   ),
                   const SizedBox(height: AppSpacing.md),
+                  _HomeworkAttachmentSection(
+                    attachments: attachments,
+                    maxCount: _maxHomeworkAttachmentCount,
+                    saving: saving,
+                    onCamera: () => _pickHomeworkAttachments(
+                      sheetContext: sheetContext,
+                      setSheetState: setSheetState,
+                      attachments: attachments,
+                      source: ImageSource.camera,
+                    ),
+                    onGallery: () => _pickHomeworkAttachments(
+                      sheetContext: sheetContext,
+                      setSheetState: setSheetState,
+                      attachments: attachments,
+                      source: ImageSource.gallery,
+                    ),
+                    onRemove: (index) =>
+                        setSheetState(() => attachments.removeAt(index)),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
@@ -340,6 +366,9 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                                       instructions: instructions.text,
                                       dueDate: dueDate,
                                       submissionRequired: submissionRequired,
+                                      attachments: List.unmodifiable(
+                                        attachments,
+                                      ),
                                     );
                                 ref.invalidate(teacherHomeworkProvider);
                                 if (sheetContext.mounted) {
@@ -387,6 +416,72 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
     );
     title.dispose();
     instructions.dispose();
+  }
+
+  Future<void> _pickHomeworkAttachments({
+    required BuildContext sheetContext,
+    required StateSetter setSheetState,
+    required List<TeacherHomeworkDraftAttachment> attachments,
+    required ImageSource source,
+  }) async {
+    try {
+      final remaining = _maxHomeworkAttachmentCount - attachments.length;
+      if (remaining <= 0) return;
+      late List<XFile> files;
+      if (source == ImageSource.camera) {
+        final file = await _picker.pickImage(
+          source: ImageSource.camera,
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 78,
+          requestFullMetadata: false,
+        );
+        files = file == null ? const [] : [file];
+      } else {
+        files = await _picker.pickMultiImage(
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 78,
+          limit: remaining,
+          requestFullMetadata: false,
+        );
+      }
+
+      final selected = <TeacherHomeworkDraftAttachment>[];
+      var skipped = false;
+      for (final file in files.take(remaining)) {
+        final bytes = await file.readAsBytes();
+        final contentType = _homeworkImageContentType(file);
+        if (contentType == null || bytes.length > _maxHomeworkAttachmentBytes) {
+          skipped = true;
+          continue;
+        }
+        selected.add(
+          TeacherHomeworkDraftAttachment(
+            fileName: file.name,
+            contentType: contentType,
+            bytes: bytes,
+          ),
+        );
+      }
+
+      if (selected.isNotEmpty && sheetContext.mounted) {
+        setSheetState(() => attachments.addAll(selected));
+      }
+      if (skipped && sheetContext.mounted) {
+        ScaffoldMessenger.of(sheetContext).showSnackBar(
+          const SnackBar(
+            content: Text('One attachment was unsupported or too large.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (sheetContext.mounted) {
+        ScaffoldMessenger.of(sheetContext).showSnackBar(
+          const SnackBar(content: Text('Attachment could not be opened.')),
+        );
+      }
+    }
   }
 
   Future<void> _showEditSheet(TeacherHomeworkItem item) async {
@@ -584,6 +679,106 @@ class _FilterChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       onSelected: (_) => onSelected(),
+    );
+  }
+}
+
+class _HomeworkAttachmentSection extends StatelessWidget {
+  const _HomeworkAttachmentSection({
+    required this.attachments,
+    required this.maxCount,
+    required this.saving,
+    required this.onCamera,
+    required this.onGallery,
+    required this.onRemove,
+  });
+
+  final List<TeacherHomeworkDraftAttachment> attachments;
+  final int maxCount;
+  final bool saving;
+  final VoidCallback onCamera;
+  final VoidCallback onGallery;
+  final ValueChanged<int> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final canAdd = !saving && attachments.length < maxCount;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Attachments (${attachments.length}/$maxCount)',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Take attachment photo',
+              onPressed: canAdd ? onCamera : null,
+              icon: const Icon(Icons.photo_camera_rounded),
+            ),
+            IconButton(
+              tooltip: 'Choose attachment photos',
+              onPressed: canAdd ? onGallery : null,
+              icon: const Icon(Icons.photo_library_rounded),
+            ),
+          ],
+        ),
+        if (attachments.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.xs),
+          for (var index = 0; index < attachments.length; index++) ...[
+            _HomeworkAttachmentTile(
+              attachment: attachments[index],
+              saving: saving,
+              onRemove: () => onRemove(index),
+            ),
+            if (index < attachments.length - 1)
+              const SizedBox(height: AppSpacing.xs),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+class _HomeworkAttachmentTile extends StatelessWidget {
+  const _HomeworkAttachmentTile({
+    required this.attachment,
+    required this.saving,
+    required this.onRemove,
+  });
+
+  final TeacherHomeworkDraftAttachment attachment;
+  final bool saving;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.slate200),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: ListTile(
+        dense: true,
+        contentPadding: const EdgeInsets.only(left: AppSpacing.sm),
+        leading: const Icon(Icons.image_outlined),
+        title: Text(
+          attachment.fileName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(_formatHomeworkAttachmentBytes(attachment.bytes.length)),
+        trailing: IconButton(
+          tooltip: 'Remove attachment',
+          onPressed: saving ? null : onRemove,
+          icon: const Icon(Icons.close_rounded),
+        ),
+      ),
     );
   }
 }
@@ -915,4 +1110,28 @@ AppStatusType _statusType(String status) {
     'CANCELLED' || 'NEEDS_CORRECTION' => AppStatusType.rejected,
     _ => AppStatusType.pending,
   };
+}
+
+String? _homeworkImageContentType(XFile file) {
+  final mime = file.mimeType?.toLowerCase();
+  if (mime != null &&
+      const {'image/jpeg', 'image/png', 'image/webp'}.contains(mime)) {
+    return mime;
+  }
+
+  final name = file.name.toLowerCase();
+  if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
+  if (name.endsWith('.png')) return 'image/png';
+  if (name.endsWith('.webp')) return 'image/webp';
+  return null;
+}
+
+String _formatHomeworkAttachmentBytes(int bytes) {
+  if (bytes >= 1024 * 1024) {
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+  if (bytes >= 1024) {
+    return '${(bytes / 1024).round()} KB';
+  }
+  return '$bytes B';
 }

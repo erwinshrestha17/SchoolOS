@@ -25,6 +25,7 @@ function createController() {
   };
   const activityMediaService = {
     getAttachmentMedia: jest.fn(),
+    getAttachmentAccessUrl: jest.fn(),
   };
   const activityPostLifecycleService = {
     updatePost: jest.fn(),
@@ -204,5 +205,41 @@ describe('ActivityFeedController M5 contracts', () => {
       domain: 'Language',
     });
     expect(result).toEqual([{ key: 'ecd-language-follows-two-step' }]);
+  });
+
+  it('serves protected activity previews with same-site embed headers', async () => {
+    const { controller, activityMediaService } = createController();
+    const stream = { pipe: jest.fn() };
+    const response = {
+      redirect: jest.fn(),
+      setHeader: jest.fn(),
+    };
+    activityMediaService.getAttachmentMedia.mockResolvedValue({
+      stream,
+      fileName: 'class-photo.png',
+      contentType: 'image/png',
+      sizeBytes: 68,
+    });
+
+    await controller.getAttachmentPreview(
+      'attachment-1',
+      actor,
+      response as never,
+    );
+
+    expect(activityMediaService.getAttachmentMedia).toHaveBeenCalledWith(
+      actor,
+      'attachment-1',
+      'preview',
+    );
+    expect(response.setHeader).toHaveBeenCalledWith(
+      'Cross-Origin-Resource-Policy',
+      'same-site',
+    );
+    expect(response.setHeader).toHaveBeenCalledWith(
+      'Cache-Control',
+      'private, max-age=60',
+    );
+    expect(stream.pipe).toHaveBeenCalledWith(response);
   });
 });
