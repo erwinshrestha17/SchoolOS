@@ -7,10 +7,13 @@ import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
+import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
+import '../../../../shared/widgets/section_header.dart';
 import '../../../../shared/widgets/status_chip.dart';
 import '../../../attendance/application/attendance_providers.dart';
+import '../../../attendance/domain/attendance_models.dart';
 import '../../../teacher/presentation/widgets/teacher_app_widgets.dart';
 
 class TeacherClassHubScreen extends ConsumerStatefulWidget {
@@ -145,6 +148,32 @@ class _TeacherClassHubScreenState extends ConsumerState<TeacherClassHubScreen> {
                 onTap: () => context.go(AppRoutes.teacherMessages),
               ),
               const SizedBox(height: AppSpacing.xl),
+              const SectionHeader(title: 'Student summaries'),
+              const SizedBox(height: AppSpacing.sm),
+              AppCard(
+                child: Column(
+                  children: [
+                    for (final entry in state.entries.take(5)) ...[
+                      _StudentSummaryRow(
+                        entry: entry,
+                        onTap: () =>
+                            _showStudentSummary(context, ref, selected, entry),
+                      ),
+                      if (entry != state.entries.take(5).last) const Divider(),
+                    ],
+                    if (state.entries.length > 5) ...[
+                      const Divider(),
+                      Text(
+                        '${state.entries.length - 5} more student(s) available in attendance.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.slate500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
               if (state.lastUpdated != null)
                 TeacherLastUpdatedLabel(
                   value: state.lastUpdated!,
@@ -156,4 +185,210 @@ class _TeacherClassHubScreenState extends ConsumerState<TeacherClassHubScreen> {
       ),
     );
   }
+}
+
+class _StudentSummaryRow extends StatelessWidget {
+  const _StudentSummaryRow({required this.entry, required this.onTap});
+
+  final AttendanceStudentEntry entry;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(
+        backgroundColor: AppColors.info.withValues(alpha: 0.12),
+        foregroundColor: AppColors.info,
+        child: Text(entry.rollNumber),
+      ),
+      title: Text(
+        entry.studentName,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontWeight: FontWeight.w800),
+      ),
+      subtitle: Text('Roll ${entry.rollNumber}'),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: onTap,
+    );
+  }
+}
+
+Future<void> _showStudentSummary(
+  BuildContext context,
+  WidgetRef ref,
+  TeacherClassSection classSection,
+  AttendanceStudentEntry entry,
+) {
+  final future = ref
+      .read(attendanceRepositoryProvider)
+      .getTeacherStudentSummary(classSection, entry.studentId);
+
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            0,
+            AppSpacing.lg,
+            AppSpacing.xl,
+          ),
+          child: FutureBuilder<TeacherStudentSummary>(
+            future: future,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const SizedBox(
+                  height: 180,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.hasError || !snapshot.hasData) {
+                return const AppCard(
+                  child: Text('Student summary is unavailable.'),
+                );
+              }
+
+              final summary = snapshot.data!;
+              final attendance = summary.attendance;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    summary.student.name,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    [
+                      summary.student.className,
+                      if (summary.student.sectionName != null)
+                        summary.student.sectionName!,
+                      if (summary.student.rollNumber != null)
+                        'Roll ${summary.student.rollNumber}',
+                    ].join(' • '),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: AppColors.slate500),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _SummaryMetric(
+                          label: 'Present',
+                          value: '${attendance.present}',
+                          color: AppColors.success,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: _SummaryMetric(
+                          label: 'Absent',
+                          value: '${attendance.absent}',
+                          color: AppColors.danger,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: _SummaryMetric(
+                          label: 'Late',
+                          value: '${attendance.late}',
+                          color: AppColors.warning,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  AppCard(
+                    hasShadow: false,
+                    color: AppColors.slate50,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Recent register window',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        StatusChip(
+                          status: _studentSummaryStatus(attendance.lastStatus),
+                          label: _studentStatusLabel(attendance.lastStatus),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _SummaryMetric extends StatelessWidget {
+  const _SummaryMetric({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      hasShadow: false,
+      color: color.withValues(alpha: 0.08),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+AppStatusType _studentSummaryStatus(String? status) {
+  return switch (status) {
+    'ABSENT' => AppStatusType.absent,
+    'LATE' => AppStatusType.late,
+    'LEAVE' ||
+    'SICK_LEAVE' ||
+    'EXCUSED_LEAVE' ||
+    'UNEXCUSED_LEAVE' => AppStatusType.pending,
+    'PRESENT' => AppStatusType.present,
+    _ => AppStatusType.pending,
+  };
+}
+
+String _studentStatusLabel(String? status) {
+  if (status == null || status.trim().isEmpty) {
+    return 'No record';
+  }
+  return status
+      .split('_')
+      .where((part) => part.isNotEmpty)
+      .map((part) => part[0].toUpperCase() + part.substring(1).toLowerCase())
+      .join(' ');
 }

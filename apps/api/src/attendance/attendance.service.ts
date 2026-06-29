@@ -339,6 +339,117 @@ export class AttendanceService {
     };
   }
 
+  async getTeacherMobileStudentSummary(
+    actor: AuthContext,
+    scope: {
+      studentId: string;
+      academicYearId: string;
+      classId: string;
+      sectionId?: string | null;
+    },
+  ) {
+    const { academicYear, classroom, section } =
+      await this.validateAttendanceScope(actor, {
+        academicYearId: scope.academicYearId,
+        classId: scope.classId,
+        sectionId: scope.sectionId ?? undefined,
+      });
+
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: scope.studentId,
+        tenantId: actor.tenantId,
+        classId: scope.classId,
+        ...(scope.sectionId ? { sectionId: scope.sectionId } : {}),
+        enrollments: {
+          some: {
+            tenantId: actor.tenantId,
+            academicYearId: scope.academicYearId,
+            classId: scope.classId,
+            sectionId: scope.sectionId ?? null,
+            status: EnrollmentStatus.ACTIVE,
+          },
+        },
+      },
+      select: {
+        id: true,
+        studentSystemId: true,
+        firstNameEn: true,
+        lastNameEn: true,
+        rollNumber: true,
+        lifecycleStatus: true,
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this teacher scope');
+    }
+
+    const records = await this.prisma.attendanceRecord.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: scope.studentId,
+        attendanceSession: {
+          tenantId: actor.tenantId,
+          academicYearId: scope.academicYearId,
+          classId: scope.classId,
+          sectionId: scope.sectionId ?? null,
+        },
+      },
+      select: {
+        status: true,
+        remark: true,
+        attendanceSession: {
+          select: {
+            attendanceDate: true,
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      take: 30,
+    });
+    const sortedRecords = [...records].sort(
+      (a, b) =>
+        b.attendanceSession.attendanceDate.getTime() -
+        a.attendanceSession.attendanceDate.getTime(),
+    );
+    const counts = summarizeAttendanceStatuses(sortedRecords);
+    const latestRecord = sortedRecords[0] ?? null;
+
+    return {
+      student: {
+        id: student.id,
+        name: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+        studentSystemId: student.studentSystemId,
+        rollNumber: student.rollNumber,
+        lifecycleStatus: student.lifecycleStatus,
+        academicYearId: academicYear.id,
+        academicYearName: academicYear.name,
+        classId: classroom.id,
+        className: classroom.name,
+        sectionId: section?.id ?? null,
+        sectionName: section?.name ?? null,
+      },
+      scope: {
+        academicYearId: academicYear.id,
+        classId: classroom.id,
+        sectionId: section?.id ?? null,
+        access: 'teacher_assigned',
+      },
+      attendance: {
+        recentWindow: sortedRecords.length,
+        present: counts.present,
+        absent: counts.absent,
+        late: counts.late,
+        leave: counts.leave,
+        lastStatus: latestRecord?.status ?? null,
+        lastRemark: latestRecord?.remark ?? null,
+        lastRecordedAt:
+          latestRecord?.attendanceSession.attendanceDate.toISOString() ?? null,
+      },
+    };
+  }
+
   async listAttendance(actor: AuthContext) {
     const studentScope = await buildStudentScopeFilter(this.prisma, actor);
 
@@ -3310,6 +3421,85 @@ export class AttendanceService {
     return content;
   }
 
+  async listMonthlyRegisterExports(
+    actor: AuthContext,
+    query: { page?: number | string; limit?: number | string } = {},
+  ) {
+    const page = normalizePositiveInteger(query.page, 1);
+    const limit = Math.min(normalizePositiveInteger(query.limit, 10), 50);
+    const skip = (page - 1) * limit;
+    const where: Prisma.ReportExportWhereInput = {
+      tenantId: actor.tenantId,
+      reportKey: 'attendance_monthly_register',
+    };
+
+    const [exports, total] = await Promise.all([
+      this.prisma.reportExport.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.reportExport.count({ where }),
+    ]);
+    const fileAssetIds = exports
+      .map((exportRecord) => exportRecord.fileAssetId)
+      .filter((fileAssetId): fileAssetId is string => Boolean(fileAssetId));
+    const fileAssets =
+      fileAssetIds.length > 0
+        ? await this.prisma.fileAsset.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              id: { in: fileAssetIds },
+              module: 'attendance',
+              softDeletedAt: null,
+              deletedAt: null,
+            },
+            select: {
+              id: true,
+              originalFilename: true,
+              mimeType: true,
+              sizeBytes: true,
+              status: true,
+            },
+          })
+        : [];
+    const fileAssetById = new Map(fileAssets.map((asset) => [asset.id, asset]));
+
+    return {
+      items: exports.map((exportRecord) => {
+        const fileAsset = exportRecord.fileAssetId
+          ? fileAssetById.get(exportRecord.fileAssetId)
+          : null;
+
+        return {
+          id: exportRecord.id,
+          reportKey: exportRecord.reportKey,
+          format: exportRecord.format,
+          status: exportRecord.status,
+          filters: exportRecord.filters,
+          requestedBy: exportRecord.requestedBy,
+          createdAt: exportRecord.createdAt,
+          completedAt: exportRecord.completedAt,
+          errorSummary: exportRecord.errorSummary,
+          file: fileAsset
+            ? {
+                fileAssetId: fileAsset.id,
+                fileName: fileAsset.originalFilename,
+                mimeType: fileAsset.mimeType,
+                sizeBytes: Number(fileAsset.sizeBytes),
+                status: fileAsset.status,
+              }
+            : null,
+        };
+      }),
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
+  }
+
   async processDailyEscalationWarnings(
     actor: AuthContext,
     runDate = new Date(),
@@ -5096,6 +5286,40 @@ function calculateAttendancePercent(
   ).length;
 
   return Math.round((presentCount / records.length) * 10000) / 100;
+}
+
+function normalizePositiveInteger(
+  value: number | string | undefined,
+  fallback: number,
+) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function summarizeAttendanceStatuses(
+  records: Array<{ status: AttendanceStatus }>,
+) {
+  return records.reduce(
+    (summary, record) => {
+      if (record.status === AttendanceStatus.ABSENT) {
+        summary.absent += 1;
+      } else if (record.status === AttendanceStatus.LATE) {
+        summary.late += 1;
+      } else if (
+        record.status === AttendanceStatus.LEAVE ||
+        record.status === AttendanceStatus.ON_LEAVE ||
+        record.status === AttendanceStatus.SICK_LEAVE ||
+        record.status === AttendanceStatus.EXCUSED_LEAVE ||
+        record.status === AttendanceStatus.UNEXCUSED_LEAVE
+      ) {
+        summary.leave += 1;
+      } else {
+        summary.present += 1;
+      }
+      return summary;
+    },
+    { present: 0, absent: 0, late: 0, leave: 0 },
+  );
 }
 
 function priorityWeight(priority: string) {

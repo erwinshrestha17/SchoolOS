@@ -65,6 +65,16 @@ export const attendanceApi = {
         bsYear: params.bsYear ? String(params.bsYear) : undefined,
       }),
     ),
+  listAttendanceRegisterExports: (params?: {
+    page?: number | null;
+    limit?: number | null;
+  }) =>
+    request<AttendanceRegisterExportPage>(
+      withQuery("/attendance/register/exports", {
+        page: params?.page ? String(params.page) : undefined,
+        limit: params?.limit ? String(params.limit) : undefined,
+      }),
+    ),
   listAttendanceDrafts: () =>
     request<AttendanceDraftSummary[]>("/attendance/drafts"),
   getAttendanceCorrection: (id: string) =>
@@ -391,6 +401,33 @@ export type AttendanceMonthlyRegister = {
       totalDays: number;
     };
   }>;
+};
+
+export type AttendanceRegisterExportPage = {
+  items: AttendanceRegisterExportSummary[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+};
+
+export type AttendanceRegisterExportSummary = {
+  id: string;
+  reportKey: "attendance_monthly_register";
+  format: string;
+  status: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
+  filters: Record<string, unknown> | null;
+  requestedBy: string | null;
+  createdAt: string;
+  completedAt: string | null;
+  errorSummary: string | null;
+  file: {
+    fileAssetId: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    status: string;
+  } | null;
 };
 
 export type AttendanceDraftSummary = {

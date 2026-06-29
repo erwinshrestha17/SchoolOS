@@ -203,6 +203,17 @@ interface AdmissionEvaluation {
   missingRequiredDocuments: string[];
   duplicateRisk: boolean;
   duplicateCandidates: NonNullable<StoredCaseMetadata['duplicateCandidates']>;
+  relatedStudentCandidates: Array<{
+    studentId: string;
+    studentSystemId: string;
+    fullNameEn: string;
+    className: string;
+    sectionName: string | null;
+    lifecycleStatus: string;
+    guardianName: string | null;
+    guardianRelation: string | null;
+    matchReasons: string[];
+  }>;
   policyRequirements: {
     admissionMode: 'DIRECT_ALLOWED' | 'REVIEW_REQUIRED';
     requireDocumentReview: boolean;
@@ -958,6 +969,7 @@ export class AdmissionCasesService {
       missingRequiredDocuments: evaluation.missingRequiredDocuments,
       duplicateRisk: evaluation.duplicateRisk,
       duplicateCandidates: evaluation.duplicateCandidates,
+      relatedStudentCandidates: evaluation.relatedStudentCandidates,
       policyRequirements: evaluation.policyRequirements,
       canAdmitDirectly: evaluation.canAdmitDirectly && !reviewComplete,
       canOverrideDuplicate: evaluation.canOverrideDuplicate && !reviewComplete,
@@ -1033,6 +1045,12 @@ export class AdmissionCasesService {
       record,
       actor,
     );
+    const duplicateCandidateIds = new Set(
+      duplicateCandidates.map((candidate) => candidate.studentId),
+    );
+    const relatedStudentCandidates = (
+      await this.findRelatedStudentCandidates(record, actor)
+    ).filter((candidate) => !duplicateCandidateIds.has(candidate.studentId));
     const duplicateRisk = duplicateCandidates.length > 0;
     const documentBlocksAdmission =
       missingRequiredDocuments.length > 0 &&
@@ -1089,6 +1107,7 @@ export class AdmissionCasesService {
       missingRequiredDocuments,
       duplicateRisk,
       duplicateCandidates,
+      relatedStudentCandidates,
       policyRequirements,
       canAdmitDirectly,
       canOverrideDuplicate,
@@ -1292,6 +1311,96 @@ export class AdmissionCasesService {
       sectionName: student.sectionRef?.name ?? null,
       lifecycleStatus: student.lifecycleStatus,
     }));
+  }
+
+  private async findRelatedStudentCandidates(
+    record: AdmissionCaseRecord,
+    actor: AuthContext,
+  ) {
+    if (!record.guardianPhone) return [];
+    const guardianPhone = requireNepalPhone(record.guardianPhone);
+    const guardianName = record.guardianFullName
+      ? requirePersonName(record.guardianFullName, 'guardianFullName')
+      : null;
+    const lastNameEn = record.lastNameEn.trim().toLowerCase();
+    const lastNameNp = record.lastNameNp?.trim().toLowerCase() ?? null;
+
+    const matches = await this.prisma.student.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        guardianLinks: {
+          some: {
+            guardian: {
+              OR: [
+                { primaryPhone: guardianPhone },
+                { secondaryPhone: guardianPhone },
+              ],
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        studentSystemId: true,
+        firstNameEn: true,
+        lastNameEn: true,
+        lastNameNp: true,
+        lifecycleStatus: true,
+        class: { select: { name: true } },
+        sectionRef: { select: { name: true } },
+        guardianLinks: {
+          where: {
+            guardian: {
+              OR: [
+                { primaryPhone: guardianPhone },
+                { secondaryPhone: guardianPhone },
+              ],
+            },
+          },
+          select: {
+            relation: true,
+            guardian: { select: { fullName: true } },
+          },
+          take: 1,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    return matches.map((student) => {
+      const linkedGuardian = student.guardianLinks?.[0] ?? null;
+      const linkedGuardianName = linkedGuardian?.guardian.fullName ?? null;
+      const reasons = ['Guardian phone already has linked student records.'];
+      if (student.lastNameEn.trim().toLowerCase() === lastNameEn) {
+        reasons.push('English family name matches.');
+      }
+      if (
+        lastNameNp &&
+        student.lastNameNp?.trim().toLowerCase() === lastNameNp
+      ) {
+        reasons.push('Nepali family name matches.');
+      }
+      if (
+        guardianName &&
+        linkedGuardianName?.trim().toLowerCase() ===
+          guardianName.toLowerCase()
+      ) {
+        reasons.push('Guardian name matches an existing guardian.');
+      }
+
+      return {
+        studentId: student.id,
+        studentSystemId: student.studentSystemId,
+        fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+        className: student.class.name,
+        sectionName: student.sectionRef?.name ?? null,
+        lifecycleStatus: student.lifecycleStatus,
+        guardianName: linkedGuardianName,
+        guardianRelation: linkedGuardian?.relation ?? null,
+        matchReasons: [...new Set(reasons)],
+      };
+    });
   }
 
   private async validateDocumentReferences(

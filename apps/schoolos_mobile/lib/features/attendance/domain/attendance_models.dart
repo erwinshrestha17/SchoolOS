@@ -275,6 +275,96 @@ class AttendanceStudentEntry {
   };
 }
 
+class TeacherStudentSummary {
+  const TeacherStudentSummary({
+    required this.student,
+    required this.attendance,
+  });
+
+  final TeacherStudentIdentity student;
+  final TeacherStudentAttendance attendance;
+
+  factory TeacherStudentSummary.fromJson(Map<String, dynamic> json) {
+    final student = json['student'] is Map<String, dynamic>
+        ? json['student'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final attendance = json['attendance'] is Map<String, dynamic>
+        ? json['attendance'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    return TeacherStudentSummary(
+      student: TeacherStudentIdentity.fromJson(student),
+      attendance: TeacherStudentAttendance.fromJson(attendance),
+    );
+  }
+}
+
+class TeacherStudentIdentity {
+  const TeacherStudentIdentity({
+    required this.id,
+    required this.name,
+    this.studentSystemId,
+    this.rollNumber,
+    required this.lifecycleStatus,
+    required this.className,
+    this.sectionName,
+  });
+
+  final String id;
+  final String name;
+  final String? studentSystemId;
+  final int? rollNumber;
+  final String lifecycleStatus;
+  final String className;
+  final String? sectionName;
+
+  factory TeacherStudentIdentity.fromJson(Map<String, dynamic> json) {
+    return TeacherStudentIdentity(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'Student',
+      studentSystemId: json['studentSystemId'] as String?,
+      rollNumber: _asNullableInt(json['rollNumber']),
+      lifecycleStatus: json['lifecycleStatus'] as String? ?? 'ACTIVE',
+      className: json['className'] as String? ?? 'Class',
+      sectionName: json['sectionName'] as String?,
+    );
+  }
+}
+
+class TeacherStudentAttendance {
+  const TeacherStudentAttendance({
+    required this.recentWindow,
+    required this.present,
+    required this.absent,
+    required this.late,
+    required this.leave,
+    this.lastStatus,
+    this.lastRemark,
+    this.lastRecordedAt,
+  });
+
+  final int recentWindow;
+  final int present;
+  final int absent;
+  final int late;
+  final int leave;
+  final String? lastStatus;
+  final String? lastRemark;
+  final String? lastRecordedAt;
+
+  factory TeacherStudentAttendance.fromJson(Map<String, dynamic> json) {
+    return TeacherStudentAttendance(
+      recentWindow: _asInt(json['recentWindow']),
+      present: _asInt(json['present']),
+      absent: _asInt(json['absent']),
+      late: _asInt(json['late']),
+      leave: _asInt(json['leave']),
+      lastStatus: json['lastStatus'] as String?,
+      lastRemark: json['lastRemark'] as String?,
+      lastRecordedAt: json['lastRecordedAt'] as String?,
+    );
+  }
+}
+
 String _attendanceStatusToApi(AttendanceStatus status) {
   return switch (status) {
     AttendanceStatus.present => 'PRESENT',
@@ -303,4 +393,21 @@ AttendanceStatus attendanceStatusFromApi(String? status) {
     default:
       return AttendanceStatus.present;
   }
+}
+
+int _asInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  return 0;
+}
+
+int? _asNullableInt(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  return _asInt(value);
 }

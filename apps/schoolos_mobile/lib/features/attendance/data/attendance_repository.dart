@@ -212,6 +212,24 @@ class AttendanceRepository {
     );
   }
 
+  Future<TeacherStudentSummary> getTeacherStudentSummary(
+    TeacherClassSection classSection,
+    String studentId,
+  ) async {
+    final response = await _client.get(
+      '/mobile/teacher/students/$studentId/summary',
+      queryParameters: {
+        'academicYearId': classSection.academicYearId,
+        'classId': classSection.classId,
+        if (classSection.sectionId != null) 'sectionId': classSection.sectionId,
+      },
+    );
+    final data = response.data is Map<String, dynamic>
+        ? response.data as Map<String, dynamic>
+        : const <String, dynamic>{};
+    return TeacherStudentSummary.fromJson(data);
+  }
+
   Future<TeacherAttendanceSubmitResult> submitAttendance(
     TeacherClassSection classSection,
     DateTime date,

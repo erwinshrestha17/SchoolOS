@@ -123,33 +123,70 @@ class _ProfileContent extends StatelessWidget {
         const SectionHeader(title: 'Student identity'),
         const SizedBox(height: AppSpacing.sm),
         AppCard(
-          child: Row(
+          child: Column(
             children: [
-              Container(
-                width: 84,
-                height: 84,
-                decoration: BoxDecoration(
-                  color: AppColors.slate100,
-                  borderRadius: BorderRadius.circular(AppRadius.xl),
-                ),
-                child: const Icon(
-                  Icons.qr_code_2_rounded,
-                  size: 44,
-                  color: AppColors.slate500,
+              Row(
+                children: [
+                  Container(
+                    width: 84,
+                    height: 84,
+                    decoration: BoxDecoration(
+                      color: AppColors.slate100,
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
+                    ),
+                    child: const Icon(
+                      Icons.qr_code_2_rounded,
+                      size: 44,
+                      color: AppColors.slate500,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text(
+                      currentProfile.qrLabel,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.slate600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(),
+              _ProfileRow(
+                label: 'QR status',
+                value: _labelize(
+                  currentProfile.qrStatus?.status ?? 'UNAVAILABLE',
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Text(
-                  currentProfile.qrLabel,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: AppColors.slate600),
+              if (currentProfile.qrStatus?.lastScannedAt != null) ...[
+                const Divider(),
+                _ProfileRow(
+                  label: 'Last scan',
+                  value: _formatDate(currentProfile.qrStatus!.lastScannedAt),
                 ),
-              ),
+              ],
             ],
           ),
         ),
+        const SizedBox(height: AppSpacing.xl),
+        const SectionHeader(title: 'Documents'),
+        const SizedBox(height: AppSpacing.sm),
+        if (currentProfile.documents.isEmpty)
+          const AppCard(
+            child: Text('No mobile documents are available for this student.'),
+          )
+        else
+          AppCard(
+            child: Column(
+              children: [
+                for (final document in currentProfile.documents) ...[
+                  _DocumentRow(document: document),
+                  if (document != currentProfile.documents.last)
+                    const Divider(),
+                ],
+              ],
+            ),
+          ),
         const SizedBox(height: AppSpacing.xl),
         const SectionHeader(title: 'School record'),
         const SizedBox(height: AppSpacing.sm),
@@ -290,6 +327,97 @@ String _labelize(String value) {
       .where((part) => part.isNotEmpty)
       .map((part) => part[0].toUpperCase() + part.substring(1).toLowerCase())
       .join(' ');
+}
+
+String _formatBytes(int value) {
+  if (value <= 0) {
+    return '-';
+  }
+  if (value < 1024) {
+    return '$value B';
+  }
+  if (value < 1024 * 1024) {
+    return '${(value / 1024).toStringAsFixed(1)} KB';
+  }
+  return '${(value / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
+
+class _DocumentRow extends StatelessWidget {
+  const _DocumentRow({required this.document});
+
+  final ParentStudentDocument document;
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = [
+      _labelize(document.kind),
+      _labelize(document.status),
+      _formatBytes(document.sizeBytes),
+    ].where((value) => value != '-').join(' • ');
+    final dateLabel = document.verifiedAt != null
+        ? 'Verified ${_formatDate(document.verifiedAt)}'
+        : document.uploadedAt != null
+        ? 'Uploaded ${_formatDate(document.uploadedAt)}'
+        : null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+            ),
+            child: const Icon(
+              Icons.description_rounded,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _orDash(document.title),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle.isEmpty ? _orDash(document.fileName) : subtitle,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.slate500),
+                ),
+                if (dateLabel != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    dateLabel,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.slate500),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          StatusChip(
+            status: document.hasProtectedDownload
+                ? AppStatusType.completed
+                : AppStatusType.pending,
+            label: document.hasProtectedDownload ? 'Protected' : 'Unavailable',
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ProfileRow extends StatelessWidget {

@@ -15,6 +15,15 @@ export type PaginatedResponse<T> = {
   hasNextPage?: boolean;
 };
 
+export type StablePaginationMeta = {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+};
+
 export type ApiResponse<T> = {
   success: boolean;
   message: string;
@@ -519,6 +528,9 @@ export type HomeworkAssignmentSummary = {
   status?: 'DRAFT' | 'ASSIGNED' | 'CLOSED' | 'CANCELLED';
   attachmentMetadata?: Record<string, unknown> | null;
   maxScore: number | null;
+  attachmentCount?: number;
+  attachments?: HomeworkAttachmentSummary[];
+  submissionSummary?: HomeworkSubmissionCounts;
   submissions?: HomeworkSubmissionSummary[];
   class?: ClassSummary;
   section?: SectionSummary | null;
@@ -528,6 +540,29 @@ export type HomeworkAssignmentSummary = {
     firstName: string;
     lastName: string;
   };
+};
+
+export type HomeworkSubmissionCounts = {
+  total: number;
+  submitted?: number;
+  onTime?: number;
+  late?: number;
+  reviewed?: number;
+  unreviewed?: number;
+  needsCorrection?: number;
+  notSubmitted?: number;
+};
+
+export type HomeworkAttachmentSummary = {
+  id: string;
+  fileAssetId?: string;
+  fileAsset?: {
+    id: string;
+    originalFilename: string;
+    mimeType: string;
+    sizeBytes: number;
+    status: 'PENDING' | 'UPLOADED' | 'FAILED' | 'DELETED';
+  } | null;
 };
 
 export type HomeworkSubmissionSummary = {
@@ -547,18 +582,18 @@ export type HomeworkSubmissionSummary = {
   returnedAt?: string | null;
   student?: StudentProfile;
   homework?: HomeworkAssignmentSummary;
-  attachments?: Array<{
-    id: string;
-    fileAsset?: {
-      id: string;
-      originalFilename: string;
-      publicUrl?: string | null;
-      mimeType: string;
-      sizeBytes: string | number;
-      module?: string | null;
-      entityId?: string | null;
-    } | null;
-  }>;
+  attachments?: HomeworkAttachmentSummary[];
+};
+
+export type HomeworkAssignmentPage = {
+  items: HomeworkAssignmentSummary[];
+  meta: StablePaginationMeta;
+};
+
+export type HomeworkSubmissionPage = {
+  items: HomeworkSubmissionSummary[];
+  meta: StablePaginationMeta;
+  summary: HomeworkSubmissionCounts;
 };
 
 export type ParentTeacherThreadStatus = 'OPEN' | 'CLOSED' | 'ESCALATED';
@@ -3561,6 +3596,32 @@ export type TeacherWorkloadSummary = {
   teachingMinutes: number;
   weeklyHours: number;
   slots: TimetableSlotSummary[];
+};
+
+export type TimetableSlotPage = {
+  items: TimetableSlotSummary[];
+  meta: StablePaginationMeta;
+};
+
+export type TimetableVersionPage = {
+  items: TimetableVersionSummary[];
+  meta: StablePaginationMeta;
+};
+
+export type TimetableSubstitutionPage = {
+  items: TimetableSubstitutionSummary[];
+  meta: StablePaginationMeta;
+};
+
+export type TeacherWorkloadPage = {
+  items: TeacherWorkloadSummary[];
+  meta: StablePaginationMeta;
+  summary: {
+    teacherCount: number;
+    totalPeriods: number;
+    totalTeachingMinutes: number;
+    totalWeeklyHours: number;
+  };
 };
 
 

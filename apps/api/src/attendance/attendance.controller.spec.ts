@@ -19,6 +19,7 @@ function createController() {
     getSummary: jest.fn(),
     getMonthlyRegister: jest.fn(),
     exportMonthlyRegister: jest.fn(),
+    listMonthlyRegisterExports: jest.fn(),
     listConflicts: jest.fn(),
     listCalendarDays: jest.fn(),
     upsertCalendarDay: jest.fn(),
@@ -158,6 +159,22 @@ describe('AttendanceController M2 contracts', () => {
       actor,
     );
     expect(result).toBe('csv');
+  });
+
+  it('delegates retained monthly register exports with current actor', () => {
+    const { controller, service } = createController();
+    service.listMonthlyRegisterExports.mockReturnValue({
+      items: [],
+      total: 0,
+    });
+
+    const result = controller.listMonthlyRegisterExports(actor, '2', '5');
+
+    expect(service.listMonthlyRegisterExports).toHaveBeenCalledWith(actor, {
+      page: '2',
+      limit: '5',
+    });
+    expect(result).toEqual({ items: [], total: 0 });
   });
 
   it('delegates offline sync submissions with current actor', () => {

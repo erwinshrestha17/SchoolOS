@@ -247,6 +247,76 @@ void main() {
     });
 
     test(
+      'loads teacher-scoped student summary with explicit class scope',
+      () async {
+        const classSection = TeacherClassSection(
+          id: 'year-1:class-1:section-1',
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          name: 'Grade 3 - A',
+          subject: 'Mathematics',
+        );
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/students/student-1/summary',
+            queryParameters: {
+              'academicYearId': 'year-1',
+              'classId': 'class-1',
+              'sectionId': 'section-1',
+            },
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/students/student-1/summary',
+            ),
+            data: {
+              'student': {
+                'id': 'student-1',
+                'name': 'Asha Sharma',
+                'studentSystemId': 'SCH-001',
+                'rollNumber': 7,
+                'lifecycleStatus': 'ACTIVE',
+                'className': 'Grade 3',
+                'sectionName': 'A',
+              },
+              'attendance': {
+                'recentWindow': 2,
+                'present': 1,
+                'absent': 1,
+                'late': 0,
+                'leave': 0,
+                'lastStatus': 'ABSENT',
+                'lastRemark': 'Sick note pending',
+              },
+            },
+          ),
+        );
+
+        final summary = await repository.getTeacherStudentSummary(
+          classSection,
+          'student-1',
+        );
+
+        expect(summary.student.name, 'Asha Sharma');
+        expect(summary.student.studentSystemId, 'SCH-001');
+        expect(summary.attendance.recentWindow, 2);
+        expect(summary.attendance.lastStatus, 'ABSENT');
+        verify(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/students/student-1/summary',
+            queryParameters: {
+              'academicYearId': 'year-1',
+              'classId': 'class-1',
+              'sectionId': 'section-1',
+            },
+          ),
+        ).called(1);
+      },
+    );
+
+    test(
       'persists teacher draft attendance locally and clears after submit',
       () async {
         const classSection = TeacherClassSection(

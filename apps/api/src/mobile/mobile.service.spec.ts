@@ -1,5 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
-import { AuthMethod } from '@prisma/client';
+import { AuthMethod, FileStatus } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { MobileService } from './mobile.service';
 
@@ -8,6 +8,8 @@ describe('MobileService', () => {
   interface MobileServicePrismaMock {
     guardian: MockModel<'findFirst'>;
     student: MockModel<'findFirst' | 'findMany'>;
+    studentDocument: MockModel<'findMany' | 'findFirst'>;
+    studentQrCredential: MockModel<'findFirst'>;
     invoice: MockModel<'findMany'>;
     notificationDelivery: MockModel<'findMany' | 'findFirst' | 'count'>;
     notificationReadReceipt: MockModel<'upsert' | 'createMany'>;
@@ -40,6 +42,8 @@ describe('MobileService', () => {
     listFilesByEntity: jest.Mock;
     assertFileAccessForAuth: jest.Mock;
     auditAccess: jest.Mock;
+    getFileMetadata: jest.Mock;
+    getSignedUrl: jest.Mock;
   };
   let storageService: { getObjectBuffer: jest.Mock };
   let service: MobileService;
@@ -53,6 +57,13 @@ describe('MobileService', () => {
       student: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
+      },
+      studentDocument: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn(),
+      },
+      studentQrCredential: {
+        findFirst: jest.fn().mockResolvedValue(null),
       },
       invoice: {
         findMany: jest.fn(),
@@ -129,6 +140,8 @@ describe('MobileService', () => {
       listFilesByEntity: jest.fn().mockResolvedValue([]),
       assertFileAccessForAuth: jest.fn(),
       auditAccess: jest.fn(),
+      getFileMetadata: jest.fn(),
+      getSignedUrl: jest.fn(),
     };
     storageService = {
       getObjectBuffer: jest.fn(),
@@ -439,6 +452,9 @@ describe('MobileService', () => {
   });
 
   it('returns class teacher details on linked-child profiles', async () => {
+    const createdAt = new Date('2026-04-01T00:00:00.000Z');
+    const verifiedAt = new Date('2026-04-02T00:00:00.000Z');
+    const qrCreatedAt = new Date('2026-04-03T00:00:00.000Z');
     prisma.student.findFirst
       .mockResolvedValueOnce({ id: 'student-1' })
       .mockResolvedValueOnce({
@@ -478,6 +494,32 @@ describe('MobileService', () => {
         guardianLinks: [{ relation: 'Daughter' }],
         enrollments: [{ academicYear: { name: '2083' } }],
       });
+    prisma.studentDocument.findMany.mockResolvedValue([
+      {
+        id: 'doc-1',
+        kind: 'BIRTH_CERTIFICATE',
+        status: 'VERIFIED',
+        title: 'Birth certificate',
+        fileName: 'birth.pdf',
+        contentType: 'application/pdf',
+        sizeBytes: 1200,
+        expiryDate: null,
+        verifiedAt,
+        createdAt,
+        objectKey: 'private/object-key-is-not-selected',
+        publicUrl: 'https://example.invalid/public.pdf',
+      },
+    ]);
+    prisma.studentQrCredential.findFirst.mockResolvedValue({
+      id: 'qr-1',
+      status: 'ACTIVE',
+      createdAt: qrCreatedAt,
+      expiresAt: null,
+      lastScannedAt: null,
+      rotatedAt: null,
+      revokedAt: null,
+      tokenHash: 'hidden-hash',
+    });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
       studentLinks: [{ studentId: 'student-1' }],
@@ -490,6 +532,81 @@ describe('MobileService', () => {
       name: 'Mina Shrestha',
     });
     expect(result.child.classSection).toBe('Grade 4 - A');
+    expect(result.profile.documents).toEqual([
+      {
+        id: 'doc-1',
+        kind: 'BIRTH_CERTIFICATE',
+        status: 'VERIFIED',
+        title: 'Birth certificate',
+        fileName: 'birth.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 1200,
+        expiryDate: null,
+        verifiedAt: verifiedAt.toISOString(),
+        uploadedAt: createdAt.toISOString(),
+        downloadPath: '/mobile/students/student-1/documents/doc-1/download-url',
+      },
+    ]);
+    expect(JSON.stringify(result.profile.documents)).not.toContain(
+      'object-key',
+    );
+    expect(JSON.stringify(result.profile.documents)).not.toContain('public');
+    expect(result.profile.qrStatus).toEqual({
+      status: 'ACTIVE',
+      credentialId: 'qr-1',
+      createdAt: qrCreatedAt.toISOString(),
+      expiresAt: null,
+      lastScannedAt: null,
+      rotatedAt: null,
+      revokedAt: null,
+    });
+    expect(JSON.stringify(result.profile.qrStatus)).not.toContain(
+      'hidden-hash',
+    );
+  });
+
+  it('returns a protected parent document download URL after linked-child authorization', async () => {
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.studentDocument.findFirst.mockResolvedValue({
+      id: 'doc-1',
+      studentId: 'student-1',
+      fileId: 'file-1',
+      kind: 'BIRTH_CERTIFICATE',
+      status: 'ACTIVE',
+      fileName: 'birth.pdf',
+    });
+    fileRegistryService.getFileMetadata.mockResolvedValue({
+      id: 'file-1',
+      tenantId: 'tenant-1',
+      module: 'students',
+      entityId: 'student-1',
+      status: FileStatus.UPLOADED,
+      originalFilename: 'birth.pdf',
+    });
+    fileRegistryService.getSignedUrl.mockResolvedValue(
+      'https://signed.example/birth.pdf',
+    );
+
+    await expect(
+      service.getStudentDocumentDownloadUrl('student-1', 'doc-1', actor),
+    ).resolves.toEqual({
+      documentId: 'doc-1',
+      studentId: 'student-1',
+      fileName: 'birth.pdf',
+      kind: 'BIRTH_CERTIFICATE',
+      url: 'https://signed.example/birth.pdf',
+      expiresInSeconds: 60,
+    });
+    expect(fileRegistryService.auditAccess).toHaveBeenCalledWith(
+      'tenant-1',
+      'file-1',
+      'parent-1',
+      'download',
+    );
   });
 
   it('returns subject grade summaries for published linked-child report cards', async () => {

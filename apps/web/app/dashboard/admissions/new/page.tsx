@@ -6,10 +6,10 @@ import { M1PageHeader } from '../../../../components/m1/m1-page-header';
 export default async function NewAdmissionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string }>;
+  searchParams: Promise<{ mode?: string; caseId?: string }>;
 }) {
-  const { mode } = await searchParams;
-  const initialMode = mode === 'review' ? 'review' : mode === 'enrollment' || mode === 'direct' ? 'direct' : undefined;
+  const { mode, caseId } = await searchParams;
+  const initialMode = caseId || mode === 'enrollment' || mode === 'direct' ? 'direct' : mode === 'review' ? 'review' : undefined;
 
   return (
     <DashboardPageShell>
@@ -22,7 +22,7 @@ export default async function NewAdmissionPage({
           </Link>
         }
       />
-      <AdmissionEntry initialMode={initialMode} />
+      <AdmissionEntry initialMode={initialMode} initialCaseId={caseId} />
     </DashboardPageShell>
   );
 }

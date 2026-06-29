@@ -4,7 +4,11 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BS_MONTH_NAMES_EN, toBsDateFromGregorian } from "@schoolos/core";
+import {
+  BS_MONTH_NAMES_EN,
+  formatBsDateTime,
+  toBsDateFromGregorian,
+} from "@schoolos/core";
 import {
   AlertTriangle,
   BarChart3,
@@ -26,6 +30,7 @@ import {
 import { api } from "@/lib/api";
 import type {
   AttendanceMonthlyRegister,
+  AttendanceRegisterExportSummary,
   M2FollowUpQueue,
 } from "@/lib/api/attendance";
 import { AttendanceForm } from "@/components/forms/attendance-form";
@@ -43,6 +48,7 @@ import { LoadingState } from "@/components/ui/loading-state";
 import { LockedRecordBanner } from "@/components/ui/locked-record-banner";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { ModuleTabs } from "@/components/ui/module-tabs";
+import { ProtectedFileButton } from "@/components/ui/protected-file";
 import { SectionCard } from "@/components/ui/section-card";
 import {
   Table,
@@ -1300,7 +1306,12 @@ export function AttendanceReportsWorkspace() {
     queryKey: ["attendance-analytics"],
     queryFn: api.listAttendanceAnalytics,
   });
+  const exportHistoryQuery = useQuery({
+    queryKey: ["attendance-register-exports", 1, 8],
+    queryFn: () => api.listAttendanceRegisterExports({ page: 1, limit: 8 }),
+  });
   const analytics = analyticsQuery.data;
+  const retainedExports = exportHistoryQuery.data?.items ?? [];
 
   return (
     <DashboardPageShell>
@@ -1308,10 +1319,13 @@ export function AttendanceReportsWorkspace() {
         title="Attendance Reports & Analytics"
         description="Analyze attendance trends across classes, sections, grades, and time periods from server-generated analytics."
         primaryAction={
-          <Button variant="outline">
+          <Link
+            href="/dashboard/attendance/register"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+          >
             <Download className="h-4 w-4" />
-            Download
-          </Button>
+            Open register exports
+          </Link>
         }
       >
         <KpiGrid className="sm:grid-cols-2 lg:grid-cols-5">
@@ -1361,7 +1375,7 @@ export function AttendanceReportsWorkspace() {
           <TrendPanel analytics={analytics} />
           <SectionCard
             title="Report Results"
-            description="Server-side analytics result rows. Official PDF/CSV report jobs are unavailable until retained export jobs are wired."
+            description="Server-side analytics result rows. Official PDF/CSV snapshots are retained by the attendance backend and protected through File Registry."
           >
             <Table>
               <TableHeader>
@@ -1394,6 +1408,75 @@ export function AttendanceReportsWorkspace() {
               </TableBody>
             </Table>
           </SectionCard>
+          <SectionCard
+            title="Retained Register Exports"
+            description="Monthly register export jobs retained by the attendance module. Downloads stay behind authenticated protected-file access."
+          >
+            {exportHistoryQuery.isLoading ? (
+              <LoadingState label="Loading retained attendance exports..." />
+            ) : exportHistoryQuery.isError ? (
+              <ErrorState
+                title="Retained exports could not load"
+                message="Attendance export history remains unavailable until the backend responds."
+                onRetry={() => void exportHistoryQuery.refetch()}
+              />
+            ) : retainedExports.length === 0 ? (
+              <EmptyState
+                title="No retained exports yet"
+                description="Generate a monthly register export from the Class Register workspace to create the first protected snapshot."
+              />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Format</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Snapshot</TableHead>
+                    <TableHead>Completed</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {retainedExports.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{formatBsDateTime(item.createdAt)}</TableCell>
+                      <TableCell>{item.format.toUpperCase()}</TableCell>
+                      <TableCell>
+                        <ExportStatusBadge status={item.status} />
+                      </TableCell>
+                      <TableCell>
+                        {item.file ? (
+                          <div className="flex flex-col gap-1">
+                            <ProtectedFileButton
+                              fileAssetId={item.file.fileAssetId}
+                              fileName={item.file.fileName}
+                              action="download"
+                              showStatus={false}
+                            >
+                              <Download className="h-4 w-4" />
+                              Download protected file
+                            </ProtectedFileButton>
+                            <span className="text-xs font-semibold text-slate-500">
+                              {item.file.fileName} · {formatFileSize(item.file.sizeBytes)}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs font-semibold text-slate-500">
+                            Protected file unavailable
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {item.completedAt
+                          ? formatBsDateTime(item.completedAt)
+                          : "Not completed"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </SectionCard>
         </div>
         <SectionCard title="Report Summary">
           <SummaryRows
@@ -1402,8 +1485,8 @@ export function AttendanceReportsWorkspace() {
                 "Lifecycle",
                 "Requested / queued / processing / completed / failed",
               ],
-              ["Download", "Protected helper required"],
-              ["Export job", "Unavailable in M2 contract"],
+              ["Download", "Protected File Registry helper"],
+              ["Retained exports", String(exportHistoryQuery.data?.total ?? 0)],
             ]}
           />
         </SectionCard>
@@ -2042,6 +2125,41 @@ function StatusBadge({ status }: { status: string }) {
   if (status === "LATE") return <Badge variant="warning">Late</Badge>;
   if (status.includes("LEAVE")) return <Badge variant="info">Leave</Badge>;
   return <Badge variant="neutral">{status}</Badge>;
+}
+
+function ExportStatusBadge({
+  status,
+}: {
+  status: AttendanceRegisterExportSummary["status"];
+}) {
+  if (status === "COMPLETED") {
+    return <Badge variant="success">Completed</Badge>;
+  }
+  if (status === "QUEUED" || status === "RUNNING") {
+    return (
+      <Badge variant="info">
+        {status === "QUEUED" ? "Queued" : "Running"}
+      </Badge>
+    );
+  }
+  if (status === "FAILED" || status === "CANCELLED") {
+    return (
+      <Badge variant={status === "FAILED" ? "destructive" : "warning"}>
+        {status === "FAILED" ? "Failed" : "Cancelled"}
+      </Badge>
+    );
+  }
+  return <Badge variant="neutral">{status}</Badge>;
+}
+
+function formatFileSize(sizeBytes: number) {
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    return "0 KB";
+  }
+  if (sizeBytes < 1024 * 1024) {
+    return `${Math.ceil(sizeBytes / 1024)} KB`;
+  }
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function correctionStudentName(correction: {

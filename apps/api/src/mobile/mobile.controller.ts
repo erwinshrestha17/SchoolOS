@@ -105,6 +105,20 @@ export class MobileController {
     return this.mobileService.getStudentProfile(studentId, auth);
   }
 
+  @Get('students/:id/documents/:documentId/download-url')
+  @RequiredModule('students')
+  getStudentDocumentDownloadUrl(
+    @Param('id') studentId: string,
+    @Param('documentId') documentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.getStudentDocumentDownloadUrl(
+      studentId,
+      documentId,
+      auth,
+    );
+  }
+
   @Get('students/:id/attendance-summary')
   @RequiredModule('attendance')
   getStudentAttendanceSummary(

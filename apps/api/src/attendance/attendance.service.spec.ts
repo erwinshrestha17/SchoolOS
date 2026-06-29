@@ -308,6 +308,90 @@ describe('attendance production hardening', () => {
     );
   });
 
+  it('returns a bounded teacher-scoped mobile student summary', async () => {
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-1', name: '2083' },
+      classroom: { id: 'class-1', name: 'Grade 4' },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
+      staffFindFirst: { id: 'staff-1' },
+      studentFindFirst: {
+        id: 'student-1',
+        studentSystemId: 'SCH-2026-001',
+        firstNameEn: 'Asha',
+        lastNameEn: 'Rai',
+        rollNumber: 7,
+        lifecycleStatus: 'ACTIVE',
+        guardianLinks: [{ guardian: { primaryPhone: 'hidden' } }],
+      },
+      attendanceRecords: [
+        {
+          status: AttendanceStatus.PRESENT,
+          remark: null,
+          attendanceSession: {
+            attendanceDate: new Date('2026-06-01T00:00:00.000Z'),
+          },
+        },
+        {
+          status: AttendanceStatus.ABSENT,
+          remark: 'Sick note pending',
+          attendanceSession: {
+            attendanceDate: new Date('2026-06-02T00:00:00.000Z'),
+          },
+        },
+      ],
+    });
+
+    const result = await service.getTeacherMobileStudentSummary(teacherActor, {
+      studentId: 'student-1',
+      academicYearId: 'ay-1',
+      classId: 'class-1',
+      sectionId: 'section-1',
+    });
+
+    expect(prisma.student.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 'student-1',
+          tenantId: teacherActor.tenantId,
+          classId: 'class-1',
+          sectionId: 'section-1',
+        }),
+      }),
+    );
+    expect(result).toEqual({
+      student: {
+        id: 'student-1',
+        name: 'Asha Rai',
+        studentSystemId: 'SCH-2026-001',
+        rollNumber: 7,
+        lifecycleStatus: 'ACTIVE',
+        academicYearId: 'ay-1',
+        academicYearName: '2083',
+        classId: 'class-1',
+        className: 'Grade 4',
+        sectionId: 'section-1',
+        sectionName: 'A',
+      },
+      scope: {
+        academicYearId: 'ay-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        access: 'teacher_assigned',
+      },
+      attendance: {
+        recentWindow: 2,
+        present: 1,
+        absent: 1,
+        late: 0,
+        leave: 0,
+        lastStatus: AttendanceStatus.ABSENT,
+        lastRemark: 'Sick note pending',
+        lastRecordedAt: '2026-06-02T00:00:00.000Z',
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain('hidden');
+  });
+
   it('rejects mobile teacher roster access for unassigned class sections', async () => {
     const scopeSection = { id: 'section-1', name: 'A', classId: 'class-1' };
     const { service, prisma } = buildService({
@@ -1425,6 +1509,96 @@ describe('attendance production hardening', () => {
       }),
     );
   });
+
+  it('returns retained monthly register export jobs with protected file metadata only', async () => {
+    const createdAt = new Date('2026-05-01T08:00:00.000Z');
+    const completedAt = new Date('2026-05-01T08:00:05.000Z');
+    const { service, prisma } = buildService({
+      reportExports: [
+        {
+          id: 'export-1',
+          tenantId: adminActor.tenantId,
+          reportKey: 'attendance_monthly_register',
+          format: 'csv',
+          filters: {
+            academicYearId: 'year-1',
+            classId: 'class-1',
+            bsYear: 2083,
+            bsMonth: 1,
+          },
+          status: 'COMPLETED',
+          fileAssetId: 'file-1',
+          requestedBy: adminActor.userId,
+          errorSummary: null,
+          createdAt,
+          completedAt,
+        },
+      ],
+      reportExportCount: 1,
+      fileAssets: [
+        {
+          id: 'file-1',
+          originalFilename: 'attendance-register.csv',
+          mimeType: 'text/csv',
+          sizeBytes: BigInt(128),
+          status: 'UPLOADED',
+          objectKey: 'private/tenant-1/attendance-register.csv',
+        },
+      ],
+    });
+
+    const result = await service.listMonthlyRegisterExports(adminActor, {
+      page: '1',
+      limit: '10',
+    });
+
+    expect(prisma.reportExport.findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: adminActor.tenantId,
+        reportKey: 'attendance_monthly_register',
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      skip: 0,
+      take: 10,
+    });
+    expect(prisma.fileAsset.findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: adminActor.tenantId,
+        id: { in: ['file-1'] },
+        module: 'attendance',
+        softDeletedAt: null,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        originalFilename: true,
+        mimeType: true,
+        sizeBytes: true,
+        status: true,
+      },
+    });
+    expect(result).toEqual({
+      items: [
+        expect.objectContaining({
+          id: 'export-1',
+          reportKey: 'attendance_monthly_register',
+          status: 'COMPLETED',
+          file: {
+            fileAssetId: 'file-1',
+            fileName: 'attendance-register.csv',
+            mimeType: 'text/csv',
+            sizeBytes: 128,
+            status: 'UPLOADED',
+          },
+        }),
+      ],
+      total: 1,
+      page: 1,
+      limit: 10,
+      hasNextPage: false,
+    });
+    expect(JSON.stringify(result)).not.toContain('objectKey');
+  });
 });
 
 function buildService(options: {
@@ -1460,6 +1634,9 @@ function buildService(options: {
   timetableSlots?: unknown[];
   guardianFindFirst?: unknown;
   m2Policy?: unknown;
+  reportExports?: unknown[];
+  reportExportCount?: number;
+  fileAssets?: unknown[];
 }) {
   const tx = {
     attendanceConflict: {
@@ -1567,6 +1744,14 @@ function buildService(options: {
       count: jest.fn().mockResolvedValue(0),
       update: jest.fn().mockResolvedValue(options.correctionUpdated ?? null),
       create: jest.fn().mockResolvedValue(options.correctionUpdated ?? null),
+    },
+    reportExport: {
+      findMany: jest.fn().mockResolvedValue(options.reportExports ?? []),
+      count: jest.fn().mockResolvedValue(options.reportExportCount ?? 0),
+      create: jest.fn().mockResolvedValue({ id: 'export-1' }),
+    },
+    fileAsset: {
+      findMany: jest.fn().mockResolvedValue(options.fileAssets ?? []),
     },
     guardian: {
       findFirst: jest.fn().mockResolvedValue(options.guardianFindFirst ?? null),

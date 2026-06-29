@@ -69,6 +69,8 @@ class ChildProfile {
     this.dataProcessingConsent = false,
     this.healthWarning,
     this.canViewHealthWarning = false,
+    this.documents = const [],
+    this.qrStatus,
   });
 
   final GuardianChild child;
@@ -92,6 +94,88 @@ class ChildProfile {
   final bool dataProcessingConsent;
   final String? healthWarning;
   final bool canViewHealthWarning;
+  final List<ParentStudentDocument> documents;
+  final ParentQrStatus? qrStatus;
+}
+
+class ParentStudentDocument {
+  const ParentStudentDocument({
+    required this.id,
+    required this.title,
+    required this.fileName,
+    required this.kind,
+    required this.status,
+    required this.mimeType,
+    required this.sizeBytes,
+    required this.downloadPath,
+    this.expiryDate,
+    this.verifiedAt,
+    this.uploadedAt,
+  });
+
+  final String id;
+  final String title;
+  final String fileName;
+  final String kind;
+  final String status;
+  final String mimeType;
+  final int sizeBytes;
+  final String downloadPath;
+  final String? expiryDate;
+  final String? verifiedAt;
+  final String? uploadedAt;
+
+  bool get hasProtectedDownload => downloadPath.trim().isNotEmpty;
+
+  factory ParentStudentDocument.fromJson(Map<String, dynamic> json) {
+    return ParentStudentDocument(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? 'Student document',
+      fileName: json['fileName'] as String? ?? '',
+      kind: json['kind'] as String? ?? 'OTHER',
+      status: json['status'] as String? ?? 'ACTIVE',
+      mimeType: json['mimeType'] as String? ?? '',
+      sizeBytes: _asInt(json['sizeBytes']),
+      downloadPath: json['downloadPath'] as String? ?? '',
+      expiryDate: json['expiryDate'] as String?,
+      verifiedAt: json['verifiedAt'] as String?,
+      uploadedAt: json['uploadedAt'] as String?,
+    );
+  }
+}
+
+class ParentQrStatus {
+  const ParentQrStatus({
+    required this.status,
+    this.credentialId,
+    this.createdAt,
+    this.expiresAt,
+    this.lastScannedAt,
+    this.rotatedAt,
+    this.revokedAt,
+  });
+
+  final String status;
+  final String? credentialId;
+  final String? createdAt;
+  final String? expiresAt;
+  final String? lastScannedAt;
+  final String? rotatedAt;
+  final String? revokedAt;
+
+  bool get isActive => status.toUpperCase() == 'ACTIVE';
+
+  factory ParentQrStatus.fromJson(Map<String, dynamic> json) {
+    return ParentQrStatus(
+      status: json['status'] as String? ?? 'UNAVAILABLE',
+      credentialId: json['credentialId'] as String?,
+      createdAt: json['createdAt'] as String?,
+      expiresAt: json['expiresAt'] as String?,
+      lastScannedAt: json['lastScannedAt'] as String?,
+      rotatedAt: json['rotatedAt'] as String?,
+      revokedAt: json['revokedAt'] as String?,
+    );
+  }
 }
 
 class ParentDashboardSummary {

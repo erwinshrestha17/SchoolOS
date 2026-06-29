@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PaymentMethod, type Student } from '@prisma/client';
+import { FileStatus, PaymentMethod, type Student } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { getParentStudentIds } from '../common/security/parent-scope';
 import { PrismaService } from '../prisma/prisma.service';
@@ -530,6 +530,27 @@ export class MobileService {
 
   async getStudentProfile(studentId: string, actor: AuthContext) {
     const student = await this.getAccessibleStudent(studentId, actor);
+    const [documents, qrCredential] = await Promise.all([
+      this.listMobileStudentDocuments(studentId, actor),
+      this.prisma.studentQrCredential.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          studentId,
+          status: 'ACTIVE',
+        },
+        select: {
+          id: true,
+          status: true,
+          createdAt: true,
+          expiresAt: true,
+          lastScannedAt: true,
+          rotatedAt: true,
+          revokedAt: true,
+        },
+        orderBy: [{ createdAt: 'desc' }],
+      }),
+    ]);
+
     return {
       child: toMobileStudent(student),
       profile: {
@@ -572,7 +593,104 @@ export class MobileService {
           photoUsageConsent: Boolean(student.photoUsageConsentAt),
           dataProcessingConsent: Boolean(student.dataProcessingConsentedAt),
         },
+        documents,
+        qrStatus: qrCredential
+          ? {
+              status: qrCredential.status,
+              credentialId: qrCredential.id,
+              createdAt: toIso(qrCredential.createdAt),
+              expiresAt: toIso(qrCredential.expiresAt),
+              lastScannedAt: toIso(qrCredential.lastScannedAt),
+              rotatedAt: toIso(qrCredential.rotatedAt),
+              revokedAt: toIso(qrCredential.revokedAt),
+            }
+          : {
+              status: 'UNAVAILABLE',
+              credentialId: null,
+              createdAt: null,
+              expiresAt: null,
+              lastScannedAt: null,
+              rotatedAt: null,
+              revokedAt: null,
+            },
       },
+    };
+  }
+
+  async getStudentDocumentDownloadUrl(
+    studentId: string,
+    documentId: string,
+    actor: AuthContext,
+  ) {
+    await this.assertStudentAccess(studentId, actor);
+    const document = await this.prisma.studentDocument.findFirst({
+      where: {
+        id: documentId,
+        tenantId: actor.tenantId,
+        studentId,
+      },
+      select: {
+        id: true,
+        studentId: true,
+        fileId: true,
+        kind: true,
+        status: true,
+        fileName: true,
+      },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Student document not found');
+    }
+
+    if (!document.fileId) {
+      throw new NotFoundException('Student document file is not available');
+    }
+
+    if (!isMobileVisibleStudentDocumentStatus(document.status)) {
+      throw new ForbiddenException('Student document is not active');
+    }
+
+    const asset = await this.fileRegistryService.getFileMetadata(
+      actor.tenantId,
+      document.fileId,
+    );
+
+    if (asset.status !== FileStatus.UPLOADED) {
+      throw new NotFoundException('Student document file is not available');
+    }
+
+    if (
+      asset.module &&
+      asset.module !== 'students' &&
+      asset.module !== 'student-documents'
+    ) {
+      throw new ForbiddenException('Student document file module is invalid');
+    }
+
+    if (asset.entityId && asset.entityId !== studentId) {
+      throw new ForbiddenException(
+        'Student document file is not linked to this student',
+      );
+    }
+
+    await this.fileRegistryService.auditAccess(
+      actor.tenantId,
+      asset.id,
+      actor.userId,
+      'download',
+    );
+
+    return {
+      documentId: document.id,
+      studentId,
+      fileName: document.fileName || asset.originalFilename,
+      kind: document.kind,
+      url: await this.fileRegistryService.getSignedUrl(
+        actor.tenantId,
+        asset.id,
+      ),
+      expiresInSeconds: 60,
     };
   }
 
@@ -1413,6 +1531,52 @@ export class MobileService {
     };
   }
 
+  private async listMobileStudentDocuments(
+    studentId: string,
+    actor: AuthContext,
+  ) {
+    const documents = await this.prisma.studentDocument.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        studentId,
+        fileId: { not: null },
+        status: {
+          in: ['ACTIVE', 'VERIFIED'],
+        },
+      },
+      select: {
+        id: true,
+        kind: true,
+        status: true,
+        title: true,
+        fileName: true,
+        contentType: true,
+        sizeBytes: true,
+        expiryDate: true,
+        verifiedAt: true,
+        createdAt: true,
+      },
+      orderBy: [{ verifiedAt: 'desc' }, { createdAt: 'desc' }],
+      take: 20,
+    });
+
+    return documents.map((document) => ({
+      id: document.id,
+      kind: document.kind,
+      status: document.status,
+      title: document.title,
+      fileName: document.fileName,
+      mimeType: document.contentType,
+      sizeBytes: document.sizeBytes,
+      expiryDate: toIso(document.expiryDate),
+      verifiedAt: toIso(document.verifiedAt),
+      uploadedAt: toIso(document.createdAt),
+      downloadPath: `/mobile/students/${encodeURIComponent(
+        studentId,
+      )}/documents/${encodeURIComponent(document.id)}/download-url`,
+    }));
+  }
+
   private async getAccessibleStudent(studentId: string, actor: AuthContext) {
     await this.assertStudentAccess(studentId, actor);
     const student = await this.prisma.student.findFirst({
@@ -1813,6 +1977,10 @@ function gradeFromPercentage(percentage: number) {
 
 function toIso(value: Date | null | undefined) {
   return value ? value.toISOString() : null;
+}
+
+function isMobileVisibleStudentDocumentStatus(status: string) {
+  return status === 'ACTIVE' || status === 'VERIFIED';
 }
 
 function timestampOrZero(value: string | null) {

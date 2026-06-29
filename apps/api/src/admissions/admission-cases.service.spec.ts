@@ -321,6 +321,47 @@ describe('AdmissionCasesService', () => {
     );
   });
 
+  it('surfaces guardian-linked sibling candidates without blocking direct admission', async () => {
+    const relatedSibling = {
+      id: 'student-sibling',
+      studentSystemId: 'STU-SIBLING',
+      firstNameEn: 'Anaya',
+      lastNameEn: 'Shrestha',
+      lastNameNp: null,
+      lifecycleStatus: 'ACTIVE',
+      class: { name: 'Grade 3' },
+      sectionRef: { name: 'B' },
+      guardianLinks: [
+        {
+          relation: 'Mother',
+          guardian: { fullName: 'Sita Shrestha' },
+        },
+      ],
+    };
+    const prisma = buildPrisma();
+    prisma.student.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([relatedSibling]);
+    const service = buildService(prisma);
+
+    const result = await service.getCase('case-a', actor);
+
+    expect(result.duplicateRisk).toBe(false);
+    expect(result.canAdmitDirectly).toBe(true);
+    expect(result.relatedStudentCandidates).toEqual([
+      expect.objectContaining({
+        studentId: 'student-sibling',
+        guardianName: 'Sita Shrestha',
+        guardianRelation: 'Mother',
+        matchReasons: expect.arrayContaining([
+          'Guardian phone already has linked student records.',
+          'English family name matches.',
+          'Guardian name matches an existing guardian.',
+        ]),
+      }),
+    ]);
+  });
+
   it('does not let duplicate override bypass policy-required review or missing permission', async () => {
     const duplicate = {
       id: 'student-existing',

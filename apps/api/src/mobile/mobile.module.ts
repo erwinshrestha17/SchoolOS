@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { MobileTeacherAttendanceController } from './mobile-teacher-attendance.controller';
 import { MobileTeacherHomeworkController } from './mobile-teacher-homework.controller';
+import { MobileTeacherStudentsController } from './mobile-teacher-students.controller';
 import { MobileTeacherTimetableController } from './mobile-teacher-timetable.controller';
 import { MobilePrincipalController } from './mobile-principal.controller';
 import { MobilePrincipalService } from './mobile-principal.service';
@@ -36,6 +37,7 @@ import { AdvancedOperationsModule } from '../advanced-operations/advanced-operat
     MobileController,
     MobileTeacherAttendanceController,
     MobileTeacherHomeworkController,
+    MobileTeacherStudentsController,
     MobileTeacherTimetableController,
     MobilePrincipalController,
   ],

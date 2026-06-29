@@ -55,6 +55,27 @@ void main() {
                 'photoUsageConsent': true,
                 'dataProcessingConsent': true,
               },
+              'documents': [
+                {
+                  'id': 'doc-1',
+                  'title': 'Birth certificate',
+                  'fileName': 'birth.pdf',
+                  'kind': 'BIRTH_CERTIFICATE',
+                  'status': 'VERIFIED',
+                  'mimeType': 'application/pdf',
+                  'sizeBytes': 1200,
+                  'downloadPath':
+                      '/mobile/students/child-1/documents/doc-1/download-url',
+                  'verifiedAt': '2026-04-02T00:00:00.000Z',
+                  'objectKey': 'must-not-map',
+                },
+              ],
+              'qrStatus': {
+                'status': 'ACTIVE',
+                'credentialId': 'qr-1',
+                'createdAt': '2026-04-03T00:00:00.000Z',
+                'tokenHash': 'must-not-map',
+              },
             },
           },
         ),
@@ -72,7 +93,16 @@ void main() {
       expect(profile.healthWarning, 'Asthma / Peanuts');
       expect(profile.canViewHealthWarning, isTrue);
       expect(profile.guardianSummary, contains('Daughter access verified'));
-      expect(profile.qrLabel, contains('SCH-2026-001'));
+      expect(profile.qrLabel, contains('Student QR is active'));
+      expect(profile.qrStatus?.isActive, isTrue);
+      expect(profile.qrStatus?.credentialId, 'qr-1');
+      expect(profile.documents.single.title, 'Birth certificate');
+      expect(profile.documents.single.downloadPath, contains('/download-url'));
+      expect(profile.documents.single.hasProtectedDownload, isTrue);
+      expect(
+        profile.documents.single.downloadPath,
+        isNot(contains('must-not-map')),
+      );
     });
 
     test(

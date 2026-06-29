@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Header,
   Param,
   Patch,
   Post,
@@ -119,6 +118,19 @@ export class AttendanceController {
     }
 
     return result; // Service will return string
+  }
+
+  @Get('register/exports')
+  @Permissions('attendance:read')
+  listMonthlyRegisterExports(
+    @CurrentAuth() auth: AuthContext,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.attendanceService.listMonthlyRegisterExports(auth, {
+      page,
+      limit,
+    });
   }
 
   @Get('conflicts')
@@ -319,7 +331,7 @@ export class AttendanceController {
   ) {
     return this.attendanceService.approveCorrectionRequest(
       id,
-      { ...dto, status: 'APPROVED' },
+      Object.assign({}, dto, { status: 'APPROVED' as const }),
       auth,
     );
   }
@@ -333,7 +345,7 @@ export class AttendanceController {
   ) {
     return this.attendanceService.approveCorrectionRequest(
       id,
-      { ...dto, status: 'REJECTED' },
+      Object.assign({}, dto, { status: 'REJECTED' as const }),
       auth,
     );
   }

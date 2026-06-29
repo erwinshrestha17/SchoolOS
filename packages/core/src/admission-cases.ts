@@ -64,6 +64,17 @@ export type AdmissionCaseEligibility = {
     sectionName: string | null;
     lifecycleStatus: string;
   }>;
+  relatedStudentCandidates: Array<{
+    studentId: string;
+    studentSystemId: string;
+    fullNameEn: string;
+    className: string;
+    sectionName: string | null;
+    lifecycleStatus: string;
+    guardianName: string | null;
+    guardianRelation: string | null;
+    matchReasons: string[];
+  }>;
   policyRequirements: {
     admissionMode: 'DIRECT_ALLOWED' | 'REVIEW_REQUIRED';
     requireDocumentReview: boolean;

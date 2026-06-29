@@ -58,6 +58,13 @@ class ParentRepository {
         profile['classTeacher'] as Map<String, dynamic>? ?? const {};
     final studentSystemId = profile['studentSystemId'] as String?;
     final admissionNumber = profile['admissionNumber'] as String?;
+    final documents = (profile['documents'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(ParentStudentDocument.fromJson)
+        .toList();
+    final qrStatus = profile['qrStatus'] is Map<String, dynamic>
+        ? ParentQrStatus.fromJson(profile['qrStatus'] as Map<String, dynamic>)
+        : null;
     final healthNote = _joinNonEmpty([
       medicalSummary['medicalConditions'] as String?,
       medicalSummary['severeAllergies'] as String?,
@@ -75,9 +82,7 @@ class ParentRepository {
       attendanceSummary: 'Open attendance for the latest monthly summary.',
       homeworkSummary: 'Homework is synced from the school mobile API.',
       feesSummary: 'Fee summary is synced from the school mobile API.',
-      qrLabel: studentSystemId != null && studentSystemId.isNotEmpty
-          ? 'Student ID $studentSystemId is verified for guardian access.'
-          : 'Student identity is verified for guardian access.',
+      qrLabel: _qrLabel(studentSystemId, qrStatus),
       studentSystemId: studentSystemId,
       admissionNumber: admissionNumber,
       admissionDate: profile['admissionDate'] as String?,
@@ -92,6 +97,8 @@ class ParentRepository {
       canViewHealthWarning:
           (medicalSummary['hasMedicalConsent'] as bool? ?? false) &&
           healthNote != null,
+      documents: documents,
+      qrStatus: qrStatus,
     );
   }
 
@@ -518,6 +525,18 @@ class ParentRepository {
 String _safeFileName(String value) {
   final sanitized = value.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '-');
   return sanitized.isEmpty ? 'receipt' : sanitized;
+}
+
+String _qrLabel(String? studentSystemId, ParentQrStatus? qrStatus) {
+  if (qrStatus?.isActive ?? false) {
+    return studentSystemId != null && studentSystemId.isNotEmpty
+        ? 'Student QR is active for school-approved scans. ID $studentSystemId is verified for guardian access.'
+        : 'Student QR is active for school-approved scans.';
+  }
+
+  return studentSystemId != null && studentSystemId.isNotEmpty
+      ? 'Student ID $studentSystemId is verified for guardian access.'
+      : 'Student identity is verified for guardian access.';
 }
 
 String? _joinNonEmpty(List<String?> values) {

@@ -92,7 +92,7 @@ if (fs.existsSync(prismaSchemaDir)) {
     }
   }
 
-  fs.writeFileSync(prismaSchemaOut, combinedSchema, 'utf8');
+  fs.writeFileSync(prismaSchemaOut, `${combinedSchema.trimEnd()}\n`, 'utf8');
   console.log(`Compiled Prisma schema to: ${prismaSchemaOut}`);
 }
 

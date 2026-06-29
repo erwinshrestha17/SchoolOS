@@ -9,7 +9,7 @@ import { ErrorState } from '../ui/error-state';
 import { AdmissionCaseWizard } from './admission-case-wizard';
 import { AdmissionReviewCaseForm } from './admission-review-case-form';
 
-export function AdmissionEntry({ initialMode }: { initialMode?: 'direct' | 'review' }) {
+export function AdmissionEntry({ initialMode, initialCaseId }: { initialMode?: 'direct' | 'review'; initialCaseId?: string }) {
   const [mode, setMode] = useState<'choose' | 'direct' | 'review'>(initialMode ?? 'choose');
   const policyQuery = useQuery({ queryKey: ['admission-policy'], queryFn: admissionCasesApi.getPolicy });
 
@@ -21,7 +21,7 @@ export function AdmissionEntry({ initialMode }: { initialMode?: 'direct' | 'revi
     return <ErrorState title="Admission policy could not load" message="No student has been created. Retry before starting a new admission." onRetry={() => void policyQuery.refetch()} />;
   }
 
-  if (mode === 'direct') return <AdmissionCaseWizard />;
+  if (mode === 'direct') return <AdmissionCaseWizard initialCaseId={initialCaseId} />;
   if (mode === 'review') return <AdmissionReviewCaseForm />;
 
   const directIsDefault = policyQuery.data?.defaultPolicy.admissionMode === 'DIRECT_ALLOWED';

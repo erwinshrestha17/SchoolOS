@@ -1557,6 +1557,7 @@ describe("SchoolOS web production contracts", () => {
       "components/attendance/attendance-m2-workspaces.tsx",
       "components/attendance/attendance-conflict-review.tsx",
       "components/attendance/attendance-correction-review.tsx",
+      "lib/api/attendance.ts",
     ]);
     const requiredApis = [
       "api.listAcademicYears",
@@ -1573,6 +1574,7 @@ describe("SchoolOS web production contracts", () => {
       "api.rejectAttendanceCorrection",
       "api.getAttendanceRegister",
       "api.exportAttendanceRegister",
+      "api.listAttendanceRegisterExports",
       "api.listM2HardenedAnomalies",
       "api.listM2FollowUps",
       "api.runM2FollowUps",
@@ -1588,6 +1590,9 @@ describe("SchoolOS web production contracts", () => {
     assert.match(attendanceForm, /Correction Review Queue/);
     assert.match(attendanceForm, /Required audit reason/);
     assert.match(attendanceForm, /export prepared by the attendance backend/);
+    assert.match(attendanceForm, /\/attendance\/register\/exports/);
+    assert.match(attendanceForm, /Retained Register Exports/);
+    assert.match(attendanceForm, /Protected File Registry helper/);
     assert.match(attendanceForm, /\/dashboard\/attendance\/anomalies/);
     assert.match(attendanceForm, /\/dashboard\/attendance\/follow-ups/);
     assert.match(attendanceForm, /\/dashboard\/attendance\/offline-drafts/);

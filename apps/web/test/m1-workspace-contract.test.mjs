@@ -54,11 +54,17 @@ test('M1 entry creates one unified admission case for direct and review workflow
   assert.match(legacyPipeline, /listAdmissionApplications/);
   assert.match(legacyApplicationForm, /createAdmissionApplication/);
   assert.match(entryPage, /AdmissionEntry/);
+  assert.match(entryPage, /caseId/);
   assert.match(entry, /AdmissionCaseWizard/);
+  assert.match(entry, /initialCaseId/);
   assert.match(entry, /AdmissionReviewCaseForm/);
   assert.doesNotMatch(entry, /AdmissionApplicationForm/);
   assert.match(entry, /admissionCasesApi\.getPolicy/);
   assert.match(directWizard, /SchoolOS checks placement, policy requirements, and possible duplicates/);
+  assert.match(directWizard, /Saving admission draft/);
+  assert.match(directWizard, /Recovery link/);
+  assert.match(directWizard, /relatedStudentCandidates/);
+  assert.match(directWizard, /Guardian and sibling resolution/);
   assert.match(directWizard, /directAdmit/);
   assert.match(directWizard, /Admit student/);
   assert.match(directWizard, /admissionCasesApi\.updateCase/);

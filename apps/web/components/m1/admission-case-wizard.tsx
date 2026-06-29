@@ -2,10 +2,10 @@
 
 import { isValidDateOfBirth, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone, type AdmissionCase, type CreateAdmissionCasePayload } from '@schoolos/core';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, FileText, Loader2, ShieldCheck, Upload } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, FileText, Loader2, Save, ShieldCheck, Upload, UsersRound } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { api } from '../../lib/api';
 import { admissionCasesApi } from '../../lib/api/admission-cases';
 import { ApiRequestError } from '../../lib/api/client';
@@ -38,11 +38,13 @@ const EMPTY_FORM: CreateAdmissionCasePayload = {
 
 const STEPS = ['Student & guardian', 'Class & documents', 'Review & admit'];
 
-export function AdmissionCaseWizard() {
+export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string }) {
   const router = useRouter();
+  const hydratedCaseIdRef = useRef<string | null>(null);
+  const autosaveFingerprintRef = useRef('');
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<CreateAdmissionCasePayload>(EMPTY_FORM);
-  const [caseId, setCaseId] = useState<string | null>(null);
+  const [caseId, setCaseId] = useState<string | null>(initialCaseId ?? null);
   const [caseData, setCaseData] = useState<AdmissionCase | null>(null);
   const [documentKind, setDocumentKind] = useState('BIRTH_CERTIFICATE');
   const [admissionResult, setAdmissionResult] = useState<{
@@ -54,6 +56,11 @@ export function AdmissionCaseWizard() {
   const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
+  const recoveryQuery = useQuery({
+    queryKey: ['admission-case', initialCaseId],
+    queryFn: () => admissionCasesApi.getCase(initialCaseId!),
+    enabled: Boolean(initialCaseId),
+  });
 
   const availableSections = useMemo(
     () =>
@@ -64,14 +71,27 @@ export function AdmissionCaseWizard() {
     [form.classId, sectionsQuery.data],
   );
 
+  const persistCase = (nextPayload: CreateAdmissionCasePayload) =>
+    caseId
+      ? admissionCasesApi.updateCase(caseId, nextPayload)
+      : admissionCasesApi.createCase(nextPayload);
+
   const saveCaseMutation = useMutation({
-    mutationFn: (nextPayload: CreateAdmissionCasePayload) =>
-      caseId
-        ? admissionCasesApi.updateCase(caseId, nextPayload)
-        : admissionCasesApi.createCase(nextPayload),
+    mutationFn: persistCase,
     onSuccess: (saved) => {
       setCaseId(saved.id);
       setCaseData(saved);
+      syncRecoveryUrl(saved.id);
+      setLocalError('');
+    },
+  });
+
+  const autosaveMutation = useMutation({
+    mutationFn: persistCase,
+    onSuccess: (saved) => {
+      setCaseId(saved.id);
+      setCaseData(saved);
+      syncRecoveryUrl(saved.id);
       setLocalError('');
     },
   });
@@ -97,8 +117,8 @@ export function AdmissionCaseWizard() {
     onSuccess: (result) => setAdmissionResult(result),
   });
 
-  const setupError = academicYearsQuery.isError || classesQuery.isError || sectionsQuery.isError;
-  const setupLoading = academicYearsQuery.isLoading || classesQuery.isLoading || sectionsQuery.isLoading;
+  const setupError = academicYearsQuery.isError || classesQuery.isError || sectionsQuery.isError || recoveryQuery.isError;
+  const setupLoading = academicYearsQuery.isLoading || classesQuery.isLoading || sectionsQuery.isLoading || recoveryQuery.isLoading;
 
   function update<K extends keyof CreateAdmissionCasePayload>(key: K, value: CreateAdmissionCasePayload[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -106,20 +126,46 @@ export function AdmissionCaseWizard() {
   }
 
   function payload(): CreateAdmissionCasePayload {
-    return Object.fromEntries(
-      Object.entries({ ...form, firstNameEn: normalizePersonName(form.firstNameEn), lastNameEn: normalizePersonName(form.lastNameEn), guardianFullName: form.guardianFullName ? normalizePersonName(form.guardianFullName) : '', guardianPhone: form.guardianPhone ? normalizeNepalPhone(form.guardianPhone) : '', guardianEmail: form.guardianEmail ? normalizeEmail(form.guardianEmail) : '' }).filter(([, value]) => value !== '' && value !== undefined),
-    ) as CreateAdmissionCasePayload;
+    return buildAdmissionCasePayload(form);
   }
+
+  useEffect(() => {
+    const recovered = recoveryQuery.data;
+    if (!recovered || hydratedCaseIdRef.current === recovered.id) return;
+    hydratedCaseIdRef.current = recovered.id;
+    setCaseId(recovered.id);
+    setCaseData(recovered);
+    setForm(formFromAdmissionCase(recovered));
+    setStep(recoveryStepForCase(recovered));
+    autosaveFingerprintRef.current = JSON.stringify(buildAdmissionCasePayload(formFromAdmissionCase(recovered)));
+  }, [recoveryQuery.data]);
+
+  useEffect(() => {
+    if (admissionResult || saveCaseMutation.isPending || autosaveMutation.isPending) return;
+    const nextPayload = buildAutosavePayload(form);
+    if (!nextPayload) return;
+    const fingerprint = JSON.stringify(nextPayload);
+    if (fingerprint === autosaveFingerprintRef.current) return;
+    const timer = window.setTimeout(() => {
+      autosaveFingerprintRef.current = fingerprint;
+      autosaveMutation.mutate(nextPayload);
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [admissionResult, autosaveMutation, form, saveCaseMutation.isPending]);
 
   function validateCurrentStep() {
     if (step === 0) {
       if (!isValidPersonName(form.firstNameEn) || !isValidPersonName(form.lastNameEn)) return 'Enter valid student names.';
+      if (form.firstNameNp && !isValidPersonName(form.firstNameNp)) return 'Enter a valid Nepali first name.';
+      if (form.lastNameNp && !isValidPersonName(form.lastNameNp)) return 'Enter a valid Nepali last name.';
       if (!form.dateOfBirth || !isValidDateOfBirth(form.dateOfBirth)) return 'Enter a valid date of birth.';
       if (!form.guardianFullName || !isValidPersonName(form.guardianFullName) || !form.guardianRelation?.trim() || !form.guardianPhone) {
         return 'Enter the guardian name, relationship, and phone number.';
       }
       if (!tryNormalizeNepalPhone(form.guardianPhone)) return 'Enter a valid NTC or Ncell guardian number.';
       if (form.guardianEmail && !isValidEmail(form.guardianEmail)) return 'Enter a valid guardian email.';
+      if (form.emergencyName && !isValidPersonName(form.emergencyName)) return 'Enter a valid emergency contact name.';
+      if (form.emergencyPhone && !tryNormalizeNepalPhone(form.emergencyPhone)) return 'Enter a valid emergency contact number.';
     }
     if (step === 1) {
       if (!form.academicYearId || !form.classId || !form.admissionDate) return 'Choose the academic year, class, and admission date.';
@@ -143,12 +189,17 @@ export function AdmissionCaseWizard() {
     }
   }
 
+  if (initialCaseId && recoveryQuery.isLoading) {
+    return <div className="flex min-h-48 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-600"><Loader2 className="h-5 w-5 animate-spin" />Loading saved admission draft…</div>;
+  }
+
   if (setupError) {
     return (
       <ErrorState
-        title="Admission setup could not load"
-        message="No admission case was created. Check academic setup and try again."
+        title={recoveryQuery.isError ? 'Admission draft could not load' : 'Admission setup could not load'}
+        message={recoveryQuery.isError ? 'No admission details were changed. Check the recovery link and try again.' : 'No admission case was created. Check academic setup and try again.'}
         onRetry={() => {
+          void recoveryQuery.refetch();
           void academicYearsQuery.refetch();
           void classesQuery.refetch();
           void sectionsQuery.refetch();
@@ -171,6 +222,7 @@ export function AdmissionCaseWizard() {
     );
   }
 
+  const autosaveError = readError(autosaveMutation.error);
   const error = localError || readError(saveCaseMutation.error) || readError(uploadDocumentMutation.error) || readError(directAdmitMutation.error);
   const requiresReview = caseData?.requiresReview && caseData.displayStatus !== 'APPROVED';
   const canAdmit = caseData?.canAdmitDirectly && !requiresReview;
@@ -188,6 +240,17 @@ export function AdmissionCaseWizard() {
           </li>
         ))}
       </ol>
+
+      {(caseId || autosaveMutation.isPending || autosaveError) ? (
+        <div className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 text-sm ${autosaveError ? 'border-warning-200 bg-warning-50 text-warning-900' : 'border-blue-100 bg-blue-50 text-blue-900'}`}>
+          <p className="flex items-center gap-2 font-semibold">
+            {autosaveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {autosaveMutation.isPending ? 'Saving admission draft…' : autosaveError ? 'Draft save needs retry' : 'Draft saved'}
+          </p>
+          {caseId ? <Link href={`/dashboard/admissions/new?mode=direct&caseId=${encodeURIComponent(caseId)}`} className="text-xs font-bold underline-offset-4 hover:underline">Recovery link</Link> : null}
+        </div>
+      ) : null}
+      {autosaveError ? <p className="rounded-xl border border-warning-200 bg-warning-50 p-3 text-sm font-semibold text-warning-900" role="status">{autosaveError}</p> : null}
 
       {step === 0 ? (
         <SectionCard title="Student and guardian" description="Start with the information the school office needs for a normal admission.">
@@ -298,6 +361,7 @@ export function AdmissionCaseWizard() {
           </SectionCard>
 
           {caseData ? <EligibilityPanel admissionCase={caseData} /> : null}
+          {caseData?.relatedStudentCandidates.length ? <RelatedStudentResolution admissionCase={caseData} /> : null}
           {requiresReview ? (
             <SectionCard title="Admission review required" description="This class or admission type needs review before the student can be admitted.">
               <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-slate-600">The details are saved once. Continue to the case review without re-entering the student or guardian information.</p><Button type="button" onClick={() => router.push(`/dashboard/admissions/cases/${caseData?.id ?? ''}`)}>Open admission case</Button></div>
@@ -335,6 +399,29 @@ function EligibilityPanel({ admissionCase }: { admissionCase: AdmissionCase }) {
   );
 }
 
+function RelatedStudentResolution({ admissionCase }: { admissionCase: AdmissionCase }) {
+  return (
+    <SectionCard title="Guardian and sibling resolution" description="These existing students share the submitted guardian phone. This is family context only; duplicate review remains separate.">
+      <ul className="space-y-3">
+        {admissionCase.relatedStudentCandidates.map((candidate) => (
+          <li key={candidate.studentId} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="flex items-center gap-2 text-sm font-bold text-slate-900"><UsersRound className="h-4 w-4 text-blue-700" />{candidate.fullNameEn}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">{candidate.studentSystemId} · {candidate.className}{candidate.sectionName ? ` ${candidate.sectionName}` : ''} · {humanize(candidate.lifecycleStatus)}</p>
+              </div>
+              {candidate.guardianName ? <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-600">{candidate.guardianName}{candidate.guardianRelation ? ` · ${candidate.guardianRelation}` : ''}</span> : null}
+            </div>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-xs font-semibold text-slate-600">
+              {candidate.matchReasons.map((reason) => <li key={reason}>{reason}</li>)}
+            </ul>
+          </li>
+        ))}
+      </ul>
+    </SectionCard>
+  );
+}
+
 function Issue({ title, items, warning = false }: { title: string; items: string[]; warning?: boolean }) {
   return <div className={`rounded-xl border p-3 ${warning ? 'border-warning-200 bg-warning-50 text-warning-900' : 'border-danger-200 bg-danger-50 text-danger-900'}`}><div className="flex items-center gap-2 font-bold"><AlertTriangle className="h-4 w-4" />{title}</div><ul className="mt-2 list-disc space-y-1 pl-5">{items.map((item) => <li key={item}>{humanize(item)}</li>)}</ul></div>;
 }
@@ -355,4 +442,91 @@ function readError(error: unknown) {
   if (!error) return '';
   if (error instanceof ApiRequestError) return error.message;
   return error instanceof Error ? error.message : 'The admission could not be completed. Please try again.';
+}
+
+function buildAdmissionCasePayload(form: CreateAdmissionCasePayload): CreateAdmissionCasePayload {
+  return Object.fromEntries(
+    Object.entries({
+      ...form,
+      firstNameEn: normalizePersonName(form.firstNameEn),
+      lastNameEn: normalizePersonName(form.lastNameEn),
+      firstNameNp: form.firstNameNp ? normalizePersonName(form.firstNameNp) : '',
+      lastNameNp: form.lastNameNp ? normalizePersonName(form.lastNameNp) : '',
+      guardianFullName: form.guardianFullName ? normalizePersonName(form.guardianFullName) : '',
+      guardianPhone: form.guardianPhone ? normalizeNepalPhone(form.guardianPhone) : '',
+      guardianEmail: form.guardianEmail ? normalizeEmail(form.guardianEmail) : '',
+      emergencyName: form.emergencyName ? normalizePersonName(form.emergencyName) : '',
+      emergencyPhone: form.emergencyPhone ? normalizeNepalPhone(form.emergencyPhone) : '',
+    }).filter(([, value]) => value !== '' && value !== undefined),
+  ) as CreateAdmissionCasePayload;
+}
+
+function buildAutosavePayload(form: CreateAdmissionCasePayload): CreateAdmissionCasePayload | null {
+  if (!isValidPersonName(form.firstNameEn) || !isValidPersonName(form.lastNameEn)) return null;
+  if (form.firstNameNp && !isValidPersonName(form.firstNameNp)) return null;
+  if (form.lastNameNp && !isValidPersonName(form.lastNameNp)) return null;
+  if (form.dateOfBirth && !isValidDateOfBirth(form.dateOfBirth)) return null;
+  if (form.guardianFullName && !isValidPersonName(form.guardianFullName)) return null;
+  if (form.guardianPhone && !tryNormalizeNepalPhone(form.guardianPhone)) return null;
+  if (form.guardianEmail && !isValidEmail(form.guardianEmail)) return null;
+  if (form.emergencyName && !isValidPersonName(form.emergencyName)) return null;
+  if (form.emergencyPhone && !tryNormalizeNepalPhone(form.emergencyPhone)) return null;
+  return buildAdmissionCasePayload(form);
+}
+
+function formFromAdmissionCase(admissionCase: AdmissionCase): CreateAdmissionCasePayload {
+  return {
+    firstNameEn: admissionCase.student.firstNameEn,
+    lastNameEn: admissionCase.student.lastNameEn,
+    firstNameNp: admissionCase.student.firstNameNp ?? '',
+    lastNameNp: admissionCase.student.lastNameNp ?? '',
+    dateOfBirth: admissionCase.student.dateOfBirth ?? '',
+    gender: admissionCase.student.gender ?? 'FEMALE',
+    guardianFullName: admissionCase.guardian.fullName ?? '',
+    guardianRelation: admissionCase.guardian.relationship ?? '',
+    guardianPhone: admissionCase.guardian.phone ?? '',
+    guardianEmail: admissionCase.guardian.email ?? '',
+    guardianReceivesAlerts: admissionCase.guardian.receivesAlerts,
+    academicYearId: admissionCase.academic.academicYearId ?? '',
+    classId: admissionCase.academic.classId ?? '',
+    sectionId: admissionCase.academic.sectionId ?? '',
+    source: admissionCase.source,
+    transferStudent: admissionCase.transferStudent,
+    previousSchool: admissionCase.previousSchool ?? '',
+    notes: admissionCase.notes ?? '',
+    admissionDate: admissionCase.academic.admissionDate ?? new Date().toISOString().slice(0, 10),
+    mediumOfInstruction: admissionCase.academic.mediumOfInstruction,
+    rollNumber: admissionCase.academic.rollNumber ?? undefined,
+    documents: admissionCase.documents.map((document) => ({
+      fileId: document.fileId,
+      kind: document.kind,
+      title: document.title ?? undefined,
+    })),
+  };
+}
+
+function recoveryStepForCase(admissionCase: AdmissionCase) {
+  if (
+    admissionCase.missingRequiredFields.some((field) =>
+      ['dateOfBirth', 'gender', 'guardianFullName', 'guardianRelation', 'guardianPhone', 'guardianEmail', 'emergencyName', 'emergencyPhone'].includes(field),
+    )
+  ) {
+    return 0;
+  }
+  if (
+    admissionCase.missingRequiredFields.some((field) =>
+      ['academicYearId', 'classId', 'sectionId', 'previousSchool', 'admissionDate', 'nationalStudentId'].includes(field),
+    )
+  ) {
+    return 1;
+  }
+  return 2;
+}
+
+function syncRecoveryUrl(admissionCaseId: string) {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  url.searchParams.set('mode', 'direct');
+  url.searchParams.set('caseId', admissionCaseId);
+  window.history.replaceState(window.history.state, '', `${url.pathname}?${url.searchParams.toString()}`);
 }
