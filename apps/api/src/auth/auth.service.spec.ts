@@ -52,6 +52,9 @@ describe('AuthService', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
       },
+      mobilePushToken: {
+        deleteMany: jest.fn(),
+      },
       otpCode: {
         create: jest.fn(),
         findFirst: jest.fn(),
@@ -366,6 +369,42 @@ describe('AuthService', () => {
     expect(response.clearCookie).toHaveBeenCalledWith(
       'access_token',
       expect.objectContaining({ httpOnly: true }),
+    );
+  });
+
+  it('revokes only the logging-out mobile installation push token', async () => {
+    prisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+    prisma.refreshToken.findFirst.mockResolvedValue({
+      userId: authUser.id,
+      user: { tenantId: authUser.tenantId },
+    });
+    prisma.mobilePushToken.deleteMany.mockResolvedValue({ count: 1 });
+
+    await service.logout(
+      {
+        refreshToken: 'refresh-token',
+        installationId: '3b53ee2c-f356-477d-8b2c-7a35918590ab',
+      },
+      response,
+    );
+
+    expect(prisma.mobilePushToken.deleteMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-1',
+        userId: 'user-1',
+        installationId: '3b53ee2c-f356-477d-8b2c-7a35918590ab',
+      },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'logout',
+        tenantId: 'tenant-1',
+        userId: 'user-1',
+        after: {
+          installationId: '3b53ee2c-f356-477d-8b2c-7a35918590ab',
+          pushTokenRevoked: true,
+        },
+      }),
     );
   });
 

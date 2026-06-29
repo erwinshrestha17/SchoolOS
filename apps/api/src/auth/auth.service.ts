@@ -517,6 +517,18 @@ export class AuthService {
       : null;
 
     if (session?.user) {
+      let revokedPushTokenCount = 0;
+      if (dto.installationId) {
+        const result = await this.prisma.mobilePushToken.deleteMany({
+          where: {
+            tenantId: session.user.tenantId,
+            userId: session.userId,
+            installationId: dto.installationId,
+          },
+        });
+        revokedPushTokenCount = result.count;
+      }
+
       await this.auditService.record({
         action: 'logout',
         resource: 'auth',
@@ -525,6 +537,14 @@ export class AuthService {
         ipAddress: requestMeta?.ipAddress,
         userAgent: requestMeta?.userAgent,
         requestId: requestMeta?.requestId,
+        ...(dto.installationId
+          ? {
+              after: {
+                installationId: dto.installationId,
+                pushTokenRevoked: revokedPushTokenCount > 0,
+              },
+            }
+          : {}),
       });
     }
 

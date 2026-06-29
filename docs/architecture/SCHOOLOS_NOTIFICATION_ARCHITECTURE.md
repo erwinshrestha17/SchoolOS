@@ -1,6 +1,6 @@
 # M12 Notifications, Notices, Communication, Chat Architecture
 
-**Last updated:** 2026-06-19  
+**Last updated:** 2026-06-29
 **Status:** Canonical architecture companion for M12 notification events, delivery, preferences, provider operations, notices, chat, and notification-center behavior.  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard, Flutter companion app.
 
@@ -277,6 +277,7 @@ Suggested tenant-scoped tables/models:
 | `Notification` | User-facing inbox item |
 | `NotificationTemplate` | Channel/language/event template |
 | `NotificationDelivery` | Delivery attempt per notification/channel/provider |
+| `MobilePushToken` | Encrypted FCM token owned by one tenant, user, and app installation |
 | `NotificationPreference` | User/category/channel preference |
 | `NotificationQuietHour` | Tenant/user quiet-hours policy |
 | `NotificationAuditLog` | High-impact notification audit |
@@ -302,6 +303,8 @@ PATCH  /api/v1/notifications/read-all
 PATCH  /api/v1/notifications/:id/archive
 GET    /api/v1/notification-preferences
 PUT    /api/v1/notification-preferences
+POST   /api/v1/mobile/push-tokens
+DELETE /api/v1/mobile/push-tokens/:installationId
 ```
 
 Admin/platform diagnostics APIs:
@@ -370,6 +373,9 @@ Required surfaces:
 5. Parent/teacher chat where enabled and scoped.
 6. Session-expired, forbidden, stale, and offline states.
 7. Local notification display must not expose private content when the device is locked unless policy allows it.
+8. Register and refresh the current installation token only after authenticated persona and M12 entitlement checks.
+9. Revoke the installation token during logout and session-expiry cleanup; controlled student sessions do not register broad mobile push.
+10. Push-open routing accepts only backend-issued, tenant-matching, persona-allowlisted destinations and re-checks child ownership or assignment scope before rendering.
 
 ---
 

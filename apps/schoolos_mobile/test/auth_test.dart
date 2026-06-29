@@ -223,16 +223,25 @@ void main() {
       when(
         () => mockApiClient.post<dynamic>(
           '/auth/logout',
-          data: {'refreshToken': 'refresh_token_123'},
+          data: {
+            'refreshToken': 'refresh_token_123',
+            'installationId': '3b53ee2c-f356-477d-8b2c-7a35918590ab',
+          },
         ),
       ).thenAnswer((_) async => mockResponse);
 
-      await repository.logout(refreshToken: 'refresh_token_123');
+      await repository.logout(
+        refreshToken: 'refresh_token_123',
+        installationId: '3b53ee2c-f356-477d-8b2c-7a35918590ab',
+      );
 
       verify(
         () => mockApiClient.post<dynamic>(
           '/auth/logout',
-          data: {'refreshToken': 'refresh_token_123'},
+          data: {
+            'refreshToken': 'refresh_token_123',
+            'installationId': '3b53ee2c-f356-477d-8b2c-7a35918590ab',
+          },
         ),
       ).called(1);
     });

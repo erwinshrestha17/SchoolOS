@@ -7,6 +7,7 @@ import '../../../app/design_system/app_spacing.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/connectivity_provider.dart';
+import '../../../core/notifications/push_notification_controller.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_scaffold.dart';
 import '../../../shared/widgets/status_chip.dart';
@@ -20,6 +21,7 @@ class SettingsScreen extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final isOnline = ref.watch(connectivityProvider);
+    final pushState = ref.watch(pushNotificationControllerProvider);
 
     return AppScaffold(
       appBar: AppBar(
@@ -109,6 +111,16 @@ class SettingsScreen extends ConsumerWidget {
                     },
                   ),
                 ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.notifications_active_outlined),
+                  title: const Text('Push Notifications'),
+                  subtitle: Text(pushState.message),
+                  trailing: StatusChip(
+                    status: _pushStatus(pushState.availability),
+                    label: _pushLabel(pushState.availability),
+                  ),
+                ),
               ],
             ),
           ),
@@ -177,4 +189,26 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+AppStatusType _pushStatus(PushNotificationAvailability availability) {
+  return switch (availability) {
+    PushNotificationAvailability.ready => AppStatusType.completed,
+    PushNotificationAvailability.initializing => AppStatusType.pending,
+    PushNotificationAvailability.inactive => AppStatusType.draft,
+    _ => AppStatusType.pending,
+  };
+}
+
+String _pushLabel(PushNotificationAvailability availability) {
+  return switch (availability) {
+    PushNotificationAvailability.ready => 'Ready',
+    PushNotificationAvailability.initializing => 'Checking',
+    PushNotificationAvailability.permissionDenied => 'Off',
+    PushNotificationAvailability.providerDisabled => 'Disabled',
+    PushNotificationAvailability.providerNotReady => 'Not ready',
+    PushNotificationAvailability.unsupportedPersona => 'Unavailable',
+    PushNotificationAvailability.unavailable => 'Unavailable',
+    PushNotificationAvailability.inactive => 'Inactive',
+  };
 }

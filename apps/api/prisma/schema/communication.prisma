@@ -109,6 +109,28 @@ model NotificationReadReceipt {
   @@index([tenantId, notificationDeliveryId, userId])
 }
 
+model MobilePushToken {
+  id             String   @id @default(uuid())
+  tenantId       String
+  userId         String
+  installationId String
+  tokenHash      String
+  tokenEncrypted String
+  platform       String
+  appVersion     String?
+  deviceModel    String?
+  lastSeenAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, tokenHash])
+  @@unique([tenantId, userId, installationId])
+  @@index([tenantId, userId, lastSeenAt])
+}
+
 model NoticeReadReceipt {
   id              String   @id @default(uuid())
   tenantId        String

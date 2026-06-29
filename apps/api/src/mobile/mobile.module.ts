@@ -20,6 +20,8 @@ import { TimetableModule } from '../timetable/timetable.module';
 import { AdvancedOperationsModule } from '../advanced-operations/advanced-operations.module';
 import { ActivityFeedModule } from '../activity-feed/activity-feed.module';
 import { MobileTeacherActivityController } from './mobile-teacher-activity.controller';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { MobilePushTokensController } from './mobile-push-tokens.controller';
 
 @Module({
   imports: [
@@ -35,6 +37,7 @@ import { MobileTeacherActivityController } from './mobile-teacher-activity.contr
     TimetableModule,
     AdvancedOperationsModule,
     ActivityFeedModule,
+    NotificationsModule,
   ],
   controllers: [
     MobileController,
@@ -44,6 +47,7 @@ import { MobileTeacherActivityController } from './mobile-teacher-activity.contr
     MobileTeacherStudentsController,
     MobileTeacherTimetableController,
     MobilePrincipalController,
+    MobilePushTokensController,
   ],
   providers: [MobileService, MobilePrincipalService],
 })

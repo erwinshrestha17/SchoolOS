@@ -55,6 +55,7 @@ model Tenant {
   moodLogs                      MoodLog[]
   notificationDeliveries        NotificationDelivery[]
   notificationReadReceipts      NotificationReadReceipt[]
+  mobilePushTokens              MobilePushToken[]
   guardianConsents              GuardianConsent[]
   guardianIdentityVerifications GuardianIdentityVerification[]
   generatedStudentDocuments     GeneratedStudentDocument[]

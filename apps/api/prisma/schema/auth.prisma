@@ -36,6 +36,7 @@ model User {
   editedActivityPosts            ActivityPost[]               @relation("EditedActivityPosts")
   deletedActivityPosts           ActivityPost[]               @relation("DeletedActivityPosts")
   notificationDeliveries      NotificationDelivery[]       @relation("NotificationActor")
+  mobilePushTokens            MobilePushToken[]
   enteredMarks                MarkEntry[]                  @relation("EnteredMarks")
   reviewedStaffLeaveRequests  StaffLeaveRequest[]          @relation("ReviewedStaffLeaveRequests")
     requestedMarkLockRequests      MarkLockRequest[]             @relation("RequestedMarkLock")

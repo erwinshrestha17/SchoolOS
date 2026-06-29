@@ -2417,6 +2417,7 @@ model User {
   editedActivityPosts            ActivityPost[]               @relation("EditedActivityPosts")
   deletedActivityPosts           ActivityPost[]               @relation("DeletedActivityPosts")
   notificationDeliveries      NotificationDelivery[]       @relation("NotificationActor")
+  mobilePushTokens            MobilePushToken[]
   enteredMarks                MarkEntry[]                  @relation("EnteredMarks")
   reviewedStaffLeaveRequests  StaffLeaveRequest[]          @relation("ReviewedStaffLeaveRequests")
     requestedMarkLockRequests      MarkLockRequest[]             @relation("RequestedMarkLock")
@@ -3054,6 +3055,28 @@ model NotificationReadReceipt {
   @@id([tenantId, notificationDeliveryId, userId])
   @@index([tenantId, userId, readAt])
   @@index([tenantId, notificationDeliveryId, userId])
+}
+
+model MobilePushToken {
+  id             String   @id @default(uuid())
+  tenantId       String
+  userId         String
+  installationId String
+  tokenHash      String
+  tokenEncrypted String
+  platform       String
+  appVersion     String?
+  deviceModel    String?
+  lastSeenAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, tokenHash])
+  @@unique([tenantId, userId, installationId])
+  @@index([tenantId, userId, lastSeenAt])
 }
 
 model NoticeReadReceipt {
@@ -5920,6 +5943,7 @@ model Tenant {
   moodLogs                      MoodLog[]
   notificationDeliveries        NotificationDelivery[]
   notificationReadReceipts      NotificationReadReceipt[]
+  mobilePushTokens              MobilePushToken[]
   guardianConsents              GuardianConsent[]
   guardianIdentityVerifications GuardianIdentityVerification[]
   generatedStudentDocuments     GeneratedStudentDocument[]

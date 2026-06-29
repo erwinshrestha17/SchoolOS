@@ -6,6 +6,7 @@ describe('NotificationsProcessor', () => {
   const originalEmailWebhookUrl = process.env.EMAIL_WEBHOOK_URL;
   const originalNotificationMode =
     process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE;
+  const originalPushReady = process.env.PUSH_PROVIDER_READY;
   const originalFetch = global.fetch;
 
   afterEach(() => {
@@ -27,16 +28,49 @@ describe('NotificationsProcessor', () => {
       process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE =
         originalNotificationMode;
     }
+    if (originalPushReady === undefined) {
+      delete process.env.PUSH_PROVIDER_READY;
+    } else {
+      process.env.PUSH_PROVIDER_READY = originalPushReady;
+    }
 
     global.fetch = originalFetch;
   });
 
-  it('marks queued delivery rows as sent after provider processing succeeds', async () => {
+  it('sends a generic push payload to registered device tokens through the configured provider', async () => {
+    process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = 'configured-provider';
+    process.env.PUSH_PROVIDER_READY = 'true';
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      headers: {
+        get: jest.fn().mockReturnValue('push-provider-msg-1'),
+      },
+    }) as never;
+
     const prisma = {
       providerConfig: {
-        findFirst: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'provider-1',
+          type: 'FCM',
+          name: 'fcm-webhook',
+          enabled: true,
+          configEncrypted: {
+            webhookUrl: 'https://provider.test/push',
+          },
+          secretKeys: [],
+        }),
       },
       notificationDelivery: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'delivery-1',
+          sourceType: 'attendance_absent',
+          sourceId: 'attendance:session-1:student-1:absent',
+          studentId: 'student-1',
+          recipientUserId: 'guardian-user-1',
+          recipientUser: {
+            userRoles: [{ role: { name: 'parent' } }],
+          },
+        }),
         update: jest.fn(),
       },
     };
@@ -44,6 +78,12 @@ describe('NotificationsProcessor', () => {
       prisma as never,
       {
         shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
+      } as never,
+      undefined,
+      {
+        listActiveTokens: jest
+          .fn()
+          .mockResolvedValue(['registered-device-token']),
       } as never,
     );
 
@@ -62,15 +102,103 @@ describe('NotificationsProcessor', () => {
       },
     } as never);
 
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://provider.test/push',
+      expect.objectContaining({
+        body: expect.not.stringContaining(
+          'Your child was marked absent today.',
+        ),
+      }),
+    );
+    const pushRequest = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[0][1].body,
+    );
+    expect(pushRequest.payload).toEqual({
+      tokens: ['registered-device-token'],
+      notification: {
+        title: 'SchoolOS notification',
+        body: 'Open SchoolOS to view this update.',
+      },
+      data: {
+        notificationId: 'delivery-1',
+        tenantId: 'tenant-1',
+        route: '/parent/children/student-1/attendance',
+        childId: 'student-1',
+      },
+    });
     expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
-      where: { id: 'delivery-1' },
+      where: { id: 'delivery-1', tenantId: 'tenant-1' },
       data: {
         status: NotificationStatus.SENT,
         sentAt: expect.any(Date),
         deliveredAt: undefined,
         failedAt: undefined,
-        providerMessageId: undefined,
+        providerMessageId: 'push-provider-msg-1',
         errorMessage: null,
+      },
+    });
+  });
+
+  it('skips configured push dispatch when provider readiness is not proven', async () => {
+    process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = 'configured-provider';
+    delete process.env.PUSH_PROVIDER_READY;
+    global.fetch = jest.fn();
+
+    const prisma = {
+      providerConfig: {
+        findFirst: jest.fn(),
+      },
+      notificationDelivery: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'delivery-not-ready',
+          sourceType: 'result_published',
+          sourceId: 'report-card-1',
+          studentId: 'student-1',
+          recipientUserId: 'guardian-user-1',
+          recipientUser: {
+            userRoles: [{ role: { name: 'parent' } }],
+          },
+        }),
+        update: jest.fn(),
+      },
+    };
+    const processor = new NotificationsProcessor(
+      prisma as never,
+      {
+        shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
+      } as never,
+      undefined,
+      {
+        listActiveTokens: jest
+          .fn()
+          .mockResolvedValue(['registered-device-token']),
+      } as never,
+    );
+
+    await processor.process({
+      name: 'sendPushNotification',
+      data: {
+        title: 'Results published',
+        body: 'A result is ready.',
+        audience: 'guardian-user-1',
+        metadata: {
+          tenantId: 'tenant-1',
+          notificationDeliveryId: 'delivery-not-ready',
+        },
+      },
+    } as never);
+
+    expect(prisma.providerConfig.findFirst).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
+      where: { id: 'delivery-not-ready', tenantId: 'tenant-1' },
+      data: {
+        status: NotificationStatus.SKIPPED,
+        sentAt: undefined,
+        deliveredAt: undefined,
+        failedAt: undefined,
+        providerMessageId: undefined,
+        errorMessage: 'push provider is not ready',
       },
     });
   });
@@ -121,7 +249,7 @@ describe('NotificationsProcessor', () => {
     );
 
     expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
-      where: { id: 'delivery-2' },
+      where: { id: 'delivery-2', tenantId: 'tenant-1' },
       data: {
         status: NotificationStatus.FAILED,
         sentAt: undefined,
@@ -168,7 +296,7 @@ describe('NotificationsProcessor', () => {
 
     expect(prisma.providerConfig.findFirst).not.toHaveBeenCalled();
     expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
-      where: { id: 'delivery-3' },
+      where: { id: 'delivery-3', tenantId: 'tenant-1' },
       data: {
         status: NotificationStatus.SKIPPED,
         sentAt: undefined,
@@ -239,7 +367,7 @@ describe('NotificationsProcessor', () => {
       }),
     );
     expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
-      where: { id: 'delivery-4' },
+      where: { id: 'delivery-4', tenantId: 'tenant-1' },
       data: {
         status: NotificationStatus.SENT,
         sentAt: expect.any(Date),

@@ -74,6 +74,20 @@ flutter build ios --no-codesign
 
 Use the GA policy and production-readiness audit to record which local, emulator/device, staging, and controlled-pilot gates actually passed.
 
+## Push Notification Configuration
+
+The app registers FCM tokens only for authenticated parent, teacher, principal/admin, driver, and staff personas. Controlled student sessions do not register broad mobile push. Configure Firebase per build without committing provider secrets:
+
+```text
+--dart-define=SCHOOL_OS_FIREBASE_API_KEY=...
+--dart-define=SCHOOL_OS_FIREBASE_APP_ID=...
+--dart-define=SCHOOL_OS_FIREBASE_MESSAGING_SENDER_ID=...
+--dart-define=SCHOOL_OS_FIREBASE_PROJECT_ID=...
+--dart-define=SCHOOL_OS_FIREBASE_STORAGE_BUCKET=...   # optional
+```
+
+The backend also requires a verified configured push adapter (`PUSH_PROVIDER_MODE=configured-provider`, `PUSH_PROVIDER_ENABLED=true`, and `PUSH_PROVIDER_READY=true`). Missing app or backend provider configuration must remain visible as unavailable/not-ready; registration or local builds are not delivery proof.
+
 ## Parent Device QA Release Gate
 
 Parent mobile is not release-ready until the following Android emulator or physical-device checklist is run against a live seeded backend and evidence is recorded:

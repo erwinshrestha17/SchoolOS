@@ -189,6 +189,10 @@ export const academicsApi = {
     request<AssessmentRetakePage>(
       withQuery('/academics/assessment-retakes', params ?? {}),
     ),
+  getAssessmentRetake: (id: string) =>
+    request<AssessmentRetakeSummary>(
+      `/academics/assessment-retakes/${encodeURIComponent(id)}`,
+    ),
   createAssessmentRetake: (body: {
     markEntryId: string;
     type: AssessmentRetakeType;

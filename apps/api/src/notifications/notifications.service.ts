@@ -97,41 +97,78 @@ export class NotificationsService {
     });
   }
 
-  async getProviderReadiness(
+  getProviderReadiness(
     channel: NotificationChannel,
   ): Promise<NotificationProviderReadiness> {
-    if (isDisabled(process.env.NOTIFICATIONS_DISABLED)) {
+    return Promise.resolve(resolveProviderReadiness(channel));
+  }
+}
+
+function resolveProviderReadiness(
+  channel: NotificationChannel,
+): NotificationProviderReadiness {
+  if (isDisabled(process.env.NOTIFICATIONS_DISABLED)) {
+    return {
+      enabled: false,
+      failureCode: 'PROVIDER_DISABLED',
+      failureReason: 'Notification dispatch is disabled for this environment.',
+    };
+  }
+
+  const channelMode = getChannelMode(channel);
+  if (isDisabled(process.env[channelMode.enabledEnv])) {
+    return {
+      enabled: false,
+      failureCode: 'PROVIDER_DISABLED',
+      failureReason: `${channelMode.label} dispatch is disabled.`,
+    };
+  }
+
+  if (isDisabled(process.env[channelMode.readyEnv])) {
+    return {
+      enabled: false,
+      failureCode: 'PROVIDER_NOT_READY',
+      failureReason: `${channelMode.label} provider is not ready.`,
+    };
+  }
+
+  if (channel === NotificationChannel.PUSH) {
+    const providerMode = (
+      process.env.PUSH_PROVIDER_MODE ??
+      process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE ??
+      'dev-log'
+    )
+      .trim()
+      .toLowerCase();
+    if (providerMode === 'disabled') {
       return {
         enabled: false,
         failureCode: 'PROVIDER_DISABLED',
-        failureReason:
-          'Notification dispatch is disabled for this environment.',
+        failureReason: 'Push notification dispatch is disabled.',
       };
     }
-
-    const channelMode = getChannelMode(channel);
-    if (isDisabled(process.env[channelMode.enabledEnv])) {
-      return {
-        enabled: false,
-        failureCode: 'PROVIDER_DISABLED',
-        failureReason: `${channelMode.label} dispatch is disabled.`,
-      };
-    }
-
-    if (isDisabled(process.env[channelMode.readyEnv])) {
+    if (providerMode !== 'configured-provider' && providerMode !== 'webhook') {
       return {
         enabled: false,
         failureCode: 'PROVIDER_NOT_READY',
-        failureReason: `${channelMode.label} provider is not ready.`,
+        failureReason:
+          'Push notifications are registered, but this environment is not connected to a delivery provider.',
       };
     }
-
-    return {
-      enabled: true,
-      failureCode: null,
-      failureReason: null,
-    };
+    if (!isEnabled(process.env.PUSH_PROVIDER_READY)) {
+      return {
+        enabled: false,
+        failureCode: 'PROVIDER_NOT_READY',
+        failureReason: 'Push notification provider is not ready.',
+      };
+    }
   }
+
+  return {
+    enabled: true,
+    failureCode: null,
+    failureReason: null,
+  };
 }
 
 function escapeHtml(value: string) {
@@ -170,6 +207,13 @@ function getChannelMode(channel: NotificationChannel) {
 function isDisabled(value: string | undefined) {
   if (!value) return false;
   return ['0', 'false', 'disabled', 'off', 'no'].includes(
+    value.trim().toLowerCase(),
+  );
+}
+
+function isEnabled(value: string | undefined) {
+  if (!value) return false;
+  return ['1', 'true', 'enabled', 'on', 'yes'].includes(
     value.trim().toLowerCase(),
   );
 }

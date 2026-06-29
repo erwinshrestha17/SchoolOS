@@ -46,10 +46,10 @@ class AuthRepository {
   }
 
   /// Gracefully sign out on servers
-  Future<void> logout({String? refreshToken}) async {
+  Future<void> logout({String? refreshToken, String? installationId}) async {
     await client.post(
       '/auth/logout',
-      data: refreshToken == null ? null : {'refreshToken': refreshToken},
+      data: {'refreshToken': ?refreshToken, 'installationId': ?installationId},
     );
   }
 }

@@ -19,6 +19,7 @@ import {
   CalendarPlus,
   Check,
   ClipboardCheck,
+  Eye,
   RotateCcw,
   ShieldCheck,
   X,
@@ -97,6 +98,7 @@ export function AssessmentRetakesTab() {
   const [type, setType] = useState<AssessmentRetakeType | ''>('');
   const [page, setPage] = useState(1);
   const [target, setTarget] = useState<ActionTarget | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [form, setForm] = useState<ActionForm>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -110,6 +112,17 @@ export function AssessmentRetakesTab() {
         page,
         limit: PAGE_SIZE,
       }),
+  });
+
+  const detailQuery = useQuery({
+    queryKey: ['assessment-retake', detailId],
+    queryFn: () => {
+      if (!detailId) {
+        throw new Error('Select an assessment retake to view its detail.');
+      }
+      return academicsApi.getAssessmentRetake(detailId);
+    },
+    enabled: detailId !== null,
   });
 
   const actionMutation = useMutation({
@@ -156,6 +169,7 @@ export function AssessmentRetakesTab() {
       setSuccessMessage(successLabel(variables.action));
       setTarget(null);
       void queryClient.invalidateQueries({ queryKey: ['assessment-retakes'] });
+      void queryClient.invalidateQueries({ queryKey: ['assessment-retake'] });
       void queryClient.invalidateQueries({ queryKey: ['marks'] });
       void queryClient.invalidateQueries({ queryKey: ['report-cards'] });
       void queryClient.invalidateQueries({
@@ -174,6 +188,7 @@ export function AssessmentRetakesTab() {
     const scheduledEnd = retake.scheduledEndsAt
       ? new Date(retake.scheduledEndsAt)
       : null;
+    setDetailId(null);
     setTarget({ action, retake });
     setForm({
       ...EMPTY_FORM,
@@ -373,9 +388,10 @@ export function AssessmentRetakesTab() {
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex justify-end gap-1">
-                        <RetakeActions
-                          retake={retake}
-                          onAction={openAction}
+                        <IconAction
+                          title="View retake details"
+                          icon={<Eye className="h-4 w-4" />}
+                          onClick={() => setDetailId(retake.id)}
                         />
                       </div>
                     </td>
@@ -392,6 +408,22 @@ export function AssessmentRetakesTab() {
           />
         </div>
       )}
+
+      <RetakeDetailDialog
+        retake={detailQuery.data ?? null}
+        isLoading={detailQuery.isLoading}
+        error={
+          detailQuery.isError
+            ? detailQuery.error instanceof Error
+              ? detailQuery.error.message
+              : 'The retake detail could not be loaded.'
+            : null
+        }
+        open={detailId !== null}
+        onClose={() => setDetailId(null)}
+        onRetry={() => void detailQuery.refetch()}
+        onAction={openAction}
+      />
 
       <RetakeActionDialog
         target={target}
@@ -413,15 +445,155 @@ export function AssessmentRetakesTab() {
   );
 }
 
+function RetakeDetailDialog({
+  retake,
+  isLoading,
+  error,
+  open,
+  onClose,
+  onRetry,
+  onAction,
+}: {
+  retake: AssessmentRetakeSummary | null;
+  isLoading: boolean;
+  error: string | null;
+  open: boolean;
+  onClose: () => void;
+  onRetry: () => void;
+  onAction: (
+    action: RetakeAction,
+    retake: AssessmentRetakeSummary,
+  ) => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <Dialog open onOpenChange={(nextOpen: boolean) => !nextOpen && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Assessment retake detail</DialogTitle>
+          <DialogDescription>
+            Current backend-owned lifecycle state and available commands.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5 overflow-y-auto p-6">
+          {isLoading ? (
+            <LoadingState variant="skeleton" label="Loading retake detail" />
+          ) : error ? (
+            <ErrorState
+              title="Could not load retake detail"
+              message={error}
+              onRetry={onRetry}
+            />
+          ) : retake ? (
+            <>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-lg font-black text-slate-950">
+                    {studentName(retake)}
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    {retake.subject?.name ?? 'Subject'} |{' '}
+                    {retake.assessmentComponent?.name ?? 'Assessment'} |{' '}
+                    {displayType(retake.type)}
+                  </p>
+                </div>
+                <StatusBadge
+                  status={retake.status}
+                  tone={statusTone(retake.status)}
+                />
+              </div>
+
+              <dl className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
+                <DetailItem
+                  label="Original result"
+                  value={`${retake.originalMarks} | ${retake.originalStatus}`}
+                />
+                <DetailItem
+                  label="Retake result"
+                  value={
+                    retake.attemptMarks === null
+                      ? 'Not recorded'
+                      : `${retake.attemptMarks} | ${displayDecision(
+                          retake.resultDecision,
+                        )}`
+                  }
+                />
+                <DetailItem
+                  label="Schedule"
+                  value={
+                    retake.scheduledStartsAt
+                      ? `${formatBsDateTime(retake.scheduledStartsAt)}${
+                          retake.room ? ` | ${retake.room}` : ''
+                        }`
+                      : 'Not scheduled'
+                  }
+                />
+                <DetailItem
+                  label="Exam term"
+                  value={retake.examTerm?.name ?? retake.examTermId}
+                />
+              </dl>
+
+              <DetailNote label="Request reason" value={retake.reason} />
+              <DetailNote label="Review note" value={retake.reviewNote} />
+              <DetailNote label="Attempt note" value={retake.attemptRemarks} />
+              <DetailNote
+                label="Result decision reason"
+                value={retake.resultDecisionReason}
+              />
+              <DetailNote
+                label="Cancellation reason"
+                value={retake.cancellationReason}
+              />
+
+              <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4">
+                <RetakeActions retake={retake} onAction={onAction} />
+              </div>
+            </>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </dt>
+      <dd className="mt-1 text-sm font-semibold text-slate-900">{value}</dd>
+    </div>
+  );
+}
+
+function DetailNote({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <div>
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{value}</p>
+    </div>
+  );
+}
+
 function RetakeActions({
   retake,
   onAction,
 }: {
   retake: AssessmentRetakeSummary;
-  onAction: (
-    action: RetakeAction,
-    retake: AssessmentRetakeSummary,
-  ) => void;
+  onAction: (action: RetakeAction, retake: AssessmentRetakeSummary) => void;
 }) {
   if (retake.status === 'REQUESTED') {
     return (

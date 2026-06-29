@@ -67,6 +67,8 @@ describe('M4 academics workspace contract', () => {
     const marks = read('components/academics/tabs/marks-entry-tab.tsx');
 
     assert.match(workspace, /listAssessmentRetakes/);
+    assert.match(workspace, /getAssessmentRetake/);
+    assert.match(workspace, /RetakeDetailDialog/);
     assert.match(workspace, /approveAssessmentRetake/);
     assert.match(workspace, /rejectAssessmentRetake/);
     assert.match(workspace, /scheduleAssessmentRetake/);

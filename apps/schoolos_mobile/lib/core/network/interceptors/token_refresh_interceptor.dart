@@ -53,7 +53,8 @@ class TokenRefreshInterceptor extends Interceptor {
       return handler.resolve(retryResponse);
     } catch (e) {
       // Token refresh failed (e.g. refresh token also expired)
-      await tokenStorage.clearTokens();
+      // Keep the refresh token available until AuthNotifier calls the logout
+      // endpoint so the backend can revoke this installation's push token.
       onSessionExpired();
       return handler.next(err);
     }

@@ -8,6 +8,7 @@ import 'data/auth_repository.dart';
 import 'models/auth_user.dart';
 import 'models/login_request.dart';
 import '../network/api_client.dart';
+import '../notifications/device_installation_service.dart';
 
 enum AuthStatus { unauthenticated, loading, authenticated }
 
@@ -48,7 +49,14 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final tokenStorage = ref.watch(tokenStorageServiceProvider);
   final authRepository = ref.watch(authRepositoryProvider);
   final appPrefs = ref.watch(appPreferencesServiceProvider);
-  return AuthNotifier(tokenStorage, authRepository, appPrefs);
+  final installationService = ref.watch(deviceInstallationServiceProvider);
+  return AuthNotifier(
+    tokenStorage,
+    authRepository,
+    appPrefs,
+    null,
+    installationService,
+  );
 });
 
 class AuthNotifier extends StateNotifier<AuthState> {
@@ -57,8 +65,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     this._authRepository,
     this._appPrefs, [
     PrivateDataCleanupService? privateDataCleanup,
+    DeviceInstallationService? deviceInstallationService,
   ]) : _privateDataCleanup =
            privateDataCleanup ?? PrivateDataCleanupService(_appPrefs),
+       _deviceInstallationService = deviceInstallationService,
        super(AuthState(status: AuthStatus.unauthenticated)) {
     _authRepository.client.onSessionExpired = () {
       logout();
@@ -70,6 +80,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
   final AppPreferencesService _appPrefs;
   final PrivateDataCleanupService _privateDataCleanup;
+  final DeviceInstallationService? _deviceInstallationService;
 
   Future<void> loadSession() async {
     state = state.copyWith(status: AuthStatus.loading);
@@ -166,6 +177,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       await _authRepository.logout(
         refreshToken: await _tokenStorage.getRefreshToken(),
+        installationId: await _deviceInstallationService
+            ?.getOrCreateInstallationId(),
       );
     } catch (_) {
       // Ignore network errors during logout

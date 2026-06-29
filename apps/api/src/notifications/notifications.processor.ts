@@ -1,5 +1,5 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
+import { Logger, Optional } from '@nestjs/common';
 import { NotificationStatus } from '@prisma/client';
 import { Job } from 'bullmq';
 import { decryptSensitiveField } from '../common/security/field-encryption';
@@ -7,6 +7,8 @@ import { ConfigService } from '../config/config.service';
 import { PlansService } from '../plans/plans.service';
 import { skipSuspendedTenantJob } from '../plans/processor-tenant.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import { DevicePushTokensService } from './device-push-tokens.service';
+import { resolveMobilePushDeepLink } from './mobile-push-deep-link';
 
 interface EmailJobData {
   to: string;
@@ -55,6 +57,8 @@ export class NotificationsProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly plansService: PlansService,
     private readonly configService?: ConfigService,
+    @Optional()
+    private readonly devicePushTokensService?: DevicePushTokensService,
   ) {
     super();
   }
@@ -111,13 +115,14 @@ export class NotificationsProcessor extends WorkerHost {
     providerMessageId?: string,
   ) {
     const deliveryId = input.metadata?.notificationDeliveryId;
+    const tenantId = input.metadata?.tenantId;
 
-    if (typeof deliveryId !== 'string') {
+    if (typeof deliveryId !== 'string' || typeof tenantId !== 'string') {
       return;
     }
 
     await this.prisma.notificationDelivery.update({
-      where: { id: deliveryId },
+      where: { id: deliveryId, tenantId },
       data: {
         status,
         sentAt: status === NotificationStatus.SENT ? new Date() : undefined,
@@ -151,12 +156,96 @@ export class NotificationsProcessor extends WorkerHost {
   }
 
   private async handleSendPush(input: PushJobData): Promise<ProviderResult> {
+    const tenantId = input.metadata?.tenantId;
+    const notificationDeliveryId = input.metadata?.notificationDeliveryId;
+    if (
+      typeof tenantId !== 'string' ||
+      typeof notificationDeliveryId !== 'string'
+    ) {
+      return {
+        status: NotificationStatus.SKIPPED,
+        errorMessage: 'Push delivery metadata is incomplete',
+      };
+    }
+
+    if (!this.devicePushTokensService) {
+      return {
+        status: NotificationStatus.SKIPPED,
+        errorMessage: 'Device push token service is unavailable',
+      };
+    }
+
+    const delivery = await this.prisma.notificationDelivery.findFirst({
+      where: {
+        id: notificationDeliveryId,
+        tenantId,
+      },
+      select: {
+        id: true,
+        sourceType: true,
+        sourceId: true,
+        studentId: true,
+        recipientUserId: true,
+        recipientUser: {
+          select: {
+            userRoles: {
+              select: {
+                role: {
+                  select: { name: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!delivery?.recipientUserId) {
+      return {
+        status: NotificationStatus.SKIPPED,
+        errorMessage: 'Push recipient is not linked to an active user',
+      };
+    }
+
+    const tokens = await this.devicePushTokensService.listActiveTokens(
+      tenantId,
+      delivery.recipientUserId,
+    );
+    if (tokens.length === 0) {
+      return {
+        status: NotificationStatus.SKIPPED,
+        errorMessage: 'Recipient has no active mobile push token',
+      };
+    }
+
+    const deepLink = resolveMobilePushDeepLink({
+      notificationId: delivery.id,
+      sourceType: delivery.sourceType,
+      sourceId: delivery.sourceId,
+      studentId: delivery.studentId,
+      roles:
+        delivery.recipientUser?.userRoles.map(({ role }) => role.name) ?? [],
+    });
+    if (!deepLink) {
+      return {
+        status: NotificationStatus.SKIPPED,
+        errorMessage: 'Recipient does not have a supported mobile push persona',
+      };
+    }
+
     const provider = await this.resolveProvider('push');
     return this.deliverWithProvider(provider, {
-      title: input.title,
-      body: input.body,
-      audience: input.audience,
-      metadata: input.metadata ?? {},
+      tokens,
+      notification: {
+        title: 'SchoolOS notification',
+        body: 'Open SchoolOS to view this update.',
+      },
+      data: {
+        notificationId: delivery.id,
+        tenantId,
+        route: deepLink.route,
+        ...(deepLink.childId ? { childId: deepLink.childId } : {}),
+      },
     });
   }
 
@@ -174,6 +263,24 @@ export class NotificationsProcessor extends WorkerHost {
     }
 
     if (provider.mode === 'dev-log') {
+      if (provider.channel === 'push') {
+        const tokens = Array.isArray(payload.tokens) ? payload.tokens : [];
+        this.logger.log(
+          JSON.stringify({
+            mode: 'dev-log',
+            channel: provider.channel,
+            provider: provider.providerName,
+            tokenCount: tokens.length,
+            data: payload.data,
+          }),
+        );
+        return {
+          status: NotificationStatus.SKIPPED,
+          errorMessage:
+            'Push provider is in dev-log mode; no device delivery occurred',
+        };
+      }
+
       this.logger.log(
         JSON.stringify({
           mode: 'dev-log',
@@ -222,6 +329,20 @@ export class NotificationsProcessor extends WorkerHost {
   ): Promise<ProviderResolution> {
     const explicitMode = getChannelMode(channel);
 
+    if (
+      isDisabled(process.env.NOTIFICATIONS_DISABLED) ||
+      isDisabled(process.env[`${channel.toUpperCase()}_PROVIDER_ENABLED`])
+    ) {
+      return {
+        mode: 'disabled',
+        channel,
+        providerName: null,
+        webhookUrl: null,
+        headers: {},
+        reason: `${channel} provider disabled by configuration`,
+      };
+    }
+
     if (explicitMode === 'disabled') {
       return {
         mode: 'disabled',
@@ -230,6 +351,21 @@ export class NotificationsProcessor extends WorkerHost {
         webhookUrl: null,
         headers: {},
         reason: `${channel} provider disabled by configuration`,
+      };
+    }
+
+    if (
+      channel === 'push' &&
+      explicitMode === 'configured-provider' &&
+      !isEnabled(process.env.PUSH_PROVIDER_READY)
+    ) {
+      return {
+        mode: 'disabled',
+        channel,
+        providerName: null,
+        webhookUrl: null,
+        headers: {},
+        reason: 'push provider is not ready',
       };
     }
 
@@ -341,6 +477,20 @@ function getLegacyWebhookHeaders(channel: 'email' | 'sms' | 'push') {
     headers.Authorization = `Bearer ${token}`;
   }
   return headers;
+}
+
+function isDisabled(value: string | undefined) {
+  if (!value) return false;
+  return ['0', 'false', 'disabled', 'off', 'no'].includes(
+    value.trim().toLowerCase(),
+  );
+}
+
+function isEnabled(value: string | undefined) {
+  if (!value) return false;
+  return ['1', 'true', 'enabled', 'on', 'yes'].includes(
+    value.trim().toLowerCase(),
+  );
 }
 
 function getString(value: unknown) {

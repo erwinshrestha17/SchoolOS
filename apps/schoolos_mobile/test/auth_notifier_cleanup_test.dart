@@ -79,7 +79,7 @@ class _FakeAuthRepository extends Fake implements AuthRepository {
   ApiClient get client => _client;
 
   @override
-  Future<void> logout({String? refreshToken}) async {}
+  Future<void> logout({String? refreshToken, String? installationId}) async {}
 }
 
 class _TrackingCleanup extends PrivateDataCleanupService {
