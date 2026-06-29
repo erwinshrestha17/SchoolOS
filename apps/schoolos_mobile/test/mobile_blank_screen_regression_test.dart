@@ -16,6 +16,7 @@ import 'package:schoolos_mobile/features/principal/application/principal_provide
 import 'package:schoolos_mobile/features/principal/presentation/screens/principal_screens.dart';
 import 'package:schoolos_mobile/features/teacher/application/teacher_providers.dart';
 import 'package:schoolos_mobile/features/teacher/domain/teacher_models.dart';
+import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_activity_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_homework_screen.dart';
 
 class _MockAttendanceRepository extends Mock implements AttendanceRepository {}
@@ -325,6 +326,47 @@ void main() {
     expect(find.text('Publish'), findsOneWidget);
     expect(find.text('Review'), findsOneWidget);
     expect(find.textContaining('API not confirmed'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('teacher activity paints the consent-safe capture surface', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final snapshot = TeacherActivitySnapshot(
+      scopes: const [
+        TeacherActivityScope(
+          id: 'year-1:class-1:section-1',
+          academicYearId: 'year-1',
+          academicYearName: '2083',
+          classId: 'class-1',
+          className: 'Grade 3',
+          sectionId: 'section-1',
+          sectionName: 'A',
+        ),
+      ],
+      posts: const [],
+      lastUpdated: DateTime(2026, 6, 29, 8),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          teacherActivityProvider.overrideWith((ref) async => snapshot),
+        ],
+        child: const MaterialApp(home: TeacherActivityScreen()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Activity & milestones'), findsOneWidget);
+    expect(find.text('Activity'), findsOneWidget);
+    expect(find.text('Milestone'), findsOneWidget);
+    expect(find.text('Assigned class'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

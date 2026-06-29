@@ -42,6 +42,17 @@ function createController() {
     update: jest.fn(),
     delete: jest.fn(),
   };
+  const assessmentRetakesService = {
+    list: jest.fn(),
+    getById: jest.fn(),
+    create: jest.fn(),
+    approve: jest.fn(),
+    reject: jest.fn(),
+    schedule: jest.fn(),
+    complete: jest.fn(),
+    applyResult: jest.fn(),
+    cancel: jest.fn(),
+  };
   const casRecordsService = {
     list: jest.fn(),
     findOne: jest.fn(),
@@ -93,6 +104,7 @@ function createController() {
       academicsService as never,
       academicsFoundationService as never,
       assessmentComponentsService as never,
+      assessmentRetakesService as never,
       casRecordsService as never,
       markLockWorkflowService as never,
       reportCardPdfService as never,
@@ -106,6 +118,7 @@ function createController() {
     academicsService,
     academicsFoundationService,
     assessmentComponentsService,
+    assessmentRetakesService,
     casRecordsService,
     markLockWorkflowService,
     reportCardPdfService,
@@ -165,6 +178,72 @@ describe('AcademicsController M4 contracts', () => {
 
     expect(marksService.bulkUpsert).toHaveBeenCalledWith(dto, actor);
     expect(result).toEqual({ updated: 1 });
+  });
+
+  it('delegates the complete assessment retake command lifecycle', () => {
+    const { controller, assessmentRetakesService } = createController();
+    const createDto = {
+      markEntryId: 'mark-1',
+      type: 'MAKE_UP',
+      reason: 'Student was absent with an approved medical reason.',
+    };
+    const scheduleDto = {
+      startsAt: '2026-07-10T03:30:00.000Z',
+      endsAt: '2026-07-10T04:30:00.000Z',
+      room: 'R-2',
+    };
+    const completeDto = { marksObtained: 42, remarks: 'Verified script' };
+    const applyDto = {
+      decision: 'USE_RETAKE',
+      reason: 'Approved make-up score replaces the absence.',
+    };
+
+    controller.createAssessmentRetake(createDto as never, actor);
+    controller.approveAssessmentRetake(
+      'retake-1',
+      { reviewNote: 'Approved' },
+      actor,
+    );
+    controller.scheduleAssessmentRetake(
+      'retake-1',
+      scheduleDto as never,
+      actor,
+    );
+    controller.completeAssessmentRetake(
+      'retake-1',
+      completeDto as never,
+      actor,
+    );
+    controller.applyAssessmentRetakeResult(
+      'retake-1',
+      applyDto as never,
+      actor,
+    );
+
+    expect(assessmentRetakesService.create).toHaveBeenCalledWith(
+      createDto,
+      actor,
+    );
+    expect(assessmentRetakesService.approve).toHaveBeenCalledWith(
+      'retake-1',
+      { reviewNote: 'Approved' },
+      actor,
+    );
+    expect(assessmentRetakesService.schedule).toHaveBeenCalledWith(
+      'retake-1',
+      scheduleDto,
+      actor,
+    );
+    expect(assessmentRetakesService.complete).toHaveBeenCalledWith(
+      'retake-1',
+      completeDto,
+      actor,
+    );
+    expect(assessmentRetakesService.applyResult).toHaveBeenCalledWith(
+      'retake-1',
+      applyDto,
+      actor,
+    );
   });
 
   it('delegates CAS list with tenant actor context', () => {

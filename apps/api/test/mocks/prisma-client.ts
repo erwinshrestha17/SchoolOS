@@ -687,6 +687,7 @@ export const GradeLockStatus = {
 } as const;
 
 export const MarkEntryStatus = {
+  DRAFT: 'DRAFT',
   PRESENT: 'PRESENT',
   ABSENT: 'ABSENT',
   EXCUSED: 'EXCUSED',
@@ -694,6 +695,27 @@ export const MarkEntryStatus = {
   WITHHELD: 'WITHHELD',
   SUBMITTED: 'SUBMITTED',
   RETEST: 'RETEST',
+} as const;
+
+export const AssessmentRetakeType = {
+  RETEST: 'RETEST',
+  MAKE_UP: 'MAKE_UP',
+} as const;
+
+export const AssessmentRetakeStatus = {
+  REQUESTED: 'REQUESTED',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  SCHEDULED: 'SCHEDULED',
+  COMPLETED: 'COMPLETED',
+  APPLIED: 'APPLIED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export const AssessmentRetakeResultDecision = {
+  PENDING: 'PENDING',
+  KEEP_ORIGINAL: 'KEEP_ORIGINAL',
+  USE_RETAKE: 'USE_RETAKE',
 } as const;
 
 export const HomeworkAssignmentStatus = {

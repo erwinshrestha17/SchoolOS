@@ -807,6 +807,27 @@ enum MarkEntryStatus {
   RETEST
 }
 
+enum AssessmentRetakeType {
+  RETEST
+  MAKE_UP
+}
+
+enum AssessmentRetakeStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  SCHEDULED
+  COMPLETED
+  APPLIED
+  CANCELLED
+}
+
+enum AssessmentRetakeResultDecision {
+  PENDING
+  KEEP_ORIGINAL
+  USE_RETAKE
+}
+
 enum FinanceRequestType {
   REFUND
   REVERSAL

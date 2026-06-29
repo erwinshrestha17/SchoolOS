@@ -18,6 +18,7 @@ describe('ResultPublishingService', () => {
   let service: ResultPublishingService;
   let prisma: {
     reportCard: { findMany: jest.Mock; update: jest.Mock };
+    assessmentRetake: { findMany: jest.Mock };
     tenantSetting: { findFirst: jest.Mock };
   };
   let communicationsService: { recordDeliveryRecords: jest.Mock };
@@ -39,6 +40,9 @@ describe('ResultPublishingService', () => {
       reportCard: {
         findMany: jest.fn(),
         update: jest.fn(),
+      },
+      assessmentRetake: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
       tenantSetting: {
         findFirst: jest.fn(),
@@ -166,6 +170,25 @@ describe('ResultPublishingService', () => {
     expect(result.failed).toContainEqual({
       id: 'rc-1',
       reason: 'Report card is not locked',
+    });
+  });
+
+  it('blocks publishing while a retest or make-up lifecycle is active', async () => {
+    prisma.reportCard.findMany.mockResolvedValue([reportCard()]);
+    prisma.assessmentRetake.findMany.mockResolvedValue([
+      { studentId: 'student-1', examTermId: 'term-1' },
+    ]);
+    prisma.tenantSetting.findFirst.mockResolvedValue(null);
+
+    const result = await service.publishResults(
+      { reportCardIds: ['rc-1'] },
+      actor,
+    );
+
+    expect(result.published).toBe(0);
+    expect(result.failed).toContainEqual({
+      id: 'rc-1',
+      reason: 'A retest or make-up lifecycle is still active',
     });
   });
 

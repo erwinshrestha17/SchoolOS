@@ -14,6 +14,7 @@ import {
   Lock,
   Megaphone,
   PencilLine,
+  RotateCcw,
   Settings,
   ShieldCheck,
 } from 'lucide-react';
@@ -28,6 +29,7 @@ const workspaceTabs = [
   { href: '/dashboard/academics', label: 'Subjects', icon: ClipboardCheck },
   { href: '/dashboard/academics/exam-terms', label: 'Exam Terms', icon: ClipboardList },
   { href: '/dashboard/academics/marks', label: 'Marks Entry', icon: PencilLine },
+  { href: '/dashboard/academics/retakes', label: 'Retests', icon: RotateCcw },
   { href: '/dashboard/academics/cas', label: 'CAS', icon: Layers3 },
   { href: '/dashboard/academics/locks', label: 'Locks', icon: Lock },
   { href: '/dashboard/academics/report-cards', label: 'Report Cards', icon: FileText },
@@ -50,6 +52,14 @@ const workflowSections = [
     href: '/dashboard/academics/marks',
     action: 'Enter marks',
     icon: PencilLine,
+  },
+  {
+    title: 'Retests and make-ups',
+    description:
+      'Review requests, schedule attempts, record scores, and apply an explicit result decision.',
+    href: '/dashboard/academics/retakes',
+    action: 'Open retest queue',
+    icon: RotateCcw,
   },
   {
     title: 'Lock and review',

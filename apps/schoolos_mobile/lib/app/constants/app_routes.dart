@@ -41,6 +41,7 @@ class AppRoutes {
   static const teacherClasses = '/teacher/classes';
   static const teacherClass = '/teacher/class/:classSectionId';
   static const teacherAttendance = '/teacher/attendance';
+  static const teacherActivity = '/teacher/activity';
   static const teacherHomework = '/teacher/homework';
   static const teacherHomeworkCreate = '/teacher/homework/create';
   static const teacherMessages = '/teacher/messages';

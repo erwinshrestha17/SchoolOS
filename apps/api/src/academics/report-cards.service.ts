@@ -5,7 +5,11 @@ import {
 } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
-import { GradeLockStatus, Prisma } from '@prisma/client';
+import {
+  AssessmentRetakeStatus,
+  GradeLockStatus,
+  Prisma,
+} from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { FinanceService } from '../finance/finance.service';
@@ -87,6 +91,12 @@ export class ReportCardsService {
         'Report card generation requires locked marks for this exam term',
       );
     }
+
+    await this.assertNoActiveRetakes(
+      actor,
+      dto.examTermId,
+      dto.studentId,
+    );
 
     const existingReportCard = await this.prisma.reportCard.findUnique({
       where: {
@@ -196,6 +206,12 @@ export class ReportCardsService {
       overall.resultStatus,
     );
 
+    const reportCardVersion = existingReportCard?.version ?? 1;
+    const subjectResultRows = this.buildSubjectResultRows(
+      actor.tenantId,
+      reportCardVersion,
+      subjectGrades,
+    );
     const reportCard = await this.prisma.reportCard.upsert({
       where: {
         tenantId_academicYearId_examTermId_studentId: {
@@ -220,6 +236,9 @@ export class ReportCardsService {
         remarks,
         status,
         lockedAt,
+        subjectResults: {
+          create: subjectResultRows,
+        },
       },
       update: {
         classId: student.classId,
@@ -232,6 +251,10 @@ export class ReportCardsService {
         remarks,
         status,
         lockedAt,
+        subjectResults: {
+          deleteMany: { version: reportCardVersion },
+          create: subjectResultRows,
+        },
       },
       include: {
         academicYear: true,
@@ -490,6 +513,13 @@ export class ReportCardsService {
           publishedById: dto.republish
             ? actor.userId
             : reportCard.publishedById,
+          subjectResults: {
+            create: this.buildSubjectResultRows(
+              actor.tenantId,
+              nextVersion,
+              recalculated.subjectGrades,
+            ),
+          },
         },
         include: {
           academicYear: true,
@@ -656,6 +686,12 @@ export class ReportCardsService {
       throw new NotFoundException('Student not found in this tenant');
     }
 
+    await this.assertNoActiveRetakes(
+      actor,
+      dto.examTermId,
+      dto.studentId,
+    );
+
     const [components, marks] = await Promise.all([
       this.prisma.assessmentComponent.findMany({
         where: {
@@ -715,12 +751,61 @@ export class ReportCardsService {
 
     return {
       overall,
+      subjectGrades,
       remarks: this.buildRemarks(
         dto.remarks,
         subjectGrades,
         overall.resultStatus,
       ),
     };
+  }
+
+  private buildSubjectResultRows(
+    tenantId: string,
+    version: number,
+    subjectGrades: SubjectGradeResult[],
+  ) {
+    return subjectGrades.map((subject) => ({
+      tenantId,
+      version,
+      subjectId: subject.subjectId,
+      subjectName: subject.subjectName,
+      subjectCode: subject.subjectCode,
+      marksObtained: new Prisma.Decimal(subject.obtainedMarks),
+      maxMarks: new Prisma.Decimal(subject.fullMarks),
+      percentage: new Prisma.Decimal(subject.percentage),
+      grade: subject.grade,
+      gpa: new Prisma.Decimal(subject.gpa),
+      resultStatus: subject.status,
+    }));
+  }
+
+  private async assertNoActiveRetakes(
+    actor: AuthContext,
+    examTermId: string,
+    studentId: string,
+  ) {
+    const activeRetake = await this.prisma.assessmentRetake.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        examTermId,
+        studentId,
+        status: {
+          in: [
+            AssessmentRetakeStatus.REQUESTED,
+            AssessmentRetakeStatus.APPROVED,
+            AssessmentRetakeStatus.SCHEDULED,
+            AssessmentRetakeStatus.COMPLETED,
+          ],
+        },
+      },
+      select: { id: true },
+    });
+    if (activeRetake) {
+      throw new ConflictException(
+        'Report-card generation is blocked while a retest or make-up lifecycle is active',
+      );
+    }
   }
 
   private calculateSubjectGrades(

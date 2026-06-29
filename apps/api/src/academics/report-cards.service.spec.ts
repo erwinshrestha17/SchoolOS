@@ -43,6 +43,7 @@ describe('ReportCardsService', () => {
       student: { findFirst: jest.fn() },
       tenantSetting: { findFirst: jest.fn() },
       assessmentComponent: { findMany: jest.fn() },
+      assessmentRetake: { findFirst: jest.fn().mockResolvedValue(null) },
       markEntry: {
         findMany: jest.fn(),
         updateMany: jest.fn(),
@@ -272,6 +273,16 @@ describe('ReportCardsService', () => {
     expect(Number(upsertArg.create.totalMarks)).toBe(85);
     expect(Number(upsertArg.create.maxMarks)).toBe(100);
     expect(Number(upsertArg.create.percentage)).toBe(85);
+    expect(upsertArg.create.subjectResults.create).toEqual([
+      expect.objectContaining({
+        tenantId: actor.tenantId,
+        version: 1,
+        subjectId: 'subject-1',
+        subjectName: 'Mathematics',
+        subjectCode: 'MATH',
+        grade: 'A',
+      }),
+    ]);
   });
 
   it('audits successful report card generation with academic summary', async () => {
@@ -435,6 +446,14 @@ describe('ReportCardsService', () => {
           version: 2,
           fileId: null,
           publishStatus: 'CORRECTED_DRAFT',
+          subjectResults: {
+            create: [
+              expect.objectContaining({
+                version: 2,
+                subjectId: 'subject-1',
+              }),
+            ],
+          },
         }),
       }),
     );

@@ -67,8 +67,8 @@ class ParentPortalMoreTab extends ConsumerWidget {
           ),
           _Menu(
             Icons.assessment_outlined,
-            'Report Cards',
-            'Published results and protected reports',
+            'Exams & Results',
+            'Published exam schedule, results, and protected reports',
             AppRoutes.parentReportCards,
           ),
           _Menu(

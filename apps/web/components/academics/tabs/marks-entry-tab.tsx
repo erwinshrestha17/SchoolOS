@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useMemo } from 'react';
+import type { MarkEntrySummary } from '@schoolos/core';
 import { api } from '../../../lib/api';
 import { 
   Trophy, 
@@ -21,9 +22,12 @@ import {
   Lock,
   Zap,
   Users
+  ,RotateCcw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '../../ui/badge';
+import { Button } from '../../ui/button';
+import { AssessmentRetakeRequestDialog } from '../assessment-retake-request-dialog';
 
 type Props = {
   academicYears: any[];
@@ -40,6 +44,8 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
   const [statuses, setStatuses] = useState<Record<string, string>>({});
   const [remarks, setRemarks] = useState<Record<string, string>>({});
   const [saveSuccess, setSaveSuccess] = useState<number | null>(null);
+  const [retakeMark, setRetakeMark] = useState<MarkEntrySummary | null>(null);
+  const [retakeSuccess, setRetakeSuccess] = useState(false);
 
   const subjectsQuery = useQuery({ 
     queryKey: ['subjects', filters.classId], 
@@ -92,7 +98,6 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
       marksObtained: marks[studentId] ? Number(marks[studentId]) : undefined,
       isAbsent: statuses[studentId] === 'ABSENT' || statuses[studentId] === 'EXCUSED',
       isWithheld: statuses[studentId] === 'WITHHELD',
-      isRetest: statuses[studentId] === 'RETEST',
       remarks: remarks[studentId] || undefined,
     }));
   }, [marks, statuses, remarks]);
@@ -120,7 +125,6 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
     { value: 'ABSENT', label: 'A', color: 'text-rose-600 bg-rose-50' },
     { value: 'WITHHELD', label: 'W', color: 'text-amber-600 bg-amber-50' },
     { value: 'EXCUSED', label: 'E', color: 'text-blue-600 bg-blue-50' },
-    { value: 'RETEST', label: 'R', color: 'text-indigo-600 bg-indigo-50' },
   ];
 
   return (
@@ -217,6 +221,22 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
         </div>
       )}
 
+      {retakeSuccess ? (
+        <div
+          className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"
+          role="status"
+        >
+          <span>Retest or make-up request sent for review.</span>
+          <button
+            type="button"
+            className="rounded p-1 hover:bg-emerald-100"
+            onClick={() => setRetakeSuccess(false)}
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
+
       {isLocked && (
         <div className="p-6 bg-amber-50 border border-amber-100 rounded-2xl flex items-center gap-4 text-amber-800 animate-in fade-in duration-500">
           <Lock size={24} className="text-amber-500" />
@@ -240,19 +260,20 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
                   <th className="py-6 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400 w-32 text-center">Existing</th>
                   <th className="py-6 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400 w-48">Score Entry</th>
                   <th className="py-6 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400">Observations</th>
+                  <th className="py-6 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400 w-20 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {existingMarksQuery.isLoading ? (
                   <tr>
-                    <td colSpan={7} className="py-20 text-center">
+                    <td colSpan={8} className="py-20 text-center">
                        <Loader2 className="h-10 w-10 animate-spin text-[var(--color-mod-academics-accent)] mx-auto opacity-20" />
                        <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Fetching Student Roster</p>
                     </td>
                   </tr>
                 ) : studentsForClass.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-20 text-center text-slate-400">
+                    <td colSpan={8} className="py-20 text-center text-slate-400">
                        <Users className="h-12 w-12 mx-auto mb-4 opacity-10" />
                        <p className="text-xs font-black uppercase tracking-widest">No Students Found</p>
                     </td>
@@ -269,7 +290,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
                     return (
                       <tr key={student.id} className={cn(
                         "group transition-all hover:bg-slate-50/50",
-                        isLocked && "opacity-60 pointer-events-none"
+                        isLocked && "opacity-60"
                       )}>
                         <td className="py-4 px-6 text-[10px] font-black text-slate-300">{index + 1}</td>
                         <td className="py-4 px-6">
@@ -363,6 +384,26 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
                             onChange={(e) => setRemarks(c => ({ ...c, [student.id]: e.target.value }))}
                            />
                         </td>
+                        <td className="py-4 px-6 text-right">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            className="h-9 w-9 rounded-lg p-0"
+                            title="Request retest or make-up"
+                            aria-label="Request retest or make-up"
+                            disabled={
+                              !existing ||
+                              existing.status === 'DRAFT' ||
+                              existing.status === 'RETEST'
+                            }
+                            onClick={() =>
+                              setRetakeMark(existing as MarkEntrySummary)
+                            }
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        </td>
                       </tr>
                     );
                   })
@@ -407,6 +448,15 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
           </div>
         </section>
       )}
+
+      <AssessmentRetakeRequestDialog
+        mark={retakeMark}
+        open={Boolean(retakeMark)}
+        onOpenChange={(open) => {
+          if (!open) setRetakeMark(null);
+        }}
+        onRequested={() => setRetakeSuccess(true)}
+      />
     </div>
   );
 }

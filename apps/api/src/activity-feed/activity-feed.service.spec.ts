@@ -3,6 +3,7 @@ import {
   ActivityPostStatus,
   AudienceType,
   AuthMethod,
+  ConsentType,
   DevelopmentalMilestoneStatus,
   NotificationChannel,
   StudentLifecycleStatus,
@@ -33,8 +34,12 @@ describe('ActivityFeedService', () => {
         findFirst: jest.fn(),
       },
       student: {
+        count: jest.fn(),
         findMany: jest.fn(),
         findFirst: jest.fn(),
+      },
+      subjectTeacherAssignment: {
+        findMany: jest.fn(),
       },
       staff: {
         findFirst: jest.fn(),
@@ -131,7 +136,18 @@ describe('ActivityFeedService', () => {
       id: 'section-1',
       classId: 'class-1',
     });
-    prisma.student.findMany.mockResolvedValue([{ id: 'student-1' }]);
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        guardianLinks: [
+          {
+            guardian: {
+              consents: [{ granted: true, revokedAt: null }],
+            },
+          },
+        ],
+      },
+    ]);
     prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
     fileRegistry.registerFile.mockResolvedValue({ id: 'file-asset-1' });
     storageService.saveBase64Object.mockResolvedValue({
@@ -175,6 +191,22 @@ describe('ActivityFeedService', () => {
 
     expect(result.id).toBe('post-1');
     expect(prisma.student.findMany).toHaveBeenCalledWith({
+      select: {
+        guardianLinks: {
+          include: {
+            guardian: {
+              include: {
+                consents: {
+                  orderBy: { capturedAt: 'desc' },
+                  take: 1,
+                  where: { consentType: ConsentType.PHOTO_USAGE },
+                },
+              },
+            },
+          },
+        },
+        id: true,
+      },
       where: {
         tenantId: 'tenant-1',
         classId: 'class-1',
@@ -222,6 +254,230 @@ describe('ActivityFeedService', () => {
         tenantId: 'tenant-1',
       }),
     );
+  });
+
+  it('replays a mobile client submission without storing duplicate media', async () => {
+    prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
+    prisma.section.findFirst.mockResolvedValue({
+      id: 'section-1',
+      classId: 'class-1',
+    });
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        guardianLinks: [
+          {
+            guardian: {
+              consents: [{ granted: true, revokedAt: null }],
+            },
+          },
+        ],
+      },
+    ]);
+    prisma.activityPost.findFirst.mockResolvedValue({
+      id: 'post-existing',
+      clientSubmissionId: '6731ea4f-5c37-4b16-bb72-955abbadc31b',
+      attachments: [
+        {
+          id: 'attachment-existing',
+          fileName: 'photo.jpg',
+          contentType: 'image/jpeg',
+          sizeBytes: 42,
+          sortOrder: 0,
+          processingStatus: 'READY',
+          fileAssetId: 'file-asset-1',
+        },
+      ],
+      studentTags: [{ studentId: 'student-1' }],
+    });
+
+    const result = await service.createPost(
+      {
+        clientSubmissionId: '6731ea4f-5c37-4b16-bb72-955abbadc31b',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        title: 'Science day',
+        caption: 'Students built plant life-cycle charts.',
+        category: ActivityCategory.LEARNING,
+        studentIds: ['student-1'],
+        attachments: [
+          {
+            fileName: 'photo.jpg',
+            contentType: 'image/jpeg',
+            base64Content: Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString(
+              'base64',
+            ),
+          },
+        ],
+      },
+      actor,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: 'post-existing',
+        attachments: [
+          expect.objectContaining({
+            id: 'attachment-existing',
+            previewUrl: expect.stringContaining(
+              '/activity-feed/attachments/attachment-existing/preview',
+            ),
+          }),
+        ],
+      }),
+    );
+    expect(storageService.saveBase64Object).not.toHaveBeenCalled();
+    expect(prisma.activityPost.create).not.toHaveBeenCalled();
+  });
+
+  it('resolves a concurrent idempotent create race to the existing post', async () => {
+    prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        guardianLinks: [
+          {
+            guardian: {
+              consents: [{ granted: true, revokedAt: null }],
+            },
+          },
+        ],
+      },
+    ]);
+    storageService.saveBase64Object.mockResolvedValue({
+      provider: StorageProvider.LOCAL,
+      objectKey: 'tenant-1/activity-feed/class-1/photo.jpg',
+      sizeBytes: 42,
+    });
+    fileRegistry.registerFile.mockResolvedValue({ id: 'file-asset-race' });
+    prisma.activityPost.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'post-existing',
+        attachments: [],
+        studentTags: [{ studentId: 'student-1' }],
+      });
+    prisma.activityPost.create.mockRejectedValue({ code: 'P2002' });
+
+    await expect(
+      service.createPost(
+        {
+          clientSubmissionId: '6731ea4f-5c37-4b16-bb72-955abbadc31b',
+          classId: 'class-1',
+          title: 'Science day',
+          caption: 'Students built plant life-cycle charts.',
+          studentIds: ['student-1'],
+          attachments: [
+            {
+              fileName: 'photo.jpg',
+              contentType: 'image/jpeg',
+              base64Content: Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString(
+                'base64',
+              ),
+            },
+          ],
+        },
+        actor,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'post-existing' }));
+
+    expect(storageService.deleteObject).toHaveBeenCalledWith(
+      'tenant-1/activity-feed/class-1/photo.jpg',
+    );
+    expect(prisma.fileAsset.delete).toHaveBeenCalledWith({
+      where: { id: 'file-asset-race' },
+    });
+  });
+
+  it('blocks activity media before storage when a tagged student lacks photo consent', async () => {
+    prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        guardianLinks: [
+          {
+            guardian: {
+              consents: [{ granted: false, revokedAt: null }],
+            },
+          },
+        ],
+      },
+    ]);
+
+    await expect(
+      service.createPost(
+        {
+          classId: 'class-1',
+          title: 'Class activity',
+          caption: 'A consent-safe activity update.',
+          studentIds: ['student-1'],
+          attachments: [
+            {
+              fileName: 'photo.jpg',
+              contentType: 'image/jpeg',
+              base64Content: Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString(
+                'base64',
+              ),
+            },
+          ],
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Activity media cannot be uploaded for a student without active photo consent',
+    );
+
+    expect(storageService.saveBase64Object).not.toHaveBeenCalled();
+    expect(fileRegistry.registerFile).not.toHaveBeenCalled();
+  });
+
+  it('returns a paginated assignment-scoped mobile student picker with consent state', async () => {
+    prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
+    prisma.section.findFirst.mockResolvedValue({
+      id: 'section-1',
+      classId: 'class-1',
+    });
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        studentSystemId: 'STU-001',
+        firstNameEn: 'Aarav',
+        lastNameEn: 'Sharma',
+        rollNumber: 1,
+        guardianLinks: [
+          {
+            guardian: {
+              consents: [{ granted: true, revokedAt: null }],
+            },
+          },
+        ],
+      },
+    ]);
+    prisma.student.count.mockResolvedValue(1);
+
+    await expect(
+      service.listTeacherMobileStudents(actor, {
+        classId: 'class-1',
+        sectionId: 'section-1',
+        page: 1,
+        limit: 20,
+      }),
+    ).resolves.toEqual({
+      items: [
+        {
+          id: 'student-1',
+          studentSystemId: 'STU-001',
+          fullName: 'Aarav Sharma',
+          rollNumber: 1,
+          mediaConsentGranted: true,
+        },
+      ],
+      meta: { total: 1, page: 1, limit: 20, totalPages: 1 },
+    });
   });
 
   it('previews class, section, and student-specific audience with media consent counts', async () => {
@@ -381,6 +637,22 @@ describe('ActivityFeedService', () => {
     );
 
     expect(prisma.student.findMany).toHaveBeenCalledWith({
+      select: {
+        guardianLinks: {
+          include: {
+            guardian: {
+              include: {
+                consents: {
+                  orderBy: { capturedAt: 'desc' },
+                  take: 1,
+                  where: { consentType: ConsentType.PHOTO_USAGE },
+                },
+              },
+            },
+          },
+        },
+        id: true,
+      },
       where: {
         tenantId: 'tenant-1',
         classId: 'class-1',
@@ -524,6 +796,18 @@ describe('ActivityFeedService', () => {
   it('cleans up storage objects and database records if post creation fails', async () => {
     prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
     prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        guardianLinks: [
+          {
+            guardian: {
+              consents: [{ granted: true, revokedAt: null }],
+            },
+          },
+        ],
+      },
+    ]);
     storageService.saveBase64Object.mockResolvedValue({
       provider: StorageProvider.LOCAL,
       objectKey: 'tenant-1/activity-feed/class-1/photo.jpg',
@@ -541,6 +825,7 @@ describe('ActivityFeedService', () => {
           title: 'Science day',
           caption: 'Students built plant life-cycle charts.',
           category: ActivityCategory.LEARNING,
+          studentIds: ['student-1'],
           attachments: [
             {
               fileName: 'photo.jpg',
@@ -566,6 +851,18 @@ describe('ActivityFeedService', () => {
   it('deletes the created post if downstream activity-post setup fails', async () => {
     prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
     prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        guardianLinks: [
+          {
+            guardian: {
+              consents: [{ granted: true, revokedAt: null }],
+            },
+          },
+        ],
+      },
+    ]);
     storageService.saveBase64Object.mockResolvedValue({
       provider: StorageProvider.LOCAL,
       objectKey: 'tenant-1/activity-feed/class-1/photo.jpg',
@@ -596,6 +893,7 @@ describe('ActivityFeedService', () => {
           title: 'Science day',
           caption: 'Students built plant life-cycle charts.',
           category: ActivityCategory.LEARNING,
+          studentIds: ['student-1'],
           attachments: [
             {
               fileName: 'photo.jpg',

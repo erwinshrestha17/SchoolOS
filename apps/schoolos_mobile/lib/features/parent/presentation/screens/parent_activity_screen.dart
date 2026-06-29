@@ -98,13 +98,18 @@ class _ActivityContent extends ConsumerWidget {
   }
 }
 
-class _ActivityCard extends StatelessWidget {
+class _ActivityCard extends ConsumerWidget {
   const _ActivityCard({required this.item});
 
   final ParentActivityItem item;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final previewable = item.attachments.where(
+      (attachment) => attachment.canPreview,
+    );
+    final preview = previewable.isEmpty ? null : previewable.first;
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -146,6 +151,13 @@ class _ActivityCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Text(item.caption),
           ],
+          if (preview != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            _ProtectedActivityPreview(
+              attachment: preview,
+              additionalCount: item.attachments.length - 1,
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           Text(
             '${item.attachmentCount} attachments • ${item.reactionCount} reactions',
@@ -155,6 +167,95 @@ class _ActivityCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ProtectedActivityPreview extends ConsumerWidget {
+  const _ProtectedActivityPreview({
+    required this.attachment,
+    required this.additionalCount,
+  });
+
+  final ParentActivityAttachment attachment;
+  final int additionalCount;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final preview = ref.watch(
+      parentActivityPreviewProvider(attachment.previewPath),
+    );
+
+    return AspectRatio(
+      aspectRatio: 16 / 10,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: preview.when(
+          loading: () => Container(
+            color: AppColors.slate100,
+            child: const Center(child: CircularProgressIndicator()),
+          ),
+          error: (_, _) => Container(
+            color: AppColors.slate100,
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.image_not_supported_outlined),
+                const SizedBox(height: AppSpacing.sm),
+                const Text(
+                  'Protected media is unavailable.',
+                  textAlign: TextAlign.center,
+                ),
+                IconButton(
+                  tooltip: 'Retry media',
+                  onPressed: () => ref.invalidate(
+                    parentActivityPreviewProvider(attachment.previewPath),
+                  ),
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+              ],
+            ),
+          ),
+          data: (bytes) => Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.memory(
+                bytes,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (_, _, _) => Container(
+                  color: AppColors.slate100,
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.broken_image_outlined),
+                ),
+              ),
+              if (additionalCount > 0)
+                Positioned(
+                  right: AppSpacing.sm,
+                  bottom: AppSpacing.sm,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.xs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.72),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '+$additionalCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

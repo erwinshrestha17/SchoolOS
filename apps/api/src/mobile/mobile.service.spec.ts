@@ -15,7 +15,8 @@ describe('MobileService', () => {
     notificationReadReceipt: MockModel<'upsert' | 'createMany'>;
     homeworkAssignment: MockModel<'findMany' | 'findFirst'>;
     reportCard: MockModel<'findMany' | 'findFirst'>;
-    markEntry: MockModel<'findMany'>;
+    examTimetableSlot: MockModel<'findMany'>;
+    activityPost: MockModel<'findMany'>;
     canteenMealServing: MockModel<'findMany'>;
     transportStudentAssignment: MockModel<'findFirst'>;
     transportEnrollment: MockModel<'findFirst'>;
@@ -85,7 +86,10 @@ describe('MobileService', () => {
         findMany: jest.fn(),
         findFirst: jest.fn(),
       },
-      markEntry: {
+      examTimetableSlot: {
+        findMany: jest.fn(),
+      },
+      activityPost: {
         findMany: jest.fn(),
       },
       canteenMealServing: {
@@ -629,40 +633,53 @@ describe('MobileService', () => {
         remarks: 'Strong progress',
         publishedAt: new Date('2026-06-01T00:00:00.000Z'),
         fileId: 'file-1',
-      },
-    ]);
-    prisma.markEntry.findMany.mockResolvedValue([
-      {
-        examTermId: 'term-1',
-        subjectId: 'subject-1',
-        marksObtained: 42,
-        subject: { id: 'subject-1', name: 'Mathematics', code: 'MATH' },
-        assessmentComponent: { maxMarks: 50 },
-      },
-      {
-        examTermId: 'term-1',
-        subjectId: 'subject-1',
-        marksObtained: 43,
-        subject: { id: 'subject-1', name: 'Mathematics', code: 'MATH' },
-        assessmentComponent: { maxMarks: 50 },
-      },
-      {
-        examTermId: 'term-1',
-        subjectId: 'subject-2',
-        marksObtained: 35,
-        subject: { id: 'subject-2', name: 'English', code: 'ENG' },
-        assessmentComponent: { maxMarks: 50 },
+        version: 2,
+        subjectResults: [
+          {
+            version: 1,
+            subjectId: 'subject-old',
+            subjectName: 'Stale draft',
+            subjectCode: 'OLD',
+            marksObtained: 10,
+            maxMarks: 100,
+            percentage: 10,
+            grade: 'NG',
+          },
+          {
+            version: 2,
+            subjectId: 'subject-1',
+            subjectName: 'Mathematics',
+            subjectCode: 'MATH',
+            marksObtained: 85,
+            maxMarks: 100,
+            percentage: 85,
+            grade: 'A',
+          },
+          {
+            version: 2,
+            subjectId: 'subject-2',
+            subjectName: 'English',
+            subjectCode: 'ENG',
+            marksObtained: 35,
+            maxMarks: 50,
+            percentage: 70,
+            grade: 'B+',
+          },
+        ],
       },
     ]);
 
     const result = await service.getStudentReportCards('student-1', actor);
 
-    expect(prisma.markEntry.findMany).toHaveBeenCalledWith(
+    expect(prisma.reportCard.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
+        include: expect.objectContaining({
+          subjectResults: expect.any(Object),
+        }),
         where: expect.objectContaining({
           tenantId: 'tenant-1',
           studentId: 'student-1',
-          examTermId: { in: ['term-1'] },
+          publishStatus: 'PUBLISHED',
         }),
       }),
     );
@@ -690,6 +707,70 @@ describe('MobileService', () => {
         ],
       }),
     );
+  });
+
+  it('returns only published exam slots for the linked child current enrollment', async () => {
+    prisma.student.findFirst
+      .mockResolvedValueOnce({ id: 'student-1' })
+      .mockResolvedValueOnce({
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        class: { id: 'class-1', name: 'Grade 5' },
+        sectionRef: { id: 'section-1', name: 'A' },
+        guardianLinks: [{ guardian: { userId: 'parent-1' } }],
+        enrollments: [
+          {
+            academicYearId: 'year-1',
+            academicYear: {
+              id: 'year-1',
+              name: '2083/84',
+              startsOn: new Date('2026-04-14T00:00:00.000Z'),
+              endsOn: new Date('2027-04-13T00:00:00.000Z'),
+            },
+          },
+        ],
+      });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.examTimetableSlot.findMany.mockResolvedValue([
+      {
+        id: 'exam-slot-1',
+        startsAt: new Date('2026-07-10T03:30:00.000Z'),
+        endsAt: new Date('2026-07-10T04:30:00.000Z'),
+        room: 'Room 4',
+        publishedAt: new Date('2026-07-01T00:00:00.000Z'),
+        examTerm: { id: 'term-1', name: 'First Terminal' },
+        subject: { id: 'subject-1', name: 'Mathematics', code: 'MATH' },
+      },
+    ]);
+
+    const result = await service.getStudentExamSchedule('student-1', actor);
+
+    expect(prisma.examTimetableSlot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: 'tenant-1',
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          publishedAt: { not: null },
+          OR: [{ sectionId: null }, { sectionId: 'section-1' }],
+        },
+        take: 100,
+      }),
+    );
+    expect(result).toEqual({
+      academicYear: { id: 'year-1', name: '2083/84' },
+      items: [
+        expect.objectContaining({
+          id: 'exam-slot-1',
+          room: 'Room 4',
+          subject: { id: 'subject-1', name: 'Mathematics', code: 'MATH' },
+        }),
+      ],
+    });
   });
 
   it('lists notifications for the signed-in parent and linked students with read state', async () => {
@@ -1021,6 +1102,72 @@ describe('MobileService', () => {
     expect(transportSpy).not.toHaveBeenCalled();
     expect(canteenSpy).not.toHaveBeenCalled();
     expect(activitySpy).not.toHaveBeenCalled();
+  });
+
+  it('returns protected activity preview paths without storage internals', async () => {
+    prisma.student.findFirst
+      .mockResolvedValueOnce({ id: 'student-1' })
+      .mockResolvedValueOnce({
+        id: 'student-1',
+        tenantId: 'tenant-1',
+        firstNameEn: 'Asha',
+        lastNameEn: 'Rai',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        class: { id: 'class-1', name: 'Grade 4' },
+        sectionRef: { id: 'section-1', name: 'A' },
+        guardianLinks: [],
+        enrollments: [],
+      });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.activityPost.findMany.mockResolvedValue([
+      {
+        id: 'post-1',
+        title: 'Science day',
+        caption: 'Students built models.',
+        category: 'LEARNING',
+        publishedAt: new Date('2026-06-29T00:00:00.000Z'),
+        createdAt: new Date('2026-06-29T00:00:00.000Z'),
+        attachments: [
+          {
+            id: 'attachment-1',
+            fileName: 'science.jpg',
+            contentType: 'image/jpeg',
+            sizeBytes: 2048,
+            processingStatus: 'READY',
+            objectKey: 'must-not-leak',
+          },
+        ],
+        _count: { attachments: 1, reactions: 2 },
+      },
+    ]);
+
+    const result = await service.getStudentActivityFeed(
+      'student-1',
+      actor,
+      '10',
+    );
+
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        id: 'post-1',
+        attachments: [
+          {
+            id: 'attachment-1',
+            fileName: 'science.jpg',
+            contentType: 'image/jpeg',
+            sizeBytes: 2048,
+            processingStatus: 'READY',
+            previewPath:
+              '/activity-feed/attachments/attachment-1/preview',
+          },
+        ],
+      }),
+    );
+    expect(JSON.stringify(result)).not.toContain('must-not-leak');
   });
 
   it('returns homework scoped to the linked child class and section', async () => {

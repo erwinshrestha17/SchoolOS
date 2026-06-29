@@ -15,6 +15,7 @@ import '../features/attendance/presentation/screens/parent_attendance_screen.dar
 import '../features/attendance/presentation/screens/teacher_classes_screen.dart';
 import '../features/attendance/presentation/screens/teacher_attendance_screen.dart';
 import '../features/teacher/presentation/screens/teacher_class_hub_screen.dart';
+import '../features/teacher/presentation/screens/teacher_activity_screen.dart';
 import '../features/teacher/presentation/screens/teacher_homework_screen.dart';
 import '../features/teacher/presentation/screens/teacher_messages_screen.dart';
 import '../features/teacher/presentation/screens/teacher_profile_screen.dart';
@@ -241,6 +242,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.teacherHomework,
         builder: (context, state) => const TeacherHomeworkScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.teacherActivity,
+        builder: (context, state) => const TeacherActivityScreen(),
       ),
       GoRoute(
         path: AppRoutes.teacherMessages,

@@ -7,9 +7,16 @@ import 'package:schoolos_mobile/features/parent/domain/parent_models.dart';
 
 class MockApiClient extends Mock implements ApiClient {}
 
+class MockDio extends Mock implements Dio {}
+
 void main() {
+  setUpAll(() {
+    registerFallbackValue(Options());
+  });
+
   group('ParentRepository', () {
     late MockApiClient apiClient;
+    late MockDio dio;
     late ParentRepository repository;
 
     const child = GuardianChild(
@@ -23,6 +30,8 @@ void main() {
 
     setUp(() {
       apiClient = MockApiClient();
+      dio = MockDio();
+      when(() => apiClient.dio).thenReturn(dio);
       repository = ParentRepository(apiClient);
     });
 
@@ -187,6 +196,70 @@ void main() {
       expect(cards.first.attendancePercentage, 94);
       expect(cards.first.subjects.single.subjectName, 'Mathematics');
       expect(cards.first.subjects.single.grade, 'A');
+    });
+
+    test(
+      'downloads activity media only through the protected API path',
+      () async {
+        when(
+          () => dio.get<List<int>>(
+            '/activity-feed/attachments/attachment-1/preview',
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: 'activity-preview'),
+            data: [0xff, 0xd8, 0xff, 0xd9],
+          ),
+        );
+
+        final bytes = await repository.getActivityPreview(
+          '/activity-feed/attachments/attachment-1/preview',
+        );
+
+        expect(bytes, [0xff, 0xd8, 0xff, 0xd9]);
+        verify(
+          () => dio.get<List<int>>(
+            '/activity-feed/attachments/attachment-1/preview',
+            options: any(named: 'options'),
+          ),
+        ).called(1);
+      },
+    );
+
+    test('maps the linked-child published exam schedule', () async {
+      when(
+        () => apiClient.get<dynamic>('/mobile/students/child-1/exam-schedule'),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: 'exam-schedule'),
+          data: {
+            'academicYear': {'id': 'year-1', 'name': '2083/84'},
+            'items': [
+              {
+                'id': 'exam-slot-1',
+                'examTerm': {'id': 'term-1', 'name': 'First Terminal'},
+                'subject': {
+                  'id': 'subject-1',
+                  'name': 'Mathematics',
+                  'code': 'MATH',
+                },
+                'startsAt': '2026-07-10T03:30:00.000Z',
+                'endsAt': '2026-07-10T04:30:00.000Z',
+                'room': 'Room 4',
+                'publishedAt': '2026-07-01T00:00:00.000Z',
+              },
+            ],
+          },
+        ),
+      );
+
+      final schedule = await repository.getExamScheduleForChild('child-1');
+
+      expect(schedule.academicYearName, '2083/84');
+      expect(schedule.items, hasLength(1));
+      expect(schedule.items.single.subjectName, 'Mathematics');
+      expect(schedule.items.single.room, 'Room 4');
     });
 
     test('maps linked-child payment gateway readiness', () async {

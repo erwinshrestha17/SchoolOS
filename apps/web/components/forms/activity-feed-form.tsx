@@ -36,7 +36,9 @@ import {
   Target,
   Truck,
   Smile,
+  Lock,
 } from "lucide-react";
+import type { ActivityAudiencePreview } from "../../lib/api/activity";
 
 const today = new Date().toISOString().slice(0, 10);
 const maxImageBytes = 10 * 1024 * 1024;
@@ -133,6 +135,8 @@ type CreatePostState = {
   category: ActivityCategory;
   studentIds: string[];
 };
+
+type PostAudienceStudent = ActivityAudiencePreview["students"][number];
 
 type GalleryFiltersState = {
   classId: string;
@@ -242,6 +246,15 @@ export function ActivityFeedForm({
     queryKey: ["activity-posts"],
     queryFn: () => api.listActivityPosts(),
   });
+  const audiencePreviewQuery = useQuery({
+    queryKey: ["activity-audience-preview", post.classId, post.sectionId],
+    queryFn: () =>
+      api.previewActivityAudience({
+        classId: post.classId,
+        sectionId: post.sectionId || null,
+      }),
+    enabled: Boolean(post.classId),
+  });
   const galleryQuery = useQuery({
     queryKey: ["activity-gallery", galleryFilters],
     queryFn: () =>
@@ -297,11 +310,6 @@ export function ActivityFeedForm({
   );
   const moodSections = filterSectionsForClass(sections, moodLog.classId);
   const milestoneSections = filterSectionsForClass(sections, milestone.classId);
-  const classStudents = filterStudentsForClass(students, post.classId);
-  const visiblePostStudents = filterStudentsForSectionWherePossible(
-    classStudents,
-    post.sectionId,
-  );
   const galleryStudents = filterStudentsForSectionWherePossible(
     filterStudentsForClass(students, galleryFilters.classId),
     galleryFilters.sectionId,
@@ -314,7 +322,8 @@ export function ActivityFeedForm({
     filterStudentsForClass(students, milestone.classId),
     milestone.sectionId,
   );
-  const selectedPostStudents = visiblePostStudents.filter((student) =>
+  const postAudienceStudents = audiencePreviewQuery.data?.students ?? [];
+  const selectedPostStudents = postAudienceStudents.filter((student) =>
     post.studentIds.includes(student.id),
   );
   const activityDeliveries = (deliveriesQuery.data ?? []).filter(
@@ -430,6 +439,24 @@ export function ActivityFeedForm({
       return;
     }
 
+    if (post.studentIds.length === 0) {
+      setFileWarning("Tag every student visible in the selected photos.");
+      return;
+    }
+
+    const selectedAudience = postAudienceStudents.filter((student) =>
+      post.studentIds.includes(student.id),
+    );
+    if (
+      selectedAudience.length !== post.studentIds.length ||
+      selectedAudience.some((student) => !student.mediaConsentGranted)
+    ) {
+      setFileWarning(
+        "Activity media requires active photo consent for every tagged student.",
+      );
+      return;
+    }
+
     if (selectedFiles.some((file) => !file.type.startsWith("image/"))) {
       setFileWarning("Activity attachments must be image files.");
       return;
@@ -447,12 +474,7 @@ export function ActivityFeedForm({
       title: post.title.trim(),
       caption: post.caption.trim(),
       sectionId: post.sectionId || null,
-      audienceType:
-        post.studentIds.length > 0
-          ? "ALL"
-          : post.sectionId
-            ? "SECTION"
-            : "CLASS",
+      audienceType: "STUDENT",
       attachments,
     });
   }
@@ -514,7 +536,7 @@ export function ActivityFeedForm({
             post={post}
             setPost={setPost}
             sections={postSections}
-            students={visiblePostStudents}
+            students={postAudienceStudents}
             selectedStudents={selectedPostStudents}
             selectedFiles={selectedFiles}
             fileWarning={fileWarning}
@@ -522,6 +544,7 @@ export function ActivityFeedForm({
             mutationError={
               postMutation.isError ? postMutation.error.message : null
             }
+            audienceLoading={audiencePreviewQuery.isLoading}
             isPending={postMutation.isPending}
             updateFiles={updateFiles}
             toggleStudent={toggleStudent}
@@ -624,6 +647,7 @@ function CreatePostSection({
   fileWarning,
   postSuccess,
   mutationError,
+  audienceLoading,
   isPending,
   updateFiles,
   toggleStudent,
@@ -634,22 +658,19 @@ function CreatePostSection({
   post: CreatePostState;
   setPost: Dispatch<SetStateAction<CreatePostState>>;
   sections: SectionSummaryForUi[];
-  students: StudentProfile[];
-  selectedStudents: StudentProfile[];
+  students: PostAudienceStudent[];
+  selectedStudents: PostAudienceStudent[];
   selectedFiles: File[];
   fileWarning: string | null;
   postSuccess: string | null;
   mutationError: string | null;
+  audienceLoading: boolean;
   isPending: boolean;
   updateFiles: (files: FileList | null) => void;
   toggleStudent: (studentId: string) => void;
   createPost: () => void;
 }) {
-  const audienceLabel = post.studentIds.length
-    ? `${post.studentIds.length} specific student${post.studentIds.length === 1 ? "" : "s"}`
-    : post.sectionId
-      ? "Selected section"
-      : "Whole class";
+  const audienceLabel = `${post.studentIds.length} tagged student${post.studentIds.length === 1 ? "" : "s"}`;
 
   return (
     <div className="grid gap-8 xl:grid-cols-3">
@@ -717,8 +738,7 @@ function CreatePostSection({
                   Tagged Students
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  Choose specific children to notify their guardians
-                  exclusively.
+                  Tag every student visible in the selected photos.
                 </p>
               </div>
               <Badge variant="secondary" className="text-xs font-bold">
@@ -727,7 +747,9 @@ function CreatePostSection({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {students.length > 0 ? (
+              {audienceLoading ? (
+                <LoadingState />
+              ) : students.length > 0 ? (
                 students.map((student) => {
                   const selected = post.studentIds.includes(student.id);
 
@@ -736,14 +758,18 @@ function CreatePostSection({
                       key={student.id}
                       type="button"
                       className={cn(
-                        "h-9 rounded-full px-4 text-xs font-bold transition-all",
+                        "inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50",
                         selected
                           ? "bg-[var(--color-mod-activity-accent)] text-white shadow-sm"
                           : "bg-white border border-slate-200 text-slate-600 hover:border-slate-300",
                       )}
+                      disabled={!student.mediaConsentGranted}
                       onClick={() => toggleStudent(student.id)}
                     >
-                      {studentDisplayName(student)}
+                      {!student.mediaConsentGranted && (
+                        <Lock className="h-3.5 w-3.5" />
+                      )}
+                      {student.fullName}
                     </button>
                   );
                 })
@@ -865,6 +891,7 @@ function CreatePostSection({
                 !post.classId ||
                 post.title.trim().length < 2 ||
                 post.caption.trim().length < 2 ||
+                post.studentIds.length === 0 ||
                 selectedFiles.length === 0 ||
                 selectedFiles.length > 5 ||
                 Boolean(fileWarning) ||
@@ -909,7 +936,7 @@ function ReviewPanel({
   audienceLabel: string;
   selectedClassName: string;
   selectedSectionName: string;
-  selectedStudents: StudentProfile[];
+  selectedStudents: PostAudienceStudent[];
   photoCount: number;
   category: string;
 }) {
@@ -939,8 +966,8 @@ function ReviewPanel({
         <p className="mb-2 text-xs font-bold text-slate-500">Tagged Students</p>
         <p className="text-xs font-medium leading-relaxed text-slate-700">
           {selectedStudents.length > 0
-            ? selectedStudents.map(studentDisplayName).join(", ")
-            : "No specific students tagged; audience follows class/section selection."}
+            ? selectedStudents.map((student) => student.fullName).join(", ")
+            : "No students tagged yet."}
         </p>
       </div>
 

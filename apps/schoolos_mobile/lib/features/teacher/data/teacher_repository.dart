@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../../core/errors/app_exception.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/private_read_cache.dart';
@@ -237,6 +239,146 @@ class TeacherRepository {
           'teacherRemarks': teacherRemarks.trim(),
         if (correctionRemarks != null && correctionRemarks.trim().isNotEmpty)
           'correctionRemarks': correctionRemarks.trim(),
+      },
+    );
+  }
+
+  Future<TeacherActivitySnapshot> getActivity() async {
+    const cacheKey = 'teacher_activity';
+    late Map<String, dynamic> data;
+    try {
+      final responses = await Future.wait([
+        _client.get('/mobile/teacher/activity/scopes'),
+        _client.get(
+          '/mobile/teacher/activity/posts',
+          queryParameters: {'page': 1, 'limit': 20},
+        ),
+      ]);
+      data = {
+        'scopes': responses[0].data,
+        'posts': responses[1].data,
+        '_mobileLastUpdated': DateTime.now().toIso8601String(),
+      };
+      await cache?.write(cacheKey, data);
+    } on AppException catch (error) {
+      if (error is! NetworkException && error is! TimeoutException) rethrow;
+      final cached = cache?.read(cacheKey);
+      if (cached == null) rethrow;
+      data = cached.withMetadata();
+    }
+
+    final scopes = data['scopes'] is Map<String, dynamic>
+        ? data['scopes'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final posts = data['posts'] is Map<String, dynamic>
+        ? data['posts'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    return TeacherActivitySnapshot(
+      scopes: _asList(scopes['items'])
+          .whereType<Map<String, dynamic>>()
+          .map(TeacherActivityScope.fromJson)
+          .toList(),
+      posts: _asList(posts['items'])
+          .whereType<Map<String, dynamic>>()
+          .map(TeacherActivityPost.fromJson)
+          .toList(),
+      lastUpdated:
+          DateTime.tryParse(data['_mobileLastUpdated'] as String? ?? '') ??
+          DateTime.now(),
+      fromCache: data['_mobileFromCache'] as bool? ?? false,
+    );
+  }
+
+  Future<TeacherActivityStudentPage> getActivityStudents({
+    required TeacherActivityScope scope,
+    int page = 1,
+    String? search,
+  }) async {
+    final response = await _client.get(
+      '/mobile/teacher/activity/students',
+      queryParameters: {
+        'classId': scope.classId,
+        if (scope.sectionId != null) 'sectionId': scope.sectionId,
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+        'page': page,
+        'limit': 50,
+      },
+    );
+    final data = response.data is Map<String, dynamic>
+        ? response.data as Map<String, dynamic>
+        : const <String, dynamic>{};
+    return TeacherActivityStudentPage.fromJson(data);
+  }
+
+  Future<TeacherActivityPost> createActivityPost({
+    required String clientSubmissionId,
+    required TeacherActivityScope scope,
+    required String title,
+    required String caption,
+    required String category,
+    required List<String> studentIds,
+    required List<TeacherActivityMedia> attachments,
+  }) async {
+    final data = {
+      'clientSubmissionId': clientSubmissionId,
+      'classId': scope.classId,
+      if (scope.sectionId != null) 'sectionId': scope.sectionId,
+      'title': title.trim(),
+      'caption': caption.trim(),
+      'category': category,
+      'studentIds': studentIds,
+      'attachments': attachments
+          .map(
+            (attachment) => {
+              'fileName': attachment.fileName,
+              'contentType': attachment.contentType,
+              'base64Content': base64Encode(attachment.bytes),
+            },
+          )
+          .toList(),
+    };
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final response = await _client.post(
+          '/mobile/teacher/activity/posts',
+          data: data,
+        );
+        final body = response.data is Map<String, dynamic>
+            ? response.data as Map<String, dynamic>
+            : const <String, dynamic>{};
+        return TeacherActivityPost.fromJson(body);
+      } on AppException catch (error) {
+        final retryable =
+            error is NetworkException || error is TimeoutException;
+        if (!retryable || attempt == 1) rethrow;
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+      }
+    }
+
+    throw const NetworkException('Activity upload did not complete.');
+  }
+
+  Future<void> createMilestone({
+    required TeacherActivityScope scope,
+    required String studentId,
+    required String domain,
+    required String milestone,
+    required String status,
+    String? observationNote,
+  }) async {
+    await _client.post(
+      '/mobile/teacher/activity/milestones',
+      data: {
+        'classId': scope.classId,
+        if (scope.sectionId != null) 'sectionId': scope.sectionId,
+        'studentId': studentId,
+        'domain': domain.trim(),
+        'milestone': milestone.trim(),
+        'status': status,
+        if (observationNote != null && observationNote.trim().isNotEmpty)
+          'observationNote': observationNote.trim(),
+        'observedAt': DateTime.now().toUtc().toIso8601String(),
       },
     );
   }

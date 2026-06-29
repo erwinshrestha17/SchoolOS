@@ -32,5 +32,6 @@ import { MediaAccessController } from './media-access.controller';
     ActivityPostLifecycleService,
     ActivityMediaProcessor,
   ],
+  exports: [ActivityFeedService],
 })
 export class ActivityFeedModule {}

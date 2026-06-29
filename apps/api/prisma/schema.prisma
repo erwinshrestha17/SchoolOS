@@ -823,6 +823,27 @@ enum MarkEntryStatus {
   RETEST
 }
 
+enum AssessmentRetakeType {
+  RETEST
+  MAKE_UP
+}
+
+enum AssessmentRetakeStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  SCHEDULED
+  COMPLETED
+  APPLIED
+  CANCELLED
+}
+
+enum AssessmentRetakeResultDecision {
+  PENDING
+  KEEP_ORIGINAL
+  USE_RETAKE
+}
+
 enum FinanceRequestType {
   REFUND
   REVERSAL
@@ -1135,6 +1156,7 @@ model Class {
   subjectWeeklyRequirements SubjectWeeklyRequirement[]
   conversations             Conversation[]
   examTimetableSlots        ExamTimetableSlot[]
+  assessmentRetakes         AssessmentRetake[]
   attendanceDrafts          AttendanceDraft[]
   learningActivities        LearningActivity[]
   learningSessions          LearningSession[]
@@ -1174,6 +1196,7 @@ model Section {
   subjectWeeklyRequirements SubjectWeeklyRequirement[]
   conversations             Conversation[]
   examTimetableSlots        ExamTimetableSlot[]
+  assessmentRetakes         AssessmentRetake[]
   attendanceDrafts          AttendanceDraft[]
   learningActivities        LearningActivity[]
   learningSessions          LearningSession[]
@@ -1203,11 +1226,13 @@ model Subject {
   homeworkAssignments       HomeworkAssignment[]
   subjectWeeklyRequirements SubjectWeeklyRequirement[]
   examTimetableSlots        ExamTimetableSlot[]
+  assessmentRetakes         AssessmentRetake[]
   syllabusTopics            SyllabusTopic[]
   learningActivities        LearningActivity[]
   learningSessions          LearningSession[]
   learningProgress          LearningProgress[]
   learningResources         LearningResource[]
+  reportCardSubjectResults  ReportCardSubjectResult[]
 
   @@unique([tenantId, classId, code])
 }
@@ -1525,6 +1550,7 @@ model ActivityPost {
   classId          String
   sectionId        String?
   createdById      String?
+  clientSubmissionId String?
   title            String
   caption          String
   category         ActivityCategory   @default(GENERAL)
@@ -1555,6 +1581,7 @@ model ActivityPost {
 
   @@index([tenantId, classId, sectionId, publishedAt])
   @@index([tenantId, status])
+  @@unique([tenantId, createdById, clientSubmissionId])
 }
 
 model ActivityAttachment {
@@ -2397,6 +2424,12 @@ model User {
     publishedReportCards           ReportCard[]                  @relation("PublishedReportCards")
     requestedReportCardCorrections ReportCardCorrectionRequest[] @relation("RequestedReportCardCorrection")
     reviewedReportCardCorrections  ReportCardCorrectionRequest[] @relation("ReviewedReportCardCorrection")
+    requestedAssessmentRetakes     AssessmentRetake[]             @relation("RequestedAssessmentRetakes")
+    reviewedAssessmentRetakes      AssessmentRetake[]             @relation("ReviewedAssessmentRetakes")
+    scheduledAssessmentRetakes     AssessmentRetake[]             @relation("ScheduledAssessmentRetakes")
+    completedAssessmentRetakes     AssessmentRetake[]             @relation("CompletedAssessmentRetakes")
+    appliedAssessmentRetakes       AssessmentRetake[]             @relation("AppliedAssessmentRetakes")
+    cancelledAssessmentRetakes     AssessmentRetake[]             @relation("CancelledAssessmentRetakes")
   transportTripsCreated       TransportTrip[]              @relation("TransportTripCreatedBy")
   transportTripsCompleted     TransportTrip[]              @relation("TransportTripCompletedBy")
   transportStatusesMarked     TransportTripStudentStatus[] @relation("TransportTripStatusMarkedBy")
@@ -3140,6 +3173,7 @@ model ExamTerm {
   reportCards      ReportCard[]
   timetableSlots   ExamTimetableSlot[]
   markLockRequests MarkLockRequest[]
+  assessmentRetakes AssessmentRetake[]
 
   @@unique([tenantId, academicYearId, name])
 }
@@ -3161,6 +3195,7 @@ model AssessmentComponent {
   examTerm    ExamTerm    @relation(fields: [examTermId], references: [id], onDelete: Cascade)
   subject     Subject     @relation(fields: [subjectId], references: [id], onDelete: Restrict)
   markEntries MarkEntry[]
+  assessmentRetakes AssessmentRetake[]
 
   @@unique([tenantId, examTermId, subjectId, name])
 }
@@ -3186,6 +3221,7 @@ model MarkEntry {
   subject             Subject             @relation(fields: [subjectId], references: [id], onDelete: Restrict)
   student             Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
   enteredBy           User?               @relation("EnteredMarks", fields: [enteredById], references: [id], onDelete: SetNull)
+  assessmentRetakes   AssessmentRetake[]
 
   @@unique([tenantId, assessmentComponentId, studentId])
   @@index([tenantId, examTermId, studentId])
@@ -3256,9 +3292,34 @@ model ReportCard {
   file              FileAsset?                    @relation("ReportCardFile", fields: [fileId], references: [id], onDelete: SetNull)
   history           ReportCardHistory[]
   correctionRequests ReportCardCorrectionRequest[]
+  subjectResults    ReportCardSubjectResult[]
 
   @@unique([tenantId, academicYearId, examTermId, studentId])
   @@index([tenantId, classId, sectionId])
+}
+
+model ReportCardSubjectResult {
+  id             String   @id @default(uuid())
+  tenantId       String
+  reportCardId   String
+  version        Int
+  subjectId      String
+  subjectName    String
+  subjectCode    String
+  marksObtained  Decimal  @db.Decimal(10, 2)
+  maxMarks       Decimal  @db.Decimal(10, 2)
+  percentage     Decimal  @db.Decimal(5, 2)
+  grade          String
+  gpa            Decimal  @db.Decimal(3, 2)
+  resultStatus   String
+  createdAt      DateTime @default(now())
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  reportCard ReportCard @relation(fields: [reportCardId], references: [id], onDelete: Cascade)
+  subject    Subject    @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, reportCardId, version, subjectId])
+  @@index([tenantId, reportCardId, version])
 }
 
 model ReportCardHistory {
@@ -3333,6 +3394,65 @@ model ExamTimetableSlot {
   section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, examTermId, classId, sectionId])
+}
+
+model AssessmentRetake {
+  id                   String                         @id @default(uuid())
+  tenantId             String
+  markEntryId          String
+  examTermId           String
+  assessmentComponentId String
+  subjectId            String
+  studentId            String
+  classId              String
+  sectionId            String?
+  type                 AssessmentRetakeType
+  status               AssessmentRetakeStatus        @default(REQUESTED)
+  reason               String
+  originalMarks        Decimal                        @db.Decimal(8, 2)
+  originalStatus       MarkEntryStatus
+  scheduledStartsAt    DateTime?
+  scheduledEndsAt      DateTime?
+  room                 String?
+  attemptMarks         Decimal?                       @db.Decimal(8, 2)
+  attemptRemarks       String?
+  resultDecision       AssessmentRetakeResultDecision @default(PENDING)
+  resultDecisionReason String?
+  requestedById        String
+  reviewedById         String?
+  reviewNote           String?
+  reviewedAt           DateTime?
+  scheduledById        String?
+  scheduledAt          DateTime?
+  completedById        String?
+  completedAt          DateTime?
+  appliedById          String?
+  appliedAt            DateTime?
+  cancelledById        String?
+  cancelledAt          DateTime?
+  cancellationReason   String?
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  markEntry           MarkEntry           @relation(fields: [markEntryId], references: [id], onDelete: Restrict)
+  examTerm            ExamTerm            @relation(fields: [examTermId], references: [id], onDelete: Restrict)
+  assessmentComponent AssessmentComponent @relation(fields: [assessmentComponentId], references: [id], onDelete: Restrict)
+  subject             Subject             @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  student             Student             @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  class               Class               @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section             Section?            @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  requestedBy         User                @relation("RequestedAssessmentRetakes", fields: [requestedById], references: [id], onDelete: Restrict)
+  reviewedBy          User?               @relation("ReviewedAssessmentRetakes", fields: [reviewedById], references: [id], onDelete: SetNull)
+  scheduledBy         User?               @relation("ScheduledAssessmentRetakes", fields: [scheduledById], references: [id], onDelete: SetNull)
+  completedBy         User?               @relation("CompletedAssessmentRetakes", fields: [completedById], references: [id], onDelete: SetNull)
+  appliedBy           User?               @relation("AppliedAssessmentRetakes", fields: [appliedById], references: [id], onDelete: SetNull)
+  cancelledBy         User?               @relation("CancelledAssessmentRetakes", fields: [cancelledById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, examTermId, classId, sectionId])
+  @@index([tenantId, studentId, createdAt])
+  @@index([tenantId, markEntryId, status])
 }
 
 model MarkLockRequest {
@@ -5328,6 +5448,7 @@ model Student {
   casRecords                   CasRecord[]
   reportCards                  ReportCard[]
   reportCardHistories          ReportCardHistory[]
+  assessmentRetakes            AssessmentRetake[]
   promotionRecords             PromotionRecord[]
   homeworkSubmissions          HomeworkSubmission[]
   conversations                Conversation[]
@@ -5814,6 +5935,8 @@ model Tenant {
   reportCards                   ReportCard[]
   reportCardHistories           ReportCardHistory[]
   reportCardCorrectionRequests  ReportCardCorrectionRequest[]
+  reportCardSubjectResults      ReportCardSubjectResult[]
+  assessmentRetakes             AssessmentRetake[]
   promotionRecords              PromotionRecord[]
   attendanceDrafts              AttendanceDraft[]
   timetableSlots                TimetableSlot[]

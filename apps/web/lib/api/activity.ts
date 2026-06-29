@@ -14,6 +14,22 @@ import {
   withQuery,
 } from './client';
 
+export type ActivityAudiencePreview = {
+  audienceType: 'CLASS' | 'SECTION' | 'STUDENT';
+  classId: string;
+  sectionId: string | null;
+  studentCount: number;
+  mediaConsent: {
+    grantedStudentCount: number;
+    blockedStudentCount: number;
+  };
+  students: Array<{
+    id: string;
+    fullName: string;
+    mediaConsentGranted: boolean;
+  }>;
+};
+
 export const activityApi = {
   listActivityPosts: (params?: {
     studentId?: string | null;
@@ -45,6 +61,18 @@ export const activityApi = {
     request<ActivityPost[]>(withQuery('/activity-feed/parent', params ?? {})),
   getActivityPost: (postId: string) =>
     request<ActivityPost>(`/activity-feed/posts/${encodeURIComponent(postId)}`),
+  previewActivityAudience: (params: {
+    classId: string;
+    sectionId?: string | null;
+    studentIds?: string[];
+  }) =>
+    request<ActivityAudiencePreview>(
+      withQuery('/activity-feed/audience-preview', {
+        classId: params.classId,
+        sectionId: params.sectionId,
+        studentIds: params.studentIds?.join(','),
+      }),
+    ),
   updateActivityPost: (postId: string, body: JsonBody) =>
     request<ActivityPost>(
       `/activity-feed/posts/${encodeURIComponent(postId)}`,

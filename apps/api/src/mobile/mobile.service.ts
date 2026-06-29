@@ -981,6 +981,16 @@ export class MobileService {
         ],
       },
       include: {
+        attachments: {
+          orderBy: { sortOrder: 'asc' },
+          select: {
+            id: true,
+            fileName: true,
+            contentType: true,
+            sizeBytes: true,
+            processingStatus: true,
+          },
+        },
         _count: {
           select: {
             attachments: true,
@@ -1001,6 +1011,16 @@ export class MobileService {
         publishedAt: toIso(item.publishedAt ?? item.createdAt),
         attachmentCount: item._count.attachments,
         reactionCount: item._count.reactions,
+        attachments: item.attachments.map((attachment) => ({
+          id: attachment.id,
+          fileName: attachment.fileName,
+          contentType: attachment.contentType,
+          sizeBytes: attachment.sizeBytes,
+          processingStatus: attachment.processingStatus,
+          previewPath: `/activity-feed/attachments/${encodeURIComponent(
+            attachment.id,
+          )}/preview`,
+        })),
       })),
     };
   }
@@ -1189,27 +1209,13 @@ export class MobileService {
       include: {
         academicYear: { select: { id: true, name: true } },
         examTerm: { select: { id: true, name: true } },
+        subjectResults: {
+          orderBy: [{ subjectCode: 'asc' }, { subjectName: 'asc' }],
+        },
       },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: 10,
     });
-    const examTermIds = reportCards.map((card) => card.examTermId);
-    const marks =
-      examTermIds.length === 0
-        ? []
-        : await this.prisma.markEntry.findMany({
-            where: {
-              tenantId: actor.tenantId,
-              studentId,
-              examTermId: { in: examTermIds },
-            },
-            include: {
-              subject: { select: { id: true, name: true, code: true } },
-              assessmentComponent: { select: { maxMarks: true } },
-            },
-            orderBy: [{ subject: { code: 'asc' } }],
-          });
-    const subjectsByTerm = groupReportCardSubjects(marks);
 
     return {
       items: reportCards.map((card) => ({
@@ -1226,7 +1232,58 @@ export class MobileService {
         hasFile: Boolean(card.fileId),
         attendancePercentage: null,
         classTeacherRemark: card.remarks,
-        subjects: subjectsByTerm.get(card.examTermId) ?? [],
+        subjects: card.subjectResults
+          .filter((subject) => subject.version === card.version)
+          .map((subject) => ({
+            subjectId: subject.subjectId,
+            subjectName: subject.subjectName,
+            marksObtained: money(subject.marksObtained),
+            maxMarks: money(subject.maxMarks),
+            percentage: money(subject.percentage),
+            grade: subject.grade,
+          })),
+      })),
+    };
+  }
+
+  async getStudentExamSchedule(studentId: string, actor: AuthContext) {
+    const student = await this.getAccessibleStudent(studentId, actor);
+    const enrollment = student.enrollments[0];
+    if (!enrollment) {
+      return { academicYear: null, items: [] };
+    }
+
+    const items = await this.prisma.examTimetableSlot.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        academicYearId: enrollment.academicYearId,
+        classId: student.classId,
+        publishedAt: { not: null },
+        OR: student.sectionId
+          ? [{ sectionId: null }, { sectionId: student.sectionId }]
+          : [{ sectionId: null }],
+      },
+      include: {
+        examTerm: { select: { id: true, name: true } },
+        subject: { select: { id: true, name: true, code: true } },
+      },
+      orderBy: [{ startsAt: 'asc' }, { subject: { code: 'asc' } }],
+      take: 100,
+    });
+
+    return {
+      academicYear: {
+        id: enrollment.academicYearId,
+        name: enrollment.academicYear.name,
+      },
+      items: items.map((item) => ({
+        id: item.id,
+        examTerm: item.examTerm,
+        subject: item.subject,
+        startsAt: item.startsAt.toISOString(),
+        endsAt: item.endsAt.toISOString(),
+        room: item.room,
+        publishedAt: item.publishedAt?.toISOString() ?? '',
       })),
     };
   }
@@ -1897,82 +1954,6 @@ function hasToNumber(value: unknown): value is { toNumber: () => number } {
 
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
-}
-
-function groupReportCardSubjects(
-  marks: Array<{
-    examTermId: string;
-    subjectId: string;
-    marksObtained: unknown;
-    subject: { id: string; name: string; code: string };
-    assessmentComponent: { maxMarks: unknown };
-  }>,
-) {
-  const grouped = new Map<
-    string,
-    Map<
-      string,
-      {
-        subjectId: string;
-        subjectName: string;
-        marksObtained: number;
-        maxMarks: number;
-      }
-    >
-  >();
-
-  for (const mark of marks) {
-    const termSubjects =
-      grouped.get(mark.examTermId) ??
-      new Map<
-        string,
-        {
-          subjectId: string;
-          subjectName: string;
-          marksObtained: number;
-          maxMarks: number;
-        }
-      >();
-    const subject = termSubjects.get(mark.subjectId) ?? {
-      subjectId: mark.subject.id,
-      subjectName: mark.subject.name,
-      marksObtained: 0,
-      maxMarks: 0,
-    };
-    subject.marksObtained += money(mark.marksObtained);
-    subject.maxMarks += money(mark.assessmentComponent.maxMarks);
-    termSubjects.set(mark.subjectId, subject);
-    grouped.set(mark.examTermId, termSubjects);
-  }
-
-  return new Map(
-    Array.from(grouped.entries()).map(([termId, subjects]) => [
-      termId,
-      Array.from(subjects.values()).map((subject) => {
-        const percentage =
-          subject.maxMarks <= 0
-            ? 0
-            : roundMoney((subject.marksObtained / subject.maxMarks) * 100);
-        return {
-          ...subject,
-          marksObtained: roundMoney(subject.marksObtained),
-          maxMarks: roundMoney(subject.maxMarks),
-          percentage,
-          grade: gradeFromPercentage(percentage),
-        };
-      }),
-    ]),
-  );
-}
-
-function gradeFromPercentage(percentage: number) {
-  if (percentage >= 90) return 'A+';
-  if (percentage >= 80) return 'A';
-  if (percentage >= 70) return 'B+';
-  if (percentage >= 60) return 'B';
-  if (percentage >= 50) return 'C+';
-  if (percentage >= 40) return 'C';
-  return 'D';
 }
 
 function toIso(value: Date | null | undefined) {

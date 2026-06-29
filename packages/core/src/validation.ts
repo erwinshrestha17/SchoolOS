@@ -254,6 +254,7 @@ export type SectionFormInput = z.input<typeof sectionFormSchema>;
 // ─── Compiled from validation/activity.ts ───
 
 export const activityPostFormSchema = z.object({
+  clientSubmissionId: z.string().uuid().optional(),
   classId: z.string().min(1),
   sectionId: z.string().optional().nullable(),
   title: z.string().min(2),

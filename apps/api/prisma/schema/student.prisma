@@ -81,6 +81,7 @@ model Student {
   casRecords                   CasRecord[]
   reportCards                  ReportCard[]
   reportCardHistories          ReportCardHistory[]
+  assessmentRetakes            AssessmentRetake[]
   promotionRecords             PromotionRecord[]
   homeworkSubmissions          HomeworkSubmission[]
   conversations                Conversation[]

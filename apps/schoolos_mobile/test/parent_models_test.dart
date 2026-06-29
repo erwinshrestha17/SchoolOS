@@ -132,6 +132,38 @@ void main() {
     });
   });
 
+  test('maps only protected activity media paths', () {
+    final item = ParentActivityItem.fromJson({
+      'id': 'post-1',
+      'title': 'Science day',
+      'caption': 'Students built models.',
+      'category': 'LEARNING',
+      'attachmentCount': 1,
+      'reactionCount': 2,
+      'attachments': [
+        {
+          'id': 'attachment-1',
+          'fileName': 'science.jpg',
+          'contentType': 'image/jpeg',
+          'sizeBytes': 2048,
+          'processingStatus': 'READY',
+          'previewPath': '/activity-feed/attachments/attachment-1/preview',
+          'objectKey': 'must-not-map',
+        },
+      ],
+    });
+
+    expect(item.attachments.single.canPreview, isTrue);
+    expect(
+      item.attachments.single.previewPath,
+      '/activity-feed/attachments/attachment-1/preview',
+    );
+    expect(
+      item.attachments.single.previewPath,
+      isNot(contains('must-not-map')),
+    );
+  });
+
   test('maps timetable slots from mobile API data', () {
     final timetable = ParentTimetable.fromJson({
       'version': {'name': 'Primary timetable', 'status': 'PUBLISHED'},
@@ -152,6 +184,29 @@ void main() {
     expect(timetable.versionName, 'Primary timetable');
     expect(timetable.slots.single.subjectName, 'Science');
     expect(timetable.slots.single.teacherName, 'Ms. Rana');
+  });
+
+  test('maps a purpose-limited published exam schedule', () {
+    final schedule = ParentExamSchedule.fromJson({
+      'academicYear': {'id': 'year-1', 'name': '2083/84'},
+      'items': [
+        {
+          'id': 'exam-slot-1',
+          'examTerm': {'id': 'term-1', 'name': 'First Terminal'},
+          'subject': {'id': 'subject-1', 'name': 'Mathematics', 'code': 'MATH'},
+          'startsAt': '2026-07-10T03:30:00.000Z',
+          'endsAt': '2026-07-10T04:30:00.000Z',
+          'room': 'Room 4',
+          'publishedAt': '2026-07-01T00:00:00.000Z',
+        },
+      ],
+    });
+
+    expect(schedule.academicYearName, '2083/84');
+    expect(schedule.items.single.examTermName, 'First Terminal');
+    expect(schedule.items.single.subjectName, 'Mathematics');
+    expect(schedule.items.single.room, 'Room 4');
+    expect(schedule.items.single.startsAt.isUtc, isTrue);
   });
 
   test('maps transport and canteen module data', () {

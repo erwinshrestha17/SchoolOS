@@ -3,7 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MarkEntryStatus, Prisma } from '@prisma/client';
+import {
+  AssessmentRetakeStatus,
+  MarkEntryStatus,
+  Prisma,
+} from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -83,6 +87,12 @@ export class MarksService {
 
     const maxMarks = Number(component.maxMarks);
     for (const entry of dto.entries) {
+      if (entry.isRetest) {
+        throw new ConflictException(
+          'Use the assessment-retakes workflow to request a retest or make-up',
+        );
+      }
+
       const activeStatesCount =
         (entry.isAbsent ? 1 : 0) +
         (entry.isWithheld ? 1 : 0) +
@@ -146,6 +156,29 @@ export class MarksService {
       },
     });
 
+    if (existingMarks.length > 0) {
+      const activeRetake = await this.prisma.assessmentRetake.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          markEntryId: { in: existingMarks.map((mark) => mark.id) },
+          status: {
+            in: [
+              AssessmentRetakeStatus.REQUESTED,
+              AssessmentRetakeStatus.APPROVED,
+              AssessmentRetakeStatus.SCHEDULED,
+              AssessmentRetakeStatus.COMPLETED,
+            ],
+          },
+        },
+        select: { id: true },
+      });
+      if (activeRetake) {
+        throw new ConflictException(
+          'A mark with an active retest or make-up lifecycle cannot be edited directly',
+        );
+      }
+    }
+
     for (const mark of existingMarks) {
       if (mark.isLocked && !approvedStudentIds.has(mark.studentId)) {
         throw new ConflictException(
@@ -160,7 +193,6 @@ export class MarksService {
         if (entry.isDraft) status = MarkEntryStatus.DRAFT;
         else if (entry.isAbsent) status = MarkEntryStatus.ABSENT;
         else if (entry.isWithheld) status = MarkEntryStatus.WITHHELD;
-        else if (entry.isRetest) status = MarkEntryStatus.RETEST;
 
         const val = entry.marksObtained ?? 0;
 
@@ -341,6 +373,12 @@ export class MarksService {
   }
 
   async updateMark(id: string, dto: UpdateMarkDto, actor: AuthContext) {
+    if (dto.isRetest) {
+      throw new ConflictException(
+        'Use the assessment-retakes workflow to request a retest or make-up',
+      );
+    }
+
     const existingMark = await this.prisma.markEntry.findFirst({
       where: { id, tenantId: actor.tenantId },
       include: { assessmentComponent: true },
@@ -348,6 +386,27 @@ export class MarksService {
 
     if (!existingMark) {
       throw new NotFoundException('Mark entry not found');
+    }
+
+    const activeRetake = await this.prisma.assessmentRetake.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        markEntryId: id,
+        status: {
+          in: [
+            AssessmentRetakeStatus.REQUESTED,
+            AssessmentRetakeStatus.APPROVED,
+            AssessmentRetakeStatus.SCHEDULED,
+            AssessmentRetakeStatus.COMPLETED,
+          ],
+        },
+      },
+      select: { id: true },
+    });
+    if (activeRetake) {
+      throw new ConflictException(
+        'A mark with an active retest or make-up lifecycle cannot be edited directly',
+      );
     }
 
     const examTerm = await this.prisma.examTerm.findFirst({

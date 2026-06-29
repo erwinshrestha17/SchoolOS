@@ -724,6 +724,107 @@ export type ExamTimetableSlotSummary = {
   publishedAt: string | null;
 };
 
+export type MobileExamSchedule = {
+  academicYear: {
+    id: string;
+    name: string;
+  } | null;
+  items: MobileExamScheduleItem[];
+};
+
+export type MobileExamScheduleItem = {
+  id: string;
+  examTerm: {
+    id: string;
+    name: string;
+  };
+  subject: {
+    id: string;
+    name: string;
+    code: string;
+  };
+  startsAt: string;
+  endsAt: string;
+  room: string | null;
+  publishedAt: string;
+};
+
+export type AssessmentRetakeType = 'RETEST' | 'MAKE_UP';
+
+export type AssessmentRetakeStatus =
+  | 'REQUESTED'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'SCHEDULED'
+  | 'COMPLETED'
+  | 'APPLIED'
+  | 'CANCELLED';
+
+export type AssessmentRetakeResultDecision =
+  | 'PENDING'
+  | 'KEEP_ORIGINAL'
+  | 'USE_RETAKE';
+
+export type AssessmentRetakeSummary = {
+  id: string;
+  markEntryId: string;
+  examTermId: string;
+  assessmentComponentId: string;
+  subjectId: string;
+  studentId: string;
+  classId: string;
+  sectionId: string | null;
+  type: AssessmentRetakeType;
+  status: AssessmentRetakeStatus;
+  reason: string;
+  originalMarks: number;
+  originalStatus: MarkEntrySummary['status'];
+  scheduledStartsAt: string | null;
+  scheduledEndsAt: string | null;
+  room: string | null;
+  attemptMarks: number | null;
+  attemptRemarks: string | null;
+  resultDecision: AssessmentRetakeResultDecision;
+  resultDecisionReason: string | null;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  completedAt: string | null;
+  appliedAt: string | null;
+  cancellationReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  student?: {
+    id: string;
+    studentSystemId: string;
+    firstNameEn: string;
+    lastNameEn: string;
+  };
+  class?: { id: string; name: string };
+  section?: { id: string; name: string } | null;
+  subject?: { id: string; name: string; code: string };
+  examTerm?: {
+    id: string;
+    name: string;
+    academicYearId: string;
+    isLocked: boolean;
+  };
+  assessmentComponent?: {
+    id: string;
+    name: string;
+    maxMarks: number;
+  };
+};
+
+export type AssessmentRetakePage = {
+  items: AssessmentRetakeSummary[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+};
+
 export type MarkLockRequestSummary = {
   id: string;
   examTermId: string;

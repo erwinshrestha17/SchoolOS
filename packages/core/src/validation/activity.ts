@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { studentDocumentFormSchema } from './student.js';
 
 export const activityPostFormSchema = z.object({
+  clientSubmissionId: z.string().uuid().optional(),
   classId: z.string().min(1),
   sectionId: z.string().optional().nullable(),
   title: z.string().min(2),

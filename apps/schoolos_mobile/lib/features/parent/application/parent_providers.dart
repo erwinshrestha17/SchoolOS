@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/connectivity_provider.dart';
@@ -46,6 +48,13 @@ final parentTimetableProvider = FutureProvider.autoDispose
       return ref.watch(parentRepositoryProvider).getTimetableForChild(childId);
     });
 
+final parentExamScheduleProvider = FutureProvider.autoDispose
+    .family<ParentExamSchedule, String>((ref, childId) {
+      return ref
+          .watch(parentRepositoryProvider)
+          .getExamScheduleForChild(childId);
+    });
+
 final parentReportCardsProvider = FutureProvider.autoDispose
     .family<List<ParentReportCard>, String>((ref, childId) {
       return ref
@@ -83,6 +92,13 @@ final parentActivityFeedProvider = FutureProvider.autoDispose
       return ref
           .watch(parentRepositoryProvider)
           .getActivityFeedForChild(childId);
+    });
+
+final parentActivityPreviewProvider = FutureProvider.autoDispose
+    .family<Uint8List, String>((ref, previewPath) {
+      return ref
+          .watch(parentRepositoryProvider)
+          .getActivityPreview(previewPath);
     });
 
 final parentTransportProvider = FutureProvider.autoDispose

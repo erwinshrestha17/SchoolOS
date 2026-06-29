@@ -30,7 +30,7 @@ describe('MarksService', () => {
     expect(service).toBeDefined();
   });
 
-  it('persists draft, absent, withheld, and retest mark states through tenant-scoped bulk upsert', async () => {
+  it('persists draft, absent, and withheld states through tenant-scoped bulk upsert', async () => {
     const actor: AuthContext = {
       tenantId: 'tenant-1',
       tenantSlug: 'tenant-one',
@@ -66,7 +66,6 @@ describe('MarksService', () => {
         findMany: jest.fn().mockResolvedValue([
           { id: 'student-absent', tenantId: actor.tenantId },
           { id: 'student-withheld', tenantId: actor.tenantId },
-          { id: 'student-retest', tenantId: actor.tenantId },
           { id: 'student-draft', tenantId: actor.tenantId },
         ]),
       },
@@ -102,12 +101,6 @@ describe('MarksService', () => {
           { studentId: 'student-draft', isDraft: true },
           { studentId: 'student-absent', isAbsent: true },
           { studentId: 'student-withheld', isWithheld: true },
-          {
-            studentId: 'student-retest',
-            isRetest: true,
-            marksObtained: 60,
-            remarks: 'Make-up test scheduled',
-          },
         ],
       },
       actor,
@@ -120,14 +113,13 @@ describe('MarksService', () => {
             'student-draft',
             'student-absent',
             'student-withheld',
-            'student-retest',
           ],
         },
         tenantId: actor.tenantId,
         classId: 'class-1',
       },
     });
-    expect(prisma.markEntry.upsert).toHaveBeenCalledTimes(4);
+    expect(prisma.markEntry.upsert).toHaveBeenCalledTimes(3);
     expect(prisma.markEntry.upsert).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
@@ -162,17 +154,7 @@ describe('MarksService', () => {
         }),
       }),
     );
-    expect(prisma.markEntry.upsert).toHaveBeenNthCalledWith(
-      4,
-      expect.objectContaining({
-        create: expect.objectContaining({
-          status: MarkEntryStatus.RETEST,
-          marksObtained: new Prisma.Decimal(60),
-          remarks: 'Make-up test scheduled',
-        }),
-      }),
-    );
-    expect(result.updated).toBe(4);
+    expect(result.updated).toBe(3);
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'ACADEMICS_MARKS_BULK_UPSERTED',
@@ -180,9 +162,72 @@ describe('MarksService', () => {
         tenantId: actor.tenantId,
         after: expect.objectContaining({
           componentId: 'component-1',
-          count: 4,
+          count: 3,
         }),
       }),
     );
+  });
+
+  it('rejects direct retest flags so lifecycle records cannot be bypassed', async () => {
+    const actor = {
+      tenantId: 'tenant-1',
+      tenantSlug: 'tenant-one',
+      userId: 'teacher-1',
+      email: 'teacher@schoolos.test',
+      authMethod: AuthMethod.PASSWORD,
+      roles: ['teacher'],
+      permissions: ['academics:enter_marks'],
+    } as AuthContext;
+    const prisma = {
+      examTerm: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'term-1',
+          tenantId: actor.tenantId,
+          isLocked: false,
+        }),
+      },
+      assessmentComponent: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'component-1',
+          tenantId: actor.tenantId,
+          examTermId: 'term-1',
+          subjectId: 'subject-1',
+          maxMarks: new Prisma.Decimal(100),
+          subject: {
+            id: 'subject-1',
+            classId: 'class-1',
+            class: { id: 'class-1', name: 'Class 1' },
+          },
+        }),
+      },
+      student: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'student-1', tenantId: actor.tenantId },
+        ]),
+      },
+    };
+    const marksService = new MarksService(
+      prisma as unknown as PrismaService,
+      { record: jest.fn() } as unknown as AuditService,
+    );
+
+    await expect(
+      marksService.bulkUpsert(
+        {
+          examTermId: 'term-1',
+          assessmentComponentId: 'component-1',
+          subjectId: 'subject-1',
+          classId: 'class-1',
+          entries: [
+            {
+              studentId: 'student-1',
+              isRetest: true,
+              marksObtained: 60,
+            },
+          ],
+        },
+        actor,
+      ),
+    ).rejects.toThrow('assessment-retakes workflow');
   });
 });

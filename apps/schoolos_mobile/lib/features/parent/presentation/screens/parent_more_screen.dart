@@ -49,7 +49,7 @@ class ParentMoreScreen extends StatelessWidget {
                 ),
                 _moduleAction(
                   context,
-                  'Report Card',
+                  'Exams & Results',
                   Icons.analytics_rounded,
                   AppColors.teacherAccent,
                   route: AppRoutes.parentReportCards,

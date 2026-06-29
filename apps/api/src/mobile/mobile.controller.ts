@@ -280,6 +280,15 @@ export class MobileController {
     return this.mobileService.getStudentTimetable(studentId, auth);
   }
 
+  @Get('students/:id/exam-schedule')
+  @RequiredModule('exams')
+  getStudentExamSchedule(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.getStudentExamSchedule(studentId, auth);
+  }
+
   @Get('students/:id/report-cards')
   @RequiredModule('exams')
   getStudentReportCards(

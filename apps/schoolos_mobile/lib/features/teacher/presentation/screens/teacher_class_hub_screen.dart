@@ -141,6 +141,14 @@ class _TeacherClassHubScreenState extends ConsumerState<TeacherClassHubScreen> {
               ),
               const SizedBox(height: AppSpacing.md),
               TeacherTaskCard(
+                title: 'Activities & milestones',
+                subtitle: 'Capture a photo update or student observation.',
+                icon: Icons.photo_camera_rounded,
+                iconColor: AppColors.teacherAccent,
+                onTap: () => context.go(AppRoutes.teacherActivity),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TeacherTaskCard(
                 title: 'Messages',
                 subtitle: 'Open scoped parent-teacher threads.',
                 icon: Icons.chat_bubble_rounded,

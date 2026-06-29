@@ -18,12 +18,18 @@ class ParentReportCardsScreen extends ConsumerWidget {
     final child = state.selectedChild;
 
     return ParentDetailScaffold(
-      title: 'Report Cards',
+      title: 'Exams & Results',
       selectedIndex: 4,
       body: switch (state.status) {
         ParentDataStatus.loading => const PortalLoadingState(),
         ParentDataStatus.success when child != null => RefreshIndicator(
-          onRefresh: controller.load,
+          onRefresh: () async {
+            for (final linkedChild in state.children) {
+              ref.invalidate(parentExamScheduleProvider(linkedChild.id));
+              ref.invalidate(parentReportCardsProvider(linkedChild.id));
+            }
+            await controller.load();
+          },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
             children: [
@@ -35,11 +41,19 @@ class ParentReportCardsScreen extends ConsumerWidget {
                   statusLabel: state.isOffline ? 'Offline copy' : null,
                 ),
                 const SizedBox(height: 16),
+                const ParentSectionHeader(title: 'Published exam schedule'),
+                const SizedBox(height: 8),
+                _ExamScheduleBody(child: child),
+                const SizedBox(height: 22),
+                const ParentSectionHeader(title: 'Published results'),
+                const SizedBox(height: 8),
                 _ReportCardsBody(child: child),
               ] else
                 for (final linkedChild in state.children) ...[
                   ParentSectionHeader(title: linkedChild.name),
                   const SizedBox(height: 8),
+                  _ExamScheduleBody(child: linkedChild),
+                  const SizedBox(height: 18),
                   _ReportCardsBody(child: linkedChild),
                   const SizedBox(height: 18),
                 ],
@@ -48,6 +62,93 @@ class ParentReportCardsScreen extends ConsumerWidget {
         ),
         _ => PortalErrorState(onRetry: controller.load),
       },
+    );
+  }
+}
+
+class _ExamScheduleBody extends ConsumerWidget {
+  const _ExamScheduleBody({required this.child});
+
+  final GuardianChild child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final schedule = ref.watch(parentExamScheduleProvider(child.id));
+    return schedule.when(
+      loading: () => const PortalLoadingState(),
+      error: (_, _) => PortalErrorState(
+        onRetry: () => ref.invalidate(parentExamScheduleProvider(child.id)),
+      ),
+      data: (data) {
+        if (data.items.isEmpty) {
+          return const PortalCard(
+            child: Text('No published exam schedule is available yet.'),
+          );
+        }
+
+        return Column(
+          children: [
+            for (final item in data.items) ...[
+              _ExamScheduleTile(item: item),
+              const SizedBox(height: 12),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ExamScheduleTile extends StatelessWidget {
+  const _ExamScheduleTile({required this.item});
+
+  final ParentExamScheduleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return PortalCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const FeatureIcon(
+            Icons.event_available_rounded,
+            color: ParentPortalColors.blue,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.subjectName,
+                  style: const TextStyle(
+                    color: ParentPortalColors.navy,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  item.examTermName,
+                  style: const TextStyle(color: ParentPortalColors.muted),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  NepaliBsCalendar.formatBsDate(item.startsAt, long: true),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                Text(
+                  '${NepaliBsCalendar.formatNepalTime(item.startsAt)} - '
+                  '${NepaliBsCalendar.formatNepalTime(item.endsAt)}'
+                  '${item.room == null ? '' : ' | ${item.room}'}',
+                  style: const TextStyle(color: ParentPortalColors.muted),
+                ),
+              ],
+            ),
+          ),
+          const StatusBadge(label: 'Published', icon: Icons.check_rounded),
+        ],
+      ),
     );
   }
 }

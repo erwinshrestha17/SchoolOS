@@ -600,6 +600,73 @@ class ParentTimetableSlot {
   }
 }
 
+class ParentExamSchedule {
+  const ParentExamSchedule({
+    this.academicYearId,
+    this.academicYearName,
+    this.items = const [],
+  });
+
+  final String? academicYearId;
+  final String? academicYearName;
+  final List<ParentExamScheduleItem> items;
+
+  factory ParentExamSchedule.fromJson(Map<String, dynamic> json) {
+    final academicYear = _asMap(json['academicYear']);
+    return ParentExamSchedule(
+      academicYearId: academicYear?['id'] as String?,
+      academicYearName: academicYear?['name'] as String?,
+      items: _asList(json['items'])
+          .whereType<Map<String, dynamic>>()
+          .map(ParentExamScheduleItem.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class ParentExamScheduleItem {
+  const ParentExamScheduleItem({
+    required this.id,
+    required this.examTermId,
+    required this.examTermName,
+    required this.subjectId,
+    required this.subjectName,
+    required this.subjectCode,
+    required this.startsAt,
+    required this.endsAt,
+    this.room,
+    this.publishedAt,
+  });
+
+  final String id;
+  final String examTermId;
+  final String examTermName;
+  final String subjectId;
+  final String subjectName;
+  final String subjectCode;
+  final DateTime startsAt;
+  final DateTime endsAt;
+  final String? room;
+  final DateTime? publishedAt;
+
+  factory ParentExamScheduleItem.fromJson(Map<String, dynamic> json) {
+    final examTerm = _asMap(json['examTerm']);
+    final subject = _asMap(json['subject']);
+    return ParentExamScheduleItem(
+      id: json['id'] as String? ?? '',
+      examTermId: examTerm?['id'] as String? ?? '',
+      examTermName: examTerm?['name'] as String? ?? 'Exam',
+      subjectId: subject?['id'] as String? ?? '',
+      subjectName: subject?['name'] as String? ?? 'Subject',
+      subjectCode: subject?['code'] as String? ?? '',
+      startsAt: DateTime.parse(json['startsAt'] as String),
+      endsAt: DateTime.parse(json['endsAt'] as String),
+      room: json['room'] as String?,
+      publishedAt: _asDateTime(json['publishedAt']),
+    );
+  }
+}
+
 class ParentReportCard {
   const ParentReportCard({
     required this.id,
@@ -779,6 +846,7 @@ class ParentActivityItem {
     this.publishedAt,
     required this.attachmentCount,
     required this.reactionCount,
+    required this.attachments,
   });
 
   final String id;
@@ -788,6 +856,7 @@ class ParentActivityItem {
   final String? publishedAt;
   final int attachmentCount;
   final int reactionCount;
+  final List<ParentActivityAttachment> attachments;
 
   factory ParentActivityItem.fromJson(Map<String, dynamic> json) {
     return ParentActivityItem(
@@ -798,6 +867,41 @@ class ParentActivityItem {
       publishedAt: json['publishedAt'] as String?,
       attachmentCount: _asInt(json['attachmentCount']),
       reactionCount: _asInt(json['reactionCount']),
+      attachments: _asList(json['attachments'])
+          .whereType<Map<String, dynamic>>()
+          .map(ParentActivityAttachment.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class ParentActivityAttachment {
+  const ParentActivityAttachment({
+    required this.id,
+    required this.fileName,
+    required this.contentType,
+    required this.sizeBytes,
+    required this.processingStatus,
+    required this.previewPath,
+  });
+
+  final String id;
+  final String fileName;
+  final String contentType;
+  final int sizeBytes;
+  final String processingStatus;
+  final String previewPath;
+
+  bool get canPreview => previewPath.startsWith('/activity-feed/attachments/');
+
+  factory ParentActivityAttachment.fromJson(Map<String, dynamic> json) {
+    return ParentActivityAttachment(
+      id: json['id'] as String? ?? '',
+      fileName: json['fileName'] as String? ?? 'Activity photo',
+      contentType: json['contentType'] as String? ?? 'image/jpeg',
+      sizeBytes: _asInt(json['sizeBytes']),
+      processingStatus: json['processingStatus'] as String? ?? 'PENDING',
+      previewPath: json['previewPath'] as String? ?? '',
     );
   }
 }
@@ -1333,6 +1437,13 @@ num? _asNullableNum(Object? value) {
     return null;
   }
   return _asNum(value);
+}
+
+DateTime? _asDateTime(Object? value) {
+  if (value is! String || value.isEmpty) {
+    return null;
+  }
+  return DateTime.tryParse(value);
 }
 
 String _feeStatus(Map<String, dynamic>? fees) {

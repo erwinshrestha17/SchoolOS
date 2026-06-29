@@ -64,6 +64,7 @@ model Class {
   subjectWeeklyRequirements SubjectWeeklyRequirement[]
   conversations             Conversation[]
   examTimetableSlots        ExamTimetableSlot[]
+  assessmentRetakes         AssessmentRetake[]
   attendanceDrafts          AttendanceDraft[]
   learningActivities        LearningActivity[]
   learningSessions          LearningSession[]
@@ -103,6 +104,7 @@ model Section {
   subjectWeeklyRequirements SubjectWeeklyRequirement[]
   conversations             Conversation[]
   examTimetableSlots        ExamTimetableSlot[]
+  assessmentRetakes         AssessmentRetake[]
   attendanceDrafts          AttendanceDraft[]
   learningActivities        LearningActivity[]
   learningSessions          LearningSession[]
@@ -132,11 +134,13 @@ model Subject {
   homeworkAssignments       HomeworkAssignment[]
   subjectWeeklyRequirements SubjectWeeklyRequirement[]
   examTimetableSlots        ExamTimetableSlot[]
+  assessmentRetakes         AssessmentRetake[]
   syllabusTopics            SyllabusTopic[]
   learningActivities        LearningActivity[]
   learningSessions          LearningSession[]
   learningProgress          LearningProgress[]
   learningResources         LearningResource[]
+  reportCardSubjectResults  ReportCardSubjectResult[]
 
   @@unique([tenantId, classId, code])
 }

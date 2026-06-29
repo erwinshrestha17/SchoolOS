@@ -20,6 +20,7 @@ import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { AcademicsFoundationService } from './academics-foundation.service';
 import { AcademicsService } from './academics.service';
 import { AssessmentComponentsService } from './assessment-components.service';
+import { AssessmentRetakesService } from './assessment-retakes.service';
 import { CasRecordsService } from './cas-records.service';
 import { MarkLockWorkflowService } from './mark-lock-workflow.service';
 import { MarksService } from './marks.service';
@@ -67,6 +68,16 @@ import { PreviewClassResultsDto } from './dto/preview-class-results.dto';
 import { GradeCalculatorService } from './grade-calculator.service';
 import { ResultsService } from './results.service';
 import { ApplyAssessmentTemplateDto } from './dto/apply-assessment-template.dto';
+import {
+  ApplyAssessmentRetakeResultDto,
+  ApproveAssessmentRetakeDto,
+  CancelAssessmentRetakeDto,
+  CompleteAssessmentRetakeDto,
+  CreateAssessmentRetakeDto,
+  ListAssessmentRetakesDto,
+  RejectAssessmentRetakeDto,
+  ScheduleAssessmentRetakeDto,
+} from './dto/assessment-retake.dto';
 
 @Controller('academics')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -76,6 +87,7 @@ export class AcademicsController {
     private readonly academicsService: AcademicsService,
     private readonly academicsFoundationService: AcademicsFoundationService,
     private readonly assessmentComponentsService: AssessmentComponentsService,
+    private readonly assessmentRetakesService: AssessmentRetakesService,
     private readonly casRecordsService: CasRecordsService,
     private readonly markLockWorkflowService: MarkLockWorkflowService,
     private readonly reportCardPdfService: ReportCardPdfService,
@@ -252,6 +264,117 @@ export class AcademicsController {
   @Permissions('marks:read', 'academics:read')
   listMarks(@CurrentAuth() auth: AuthContext, @Query() dto: ListMarksDto) {
     return this.marksService.listMarks(auth, dto);
+  }
+
+  @Get('assessment-retakes')
+  @Permissions('academics:read', 'marks:read')
+  listAssessmentRetakes(
+    @Query() dto: ListAssessmentRetakesDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.assessmentRetakesService.list(auth, dto);
+  }
+
+  @Get('assessment-retakes/:assessmentRetakeId')
+  @Permissions('academics:read', 'marks:read')
+  getAssessmentRetake(
+    @Param('assessmentRetakeId') assessmentRetakeId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.assessmentRetakesService.getById(assessmentRetakeId, auth);
+  }
+
+  @Post('assessment-retakes')
+  @Permissions('academics:enter_marks', 'marks:manage')
+  createAssessmentRetake(
+    @Body() dto: CreateAssessmentRetakeDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.assessmentRetakesService.create(dto, auth);
+  }
+
+  @Post('assessment-retakes/:assessmentRetakeId/approve')
+  @Permissions('academics:update')
+  approveAssessmentRetake(
+    @Param('assessmentRetakeId') assessmentRetakeId: string,
+    @Body() dto: ApproveAssessmentRetakeDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.assessmentRetakesService.approve(
+      assessmentRetakeId,
+      dto,
+      auth,
+    );
+  }
+
+  @Post('assessment-retakes/:assessmentRetakeId/reject')
+  @Permissions('academics:update')
+  rejectAssessmentRetake(
+    @Param('assessmentRetakeId') assessmentRetakeId: string,
+    @Body() dto: RejectAssessmentRetakeDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.assessmentRetakesService.reject(
+      assessmentRetakeId,
+      dto,
+      auth,
+    );
+  }
+
+  @Post('assessment-retakes/:assessmentRetakeId/schedule')
+  @Permissions('academics:update')
+  scheduleAssessmentRetake(
+    @Param('assessmentRetakeId') assessmentRetakeId: string,
+    @Body() dto: ScheduleAssessmentRetakeDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.assessmentRetakesService.schedule(
+      assessmentRetakeId,
+      dto,
+      auth,
+    );
+  }
+
+  @Post('assessment-retakes/:assessmentRetakeId/complete')
+  @Permissions('academics:update')
+  completeAssessmentRetake(
+    @Param('assessmentRetakeId') assessmentRetakeId: string,
+    @Body() dto: CompleteAssessmentRetakeDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.assessmentRetakesService.complete(
+      assessmentRetakeId,
+      dto,
+      auth,
+    );
+  }
+
+  @Post('assessment-retakes/:assessmentRetakeId/apply-result')
+  @Permissions('academics:update')
+  applyAssessmentRetakeResult(
+    @Param('assessmentRetakeId') assessmentRetakeId: string,
+    @Body() dto: ApplyAssessmentRetakeResultDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.assessmentRetakesService.applyResult(
+      assessmentRetakeId,
+      dto,
+      auth,
+    );
+  }
+
+  @Post('assessment-retakes/:assessmentRetakeId/cancel')
+  @Permissions('academics:update')
+  cancelAssessmentRetake(
+    @Param('assessmentRetakeId') assessmentRetakeId: string,
+    @Body() dto: CancelAssessmentRetakeDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.assessmentRetakesService.cancel(
+      assessmentRetakeId,
+      dto,
+      auth,
+    );
   }
 
   @Get('marks/student/:studentId')

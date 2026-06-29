@@ -137,6 +137,15 @@ class TeacherDashboard extends ConsumerWidget {
                     ),
                     const SizedBox(height: AppSpacing.md),
                     TeacherTaskCard(
+                      title: 'Activities & milestones',
+                      subtitle:
+                          'Capture a consent-safe class update or observation.',
+                      icon: Icons.photo_camera_rounded,
+                      iconColor: AppColors.teacherAccent,
+                      onTap: () => context.go(AppRoutes.teacherActivity),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    TeacherTaskCard(
                       title: 'Assigned classes',
                       subtitle:
                           '${state.classes.length} active class/subject assignment(s)',

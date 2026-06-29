@@ -7,6 +7,7 @@ import {
   IsEnum,
   IsOptional,
   IsString,
+  IsUUID,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -27,6 +28,10 @@ class ActivityAttachmentInputDto {
 }
 
 export class CreateActivityPostDto {
+  @IsOptional()
+  @IsUUID()
+  clientSubmissionId?: string;
+
   @IsString()
   @MinLength(1)
   classId!: string;

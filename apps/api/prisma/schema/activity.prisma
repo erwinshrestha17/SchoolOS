@@ -4,6 +4,7 @@ model ActivityPost {
   classId          String
   sectionId        String?
   createdById      String?
+  clientSubmissionId String?
   title            String
   caption          String
   category         ActivityCategory   @default(GENERAL)
@@ -34,6 +35,7 @@ model ActivityPost {
 
   @@index([tenantId, classId, sectionId, publishedAt])
   @@index([tenantId, status])
+  @@unique([tenantId, createdById, clientSubmissionId])
 }
 
 model ActivityAttachment {

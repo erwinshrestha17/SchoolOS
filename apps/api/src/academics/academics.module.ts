@@ -11,6 +11,7 @@ import { AcademicsController } from './academics.controller';
 import { AcademicsFoundationService } from './academics-foundation.service';
 import { AcademicsService } from './academics.service';
 import { AssessmentComponentsService } from './assessment-components.service';
+import { AssessmentRetakesService } from './assessment-retakes.service';
 import { CasRecordsService } from './cas-records.service';
 import { GradeCalculatorService } from './grade-calculator.service';
 import { MarkLockWorkflowService } from './mark-lock-workflow.service';
@@ -48,6 +49,7 @@ import {
     AcademicsService,
     AcademicsFoundationService,
     AssessmentComponentsService,
+    AssessmentRetakesService,
     CasRecordsService,
     GradeCalculatorService,
     MarkLockWorkflowService,
@@ -63,6 +65,7 @@ import {
     AcademicsService,
     AcademicsFoundationService,
     AssessmentComponentsService,
+    AssessmentRetakesService,
     CasRecordsService,
     GradeCalculatorService,
     MarkLockWorkflowService,

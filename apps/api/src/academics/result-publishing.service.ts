@@ -1,5 +1,6 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import {
+  AssessmentRetakeStatus,
   AudienceType,
   ConsentType,
   GradeLockStatus,
@@ -99,6 +100,10 @@ export class ResultPublishingService {
     });
 
     const blockOnDues = await this.shouldBlockPublishingOnDues(actor);
+    const activeRetakeKeys = await this.getActiveRetakeKeys(
+      actor,
+      reportCards,
+    );
     const results: PublishingReadinessRow[] = [];
 
     for (const card of reportCards) {
@@ -108,6 +113,14 @@ export class ResultPublishingService {
         blockedReasons.push(
           `Report card is not LOCKED (current: ${card.status})`,
         );
+      }
+
+      if (
+        activeRetakeKeys.has(
+          this.retakeKey(card.studentId, card.examTermId),
+        )
+      ) {
+        blockedReasons.push('A retest or make-up lifecycle is still active');
       }
 
       if (blockOnDues) {
@@ -191,8 +204,22 @@ export class ResultPublishingService {
 
     this.addMissingIdFailures(explicitIds, cards, results.failed);
     const blockOnDues = await this.shouldBlockPublishingOnDues(actor);
+    const activeRetakeKeys = await this.getActiveRetakeKeys(actor, cards);
 
     for (const card of cards) {
+      if (
+        activeRetakeKeys.has(
+          this.retakeKey(card.studentId, card.examTermId),
+        )
+      ) {
+        results.skipped++;
+        results.failed.push({
+          id: card.id,
+          reason: 'A retest or make-up lifecycle is still active',
+        });
+        continue;
+      }
+
       if (blockOnDues) {
         const ledger = await this.financeService.getStudentFeeLedger(
           card.studentId,
@@ -392,6 +419,42 @@ export class ResultPublishingService {
     }
 
     return normalized;
+  }
+
+  private async getActiveRetakeKeys(
+    actor: AuthContext,
+    cards: Array<{ studentId: string; examTermId: string }>,
+  ) {
+    if (cards.length === 0) {
+      return new Set<string>();
+    }
+
+    const retakes = await this.prisma.assessmentRetake.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: { in: [...new Set(cards.map((card) => card.studentId))] },
+        examTermId: { in: [...new Set(cards.map((card) => card.examTermId))] },
+        status: {
+          in: [
+            AssessmentRetakeStatus.REQUESTED,
+            AssessmentRetakeStatus.APPROVED,
+            AssessmentRetakeStatus.SCHEDULED,
+            AssessmentRetakeStatus.COMPLETED,
+          ],
+        },
+      },
+      select: { studentId: true, examTermId: true },
+    });
+
+    return new Set(
+      retakes.map((retake) =>
+        this.retakeKey(retake.studentId, retake.examTermId),
+      ),
+    );
+  }
+
+  private retakeKey(studentId: string, examTermId: string) {
+    return `${studentId}:${examTermId}`;
   }
 
   private addMissingIdFailures(

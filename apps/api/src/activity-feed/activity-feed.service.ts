@@ -1,6 +1,7 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -637,6 +638,206 @@ export class ActivityFeedService {
     };
   }
 
+  async listTeacherMobileScopes(actor: AuthContext) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+      select: { id: true },
+    });
+    if (!staff) {
+      throw new ForbiddenException('Active teacher profile is required');
+    }
+
+    const assignments =
+      await this.prisma.subjectTeacherAssignment.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: staff.id,
+          academicYear: { isCurrent: true },
+        },
+        select: {
+          academicYearId: true,
+          classId: true,
+          sectionId: true,
+          academicYear: { select: { name: true } },
+          class: { select: { name: true, level: true } },
+          section: { select: { name: true } },
+        },
+        orderBy: [
+          { class: { level: 'asc' } },
+          { section: { name: 'asc' } },
+        ],
+        take: 200,
+      });
+
+    const scopes = new Map<
+      string,
+      {
+        id: string;
+        academicYearId: string;
+        academicYearName: string;
+        classId: string;
+        className: string;
+        sectionId: string | null;
+        sectionName: string | null;
+      }
+    >();
+
+    for (const assignment of assignments) {
+      const id = `${assignment.academicYearId}:${assignment.classId}:${assignment.sectionId ?? 'none'}`;
+      if (!scopes.has(id)) {
+        scopes.set(id, {
+          id,
+          academicYearId: assignment.academicYearId,
+          academicYearName: assignment.academicYear.name,
+          classId: assignment.classId,
+          className: assignment.class.name,
+          sectionId: assignment.sectionId,
+          sectionName: assignment.section?.name ?? null,
+        });
+      }
+    }
+
+    return { items: [...scopes.values()] };
+  }
+
+  async listTeacherMobileStudents(
+    actor: AuthContext,
+    query: {
+      classId: string;
+      sectionId?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    await this.ensureClassSectionAndWriteAccess(actor, {
+      classId: query.classId,
+      sectionId: query.sectionId,
+      requireWritable: true,
+    });
+
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 25, 50);
+    const search = query.search?.trim();
+    const where: Prisma.StudentWhereInput = {
+      tenantId: actor.tenantId,
+      classId: query.classId,
+      ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+      lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      ...(search
+        ? {
+            OR: [
+              { firstNameEn: { contains: search, mode: 'insensitive' } },
+              { lastNameEn: { contains: search, mode: 'insensitive' } },
+              { studentSystemId: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const [students, total] = await Promise.all([
+      this.prisma.student.findMany({
+        where,
+        select: {
+          id: true,
+          studentSystemId: true,
+          firstNameEn: true,
+          lastNameEn: true,
+          rollNumber: true,
+          guardianLinks: {
+            include: {
+              guardian: {
+                include: {
+                  consents: {
+                    where: { consentType: ConsentType.PHOTO_USAGE },
+                    orderBy: { capturedAt: 'desc' },
+                    take: 1,
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: [
+          { rollNumber: 'asc' },
+          { firstNameEn: 'asc' },
+          { lastNameEn: 'asc' },
+        ],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.student.count({ where }),
+    ]);
+
+    return {
+      items: students.map((student) => ({
+        id: student.id,
+        studentSystemId: student.studentSystemId,
+        fullName:
+          `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+        rollNumber: student.rollNumber,
+        mediaConsentGranted: hasCurrentPhotoConsent(student.guardianLinks),
+      })),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async listTeacherMobilePosts(
+    actor: AuthContext,
+    query: { page?: number; limit?: number },
+  ) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 20, 50);
+    const where: Prisma.ActivityPostWhereInput = {
+      tenantId: actor.tenantId,
+      createdById: actor.userId,
+      softDeletedAt: null,
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.activityPost.findMany({
+        where,
+        include: {
+          class: { select: { id: true, name: true } },
+          section: { select: { id: true, name: true } },
+          attachments: { orderBy: { sortOrder: 'asc' } },
+          studentTags: {
+            include: {
+              student: {
+                select: {
+                  id: true,
+                  studentSystemId: true,
+                  firstNameEn: true,
+                  lastNameEn: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.activityPost.count({ where }),
+    ]);
+
+    return {
+      items: items.map((post) =>
+        this.serializePostForActor(post, { blocked: false }),
+      ),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
   async createPost(dto: CreateActivityPostDto, actor: AuthContext) {
     await this.ensureClassSectionAndWriteAccess(actor, {
       classId: dto.classId,
@@ -644,26 +845,72 @@ export class ActivityFeedService {
       requireWritable: true,
     });
 
-    if (dto.studentIds?.length) {
-      const students = await this.prisma.student.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          classId: dto.classId,
-          ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
-          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
-          id: { in: dto.studentIds },
-        },
-      });
-
-      if (students.length !== dto.studentIds.length) {
-        throw new NotFoundException(
-          'One or more tagged students were not active in this class/section',
-        );
-      }
-    }
-
     for (const attachment of dto.attachments) {
       this.validateActivityAttachment(attachment);
+    }
+
+    if (!dto.studentIds?.length) {
+      throw new BadRequestException(
+        'Tag every student visible in activity media before uploading',
+      );
+    }
+
+    const students = await this.prisma.student.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        classId: dto.classId,
+        ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        id: { in: dto.studentIds },
+      },
+      select: {
+        id: true,
+        guardianLinks: {
+          include: {
+            guardian: {
+              include: {
+                consents: {
+                  where: { consentType: ConsentType.PHOTO_USAGE },
+                  orderBy: { capturedAt: 'desc' },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (students.length !== dto.studentIds.length) {
+      throw new NotFoundException(
+        'One or more tagged students were not active in this class/section',
+      );
+    }
+    if (
+      students.some(
+        (student) => !hasCurrentPhotoConsent(student.guardianLinks),
+      )
+    ) {
+      throw new ForbiddenException(
+        'Activity media cannot be uploaded for a student without active photo consent',
+      );
+    }
+
+    if (dto.clientSubmissionId) {
+      const existing = await this.prisma.activityPost.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          createdById: actor.userId,
+          clientSubmissionId: dto.clientSubmissionId,
+        },
+        include: {
+          attachments: { orderBy: { sortOrder: 'asc' } },
+          studentTags: true,
+        },
+      });
+      if (existing) {
+        return this.serializePostForActor(existing, { blocked: false });
+      }
     }
 
     const storedAttachments: StoredActivityAttachment[] = [];
@@ -729,6 +976,7 @@ export class ActivityFeedService {
           classId: dto.classId,
           sectionId: dto.sectionId ?? null,
           createdById: actor.userId,
+          clientSubmissionId: dto.clientSubmissionId,
           title: dto.title,
           caption: dto.caption,
           category: dto.category ?? ActivityCategory.GENERAL,
@@ -840,10 +1088,33 @@ export class ActivityFeedService {
         }
       }
       await this.cleanupStoredActivityAttachments(storedAttachments);
+      if (
+        !post?.id &&
+        dto.clientSubmissionId &&
+        isDatabaseErrorCode(error, 'P2002')
+      ) {
+        const existing = await this.prisma.activityPost.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            createdById: actor.userId,
+            clientSubmissionId: dto.clientSubmissionId,
+          },
+          include: {
+            attachments: { orderBy: { sortOrder: 'asc' } },
+            studentTags: true,
+          },
+        });
+        if (existing) {
+          return this.serializePostForActor(existing, { blocked: false });
+        }
+        throw new ConflictException(
+          'This activity submission is already being processed',
+        );
+      }
       throw error;
     }
 
-    return post;
+    return this.serializePostForActor(post, { blocked: false });
   }
 
   @OnEvent('student.admitted')
@@ -1756,6 +2027,36 @@ function normalizeStudentIds(studentIds?: string | string[]) {
         .map((value) => value.trim())
         .filter(Boolean),
     ),
+  );
+}
+
+function hasCurrentPhotoConsent(
+  guardianLinks: Array<{
+    guardian: {
+      consents: Array<{ granted: boolean; revokedAt: Date | null }>;
+    };
+  }>,
+) {
+  let granted = false;
+  for (const link of guardianLinks) {
+    const latestConsent = link.guardian.consents[0];
+    if (!latestConsent) {
+      continue;
+    }
+    if (!latestConsent.granted || latestConsent.revokedAt) {
+      return false;
+    }
+    granted = true;
+  }
+  return granted;
+}
+
+function isDatabaseErrorCode(error: unknown, code: string) {
+  return Boolean(
+    error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error as { code?: unknown }).code === code,
   );
 }
 

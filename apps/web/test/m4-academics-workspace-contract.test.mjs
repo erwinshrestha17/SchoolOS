@@ -41,6 +41,7 @@ describe('M4 academics workspace contract', () => {
     for (const route of [
       '/dashboard/academics/exam-terms',
       '/dashboard/academics/marks',
+      '/dashboard/academics/retakes',
       '/dashboard/academics/cas',
       '/dashboard/academics/locks',
       '/dashboard/academics/report-cards',
@@ -53,5 +54,41 @@ describe('M4 academics workspace contract', () => {
 
     assert.match(page, /protected PDF access/);
     assert.match(page, /tenant-scoped and permissioned M4 workspaces/);
+  });
+
+  it('wires the full retest and make-up lifecycle to real API commands', () => {
+    const workspace = read(
+      'components/academics/tabs/assessment-retakes-tab.tsx',
+    );
+    const requestDialog = read(
+      'components/academics/assessment-retake-request-dialog.tsx',
+    );
+    const api = read('lib/api/academics.ts');
+    const marks = read('components/academics/tabs/marks-entry-tab.tsx');
+
+    assert.match(workspace, /listAssessmentRetakes/);
+    assert.match(workspace, /approveAssessmentRetake/);
+    assert.match(workspace, /rejectAssessmentRetake/);
+    assert.match(workspace, /scheduleAssessmentRetake/);
+    assert.match(workspace, /completeAssessmentRetake/);
+    assert.match(workspace, /applyAssessmentRetakeResult/);
+    assert.match(workspace, /cancelAssessmentRetake/);
+    assert.match(workspace, /formatBsDateTime/);
+    assert.match(workspace, /zonedNepalDateTimeToUtc/);
+    assert.match(requestDialog, /createAssessmentRetake/);
+    assert.match(api, /assessment-retakes/);
+    assert.match(marks, /AssessmentRetakeRequestDialog/);
+    assert.doesNotMatch(marks, /isRetest:/);
+  });
+
+  it('omits blank optional UUID filters from CAS list requests', () => {
+    const api = read('lib/api/academics.ts');
+
+    assert.match(api, /Object\.entries\(filters \?\? \{\}\)\.filter/);
+    assert.match(api, /value !== ''/);
+    assert.match(
+      api,
+      /withQuery\('\/academics\/cas-records', activeFilters\)/,
+    );
   });
 });

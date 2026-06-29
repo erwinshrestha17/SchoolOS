@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -157,6 +158,14 @@ class ParentRepository {
     return ParentTimetable.fromJson(data);
   }
 
+  Future<ParentExamSchedule> getExamScheduleForChild(String childId) async {
+    final data = await _getMap(
+      '/mobile/students/$childId/exam-schedule',
+      cacheKey: 'parent_exam_schedule_$childId',
+    );
+    return ParentExamSchedule.fromJson(data);
+  }
+
   Future<ParentPaymentGatewayReadiness> getPaymentGatewayReadiness(
     String childId,
   ) async {
@@ -309,6 +318,24 @@ class ParentRepository {
         .whereType<Map<String, dynamic>>()
         .map(ParentActivityItem.fromJson)
         .toList();
+  }
+
+  Future<Uint8List> getActivityPreview(String previewPath) async {
+    if (!previewPath.startsWith('/activity-feed/attachments/')) {
+      throw const ValidationException(
+        message: 'Activity media is unavailable.',
+      );
+    }
+
+    final response = await _client.dio.get<List<int>>(
+      previewPath,
+      options: Options(responseType: ResponseType.bytes),
+    );
+    final bytes = response.data;
+    if (bytes == null || bytes.isEmpty) {
+      throw const NotFoundAppException('Activity media is unavailable.');
+    }
+    return Uint8List.fromList(bytes);
   }
 
   Future<ParentTransportInfo> getTransportForChild(String childId) async {

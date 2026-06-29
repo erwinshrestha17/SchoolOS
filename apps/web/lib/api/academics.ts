@@ -1,6 +1,11 @@
 import type {
   AcademicYearSummary,
   AssessmentComponentSummary,
+  AssessmentRetakePage,
+  AssessmentRetakeResultDecision,
+  AssessmentRetakeStatus,
+  AssessmentRetakeSummary,
+  AssessmentRetakeType,
   BatchPromotionResult,
   CasRecordSummary,
   ClassSummary,
@@ -170,6 +175,70 @@ export const academicsApi = {
         method: 'POST',
         json: body,
       },
+    ),
+  listAssessmentRetakes: (params?: {
+    status?: AssessmentRetakeStatus | null;
+    type?: AssessmentRetakeType | null;
+    studentId?: string | null;
+    examTermId?: string | null;
+    classId?: string | null;
+    sectionId?: string | null;
+    page?: number;
+    limit?: number;
+  }) =>
+    request<AssessmentRetakePage>(
+      withQuery('/academics/assessment-retakes', params ?? {}),
+    ),
+  createAssessmentRetake: (body: {
+    markEntryId: string;
+    type: AssessmentRetakeType;
+    reason: string;
+  }) =>
+    request<AssessmentRetakeSummary>('/academics/assessment-retakes', {
+      method: 'POST',
+      json: body,
+    }),
+  approveAssessmentRetake: (id: string, body: { reviewNote?: string }) =>
+    request<AssessmentRetakeSummary>(
+      `/academics/assessment-retakes/${encodeURIComponent(id)}/approve`,
+      { method: 'POST', json: body },
+    ),
+  rejectAssessmentRetake: (id: string, body: { reviewNote: string }) =>
+    request<AssessmentRetakeSummary>(
+      `/academics/assessment-retakes/${encodeURIComponent(id)}/reject`,
+      { method: 'POST', json: body },
+    ),
+  scheduleAssessmentRetake: (
+    id: string,
+    body: { startsAt: string; endsAt: string; room?: string },
+  ) =>
+    request<AssessmentRetakeSummary>(
+      `/academics/assessment-retakes/${encodeURIComponent(id)}/schedule`,
+      { method: 'POST', json: body },
+    ),
+  completeAssessmentRetake: (
+    id: string,
+    body: { marksObtained: number; remarks?: string },
+  ) =>
+    request<AssessmentRetakeSummary>(
+      `/academics/assessment-retakes/${encodeURIComponent(id)}/complete`,
+      { method: 'POST', json: body },
+    ),
+  applyAssessmentRetakeResult: (
+    id: string,
+    body: {
+      decision: Exclude<AssessmentRetakeResultDecision, 'PENDING'>;
+      reason: string;
+    },
+  ) =>
+    request<AssessmentRetakeSummary>(
+      `/academics/assessment-retakes/${encodeURIComponent(id)}/apply-result`,
+      { method: 'POST', json: body },
+    ),
+  cancelAssessmentRetake: (id: string, body: { reason: string }) =>
+    request<AssessmentRetakeSummary>(
+      `/academics/assessment-retakes/${encodeURIComponent(id)}/cancel`,
+      { method: 'POST', json: body },
     ),
   listComponentsByExamTerm: (
     examTermId: string,
@@ -744,14 +813,21 @@ export const academicsApi = {
     }),
 
   // Academics - CAS
-  listCasRecords: (filters?: CasListFilters) =>
-    request<
+  listCasRecords: (filters?: CasListFilters) => {
+    const activeFilters = Object.fromEntries(
+      Object.entries(filters ?? {}).filter(
+        ([, value]) => value !== undefined && value !== null && value !== '',
+      ),
+    );
+
+    return request<
       | PaginatedResponse<CasRecordSummary>
       | { items: CasRecordSummary[] }
       | CasRecordSummary[]
-    >(withQuery('/academics/cas-records', filters ?? {})).then((result) =>
+    >(withQuery('/academics/cas-records', activeFilters)).then((result) =>
       Array.isArray(result) ? result : result.items,
-    ),
+    );
+  },
   updateCasRecord: (id: string, body: JsonBody) =>
     request<CasRecordSummary>(
       `/academics/cas-records/${encodeURIComponent(id)}`,

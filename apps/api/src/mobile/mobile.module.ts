@@ -18,6 +18,8 @@ import { StorageModule } from '../storage/storage.module';
 import { CanteenModule } from '../canteen/canteen.module';
 import { TimetableModule } from '../timetable/timetable.module';
 import { AdvancedOperationsModule } from '../advanced-operations/advanced-operations.module';
+import { ActivityFeedModule } from '../activity-feed/activity-feed.module';
+import { MobileTeacherActivityController } from './mobile-teacher-activity.controller';
 
 @Module({
   imports: [
@@ -32,10 +34,12 @@ import { AdvancedOperationsModule } from '../advanced-operations/advanced-operat
     CanteenModule,
     TimetableModule,
     AdvancedOperationsModule,
+    ActivityFeedModule,
   ],
   controllers: [
     MobileController,
     MobileTeacherAttendanceController,
+    MobileTeacherActivityController,
     MobileTeacherHomeworkController,
     MobileTeacherStudentsController,
     MobileTeacherTimetableController,

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 class TeacherMessageThread {
   const TeacherMessageThread({
     required this.id,
@@ -505,6 +507,209 @@ class TeacherTimetableSubstitution {
       substituteTeacherName: json['substituteTeacherName'] as String?,
     );
   }
+}
+
+class TeacherActivityScope {
+  const TeacherActivityScope({
+    required this.id,
+    required this.academicYearId,
+    required this.academicYearName,
+    required this.classId,
+    required this.className,
+    this.sectionId,
+    this.sectionName,
+  });
+
+  final String id;
+  final String academicYearId;
+  final String academicYearName;
+  final String classId;
+  final String className;
+  final String? sectionId;
+  final String? sectionName;
+
+  String get label => [
+    className,
+    if (sectionName != null && sectionName!.isNotEmpty) sectionName!,
+  ].join(' • ');
+
+  factory TeacherActivityScope.fromJson(Map<String, dynamic> json) {
+    return TeacherActivityScope(
+      id: json['id'] as String? ?? '',
+      academicYearId: json['academicYearId'] as String? ?? '',
+      academicYearName: json['academicYearName'] as String? ?? '',
+      classId: json['classId'] as String? ?? '',
+      className: json['className'] as String? ?? 'Class',
+      sectionId: json['sectionId'] as String?,
+      sectionName: json['sectionName'] as String?,
+    );
+  }
+}
+
+class TeacherActivityStudent {
+  const TeacherActivityStudent({
+    required this.id,
+    required this.studentSystemId,
+    required this.fullName,
+    this.rollNumber,
+    required this.mediaConsentGranted,
+  });
+
+  final String id;
+  final String studentSystemId;
+  final String fullName;
+  final int? rollNumber;
+  final bool mediaConsentGranted;
+
+  factory TeacherActivityStudent.fromJson(Map<String, dynamic> json) {
+    return TeacherActivityStudent(
+      id: json['id'] as String? ?? '',
+      studentSystemId: json['studentSystemId'] as String? ?? '',
+      fullName: json['fullName'] as String? ?? 'Student',
+      rollNumber: json['rollNumber'] is num
+          ? (json['rollNumber'] as num).toInt()
+          : null,
+      mediaConsentGranted: json['mediaConsentGranted'] as bool? ?? false,
+    );
+  }
+}
+
+class TeacherActivityStudentPage {
+  const TeacherActivityStudentPage({
+    required this.items,
+    required this.page,
+    required this.totalPages,
+    required this.total,
+  });
+
+  final List<TeacherActivityStudent> items;
+  final int page;
+  final int totalPages;
+  final int total;
+
+  factory TeacherActivityStudentPage.fromJson(Map<String, dynamic> json) {
+    final meta = json['meta'] is Map<String, dynamic>
+        ? json['meta'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    return TeacherActivityStudentPage(
+      items: _asList(json['items'])
+          .whereType<Map<String, dynamic>>()
+          .map(TeacherActivityStudent.fromJson)
+          .toList(),
+      page: _asInt(meta['page']),
+      totalPages: _asInt(meta['totalPages']),
+      total: _asInt(meta['total']),
+    );
+  }
+}
+
+class TeacherActivityAttachment {
+  const TeacherActivityAttachment({
+    required this.id,
+    required this.fileName,
+    required this.contentType,
+    required this.sizeBytes,
+    required this.processingStatus,
+    this.previewUrl,
+  });
+
+  final String id;
+  final String fileName;
+  final String contentType;
+  final int sizeBytes;
+  final String processingStatus;
+  final String? previewUrl;
+
+  factory TeacherActivityAttachment.fromJson(Map<String, dynamic> json) {
+    return TeacherActivityAttachment(
+      id: json['id'] as String? ?? '',
+      fileName: json['fileName'] as String? ?? 'Activity image',
+      contentType: json['contentType'] as String? ?? 'image/jpeg',
+      sizeBytes: _asInt(json['sizeBytes']),
+      processingStatus: json['processingStatus'] as String? ?? 'PENDING',
+      previewUrl: json['previewUrl'] as String?,
+    );
+  }
+}
+
+class TeacherActivityPost {
+  const TeacherActivityPost({
+    required this.id,
+    required this.title,
+    required this.caption,
+    required this.category,
+    required this.status,
+    required this.className,
+    this.sectionName,
+    required this.createdAt,
+    required this.attachments,
+  });
+
+  final String id;
+  final String title;
+  final String caption;
+  final String category;
+  final String status;
+  final String className;
+  final String? sectionName;
+  final DateTime? createdAt;
+  final List<TeacherActivityAttachment> attachments;
+
+  String get classLabel => [
+    className,
+    if (sectionName != null && sectionName!.isNotEmpty) sectionName!,
+  ].join(' • ');
+
+  factory TeacherActivityPost.fromJson(Map<String, dynamic> json) {
+    final classData = json['class'] is Map<String, dynamic>
+        ? json['class'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final sectionData = json['section'] is Map<String, dynamic>
+        ? json['section'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    return TeacherActivityPost(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? 'Activity',
+      caption: json['caption'] as String? ?? '',
+      category: json['category'] as String? ?? 'GENERAL',
+      status: json['status'] as String? ?? 'PENDING_APPROVAL',
+      className: classData['name'] as String? ?? 'Class',
+      sectionName: sectionData['name'] as String?,
+      createdAt: DateTime.tryParse(
+        json['createdAt'] as String? ?? json['publishedAt'] as String? ?? '',
+      ),
+      attachments: _asList(json['attachments'])
+          .whereType<Map<String, dynamic>>()
+          .map(TeacherActivityAttachment.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class TeacherActivitySnapshot {
+  const TeacherActivitySnapshot({
+    required this.scopes,
+    required this.posts,
+    required this.lastUpdated,
+    this.fromCache = false,
+  });
+
+  final List<TeacherActivityScope> scopes;
+  final List<TeacherActivityPost> posts;
+  final DateTime lastUpdated;
+  final bool fromCache;
+}
+
+class TeacherActivityMedia {
+  const TeacherActivityMedia({
+    required this.fileName,
+    required this.contentType,
+    required this.bytes,
+  });
+
+  final String fileName;
+  final String contentType;
+  final Uint8List bytes;
 }
 
 List<dynamic> _asList(Object? value) {

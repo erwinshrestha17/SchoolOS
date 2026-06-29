@@ -70,6 +70,8 @@ model Tenant {
   reportCards                   ReportCard[]
   reportCardHistories           ReportCardHistory[]
   reportCardCorrectionRequests  ReportCardCorrectionRequest[]
+  reportCardSubjectResults      ReportCardSubjectResult[]
+  assessmentRetakes             AssessmentRetake[]
   promotionRecords              PromotionRecord[]
   attendanceDrafts              AttendanceDraft[]
   timetableSlots                TimetableSlot[]
