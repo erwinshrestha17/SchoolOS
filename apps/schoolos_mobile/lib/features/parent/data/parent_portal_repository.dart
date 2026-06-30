@@ -17,8 +17,14 @@ class ParentPortalRepository {
   final String parentName;
   final String schoolName;
 
-  Future<ParentPortalData> load() async {
+  Future<ParentPortalData> load({String? activeChildId}) async {
     final children = await parentRepository.getGuardianChildren();
+    final resolvedActiveChildId =
+        children.any((child) => child.id == activeChildId)
+        ? activeChildId
+        : children.isEmpty
+        ? null
+        : children.first.id;
     final dashboards = <String, ParentDashboardSummary>{};
     final profiles = <String, ChildProfile>{};
     final homework = <ParentPortalHomework>[];
@@ -50,6 +56,7 @@ class ParentPortalRepository {
       parentName: parentName,
       schoolName: schoolName,
       lastUpdated: _formatTime(DateTime.now()),
+      activeChildId: resolvedActiveChildId,
       children: [
         for (final child in children)
           _childFromApi(child, dashboards[child.id], profiles[child.id]),
@@ -58,14 +65,6 @@ class ParentPortalRepository {
       updates: [
         for (final item in notifications.items) _updateFromApi(item, children),
       ],
-      totalFeesDue: dashboards.values.fold<num>(
-        0,
-        (sum, item) => sum + item.feesDue,
-      ),
-      overdueFeesCount: dashboards.values.fold<int>(
-        0,
-        (sum, item) => sum + item.overdueFeesCount,
-      ),
       unreadUpdates: notifications.unreadCount,
     );
   }
@@ -140,6 +139,7 @@ class ParentPortalRepository {
           );
     return ParentPortalUpdate(
       id: item.id,
+      childId: item.childId,
       category: _categoryFromNotification(item.type),
       title: item.title,
       body: item.body,

@@ -13,6 +13,7 @@ import '../../features/parent/presentation/screens/parent_portal_homework_tab.da
 import '../../features/parent/presentation/screens/parent_portal_more_tab.dart';
 import '../../features/parent/presentation/screens/parent_portal_updates_tab.dart';
 import '../../features/parent/presentation/widgets/parent_portal_widgets.dart';
+import 'app_exception_view.dart';
 
 class SchoolOsAppShell extends ConsumerStatefulWidget {
   const SchoolOsAppShell({
@@ -31,7 +32,13 @@ class SchoolOsAppShell extends ConsumerStatefulWidget {
 class _SchoolOsAppShellState extends ConsumerState<SchoolOsAppShell> {
   late int selectedIndex = widget.initialIndex.clamp(0, 4);
 
-  static const titles = ['SchoolOS Mobile', 'Children', 'Homework', 'Updates', 'More'];
+  static const titles = [
+    'SchoolOS Mobile',
+    'Children',
+    'Homework',
+    'Updates',
+    'More',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -42,16 +49,23 @@ class _SchoolOsAppShellState extends ConsumerState<SchoolOsAppShell> {
       body: SafeArea(
         top: false,
         child: data.when(
+          skipLoadingOnReload: false,
+          skipLoadingOnRefresh: false,
           loading: () => const PortalLoadingState(),
-          error: (_, _) => PortalErrorState(
+          error: (error, _) => AppExceptionView(
+            error: error,
             onRetry: () => ref.invalidate(parentPortalDataProvider),
+            onSignIn: () => context.go(AppRoutes.login),
           ),
           data: (portal) => IndexedStack(
             index: selectedIndex,
             children: [
               _ParentHomeWithSummary(data: portal),
               ParentPortalChildrenTab(data: portal),
-              ParentPortalHomeworkTab(data: portal, initialChildId: widget.initialChildId),
+              ParentPortalHomeworkTab(
+                data: portal,
+                initialChildId: widget.initialChildId,
+              ),
               ParentPortalUpdatesTab(data: portal),
               ParentPortalMoreTab(data: portal),
             ],
@@ -77,7 +91,9 @@ class _ParentHomeWithSummary extends StatelessWidget {
       children: [
         const Padding(
           padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: OperationalSummaryCard(persona: OperationalMobilePersona.parent),
+          child: OperationalSummaryCard(
+            persona: OperationalMobilePersona.parent,
+          ),
         ),
         Expanded(child: ParentPortalHomeTab(data: data)),
       ],
@@ -100,7 +116,10 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
     return AppBar(
       title: Text(
         title,
-        style: const TextStyle(color: ParentPortalColors.navy, fontWeight: FontWeight.w900),
+        style: const TextStyle(
+          color: ParentPortalColors.navy,
+          fontWeight: FontWeight.w900,
+        ),
       ),
       backgroundColor: ParentPortalColors.page,
       surfaceTintColor: Colors.transparent,
@@ -162,13 +181,19 @@ class SchoolOsBottomNavigation extends StatelessWidget {
                   onTap: () => onSelected(index),
                   borderRadius: BorderRadius.circular(16),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 2,
+                      vertical: 3,
+                    ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 13,
+                            vertical: 5,
+                          ),
                           decoration: BoxDecoration(
                             color: selectedIndex == index
                                 ? ParentPortalColors.greenSoft
@@ -176,7 +201,9 @@ class SchoolOsBottomNavigation extends StatelessWidget {
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Icon(
-                            selectedIndex == index ? items[index].$2 : items[index].$1,
+                            selectedIndex == index
+                                ? items[index].$2
+                                : items[index].$1,
                             size: 22,
                             color: selectedIndex == index
                                 ? ParentPortalColors.green

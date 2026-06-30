@@ -75,6 +75,12 @@ void main() {
           'activeTrip': {
             'studentStatus': 'BOARDED',
             'route': {'name': 'Route A'},
+            'latestLocation': {
+              'recordedAt': '2026-06-30T00:00:00.000Z',
+              'ageSeconds': 30,
+              'confidence': 'fresh',
+              'isStale': false,
+            },
           },
         },
         'canteen': {
@@ -230,6 +236,9 @@ void main() {
           'longitude': 85.3222,
           'speedKph': 18.5,
           'recordedAt': '2026-06-02T07:45:00.000Z',
+          'ageSeconds': 1080,
+          'confidence': 'stale',
+          'isStale': true,
         },
       },
       'assignment': {'status': 'ACTIVE', 'pickupDirection': 'PICKUP'},
@@ -272,6 +281,9 @@ void main() {
     expect(transport.latitude, 27.7101);
     expect(transport.longitude, 85.3222);
     expect(transport.hasLatestLocation, isTrue);
+    expect(transport.locationAgeMinutes, 18);
+    expect(transport.locationConfidence, 'stale');
+    expect(transport.isLocationStale, isTrue);
     expect(transport.feeAmount, 1200);
     expect(canteen.isLowBalance, isTrue);
     expect(canteen.activeMealPlans.single.name, 'Lunch');

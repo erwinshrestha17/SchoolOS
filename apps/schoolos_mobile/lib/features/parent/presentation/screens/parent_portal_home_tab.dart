@@ -1,23 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/constants/app_routes.dart';
+import '../../../../core/storage/app_preferences_service.dart';
+import '../../application/parent_portal_providers.dart';
 import '../../domain/parent_portal_models.dart';
 import '../widgets/parent_portal_widgets.dart';
 
-class ParentPortalHomeTab extends StatefulWidget {
+class ParentPortalHomeTab extends ConsumerStatefulWidget {
   const ParentPortalHomeTab({super.key, required this.data});
 
   final ParentPortalData data;
 
   @override
-  State<ParentPortalHomeTab> createState() => _ParentPortalHomeTabState();
+  ConsumerState<ParentPortalHomeTab> createState() =>
+      _ParentPortalHomeTabState();
 }
 
-class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
+class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
     with AutomaticKeepAliveClientMixin {
-  String selectedChild = 'all';
-
   @override
   bool get wantKeepAlive => true;
 
@@ -25,24 +27,53 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
   Widget build(BuildContext context) {
     super.build(context);
     final linkedCount = widget.data.children.length;
-    final attentionCount =
-        widget.data.pendingHomeworkCount +
-        widget.data.overdueFeesCount +
-        widget.data.unreadUpdates;
-    final nextAttentionChild = widget.data.children
-        .cast<ParentPortalChild?>()
-        .firstWhere(
-          (child) =>
-              (child?.homeworkPending ?? 0) > 0 ||
-              (child?.feesDue ?? 0) > 0 ||
-              (child?.unreadUpdates ?? 0) > 0,
-          orElse: () => null,
-        );
-    final children = selectedChild == 'all'
-        ? widget.data.children
-        : widget.data.children
-              .where((child) => child.id == selectedChild)
+    final activeChild = widget.data.activeChild;
+    final actions = activeChild == null
+        ? const <_ParentAction>[]
+        : _actionsFor(activeChild);
+    final visibleUpdates = activeChild == null
+        ? const <ParentPortalUpdate>[]
+        : widget.data.updates
+              .where(
+                (update) =>
+                    update.childId == null || update.childId == activeChild.id,
+              )
               .toList();
+
+    if (activeChild == null) {
+      return ListView(
+        key: const PageStorageKey('parent-home-no-child'),
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 28),
+        children: const [
+          PortalCard(
+            child: Column(
+              children: [
+                Icon(
+                  Icons.family_restroom_outlined,
+                  size: 44,
+                  color: ParentPortalColors.muted,
+                ),
+                SizedBox(height: 12),
+                Text(
+                  'No linked child',
+                  style: TextStyle(
+                    color: ParentPortalColors.navy,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Ask the school office to confirm your guardian link. Child information stays hidden until access is active.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: ParentPortalColors.muted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
 
     return ListView(
       key: const PageStorageKey('parent-home'),
@@ -66,7 +97,7 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
             const SizedBox(width: 6),
             Expanded(
               child: Text(
-                '$linkedCount linked ${linkedCount == 1 ? 'child' : 'children'} - Updated ${widget.data.lastUpdated}',
+                '${activeChild.name} • ${activeChild.classSection} • ${activeChild.attendanceTime}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -100,9 +131,9 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
                   ),
                   const SizedBox(width: 7),
                   Text(
-                    attentionCount == 0
+                    actions.isEmpty
                         ? 'No urgent item'
-                        : '$attentionCount item${attentionCount == 1 ? '' : 's'} need attention',
+                        : '${actions.length} item${actions.length == 1 ? '' : 's'} need attention',
                     style: TextStyle(
                       color: ParentPortalColors.orange,
                       fontWeight: FontWeight.w800,
@@ -119,17 +150,11 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                ChildSelectorChip(
-                  label: 'All children',
-                  selected: selectedChild == 'all',
-                  onSelected: () => setState(() => selectedChild = 'all'),
-                ),
-                const SizedBox(width: 8),
                 for (final child in widget.data.children) ...[
                   ChildSelectorChip(
                     label: child.name.split(' ').first,
-                    selected: selectedChild == child.id,
-                    onSelected: () => setState(() => selectedChild = child.id),
+                    selected: activeChild.id == child.id,
+                    onSelected: () => _selectChild(child.id),
                   ),
                   const SizedBox(width: 8),
                 ],
@@ -139,7 +164,9 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
           const SizedBox(height: 24),
         ] else
           const SizedBox(height: 20),
-        const ParentSectionHeader(title: 'Today for your family'),
+        ParentSectionHeader(
+          title: '${activeChild.name.split(' ').first} today',
+        ),
         const SizedBox(height: 10),
         PortalCard(
           child: Column(
@@ -149,16 +176,16 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
                   Expanded(
                     child: SummaryMetric(
                       icon: Icons.fact_check_outlined,
-                      value: '${widget.data.presentTodayCount}/$linkedCount',
-                      label: 'present today',
+                      value: _attendanceMetric(activeChild),
+                      label: 'attendance',
                       color: ParentPortalColors.green,
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: SummaryMetric(
                       icon: Icons.menu_book_outlined,
-                      value: '${widget.data.pendingHomeworkCount}',
+                      value: '${activeChild.homeworkPending}',
                       label: 'homework due',
                       color: ParentPortalColors.purple,
                     ),
@@ -171,16 +198,16 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
                   Expanded(
                     child: SummaryMetric(
                       icon: Icons.notifications_none_rounded,
-                      value: '${widget.data.unreadUpdates}',
+                      value: '${activeChild.unreadUpdates}',
                       label: 'unread update',
                       color: ParentPortalColors.blue,
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: SummaryMetric(
                       icon: Icons.directions_bus_outlined,
-                      value: _transportMetric(widget.data.children),
+                      value: _transportMetric(activeChild),
                       label: 'transport',
                       color: ParentPortalColors.orange,
                     ),
@@ -190,9 +217,9 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
               const SizedBox(height: 18),
               SummaryMetric(
                 icon: Icons.account_balance_wallet_outlined,
-                value: _feesMetric(widget.data),
-                label: widget.data.totalFeesDue > 0 ? 'fees due' : 'fees paid',
-                color: widget.data.totalFeesDue > 0
+                value: _feesMetric(activeChild),
+                label: activeChild.feesDue > 0 ? 'fees due' : 'fees paid',
+                color: activeChild.feesDue > 0
                     ? ParentPortalColors.orange
                     : ParentPortalColors.green,
               ),
@@ -220,7 +247,7 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
           ),
         ),
         const SizedBox(height: 16),
-        if (nextAttentionChild != null) ...[
+        if (actions.isNotEmpty) ...[
           PortalCard(
             color: ParentPortalColors.orangeSoft,
             borderColor: ParentPortalColors.orange.withValues(alpha: .35),
@@ -230,7 +257,7 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
                 Row(
                   children: [
                     AvatarInitials(
-                      name: nextAttentionChild.name,
+                      name: activeChild.name,
                       radius: 21,
                       backgroundColor: Colors.white,
                       foregroundColor: ParentPortalColors.orange,
@@ -238,7 +265,7 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        '${nextAttentionChild.name} needs your attention',
+                        '${activeChild.name} needs your attention',
                         style: const TextStyle(
                           color: ParentPortalColors.navy,
                           fontWeight: FontWeight.w900,
@@ -249,32 +276,19 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
                   ],
                 ),
                 const SizedBox(height: 14),
-                if (nextAttentionChild.homeworkPending > 0)
+                for (var index = 0; index < actions.length; index++) ...[
+                  if (index > 0) const SizedBox(height: 9),
                   _AttentionLine(
-                    icon: Icons.menu_book_outlined,
-                    text:
-                        '${nextAttentionChild.homeworkPending} homework pending',
-                  ),
-                if (nextAttentionChild.feesDue > 0) ...[
-                  const SizedBox(height: 9),
-                  _AttentionLine(
-                    icon: Icons.account_balance_wallet_outlined,
-                    text: 'NPR ${nextAttentionChild.feesDue} fees due',
-                  ),
-                ],
-                if (nextAttentionChild.unreadUpdates > 0) ...[
-                  const SizedBox(height: 9),
-                  _AttentionLine(
-                    icon: Icons.notifications_none_rounded,
-                    text:
-                        '${nextAttentionChild.unreadUpdates} unread update${nextAttentionChild.unreadUpdates == 1 ? '' : 's'}',
+                    icon: actions[index].icon,
+                    text: actions[index].label,
+                    onTap: () => context.push(actions[index].route),
                   ),
                 ],
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: () => context.push(AppRoutes.parentUpdates),
+                    onPressed: () => context.push(actions.first.route),
                     style: FilledButton.styleFrom(
                       backgroundColor: ParentPortalColors.orange,
                     ),
@@ -288,14 +302,13 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
         ],
         const ParentSectionHeader(title: 'Children at a glance'),
         const SizedBox(height: 10),
-        for (final child in children) ...[
-          ParentChildCard(
-            child: child,
-            compact: true,
-            onTap: () => context.push(AppRoutes.parentChildDetail(child.id)),
-          ),
-          const SizedBox(height: 12),
-        ],
+        ParentChildCard(
+          child: activeChild,
+          compact: true,
+          onTap: () =>
+              context.push(AppRoutes.parentChildDetail(activeChild.id)),
+        ),
+        const SizedBox(height: 12),
         const SizedBox(height: 12),
         const ParentSectionHeader(title: 'Quick actions'),
         const SizedBox(height: 10),
@@ -308,13 +321,10 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
           childAspectRatio: 1.55,
           children: [
             ActionTile(
-              icon: Icons.event_busy_outlined,
-              title: 'Report absence',
+              icon: Icons.fact_check_outlined,
+              title: 'Attendance',
               color: ParentPortalColors.orange,
-              onTap: () => _message(
-                context,
-                'Absence reporting opens when the school enables this workflow.',
-              ),
+              onTap: () => context.push(AppRoutes.parentAttendance),
             ),
             ActionTile(
               icon: Icons.chat_bubble_outline_rounded,
@@ -339,11 +349,13 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
         const SizedBox(height: 24),
         const ParentSectionHeader(title: 'Latest update'),
         const SizedBox(height: 10),
-        if (widget.data.updates.isEmpty)
+        if (visibleUpdates.isEmpty)
           const PortalCard(child: Text('No updates from school yet.'))
         else
           PortalCard(
-            onTap: () => context.push(AppRoutes.parentUpdates),
+            onTap: () => context.push(
+              visibleUpdates.first.route ?? AppRoutes.parentUpdates,
+            ),
             child: Row(
               children: [
                 Container(
@@ -364,7 +376,7 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.data.updates.first.title,
+                        visibleUpdates.first.title,
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
                               color: ParentPortalColors.navy,
@@ -372,13 +384,13 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
                             ),
                       ),
                       Text(
-                        widget.data.updates.first.body,
+                        visibleUpdates.first.body,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                       Text(
-                        widget.data.updates.first.metadata,
+                        visibleUpdates.first.metadata,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: ParentPortalColors.muted,
                         ),
@@ -393,52 +405,144 @@ class _ParentPortalHomeTabState extends State<ParentPortalHomeTab>
       ],
     );
   }
+
+  Future<void> _selectChild(String childId) async {
+    if (widget.data.activeChild?.id == childId) return;
+    ref.read(parentActiveChildIdProvider.notifier).state = childId;
+    await ref.read(appPreferencesServiceProvider).saveSelectedChildId(childId);
+  }
 }
 
 class _AttentionLine extends StatelessWidget {
-  const _AttentionLine({required this.icon, required this.text});
+  const _AttentionLine({
+    required this.icon,
+    required this.text,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String text;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 19, color: ParentPortalColors.orange),
-        const SizedBox(width: 9),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Icon(icon, size: 19, color: ParentPortalColors.orange),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: ParentPortalColors.orange,
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
 
-void _message(BuildContext context, String message) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+class _ParentAction {
+  const _ParentAction({
+    required this.icon,
+    required this.label,
+    required this.route,
+  });
+
+  final IconData icon;
+  final String label;
+  final String route;
+}
+
+List<_ParentAction> _actionsFor(ParentPortalChild child) {
+  final actions = <_ParentAction>[];
+  final transport = '${child.transport} ${child.transportDetail ?? ''}'
+      .toLowerCase();
+
+  if (transport.contains('stale') || transport.contains('delayed')) {
+    actions.add(
+      const _ParentAction(
+        icon: Icons.directions_bus_outlined,
+        label: 'Review the latest transport update',
+        route: AppRoutes.parentTransport,
+      ),
+    );
+  }
+  if (child.feesDue > 0) {
+    actions.add(
+      _ParentAction(
+        icon: Icons.account_balance_wallet_outlined,
+        label: 'NPR ${child.feesDue.toStringAsFixed(0)} fees due',
+        route: AppRoutes.parentFees,
+      ),
+    );
+  }
+  if (child.homeworkPending > 0) {
+    actions.add(
+      _ParentAction(
+        icon: Icons.menu_book_outlined,
+        label:
+            '${child.homeworkPending} homework item${child.homeworkPending == 1 ? '' : 's'} due',
+        route: Uri(
+          path: AppRoutes.parentHomework,
+          queryParameters: {'child': child.id},
+        ).toString(),
+      ),
+    );
+  }
+  if (child.unreadUpdates > 0) {
+    actions.add(
+      _ParentAction(
+        icon: Icons.notifications_none_rounded,
+        label:
+            '${child.unreadUpdates} unread update${child.unreadUpdates == 1 ? '' : 's'}',
+        route: AppRoutes.parentUpdates,
+      ),
+    );
+  }
+
+  return actions;
+}
+
+String _attendanceMetric(ParentPortalChild child) {
+  final value = child.attendance.trim();
+  if (value.isEmpty) return 'No data yet';
+  return value
+      .replaceFirst(RegExp(r'\s+today$', caseSensitive: false), '')
+      .trim();
+}
+
+String _transportMetric(ParentPortalChild child) {
+  final text = '${child.transport} ${child.transportDetail ?? ''}'
+      .toLowerCase();
+  if (text.contains('locked')) return 'Locked';
+  if (text.contains('stale')) return 'GPS stale';
+  if (text.contains('delayed')) return 'Delayed';
+  if (text.contains('unavailable')) return 'Unavailable';
+  if (text.contains('no transport') || text.contains('no active')) {
+    return 'None';
+  }
+  return 'Active';
+}
+
+String _feesMetric(ParentPortalChild child) {
+  if (child.feesDue <= 0) {
+    return 'Paid';
+  }
+  return 'NPR ${child.feesDue.toStringAsFixed(0)}';
 }
 
 String _firstName(String value) {
   final parts = value.trim().split(RegExp(r'\s+'));
   return parts.isEmpty || parts.first.isEmpty ? 'Parent' : parts.first;
-}
-
-String _transportMetric(List<ParentPortalChild> children) {
-  final active = children.where((child) {
-    final text = '${child.transport} ${child.transportDetail ?? ''}'
-        .toLowerCase();
-    return !text.contains('no transport') && !text.contains('locked');
-  }).length;
-  return active == 0 ? 'None' : '$active active';
-}
-
-String _feesMetric(ParentPortalData data) {
-  if (data.totalFeesDue <= 0) {
-    return 'Paid';
-  }
-  return 'NPR ${data.totalFeesDue.toStringAsFixed(0)}';
 }

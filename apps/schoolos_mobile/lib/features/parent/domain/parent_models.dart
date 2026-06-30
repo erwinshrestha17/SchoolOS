@@ -919,6 +919,9 @@ class ParentTransportInfo {
     this.tripDirection,
     this.studentStatus,
     this.latestLocationAt,
+    this.locationAgeSeconds,
+    this.locationConfidence = 'missing',
+    this.isLocationStale = false,
     this.latitude,
     this.longitude,
     this.speedKph,
@@ -942,6 +945,9 @@ class ParentTransportInfo {
   final String? tripDirection;
   final String? studentStatus;
   final String? latestLocationAt;
+  final int? locationAgeSeconds;
+  final String locationConfidence;
+  final bool isLocationStale;
   final num? latitude;
   final num? longitude;
   final num? speedKph;
@@ -956,6 +962,9 @@ class ParentTransportInfo {
   bool get hasActiveTrip => tripStatus != null;
   bool get hasRoute => routeName != null || routeCode != null;
   bool get hasLatestLocation => latestLocationAt != null;
+  bool get isLocationDelayed => locationConfidence == 'delayed';
+  int? get locationAgeMinutes =>
+      locationAgeSeconds == null ? null : (locationAgeSeconds! / 60).floor();
 
   factory ParentTransportInfo.fromJson(Map<String, dynamic> json) {
     final activeTrip = _asMap(json['activeTrip']);
@@ -986,6 +995,9 @@ class ParentTransportInfo {
       tripDirection: activeTrip?['direction'] as String?,
       studentStatus: activeTrip?['studentStatus'] as String?,
       latestLocationAt: latestLocation?['recordedAt'] as String?,
+      locationAgeSeconds: _asNullableInt(latestLocation?['ageSeconds']),
+      locationConfidence: latestLocation?['confidence'] as String? ?? 'missing',
+      isLocationStale: latestLocation?['isStale'] as bool? ?? false,
       latitude: _asNullableNum(latestLocation?['latitude']),
       longitude: _asNullableNum(latestLocation?['longitude']),
       speedKph: _asNullableNum(latestLocation?['speedKph']),
@@ -1467,6 +1479,11 @@ String _formatAttendancePercent(Map<String, dynamic>? attendance) {
 String _formatTransportStatus(Map<String, dynamic>? transport) {
   final activeTrip = _asMap(transport?['activeTrip']);
   if (activeTrip != null) {
+    final latestLocation = _asMap(activeTrip['latestLocation']);
+    final confidence = latestLocation?['confidence'] as String?;
+    if (latestLocation == null) return 'GPS unavailable';
+    if (confidence == 'stale') return 'GPS stale';
+    if (confidence == 'delayed') return 'GPS delayed';
     final studentStatus = activeTrip['studentStatus'] as String? ?? 'ON_ROUTE';
     return _labelize(studentStatus);
   }

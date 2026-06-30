@@ -176,6 +176,48 @@ describe('MobileService', () => {
     };
   });
 
+  it('lists only linked students with an active lifecycle and enrollment', async () => {
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-active' }],
+    });
+    prisma.student.findMany.mockResolvedValue([]);
+
+    await expect(service.listMyStudents(actor)).resolves.toEqual({ items: [] });
+
+    expect(prisma.guardian.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-1',
+        userId: 'parent-1',
+      },
+      select: {
+        studentLinks: {
+          where: {
+            student: {
+              lifecycleStatus: 'ACTIVE',
+              enrollments: {
+                some: { status: 'ACTIVE' },
+              },
+            },
+          },
+          select: { studentId: true },
+        },
+      },
+    });
+    expect(prisma.student.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: 'tenant-1',
+          id: { in: ['student-active'] },
+          lifecycleStatus: 'ACTIVE',
+          enrollments: {
+            some: { status: 'ACTIVE' },
+          },
+        },
+      }),
+    );
+  });
+
   it('denies parent access to students outside their guardian links', async () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-other' });
     prisma.guardian.findFirst.mockResolvedValue({
@@ -187,6 +229,28 @@ describe('MobileService', () => {
       service.getStudentFeesSummary('student-other', actor),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.invoice.findMany).not.toHaveBeenCalled();
+  });
+
+  it('fails closed immediately after a guardian link is removed', async () => {
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.guardian.findFirst
+      .mockResolvedValueOnce({
+        id: 'guardian-1',
+        studentLinks: [{ studentId: 'student-1' }],
+      })
+      .mockResolvedValueOnce({
+        id: 'guardian-1',
+        studentLinks: [],
+      });
+    prisma.invoice.findMany.mockResolvedValue([]);
+
+    await expect(
+      service.getStudentFeesSummary('student-1', actor),
+    ).resolves.toEqual(expect.objectContaining({ totalOutstanding: 0 }));
+    await expect(
+      service.getStudentFeesSummary('student-1', actor),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.invoice.findMany).toHaveBeenCalledTimes(1);
   });
 
   it('denies student-only actors from generic parent mobile student surfaces', async () => {
@@ -835,6 +899,34 @@ describe('MobileService', () => {
     ]);
   });
 
+  it('scopes parent dashboard notifications to the active child and global parent items', async () => {
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+    prisma.notificationDelivery.count.mockResolvedValue(0);
+
+    await service.listNotifications(actor, {}, ['student-1']);
+
+    expect(prisma.notificationDelivery.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          OR: [
+            { recipientUserId: 'parent-1', studentId: null },
+            { studentId: { in: ['student-1'] } },
+          ],
+        }),
+      }),
+    );
+    expect(prisma.notificationDelivery.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        tenantId: 'tenant-1',
+        OR: [
+          { recipientUserId: 'parent-1', studentId: null },
+          { studentId: { in: ['student-1'] } },
+        ],
+      }),
+    });
+  });
+
   it('returns a parent-scoped unread count without loading notification bodies', async () => {
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
@@ -1096,12 +1188,44 @@ describe('MobileService', () => {
     expect(result.attendance).toBeNull();
     expect(result.fees).toBeNull();
     expect(result.homework).toBeNull();
+    expect(service.listNotifications).toHaveBeenCalledWith(actor, {}, [
+      'student-1',
+    ]);
     expect(attendanceSpy).not.toHaveBeenCalled();
     expect(feesSpy).not.toHaveBeenCalled();
     expect(homeworkSpy).not.toHaveBeenCalled();
     expect(transportSpy).not.toHaveBeenCalled();
     expect(canteenSpy).not.toHaveBeenCalled();
     expect(activitySpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unlinked dashboard child before loading any child-scoped module', async () => {
+    jest.spyOn(service, 'listMyStudents').mockResolvedValue({
+      items: [
+        {
+          id: 'student-allowed',
+          name: 'Asha Rai',
+          classSection: 'Grade 4 - A',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          rollNumber: '7',
+          academicYear: '2082',
+          academicYearStartsOn: '2025-04-14T00:00:00.000Z',
+          academicYearEndsOn: '2026-04-13T00:00:00.000Z',
+          relationship: 'Daughter',
+        },
+      ],
+    });
+    const notificationsSpy = jest.spyOn(service, 'listNotifications');
+
+    await expect(
+      service.getDashboard(actor, 'student-other'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(entitlementsService.getEntitlements).not.toHaveBeenCalled();
+    expect(notificationsSpy).not.toHaveBeenCalled();
+    expect(prisma.invoice.findMany).not.toHaveBeenCalled();
+    expect(prisma.homeworkAssignment.findMany).not.toHaveBeenCalled();
   });
 
   it('returns protected activity preview paths without storage internals', async () => {
@@ -1161,8 +1285,7 @@ describe('MobileService', () => {
             contentType: 'image/jpeg',
             sizeBytes: 2048,
             processingStatus: 'READY',
-            previewPath:
-              '/activity-feed/attachments/attachment-1/preview',
+            previewPath: '/activity-feed/attachments/attachment-1/preview',
           },
         ],
       }),
@@ -1429,6 +1552,9 @@ describe('MobileService', () => {
           longitude: 85.3222,
           speedKph: 18.5,
           recordedAt: '2026-06-02T07:45:00.000Z',
+          ageSeconds: expect.any(Number),
+          confidence: 'stale',
+          isStale: true,
         },
       }),
     );

@@ -86,6 +86,7 @@ class ParentPortalHomework {
 class ParentPortalUpdate {
   const ParentPortalUpdate({
     required this.id,
+    this.childId,
     required this.category,
     required this.title,
     required this.body,
@@ -99,6 +100,7 @@ class ParentPortalUpdate {
   });
 
   final String id;
+  final String? childId;
   final ParentUpdateCategory category;
   final String title;
   final String body;
@@ -116,6 +118,7 @@ class ParentPortalData {
     required this.parentName,
     required this.schoolName,
     required this.lastUpdated,
+    this.activeChildId,
     required this.children,
     required this.homework,
     required this.updates,
@@ -127,6 +130,7 @@ class ParentPortalData {
   final String parentName;
   final String schoolName;
   final String lastUpdated;
+  final String? activeChildId;
   final List<ParentPortalChild> children;
   final List<ParentPortalHomework> homework;
   final List<ParentPortalUpdate> updates;
@@ -134,13 +138,11 @@ class ParentPortalData {
   final int overdueFeesCount;
   final int unreadUpdates;
 
-  int get presentTodayCount {
-    return children.where((child) {
-      return child.attendance.toLowerCase().contains('present');
-    }).length;
-  }
-
-  int get pendingHomeworkCount {
-    return homework.where((item) => !item.isCompleted).length;
+  ParentPortalChild? get activeChild {
+    if (children.isEmpty) return null;
+    return children.firstWhere(
+      (child) => child.id == activeChildId,
+      orElse: () => children.first,
+    );
   }
 }

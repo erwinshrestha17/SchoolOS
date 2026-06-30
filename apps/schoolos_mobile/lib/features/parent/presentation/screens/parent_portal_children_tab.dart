@@ -44,9 +44,9 @@ class ParentPortalChildrenTab extends StatelessWidget {
                   SizedBox(width: 12),
                   Expanded(
                     child: SummaryMetric(
-                      icon: Icons.fact_check_outlined,
-                      value: '${data.presentTodayCount} of $linkedCount',
-                      label: 'present today',
+                      icon: Icons.verified_user_outlined,
+                      value: 'Child-scoped',
+                      label: 'school records',
                       color: ParentPortalColors.green,
                     ),
                   ),

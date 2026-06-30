@@ -95,7 +95,21 @@ class _ParentScreenApiClient extends ApiClient {
           'route': {'name': 'Route A', 'code': 'A'},
           'stop': {'name': 'Gate 1', 'sequence': 1},
         },
-        'activeTrip': null,
+        'activeTrip': {
+          'status': 'ACTIVE',
+          'studentStatus': 'BOARDED',
+          'direction': 'PICKUP',
+          'route': {'name': 'Route A', 'code': 'A'},
+          'vehicle': {'registrationNumber': 'BA-1-PA-1234'},
+          'latestLocation': {
+            'latitude': 27.7,
+            'longitude': 85.3,
+            'recordedAt': '2026-06-30T00:00:00.000Z',
+            'ageSeconds': 1080,
+            'confidence': 'stale',
+            'isStale': true,
+          },
+        },
       };
     }
     if (path == '/mobile/students/child-1/library') {
@@ -234,6 +248,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      if (screen is ParentTransportScreen) {
+        expect(find.text('GPS is stale'), findsOneWidget);
+        expect(find.text('Last updated 18 minutes ago'), findsOneWidget);
+      }
       expect(
         tester.takeException(),
         isNull,

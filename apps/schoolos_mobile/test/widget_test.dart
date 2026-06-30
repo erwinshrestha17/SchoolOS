@@ -11,6 +11,7 @@ import 'package:schoolos_mobile/core/storage/token_storage_service.dart';
 import 'package:schoolos_mobile/core/auth/auth_provider.dart';
 import 'package:schoolos_mobile/core/auth/data/auth_repository.dart';
 import 'package:schoolos_mobile/core/auth/models/auth_user.dart';
+import 'package:schoolos_mobile/core/errors/app_exception.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
 import 'package:schoolos_mobile/features/operational_summary/application/operational_summary_providers.dart';
 import 'package:schoolos_mobile/features/operational_summary/domain/operational_summary_models.dart';
@@ -398,4 +399,32 @@ void main() {
     expect(find.text('Parent-Teacher Meeting'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'parent portal keeps module locked and permission denied distinct',
+    (WidgetTester tester) async {
+      final cases = <(Object, String)>[
+        (const ModuleLockedException(), 'Module not enabled'),
+        (const PermissionException(), 'Access not available'),
+      ];
+
+      for (final (error, expectedTitle) in cases) {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              testOperationalSummaryOverride,
+              parentPortalDataProvider.overrideWith(
+                (ref) => Future<ParentPortalData>.error(error),
+              ),
+            ],
+            child: const MaterialApp(home: SchoolOsAppShell()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text(expectedTitle), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }
+    },
+  );
 }

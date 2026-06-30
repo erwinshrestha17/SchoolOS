@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../application/parent_providers.dart';
 import '../../domain/parent_models.dart';
 import '../widgets/parent_detail_widgets.dart';
@@ -147,7 +148,7 @@ class _TripCard extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!info.hasActiveTrip) {
       return const PortalCard(
-        child: Text('No active transport trip for this child right now.'),
+        child: Text('Trip not started. No active trip is available right now.'),
       );
     }
 
@@ -204,7 +205,16 @@ class _TripCard extends StatelessWidget {
           if (info.hasLatestLocation) ...[
             const SizedBox(height: 8),
             Text(
-              'Latest location ${_dateTime(info.latestLocationAt)}',
+              _gpsStatus(info),
+              style: TextStyle(
+                color: info.isLocationStale || info.isLocationDelayed
+                    ? ParentPortalColors.orange
+                    : ParentPortalColors.green,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              _lastUpdated(info),
               style: const TextStyle(color: ParentPortalColors.muted),
             ),
             if (info.latitude != null && info.longitude != null)
@@ -214,7 +224,7 @@ class _TripCard extends StatelessWidget {
               ),
           ] else
             const Text(
-              'No live location has been published for this trip yet.',
+              'GPS unavailable. No location has been published for this trip.',
               style: TextStyle(color: ParentPortalColors.muted),
             ),
         ],
@@ -247,10 +257,21 @@ class _RouteMetric extends StatelessWidget {
   );
 }
 
-String _dateTime(String? value) {
+String _lastUpdated(ParentTransportInfo info) {
+  final ageMinutes = info.locationAgeMinutes;
+  if (ageMinutes != null) {
+    if (ageMinutes < 1) return 'Last updated less than a minute ago';
+    return 'Last updated $ageMinutes minute${ageMinutes == 1 ? '' : 's'} ago';
+  }
+
+  final value = info.latestLocationAt;
   final date = DateTime.tryParse(value ?? '');
   if (date == null) return 'time unavailable';
-  return '${date.year}-${_two(date.month)}-${_two(date.day)} ${_two(date.hour)}:${_two(date.minute)}';
+  return 'Last updated ${NepaliBsCalendar.formatBsDateTime(date)}';
 }
 
-String _two(int value) => value.toString().padLeft(2, '0');
+String _gpsStatus(ParentTransportInfo info) {
+  if (info.isLocationStale) return 'GPS is stale';
+  if (info.isLocationDelayed) return 'GPS update delayed';
+  return 'GPS updated';
+}

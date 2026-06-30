@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { FileStatus, PaymentMethod, type Student } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
-import { getParentStudentIds } from '../common/security/parent-scope';
+import { isParentOnly } from '../common/security/parent-scope';
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { FinanceService } from '../finance/finance.service';
@@ -76,6 +76,10 @@ export class MobileService {
       where: {
         tenantId: actor.tenantId,
         id: { in: studentIds },
+        lifecycleStatus: 'ACTIVE',
+        enrollments: {
+          some: { status: 'ACTIVE' },
+        },
       },
       include: {
         class: {
@@ -106,6 +110,9 @@ export class MobileService {
           orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
         },
         enrollments: {
+          where: {
+            status: 'ACTIVE',
+          },
           include: {
             academicYear: {
               select: {
@@ -129,6 +136,14 @@ export class MobileService {
 
   async getDashboard(actor: AuthContext, requestedStudentId?: string) {
     const children = await this.listMyStudents(actor);
+    if (
+      requestedStudentId &&
+      !children.items.some((child) => child.id === requestedStudentId)
+    ) {
+      throw new ForbiddenException(
+        'Mobile access denied for this active student.',
+      );
+    }
     const selectedStudentId = requestedStudentId ?? children.items[0]?.id;
     const entitlements = await this.entitlementsService.getEntitlements(
       actor.tenantId,
@@ -179,7 +194,7 @@ export class MobileService {
       enabled('homework')
         ? this.getStudentHomework(selectedStudentId, actor, '5')
         : Promise.resolve(null),
-      this.listNotifications(actor),
+      this.listNotifications(actor, {}, [selectedStudentId]),
       enabled('transport')
         ? this.getStudentTransport(selectedStudentId, actor)
         : Promise.resolve(null),
@@ -217,9 +232,16 @@ export class MobileService {
   async listNotifications(
     actor: AuthContext,
     query: { limit?: number; cursor?: string; unreadOnly?: boolean } = {},
+    scopedStudentIds?: string[],
   ) {
-    const studentIds = await this.getAllowedStudentIds(actor);
-    const visibility = this.parentNotificationVisibility(actor, studentIds);
+    const studentIds =
+      scopedStudentIds ?? (await this.getAllowedStudentIds(actor));
+    const childScoped = scopedStudentIds !== undefined;
+    const visibility = this.parentNotificationVisibility(
+      actor,
+      studentIds,
+      childScoped,
+    );
     const limit = Math.min(Math.max(query.limit ?? 30, 1), 100);
     const notifications = await this.prisma.notificationDelivery.findMany({
       where: {
@@ -301,7 +323,11 @@ export class MobileService {
     }));
 
     return {
-      unreadCount: await this.countUnreadNotifications(actor, studentIds),
+      unreadCount: await this.countUnreadNotifications(
+        actor,
+        studentIds,
+        childScoped,
+      ),
       items,
       nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
     };
@@ -1581,6 +1607,9 @@ export class MobileService {
                   recordedAt: toIso(
                     activeStatus.trip.locationPings[0].recordedAt,
                   ),
+                  ...transportLocationFreshness(
+                    activeStatus.trip.locationPings[0].recordedAt,
+                  ),
                 }
               : null,
           }
@@ -1640,6 +1669,10 @@ export class MobileService {
       where: {
         id: studentId,
         tenantId: actor.tenantId,
+        lifecycleStatus: 'ACTIVE',
+        enrollments: {
+          some: { status: 'ACTIVE' },
+        },
       },
       include: {
         class: {
@@ -1677,6 +1710,9 @@ export class MobileService {
           orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
         },
         enrollments: {
+          where: {
+            status: 'ACTIVE',
+          },
           include: {
             academicYear: {
               select: {
@@ -1742,6 +1778,10 @@ export class MobileService {
       where: {
         id: studentId,
         tenantId: actor.tenantId,
+        lifecycleStatus: 'ACTIVE',
+        enrollments: {
+          some: { status: 'ACTIVE' },
+        },
       },
       select: { id: true },
     });
@@ -1759,20 +1799,27 @@ export class MobileService {
   private parentNotificationVisibility(
     actor: AuthContext,
     studentIds: string[],
+    childScoped = false,
   ) {
     return {
       tenantId: actor.tenantId,
       OR: [
-        { recipientUserId: actor.userId },
+        childScoped
+          ? { recipientUserId: actor.userId, studentId: null }
+          : { recipientUserId: actor.userId },
         ...(studentIds.length > 0 ? [{ studentId: { in: studentIds } }] : []),
       ],
     };
   }
 
-  private countUnreadNotifications(actor: AuthContext, studentIds: string[]) {
+  private countUnreadNotifications(
+    actor: AuthContext,
+    studentIds: string[],
+    childScoped = false,
+  ) {
     return this.prisma.notificationDelivery.count({
       where: {
-        ...this.parentNotificationVisibility(actor, studentIds),
+        ...this.parentNotificationVisibility(actor, studentIds, childScoped),
         readReceipts: {
           none: { tenantId: actor.tenantId, userId: actor.userId },
         },
@@ -1781,13 +1828,47 @@ export class MobileService {
   }
 
   private async getAllowedStudentIds(actor: AuthContext) {
-    const parentStudentIds = await getParentStudentIds(this.prisma, actor);
-    if (parentStudentIds !== null) {
-      return parentStudentIds;
+    if (!isParentOnly(actor)) {
+      throw new ForbiddenException('Mobile student scope is not available');
     }
 
-    throw new ForbiddenException('Mobile student scope is not available');
+    const guardian = await this.prisma.guardian.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+      },
+      select: {
+        studentLinks: {
+          where: {
+            student: {
+              lifecycleStatus: 'ACTIVE',
+              enrollments: {
+                some: { status: 'ACTIVE' },
+              },
+            },
+          },
+          select: { studentId: true },
+        },
+      },
+    });
+
+    return guardian?.studentLinks.map((link) => link.studentId) ?? [];
   }
+}
+
+function transportLocationFreshness(recordedAt: Date) {
+  const ageSeconds = Math.max(
+    0,
+    Math.floor((Date.now() - recordedAt.getTime()) / 1000),
+  );
+  const confidence =
+    ageSeconds > 600 ? 'stale' : ageSeconds > 120 ? 'delayed' : 'fresh';
+
+  return {
+    ageSeconds,
+    confidence,
+    isStale: confidence === 'stale',
+  };
 }
 
 function parentNotificationRoute(item: {

@@ -170,14 +170,20 @@ class ParentState {
     String? message,
     DateTime? lastUpdated,
     bool? isOffline,
+    bool clearSelectedChild = false,
+    bool clearDashboard = false,
+    bool clearProfile = false,
+    bool clearMessage = false,
   }) {
     return ParentState(
       status: status ?? this.status,
       children: children ?? this.children,
-      selectedChildId: selectedChildId ?? this.selectedChildId,
-      dashboard: dashboard ?? this.dashboard,
-      profile: profile ?? this.profile,
-      message: message ?? this.message,
+      selectedChildId: clearSelectedChild
+          ? null
+          : selectedChildId ?? this.selectedChildId,
+      dashboard: clearDashboard ? null : dashboard ?? this.dashboard,
+      profile: clearProfile ? null : profile ?? this.profile,
+      message: clearMessage ? null : message ?? this.message,
       lastUpdated: lastUpdated ?? this.lastUpdated,
       isOffline: isOffline ?? this.isOffline,
     );
@@ -197,20 +203,27 @@ class ParentController extends StateNotifier<ParentState> {
   final ParentRepository _repository;
   final AppPreferencesService _preferences;
   final bool _isOnline;
+  int _loadGeneration = 0;
 
   Future<void> load({String? childId}) async {
+    final generation = ++_loadGeneration;
     state = state.copyWith(
       status: ParentDataStatus.loading,
+      selectedChildId: childId,
+      clearDashboard: true,
+      clearProfile: true,
+      clearMessage: true,
       isOffline: !_isOnline,
-      message: null,
     );
 
     try {
       final children = await _repository.getGuardianChildren();
+      if (generation != _loadGeneration) return;
       if (children.isEmpty) {
-        state = state.copyWith(
+        state = ParentState(
           status: ParentDataStatus.empty,
           children: children,
+          isOffline: !_isOnline,
           message: 'No children are linked to this guardian account yet.',
         );
         return;
@@ -226,10 +239,13 @@ class ParentController extends StateNotifier<ParentState> {
       );
 
       await _preferences.saveSelectedChildId(selectedChildId);
+      if (generation != _loadGeneration) return;
       final dashboard = await _repository.getParentDashboardSummaryForChild(
         selectedChild,
       );
+      if (generation != _loadGeneration) return;
       final profile = await _repository.getChildProfileForChild(selectedChild);
+      if (generation != _loadGeneration) return;
 
       state = ParentState(
         status: ParentDataStatus.success,
@@ -244,6 +260,7 @@ class ParentController extends StateNotifier<ParentState> {
             : 'You are offline. Showing last saved parent data.',
       );
     } catch (error) {
+      if (generation != _loadGeneration) return;
       final status = switch (error) {
         ModuleLockedException() => ParentDataStatus.moduleLocked,
         PermissionException() => ParentDataStatus.forbidden,
@@ -263,7 +280,6 @@ class ParentController extends StateNotifier<ParentState> {
   }
 
   Future<void> selectChild(String childId) async {
-    await _preferences.saveSelectedChildId(childId);
     await load(childId: childId);
   }
 }
