@@ -30,8 +30,9 @@ class ParentDetailScaffold extends StatelessWidget {
         final route = [
           AppRoutes.parentHome,
           AppRoutes.parentChildren,
+          AppRoutes.parentAttendance,
           AppRoutes.parentHomework,
-          AppRoutes.parentUpdates,
+          AppRoutes.notices,
           AppRoutes.parentMore,
         ][index];
         context.go(route);

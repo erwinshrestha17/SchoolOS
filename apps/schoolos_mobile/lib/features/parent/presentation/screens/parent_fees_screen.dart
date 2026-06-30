@@ -24,7 +24,7 @@ class ParentFeesScreen extends ConsumerWidget {
 
     return ParentDetailScaffold(
       title: title,
-      selectedIndex: 4,
+      selectedIndex: 5,
       body: switch (state.status) {
         ParentDataStatus.loading => const PortalLoadingState(),
         ParentDataStatus.empty => const Center(

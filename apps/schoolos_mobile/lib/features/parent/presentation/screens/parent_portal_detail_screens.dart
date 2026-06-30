@@ -324,7 +324,7 @@ class _ParentPortalHomeworkDetailScreenState
     final data = ref.watch(parentPortalDataProvider);
     return ParentDetailScaffold(
       title: 'Homework detail',
-      selectedIndex: 2,
+      selectedIndex: 3,
       body: data.when(
         loading: () => const PortalLoadingState(),
         error: (_, _) => PortalErrorState(

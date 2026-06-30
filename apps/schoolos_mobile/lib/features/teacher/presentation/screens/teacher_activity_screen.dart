@@ -8,7 +8,7 @@ import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/status_chip.dart';
@@ -82,9 +82,8 @@ class _TeacherActivityScreenState extends ConsumerState<TeacherActivityScreen> {
             ],
           ),
         ),
-        error: (_, _) => AppErrorView(
-          title: 'Activities are unavailable',
-          message: 'Please try again in a moment.',
+        error: (error, _) => AppExceptionView(
+          error: error,
           onRetry: () => ref.invalidate(teacherActivityProvider),
         ),
         data: (snapshot) {

@@ -7,7 +7,7 @@ class AppErrorView extends StatelessWidget {
   const AppErrorView({
     super.key,
     required this.message,
-    this.title = 'Something went wrong',
+    this.title = 'Could not load this information',
     this.onRetry,
     this.isOffline = false,
   });
@@ -46,7 +46,7 @@ class AppErrorView extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.xl),
             Text(
-              isOffline ? 'Connection Lost' : title,
+              isOffline ? 'Connection lost' : title,
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: isDark ? Colors.white : AppColors.slate900,

@@ -16,7 +16,7 @@ class ParentMoreScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return RoleShellScaffold(
       role: 'PARENT',
-      selectedIndex: 4,
+      selectedIndex: 5,
       title: 'More',
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.lg),

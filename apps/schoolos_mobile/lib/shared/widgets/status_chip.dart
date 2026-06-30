@@ -15,6 +15,12 @@ enum AppStatusType {
   draft,
   published,
   completed,
+  notRecorded,
+  queued,
+  syncing,
+  synced,
+  failed,
+  unavailable,
 }
 
 class StatusChip extends StatelessWidget {
@@ -75,6 +81,18 @@ class StatusChip extends StatelessWidget {
         return 'Published';
       case AppStatusType.completed:
         return 'Completed';
+      case AppStatusType.notRecorded:
+        return 'Not recorded';
+      case AppStatusType.queued:
+        return 'Queued';
+      case AppStatusType.syncing:
+        return 'Syncing';
+      case AppStatusType.synced:
+        return 'Synced';
+      case AppStatusType.failed:
+        return 'Failed';
+      case AppStatusType.unavailable:
+        return 'Unavailable';
     }
   }
 
@@ -84,12 +102,14 @@ class StatusChip extends StatelessWidget {
       case AppStatusType.paid:
       case AppStatusType.approved:
       case AppStatusType.completed:
+      case AppStatusType.synced:
         return (
           AppColors.successLight.withValues(alpha: isDark ? 0.15 : 0.8),
           isDark ? AppColors.success : AppColors.successDark,
         );
       case AppStatusType.absent:
       case AppStatusType.rejected:
+      case AppStatusType.failed:
         return (
           AppColors.dangerLight.withValues(alpha: isDark ? 0.15 : 0.8),
           isDark ? AppColors.danger : AppColors.dangerDark,
@@ -97,6 +117,8 @@ class StatusChip extends StatelessWidget {
       case AppStatusType.late:
       case AppStatusType.due:
       case AppStatusType.pending:
+      case AppStatusType.queued:
+      case AppStatusType.syncing:
         return (
           AppColors.warningLight.withValues(alpha: isDark ? 0.15 : 0.8),
           isDark ? AppColors.warning : AppColors.warningDark,
@@ -108,6 +130,8 @@ class StatusChip extends StatelessWidget {
           isDark ? AppColors.info : AppColors.infoDark,
         );
       case AppStatusType.draft:
+      case AppStatusType.notRecorded:
+      case AppStatusType.unavailable:
         return (
           isDark ? AppColors.slate800 : AppColors.slate100,
           isDark ? AppColors.slate300 : AppColors.slate600,

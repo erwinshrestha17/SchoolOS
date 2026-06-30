@@ -18,29 +18,50 @@ class AppExceptionView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (error is ModuleLockedException) {
+    final currentError = error;
+
+    if (currentError is ModuleLockedException) {
       return const ModuleLockedState();
     }
-    if (error is PermissionException) {
+    if (currentError is PermissionException) {
       return const PermissionDeniedState();
     }
-    if (error is SessionExpiredException || error is AuthException) {
+    if (currentError is SessionExpiredException ||
+        currentError is AuthException) {
       return SessionExpiredState(onSignIn: onSignIn);
     }
-    if (error is NotFoundAppException) {
+    if (currentError is NotFoundAppException) {
       return const AppAccessState(
         title: 'No longer available',
         message: 'This information is no longer available.',
         icon: Icons.search_off_rounded,
       );
     }
-    if (error is NetworkException || error is TimeoutException) {
+    if (currentError is NetworkException || currentError is TimeoutException) {
+      final appError = currentError as AppException;
       return AppErrorView(
         title: 'You are offline',
-        message: 'Reconnect to the internet and try again.',
+        message: appError.message,
         isOffline: true,
         onRetry: onRetry,
       );
+    }
+    if (currentError is ConflictAppException) {
+      return AppErrorView(
+        title: 'Refresh needed',
+        message: currentError.message,
+        onRetry: onRetry,
+      );
+    }
+    if (currentError is ValidationException) {
+      return AppErrorView(
+        title: 'Check the details',
+        message: currentError.message,
+        onRetry: onRetry,
+      );
+    }
+    if (currentError is AppException) {
+      return AppErrorView(message: currentError.message, onRetry: onRetry);
     }
 
     return AppErrorView(

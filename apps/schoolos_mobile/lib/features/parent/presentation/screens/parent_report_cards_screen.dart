@@ -19,7 +19,7 @@ class ParentReportCardsScreen extends ConsumerWidget {
 
     return ParentDetailScaffold(
       title: 'Exams & Results',
-      selectedIndex: 4,
+      selectedIndex: 5,
       body: switch (state.status) {
         ParentDataStatus.loading => const PortalLoadingState(),
         ParentDataStatus.success when child != null => RefreshIndicator(

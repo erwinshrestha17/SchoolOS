@@ -16,7 +16,7 @@ class ParentConsentsScreen extends ConsumerWidget {
     final consents = ref.watch(parentConsentStatusProvider);
     return ParentDetailScaffold(
       title: 'Consent & Permissions',
-      selectedIndex: 4,
+      selectedIndex: 5,
       body: portal.when(
         loading: () => const _ConsentLoading(),
         error: (_, _) => _ConsentUnavailable(

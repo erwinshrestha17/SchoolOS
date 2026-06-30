@@ -6,7 +6,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../application/parent_providers.dart';
@@ -24,7 +24,7 @@ class ParentActivityScreen extends ConsumerWidget {
 
     return RoleShellScaffold(
       role: 'PARENT',
-      selectedIndex: 4,
+      selectedIndex: 5,
       title: 'Activity',
       body: ParentStateView(
         status: state.status,
@@ -62,9 +62,8 @@ class _ActivityContent extends ConsumerWidget {
           ],
         ),
       ),
-      error: (_, _) => AppErrorView(
-        title: 'Could not load activity',
-        message: 'Please try again in a moment.',
+      error: (error, _) => AppExceptionView(
+        error: error,
         onRetry: () => ref.invalidate(parentActivityFeedProvider(childId)),
       ),
       data: (items) => RefreshIndicator(

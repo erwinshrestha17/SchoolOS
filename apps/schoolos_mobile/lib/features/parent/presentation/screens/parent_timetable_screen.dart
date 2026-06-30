@@ -5,7 +5,7 @@ import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/section_header.dart';
@@ -17,7 +17,7 @@ class ParentTimetableScreen extends ConsumerWidget {
   const ParentTimetableScreen({
     super.key,
     this.role = 'PARENT',
-    this.selectedIndex = 4,
+    this.selectedIndex = 5,
     this.title = 'Timetable',
   });
 
@@ -98,9 +98,8 @@ class _TimetableContent extends ConsumerWidget {
           ],
         ),
       ),
-      error: (_, _) => AppErrorView(
-        title: 'Could not load timetable',
-        message: 'Please try again in a moment.',
+      error: (error, _) => AppExceptionView(
+        error: error,
         onRetry: () => ref.invalidate(parentTimetableProvider(childId)),
       ),
       data: (data) {

@@ -18,6 +18,7 @@ import 'package:schoolos_mobile/features/operational_summary/domain/operational_
 import 'package:schoolos_mobile/features/parent/application/parent_portal_providers.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_portal_models.dart';
 import 'package:schoolos_mobile/shared/widgets/app_button.dart';
+import 'package:schoolos_mobile/shared/widgets/app_exception_view.dart';
 import 'package:schoolos_mobile/shared/widgets/status_chip.dart';
 import 'package:schoolos_mobile/shared/widgets/role_badge.dart';
 import 'package:schoolos_mobile/shared/widgets/role_shell_scaffold.dart';
@@ -152,6 +153,28 @@ void main() {
     expect(find.text('Present'), findsOneWidget);
   });
 
+  testWidgets('AppExceptionView shows safe offline and conflict states', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: AppExceptionView(error: NetworkException())),
+      ),
+    );
+
+    expect(find.text('Connection lost'), findsOneWidget);
+    expect(find.textContaining('No internet connection'), findsOneWidget);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: AppExceptionView(error: ConflictAppException())),
+      ),
+    );
+
+    expect(find.text('Refresh needed'), findsOneWidget);
+    expect(find.textContaining('Refresh and try again'), findsOneWidget);
+  });
+
   testWidgets('RoleBadge renders correct role label', (
     WidgetTester tester,
   ) async {
@@ -182,8 +205,9 @@ void main() {
 
     expect(find.text('Parent Home Body'), findsOneWidget);
     expect(find.text('Home'), findsOneWidget);
-    expect(find.text('Child'), findsOneWidget);
-    expect(find.text('Fees'), findsOneWidget);
+    expect(find.text('Children'), findsOneWidget);
+    expect(find.text('Attendance'), findsOneWidget);
+    expect(find.text('Homework'), findsOneWidget);
     expect(find.text('Notices'), findsOneWidget);
     expect(find.text('More'), findsOneWidget);
   });
@@ -383,7 +407,7 @@ void main() {
     expect(find.text('Homework summary'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('Updates').last);
+    await tester.tap(find.text('Notices').last);
     await tester.pumpAndSettle();
     expect(find.text('Holiday notice for Friday'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -411,6 +435,7 @@ void main() {
       for (final (error, expectedTitle) in cases) {
         await tester.pumpWidget(
           ProviderScope(
+            key: ValueKey(expectedTitle),
             overrides: [
               testOperationalSummaryOverride,
               parentPortalDataProvider.overrideWith(

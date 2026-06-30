@@ -6,7 +6,7 @@ import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/section_header.dart';
@@ -27,9 +27,8 @@ class DriverRouteScreen extends ConsumerWidget {
       title: 'Route',
       body: dashboard.when(
         loading: () => const _DriverListLoading(),
-        error: (_, _) => AppErrorView(
-          title: 'Unable to load route',
-          message: 'Driver route assignments could not be loaded.',
+        error: (error, _) => AppExceptionView(
+          error: error,
           onRetry: () => ref.invalidate(driverTransportDashboardProvider),
         ),
         data: (summary) => RefreshIndicator(
@@ -93,9 +92,8 @@ class DriverStudentsScreen extends ConsumerWidget {
       title: 'Students',
       body: dashboard.when(
         loading: () => const _DriverListLoading(),
-        error: (_, _) => AppErrorView(
-          title: 'Unable to load students',
-          message: 'Driver active trip students could not be loaded.',
+        error: (error, _) => AppExceptionView(
+          error: error,
           onRetry: () => ref.invalidate(driverTransportDashboardProvider),
         ),
         data: (summary) {
@@ -120,9 +118,8 @@ class DriverStudentsScreen extends ConsumerWidget {
 
           return manifest.when(
             loading: () => const _DriverListLoading(),
-            error: (_, _) => AppErrorView(
-              title: 'Unable to load manifest',
-              message: 'Try again after dispatch syncs the active trip.',
+            error: (error, _) => AppExceptionView(
+              error: error,
               onRetry: () =>
                   ref.invalidate(driverTripManifestProvider(trip.id)),
             ),
@@ -172,9 +169,8 @@ class DriverHistoryScreen extends ConsumerWidget {
       title: 'History',
       body: history.when(
         loading: () => const _DriverListLoading(),
-        error: (_, _) => AppErrorView(
-          title: 'Unable to load history',
-          message: 'Driver trip history could not be loaded.',
+        error: (error, _) => AppExceptionView(
+          error: error,
           onRetry: () => ref.invalidate(driverTripHistoryProvider),
         ),
         data: (trips) => RefreshIndicator(

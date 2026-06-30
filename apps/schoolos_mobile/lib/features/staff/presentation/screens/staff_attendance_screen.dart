@@ -6,7 +6,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/section_header.dart';
@@ -27,9 +27,8 @@ class StaffAttendanceScreen extends ConsumerWidget {
       title: 'My Attendance',
       body: attendance.when(
         loading: () => const AppLoading(message: 'Loading attendance...'),
-        error: (_, _) => AppErrorView(
-          title: 'Could not load attendance',
-          message: 'Your staff attendance could not be loaded right now.',
+        error: (error, _) => AppExceptionView(
+          error: error,
           onRetry: () => ref.invalidate(staffAttendanceProvider),
         ),
         data: (records) => RefreshIndicator(

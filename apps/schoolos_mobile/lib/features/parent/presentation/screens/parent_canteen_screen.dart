@@ -20,7 +20,7 @@ class ParentCanteenScreen extends ConsumerWidget {
 
     return ParentDetailScaffold(
       title: 'Canteen Wallet',
-      selectedIndex: 4,
+      selectedIndex: 5,
       body: switch (state.status) {
         ParentDataStatus.loading => const PortalLoadingState(),
         ParentDataStatus.success when child != null => RefreshIndicator(

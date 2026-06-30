@@ -9,7 +9,7 @@ import '../../../../core/permissions/permission_service.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_gradient_card.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/dashboard_card.dart';
@@ -55,10 +55,8 @@ class DriverDashboard extends ConsumerWidget {
                 ),
               ),
         loading: () => const _DriverDashboardLoading(),
-        error: (error, stackTrace) => AppErrorView(
-          title: 'Unable to load driver board',
-          message:
-              'Check your connection and try again. Driver routes come from the transport dispatch API.',
+        error: (error, stackTrace) => AppExceptionView(
+          error: error,
           onRetry: () => ref.invalidate(driverTransportDashboardProvider),
         ),
       ),
@@ -519,6 +517,14 @@ class _TripManifestSheetState extends ConsumerState<_TripManifestSheet> {
           content: Text('${_studentName(student)} marked ${action.label}.'),
         ),
       );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showDriverActionFailure(
+        context,
+        'Could not update this student yet. Refresh the manifest and try again.',
+      );
     } finally {
       if (mounted) {
         setState(() => _busyKey = null);
@@ -568,6 +574,14 @@ class _TripManifestSheetState extends ConsumerState<_TripManifestSheet> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Trip completed.')));
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showDriverActionFailure(
+        context,
+        'Could not complete this trip. Check connection and refresh trip status.',
+      );
     } finally {
       if (mounted) {
         setState(() => _busyKey = null);
@@ -628,6 +642,14 @@ class _TripManifestSheetState extends ConsumerState<_TripManifestSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('GPS ping sent to transport tracking.')),
       );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showDriverActionFailure(
+        context,
+        'GPS was not sent. Location may be out of date until the next successful sync.',
+      );
     } finally {
       if (mounted) {
         setState(() => _busyKey = null);
@@ -654,9 +676,8 @@ class _TripManifestSheetState extends ConsumerState<_TripManifestSheet> {
           ],
         ),
       ),
-      error: (_, _) => AppErrorView(
-        title: 'Could not load manifest',
-        message: 'Try again once the trip assignment is available.',
+      error: (error, _) => AppExceptionView(
+        error: error,
         onRetry: () =>
             ref.invalidate(driverTripManifestProvider(widget.tripId)),
       ),
@@ -670,6 +691,10 @@ class _TripManifestSheetState extends ConsumerState<_TripManifestSheet> {
       ),
     );
   }
+}
+
+void _showDriverActionFailure(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }
 
 class _ManifestContent extends StatelessWidget {

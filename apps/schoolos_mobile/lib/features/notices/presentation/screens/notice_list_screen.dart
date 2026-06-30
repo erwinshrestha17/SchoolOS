@@ -5,8 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/constants/app_routes.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/app_error_view.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
+import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/app_scaffold.dart';
 import '../../../../shared/widgets/section_header.dart';
@@ -38,22 +38,17 @@ class NoticeListScreen extends ConsumerWidget {
                 ],
               ),
             )
-          : state.message != null && state.notices.isEmpty
-          ? state.error == null
-                ? AppErrorView(
-                    title: 'Could not load notices',
-                    message: state.message!,
-                    onRetry: controller.load,
-                  )
-                : AppExceptionView(
-                    error: state.error!,
-                    onRetry: controller.load,
-                  )
+          : state.error != null && state.notices.isEmpty
+          ? AppExceptionView(error: state.error!, onRetry: controller.load)
           : RefreshIndicator(
               onRefresh: controller.load,
               child: ListView(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 children: [
+                  if (state.message != null) ...[
+                    _NoticeStateBanner(message: state.message!),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
                   Row(
                     children: [
                       const Expanded(
@@ -103,6 +98,27 @@ class NoticeListScreen extends ConsumerWidget {
                 ],
               ),
             ),
+    );
+  }
+}
+
+class _NoticeStateBanner extends StatelessWidget {
+  const _NoticeStateBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      hasShadow: false,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline_rounded, size: 20),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(child: Text(message)),
+        ],
+      ),
     );
   }
 }

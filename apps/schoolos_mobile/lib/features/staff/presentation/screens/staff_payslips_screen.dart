@@ -3,11 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
-import '../../../../core/errors/app_exception.dart';
 import '../../../../core/platform/file_share_service.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/section_header.dart';
@@ -28,9 +27,8 @@ class StaffPayslipsScreen extends ConsumerWidget {
       title: 'My Payslips',
       body: payslips.when(
         loading: () => const AppLoading(message: 'Loading payslips...'),
-        error: (error, _) => AppErrorView(
-          title: 'Could not load payslips',
-          message: _errorMessage(error),
+        error: (error, _) => AppExceptionView(
+          error: error,
           onRetry: () => ref.invalidate(staffPayslipsProvider),
         ),
         data: (items) => RefreshIndicator(
@@ -320,11 +318,4 @@ String _label(String value) {
             : '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
       )
       .join(' ');
-}
-
-String _errorMessage(Object error) {
-  if (error is PermissionException) {
-    return error.message;
-  }
-  return 'Your payroll payslips could not be loaded right now.';
 }

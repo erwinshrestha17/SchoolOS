@@ -39,16 +39,19 @@ class AppCard extends StatelessWidget {
             ? Border.all(color: AppColors.slate800, width: 1)
             : Border.all(color: AppColors.slate100, width: 1));
 
-    final Widget cardContent = Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: cardBorderRadius,
-        border: decorationBorder,
-        boxShadow: hasShadow && !isDark ? AppShadows.soft : null,
-      ),
-      child: ClipRRect(
-        borderRadius: cardBorderRadius,
-        child: Padding(padding: padding, child: child),
+    final Widget cardContent = ConstrainedBox(
+      constraints: BoxConstraints(minHeight: onTap == null ? 0 : 44),
+      child: Container(
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: cardBorderRadius,
+          border: decorationBorder,
+          boxShadow: hasShadow && !isDark ? AppShadows.soft : null,
+        ),
+        child: ClipRRect(
+          borderRadius: cardBorderRadius,
+          child: Padding(padding: padding, child: child),
+        ),
       ),
     );
 

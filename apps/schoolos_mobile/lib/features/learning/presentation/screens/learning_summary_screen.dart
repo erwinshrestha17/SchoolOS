@@ -6,7 +6,7 @@ import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/section_header.dart';
@@ -20,7 +20,7 @@ class LearningSummaryScreen extends ConsumerWidget {
   const LearningSummaryScreen({
     super.key,
     this.role = 'PARENT',
-    this.selectedIndex = 4,
+    this.selectedIndex = 5,
     this.title = 'Learning',
   });
 
@@ -70,9 +70,8 @@ class _ParentLearningSummary extends ConsumerWidget {
 
     return summary.when(
       loading: () => const _LearningLoading(),
-      error: (_, _) => AppErrorView(
-        title: 'Could not load learning summary',
-        message: 'Please try again in a moment.',
+      error: (error, _) => AppExceptionView(
+        error: error,
         onRetry: () => ref.invalidate(parentLearningSummariesProvider(null)),
       ),
       data: (items) {
@@ -176,9 +175,8 @@ class _StudentLearningSummary extends ConsumerWidget {
 
     return summary.when(
       loading: () => const _LearningLoading(),
-      error: (_, _) => AppErrorView(
-        title: 'Could not load learning summary',
-        message: 'Please try again in a moment.',
+      error: (error, _) => AppExceptionView(
+        error: error,
         onRetry: () => ref.invalidate(studentLearningSummaryProvider(childId)),
       ),
       data: (item) => _LearningSummaryList(

@@ -20,7 +20,7 @@ class ParentHomeworkScreen extends ConsumerWidget {
   const ParentHomeworkScreen({
     super.key,
     this.role = 'PARENT',
-    this.selectedIndex = 4,
+    this.selectedIndex = 3,
     this.title = 'Homework',
   });
 

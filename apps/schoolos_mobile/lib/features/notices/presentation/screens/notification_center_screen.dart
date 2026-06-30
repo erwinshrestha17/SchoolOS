@@ -9,7 +9,7 @@ import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../parent/application/parent_portal_providers.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/app_scaffold.dart';
 import '../../application/notices_providers.dart';
@@ -55,9 +55,8 @@ class NotificationCenterScreen extends ConsumerWidget {
               ),
             )
           : notifications.error != null
-          ? AppErrorView(
-              title: 'Could not load notifications',
-              message: 'Please try again in a moment.',
+          ? AppExceptionView(
+              error: notifications.error!,
               onRetry: () =>
                   ref.read(parentNotificationsProvider.notifier).refresh(),
             )

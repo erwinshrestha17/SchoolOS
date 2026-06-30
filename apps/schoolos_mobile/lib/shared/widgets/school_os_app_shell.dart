@@ -36,7 +36,7 @@ class _SchoolOsAppShellState extends ConsumerState<SchoolOsAppShell> {
     'SchoolOS Mobile',
     'Children',
     'Homework',
-    'Updates',
+    'Notices',
     'More',
   ];
 
@@ -73,10 +73,43 @@ class _SchoolOsAppShellState extends ConsumerState<SchoolOsAppShell> {
         ),
       ),
       bottomNavigationBar: SchoolOsBottomNavigation(
-        selectedIndex: selectedIndex,
-        onSelected: (index) => setState(() => selectedIndex = index),
+        selectedIndex: _navIndexForShellIndex(selectedIndex),
+        onSelected: _handleNavigationSelection,
       ),
     );
+  }
+
+  int _navIndexForShellIndex(int index) {
+    return switch (index) {
+      0 => 0,
+      1 => 1,
+      2 => 3,
+      3 => 4,
+      _ => 5,
+    };
+  }
+
+  void _handleNavigationSelection(int index) {
+    switch (index) {
+      case 0:
+        setState(() => selectedIndex = 0);
+        return;
+      case 1:
+        setState(() => selectedIndex = 1);
+        return;
+      case 2:
+        context.go(AppRoutes.parentAttendance);
+        return;
+      case 3:
+        setState(() => selectedIndex = 2);
+        return;
+      case 4:
+        setState(() => selectedIndex = 3);
+        return;
+      case 5:
+        setState(() => selectedIndex = 4);
+        return;
+    }
   }
 }
 
@@ -158,8 +191,9 @@ class SchoolOsBottomNavigation extends StatelessWidget {
   static const items = [
     (Icons.home_outlined, Icons.home_rounded, 'Home'),
     (Icons.family_restroom_outlined, Icons.family_restroom_rounded, 'Children'),
+    (Icons.fact_check_outlined, Icons.fact_check_rounded, 'Attendance'),
     (Icons.menu_book_outlined, Icons.menu_book_rounded, 'Homework'),
-    (Icons.notifications_none_rounded, Icons.notifications_rounded, 'Updates'),
+    (Icons.notifications_none_rounded, Icons.notifications_rounded, 'Notices'),
     (Icons.grid_view_outlined, Icons.grid_view_rounded, 'More'),
   ];
 

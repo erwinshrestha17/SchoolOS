@@ -111,7 +111,11 @@ class NepaliBsCalendar {
 
   static BsDate fromAd(DateTime value) {
     final local = toNepalLocalDateTime(value);
-    final bs = DateTime.utc(local.year, local.month, local.day).toNepaliDateTime();
+    final bs = DateTime.utc(
+      local.year,
+      local.month,
+      local.day,
+    ).toNepaliDateTime();
     return BsDate(year: bs.year, month: bs.month, day: bs.day);
   }
 
@@ -146,7 +150,8 @@ class NepaliBsCalendar {
     return date;
   }
 
-  static String formatBsDateForInput(DateTime value) => fromAd(value).inputValue;
+  static String formatBsDateForInput(DateTime value) =>
+      fromAd(value).inputValue;
 
   static String formatBsDate(
     DateTime value, {
@@ -158,7 +163,8 @@ class NepaliBsCalendar {
     if (short) return date.inputValue;
     final standard = '${monthName(date.month)} ${date.day}, ${date.year}';
     if (!long) return standard;
-    final weekday = DateTime.utc(local.year, local.month, local.day).weekday % 7;
+    final weekday =
+        DateTime.utc(local.year, local.month, local.day).weekday % 7;
     return '${_weekdayNames[weekday]}, $standard';
   }
 
@@ -191,6 +197,11 @@ class NepaliBsCalendar {
 
   static DateTime startOfNepalSchoolDayUtc(DateTime value) {
     final local = toNepalLocalDateTime(value);
-    return tz.TZDateTime(_nepalLocation, local.year, local.month, local.day).toUtc();
+    return tz.TZDateTime(
+      _nepalLocation,
+      local.year,
+      local.month,
+      local.day,
+    ).toUtc();
   }
 }

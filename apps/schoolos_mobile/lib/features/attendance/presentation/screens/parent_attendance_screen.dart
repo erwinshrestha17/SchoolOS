@@ -21,7 +21,7 @@ class ParentAttendanceScreen extends ConsumerWidget {
 
     return ParentDetailScaffold(
       title: 'Attendance',
-      selectedIndex: 1,
+      selectedIndex: 2,
       body: switch (state.status) {
         ParentDataStatus.loading => const PortalLoadingState(),
         ParentDataStatus.success when child != null => RefreshIndicator(

@@ -23,7 +23,7 @@ class _ParentCalendarScreenState extends ConsumerState<ParentCalendarScreen> {
     final portal = ref.watch(parentPortalDataProvider);
     return ParentDetailScaffold(
       title: 'BS Calendar',
-      selectedIndex: 4,
+      selectedIndex: 5,
       body: portal.when(
         loading: () => const PortalLoadingState(),
         error: (_, _) => PortalErrorState(
