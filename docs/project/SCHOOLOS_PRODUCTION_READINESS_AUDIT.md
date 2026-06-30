@@ -256,11 +256,17 @@ No active Markdown documents were deleted or archived in this audit. The consoli
 
 ## Medium-Priority Gaps
 
-- Add a committed web env example or documented web env matrix.
+- Keep the committed web env example and staging/production env preflight aligned with actual deployment variables.
 - Expand observability evidence: deployed logs, queue dashboards, alerts, and on-call procedures.
 - Record browser accessibility and responsive QA beyond contract tests.
 - Keep app-level E2E README aligned with actual skip behavior.
 - Address Flutter plugin Kotlin Gradle Plugin deprecation before it becomes a build blocker.
+
+## 2026-06-30 Phase 4 Tooling Update
+
+The repository now has a strict staging deploy environment preflight path: `pnpm verify:env:staging` runs `scripts/check-deploy-env.mjs` with `DEPLOY_ENV=staging` and `NODE_ENV=production`. It validates HTTPS origins, `NEXT_PUBLIC_API_BASE_URL`, non-placeholder secrets, production runtime opt-in, provider-mode consistency, and storage-specific required values. `apps/web/.env.example` was added for the web API base URL.
+
+This is not staging evidence. No staging deployment, migration apply, provider/storage sandbox check, backup/restore drill, monitoring/alert proof, staging browser E2E, staging mobile QA, or controlled pilot was run as part of this update.
 
 ## Deferred Items
 

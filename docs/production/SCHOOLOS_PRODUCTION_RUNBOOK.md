@@ -53,12 +53,18 @@ Required behavior:
 API environment (`apps/api/.env`):
 ```bash
 NODE_ENV=production
+DEPLOY_ENV=staging
+ALLOW_PROD_BOOT=true
 PORT=4000
 DATABASE_URL=postgresql://schoolos:strong-password@postgres:5432/schoolos_db?schema=public
 REDIS_HOST=redis
 REDIS_PORT=6379
 JWT_SECRET=replace-with-32-plus-character-random-secret
 JWT_CHALLENGE_SECRET=replace-with-second-32-plus-character-random-secret
+TOKEN_HASH_PEPPER=replace-with-third-32-plus-character-random-secret
+JWT_ISSUER=schoolos-staging
+JWT_AUDIENCE_WEB=schoolos-web-staging
+JWT_AUDIENCE_MOBILE=schoolos-mobile-staging
 JWT_ACCESS_TTL=15m
 JWT_CHALLENGE_TTL=10m
 JWT_REFRESH_TTL_DAYS=7
@@ -85,6 +91,8 @@ NEXT_PUBLIC_API_BASE_URL=https://api-staging.schoolos.example/api/v1
 
 Required production environment variables:
 ```bash
+NODE_ENV=production
+DEPLOY_ENV=staging or production
 ALLOW_PROD_BOOT=true
 DATABASE_URL
 REDIS_HOST
@@ -92,7 +100,14 @@ REDIS_PORT
 JWT_SECRET
 JWT_CHALLENGE_SECRET
 MEDICAL_ENCRYPTION_KEY
+TOKEN_HASH_PEPPER
+JWT_ISSUER
+JWT_AUDIENCE_WEB
+JWT_AUDIENCE_MOBILE
 FRONTEND_ORIGIN
+PASSWORD_RESET_APP_URL
+NEXT_PUBLIC_API_BASE_URL
+TRUST_PROXY=true
 ```
 
 If using webhook email mode:
@@ -162,11 +177,19 @@ Before deployment:
 7. Confirm provider modes (disabled, dev-log, mock, or configured).
 
 ### Canonical Verification Command
-Run from repo root before deployment:
+Export or inject the real staging values, then run from repo root before deployment:
 ```bash
-pnpm verify:deploy
+pnpm verify:env:staging
+DEPLOY_ENV=staging NODE_ENV=production pnpm verify:deploy
 ```
-This command covers: deploy env preflight, tracked artifact guard, Prisma generate/validate, OpenAPI gate, lint, typecheck, unit tests, API E2E, web smoke E2E, and build.
+Use `pnpm verify:env:production` for production release checks. These commands require real environment values in the shell; placeholders in `.env.example` are intentionally rejected. `verify:deploy` covers: deploy env preflight, tracked artifact guard, Prisma generate/validate, OpenAPI gate, lint, typecheck, unit tests, API E2E, web smoke E2E, and build.
+
+If staging values live in an untracked file, load them without printing secrets:
+```bash
+DEPLOY_ENV_FILE=/secure/path/schoolos-staging.env pnpm verify:env:staging
+DEPLOY_ENV_FILE=/secure/path/schoolos-staging.env DEPLOY_ENV=staging NODE_ENV=production pnpm verify:deploy
+```
+The env file may contain `DEPLOY_ENV=staging` and `NODE_ENV=production`; shell variables still take precedence over file values.
 
 Full verification fallback:
 ```bash
@@ -185,6 +208,15 @@ If Docker/API/web are running:
 ```bash
 pnpm smoke:pilot          # Legacy alias: pnpm smoke:phase1
 SMOKE_LOGIN=true pnpm smoke:pilot
+```
+
+For staging smoke, point the same command at deployed services and record the command output with the release evidence:
+```bash
+SMOKE_API_BASE_URL=https://api-staging.schoolos.example/api/v1 \
+DATABASE_URL=postgresql://... \
+REDIS_HOST=... \
+REDIS_PORT=6379 \
+pnpm smoke:pilot
 ```
 
 ---

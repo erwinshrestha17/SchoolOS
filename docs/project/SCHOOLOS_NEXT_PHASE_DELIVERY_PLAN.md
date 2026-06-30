@@ -211,7 +211,7 @@ Plus an Android emulator checklist with screenshots/log evidence for every repre
 | Staging/deploy | Validate secrets, HTTPS origins, storage, email/SMS/push modes, payment gateway sandbox, backups, restore, rollback, logs, and alerts. |
 
 **Acceptance criteria:**
-- `DEPLOY_ENV=production pnpm verify:env:deploy` equivalent passes for staging/production-like env values.
+- `pnpm verify:env:staging` passes with real staging values using `NODE_ENV=production`, HTTPS origins, non-placeholder secrets, configured web API base URL, and explicit provider/storage modes.
 - Staging migration apply is recorded.
 - Backup restore drill is recorded with duration and validation result.
 - Provider readiness is documented as real, sandbox, disabled, or blocked.
@@ -224,6 +224,8 @@ pnpm smoke:pilot
 ```
 
 Plus staging-specific migration, backup, restore, provider, and alert verification records.
+
+**2026-06-30 implementation support update:** `scripts/check-deploy-env.mjs` now supports `DEPLOY_ENV=staging` as a strict preflight target instead of validating only production. It can also load real staging values from an untracked `DEPLOY_ENV_FILE` / `SCHOOLOS_DEPLOY_ENV_FILE` without committing secrets. The preflight still does not prove deployment by itself; it only blocks missing or unsafe environment values before staging migration, smoke, browser, mobile, provider, storage, backup, and alert evidence is collected.
 
 ## Phase 5 - Controlled Single-School Pilot
 

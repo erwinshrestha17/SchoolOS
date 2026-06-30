@@ -1,7 +1,7 @@
 # SchoolOS Project Status
 
 **Status:** Current evidence-based project status snapshot
-**Last updated:** 2026-06-21
+**Last updated:** 2026-06-30
 **Product:** Nepal-first multi-tenant education operating SaaS with staged Preschool, School (Grade 1-10), Higher Secondary / +2, and Bachelor's direction. Master's is eligibility/future-extension only, not a full active management pack.
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js App Router, Flutter companion app, shared `@schoolos/core` contracts
 
@@ -130,7 +130,7 @@ Use the readiness statuses from the audit. Most modules are `IMPLEMENTED_UNVERIF
 
 ## Current Blockers
 
-1. Run staging migration/deploy/provider/storage/backup/restore verification.
+1. Run staging migration/deploy/provider/storage/backup/restore verification. The staging env preflight command path now exists, but no staging values or deployed environment have been verified.
 2. Run staging authenticated browser E2E and staging mobile role-flow QA once staging exists.
 3. Add physical-device and signed mobile release evidence before release-candidate claims.
 4. Resolve production environment requirements and document validated deployment values without committing secrets.
@@ -156,3 +156,10 @@ Entry criteria already met locally:
 - Parent, teacher, staff, and driver scope checks pass locally.
 - `pnpm smoke:pilot` and `pnpm test:web:e2e` pass with local Postgres, Redis, API, and seeded data.
 - Android emulator role-flow QA returns real records or valid permission/empty responses, not generic backend failures.
+
+2026-06-30 Phase 4 tooling update:
+
+- `pnpm verify:env:staging` and `pnpm verify:env:production` run the strict deploy env preflight with `NODE_ENV=production`.
+- The preflight checks HTTPS origins, web API base URL, non-placeholder secrets, production runtime opt-in, provider mode consistency, and storage-specific required values.
+- The preflight can load an untracked staging env file through `DEPLOY_ENV_FILE` / `SCHOOLOS_DEPLOY_ENV_FILE`; no real staging values have been supplied or verified yet.
+- `apps/web/.env.example` now documents the required web API base URL. This is tooling support only; staging remains unverified until the deployed checks pass.

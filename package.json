@@ -20,6 +20,8 @@
     "db:seed:platform": "pnpm --filter @schoolos/api db:seed:platform",
     "test:web:e2e": "pnpm --filter @schoolos/web test:e2e",
     "verify:env:deploy": "node scripts/check-deploy-env.mjs",
+    "verify:env:staging": "DEPLOY_ENV=staging NODE_ENV=production node scripts/check-deploy-env.mjs",
+    "verify:env:production": "DEPLOY_ENV=production NODE_ENV=production node scripts/check-deploy-env.mjs",
     "verify:tracked-artifacts": "node scripts/check-tracked-artifacts.mjs",
     "verify:openapi": "node scripts/check-openapi-gate.mjs",
     "verify:deploy:core": "pnpm compile:artifacts && pnpm verify:env:deploy && pnpm verify:tracked-artifacts && pnpm db:generate && pnpm db:validate && pnpm verify:openapi && pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build",
