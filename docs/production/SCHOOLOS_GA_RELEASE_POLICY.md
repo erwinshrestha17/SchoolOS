@@ -102,7 +102,26 @@ A workflow, module, release candidate, or GA release is complete only when its a
 - No raw object key, permanent provider URL, token hash, provider credential, salary/bank value, or private payload is exposed in UI, API, logs, or client cache.
 - Retention, archival, temporary-export expiry, backup, restore, and legal/financial record safeguards are documented and tested where applicable.
 
-### 4.5 Verification and release evidence
+### 4.5 Mobile distribution size
+
+The first SchoolOS mobile release must remain practical for Nepal's mobile-data and weaker-network conditions.
+
+| Measure | Android | iPhone |
+|---|---:|---:|
+| Target store download | 20-30 MB | 25-35 MB |
+| Absolute first-release store-download limit | Under 50 MB | Under 50 MB |
+| Target installed size | 50-90 MB | 50-90 MB |
+
+- Android release distribution uses an Android App Bundle (`.aab`) so Google Play can deliver device-specific files.
+- Student photos, PDFs, report cards, videos, and large illustrations are not bundled in the application package.
+- Protected and media files load securely only when requested; feature modules do not add large always-installed asset packs.
+- Images are compressed and appropriately sized. Heavy animation/video packages require explicit release-size review.
+- Module assets are lazy-loaded where the platform supports it.
+- Optional persistent cache is user-controlled, limited to approved safe data, clearable, and capped at no more than 100 MB for the first release. Private cache still clears on logout/session expiry as required.
+- Release-candidate evidence records the Android and iPhone store-download estimates plus installed size on representative devices. A debug APK size is not accepted as store-download evidence.
+- Exceeding either platform's 50 MB store-download limit blocks the first release. Missing size evidence blocks a release-candidate or GA claim.
+
+### 4.6 Verification and release evidence
 
 Relevant implementation changes must run and truthfully report applicable checks:
 

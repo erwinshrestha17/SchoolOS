@@ -1,7 +1,7 @@
 # SchoolOS Mobile Master Guide
 
 **Status:** App-local pointer and guardrail
-**Updated:** 2026-06-26
+**Updated:** 2026-07-01
 **Authoritative mobile plan:** `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`
 **Authoritative surface allocation:** `docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`
 **Authoritative release policy:** `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`
@@ -38,6 +38,7 @@ This file stays in the Flutter app so mobile contributors can find the active mo
 13. Every screen needs loading, empty, error, permission-denied, module-locked, offline, and success/pending states where applicable.
 14. Protected files use authenticated download/share helpers only.
 15. Passing Flutter unit tests or a debug APK build is not mobile GA proof; supported personas require seeded backend, emulator/device, deep-link, permission-denial, logout-cache-clearing, and protected-file evidence.
+16. First-release packaging follows the GA policy's mobile size gates, ships Android as an `.aab`, and never bundles student photos, PDFs, report cards, videos, or large illustrations.
 
 ## Current Feature Roots
 

@@ -6,7 +6,7 @@
 **Precedence:** Backend/OpenAPI/shared contracts and backend authorization remain authoritative. Cross-surface ownership lives in `../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`; mobile implementation guidance also lives in `../../apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md`.
 **Inputs/source documents:** `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`, `../requirements/SCHOOLOS_SRS.md`, `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`, `../../apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md`.
 **Out-of-scope content:** Endpoint invention, DTO schemas, Flutter runtime implementation, provider setup, staging/device proof, and GA readiness claims.
-**Last reviewed date:** 2026-06-26
+**Last reviewed date:** 2026-07-01
 
 This document is planning and design guidance only. It does not implement mobile screens, APIs, backend code, database, migrations, package changes, or tests.
 
@@ -163,6 +163,18 @@ Mobile must work well on weak Nepal school/guardian internet:
 - Cache safe read-only summaries.
 - Make retry behavior obvious.
 - Never silently overwrite server data after reconnect.
+
+### 4.5 Lightweight package and on-demand media
+
+The numeric store-download, installed-size, and optional-cache budgets are release gates owned by `../production/SCHOOLOS_GA_RELEASE_POLICY.md`.
+
+- Ship Android through an Android App Bundle (`.aab`).
+- Do not bundle student photos, PDFs, report cards, videos, or large illustrations.
+- Load protected files and media securely only after the user requests them.
+- Prefer initials, compact placeholders, and compressed right-sized images over always-installed artwork.
+- Do not add heavy animation/video dependencies without a measured release-build size review.
+- Lazy-load module assets and optional media.
+- Keep offline storage to approved safe summaries and metadata. Optional persistent cache must be user-controlled, bounded, clearable, and subject to logout/session-expiry cleanup.
 
 ---
 
@@ -1169,6 +1181,8 @@ Before marking any mobile screen complete:
 [ ] Deep links re-check scope before rendering.
 [ ] Minimum 44px tap targets.
 [ ] No private data appears in logs or error messages.
+[ ] Student photos, PDFs, report cards, videos, and large illustrations are loaded on demand rather than bundled.
+[ ] New packages/assets have measured release-build size impact where applicable.
 [ ] Persona smoke case exists or is updated.
 ```
 
@@ -1190,6 +1204,8 @@ flutter build apk --debug
 flutter build ios --no-codesign
 ```
 
+Before a release-candidate claim, also build the signed/release distribution artifacts, use Android App Bundle (`.aab`) delivery, run platform size analysis, and record store-download estimates plus representative installed sizes against the budgets in `../production/SCHOOLOS_GA_RELEASE_POLICY.md`. Debug APK size is not store-download evidence.
+
 ---
 
 ## 23. Mobile Risks
@@ -1207,6 +1223,7 @@ flutter build ios --no-codesign
 | Raw file URL/object key exposure | Protected file helpers only. |
 | Push notification opens forbidden data | Deep link re-checks session/scope before rendering. |
 | Harsh learning labels or public ranking | Supportive labels only, no public leaderboard. |
+| Release package becomes expensive on Nepal mobile data | Enforce release size budgets, use Android App Bundle delivery, measure package growth, and load media on demand. |
 
 ---
 
