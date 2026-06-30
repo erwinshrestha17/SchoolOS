@@ -241,4 +241,64 @@ void main() {
       );
     }
   });
+
+  testWidgets('parent consents keeps trip and pickup requests unavailable', (
+    tester,
+  ) async {
+    final sharedPrefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPreferencesServiceProvider.overrideWithValue(
+            AppPreferencesService(sharedPrefs),
+          ),
+          apiClientProvider.overrideWithValue(_ParentScreenApiClient()),
+          parentPortalDataProvider.overrideWith(
+            (ref) async => const ParentPortalData(
+              parentName: 'Parent',
+              schoolName: 'School',
+              lastUpdated: 'now',
+              children: [
+                ParentPortalChild(
+                  id: 'child-1',
+                  name: 'Asha Rai',
+                  classSection: 'Grade 4 - A',
+                  teacher: 'Class teacher',
+                  attendance: 'Present today',
+                  attendanceTime: 'Updated now',
+                  transport: 'Route A',
+                  homework: 'No pending homework',
+                  updates: 'No unread updates',
+                ),
+              ],
+              homework: [],
+              updates: [],
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: ParentConsentsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Trip permission'),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Trip permission'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Authorized pickup'),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Authorized pickup'), findsOneWidget);
+    expect(find.text('Unavailable'), findsNWidgets(2));
+    expect(
+      find.textContaining('No pickup contact is activated from mobile.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Pending API'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }

@@ -1310,11 +1310,10 @@ class _TasksBody extends StatelessWidget {
         _Callout(
           icon: Icons.add_rounded,
           title: 'Create follow-up task',
-          message: _string(
-            data['createTask'] is Map
-                ? (data['createTask'] as Map)['message']
-                : null,
-            fallback: 'Task creation is unavailable on mobile.',
+          message: _unsupportedActionMessage(
+            data['createTask'],
+            fallback:
+                'Follow-up task creation is not enabled in the principal app yet. Use the school operations workspace for now.',
           ),
           color: AppColors.info,
         ),
@@ -1359,17 +1358,33 @@ class _WalkthroughsBody extends StatelessWidget {
         const SectionHeader(title: "Today's Walkthroughs"),
         const SizedBox(height: AppSpacing.sm),
         _ItemList(items: _list(data['todaysWalkthroughs'])),
+        if (_list(data['recentObservations']).isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.lg),
+          const SectionHeader(title: 'Recent Observations'),
+          const SizedBox(height: AppSpacing.sm),
+          _ItemList(items: _list(data['recentObservations'])),
+        ],
         const SizedBox(height: AppSpacing.md),
         _Callout(
           icon: Icons.add_rounded,
           title: 'New observation',
-          message: _string(
-            data['newObservation'] is Map
-                ? (data['newObservation'] as Map)['message']
-                : null,
-            fallback: 'New observations are unavailable on mobile.',
+          message: _unsupportedActionMessage(
+            data['newObservation'],
+            fallback:
+                'Walkthrough observation capture is not enabled in the principal app yet. Scheduled visits are shown read-only.',
           ),
           color: AppColors.info,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _Callout(
+          icon: Icons.assignment_late_rounded,
+          title: 'Walkthrough follow-up',
+          message: _unsupportedActionMessage(
+            data['followUpCapture'],
+            fallback:
+                'Walkthrough follow-up capture is not enabled in the principal app yet. Follow-up status remains read-only here.',
+          ),
+          color: AppColors.warning,
         ),
       ],
     );
@@ -2929,6 +2944,12 @@ String _string(Object? value, {String fallback = ''}) {
   if (value == null) return fallback;
   final string = '$value';
   return string.isEmpty ? fallback : string;
+}
+
+String _unsupportedActionMessage(Object? value, {required String fallback}) {
+  if (value is Map && value['supported'] == false) return fallback;
+  if (value is Map) return _string(value['message'], fallback: fallback);
+  return fallback;
 }
 
 String _maskPhone(String value) {

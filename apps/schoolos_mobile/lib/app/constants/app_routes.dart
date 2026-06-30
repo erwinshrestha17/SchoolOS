@@ -87,6 +87,20 @@ class AppRoutes {
       '/teacher/class/${Uri.encodeComponent(classSectionId)}';
   static String teacherAttendanceFor(String classSectionId) =>
       '/teacher/attendance/${Uri.encodeComponent(classSectionId)}';
+  static String teacherHomeworkForClass({
+    required String classId,
+    String? sectionId,
+    String? mode,
+  }) {
+    final query = {
+      'classId': classId,
+      if (sectionId != null && sectionId.trim().isNotEmpty)
+        'sectionId': sectionId,
+      if (mode != null && mode.trim().isNotEmpty) 'mode': mode,
+    };
+    return Uri(path: teacherHomework, queryParameters: query).toString();
+  }
+
   static String teacherMessageThreadDetail(String threadId) =>
       '/teacher/messages/${Uri.encodeComponent(threadId)}';
 }

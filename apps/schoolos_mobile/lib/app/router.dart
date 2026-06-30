@@ -241,7 +241,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.teacherHomework,
-        builder: (context, state) => const TeacherHomeworkScreen(),
+        builder: (context, state) => TeacherHomeworkScreen(
+          initialClassId: state.uri.queryParameters['classId'],
+          initialSectionId: state.uri.queryParameters['sectionId'],
+          initialMode: state.uri.queryParameters['mode'],
+        ),
       ),
       GoRoute(
         path: AppRoutes.teacherActivity,

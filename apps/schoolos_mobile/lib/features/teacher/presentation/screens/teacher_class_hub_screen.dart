@@ -132,12 +132,31 @@ class _TeacherClassHubScreenState extends ConsumerState<TeacherClassHubScreen> {
               ),
               const SizedBox(height: AppSpacing.md),
               TeacherTaskCard(
-                title: 'Homework',
-                subtitle:
-                    'Mobile teacher homework needs a purpose-limited backend DTO before class actions are enabled.',
-                icon: Icons.menu_book_rounded,
+                title: 'Create homework',
+                subtitle: 'Draft for this assigned class context.',
+                icon: Icons.add_task_rounded,
                 iconColor: AppColors.teacherAccent,
-                onTap: () => context.go(AppRoutes.teacherHomework),
+                onTap: () => context.go(
+                  AppRoutes.teacherHomeworkForClass(
+                    classId: selected.classId,
+                    sectionId: selected.sectionId,
+                    mode: 'create',
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TeacherTaskCard(
+                title: 'Review homework',
+                subtitle: 'Check submissions for this class.',
+                icon: Icons.rate_review_rounded,
+                iconColor: AppColors.warning,
+                onTap: () => context.go(
+                  AppRoutes.teacherHomeworkForClass(
+                    classId: selected.classId,
+                    sectionId: selected.sectionId,
+                    mode: 'review',
+                  ),
+                ),
               ),
               const SizedBox(height: AppSpacing.md),
               TeacherTaskCard(
@@ -203,22 +222,25 @@ class _StudentSummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: CircleAvatar(
-        backgroundColor: AppColors.info.withValues(alpha: 0.12),
-        foregroundColor: AppColors.info,
-        child: Text(entry.rollNumber),
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: CircleAvatar(
+          backgroundColor: AppColors.info.withValues(alpha: 0.12),
+          foregroundColor: AppColors.info,
+          child: Text(entry.rollNumber),
+        ),
+        title: Text(
+          entry.studentName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        subtitle: Text('Roll ${entry.rollNumber}'),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: onTap,
       ),
-      title: Text(
-        entry.studentName,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w800),
-      ),
-      subtitle: Text('Roll ${entry.rollNumber}'),
-      trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: onTap,
     );
   }
 }

@@ -114,8 +114,19 @@ class TeacherRepository {
     );
   }
 
-  Future<TeacherHomeworkSnapshot> getHomework({String? status}) async {
-    final cacheKey = 'teacher_homework_${status ?? 'all'}';
+  Future<TeacherHomeworkSnapshot> getHomework({
+    String? status,
+    String? classId,
+    String? sectionId,
+    String? subjectId,
+  }) async {
+    final cacheKey = [
+      'teacher_homework',
+      status ?? 'all',
+      classId ?? 'all-classes',
+      sectionId ?? 'all-sections',
+      subjectId ?? 'all-subjects',
+    ].join('_');
     late Map<String, dynamic> data;
     try {
       final responses = await Future.wait([
@@ -124,6 +135,12 @@ class TeacherRepository {
           queryParameters: {
             'limit': '50',
             ...?status == null ? null : {'status': status},
+            if (classId != null && classId.trim().isNotEmpty)
+              'classId': classId,
+            if (sectionId != null && sectionId.trim().isNotEmpty)
+              'sectionId': sectionId,
+            if (subjectId != null && subjectId.trim().isNotEmpty)
+              'subjectId': subjectId,
           },
         ),
         _client.get('/mobile/teacher/homework/scopes'),

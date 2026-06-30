@@ -30,9 +30,14 @@ class AppButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final Widget labelWidget = Text(
-      label,
-      style: const TextStyle(fontWeight: FontWeight.w600),
+    final Widget labelWidget = Flexible(
+      child: Text(
+        label,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
     );
 
     final Widget content = isLoading

@@ -86,6 +86,49 @@ void main() {
     expect(snapshot.scopes.single.label, 'Grade 3 • A • Mathematics');
   });
 
+  test('loads class-scoped homework with backend-supported filters', () async {
+    when(
+      () => apiClient.get<dynamic>(
+        '/mobile/teacher/homework',
+        queryParameters: {
+          'limit': '50',
+          'classId': 'class-1',
+          'sectionId': 'section-1',
+        },
+      ),
+    ).thenAnswer(
+      (_) async => Response(
+        requestOptions: RequestOptions(path: '/mobile/teacher/homework'),
+        data: {'items': <Map<String, dynamic>>[], 'total': 0},
+      ),
+    );
+    when(
+      () => apiClient.get<dynamic>('/mobile/teacher/homework/scopes'),
+    ).thenAnswer(
+      (_) async => Response(
+        requestOptions: RequestOptions(path: '/mobile/teacher/homework/scopes'),
+        data: {'items': <Map<String, dynamic>>[]},
+      ),
+    );
+
+    final snapshot = await repository.getHomework(
+      classId: 'class-1',
+      sectionId: 'section-1',
+    );
+
+    expect(snapshot.total, 0);
+    verify(
+      () => apiClient.get<dynamic>(
+        '/mobile/teacher/homework',
+        queryParameters: {
+          'limit': '50',
+          'classId': 'class-1',
+          'sectionId': 'section-1',
+        },
+      ),
+    ).called(1);
+  });
+
   test('creates a safe draft and publishes through mobile endpoints', () async {
     const scope = schoolosScope;
     when(

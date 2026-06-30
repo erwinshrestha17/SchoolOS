@@ -81,16 +81,16 @@ class ParentConsentsScreen extends ConsumerWidget {
                 icon: Icons.directions_bus_rounded,
                 title: 'Trip permission',
                 message:
-                    'Trip approvals will be shown here after the school publishes a mobile consent request.',
-                statusLabel: 'Pending API',
+                    'Trip permission requests are not enabled in the parent app yet. School trip approvals remain with the school office.',
+                statusLabel: 'Unavailable',
               ),
               const SizedBox(height: 12),
               const _ReadOnlyPermissionCard(
                 icon: Icons.group_rounded,
                 title: 'Authorized pickup',
                 message:
-                    'Pickup contacts need a protected school approval workflow before editing is available in the parent app.',
-                statusLabel: 'Pending API',
+                    'Pickup contact requests need a school-approved pickup workflow before parents can submit changes. No pickup contact is activated from mobile.',
+                statusLabel: 'Unavailable',
               ),
             ],
           ),

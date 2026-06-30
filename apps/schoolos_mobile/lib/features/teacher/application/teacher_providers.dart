@@ -37,10 +37,15 @@ final teacherMessageDetailProvider = FutureProvider.autoDispose
     });
 
 final teacherHomeworkProvider = FutureProvider.autoDispose
-    .family<TeacherHomeworkSnapshot, String?>((ref, status) async {
+    .family<TeacherHomeworkSnapshot, TeacherHomeworkQuery>((ref, query) async {
       final snapshot = await ref
           .watch(teacherRepositoryProvider)
-          .getHomework(status: status);
+          .getHomework(
+            status: query.status,
+            classId: query.classId,
+            sectionId: query.sectionId,
+            subjectId: query.subjectId,
+          );
       final isOnline = ref.watch(connectivityProvider);
       return TeacherHomeworkSnapshot(
         items: snapshot.items,

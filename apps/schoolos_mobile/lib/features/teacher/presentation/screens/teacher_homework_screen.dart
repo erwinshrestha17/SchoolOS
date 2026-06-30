@@ -17,7 +17,16 @@ import '../../domain/teacher_models.dart';
 import '../widgets/teacher_app_widgets.dart';
 
 class TeacherHomeworkScreen extends ConsumerStatefulWidget {
-  const TeacherHomeworkScreen({super.key});
+  const TeacherHomeworkScreen({
+    super.key,
+    this.initialClassId,
+    this.initialSectionId,
+    this.initialMode,
+  });
+
+  final String? initialClassId;
+  final String? initialSectionId;
+  final String? initialMode;
 
   @override
   ConsumerState<TeacherHomeworkScreen> createState() =>
@@ -30,19 +39,25 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
 
   final _picker = ImagePicker();
   String? _status;
+  bool _openedInitialCreate = false;
 
   @override
   Widget build(BuildContext context) {
-    final provider = teacherHomeworkProvider(_status);
+    final query = _currentQuery();
+    final provider = teacherHomeworkProvider(query);
     final homework = ref.watch(provider);
-    final scopes =
-        homework.valueOrNull?.scopes ?? const <TeacherHomeworkScope>[];
+    final snapshot = homework.valueOrNull;
+    final scopes = _scopesForQuery(
+      snapshot?.scopes ?? const <TeacherHomeworkScope>[],
+      query,
+    );
+    final writesLocked = snapshot?.fromCache ?? false;
 
     return RoleShellScaffold(
       role: 'TEACHER',
       selectedIndex: 2,
       title: 'Homework',
-      floatingActionButton: scopes.isEmpty
+      floatingActionButton: scopes.isEmpty || writesLocked
           ? null
           : FloatingActionButton.extended(
               onPressed: () => _showCreateSheet(scopes),
@@ -57,117 +72,176 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
             error: error,
             onRetry: () => ref.invalidate(provider),
           ),
-          data: (snapshot) => ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.lg,
-              AppSpacing.lg,
-              112,
-            ),
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Homework',
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.w900),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Refresh homework',
-                    onPressed: () => ref.invalidate(provider),
-                    icon: const Icon(Icons.refresh_rounded),
-                  ),
-                ],
+          data: (snapshot) {
+            final contextScopes = _scopesForQuery(snapshot.scopes, query);
+            final visibleItems = query.reviewOnly
+                ? snapshot.items
+                      .where((item) => item.submissions.toReview > 0)
+                      .toList()
+                : snapshot.items;
+            if (widget.initialMode == 'create' &&
+                !_openedInitialCreate &&
+                contextScopes.isNotEmpty &&
+                !snapshot.fromCache) {
+              _openedInitialCreate = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _showCreateSheet(contextScopes);
+              });
+            }
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.lg,
+                AppSpacing.lg,
+                112,
               ),
-              const SizedBox(height: AppSpacing.md),
-              Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                children: [
-                  _FilterChip(
-                    label: 'All',
-                    selected: _status == null,
-                    onSelected: () => setState(() => _status = null),
-                  ),
-                  for (final status in const ['DRAFT', 'ASSIGNED', 'CLOSED'])
-                    _FilterChip(
-                      label: _statusLabel(status),
-                      selected: _status == status,
-                      onSelected: () => setState(() => _status = status),
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        query.reviewOnly ? 'Homework Review' : 'Homework',
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.w900),
+                      ),
                     ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Row(
-                children: [
-                  Expanded(
-                    child: TeacherTaskCard(
-                      title: 'Assignments',
-                      subtitle: 'Assigned to your classes',
-                      icon: Icons.school_rounded,
-                      iconColor: AppColors.success,
-                      value: '${snapshot.total}',
+                    IconButton(
+                      tooltip: 'Refresh homework',
+                      onPressed: () => ref.invalidate(provider),
+                      icon: const Icon(Icons.refresh_rounded),
                     ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: TeacherTaskCard(
-                      title: 'To review',
-                      subtitle: 'Submitted work',
-                      icon: Icons.rate_review_rounded,
-                      iconColor: AppColors.warning,
-                      value: '${snapshot.toReview}',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              if (snapshot.scopes.isEmpty)
-                const AppEmptyState(
-                  title: 'No assigned teaching scope',
-                  message:
-                      'Homework becomes available after a class, section, and subject are assigned to you.',
-                  icon: Icons.school_outlined,
-                )
-              else if (snapshot.items.isEmpty)
-                AppEmptyState(
-                  title: _status == null
-                      ? 'No homework yet'
-                      : 'No ${_statusLabel(_status!).toLowerCase()} homework',
-                  message: _status == null
-                      ? 'Create a draft for one of your assigned classes.'
-                      : 'Choose another filter or create a new draft.',
-                  icon: Icons.assignment_outlined,
-                  actionLabel: 'Create homework',
-                  onActionPressed: () => _showCreateSheet(snapshot.scopes),
-                )
-              else
-                for (final item in snapshot.items) ...[
-                  _HomeworkCard(
-                    item: item,
-                    onEdit: item.status == 'DRAFT'
-                        ? () => _showEditSheet(item)
-                        : null,
-                    onPublish: item.status == 'DRAFT'
-                        ? () => _publish(item)
-                        : null,
-                    onReview: item.submissions.toReview > 0
-                        ? () => _showSubmissions(item)
-                        : null,
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                if (query.hasClassContext) ...[
+                  _ClassContextBanner(
+                    label: contextScopes.isNotEmpty
+                        ? contextScopes.first.label
+                        : 'Selected class context',
+                    unavailable: contextScopes.isEmpty,
                   ),
                   const SizedBox(height: AppSpacing.md),
                 ],
-              TeacherLastUpdatedLabel(
-                value: snapshot.lastUpdated,
-                cached: snapshot.fromCache,
-              ),
-            ],
-          ),
+                if (snapshot.fromCache) ...[
+                  const _OfflineReadOnlyCard(),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    _FilterChip(
+                      label: 'All',
+                      selected: _status == null,
+                      onSelected: () => setState(() => _status = null),
+                    ),
+                    for (final status in const ['DRAFT', 'ASSIGNED', 'CLOSED'])
+                      _FilterChip(
+                        label: _statusLabel(status),
+                        selected: _status == status,
+                        onSelected: () => setState(() => _status = status),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TeacherTaskCard(
+                        title: 'Assignments',
+                        subtitle: query.hasClassContext
+                            ? 'For selected class'
+                            : 'Assigned to your classes',
+                        icon: Icons.school_rounded,
+                        iconColor: AppColors.success,
+                        value: '${snapshot.total}',
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: TeacherTaskCard(
+                        title: 'To review',
+                        subtitle: 'Submitted work',
+                        icon: Icons.rate_review_rounded,
+                        iconColor: AppColors.warning,
+                        value: '${snapshot.toReview}',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                if (snapshot.scopes.isEmpty)
+                  const AppEmptyState(
+                    title: 'No assigned teaching scope',
+                    message:
+                        'Homework becomes available after a class, section, and subject are assigned to you.',
+                    icon: Icons.school_outlined,
+                  )
+                else if (contextScopes.isEmpty)
+                  const AppEmptyState(
+                    title: 'Class not available for homework',
+                    message:
+                        'This class is not in your current homework assignment scopes.',
+                    icon: Icons.lock_outline_rounded,
+                  )
+                else if (visibleItems.isEmpty)
+                  AppEmptyState(
+                    title: query.reviewOnly
+                        ? 'No submissions to review'
+                        : _status == null
+                        ? 'No homework yet'
+                        : 'No ${_statusLabel(_status!).toLowerCase()} homework',
+                    message: query.reviewOnly
+                        ? 'Reviewed or unsubmitted work will stay out of this queue.'
+                        : snapshot.fromCache
+                        ? 'This action needs internet. Please reconnect to create homework.'
+                        : _status == null
+                        ? 'Create a draft for one of your assigned classes.'
+                        : 'Choose another filter or create a new draft.',
+                    icon: Icons.assignment_outlined,
+                    actionLabel: query.reviewOnly || snapshot.fromCache
+                        ? null
+                        : 'Create homework',
+                    onActionPressed: query.reviewOnly || snapshot.fromCache
+                        ? null
+                        : () => _showCreateSheet(contextScopes),
+                  )
+                else
+                  for (final item in visibleItems) ...[
+                    _HomeworkCard(
+                      item: item,
+                      onEdit: item.status == 'DRAFT' && !snapshot.fromCache
+                          ? () => _showEditSheet(item)
+                          : null,
+                      onPublish: item.status == 'DRAFT' && !snapshot.fromCache
+                          ? () => _publish(item)
+                          : null,
+                      onReview:
+                          item.submissions.toReview > 0 && !snapshot.fromCache
+                          ? () => _showSubmissions(item)
+                          : null,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                TeacherLastUpdatedLabel(
+                  value: snapshot.lastUpdated,
+                  cached: snapshot.fromCache,
+                ),
+              ],
+            );
+          },
         ),
       ),
+    );
+  }
+
+  TeacherHomeworkQuery _currentQuery() {
+    return TeacherHomeworkQuery(
+      status: _status,
+      classId: _clean(widget.initialClassId),
+      sectionId: _clean(widget.initialSectionId),
+      reviewOnly: widget.initialMode == 'review',
     );
   }
 
@@ -194,7 +268,7 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
     if (confirmed != true || !mounted) return;
     try {
       await ref.read(teacherRepositoryProvider).publishHomework(item.id);
-      ref.invalidate(teacherHomeworkProvider);
+      ref.invalidate(teacherHomeworkProvider(_currentQuery()));
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -247,31 +321,52 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  DropdownButtonFormField<TeacherHomeworkScope>(
-                    initialValue: selectedScope,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Class and subject',
-                    ),
-                    items: [
-                      for (final scope in scopes)
-                        DropdownMenuItem(
-                          value: scope,
-                          child: Text(
+                  if (scopes.length == 1)
+                    InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Class and subject',
+                      ),
+                      child: Text(
+                        selectedScope.label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    )
+                  else
+                    DropdownButtonFormField<TeacherHomeworkScope>(
+                      initialValue: selectedScope,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Class and subject',
+                      ),
+                      selectedItemBuilder: (context) => [
+                        for (final scope in scopes)
+                          Text(
                             scope.label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                    ],
-                    onChanged: saving
-                        ? null
-                        : (value) {
-                            if (value != null) {
-                              setSheetState(() => selectedScope = value);
-                            }
-                          },
-                  ),
+                      ],
+                      items: [
+                        for (final scope in scopes)
+                          DropdownMenuItem(
+                            value: scope,
+                            child: Text(
+                              scope.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: saving
+                          ? null
+                          : (value) {
+                              if (value != null) {
+                                setSheetState(() => selectedScope = value);
+                              }
+                            },
+                    ),
                   const SizedBox(height: AppSpacing.md),
                   TextFormField(
                     controller: title,
@@ -319,14 +414,29 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                             }
                           },
                   ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Student submission required'),
-                    value: submissionRequired,
-                    onChanged: saving
-                        ? null
-                        : (value) =>
-                              setSheetState(() => submissionRequired = value),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.xs,
+                    ),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Student submission required',
+                            softWrap: true,
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        Switch(
+                          value: submissionRequired,
+                          onChanged: saving
+                              ? null
+                              : (value) => setSheetState(
+                                  () => submissionRequired = value,
+                                ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   _HomeworkAttachmentSection(
@@ -370,7 +480,9 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                                         attachments,
                                       ),
                                     );
-                                ref.invalidate(teacherHomeworkProvider);
+                                ref.invalidate(
+                                  teacherHomeworkProvider(_currentQuery()),
+                                );
                                 if (sheetContext.mounted) {
                                   Navigator.pop(sheetContext);
                                 }
@@ -603,7 +715,9 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                                       dueDate: dueDate,
                                       submissionRequired: submissionRequired,
                                     );
-                                ref.invalidate(teacherHomeworkProvider);
+                                ref.invalidate(
+                                  teacherHomeworkProvider(_currentQuery()),
+                                );
                                 if (sheetContext.mounted) {
                                   Navigator.pop(sheetContext);
                                 }
@@ -658,8 +772,80 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
       useSafeArea: true,
       builder: (context) => _SubmissionsSheet(homework: item),
     );
-    ref.invalidate(teacherHomeworkProvider);
+    ref.invalidate(teacherHomeworkProvider(_currentQuery()));
   }
+}
+
+class _ClassContextBanner extends StatelessWidget {
+  const _ClassContextBanner({required this.label, this.unavailable = false});
+
+  final String label;
+  final bool unavailable;
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    hasShadow: false,
+    color: unavailable ? AppColors.warningLight : AppColors.slate50,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final textWidth = (constraints.maxWidth - 36).clamp(0, double.infinity);
+        return Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Icon(
+              unavailable ? Icons.lock_outline_rounded : Icons.school_rounded,
+              color: unavailable ? AppColors.warning : AppColors.teacherAccent,
+            ),
+            SizedBox(
+              width: textWidth.toDouble(),
+              child: Text(
+                unavailable
+                    ? 'Selected class context is not available for homework.'
+                    : 'Showing homework for $label',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+class _OfflineReadOnlyCard extends StatelessWidget {
+  const _OfflineReadOnlyCard();
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    hasShadow: false,
+    color: AppColors.warningLight,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final textWidth = (constraints.maxWidth - 36).clamp(0, double.infinity);
+        return Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off_rounded, color: AppColors.warning),
+            SizedBox(
+              width: textWidth.toDouble(),
+              child: Text(
+                'You are offline. Homework is read-only until the connection returns.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }
 
 class _FilterChip extends StatelessWidget {
@@ -1110,6 +1296,19 @@ AppStatusType _statusType(String status) {
     'CANCELLED' || 'NEEDS_CORRECTION' => AppStatusType.rejected,
     _ => AppStatusType.pending,
   };
+}
+
+String? _clean(String? value) {
+  final trimmed = value?.trim();
+  return trimmed == null || trimmed.isEmpty ? null : trimmed;
+}
+
+List<TeacherHomeworkScope> _scopesForQuery(
+  List<TeacherHomeworkScope> scopes,
+  TeacherHomeworkQuery query,
+) {
+  if (!query.hasClassContext && query.subjectId == null) return scopes;
+  return scopes.where(query.matchesScope).toList();
 }
 
 String? _homeworkImageContentType(XFile file) {

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:schoolos_mobile/app/constants/app_routes.dart';
 import 'package:schoolos_mobile/core/auth/auth_provider.dart';
 import 'package:schoolos_mobile/core/auth/data/auth_repository.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
@@ -17,7 +19,9 @@ import 'package:schoolos_mobile/features/principal/presentation/screens/principa
 import 'package:schoolos_mobile/features/teacher/application/teacher_providers.dart';
 import 'package:schoolos_mobile/features/teacher/domain/teacher_models.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_activity_screen.dart';
+import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_class_hub_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_homework_screen.dart';
+import 'package:schoolos_mobile/features/teacher/presentation/widgets/teacher_app_widgets.dart';
 
 class _MockAttendanceRepository extends Mock implements AttendanceRepository {}
 
@@ -157,6 +161,116 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('principal tasks keeps unsupported task creation unavailable', (
+    tester,
+  ) async {
+    final sharedPrefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPreferencesServiceProvider.overrideWithValue(
+            AppPreferencesService(sharedPrefs),
+          ),
+          tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authProvider.overrideWith((ref) {
+            return _FakeAuthNotifier(
+              ref.watch(tokenStorageServiceProvider),
+              ref.watch(authRepositoryProvider),
+              ref.watch(appPreferencesServiceProvider),
+            );
+          }),
+          principalSnapshotProvider.overrideWith((ref, key) async {
+            return {
+              'metrics': {'dueToday': 0, 'overdue': 0, 'completed': 0},
+              'items': <Map<String, dynamic>>[],
+              'createTask': {
+                'supported': false,
+                'message': 'Follow-up task creation needs backend work.',
+              },
+            };
+          }),
+        ],
+        child: const MaterialApp(home: PrincipalTasksScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Create follow-up task'), findsOneWidget);
+    expect(
+      find.text(
+        'Follow-up task creation is not enabled in the principal app yet. Use the school operations workspace for now.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('backend'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('principal walkthrough writes remain clearly unavailable', (
+    tester,
+  ) async {
+    final sharedPrefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPreferencesServiceProvider.overrideWithValue(
+            AppPreferencesService(sharedPrefs),
+          ),
+          tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authProvider.overrideWith((ref) {
+            return _FakeAuthNotifier(
+              ref.watch(tokenStorageServiceProvider),
+              ref.watch(authRepositoryProvider),
+              ref.watch(appPreferencesServiceProvider),
+            );
+          }),
+          principalSnapshotProvider.overrideWith((ref, key) async {
+            return {
+              'metrics': {'scheduled': 1, 'completed': 0, 'followUp': 0},
+              'todaysWalkthroughs': [
+                {
+                  'id': 'slot-1',
+                  'title': 'Grade 3 - Mathematics',
+                  'subtitle': 'Mina Shrestha',
+                  'detail': 'Period 1',
+                  'status': 'Scheduled',
+                },
+              ],
+              'recentObservations': <Map<String, dynamic>>[],
+              'newObservation': {
+                'supported': false,
+                'message':
+                    'New classroom observations need an audited endpoint.',
+              },
+            };
+          }),
+        ],
+        child: const MaterialApp(home: PrincipalWalkthroughsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Grade 3 - Mathematics'), findsOneWidget);
+    expect(find.text('New observation'), findsOneWidget);
+    expect(find.text('Walkthrough follow-up'), findsOneWidget);
+    expect(
+      find.text(
+        'Walkthrough observation capture is not enabled in the principal app yet. Scheduled visits are shown read-only.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Walkthrough follow-up capture is not enabled in the principal app yet. Follow-up status remains read-only here.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('endpoint'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('teacher attendance paints assigned roster content', (
     tester,
   ) async {
@@ -265,6 +379,98 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('teacher class hub opens homework create and review with context', (
+    tester,
+  ) async {
+    final repository = _MockAttendanceRepository();
+    when(() => repository.getTeacherToday(any())).thenAnswer(
+      (_) async => TeacherTodaySnapshot(
+        date: DateTime(2026, 6, 19),
+        periods: const [],
+        classes: const [assignedClass],
+        pendingAttendanceCount: 1,
+        lastUpdated: DateTime(2026, 6, 19, 8),
+      ),
+    );
+    when(
+      () => repository.loadDraftAttendance(any(), any()),
+    ).thenAnswer((_) async => null);
+    when(() => repository.getClassAttendanceSheet(any(), any())).thenAnswer(
+      (_) async => TeacherRosterSnapshot(
+        entries: const [student],
+        attendance: const TeacherAttendanceMeta(
+          isSubmitted: false,
+          isLocked: false,
+          conflictStatus: 'NONE',
+        ),
+        isWorkingDay: true,
+        lastUpdated: DateTime(2026, 6, 19, 8),
+      ),
+    );
+    final controller = TeacherAttendanceController(
+      repository: repository,
+      isOnline: true,
+    );
+
+    Future<void> pumpHub() async {
+      final router = GoRouter(
+        initialLocation: AppRoutes.teacherClassDetail(assignedClass.id),
+        routes: [
+          GoRoute(
+            path: AppRoutes.teacherClass,
+            builder: (context, state) => TeacherClassHubScreen(
+              classSectionId: state.pathParameters['classSectionId'] ?? '',
+            ),
+          ),
+          GoRoute(
+            path: AppRoutes.teacherHomework,
+            builder: (context, state) {
+              final query = state.uri.queryParameters;
+              return Scaffold(
+                body: Text(
+                  'homework:${query['mode']}:${query['classId']}:${query['sectionId']}',
+                ),
+              );
+            },
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            teacherAttendanceControllerProvider.overrideWith(
+              (ref) => controller,
+            ),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+
+    await pumpHub();
+    await tester.scrollUntilVisible(
+      find.text('Activities & milestones'),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.widgetWithText(TeacherTaskCard, 'Create homework'));
+    await tester.pumpAndSettle();
+    expect(find.text('homework:create:class-1:section-1'), findsOneWidget);
+
+    await pumpHub();
+    await tester.scrollUntilVisible(
+      find.text('Activities & milestones'),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.widgetWithText(TeacherTaskCard, 'Review homework'));
+    await tester.pumpAndSettle();
+    expect(find.text('homework:review:class-1:section-1'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('teacher homework paints real assignment content', (
     tester,
   ) async {
@@ -326,6 +532,99 @@ void main() {
     expect(find.text('Publish'), findsOneWidget);
     expect(find.text('Review'), findsOneWidget);
     expect(find.textContaining('API not confirmed'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('teacher homework create mode preselects selected class scope', (
+    tester,
+  ) async {
+    final snapshot = TeacherHomeworkSnapshot(
+      items: const [],
+      scopes: const [
+        TeacherHomeworkScope(
+          id: 'year-1:class-1:section-1:subject-1',
+          academicYearId: 'year-1',
+          academicYearName: '2082',
+          classId: 'class-1',
+          className: 'Grade 3',
+          sectionId: 'section-1',
+          sectionName: 'A',
+          subjectId: 'subject-1',
+          subjectName: 'Mathematics',
+        ),
+      ],
+      total: 0,
+      lastUpdated: DateTime(2026, 6, 19, 8),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          teacherHomeworkProvider.overrideWith((ref, query) async => snapshot),
+        ],
+        child: const MaterialApp(
+          home: TeacherHomeworkScreen(
+            initialClassId: 'class-1',
+            initialSectionId: 'section-1',
+            initialMode: 'create',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Showing homework for Grade 3 • A • Mathematics'),
+      findsOneWidget,
+    );
+    expect(find.text('Create homework draft'), findsOneWidget);
+    expect(find.text('Grade 3 • A • Mathematics'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('teacher homework cached mode blocks write attempts', (
+    tester,
+  ) async {
+    final snapshot = TeacherHomeworkSnapshot(
+      items: const [],
+      scopes: const [
+        TeacherHomeworkScope(
+          id: 'year-1:class-1:section-1:subject-1',
+          academicYearId: 'year-1',
+          academicYearName: '2082',
+          classId: 'class-1',
+          className: 'Grade 3',
+          sectionId: 'section-1',
+          sectionName: 'A',
+          subjectId: 'subject-1',
+          subjectName: 'Mathematics',
+        ),
+      ],
+      total: 0,
+      lastUpdated: DateTime(2026, 6, 19, 8),
+      fromCache: true,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          teacherHomeworkProvider.overrideWith((ref, query) async => snapshot),
+        ],
+        child: const MaterialApp(
+          home: TeacherHomeworkScreen(initialClassId: 'class-1'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'You are offline. Homework is read-only until the connection returns.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(FloatingActionButton), findsNothing);
+    expect(find.text('Create homework'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

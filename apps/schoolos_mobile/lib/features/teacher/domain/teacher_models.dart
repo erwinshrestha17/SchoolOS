@@ -315,6 +315,51 @@ class TeacherHomeworkSnapshot {
       items.fold(0, (count, item) => count + item.submissions.toReview);
 }
 
+class TeacherHomeworkQuery {
+  const TeacherHomeworkQuery({
+    this.status,
+    this.classId,
+    this.sectionId,
+    this.subjectId,
+    this.reviewOnly = false,
+  });
+
+  final String? status;
+  final String? classId;
+  final String? sectionId;
+  final String? subjectId;
+  final bool reviewOnly;
+
+  bool get hasClassContext => classId != null && classId!.trim().isNotEmpty;
+
+  bool matchesScope(TeacherHomeworkScope scope) {
+    if (classId != null && classId!.trim().isNotEmpty) {
+      if (scope.classId != classId) return false;
+    }
+    if (sectionId != null && sectionId!.trim().isNotEmpty) {
+      if (scope.sectionId != sectionId) return false;
+    }
+    if (subjectId != null && subjectId!.trim().isNotEmpty) {
+      if (scope.subjectId != subjectId) return false;
+    }
+    return true;
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is TeacherHomeworkQuery &&
+        other.status == status &&
+        other.classId == classId &&
+        other.sectionId == sectionId &&
+        other.subjectId == subjectId &&
+        other.reviewOnly == reviewOnly;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(status, classId, sectionId, subjectId, reviewOnly);
+}
+
 class TeacherHomeworkSubmission {
   const TeacherHomeworkSubmission({
     required this.id,
