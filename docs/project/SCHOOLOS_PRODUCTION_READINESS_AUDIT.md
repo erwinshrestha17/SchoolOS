@@ -52,6 +52,20 @@ Phase 2 authenticated web E2E and Phase 3 emulator role-flow QA ran against the 
 | Driver role flow | PASS | Driver login showed live trip, route, vehicle, assignment counts, active route, and student manifest for the assigned route only. |
 | Settings logout path | PASS after fix | Logout `ListTile` debug Material assertion was fixed by wrapping the tile in its own transparent `Material`; no fresh assertion appeared on the spot-check. |
 
+## 2026-06-30 Web UI/API Alignment Evidence Update
+
+The authenticated dashboard shell and module overview alignment were updated using existing purpose-limited APIs and explicit unavailable states where bounded summary contracts did not exist. No backend, Prisma, OpenAPI, permission, or money contract was added to manufacture visual parity.
+
+| Command / Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm --filter @schoolos/web lint` | PASS | Web lint completed without errors. |
+| `pnpm --filter @schoolos/web typecheck` | PASS | Web TypeScript completed without errors. |
+| `pnpm --filter @schoolos/web test` | PASS | 172 web tests passed. |
+| `pnpm --filter @schoolos/web build` | PASS | Next.js production build completed and generated 160 static pages. |
+| Authenticated rendered comparison | NOT RUN | The local server started, but the in-app browser policy rejected the local target. No screenshot-fidelity, responsive-browser, or staging claim is recorded from this update. |
+
+The durable M3, M4, and M5 UI/API rules from that alignment pass live in their module references. Current readiness remains governed by this audit; local source checks do not replace authenticated rendered QA, staging browser proof, or controlled-pilot evidence.
+
 ## Commands Actually Run
 
 | Command | Result | Evidence |
@@ -224,8 +238,6 @@ The full current tracked Markdown inventory is now owned by `docs/project/SCHOOL
 | `docs/README.md` | UPDATE | Documentation index; add audit and next-phase plan. |
 | `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md` | UPDATE | Keep as product source of truth; avoid production-ready wording without proof. |
 | `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` | UPDATE | Keep as functional source of truth; avoid readiness claims. |
-| `docs/project/SCHOOLOS_PROJECT_STATUS.md` | UPDATE | Current status should be audit-led and conservative. |
-| `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md` | UPDATE | Keep as implementation backlog; next execution path moves to next-phase plan. |
 | `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` | KEEP_AS_CANONICAL | New canonical audit. |
 | `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` | KEEP_AS_CANONICAL | New focused delivery path. |
 | `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | KEEP_AS_CANONICAL | Architecture/security source of truth. |

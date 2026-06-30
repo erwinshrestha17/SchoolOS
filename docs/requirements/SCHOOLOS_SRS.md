@@ -6,7 +6,7 @@
 **Precedence:** This SRS translates the BRD, PRD, and FRS into software constraints. It does not replace module behavior in `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, current readiness evidence in `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`, or implementation sequencing in `../project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`.
 **Inputs/source documents:** `../product/SCHOOLOS_BRD.md`, `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`, `../architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `../architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md`, `../architecture/SCHOOLOS_PLATFORM_OPERATIONS.md`, `../architecture/SCHOOLOS_NAMING_CONVENTIONS.md`, `../production/SCHOOLOS_GA_RELEASE_POLICY.md`, `../production/SCHOOLOS_PRODUCTION_RUNBOOK.md`, `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`, `../project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`, actual repository code inspected on 2026-06-20.
 **Out-of-scope content:** Exact endpoint URLs for proposed APIs, Prisma migrations for proposed structures, screen-by-screen UI specs, pricing, staging secrets, deployment credentials, and GA readiness claims.
-**Last reviewed date:** 2026-06-26
+**Last reviewed date:** 2026-07-01
 
 ---
 
@@ -135,6 +135,11 @@ Current repository status: **PROPOSED / NEEDS_SCHEMA_DESIGN**. Do not invent end
 | SRS-NFR-08 | Mobile supports offline safe reads only by default; offline writes require explicit idempotency, replay/reconciliation design, and visible queued/synced/failed state. |
 | SRS-NFR-09 | No offline payments, wallet debits, refunds, payroll, accounting, report-card publishing, tenant settings, platform controls, or high-risk writes. |
 | SRS-NFR-10 | M14 Intelligence / AI remains roadmap-only and must not introduce AI runtime, AI tutor, AI chat, adaptive learning, or inference workflows until approved. |
+| SRS-NFR-11 | Education-reporting validation, summaries, report states and export generation are backend-owned, tenant-scoped, permission-filtered and auditable. |
+| SRS-NFR-12 | Generated compliance reports and evidence packages are versioned protected File Registry artifacts with as-of timestamps and retention policy. |
+| SRS-NFR-13 | Formal invoice and adjustment-note identifiers are allocated transactionally by tenant, fiscal year and document type; issued identifiers are never reused. |
+| SRS-NFR-14 | Issued tax invoices and adjustment notes are immutable snapshots; cancellation, credit/debit, reprint and retry workflows are idempotent and audited. |
+| SRS-NFR-15 | External government/provider states distinguish disabled, export-only, sandbox, queued, accepted, rejected and transport failure; SchoolOS never infers certification or official submission. |
 
 ## 6. Backend API Rules
 
@@ -210,6 +215,9 @@ Mobile workflow priority:
 | Preschool safety | Emergency/care fields exist on `Student`; activity/milestone models exist. | Authorized pickup, temporary pickup, arrival/checkout, and pickup exception workflows need schema design. |
 | Higher Secondary | `Subject.hasPractical`, theory/practical marks, assessments, exams, report cards, and promotion exist. | Stream/subject-combination/practical/project tracking needs ownership, indexes, API, UI, and tests. |
 | Money correctness | Fees, payments, receipts, cashier close, accounting, payroll, and canteen wallet/POS models exist. | Continue Decimal/database totals, idempotency, reversal/correction, and transaction-boundary tests. |
+| Institution compliance profile | Tenant/settings data exists, but no standalone compliance module is approved. | Extend M0-owned legal/location/affiliation/accreditation settings only through reviewed schema/contracts and field-level permission/audit rules. |
+| Reporting snapshots | Reports/export history and queue processors exist. | M1/M4/M7 and other owners generate tenant-scoped validation results and versioned report snapshots; ERROR findings block ready state. |
+| Formal tax billing | M3 invoices/payments/receipts and M11 posting foundations exist; formal tax-invoice schema/API proof is not established here. | Any formal invoice/sequence/note/CBMS models require tenant/fiscal/document indexes, immutable snapshots, idempotent commands, OpenAPI/shared contracts and concurrency tests. |
 | Files | `FileAsset` and module file references exist. | New files must use File Registry metadata, retention, protected access, and lifecycle audit. |
 | Reporting performance | Reports/export history and queue processors exist. | Large reports must be queued and indexed; no dashboard raw-table scans. |
 | Migration safety | Split schema and migrations exist. | Proposed program/stage structures require migration replay, backfill, index review, and seed idempotency proof. |
@@ -277,4 +285,6 @@ Mobile workflow priority:
 | Higher Secondary projects/practicals lifecycle | NEEDS_SCHEMA_DESIGN | Design lifecycle, assessment, files, notifications, and parent/student visibility. |
 | Conceptual ExperienceContext | PROPOSED | Backend contract, OpenAPI, shared DTO, web/mobile integration, tests. |
 | Bachelor's scope | PROPOSED / NEEDS_SCHEMA_DESIGN | Schema, OpenAPI, shared contracts, RBAC/entitlement design, web/mobile contracts, seed, browser/mobile tests, tenant-isolation tests, student self-scope tests, and staging proof. |
+| Education-reporting compliance composition | PROPOSED / NEEDS_CONTRACT_DESIGN | Confirm official iEMIS/UGC/HEMIS/QAA fields, module-owned projections, validation states, protected export contracts, permissions, retention and pilot evidence. |
+| Formal/IRD-ready billing extension | PROPOSED / NEEDS_CONTRACT_DESIGN | Confirm legal/tax policy, sequence concurrency, immutable invoice/note schema, OpenAPI/shared contracts, M11 posting, provider adapter, tenant tests and official approval boundaries. |
 | Master's scope | NOT_ACTIVE_MANAGEMENT_PACK | Keep eligibility-only until a separate full management pack is approved. |

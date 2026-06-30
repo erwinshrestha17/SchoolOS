@@ -1,7 +1,7 @@
 # SchoolOS Documentation Archive
 
 **Status:** Archive index
-**Last updated:** 2026-06-21
+**Last updated:** 2026-07-01
 
 This folder is for old, superseded, duplicated, or one-off planning documents.
 
@@ -53,8 +53,6 @@ docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
 docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
 docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md
 docs/requirements/SCHOOLOS_SRS.md
-docs/project/SCHOOLOS_PROJECT_STATUS.md
-docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md
 docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md
 docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md
 docs/project/SCHOOLOS_DOCUMENTATION_INVENTORY.md
@@ -77,7 +75,7 @@ Check `docs/project/SCHOOLOS_DOCUMENTATION_INVENTORY.md` before archiving or del
 
 | Archived path | Original path | Replacement / current owner |
 |---|---|---|
-| `design/design-qa.md` | `design-qa.md` | `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `docs/design/modules/`, and `docs/implementation/WEB_UI_API_ALIGNMENT_AUDIT.md`. |
+| `design/design-qa.md` | `design-qa.md` | `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `docs/design/modules/`, and `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`. |
 | `design/HOSTEL_WEB_REFERENCE_ANALYSIS_RETIRED.md` | `docs/design/HOSTEL_WEB_REFERENCE_ANALYSIS_RETIRED.md` | Active M0-M14 taxonomy in `docs/README.md`, `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, and `docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`. |
 | `design/decisions/2026-06-19-m2-attendance-web-reference.md` | `docs/design/decisions/2026-06-19-m2-attendance-web-reference.md` | `docs/design/modules/M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md` and `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`. |
 | `project/checklists/2026-06-19-m2-attendance-frontend-delivery-checklist.md` | `docs/project/checklists/2026-06-19-m2-attendance-frontend-delivery-checklist.md` | `docs/design/modules/M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md` and current delivery plan. |

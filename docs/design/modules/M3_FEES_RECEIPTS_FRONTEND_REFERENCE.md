@@ -1,7 +1,7 @@
 # M3 Fees and Receipts — Frontend Web Design Reference
 
 **Status:** Active module-level frontend design reference.
-**Updated:** 2026-06-19
+**Updated:** 2026-07-01
 **Module:** M3 Fees and Receipts
 **Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`
 **Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
@@ -758,6 +758,22 @@ Parent endpoints are linked-child only; cashier capabilities are narrower than a
 - Use school fee heads, academic periods, class/section and guardian phone lookup conventions.
 - Receipts need school identity, fiscal/receipt numbering, payer/student context, allocations, method, and authorized status from backend.
 - Keep school fees separate from SchoolOS subscription/platform billing.
+
+## 12A. IRD-ready formal billing extension
+
+Formal billing remains part of M3; it is not a separate module.
+
+Required workspace capabilities when backend/OpenAPI support exists:
+
+1. Billing compliance settings for legal name, PAN/VAT state, invoice language, billing mode and safe provider readiness.
+2. Fiscal-year/document-type sequence visibility, lock state and audit; the browser never allocates or predicts the official next number.
+3. Backend-calculated tax-invoice preview followed by one idempotent issue command and immutable detail.
+4. Cancellation, credit note and debit note workflows linked to the original invoice with reason, impact preview, permission and audit.
+5. Protected invoice/note PDFs, copy/reprint marking and child-scoped parent copies.
+6. Bounded CBMS adapter/export logs with distinct queued, accepted, rejected, failed and retrying states.
+7. M11 handoff status as read-only source-posting context; M3 UI never writes journals or overrides fiscal locks.
+
+Issued documents have no edit/delete action. Sequence changes, issue, cancel, credit/debit and provider retries are high-risk actions. UI wording remains `IRD-compliance-ready` or `CBMS-ready` until official evidence is configured. All routes, DTOs, permissions and status values need backend/OpenAPI confirmation before implementation.
 
 ---
 

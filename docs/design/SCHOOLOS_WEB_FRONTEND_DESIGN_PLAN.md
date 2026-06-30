@@ -415,6 +415,20 @@ Bachelor's is an active future product direction, not an implemented web workspa
 
 Master's web administration is intentionally not in current scope.
 
+## 14B. Cross-module compliance workspace
+
+Education-reporting and formal-billing readiness must be composed from existing module workspaces rather than introduced as new module numbers.
+
+- M0 settings owns institution identity, affiliation, accreditation and tax-profile fields.
+- M1 owns iEMIS/student-profile readiness and links users to the exact record requiring correction.
+- M4 owns academic/program/result reporting readiness.
+- M7 owns permission-filtered staff qualification/workload reporting readiness.
+- M3 owns formal invoice settings, sequence state, immutable tax invoices, cancellation, credit/debit notes and protected copies.
+- M11 owns posting status, fiscal locks, reconciliation and official accounting reports.
+- Shared report/export screens show backend validation severity, queued state, as-of time, protected result, submission marker and audit history.
+
+The web must not calculate compliance scores, allocate invoice numbers, edit issued invoices, show raw provider payloads, or claim UGC/IRD/CBMS integration without recorded backend evidence. Missing contracts render a friendly unavailable state and remain documented as needing backend/OpenAPI confirmation.
+
 ## 15. Module Design References
 
 All feature explanations, personas, routes, screen specifications, wireframes, component plans, backend dependencies, state matrices, security rules, Nepal requirements, and done definitions live in these files:

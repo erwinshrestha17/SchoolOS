@@ -1,9 +1,9 @@
 # SchoolOS Module Design References
 
 **Status:** Module-level frontend design reference index.  
-**Updated:** 2026-06-22
+**Updated:** 2026-07-01
 
-This folder contains the implementation-ready M1-M13 frontend web design references plus owner-approved planned compliance references. Each file owns its module's feature explanations, personas, route plan, screen specifications, component plan, backend/API needs, state matrix, security boundaries, Nepal-specific requirements, implementation checklist, and done definition.
+This folder contains the implementation-ready M1-M13 frontend web design references. Each file owns its module's feature explanations, personas, route plan, screen specifications, component plan, backend/API needs, state matrix, security boundaries, Nepal-specific requirements, implementation checklist, and done definition.
 
 These files complement and must follow the main web design sources:
 
@@ -25,7 +25,6 @@ Backend/OpenAPI/shared contracts remain authoritative for DTOs, API names, route
 | M1 | Admissions and Student Profiles | [M1 reference](M1_ADMISSIONS_STUDENT_PROFILES_FRONTEND_REFERENCE.md) |
 | M2 | Smart Attendance | [M2 reference](M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md) |
 | M3 | Fees and Receipts | [M3 reference](M3_FEES_RECEIPTS_FRONTEND_REFERENCE.md) |
-| M3B | IRD Billing Compliance extension | [M3B reference](M3B_IRD_BILLING_COMPLIANCE_FRONTEND_REFERENCE.md) |
 | M4 | Academics, Exams, CAS, Report Cards | [M4 reference](M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md) |
 | M5 | Activity Feed and Milestones | [M5 reference](M5_ACTIVITY_FEED_MILESTONES_FRONTEND_REFERENCE.md) |
 | M6 | Homework and Timetable | [M6 reference](M6_HOMEWORK_TIMETABLE_FRONTEND_REFERENCE.md) |
@@ -36,7 +35,6 @@ Backend/OpenAPI/shared contracts remain authoritative for DTOs, API names, route
 | M11 | Accounting and Finance | [M11 reference](M11_ACCOUNTING_FINANCE_FRONTEND_REFERENCE.md) |
 | M12 | Notifications, Notices, Communication, Chat | [M12 reference](M12_NOTIFICATIONS_COMMUNICATION_FRONTEND_REFERENCE.md) |
 | M13 | Learning Layer | [M13 reference](M13_LEARNING_LAYER_FRONTEND_REFERENCE.md) |
-| M15 | Education Compliance | [M15 reference](M15_EDUCATION_COMPLIANCE_FRONTEND_REFERENCE.md) |
 
 `M8A`, `M8B`, and `M8C` are obsolete labels. Library, Transport, and Canteen are standalone modules.
 
@@ -44,9 +42,7 @@ Inventory & Asset Management is scrapped from active design scope.
 
 M14 Intelligence / AI is deferred and intentionally has no active frontend implementation reference.
 
-M3B is an extension of M3 Fees and Receipts, not a separate billing source of truth. M11 remains authoritative for accounting journals, fiscal periods, locks, reconciliation, and financial reports.
-
-M15 Education Compliance is a planned compliance module. It is indexed here because the project owner approved UGC/HEMIS and IRD compliance documentation on 2026-06-22. Implementation still requires backend/OpenAPI confirmation.
+Formal/IRD-ready billing stays inside the M3 reference, while M11 remains authoritative for accounting journals, fiscal periods, locks, reconciliation, and financial reports. Education-reporting readiness is composed from the existing M0, M1, M4, M7, M11 and M12 owners.
 
 ---
 
@@ -64,14 +60,6 @@ For module-specific frontend implementation, read in this order:
 7. The matching module reference in this folder
 8. Existing routes/components/API clients/OpenAPI/contracts/tests for the touched module
 ```
-
-For M3B or M15, also read:
-
-```text
-docs/product/SCHOOLOS_EDUCATION_COMPLIANCE_IRD_BILLING_SPEC.md
-```
-
----
 
 ## Common Design Rules Across All Module References
 
@@ -115,4 +103,4 @@ Do not invent response shapes in frontend code.
 - Do not reintroduce `M8A`, `M8B`, or `M8C` module numbering.
 - Do not create Inventory & Asset Management references unless the project owner explicitly re-approves the module.
 - Do not create M14 AI frontend implementation docs until M14 is approved for active implementation.
-- Keep M3B and M15 compliance docs aligned with `docs/product/SCHOOLOS_EDUCATION_COMPLIANCE_IRD_BILLING_SPEC.md` until master PRD/FRS/SRS/SDD files absorb the approved scope.
+- Keep education-reporting and formal/IRD-ready billing behavior inside existing module owners; do not create additional module references for these capabilities.

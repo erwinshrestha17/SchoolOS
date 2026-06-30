@@ -1,7 +1,7 @@
 # M1 Admissions and Student Profiles — Frontend Web Design Reference
 
 **Status:** Active module-level frontend design reference.
-**Updated:** 2026-06-20
+**Updated:** 2026-07-01
 **Module:** M1 Admissions and Student Profiles
 **Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`
 **Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
@@ -803,6 +803,9 @@ Teacher assigned-student and parent linked-child projections must not reuse admi
 - Use local class/section/roll conventions and academic-year context.
 - Treat IEMIS readiness as validation/export planning; current government schema needs backend verification.
 - ID cards and transfer certificates must use school-approved numbering/templates and protected delivery.
+- IEMIS readiness groups backend validation by institution, class/section, student profile, guardian, active enrollment and required documents; ERROR findings block ready/export state.
+- Validation links to the owning M1 edit workflow and never silently changes student or guardian truth.
+- Each export is a server-generated, versioned File Registry artifact with an as-of timestamp and audit history; generation does not imply government submission.
 
 ---
 

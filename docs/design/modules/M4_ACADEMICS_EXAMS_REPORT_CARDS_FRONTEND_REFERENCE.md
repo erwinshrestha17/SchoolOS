@@ -1,7 +1,7 @@
 # M4 Academics, Exams, CAS, Report Cards — Frontend Web Design Reference
 
 **Status:** Active module-level frontend design reference.
-**Updated:** 2026-06-21
+**Updated:** 2026-07-01
 **Module:** M4 Academics, Exams, CAS, Report Cards
 **Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`
 **Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
@@ -778,6 +778,7 @@ The retired M4 web reference specification was merged here so `docs/design/modul
 - States such as absent, withheld, retest/make-up, practical pending, and project pending appear only when the backend exposes them. A blank mark must not silently become a lifecycle state.
 - Locked sheets are read-only. Corrections, result withholding, publication changes, report-card regeneration, and promotion decisions use reasoned, audited workflows and never silently mutate a published snapshot.
 - Report-card generation, exports, and regeneration are backend jobs with queued, processing, completed, failed, partial-failure, unavailable, version, and protected-file states.
+- Higher-education reporting readiness may compose backend-owned program, level, term, enrollment and published-result summaries after the Bachelor schema/contracts are approved. It must not invent program structures or treat export generation as UGC/HEMIS submission.
 
 ---
 

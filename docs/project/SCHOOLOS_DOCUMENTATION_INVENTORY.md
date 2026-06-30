@@ -2,11 +2,11 @@
 
 **Status:** Canonical documentation inventory
 **Owner/audience:** Documentation owner, product/architecture owners, coding agents, QA, support/operations
-**Scope:** Complete tracked Markdown inventory, source-of-truth ownership, duplicate/overlap notes, inbound-reference notes, recommended consolidation action, actions executed in the 2026-06-20 completion pass, and repo-wide decisions from the 2026-06-21 Markdown audit.
+**Scope:** Complete tracked Markdown inventory, source-of-truth ownership, duplicate/overlap notes, inbound-reference notes, recommended consolidation action, and consolidation decisions through 2026-07-01.
 **Precedence:** This inventory maps documents only. It does not replace the BRD, PRD, FRS, SRS, SDD, MDD, release policy, readiness audit, or runbook.
-**Inputs/source documents:** `git status --short`, `git ls-files '*.md'`, `rg --files -g '*.md'`, `git grep`/`rg` reference scans, Markdown heading/link scan, and source inspection performed on 2026-06-20 and refreshed on 2026-06-21.
+**Inputs/source documents:** `git status --short`, `git ls-files '*.md'`, `rg --files -g '*.md'`, `git grep`/`rg` reference scans, Markdown heading/link scan, and source inspection performed on 2026-06-20, 2026-06-21, and 2026-07-01.
 **Out-of-scope content:** Runtime implementation proof, endpoint contracts, schema changes beyond documented recommendations, and archive history before current tracked Markdown.
-**Last reviewed date:** 2026-06-21
+**Last reviewed date:** 2026-07-01
 
 ---
 
@@ -35,11 +35,11 @@ ARCHIVE
 DELETE
 ```
 
-This inventory reflects the final documentation state after the 2026-06-20 consolidation completion pass plus the 2026-06-21 repo-wide Markdown audit. Recommended actions describe the current action for each remaining path, not a claim that runtime implementation exists.
+This inventory reflects the documentation state after the 2026-06-20/21 consolidation and the 2026-07-01 source-of-truth cleanup. Recommended actions describe the current action for each remaining path, not a claim that runtime implementation exists.
 
-The completion pass archived temporary/retired Markdown that was safe to move after inbound references were checked and active links were updated. No Markdown file was deleted.
+The 2026-06-20/21 completion pass archived temporary/retired Markdown after inbound references were checked and active links were updated.
 
-The 2026-06-21 audit found 64 tracked Markdown files. The decision is not to delete Markdown blindly: canonical docs, app-local guardrails, design systems, E2E guides, archive indexes, and generated asset README files stay. Ten duplicate web reference and implementation-guide documents were merged into active owners, given replacement notes, and archived.
+The 2026-07-01 audit started from 67 tracked Markdown files. Six redundant active documents were merged into canonical owners and deleted with project-owner authorization, leaving 61 tracked Markdown files. Canonical docs, app-local guardrails, design systems, E2E guides, archive indexes, and generated asset README files remain.
 
 ## 2. Source-Of-Truth Hierarchy
 
@@ -77,7 +77,7 @@ The 2026-06-21 audit found 64 tracked Markdown files. The decision is not to del
 | `docs/archive/web/modules/M8_LIBRARY_FRONTEND_IMPLEMENTATION_GUIDE.md` | Archived app-local M8 implementation guide. | archive | Unique guidance merged into active M8 module reference. | Archive index only. | KEEP | `docs/design/modules/M8_LIBRARY_FRONTEND_REFERENCE.md`. |
 | `docs/archive/web/modules/README.md` | Archived app-local web module implementation guide index. | archive | Active module references now live under `docs/design/modules/`. | Archive index only. | KEEP | `docs/design/modules/README.md`. |
 | `apps/web/e2e/README.md` | Browser smoke/E2E guide. | active supporting | Overlaps readiness audit for evidence but owns how-to. | Docs read order. | KEEP | N/A |
-| `docs/archive/design/design-qa.md` | Archived ad hoc M1 UI QA note. | archive | Historical visual QA evidence; active rules live elsewhere. | Archive index only. | KEEP | `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `docs/design/modules/`, `docs/implementation/WEB_UI_API_ALIGNMENT_AUDIT.md`. |
+| `docs/archive/design/design-qa.md` | Archived ad hoc M1 UI QA note. | archive | Historical visual QA evidence; active rules live elsewhere. | Archive index only. | KEEP | `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `docs/design/modules/`, `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`. |
 | `docs/README.md` | Documentation map and read order. | canonical | Summarizes all canonical docs. | Root README should point here. | KEEP | N/A |
 | `docs/architecture/NEPAL_BS_DATE_TIME_STANDARD.md` | Nepal date/time standard. | active supporting | Complements architecture/security and core helper code. | None observed. | KEEP | N/A |
 | `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` | Canonical SDD, security, storage, performance, platform architecture rules. | canonical | Overlaps SRS for constraints; SRS references rather than duplicates. | Docs read order. | KEEP | N/A |
@@ -104,7 +104,7 @@ The 2026-06-21 audit found 64 tracked Markdown files. The decision is not to del
 | `docs/design/modules/M13_LEARNING_LAYER_FRONTEND_REFERENCE.md` | M13 module web design reference. | active supporting | Complements M13 PRD/FRS/MDD. | Module index. | KEEP | N/A |
 | `docs/design/modules/M1_ADMISSIONS_STUDENT_PROFILES_FRONTEND_REFERENCE.md` | M1 module web design reference. | active supporting | Overlaps dashboard/M1 visual appendix. | Module index. | KEEP | N/A |
 | `docs/design/modules/M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md` | M2 module web design reference. | active supporting | Overlaps M2 decision/checklist. | Module index. | KEEP | N/A |
-| `docs/design/modules/M3_FEES_RECEIPTS_FRONTEND_REFERENCE.md` | M3 module web design reference. | active supporting | Complements finance implementation audit. | Module index. | KEEP | N/A |
+| `docs/design/modules/M3_FEES_RECEIPTS_FRONTEND_REFERENCE.md` | M3 module web design reference, including formal/IRD-ready billing extension. | active supporting | Complements M11 accounting boundaries. | Module index. | KEEP | N/A |
 | `docs/design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md` | M4 module web design reference. | active supporting | Overlaps M4 web spec/execution plan. | Module index. | KEEP | N/A |
 | `docs/design/modules/M5_ACTIVITY_FEED_MILESTONES_FRONTEND_REFERENCE.md` | M5 module web design reference. | active supporting | Complements stage-aware preschool activity requirements. | Module index. | KEEP | N/A |
 | `docs/design/modules/M6_HOMEWORK_TIMETABLE_FRONTEND_REFERENCE.md` | M6 module web design reference. | active supporting | Overlaps M6 analysis/checklist. | Module index. | KEEP | N/A |
@@ -112,8 +112,7 @@ The 2026-06-21 audit found 64 tracked Markdown files. The decision is not to del
 | `docs/design/modules/M8_LIBRARY_FRONTEND_REFERENCE.md` | M8 module web design reference. | active supporting | Overlaps app-local M8 guide. | Module index. | KEEP | N/A |
 | `docs/design/modules/M9_TRANSPORT_FRONTEND_REFERENCE.md` | M9 module web design reference. | active supporting | Overlaps M9 analysis. | Module index. | KEEP | N/A |
 | `docs/design/modules/README.md` | Module design reference index. | active supporting | Summarizes module files. | Web design plan. | KEEP | N/A |
-| `docs/archive/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md` | Archived M4 frontend execution plan. | archive | Historical W0-W8 slice detail; active guidance is module reference plus next-phase plan. | M4 reference spec and alignment audit mention archive only. | KEEP | `docs/design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md`; `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`. |
-| `docs/implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | Web UI/API alignment audit and implementation notes. | active supporting | Overlaps readiness audit for web, but owns UI/API alignment. | Docs map. | KEEP | N/A |
+| `docs/archive/implementation/M4_ACADEMICS_FRONTEND_EXECUTION_PLAN.md` | Archived M4 frontend execution plan. | archive | Historical W0-W8 slice detail; active guidance is module reference plus next-phase plan. | Archive references only. | KEEP | `docs/design/modules/M4_ACADEMICS_EXAMS_REPORT_CARDS_FRONTEND_REFERENCE.md`; `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`. |
 | `docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md` | Cross-surface allocation and role/surface boundaries. | active supporting | Overlaps PRD/SRS/MDD; retained for detailed allocation. | PRD/FRS and docs map. | KEEP | N/A |
 | `docs/product/SCHOOLOS_BRD.md` | Business requirements and market/stage rollout. | canonical | New formal BRD. | Docs map. | KEEP | N/A |
 | `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` | Canonical FRS. | canonical | Overlaps PRD/MDD; owns workflow behavior. | Product allocation doc. | KEEP | N/A |
@@ -123,10 +122,8 @@ The 2026-06-21 audit found 64 tracked Markdown files. The decision is not to del
 | `docs/archive/project/M10_CANTEEN_FRONTEND_IMPLEMENTATION_CHECKLIST.md` | Archived M10 frontend checklist. | archive | Absorbed into active M10 module reference. | Archive index only. | KEEP | `docs/design/modules/M10_CANTEEN_FRONTEND_REFERENCE.md`. |
 | `docs/archive/project/M6_HOMEWORK_TIMETABLE_FRONTEND_IMPLEMENTATION_CHECKLIST.md` | Archived M6 frontend checklist. | archive | Absorbed into active M6 module reference. | Archive index only. | KEEP | `docs/design/modules/M6_HOMEWORK_TIMETABLE_FRONTEND_REFERENCE.md`. |
 | `docs/project/SCHOOLOS_DOCUMENTATION_INVENTORY.md` | Complete Markdown inventory. | canonical | New owner for documentation inventory. | Docs map. | KEEP | N/A |
-| `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md` | Long implementation backlog and module history. | active supporting | Overlaps next-phase plan; next-phase owns current sequence. | Docs map. | KEEP | `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` for active execution. |
-| `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` | Dependency-driven execution sequence. | canonical | Overlaps implementation plan only for current route. | Readiness audit/product allocation. | KEEP | N/A |
-| `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` | Current readiness evidence and blockers. | canonical | Contains older inventory; this doc now owns full inventory. | Readiness docs. | KEEP | N/A |
-| `docs/project/SCHOOLOS_PROJECT_STATUS.md` | Concise current status snapshot. | active supporting | Summarizes audit; should not replace it. | Docs map. | KEEP | Audit for evidence. |
+| `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` | Dependency-driven execution sequence. | canonical | Owns active sequence; historical module backlog was removed after durable ownership rules were absorbed into the MDD. | Readiness audit/product allocation. | KEEP | N/A |
+| `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` | Current readiness evidence and blockers. | canonical | Contains a clearly labeled historical inventory snapshot; this inventory owns the complete current list. | Readiness docs. | KEEP | N/A |
 | `docs/archive/project/checklists/2026-06-19-m2-attendance-frontend-delivery-checklist.md` | Archived M2 attendance frontend delivery checklist. | archive | Absorbed into active M2 module reference. | Archive index and archived M2 decision note. | KEEP | `docs/design/modules/M2_SMART_ATTENDANCE_FRONTEND_REFERENCE.md`. |
 | `docs/requirements/SCHOOLOS_SRS.md` | Canonical SRS. | canonical | New requirements bridge; references PRD/FRS rather than duplicating. | Docs map. | KEEP | N/A |
 
@@ -136,11 +133,25 @@ The 2026-06-21 audit found 64 tracked Markdown files. The decision is not to del
 |---|---|
 | Create formal BRD/PRD/FRS/SRS/SDD/MDD ownership model. | Done through BRD, existing PRD/FRS, new SRS, existing architecture/security as SDD, and new module design catalog as MDD. |
 | Keep release evidence separate from product/architecture docs. | `SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` remains current proof owner. |
-| Keep execution sequence separate from backlog/history. | `SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` remains current route; implementation plan remains supporting backlog/history. |
+| Keep execution sequence separate from architecture ownership. | `SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` owns current execution; durable advanced-operations ownership is in the MDD. |
 | Archive temporary/retired documents where safe. | `design-qa.md`, Hostel retired appendix, M2 decision/checklist, M4 execution plan, M6 checklist, and M10 checklist were moved under `docs/archive/`. |
-| Delete obsolete Markdown. | None. Historical content remains available under `docs/archive/`. |
+| Delete obsolete Markdown. | Six active duplicates were deleted on 2026-07-01 after unique content and inbound references were merged. Git history remains the historical record. |
 | Retain app-local guides where they prevent mistakes. | App AGENTS, mobile guide, design systems, and E2E README remain active supporting docs. |
 | Remove duplicate source-of-truth ownership. | Active implementation sequencing stays in `SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`; module web detail stays in `docs/design/modules/`; archived checklists are historical only. |
-| Do we need all 64 tracked Markdown files as active reading material? | No. The active reading set is the canonical/supporting docs; the 10 duplicate web reference/implementation-guide files were consolidated and archived. |
-| Delete candidates after audit. | None. Historical content remains under `docs/archive/` with replacement notes. |
+| Do we need every tracked Markdown file as active reading material? | No. Read the canonical baseline plus focused owners; archived documents remain historical only. |
+| Delete candidates after audit. | Completed for six fully absorbed active duplicates on 2026-07-01. |
 | 2026-06-21 web-reference cleanup. | Principal dashboard, M4, M6, M7, M8, M9, M10, M11, and M12 unique guidance was merged into active owners before the duplicate files were archived. |
+| 2026-07-01 project-status and implementation-plan cleanup. | Current status remains in the readiness audit, execution remains in the next-phase plan, and durable advanced-operations ownership moved to the MDD. |
+| 2026-07-01 web-alignment cleanup. | Durable M3/M4/M5 guidance remains in module references and local verification evidence moved to the readiness audit. |
+| 2026-07-01 compliance cleanup. | Standalone compliance-module labels were removed; approved requirements now live under existing M0/M1/M3/M4/M7/M11/M12 owners across PRD/FRS/SRS/SDD/MDD and module references. |
+
+### 4.1 Files deleted after merge on 2026-07-01
+
+| Deleted path | Absorbed by |
+|---|---|
+| `docs/project/SCHOOLOS_PROJECT_STATUS.md` | `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` |
+| `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md` | `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` and `docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md` |
+| `docs/implementation/WEB_UI_API_ALIGNMENT_AUDIT.md` | M3/M4/M5 frontend references and `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` |
+| `docs/product/SCHOOLOS_EDUCATION_COMPLIANCE_IRD_BILLING_SPEC.md` | PRD, FRS, SRS, SDD, MDD, web plan, and affected module references |
+| `docs/design/modules/M3B_IRD_BILLING_COMPLIANCE_FRONTEND_REFERENCE.md` | `docs/design/modules/M3_FEES_RECEIPTS_FRONTEND_REFERENCE.md` and M11 boundary guidance |
+| `docs/design/modules/M15_EDUCATION_COMPLIANCE_FRONTEND_REFERENCE.md` | Existing M0/M1/M4/M7/M11/M12 owners and cross-module reporting/export guidance |

@@ -1,4 +1,4 @@
-> Archived 2026-06-20. Replaced by `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `docs/design/modules/`, and `docs/implementation/WEB_UI_API_ALIGNMENT_AUDIT.md`. Retained as historical M1 visual-QA evidence only.
+> Archived 2026-06-20. Replaced by `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `docs/design/modules/`, and `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`. Retained as historical M1 visual-QA evidence only.
 
 **Source visual truth**
 

@@ -10,7 +10,7 @@
 **Precedence:** Business rationale is owned by `SCHOOLOS_BRD.md`; functional detail by `SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`; software requirements by `../requirements/SCHOOLOS_SRS.md`; module design by `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`; current readiness by `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`; release stage policy by `../production/SCHOOLOS_GA_RELEASE_POLICY.md`.
 **Inputs/source documents:** `SCHOOLOS_BRD.md`, `SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`, `../requirements/SCHOOLOS_SRS.md`, `../architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`, `../design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `../design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`, `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`, repository source inspected on 2026-06-20.
 **Out-of-scope content:** Endpoint URLs, DTO schemas, Prisma migrations, code implementation plans, pricing numbers, staging credentials, and GA readiness claims.
-**Last reviewed date:** 2026-06-26
+**Last reviewed date:** 2026-07-01
 
 ---
 
@@ -540,6 +540,33 @@ Student progression and board-preparation workflows
 ```
 
 Streams and subject combinations must remain school-configurable, not hard-coded. Parent and student views are controlled, own-scope, and non-comparative.
+
+### 7.8 Nepal education-reporting and IRD-ready billing capabilities
+
+Education compliance and tax-billing readiness extend existing modules; they are not additional module numbers.
+
+| Capability | Existing owner |
+|---|---|
+| Institution legal/location/affiliation/accreditation profile | M0 Platform Core and school settings |
+| iEMIS readiness and student/guardian/enrollment completeness | M1 Admissions and Student Profiles |
+| Academic/program/result reporting dimensions | M4 Academics |
+| Staff qualification/workload reporting dimensions | M7 HR and Payroll |
+| Formal invoices, invoice sequences, credit/debit notes, cancellation and protected copies | M3 Fees and Receipts |
+| Official posting, fiscal locks, reconciliation and financial reports | M11 Accounting and Finance |
+| Reminders and submission notifications | M12 Notifications and Communication |
+| Evidence packages, exports and immutable report versions | Owning feature module through File Registry and shared export-job infrastructure |
+
+Required product behavior:
+
+1. Treat iEMIS, UGC/HEMIS and QAA support as validation, export and auditable submission-history workflows until official integration access is verified.
+2. Keep iEMIS school reporting distinct from UGC/HEMIS higher-education reporting.
+3. Generate compliance summaries and validation results on the backend; do not calculate official readiness scores in web/mobile clients.
+4. Support report states such as draft, validating, validation failed, ready, exported, submitted, rejected and archived without claiming government acceptance.
+5. Keep formal invoice numbers tenant-, fiscal-year- and document-type-scoped; allocate them transactionally and never reuse issued numbers.
+6. Make issued tax invoices and issued credit/debit notes immutable. Corrections use cancellation, credit/debit note, refund or reversal workflows with reason and audit.
+7. Keep CBMS behavior behind a provider adapter with explicit disabled, export-only, sandbox and production readiness states.
+8. Use safe market wording such as `reporting-ready`, `IRD-compliance-ready` and `CBMS-ready` until official evidence supports stronger claims.
+9. Do not collect sensitive demographic/category data unless a confirmed reporting need and tenant policy justify it.
 
 ---
 

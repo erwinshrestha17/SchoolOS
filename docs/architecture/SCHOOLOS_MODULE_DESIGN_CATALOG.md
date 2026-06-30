@@ -6,7 +6,7 @@
 **Precedence:** Module ownership and architecture boundaries live here. Functional details remain in `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`; product intent remains in `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`; implementation sequencing remains in `../project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`; current readiness remains in `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
 **Inputs/source documents:** `../product/SCHOOLOS_BRD.md`, `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`, `SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `SCHOOLOS_NOTIFICATION_ARCHITECTURE.md`, `SCHOOLOS_PLATFORM_OPERATIONS.md`, `../requirements/SCHOOLOS_SRS.md`, repository source inspected on 2026-06-20.
 **Out-of-scope content:** Endpoint URL invention, Prisma migrations, code changes, sprint tasks not in the next-phase plan, and GA readiness claims.
-**Last reviewed date:** 2026-06-26
+**Last reviewed date:** 2026-07-01
 
 ---
 
@@ -62,14 +62,42 @@
 6. M13 remains separate and reuses core students, staff, classes, subjects, timetable, communication, files, RBAC, and audit.
 7. M14 is roadmap-only and must not be implemented as incidental analytics or AI inside another module.
 
+### 3.1 Advanced operations foundations
+
+Advanced operations deepen existing M0-M13 workflows without creating another module or introducing AI. Current repository foundations and their required ownership are:
+
+| Foundation | Canonical ownership | Required behavior before release claims |
+|---|---|---|
+| Approval workflows | M0 shared workflow infrastructure; the requesting feature module owns final business validation and application. | Tenant-scoped requests, reasoned rejection, safe before/after context, idempotent final application, module-visible status, audit. |
+| Rules-based automation | M0 shared automation infrastructure; feature modules emit approved triggers; M12 owns notification delivery. | Tenant/feature enablement, deterministic conditions/actions, retry-safe execution, provider-disabled honesty, execution audit. |
+| Descriptive analytics | Each module owns bounded summaries; principal/platform surfaces compose them without duplicating business logic. | Backend-owned totals, as-of timestamps, permission filtering, bounded queries, no client-derived official KPIs. |
+| Document templates and generated documents | Feature module -> File Registry -> StorageService; M0 may provide shared template infrastructure. | Versioned templates, protected artifacts, generation actor/time, reprint/access audit, localization-ready labels. |
+| Export jobs | Source module owns report semantics; shared queue/export infrastructure owns execution state. | Tenant-scoped queued work, bounded status, retry permission/reason, protected File Registry result, expiry/retention policy. |
+| Mobile/offline reliability | Purpose-limited feature APIs and Flutter feature repositories. | Safe cached reads, explicit stale/offline state, idempotent approved drafts only, conflict handling, logout/session-expiry cleanup. |
+
+These foundations must not bypass module ownership. Approval, automation, analytics, document, or export infrastructure cannot write official fee, payroll, accounting, academic, attendance, or communication state without the owning module revalidating authorization, lifecycle, idempotency, and audit requirements.
+
+### 3.2 Compliance capability ownership
+
+| Capability | Owner | Consumers/boundary |
+|---|---|---|
+| Institution legal/location/affiliation/accreditation/tax profile | M0 | M1/M3/M4/M7 reporting and billing consume a permission-filtered projection. |
+| iEMIS validation and student/guardian/enrollment completeness | M1 | May link to owning edit workflows; validation never silently changes student truth. |
+| Academic/program/result reporting dimensions | M4 | Bachelor program/term/course support remains proposed until schema/contracts exist. |
+| Staff qualification/workload reporting dimensions | M7 | Sensitive HR/payroll data is excluded unless explicitly required and permitted. |
+| Formal invoice sequences, immutable tax invoices, credit/debit notes and protected copies | M3 | Emits approved source events; does not own journals or fiscal locks. |
+| Official posting, period locks, reconciliation and accounting reports | M11 | Receives idempotent source events from M3 and other approved modules. |
+| Reminders and delivery | M12 | Source modules emit normalized events; M12 owns channels/providers/retries. |
+| Report/export job infrastructure and evidence files | Owning module + M0 shared queues/File Registry | No standalone compliance module or client-owned official score. |
+
 ## 4. Module Design Catalog
 
 | Module | Current code evidence | Stage-aware design note | Key gaps |
 |---|---|---|---|
-| M0 Platform Core | Platform, plans, tenants, settings, File Registry, reports, support override, provider, queue code exists. | Owns tenant program offerings, module entitlement, platform provider readiness, and experience-pack enablement when designed. | Program offering and experience capability schema is proposed. Staging/provider/backup proof missing. |
+| M0 Platform Core | Platform, plans, tenants, settings, File Registry, reports, support override, provider, queue code exists. | Owns tenant program offerings, module entitlement, platform provider readiness, experience-pack enablement, and shared institution legal/affiliation/accreditation/tax profile when designed. | Program offering, experience capability, and compliance-profile contract/schema are proposed. Staging/provider/backup proof missing. |
 | M1 Admissions and Student Profiles | Student, guardian, enrollment, admissions, documents, QR/ID, lifecycle code and schema exist. | Shared student/enrollment record must classify program/stage without separate student systems. Preschool needs emergency/pickup depth; +2 needs stream enrollment context. | Authorized pickup contacts, temporary pickup changes, and program/stage fields need schema/API design. |
 | M2 Smart Attendance | Attendance sessions, records, drafts, corrections, registers, teacher mobile endpoints, staff attendance exist. | Preschool arrival/late/absence/checkout must extend attendance without replacing it. +2 lab/practical attendance may need timetable context. | Pickup/drop exceptions and preschool checkout are not verified. Offline mobile attendance sync needs continued idempotency proof. |
-| M3 Fees and Receipts | Fee heads/plans/invoices/payments/receipts/refunds/reversals/cashier close and parent mobile fee surfaces exist. | Same ledger supports all stages; preschool invoices may be monthly/simple, +2 may include stream/lab/project fees. | Staging provider/payment proof and seed/pilot financial smoke missing. |
+| M3 Fees and Receipts | Fee heads/plans/invoices/payments/receipts/refunds/reversals/cashier close and parent mobile fee surfaces exist. | Same ledger supports all stages; optional formal/IRD-ready billing extends M3 without creating another module. | Formal tax-invoice/sequence/note/CBMS contracts are not verified; staging provider/payment proof and seed/pilot financial smoke remain missing. |
 | M4 Academics, Exams, CAS, Report Cards | Academic years/classes/sections/subjects, exams, assessment components, marks, CAS, report cards, promotion records exist. | Grade 1-10 owns normal exams/report cards; Preschool defaults to supportive milestones, not heavy exams; +2 needs configurable streams, combinations, practicals/projects. | Stream/combination/practical/project lifecycle needs schema, API, OpenAPI, web/mobile, tests. |
 | M5 Activity Feed and Milestones | Activity posts, attachments, tagged students, reactions, mood logs, developmental milestones, stage-filtered templates exist. | Preschool P0 surface: activity diary, simple observations, consent-safe photos, supportive milestones. | Preschool-specific policy, media consent enforcement in browser/mobile, and pickup-linked updates need verification/design. |
 | M6 Homework and Timetable | Homework, submissions, attachments, reminders, periods, rooms, versions, slots, substitutions, workload limits exist. | School Grade 1-10 and +2 are primary; Preschool uses light parent updates or teacher notes only where policy enables. | +2 theory/lab/practical timetable composition and stream filters need design. |

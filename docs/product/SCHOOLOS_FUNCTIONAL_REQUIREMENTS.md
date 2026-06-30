@@ -10,7 +10,7 @@
 **Precedence:** Product intent is owned by `SCHOOLOS_PRODUCT_REQUIREMENTS.md`; software/non-functional requirements by `../requirements/SCHOOLOS_SRS.md`; module design by `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`; current readiness by `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
 **Inputs/source documents:** `SCHOOLOS_BRD.md`, `SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`, `../requirements/SCHOOLOS_SRS.md`, `../architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`, `../architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md`, `../design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `../design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`, repository source inspected on 2026-06-20.
 **Out-of-scope content:** Endpoint URL invention for proposed APIs, Prisma migrations, UI visual layouts, staging credentials, and GA readiness claims.
-**Last reviewed date:** 2026-06-26
+**Last reviewed date:** 2026-07-01
 
 ---
 
@@ -85,10 +85,10 @@ These rules apply to every module:
 
 | Module | Functional scope |
 |---|---|
-| M0 Platform Core | Tenants, plans, feature flags, provider readiness, queues, File Registry, support override, audit, platform settings. |
+| M0 Platform Core | Tenants, plans, feature flags, provider readiness, queues, File Registry, support override, audit, platform settings, institution compliance profile. |
 | M1 Admissions and Student Profiles | Admission pipeline, student lifecycle, guardian links, documents, duplicate review, QR/ID, iEMIS readiness. |
 | M2 Smart Attendance | Roster attendance, lock windows, corrections, parent visibility, anomalies, registers, absence/late alerts. |
-| M3 Fees and Receipts | Fee setup, invoices, payments, receipts, reversals, refunds, waivers, cashier close, reconciliation handoff. |
+| M3 Fees and Receipts | Fee setup, invoices, payments, receipts, reversals, refunds, waivers, cashier close, formal/IRD-ready billing, reconciliation handoff. |
 | M4 Academics, Exams, CAS, Report Cards | Subjects, marks, CAS, exam terms, grade sheets, report cards, promotion, academic reports. |
 | M5 Activity Feed and Milestones | Class updates, milestones, consent-aware media, parent feed, moderation, activity timeline. |
 | M6 Homework and Timetable | Homework, timetable, substitutions, conflicts, attachments, student/parent visibility. |
@@ -264,6 +264,52 @@ flowchart LR
   Short --> Client["Web/mobile helper opens or downloads without raw object key"]
 ```
 
+### 4A.12 Education reporting and formal billing compliance
+
+Compliance workflows remain inside the existing module taxonomy.
+
+Education-reporting flow:
+
+```text
+Owning M0/M1/M4/M7 data
+-> backend validation with ERROR/WARNING/INFO
+-> server-owned report snapshot
+-> queued export
+-> protected File Registry artifact
+-> optional submitted/rejected marker with actor, date, reference and audit
+```
+
+Required rules:
+
+1. A report cannot become ready while required ERROR validations remain unresolved.
+2. Re-export creates a new run/version and never overwrites earlier evidence.
+3. iEMIS and UGC/HEMIS remain distinct reporting contexts.
+4. QAA evidence and affiliation documents use protected file access.
+5. Parent/student users do not receive administrative reporting exports or demographic aggregates.
+6. Official submission/integration status is never inferred from file generation.
+
+Formal billing flow:
+
+```text
+M3 fee invoice/source
+-> backend tax-invoice preview
+-> transactional sequence allocation
+-> immutable issue snapshot and protected PDF
+-> approved M11 posting event
+-> cancellation or credit/debit note for correction
+-> optional CBMS adapter/export state
+```
+
+Required rules:
+
+1. Sequence scope is tenant + fiscal year + document type.
+2. Issued and cancelled document numbers are never reused.
+3. Issue, cancel, credit, debit, reprint and provider retry commands are idempotent and audited.
+4. Reprints remain copies and do not consume a new official number.
+5. Rejected provider submissions remain distinct from transport failures.
+6. Parent copies are linked-child scoped and omit provider/accounting internals.
+7. M11 remains the only owner of official accounting posting, period locks and reconciliation.
+
 ## 5. M0 Platform Core / SaaS Foundation
 
 ### 5.1 Purpose
@@ -283,6 +329,7 @@ Manage tenants, platform administration, feature controls, provider readiness, q
 9. Use support tenant override with reason and expiry where supported.
 10. Configure school experience coverage: `PRESCHOOL`, `SCHOOL`, `HIGHER_SECONDARY`, and future `BACHELOR` after the backend-owned program/stage model is designed.
 11. Enable/disable M12 Notification/Communication and M13 Learning Layer per tenant/plan.
+12. Maintain school legal identity, location, affiliation, accreditation and tax-profile fields needed by approved reports and billing, with sensitive changes audited.
 
 ### 5.3 Acceptance criteria
 
@@ -291,6 +338,7 @@ Manage tenants, platform administration, feature controls, provider readiness, q
 3. Disabled provider mode never pretends to send real notifications, payments, or storage actions.
 4. API keys are stored hashed and only shown once during creation.
 5. File and queue failure screens show safe, non-secret diagnostics.
+6. Legal, affiliation, accreditation and tax-profile changes used by issued reports or invoices require permission, reason where policy requires it, and audit.
 
 ---
 
@@ -371,6 +419,12 @@ Manage fee plans, invoices, payments, receipts, waivers, discounts, refunds, rev
 6. Run cashier close and collection reports.
 7. Emit payment/dues notifications through M12.
 8. Hand off official finance events to M11 Accounting through approved boundaries.
+9. Support configurable simple-receipt and formal-invoice modes where approved.
+10. Maintain tenant/fiscal-year/document-type invoice sequences through backend transactional allocation.
+11. Preview and issue immutable tax invoices using backend-owned taxable, non-taxable, discount, VAT and total calculations.
+12. Correct issued invoices through cancellation, credit note or debit note workflows; never direct edit/delete.
+13. Generate protected invoice/note PDFs from immutable snapshots and mark reprints as copies.
+14. Track CBMS-ready export/submission state through an adapter without exposing provider secrets or claiming certification.
 
 ### Acceptance criteria
 
@@ -378,6 +432,12 @@ Manage fee plans, invoices, payments, receipts, waivers, discounts, refunds, rev
 2. Payment submit is idempotent.
 3. Receipt files use protected access.
 4. Posted or confirmed records are corrected by reversal/correction, not silent mutation.
+5. Final invoice/note sequence allocation is backend-only, transactional and non-reusable.
+6. Issued invoice and adjustment-note snapshots are immutable.
+7. Cancellation, credit, debit, reprint and CBMS retry actions are permissioned, idempotent and audited.
+8. Parent invoice copies remain linked-child scoped and omit internal accounting/provider fields.
+9. M3 emits approved source events; M11 performs official posting and fiscal-lock enforcement.
+10. UI and documentation use `IRD-compliance-ready` or `CBMS-ready` unless official approval evidence exists.
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Status:** Archived implementation companion for the M6 web reference analysis.
 **Updated:** 2026-06-19  
-**Master implementation source:** `docs/project/SCHOOLOS_IMPLEMENTATION_PLAN.md` remains the active implementation plan. This checklist translates the M6 reference analysis into an implementation order without claiming that the listed work is complete.
+**Active execution source:** `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`. This archived checklist does not define current implementation order.
 
 > Archived 2026-06-20. Active M6 web guidance now lives in `docs/design/modules/M6_HOMEWORK_TIMETABLE_FRONTEND_REFERENCE.md`; current delivery sequencing lives in `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`.
 

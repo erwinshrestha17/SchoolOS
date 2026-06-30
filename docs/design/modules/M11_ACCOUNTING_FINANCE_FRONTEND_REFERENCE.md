@@ -1,7 +1,7 @@
 # M11 Accounting and Finance — Frontend Web Design Reference
 
 **Status:** Active module-level frontend design reference.
-**Updated:** 2026-06-21
+**Updated:** 2026-07-01
 **Module:** M11 Accounting and Finance
 **Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`
 **Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
@@ -883,6 +883,7 @@ The retired M11 accounting analysis was merged here so this file remains the act
 - Source mapping status should distinguish mapped, unmapped, failed, pending, duplicate, and reversed. No frontend code in M3, M7, M8, M10, or other modules writes journals directly.
 - Bank reconciliation suggestions are review-only until confirmed by an authorized user. Suggestions must not auto-post; confirmation/unmatch/import/close/reopen actions require audit and reason where policy requires it.
 - Principal finance views are read-only, summary-first, and hide edit/post/reverse/source-mapping/period-reopen controls plus private operational detail beyond leadership need.
+- Formal tax invoices, credit/debit notes and cancellations originate in M3. M11 shows their idempotent posting/reversal chain, period-lock result and reconciliation status; it never reallocates M3 invoice numbers or edits the source document snapshot.
 
 ---
 

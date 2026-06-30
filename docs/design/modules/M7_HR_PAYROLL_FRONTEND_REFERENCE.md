@@ -1,7 +1,7 @@
 # M7 HR and Payroll — Frontend Web Design Reference
 
 **Status:** Active module-level frontend design reference.
-**Updated:** 2026-06-21
+**Updated:** 2026-07-01
 **Module:** M7 HR and Payroll
 **Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`
 **Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
@@ -723,6 +723,7 @@ The retired M7 web design reference was merged here so this file remains the act
 - Payroll uses a controlled state model: Draft, Review, Approved, Posted, Reversed, Correction Run, Failed Posting, Period Locked, and Accounting Disconnected where exposed. Posted payroll is immutable; corrections use reversal/correction flows only.
 - High-risk actions require impact preview, permission, pending/success/error state, safe retry behavior, and reason where policy requires it: leave decisions, payslip generation/delivery, salary version activation, payroll create/recalculate/approve/post/lock/reverse/correction, protected bulk download, contract non-renewal, staff termination, and password reset.
 - Staff self-service uses purpose-limited own-data APIs and a more mobile-friendly layout than admin payroll screens. It must never receive admin directory or payroll-run payloads.
+- Approved education-reporting views may expose backend-owned aggregate staff counts by teaching/non-teaching status, employment type, department/faculty, designation, qualification and workload. They must omit salary, bank, private contract and unrelated HR details and require backend/OpenAPI confirmation.
 
 ---
 

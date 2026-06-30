@@ -6,7 +6,7 @@
 **Precedence:** This document owns architectural rules and design constraints. Software requirements are owned by `../requirements/SCHOOLOS_SRS.md`; module design by `SCHOOLOS_MODULE_DESIGN_CATALOG.md`; product/functional behavior by `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md` and `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`; current readiness by `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
 **Inputs/source documents:** `../product/SCHOOLOS_BRD.md`, `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `../requirements/SCHOOLOS_SRS.md`, `SCHOOLOS_MODULE_DESIGN_CATALOG.md`, `SCHOOLOS_NOTIFICATION_ARCHITECTURE.md`, `SCHOOLOS_PLATFORM_OPERATIONS.md`, `../production/SCHOOLOS_GA_RELEASE_POLICY.md`, repository source inspected on 2026-06-20.
 **Out-of-scope content:** Endpoint URL invention, Prisma migrations for proposed structures, UI visual detail, staging credentials, and GA readiness claims.
-**Last reviewed date:** 2026-06-26
+**Last reviewed date:** 2026-07-01
 **Architecture:** PostgreSQL-first, NestJS modular monolith, Redis/BullMQ, private object storage, cost-aware performance budgets.
 
 ---
@@ -84,6 +84,45 @@ Required architecture guardrails for proposed stage-aware work:
 5. Backend authorization must enforce the active experience independently of UI composition.
 6. Broad Student App authorization must be backend-owned and allowed only for active Bachelor or Master enrollments; Preschool through Grade 12 remain controlled learning/session only.
 7. Do not add Master's administration, academic structure, finance, faculty, or course-management features without separate approval.
+
+## 1B. Compliance and formal-billing architecture
+
+Education reporting and IRD-ready billing are cross-module capabilities, not new module numbers.
+
+```text
+M0 institution settings
+M1 student/guardian/enrollment truth
+M4 academic/program/result truth
+M7 staff/qualification truth
+        |
+        v
+Owning-module validation and snapshot services
+        |
+        +-> queued export -> File Registry -> protected artifact
+        +-> audited submission marker (not proof of government acceptance)
+
+M3 fee invoice/source
+        |
+        v
+M3 formal invoice preview -> transactional sequence -> immutable issue snapshot
+        |
+        +-> protected invoice PDF through File Registry
+        +-> approved source event -> M11 official posting/locks/reconciliation
+        +-> provider adapter -> CBMS export/sandbox/production state
+```
+
+Architecture rules:
+
+1. M0 owns shared institution legal/location/affiliation/accreditation/tax settings; source modules retain their domain truth.
+2. Validation reads tenant-scoped projections and stores bounded findings by severity. It does not silently rewrite M1, M4, M7 or M11 records.
+3. Report runs store source period, as-of time, validation summary, actor and version; re-export creates another version.
+4. Compliance exports/evidence follow File Registry and background-job boundaries.
+5. Formal invoice sequences use database transactions and uniqueness constraints scoped by tenant, fiscal year and document type.
+6. Issued invoice/note snapshots are immutable; correction creates linked cancellation, credit/debit, refund or reversal records.
+7. M3 never writes M11 journals directly. M11 consumes approved idempotent source events and enforces fiscal locks.
+8. CBMS/provider logic stays behind an adapter. Store safe hashes/bounded diagnostics, never secrets or unrestricted raw payloads.
+9. Provider rejection and transport failure are different states. Retry requires permission, reason and audit.
+10. No UI, export or configuration label may claim UGC integration, IRD verification or CBMS certification without recorded official evidence.
 
 ## 2. Storage and File Registry Architecture
 
