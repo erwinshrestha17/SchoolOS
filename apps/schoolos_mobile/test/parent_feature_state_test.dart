@@ -115,6 +115,16 @@ class _ParentScreenApiClient extends ApiClient {
     if (path == '/mobile/students/child-1/library') {
       return {'activeIssues': [], 'recentHistory': [], 'fines': []};
     }
+    if (path == '/mobile/students/child-1/payment-gateway-readiness') {
+      return {
+        'enabled': false,
+        'status': 'not_configured',
+        'provider': null,
+        'providers': [],
+        'sandbox': false,
+        'message': 'Online payments are not enabled for this school.',
+      };
+    }
     return {};
   }
 
@@ -251,6 +261,16 @@ void main() {
       if (screen is ParentTransportScreen) {
         expect(find.text('GPS is stale'), findsOneWidget);
         expect(find.text('Last updated 18 minutes ago'), findsOneWidget);
+      }
+      if (screen is ParentFeesReceiptsScreen) {
+        expect(
+          find.text('SchoolOS never queues fee payments offline.'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Receipts appear after the backend confirms'),
+          findsOneWidget,
+        );
       }
       expect(
         tester.takeException(),

@@ -187,6 +187,35 @@ void main() {
     expect(controller.state.entries.single.status, AttendanceStatus.present);
   });
 
+  test('online sync failure keeps the saved draft retryable', () async {
+    when(
+      () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+    ).thenAnswer(
+      (_) async => TeacherAttendanceDraft(
+        clientSubmissionId: 'mobile-retry-1',
+        savedAt: DateTime(2026, 6, 18, 8),
+        entries: entries,
+      ),
+    );
+    when(
+      () => repository.submitAttendance(any(), any(), any(), any(), any()),
+    ).thenThrow(const NetworkException());
+
+    final controller = TeacherAttendanceController(
+      repository: repository,
+      isOnline: true,
+    );
+    await _waitForLoad(controller);
+    controller.markStudent('student-1', AttendanceStatus.absent);
+
+    await controller.submit();
+
+    expect(controller.state.syncStatus, AttendanceSyncStatus.failed);
+    expect(controller.state.hasUnsavedChanges, isTrue);
+    expect(controller.state.draftClientSubmissionId, 'mobile-retry-1');
+    expect(controller.state.message, contains('draft remains'));
+  });
+
   test(
     'module lock and expired session errors remain typed for safe UI states',
     () async {

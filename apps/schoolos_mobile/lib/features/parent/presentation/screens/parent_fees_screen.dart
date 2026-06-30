@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/errors/app_exception.dart';
 import '../../../../core/platform/file_share_service.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../application/parent_providers.dart';
 import '../../domain/parent_models.dart';
 import '../widgets/parent_detail_widgets.dart';
@@ -118,7 +120,11 @@ class _FeesContent extends ConsumerWidget {
         const ParentSectionHeader(title: 'Confirmed receipts'),
         const SizedBox(height: 8),
         if (summary.recentReceipts.isEmpty)
-          const PortalCard(child: Text('No confirmed receipts available yet.'))
+          const PortalCard(
+            child: Text(
+              'No confirmed receipts available yet. Receipts appear after the backend confirms payment.',
+            ),
+          )
         else
           for (final receipt in summary.recentReceipts) ...[
             _ReceiptCard(childId: child.id, receipt: receipt),
@@ -137,13 +143,29 @@ class _PaymentReadinessCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return readiness.when(
-      loading: () => const PortalCard(
-        child: Text('Checking the school payment provider...'),
+      loading: () => PortalCard(
+        child: Row(
+          children: [
+            const SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Checking the school payment provider...',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: ParentPortalColors.muted,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
       error: (_, _) => const PortalCard(
         color: ParentPortalColors.orangeSoft,
         child: Text(
-          'Payment provider status is unavailable. No payment can be started.',
+          'We could not confirm payment provider readiness. No payment can be started from mobile.',
           style: TextStyle(color: ParentPortalColors.muted),
         ),
       ),
@@ -163,9 +185,36 @@ class _PaymentReadinessCard extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                value.message,
-                style: const TextStyle(color: ParentPortalColors.muted),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  StatusBadge(
+                    label: value.enabled
+                        ? value.sandbox
+                              ? 'Sandbox ready'
+                              : 'Online ready'
+                        : 'Unavailable',
+                    color: value.enabled
+                        ? ParentPortalColors.green
+                        : ParentPortalColors.orange,
+                    background: value.enabled
+                        ? ParentPortalColors.greenSoft
+                        : ParentPortalColors.orangeSoft,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    value.message,
+                    style: const TextStyle(color: ParentPortalColors.muted),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'SchoolOS never queues fee payments offline.',
+                    style: TextStyle(
+                      color: ParentPortalColors.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -270,6 +319,12 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
   Widget build(BuildContext context) {
     final invoice = widget.invoice;
     final canPay = widget.readiness?.enabled == true && !_startingPayment;
+    final paymentStatusMessage = widget.readinessLoading
+        ? 'Checking provider readiness before payment.'
+        : widget.readiness?.enabled == true
+        ? 'Payment starts online only and remains backend-gated.'
+        : widget.readiness?.message ??
+              'Online payment is not available for this school right now.';
     return PortalCard(
       borderColor: invoice.isOverdue
           ? ParentPortalColors.orange.withValues(alpha: .4)
@@ -319,6 +374,14 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
           ),
           if (invoice.outstandingAmount > 0) ...[
             const SizedBox(height: 12),
+            Text(
+              paymentStatusMessage,
+              style: const TextStyle(
+                color: ParentPortalColors.muted,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
@@ -361,7 +424,7 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
     if (providers.isEmpty) return;
     final provider = providers.length == 1
         ? providers.first
-        : await _chooseProvider(providers);
+        : await _chooseProvider(providers, sandbox: readiness.sandbox);
     if (provider == null || !mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -439,18 +502,18 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
         context,
         'Secure checkout opened. The receipt will appear after payment confirmation.',
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
-      showFeatureSnack(
-        context,
-        'Payment could not be started. No charge was recorded. Please try again.',
-      );
+      showFeatureSnack(context, _safePaymentFailureMessage(error));
     } finally {
       if (mounted) setState(() => _startingPayment = false);
     }
   }
 
-  Future<String?> _chooseProvider(List<String> providers) {
+  Future<String?> _chooseProvider(
+    List<String> providers, {
+    required bool sandbox,
+  }) {
     return showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -473,7 +536,11 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
                     _providerLabel(provider),
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
-                  subtitle: const Text('Sandbox • confirmed immediately'),
+                  subtitle: Text(
+                    sandbox
+                        ? 'Sandbox payment - confirmed immediately'
+                        : 'Secure online checkout - internet required',
+                  ),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => Navigator.pop(context, provider),
                 ),
@@ -485,70 +552,114 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
   }
 }
 
-class _ReceiptCard extends ConsumerWidget {
+class _ReceiptCard extends ConsumerStatefulWidget {
   const _ReceiptCard({required this.childId, required this.receipt});
 
   final String childId;
   final ParentFeeReceipt receipt;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ReceiptCard> createState() => _ReceiptCardState();
+}
+
+class _ReceiptCardState extends ConsumerState<_ReceiptCard> {
+  bool _downloading = false;
+  bool _sharing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final busy = _downloading || _sharing;
+    final issuedAt = _receiptDate(widget.receipt.issuedAt);
     return PortalCard(
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const FeatureIcon(
-            Icons.verified_rounded,
-            color: ParentPortalColors.green,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  receipt.receiptNumber,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+          Row(
+            children: [
+              const FeatureIcon(
+                Icons.verified_rounded,
+                color: ParentPortalColors.green,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.receipt.receiptNumber,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    Text(
+                      '${widget.receipt.invoiceNumber} - ${_money(widget.receipt.amount)}',
+                      style: const TextStyle(color: ParentPortalColors.muted),
+                    ),
+                    if (issuedAt != null)
+                      Text(
+                        'Issued $issuedAt',
+                        style: const TextStyle(
+                          color: ParentPortalColors.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
                 ),
-                Text(
-                  '${receipt.invoiceNumber} - ${_money(receipt.amount)}',
-                  style: const TextStyle(color: ParentPortalColors.muted),
-                ),
-              ],
-            ),
+              ),
+              IconButton(
+                tooltip: 'Download protected receipt',
+                onPressed: busy ? null : () => _downloadReceipt(context),
+                icon: _downloading
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.download_rounded),
+              ),
+              IconButton(
+                tooltip: 'Share protected receipt',
+                onPressed: busy ? null : () => _shareReceipt(context),
+                icon: _sharing
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.ios_share_rounded),
+              ),
+            ],
           ),
-          IconButton(
-            tooltip: 'Download receipt',
-            onPressed: () => _downloadReceipt(context, ref),
-            icon: const Icon(Icons.download_rounded),
-          ),
-          IconButton(
-            tooltip: 'Share receipt',
-            onPressed: () => _shareReceipt(context, ref),
-            icon: const Icon(Icons.ios_share_rounded),
+          const SizedBox(height: 8),
+          const Text(
+            'Protected PDF. Available only after confirmed backend receipt generation.',
+            style: TextStyle(color: ParentPortalColors.muted, fontSize: 12),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _downloadReceipt(BuildContext context, WidgetRef ref) async {
+  Future<void> _downloadReceipt(BuildContext context) async {
+    if (_downloading || _sharing) return;
+    setState(() => _downloading = true);
     try {
       final file = await ref
           .read(parentRepositoryProvider)
-          .downloadReceiptPdf(childId: childId, receipt: receipt);
+          .downloadReceiptPdf(childId: widget.childId, receipt: widget.receipt);
       if (!context.mounted) return;
       showFeatureSnack(context, 'Receipt downloaded: ${file.fileName}');
-    } catch (_) {
+    } catch (error) {
       if (!context.mounted) return;
-      showFeatureSnack(context, 'Receipt is not available right now.');
+      showFeatureSnack(context, _safeReceiptFailureMessage(error));
+    } finally {
+      if (mounted) setState(() => _downloading = false);
     }
   }
 
-  Future<void> _shareReceipt(BuildContext context, WidgetRef ref) async {
+  Future<void> _shareReceipt(BuildContext context) async {
+    if (_downloading || _sharing) return;
+    setState(() => _sharing = true);
     try {
       final file = await ref
           .read(parentRepositoryProvider)
-          .downloadReceiptPdf(childId: childId, receipt: receipt);
+          .downloadReceiptPdf(childId: widget.childId, receipt: widget.receipt);
       await const FileShareService().shareFile(
         filePath: file.filePath,
         mimeType: 'application/pdf',
@@ -556,11 +667,39 @@ class _ReceiptCard extends ConsumerWidget {
       );
       if (!context.mounted) return;
       showFeatureSnack(context, 'Receipt ready to share.');
-    } catch (_) {
+    } catch (error) {
       if (!context.mounted) return;
-      showFeatureSnack(context, 'Could not share this receipt.');
+      showFeatureSnack(context, _safeReceiptFailureMessage(error));
+    } finally {
+      if (mounted) setState(() => _sharing = false);
     }
   }
+}
+
+String _safePaymentFailureMessage(Object error) {
+  if (error is NetworkException || error is TimeoutException) {
+    return 'Payment could not be started. This action needs internet and no charge was recorded.';
+  }
+  if (error is AppException) {
+    return error.message;
+  }
+  return 'Payment could not be started. No charge was recorded. Please try again.';
+}
+
+String _safeReceiptFailureMessage(Object error) {
+  if (error is NetworkException || error is TimeoutException) {
+    return 'We could not download this receipt. Check your connection and try again.';
+  }
+  if (error is AppException) {
+    return error.message;
+  }
+  return 'This receipt is not available right now. Please try again later.';
+}
+
+String? _receiptDate(String? value) {
+  final date = DateTime.tryParse(value ?? '');
+  if (date == null) return null;
+  return NepaliBsCalendar.formatBsDate(date);
 }
 
 class _FeeMetric extends StatelessWidget {
@@ -587,10 +726,8 @@ String _money(num value) => 'NPR ${value.toStringAsFixed(0)}';
 String _date(String? value) {
   final date = DateTime.tryParse(value ?? '');
   if (date == null) return 'not set';
-  return '${date.year}-${_two(date.month)}-${_two(date.day)}';
+  return NepaliBsCalendar.formatBsDate(date);
 }
-
-String _two(int value) => value.toString().padLeft(2, '0');
 
 String _newPaymentRequestKey() {
   final random = Random.secure();

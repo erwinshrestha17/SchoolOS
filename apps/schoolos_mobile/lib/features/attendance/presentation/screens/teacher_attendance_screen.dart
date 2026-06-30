@@ -190,9 +190,7 @@ class _TeacherAttendanceScreenState
                     : state.syncStatus == AttendanceSyncStatus.queued
                     ? 'Retry sync'
                     : 'Submit attendance',
-                icon: state.isOffline
-                    ? Icons.save_rounded
-                    : Icons.cloud_done_rounded,
+                icon: _submitActionIcon(state),
                 onPressed: state.isSubmitting
                     ? null
                     : () => _confirmSubmit(context, controller, state),
@@ -215,9 +213,7 @@ class _TeacherAttendanceScreenState
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Submit attendance?'),
-        content: Text(
-          'Submit ${state.entries.length} student record(s) for ${state.selectedClass?.name ?? 'this class'}? This register becomes read-only after submission.',
-        ),
+        content: _AttendanceSubmitSummary(state: state),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -232,6 +228,72 @@ class _TeacherAttendanceScreenState
     );
     if (confirmed == true) await controller.submit();
   }
+}
+
+class _AttendanceSubmitSummary extends StatelessWidget {
+  const _AttendanceSubmitSummary({required this.state});
+
+  final TeacherAttendanceState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final exceptions = state.entries
+        .where((entry) => entry.status != AttendanceStatus.present)
+        .length;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Submit ${state.entries.length} student record(s) for ${state.selectedClass?.name ?? 'this class'}.',
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            StatusChip(
+              status: state.changedCount == 0
+                  ? AppStatusType.synced
+                  : AppStatusType.draft,
+              label: '${state.changedCount} changed',
+            ),
+            StatusChip(
+              status: exceptions == 0
+                  ? AppStatusType.present
+                  : AppStatusType.pending,
+              label: '$exceptions exception(s)',
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          'SchoolOS will use the saved mobile submission key so a retry does not create a duplicate register.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.slate600),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'After the server accepts this attendance, the register becomes read-only on mobile.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.slate600),
+        ),
+      ],
+    );
+  }
+}
+
+IconData _submitActionIcon(TeacherAttendanceState state) {
+  if (state.isOffline) return Icons.save_rounded;
+  return switch (state.syncStatus) {
+    AttendanceSyncStatus.failed => Icons.sync_problem_rounded,
+    AttendanceSyncStatus.queued => Icons.cloud_sync_rounded,
+    AttendanceSyncStatus.syncing => Icons.cloud_sync_rounded,
+    _ => Icons.cloud_done_rounded,
+  };
 }
 
 class _TeacherAttendanceHeader extends StatelessWidget {
@@ -338,46 +400,174 @@ class _SyncBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = switch (state.syncStatus) {
-      AttendanceSyncStatus.draft => AppStatusType.draft,
-      AttendanceSyncStatus.queued => AppStatusType.pending,
-      AttendanceSyncStatus.syncing => AppStatusType.pending,
-      AttendanceSyncStatus.synced => AppStatusType.approved,
-      AttendanceSyncStatus.failed => AppStatusType.rejected,
-      AttendanceSyncStatus.conflict => AppStatusType.rejected,
+    final status = _statusType(state.syncStatus);
+    final color = switch (state.syncStatus) {
+      AttendanceSyncStatus.failed ||
+      AttendanceSyncStatus.conflict => AppColors.dangerLight,
+      AttendanceSyncStatus.queued ||
+      AttendanceSyncStatus.syncing => AppColors.warningLight,
+      AttendanceSyncStatus.synced => AppColors.successLight,
+      AttendanceSyncStatus.draft => AppColors.slate100,
     };
+    final canRetry =
+        state.hasUnsavedChanges &&
+        !state.isSubmitting &&
+        !state.isOffline &&
+        (state.syncStatus == AttendanceSyncStatus.failed ||
+            state.syncStatus == AttendanceSyncStatus.queued);
 
     return AppCard(
-      color: state.isOffline
-          ? AppColors.warningLight.withValues(alpha: 0.5)
-          : AppColors.primaryLight.withValues(alpha: 0.55),
+      color: color.withValues(alpha: 0.58),
       hasShadow: false,
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          StatusChip(status: status),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(_statusIcon(state.syncStatus), color: AppColors.slate700),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.xs,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        StatusChip(status: status),
+                        Text(
+                          _statusTitle(state),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(state.message!),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      _statusNextStep(state),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.slate600,
+                      ),
+                    ),
+                    if (state.lastUpdated != null) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Last updated ${NepaliBsCalendar.formatNepalTime(state.lastUpdated!)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.slate500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (canRetry ||
+              (state.draftClientSubmissionId != null &&
+                  !state.isSubmitting)) ...[
+            const SizedBox(height: AppSpacing.md),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
               children: [
-                Text(state.message!),
-                if (state.isOffline && state.lastUpdated != null)
-                  Text(
-                    'Last updated ${NepaliBsCalendar.formatNepalTime(state.lastUpdated!)}',
-                    style: Theme.of(context).textTheme.bodySmall,
+                if (canRetry)
+                  OutlinedButton.icon(
+                    onPressed: controller.submit,
+                    icon: const Icon(Icons.cloud_sync_rounded),
+                    label: const Text('Retry sync'),
+                  ),
+                if (state.draftClientSubmissionId != null &&
+                    !state.isSubmitting)
+                  TextButton.icon(
+                    onPressed: controller.discardDraft,
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    label: const Text('Discard draft'),
                   ),
               ],
             ),
-          ),
-          if (state.draftClientSubmissionId != null && !state.isSubmitting)
-            TextButton(
-              onPressed: controller.discardDraft,
-              child: const Text('Discard'),
-            ),
+          ],
         ],
       ),
     );
   }
+}
+
+AppStatusType _statusType(AttendanceSyncStatus status) {
+  return switch (status) {
+    AttendanceSyncStatus.draft => AppStatusType.draft,
+    AttendanceSyncStatus.queued => AppStatusType.queued,
+    AttendanceSyncStatus.syncing => AppStatusType.syncing,
+    AttendanceSyncStatus.synced => AppStatusType.synced,
+    AttendanceSyncStatus.failed => AppStatusType.failed,
+    AttendanceSyncStatus.conflict => AppStatusType.failed,
+  };
+}
+
+IconData _statusIcon(AttendanceSyncStatus status) {
+  return switch (status) {
+    AttendanceSyncStatus.draft => Icons.edit_note_rounded,
+    AttendanceSyncStatus.queued => Icons.cloud_queue_rounded,
+    AttendanceSyncStatus.syncing => Icons.cloud_sync_rounded,
+    AttendanceSyncStatus.synced => Icons.verified_rounded,
+    AttendanceSyncStatus.failed => Icons.sync_problem_rounded,
+    AttendanceSyncStatus.conflict => Icons.report_problem_outlined,
+  };
+}
+
+String _statusTitle(TeacherAttendanceState state) {
+  if (state.attendance.hasConflict ||
+      state.syncStatus == AttendanceSyncStatus.conflict) {
+    return 'Needs office review';
+  }
+  if (!state.isWorkingDay) return 'Not a working day';
+  if (state.attendance.isLocked) return 'Attendance locked';
+  if (state.attendance.isSubmitted) return 'Attendance submitted';
+  return switch (state.syncStatus) {
+    AttendanceSyncStatus.draft => 'Draft not submitted',
+    AttendanceSyncStatus.queued => 'Saved on this phone',
+    AttendanceSyncStatus.syncing => 'Syncing with SchoolOS',
+    AttendanceSyncStatus.synced => 'Synced with SchoolOS',
+    AttendanceSyncStatus.failed => 'Sync failed',
+    AttendanceSyncStatus.conflict => 'Needs office review',
+  };
+}
+
+String _statusNextStep(TeacherAttendanceState state) {
+  if (state.attendance.hasConflict ||
+      state.syncStatus == AttendanceSyncStatus.conflict) {
+    return 'Ask the office to review the conflict before changing this register.';
+  }
+  if (!state.isWorkingDay) {
+    return 'No mobile attendance action is available for this calendar day.';
+  }
+  if (state.attendance.isLocked) {
+    return 'Use the school correction process if this date needs changes.';
+  }
+  if (state.attendance.isSubmitted) {
+    return 'No further mobile action is needed for this class and date.';
+  }
+  if (state.isOffline) {
+    return 'Reconnect before official sync. Do not mark the same class on another device.';
+  }
+  return switch (state.syncStatus) {
+    AttendanceSyncStatus.draft =>
+      'Review exceptions, then submit attendance from this phone.',
+    AttendanceSyncStatus.queued =>
+      'Internet is available. Retry sync to send the saved draft.',
+    AttendanceSyncStatus.syncing =>
+      'Keep this screen open until SchoolOS confirms the result.',
+    AttendanceSyncStatus.synced =>
+      'SchoolOS has the latest attendance state for this screen.',
+    AttendanceSyncStatus.failed =>
+      'The draft remains on this device. Retry sync when the connection is stable.',
+    AttendanceSyncStatus.conflict =>
+      'Ask the office to review the conflict before changing this register.',
+  };
 }
 
 class _AttendanceStudentRow extends StatelessWidget {
