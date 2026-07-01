@@ -13,14 +13,14 @@ export function AdmissionFollowUpsCard({ studentId }: { studentId: string }) {
   });
 
   if (query.isLoading) {
-    return <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-600"><Loader2 className="h-4 w-4 animate-spin" />Loading admission follow-ups…</div>;
+    return <div id="admission-follow-ups" className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-600"><Loader2 className="h-4 w-4 animate-spin" />Loading admission follow-ups…</div>;
   }
   if (query.isError || !query.data?.items.length) {
     return null;
   }
 
   return (
-    <section className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm">
+    <section id="admission-follow-ups" className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-black text-slate-950">New admission follow-ups</p>

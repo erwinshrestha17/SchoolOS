@@ -1,6 +1,6 @@
 'use client';
 
-import { isValidDateOfBirth, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone, type AdmissionCase, type CreateAdmissionCasePayload } from '@schoolos/core';
+import { formatBsDateForInput, isValidDateOfBirth, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, toGregorianDateFromBs, tryNormalizeNepalPhone, type AdmissionCase, type CreateAdmissionCasePayload } from '@schoolos/core';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, FileText, Loader2, Save, ShieldCheck, Upload, UsersRound } from 'lucide-react';
 import Link from 'next/link';
@@ -19,9 +19,9 @@ const EMPTY_FORM: CreateAdmissionCasePayload = {
   firstNameNp: '',
   lastNameNp: '',
   dateOfBirth: '',
-  gender: 'FEMALE',
+  gender: undefined,
   guardianFullName: '',
-  guardianRelation: 'mother',
+  guardianRelation: '',
   guardianPhone: '',
   guardianEmail: '',
   guardianReceivesAlerts: true,
@@ -40,15 +40,18 @@ const STEPS = ['Student & guardian', 'Class & documents', 'Review & admit'];
 
 export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string }) {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const hydratedCaseIdRef = useRef<string | null>(null);
   const autosaveFingerprintRef = useRef('');
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<CreateAdmissionCasePayload>(EMPTY_FORM);
+  const [dateOfBirthBs, setDateOfBirthBs] = useState('');
+  const [admissionDateBs, setAdmissionDateBs] = useState(() => formatBsDateForInput(new Date()));
   const [caseId, setCaseId] = useState<string | null>(initialCaseId ?? null);
   const [caseData, setCaseData] = useState<AdmissionCase | null>(null);
   const [documentKind, setDocumentKind] = useState('BIRTH_CERTIFICATE');
   const [admissionResult, setAdmissionResult] = useState<{
-    student: { id: string; fullNameEn: string };
+    student: { id: string; studentSystemId: string; fullNameEn: string };
     redirectPath: string;
   } | null>(null);
   const [localError, setLocalError] = useState('');
@@ -135,9 +138,12 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
     hydratedCaseIdRef.current = recovered.id;
     setCaseId(recovered.id);
     setCaseData(recovered);
-    setForm(formFromAdmissionCase(recovered));
+    const recoveredForm = formFromAdmissionCase(recovered);
+    setForm(recoveredForm);
+    setDateOfBirthBs(recoveredForm.dateOfBirth ? formatBsDateForInput(recoveredForm.dateOfBirth) : '');
+    setAdmissionDateBs(recoveredForm.admissionDate ? formatBsDateForInput(recoveredForm.admissionDate) : formatBsDateForInput(new Date()));
     setStep(recoveryStepForCase(recovered));
-    autosaveFingerprintRef.current = JSON.stringify(buildAdmissionCasePayload(formFromAdmissionCase(recovered)));
+    autosaveFingerprintRef.current = JSON.stringify(buildAdmissionCasePayload(recoveredForm));
   }, [recoveryQuery.data]);
 
   useEffect(() => {
@@ -178,6 +184,7 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
     const message = validateCurrentStep();
     if (message) {
       setLocalError(message);
+      window.requestAnimationFrame(() => focusFirstInvalidField(formRef.current));
       return;
     }
     try {
@@ -209,14 +216,25 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
   }
 
   if (admissionResult) {
+    const placement = [
+      (classesQuery.data ?? []).find((schoolClass) => schoolClass.id === form.classId)?.name,
+      availableSections.find((section) => section.id === form.sectionId)?.name,
+    ].filter(Boolean).join(' / ');
     return (
       <SectionCard
-        title="Student admitted"
-        description={`${admissionResult.student.fullNameEn} now has an active student profile. Optional document, IEMIS, guardian, and QR work remains visible on the profile.`}
+        title="Admission completed successfully"
+        description={`${admissionResult.student.fullNameEn} now has an active student profile. Fee collection remains a separate workflow.`}
       >
+        <dl className="mb-5 grid gap-3 sm:grid-cols-2">
+          <Summary label="Student reference" value={admissionResult.student.studentSystemId} />
+          <Summary label="Class and section" value={placement || 'Placement recorded'} />
+          <Summary label="Guardian" value={form.guardianFullName ? 'Guardian linked' : 'Guardian follow-up required'} />
+          <Summary label="Document follow-ups" value={caseData?.followUps.length ? `${caseData.followUps.length} follow-up item${caseData.followUps.length === 1 ? '' : 's'}` : 'No follow-up items'} />
+        </dl>
         <div className="flex flex-wrap gap-3">
-          <Link href={admissionResult.redirectPath} className="inline-flex min-h-11 items-center rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-sm font-bold text-white">Open student profile</Link>
-          <Button type="button" variant="outline" onClick={() => { setStep(0); setForm({ ...EMPTY_FORM, admissionDate: new Date().toISOString().slice(0, 10) }); setCaseId(null); setCaseData(null); setAdmissionResult(null); setLocalError(''); }}>Add another student</Button>
+          <Link href={admissionResult.redirectPath} className="inline-flex min-h-11 items-center rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-sm font-bold text-white">View student profile</Link>
+          {caseData?.followUps.length ? <Link href={`${admissionResult.redirectPath}#admission-follow-ups`} className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">Open follow-up checklist</Link> : null}
+          <Button type="button" variant="outline" onClick={() => { setStep(0); setForm({ ...EMPTY_FORM, admissionDate: new Date().toISOString().slice(0, 10) }); setDateOfBirthBs(''); setAdmissionDateBs(formatBsDateForInput(new Date())); setCaseId(null); setCaseData(null); setAdmissionResult(null); setLocalError(''); }}>Add another student</Button>
         </div>
       </SectionCard>
     );
@@ -228,11 +246,16 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
   const canAdmit = caseData?.canAdmitDirectly && !requiresReview;
 
   return (
-    <form className="space-y-5" onSubmit={(event) => event.preventDefault()}>
+    <form ref={formRef} className="space-y-5" onSubmit={(event) => event.preventDefault()}>
+      <div>
+        <p className="text-sm font-black text-slate-950">Step {step + 1} of {STEPS.length}</p>
+        <p className="mt-1 text-sm text-slate-600">{STEPS[step]}</p>
+      </div>
       <ol className="grid gap-2 sm:grid-cols-3" aria-label="Admission steps">
         {STEPS.map((label, index) => (
           <li
             key={label}
+            aria-current={index === step ? 'step' : undefined}
             className={`flex items-center gap-3 rounded-xl border p-3 text-sm font-bold ${index === step ? 'border-[var(--color-mod-admissions-accent)] bg-blue-50 text-slate-900' : index < step ? 'border-success-200 bg-success-50 text-success-800' : 'border-slate-200 bg-white text-slate-500'}`}
           >
             <span className="flex h-7 w-7 items-center justify-center rounded-full border bg-white text-xs">{index + 1}</span>
@@ -245,34 +268,40 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
         <div className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 text-sm ${autosaveError ? 'border-warning-200 bg-warning-50 text-warning-900' : 'border-blue-100 bg-blue-50 text-blue-900'}`}>
           <p className="flex items-center gap-2 font-semibold">
             {autosaveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {autosaveMutation.isPending ? 'Saving admission draft…' : autosaveError ? 'Draft save needs retry' : 'Draft saved'}
+            {autosaveMutation.isPending ? 'Saving admission draft…' : autosaveError ? 'Draft save needs retry' : 'Draft saved just now'}
           </p>
           {caseId ? <Link href={`/dashboard/admissions/new?mode=direct&caseId=${encodeURIComponent(caseId)}`} className="text-xs font-bold underline-offset-4 hover:underline">Recovery link</Link> : null}
         </div>
       ) : null}
-      {autosaveError ? <p className="rounded-xl border border-warning-200 bg-warning-50 p-3 text-sm font-semibold text-warning-900" role="status">{autosaveError}</p> : null}
+      {autosaveError ? <p className="rounded-xl border border-warning-200 bg-warning-50 p-3 text-sm font-semibold text-warning-900" role="status">We could not save this admission draft. Your entered details are still here. Try again.</p> : null}
 
       {step === 0 ? (
         <SectionCard title="Student and guardian" description="Start with the information the school office needs for a normal admission.">
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="First name (English)" required><input value={form.firstNameEn} onChange={(event) => update('firstNameEn', event.target.value)} autoComplete="given-name" /></Field>
-            <Field label="Last name (English)" required><input value={form.lastNameEn} onChange={(event) => update('lastNameEn', event.target.value)} autoComplete="family-name" /></Field>
-            <Field label="First name (Nepali)"><input value={form.firstNameNp ?? ''} onChange={(event) => update('firstNameNp', event.target.value)} /></Field>
-            <Field label="Last name (Nepali)"><input value={form.lastNameNp ?? ''} onChange={(event) => update('lastNameNp', event.target.value)} /></Field>
-            <Field label="Date of birth" required><input type="date" value={form.dateOfBirth ?? ''} onChange={(event) => update('dateOfBirth', event.target.value)} /></Field>
+            <Field label="First name (English)" required><input name="firstNameEn" required value={form.firstNameEn} onChange={(event) => update('firstNameEn', event.target.value)} autoComplete="given-name" /></Field>
+            <Field label="Last name (English)" required><input name="lastNameEn" required value={form.lastNameEn} onChange={(event) => update('lastNameEn', event.target.value)} autoComplete="family-name" /></Field>
+            <Field label="Date of birth (BS)" required><input name="dateOfBirth" required inputMode="numeric" placeholder="2080-01-01" value={dateOfBirthBs} onChange={(event) => { const value = event.target.value; setDateOfBirthBs(value); update('dateOfBirth', toGregorianDateInput(value)); }} /></Field>
             <Field label="Gender" required>
-              <select value={form.gender} onChange={(event) => update('gender', event.target.value as CreateAdmissionCasePayload['gender'])}>
-                <option value="FEMALE">Female</option><option value="MALE">Male</option><option value="OTHER">Other</option>
+              <select name="gender" required value={form.gender ?? ''} onChange={(event) => update('gender', event.target.value ? event.target.value as CreateAdmissionCasePayload['gender'] : undefined)}>
+                <option value="">Select gender</option><option value="FEMALE">Female</option><option value="MALE">Male</option><option value="OTHER">Other</option>
               </select>
             </Field>
-            <Field label="Guardian full name" required><input value={form.guardianFullName ?? ''} onChange={(event) => update('guardianFullName', event.target.value)} autoComplete="name" /></Field>
-            <Field label="Relationship" required><input value={form.guardianRelation ?? ''} onChange={(event) => update('guardianRelation', event.target.value)} /></Field>
-            <Field label="Guardian phone" required><input value={form.guardianPhone ?? ''} onChange={(event) => update('guardianPhone', event.target.value)} inputMode="tel" autoComplete="tel" /></Field>
-            <Field label="Guardian email"><input type="email" value={form.guardianEmail ?? ''} onChange={(event) => update('guardianEmail', event.target.value)} autoComplete="email" /></Field>
-            <Field label="IEMIS student ID"><input value={form.nationalStudentId ?? ''} onChange={(event) => update('nationalStudentId', event.target.value)} /></Field>
-            <Field label="Emergency contact name"><input value={form.emergencyName ?? ''} onChange={(event) => update('emergencyName', event.target.value)} /></Field>
-            <Field label="Emergency contact phone"><input value={form.emergencyPhone ?? ''} onChange={(event) => update('emergencyPhone', event.target.value)} inputMode="tel" /></Field>
+            <Field label="Guardian full name" required><input name="guardianFullName" required value={form.guardianFullName ?? ''} onChange={(event) => update('guardianFullName', event.target.value)} autoComplete="name" /></Field>
+            <Field label="Relationship" required><RelationshipSelect name="guardianRelation" value={form.guardianRelation ?? ''} onChange={(value) => update('guardianRelation', value)} /></Field>
+            <Field label="Guardian phone" required><input name="guardianPhone" required value={form.guardianPhone ?? ''} onChange={(event) => update('guardianPhone', event.target.value)} inputMode="tel" autoComplete="tel" /></Field>
           </div>
+          {caseData && (caseData.duplicateRisk || caseData.relatedStudentCandidates.length > 0) ? <EarlyMatchNotice admissionCase={caseData} /> : null}
+          <details className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <summary className="cursor-pointer text-sm font-black text-slate-800">Additional student and guardian details</summary>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <Field label="First name (Nepali)"><input value={form.firstNameNp ?? ''} onChange={(event) => update('firstNameNp', event.target.value)} /></Field>
+              <Field label="Last name (Nepali)"><input value={form.lastNameNp ?? ''} onChange={(event) => update('lastNameNp', event.target.value)} /></Field>
+              <Field label="Guardian email"><input type="email" value={form.guardianEmail ?? ''} onChange={(event) => update('guardianEmail', event.target.value)} autoComplete="email" /></Field>
+              <Field label="IEMIS student ID"><input value={form.nationalStudentId ?? ''} onChange={(event) => update('nationalStudentId', event.target.value)} /></Field>
+              <Field label="Emergency contact name"><input value={form.emergencyName ?? ''} onChange={(event) => update('emergencyName', event.target.value)} /></Field>
+              <Field label="Emergency contact phone"><input value={form.emergencyPhone ?? ''} onChange={(event) => update('emergencyPhone', event.target.value)} inputMode="tel" /></Field>
+            </div>
+          </details>
         </SectionCard>
       ) : null}
 
@@ -297,7 +326,7 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
                 {availableSections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
               </select>
             </Field>
-            <Field label="Admission date" required><input type="date" value={form.admissionDate ?? ''} onChange={(event) => update('admissionDate', event.target.value)} /></Field>
+            <Field label="Admission date (BS)" required><input required inputMode="numeric" placeholder="2083-01-01" value={admissionDateBs} onChange={(event) => { const value = event.target.value; setAdmissionDateBs(value); update('admissionDate', toGregorianDateInput(value)); }} /></Field>
             <Field label="Admission source">
               <select value={form.source} onChange={(event) => update('source', event.target.value as CreateAdmissionCasePayload['source'])}>
                 <option value="OFFICE_WALK_IN">Office / walk-in</option><option value="PARENT_ONLINE">Parent online application</option><option value="PHONE_INQUIRY">Phone inquiry</option><option value="TRANSFER_REQUEST">Transfer request</option><option value="IMPORT">Import</option>
@@ -373,9 +402,10 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
       {error ? <p className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-800" role="alert">{error}</p> : null}
 
       <div className="sticky bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
-        <p className="flex items-center gap-2 text-xs font-semibold text-slate-500"><ShieldCheck className="h-4 w-4" />Student records are created only after the backend confirms the admission.</p>
+        <p className="flex items-center gap-2 text-xs font-semibold text-slate-600"><ShieldCheck className="h-4 w-4" />{step === 0 ? 'This admission is not complete yet. Continue to placement and documents.' : step === 1 ? 'Review the placement, documents, and school policy before completion.' : requiresReview ? 'This admission needs review before it can be completed.' : 'Check the admission summary before completing the admission.'}</p>
         <div className="flex flex-wrap gap-2">
           {step > 0 ? <Button type="button" variant="outline" onClick={() => { setLocalError(''); setStep((current) => current - 1); }}><ChevronLeft className="h-4 w-4" />Back</Button> : <Link className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50" href="/dashboard/admissions">Cancel</Link>}
+          {caseId ? <Button type="button" variant="outline" disabled={saveCaseMutation.isPending} onClick={() => void saveCaseMutation.mutateAsync(payload()).then(() => router.push('/dashboard/admissions')).catch(() => undefined)}>Save and exit</Button> : null}
           {step < 2 ? <Button type="button" disabled={saveCaseMutation.isPending} onClick={() => void continueStep()}>{saveCaseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ChevronRight className="h-4 w-4" />}{step === 1 ? 'Check admission' : 'Continue'}</Button> : canAdmit && caseData ? <Button type="button" disabled={directAdmitMutation.isPending} onClick={() => directAdmitMutation.mutate(caseData.id)}>{directAdmitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Admit student</Button> : null}
         </div>
       </div>
@@ -422,6 +452,27 @@ function RelatedStudentResolution({ admissionCase }: { admissionCase: AdmissionC
   );
 }
 
+function EarlyMatchNotice({ admissionCase }: { admissionCase: AdmissionCase }) {
+  const duplicateCount = admissionCase.duplicateCandidates.length;
+  const relatedCount = admissionCase.relatedStudentCandidates.length;
+  return (
+    <div className="mt-5 rounded-xl border border-warning-200 bg-warning-50 p-4 text-warning-950" role="status">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+        <div>
+          <p className="font-black">Possible existing record found</p>
+          <p className="mt-1 text-sm">
+            {duplicateCount > 0
+              ? `The backend found ${duplicateCount} possible student match${duplicateCount === 1 ? '' : 'es'}. Review before completing admission.`
+              : `This guardian phone is already linked to ${relatedCount} student record${relatedCount === 1 ? '' : 's'}. No guardian or sibling link was changed.`}
+          </p>
+          {admissionCase.id ? <Link href={`/dashboard/admissions/cases/${admissionCase.id}`} className="mt-3 inline-flex text-sm font-black underline underline-offset-4">Review saved case</Link> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Issue({ title, items, warning = false }: { title: string; items: string[]; warning?: boolean }) {
   return <div className={`rounded-xl border p-3 ${warning ? 'border-warning-200 bg-warning-50 text-warning-900' : 'border-danger-200 bg-danger-50 text-danger-900'}`}><div className="flex items-center gap-2 font-bold"><AlertTriangle className="h-4 w-4" />{title}</div><ul className="mt-2 list-disc space-y-1 pl-5">{items.map((item) => <li key={item}>{humanize(item)}</li>)}</ul></div>;
 }
@@ -432,6 +483,26 @@ function Summary({ label, value }: { label: string; value: string }) {
 
 function Field({ label, required = false, className = '', children }: { label: string; required?: boolean; className?: string; children: ReactNode }) {
   return <label className={`block space-y-2 text-sm font-bold text-slate-700 ${className}`}><span>{label}{required ? <span className="text-danger-600"> *</span> : null}</span>{children}</label>;
+}
+
+function RelationshipSelect({
+  name,
+  value,
+  onChange,
+}: {
+  name: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const standardOptions = ['Mother', 'Father', 'Guardian', 'Grandparent', 'Sibling', 'Other'];
+  const hasCustomValue = Boolean(value) && !standardOptions.includes(value);
+  return (
+    <select name={name} required value={value} onChange={(event) => onChange(event.target.value)}>
+      <option value="">Select relationship</option>
+      {hasCustomValue ? <option value={value}>{value}</option> : null}
+      {standardOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+    </select>
+  );
 }
 
 function humanize(value: string) {
@@ -481,7 +552,7 @@ function formFromAdmissionCase(admissionCase: AdmissionCase): CreateAdmissionCas
     firstNameNp: admissionCase.student.firstNameNp ?? '',
     lastNameNp: admissionCase.student.lastNameNp ?? '',
     dateOfBirth: admissionCase.student.dateOfBirth ?? '',
-    gender: admissionCase.student.gender ?? 'FEMALE',
+    gender: admissionCase.student.gender ?? undefined,
     guardianFullName: admissionCase.guardian.fullName ?? '',
     guardianRelation: admissionCase.guardian.relationship ?? '',
     guardianPhone: admissionCase.guardian.phone ?? '',
@@ -529,4 +600,18 @@ function syncRecoveryUrl(admissionCaseId: string) {
   url.searchParams.set('mode', 'direct');
   url.searchParams.set('caseId', admissionCaseId);
   window.history.replaceState(window.history.state, '', `${url.pathname}?${url.searchParams.toString()}`);
+}
+
+function focusFirstInvalidField(form: HTMLFormElement | null) {
+  const field = form?.querySelector<HTMLElement>('input:invalid, select:invalid, textarea:invalid');
+  field?.focus();
+}
+
+function toGregorianDateInput(bsDate: string) {
+  try {
+    const date = toGregorianDateFromBs(bsDate);
+    return `${String(date.year).padStart(4, '0')}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
+  } catch {
+    return '';
+  }
 }

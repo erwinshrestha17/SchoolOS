@@ -3,17 +3,20 @@
 import { formatBsDate, formatBsDateTime, type StudentDocument, type StudentProfile } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, FileCheck2, FileClock, FileWarning, Search, ShieldCheck, Upload } from 'lucide-react';
+import Link from 'next/link';
 import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '../../lib/api';
+import { ApiRequestError } from '../../lib/api/client';
 import { fileToBase64Payload } from '../../lib/files';
 import { Avatar } from '../ui/avatar';
 import { Button } from '../ui/button';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { EmptyState } from '../ui/empty-state';
-import { ErrorState } from '../ui/error-state';
-import { KpiCard, KpiGrid } from '../ui/kpi-card';
+import { KpiCard } from '../ui/kpi-card';
 import { LoadingState } from '../ui/loading-state';
+import { ModuleLockedState } from '../ui/module-locked-state';
+import { PageState } from '../ui/page-state';
 import { ProtectedFileButton } from '../ui/protected-file';
 import { StatusBadge } from '../ui/status-badge';
 import { Toast } from '../ui/toast';
@@ -137,7 +140,9 @@ export function StudentDocumentsWorkspace() {
   });
 
   if (studentsQuery.isLoading && !requestedStudentId) return <LoadingState variant="page" label="Loading student documents…" />;
-  if (studentsQuery.isError && !requestedStudentId) return <ErrorState title="Student records could not load" message="No files were changed." onRetry={() => void studentsQuery.refetch()} />;
+  if (studentsQuery.isError && !requestedStudentId) {
+    return <DocumentWorkspaceFailure error={studentsQuery.error} onRetry={() => void studentsQuery.refetch()} />;
+  }
 
   const documents = profileQuery.data?.documents ?? [];
   const verified = documents.filter((document) => document.status === 'VERIFIED').length;
@@ -150,7 +155,7 @@ export function StudentDocumentsWorkspace() {
       {toast ? <Toast {...toast} onDismiss={() => setToast(null)} /> : null}
       <input ref={fileInputRef} type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) uploadMutation.mutate(file); event.currentTarget.value = ''; }} />
 
-      <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)_340px]">
+      <div className="grid gap-5 xl:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[260px_minmax(0,1fr)_300px]">
         <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-4 shadow-sm xl:sticky xl:top-24">
           <h2 className="text-sm font-black text-slate-950">Select Student</h2>
           <label className="relative mt-3 block"><span className="sr-only">Search students</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name or admission no." className="pl-9" /></label>
@@ -167,13 +172,13 @@ export function StudentDocumentsWorkspace() {
         <main className="min-w-0 space-y-5">
           {!selectedStudent ? (
             requestedStudentId && requestedProfileQuery.isError ? (
-              <ErrorState title="Linked student could not load" message="The student may not exist or you may not have access to this protected document workspace." onRetry={() => void requestedProfileQuery.refetch()} />
+              <DocumentWorkspaceFailure error={requestedProfileQuery.error} onRetry={() => void requestedProfileQuery.refetch()} />
             ) : requestedStudentId ? (
               <LoadingState variant="skeleton" label="Loading linked student documents…" />
             ) : (
               <EmptyState title="Select a student" description="Choose a student to review guardians, document checklist, protected files, and verification history." />
             )
-          ) : profileQuery.isLoading ? <LoadingState variant="skeleton" label="Loading protected student record…" /> : profileQuery.isError || !profileQuery.data ? <ErrorState title="Student documents could not load" message="No files were changed." onRetry={() => void profileQuery.refetch()} /> : (
+          ) : profileQuery.isLoading ? <LoadingState variant="skeleton" label="Loading protected student record…" /> : profileQuery.isError || !profileQuery.data ? <DocumentWorkspaceFailure error={profileQuery.error} onRetry={() => void profileQuery.refetch()} /> : (
             <>
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -187,11 +192,10 @@ export function StudentDocumentsWorkspace() {
                 {profileQuery.data.guardians.length === 0 ? <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No guardians are linked.</p> : <div className="mt-4 grid gap-3 md:grid-cols-2">{profileQuery.data.guardians.map((guardian) => <article key={guardian.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4"><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-black text-slate-900">{guardian.fullName}</h3>{guardian.isPrimary ? <StatusBadge status="PRIMARY" tone="info" /> : null}</div><p className="mt-1 text-xs font-semibold text-slate-500">{guardian.relation} · {guardian.primaryPhone}</p><p className="mt-1 text-xs text-slate-500">{guardian.email ?? 'Email not recorded'}</p></div><Button type="button" size="sm" variant="outline" onClick={() => setGuardianToRemove({ id: guardian.id, name: guardian.fullName })}>Revoke access</Button></div></article>)}</div>}
               </section>
 
-              <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <KpiCard title="Total" value={documents.length} icon={<FileCheck2 size={18} />} tone="info" />
                 <KpiCard title="Verified" value={verified} icon={<CheckCircle2 size={18} />} tone="success" />
                 <KpiCard title="Pending" value={pending} icon={<FileClock size={18} />} tone="warning" />
-                <KpiCard title="Missing" value="Unavailable" icon={<FileWarning size={18} />} tone="neutral" />
                 <KpiCard title="Expiring" value={expiring} icon={<FileClock size={18} />} tone={expiring ? 'warning' : 'success'} />
                 <KpiCard title="Rejected" value={rejected} icon={<FileWarning size={18} />} tone={rejected ? 'danger' : 'success'} />
               </div>
@@ -204,7 +208,7 @@ export function StudentDocumentsWorkspace() {
           )}
         </main>
 
-        <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:sticky xl:top-24" aria-label="Document inspector">
+        <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2 2xl:col-span-1 2xl:sticky 2xl:top-24" aria-label="Document inspector">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-4"><ShieldCheck className="h-5 w-5 text-primary-600" /><h2 className="text-base font-black text-slate-950">Document Inspector</h2></div>
           <div className="border-b border-slate-100 py-4"><div className="flex items-center justify-between"><h3 className="text-xs font-black uppercase tracking-wide text-slate-500">Expiry reminders</h3><StatusBadge status={`${expiryTemplatesQuery.data?.filter((item) => item.isActive).length ?? 0} ACTIVE`} tone="info" /></div>{expiryTemplatesQuery.isError ? <p className="mt-2 text-xs font-bold text-danger-700">Expiry policies could not load.</p> : (expiryTemplatesQuery.data?.length ?? 0) === 0 ? <p className="mt-2 text-xs text-slate-500">No document-expiry reminder templates configured.</p> : <div className="mt-2 space-y-2">{expiryTemplatesQuery.data?.slice(0, 4).map((template) => <div key={template.id} className="rounded-lg bg-slate-50 p-2 text-xs"><p className="font-bold text-slate-800">{template.reminderStatus} · {template.channel}</p><p className="mt-0.5 text-slate-500">{template.daysBeforeExpiry ? `${template.daysBeforeExpiry} days before expiry` : 'At expiry'} · {template.isActive ? 'Active' : 'Inactive'}</p></div>)}</div>}</div>
           {!selectedDocument ? <p className="py-10 text-center text-sm text-slate-500">Select a document to view protected file controls, metadata, verification, and audit history.</p> : <div className="space-y-4 pt-4">
@@ -213,7 +217,7 @@ export function StudentDocumentsWorkspace() {
             {selectedDocument.status === 'REJECTED' && selectedDocument.notes ? <p className="rounded-xl border border-danger-100 bg-danger-50 p-3 text-xs font-semibold text-danger-700">Reviewer note: {latestReviewNote(selectedDocument.notes)}</p> : null}
             <label className="block text-xs font-bold text-slate-700">Review note / rejection reason<textarea rows={3} value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} placeholder="Record review notes. Required when rejecting." className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
             <div className="grid gap-2"><ProtectedFileButton fileAssetId={selectedDocument.fileId} fileName={selectedDocument.fileName} action="preview" className="w-full">Open protected preview</ProtectedFileButton><ProtectedFileButton fileAssetId={selectedDocument.fileId} fileName={selectedDocument.fileName} action="download" className="w-full">Download protected file</ProtectedFileButton><Button type="button" variant="outline" onClick={() => verifyMutation.mutate({ documentId: selectedDocument.id, status: 'VERIFIED', notes: reviewReason.trim() || 'Verified from M1 document workspace' })} disabled={verifyMutation.isPending}>Verify document</Button><Button type="button" variant="outline" onClick={() => verifyMutation.mutate({ documentId: selectedDocument.id, status: 'REJECTED', notes: reviewReason.trim() })} disabled={verifyMutation.isPending || reviewReason.trim().length < 5}>Reject document</Button></div>
-            <div className="border-t border-slate-100 pt-4"><h3 className="text-xs font-black uppercase tracking-wide text-slate-500">Audit history</h3><div className="mt-3 space-y-3">{(historyQuery.data ?? []).filter((entry) => !entry.documentId || entry.documentId === selectedDocument.id).slice(0, 6).map((entry) => <div key={entry.id} className="border-l-2 border-primary-200 pl-3 text-xs"><p className="font-bold text-slate-800">{entry.action.replace(/_/g, ' ')}</p><p className="mt-0.5 text-slate-500">{formatBsDateTime(entry.createdAt)} · {entry.performedBy}</p></div>)}{historyQuery.data?.length === 0 ? <p className="text-xs text-slate-500">No audit events returned.</p> : null}</div></div>
+            <div className="border-t border-slate-100 pt-4"><h3 className="text-xs font-black uppercase tracking-wide text-slate-500">Audit history</h3>{historyQuery.isError ? <p className="mt-3 rounded-lg border border-warning-100 bg-warning-50 p-2 text-xs font-semibold text-warning-800">Document history could not load. The protected file and admission record were not changed.</p> : <div className="mt-3 space-y-3">{(historyQuery.data ?? []).filter((entry) => !entry.documentId || entry.documentId === selectedDocument.id).slice(0, 6).map((entry) => <div key={entry.id} className="border-l-2 border-primary-200 pl-3 text-xs"><p className="font-bold text-slate-800">{entry.action.replace(/_/g, ' ')}</p><p className="mt-0.5 text-slate-500">{formatBsDateTime(entry.createdAt)} · {entry.performedBy}</p></div>)}{historyQuery.data?.length === 0 ? <p className="text-xs text-slate-500">No audit events returned.</p> : null}</div>}</div>
           </div>}
         </aside>
       </div>
@@ -246,4 +250,59 @@ function latestReviewNote(value: string) {
     .map((line) => line.replace(/^Verification Note:\s*/i, '').trim())
     .filter(Boolean)
     .at(-1) ?? value;
+}
+
+function DocumentWorkspaceFailure({
+  error,
+  onRetry,
+}: {
+  error: unknown;
+  onRetry: () => void;
+}) {
+  const returnAction = (
+    <Link
+      href="/dashboard/admissions"
+      className="inline-flex h-11 items-center justify-center rounded-2xl border-2 border-slate-200 bg-white px-6 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+    >
+      Return to admissions
+    </Link>
+  );
+
+  if (isModuleLockedError(error)) {
+    return (
+      <ModuleLockedState
+        moduleName="Admissions"
+        description="Admissions is not enabled for this school. No admission or document records were changed."
+        secondaryAction={returnAction}
+      />
+    );
+  }
+
+  if (error instanceof ApiRequestError && error.statusCode === 403) {
+    return (
+      <PageState
+        tone="permission"
+        title="You do not have permission to view admission documents."
+        description="Ask a school administrator for student document access. No admission or document records were changed."
+        secondaryAction={returnAction}
+      />
+    );
+  }
+
+  return (
+    <PageState
+      tone="danger"
+      title="We could not load admission documents right now."
+      description="Your admission records have not been changed. Try again, or return to the admission queue."
+      actionLabel="Try again"
+      onAction={onRetry}
+      secondaryAction={returnAction}
+    />
+  );
+}
+
+function isModuleLockedError(error: unknown) {
+  if (!(error instanceof ApiRequestError) || error.statusCode !== 403) return false;
+  const message = error.message.toLowerCase();
+  return message.includes('subscription plan') || message.includes('not enabled') || message.includes('module.students');
 }

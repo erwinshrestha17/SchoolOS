@@ -20,6 +20,7 @@ import {
 import { Button } from "../ui/button";
 import { ErrorState } from "../ui/error-state";
 import { formatBsDate } from "@schoolos/core";
+import { useSession } from "../session-provider";
 
 const QUEUES: Array<{
   id: AdmissionCaseQueue;
@@ -42,12 +43,24 @@ const QUEUES: Array<{
     icon: AlertTriangle,
   },
 ];
+const PRIMARY_QUEUE_IDS = new Set<AdmissionCaseQueue>([
+  "NEEDS_INFORMATION",
+  "WAITING_FOR_REVIEW",
+  "READY_TO_ADMIT",
+  "DUPLICATE_WARNINGS",
+]);
 
 export function AdmissionCaseQueues() {
+  const { hasPermissions } = useSession();
   const [queue, setQueue] = useState<AdmissionCaseQueue>("NEEDS_INFORMATION");
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [submittedSearch, setSubmittedSearch] = useState("");
+  const canCreateAdmission = hasPermissions([
+    "enrollments:create",
+    "students:create",
+    "guardians:create",
+  ]);
 
   const query = useQuery({
     queryKey: ["admission-case-queues", queue, page, submittedSearch],
@@ -77,11 +90,8 @@ export function AdmissionCaseQueues() {
 
   return (
     <section className="space-y-5">
-      <div
-        className="flex gap-2 overflow-x-auto pb-1"
-        aria-label="Admission queues"
-      >
-        {QUEUES.map((item) => {
+      <div className="flex flex-wrap items-center gap-2" aria-label="Admission queues">
+        {QUEUES.filter((item) => PRIMARY_QUEUE_IDS.has(item.id)).map((item) => {
           const Icon = item.icon;
           const selected = item.id === queue;
           return (
@@ -99,6 +109,26 @@ export function AdmissionCaseQueues() {
             </button>
           );
         })}
+        <label className="sr-only" htmlFor="admission-more-filters">
+          More admission filters
+        </label>
+        <select
+          id="admission-more-filters"
+          value={PRIMARY_QUEUE_IDS.has(queue) ? "" : queue}
+          onChange={(event) => {
+            if (!event.target.value) return;
+            setQueue(event.target.value as AdmissionCaseQueue);
+            setPage(1);
+          }}
+          className="min-h-11 !w-44 shrink-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700"
+        >
+          <option value="">More filters</option>
+          {QUEUES.filter((item) => !PRIMARY_QUEUE_IDS.has(item.id)).map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -217,17 +247,44 @@ export function AdmissionCaseQueues() {
               Try another queue or change your search. New office admissions
               appear here after the backend checks their requirements.
             </p>
-            <Link
-              href="/dashboard/admissions/new"
-              className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-sm font-bold text-white"
-            >
-              New admission
-            </Link>
+            {submittedSearch ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-4"
+                onClick={() => {
+                  setSearch("");
+                  setSubmittedSearch("");
+                  setPage(1);
+                }}
+              >
+                Clear search
+              </Button>
+            ) : canCreateAdmission ? (
+              <Link
+                href="/dashboard/admissions/new"
+                className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-sm font-bold text-white"
+              >
+                New admission
+              </Link>
+            ) : queue !== "NEEDS_INFORMATION" ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-4"
+                onClick={() => {
+                  setQueue("NEEDS_INFORMATION");
+                  setPage(1);
+                }}
+              >
+                View needs information
+              </Button>
+            ) : null}
           </div>
         )}
       </div>
 
-      {query.data ? (
+      {query.data && (query.data.total > query.data.limit || page > 1) ? (
         <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
           <span>
             {query.data.total} admission{" "}

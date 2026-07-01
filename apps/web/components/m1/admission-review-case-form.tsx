@@ -1,7 +1,7 @@
 'use client';
 
 import type { CreateAdmissionCasePayload } from '@schoolos/core';
-import { isValidDateOfBirth, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone } from '@schoolos/core';
+import { formatBsDateForInput, isValidDateOfBirth, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, toGregorianDateFromBs, tryNormalizeNepalPhone } from '@schoolos/core';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ClipboardCheck, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -16,9 +16,9 @@ const emptyForm: CreateAdmissionCasePayload = {
   firstNameEn: '',
   lastNameEn: '',
   dateOfBirth: '',
-  gender: 'FEMALE',
+  gender: undefined,
   guardianFullName: '',
-  guardianRelation: 'mother',
+  guardianRelation: '',
   guardianPhone: '',
   academicYearId: '',
   classId: '',
@@ -32,6 +32,8 @@ export function AdmissionReviewCaseForm() {
   const router = useRouter();
   const admissionCaseIdRef = useRef<string | null>(null);
   const [form, setForm] = useState<CreateAdmissionCasePayload>(emptyForm);
+  const [dateOfBirthBs, setDateOfBirthBs] = useState('');
+  const [admissionDateBs, setAdmissionDateBs] = useState(() => formatBsDateForInput(new Date()));
   const [error, setError] = useState('');
   const years = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
   const classes = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
@@ -82,16 +84,21 @@ export function AdmissionReviewCaseForm() {
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="First name (English)" required><input value={form.firstNameEn} onChange={(event) => update('firstNameEn', event.target.value)} /></Field>
           <Field label="Last name (English)" required><input value={form.lastNameEn} onChange={(event) => update('lastNameEn', event.target.value)} /></Field>
-          <Field label="Date of birth" required><input type="date" value={form.dateOfBirth ?? ''} onChange={(event) => update('dateOfBirth', event.target.value)} /></Field>
-          <Field label="Gender" required><select value={form.gender} onChange={(event) => update('gender', event.target.value as CreateAdmissionCasePayload['gender'])}><option value="FEMALE">Female</option><option value="MALE">Male</option><option value="OTHER">Other</option></select></Field>
+          <Field label="Date of birth (BS)" required><input required inputMode="numeric" placeholder="2080-01-01" value={dateOfBirthBs} onChange={(event) => { const value = event.target.value; setDateOfBirthBs(value); update('dateOfBirth', toGregorianDateInput(value)); }} /></Field>
+          <Field label="Gender" required><select required value={form.gender ?? ''} onChange={(event) => update('gender', event.target.value ? event.target.value as CreateAdmissionCasePayload['gender'] : undefined)}><option value="">Select gender</option><option value="FEMALE">Female</option><option value="MALE">Male</option><option value="OTHER">Other</option></select></Field>
           <Field label="Guardian full name" required><input value={form.guardianFullName ?? ''} onChange={(event) => update('guardianFullName', event.target.value)} /></Field>
-          <Field label="Guardian relationship" required><input value={form.guardianRelation ?? ''} onChange={(event) => update('guardianRelation', event.target.value)} /></Field>
+          <Field label="Guardian relationship" required><RelationshipSelect value={form.guardianRelation ?? ''} onChange={(value) => update('guardianRelation', value)} /></Field>
           <Field label="Guardian phone" required><input value={form.guardianPhone ?? ''} onChange={(event) => update('guardianPhone', event.target.value)} inputMode="tel" /></Field>
           <Field label="Guardian email"><input type="email" value={form.guardianEmail ?? ''} onChange={(event) => update('guardianEmail', event.target.value)} /></Field>
-          <Field label="IEMIS student ID"><input value={form.nationalStudentId ?? ''} onChange={(event) => update('nationalStudentId', event.target.value)} /></Field>
-          <Field label="Emergency contact name"><input value={form.emergencyName ?? ''} onChange={(event) => update('emergencyName', event.target.value)} /></Field>
-          <Field label="Emergency contact phone"><input value={form.emergencyPhone ?? ''} onChange={(event) => update('emergencyPhone', event.target.value)} inputMode="tel" /></Field>
         </div>
+        <details className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <summary className="cursor-pointer text-sm font-black text-slate-800">Additional student and emergency details</summary>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <Field label="IEMIS student ID"><input value={form.nationalStudentId ?? ''} onChange={(event) => update('nationalStudentId', event.target.value)} /></Field>
+            <Field label="Emergency contact name"><input value={form.emergencyName ?? ''} onChange={(event) => update('emergencyName', event.target.value)} /></Field>
+            <Field label="Emergency contact phone"><input value={form.emergencyPhone ?? ''} onChange={(event) => update('emergencyPhone', event.target.value)} inputMode="tel" /></Field>
+          </div>
+        </details>
       </SectionCard>
       <SectionCard title="Requested placement" description="The school saves these details once and reviewers only resolve missing or policy-required items.">
         <div className="grid gap-4 md:grid-cols-2">
@@ -99,7 +106,7 @@ export function AdmissionReviewCaseForm() {
           <Field label="Academic year" required><select value={form.academicYearId ?? ''} onChange={(event) => update('academicYearId', event.target.value)}><option value="">Select academic year</option>{(years.data ?? []).map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}</select></Field>
           <Field label="Requested class" required><select value={form.classId ?? ''} onChange={(event) => { update('classId', event.target.value); update('sectionId', ''); }}><option value="">Select class</option>{(classes.data ?? []).map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</option>)}</select></Field>
           <Field label="Requested section"><select value={form.sectionId ?? ''} onChange={(event) => update('sectionId', event.target.value)}><option value="">Select section</option>{sectionOptions.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}</select></Field>
-          <Field label="Admission date" required><input type="date" value={form.admissionDate ?? ''} onChange={(event) => update('admissionDate', event.target.value)} /></Field>
+          <Field label="Admission date (BS)" required><input required inputMode="numeric" placeholder="2083-01-01" value={admissionDateBs} onChange={(event) => { const value = event.target.value; setAdmissionDateBs(value); update('admissionDate', toGregorianDateInput(value)); }} /></Field>
           <Field label="Previous school"><input value={form.previousSchool ?? ''} onChange={(event) => update('previousSchool', event.target.value)} /></Field>
           <Field label="Review note" className="md:col-span-2"><textarea rows={4} value={form.notes ?? ''} onChange={(event) => update('notes', event.target.value)} placeholder="Scholarship, interview, Grade 11 marks, or transfer review." /></Field>
         </div>
@@ -112,4 +119,23 @@ export function AdmissionReviewCaseForm() {
 
 function Field({ label, required = false, className = '', children }: { label: string; required?: boolean; className?: string; children: React.ReactNode }) {
   return <label className={`block space-y-2 text-sm font-bold text-slate-700 ${className}`}><span>{label}{required ? <span className="text-danger-600"> *</span> : null}</span>{children}</label>;
+}
+
+function RelationshipSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const options = ['Mother', 'Father', 'Guardian', 'Grandparent', 'Sibling', 'Other'];
+  return (
+    <select required value={value} onChange={(event) => onChange(event.target.value)}>
+      <option value="">Select relationship</option>
+      {options.map((option) => <option key={option} value={option}>{option}</option>)}
+    </select>
+  );
+}
+
+function toGregorianDateInput(bsDate: string) {
+  try {
+    const date = toGregorianDateFromBs(bsDate);
+    return `${String(date.year).padStart(4, '0')}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
+  } catch {
+    return '';
+  }
 }

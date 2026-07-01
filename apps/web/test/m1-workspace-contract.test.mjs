@@ -9,6 +9,7 @@ const read = (path) => readFileSync(join(webRoot, path), 'utf8');
 test('M1 workspaces expose real route-backed operations', () => {
   const api = read('lib/api/students.ts');
   const documentsWorkspace = read('components/m1/student-documents-workspace.tsx');
+  const documentsErrorBoundary = read('app/dashboard/admissions/documents/error.tsx');
   const routes = [
     'app/dashboard/admissions/documents/page.tsx',
     'app/dashboard/admissions/duplicates/page.tsx',
@@ -36,6 +37,16 @@ test('M1 workspaces expose real route-backed operations', () => {
   assert.match(documentsWorkspace, /requestedKind/);
   assert.match(documentsWorkspace, /api\.getStudentProfile\(requestedStudentId!\)/);
   assert.match(documentsWorkspace, /The linked student record can still load from the protected profile route/);
+  assert.match(documentsWorkspace, /DocumentWorkspaceFailure/);
+  assert.match(documentsWorkspace, /ApiRequestError/);
+  assert.match(documentsWorkspace, /ModuleLockedState/);
+  assert.match(documentsWorkspace, /We could not load admission documents right now/);
+  assert.match(documentsWorkspace, /Your admission records have not been changed/);
+  assert.doesNotMatch(documentsWorkspace, /title="Missing" value="Unavailable"/);
+  assert.match(documentsErrorBoundary, /M1PageHeader/);
+  assert.match(documentsErrorBoundary, /onAction=\{reset\}/);
+  assert.match(documentsErrorBoundary, /Return to admissions/);
+  assert.match(documentsErrorBoundary, /Your admission records have not been changed/);
 });
 
 test('M1 entry creates one unified admission case for direct and review workflows', () => {
@@ -48,6 +59,7 @@ test('M1 entry creates one unified admission case for direct and review workflow
   const queues = read('components/m1/admission-case-queues.tsx');
   const caseApi = read('lib/api/admission-cases.ts');
   const admissionsPage = read('app/dashboard/admissions/page.tsx');
+  const dashboardShell = read('components/layout/dashboard-shell.tsx');
   const policySettings = read('components/settings/admission-policy-settings.tsx');
   const mobileRouter = read('../schoolos_mobile/lib/app/router.dart');
 
@@ -60,9 +72,17 @@ test('M1 entry creates one unified admission case for direct and review workflow
   assert.match(entry, /AdmissionReviewCaseForm/);
   assert.doesNotMatch(entry, /AdmissionApplicationForm/);
   assert.match(entry, /admissionCasesApi\.getPolicy/);
+  assert.match(entry, /School-office admission/);
+  assert.match(entry, /Continue an existing application/);
+  assert.match(entry, /Transfer or special review/);
+  assert.match(entry, /Import admissions/);
   assert.match(directWizard, /SchoolOS checks placement, policy requirements, and possible duplicates/);
   assert.match(directWizard, /Saving admission draft/);
+  assert.match(directWizard, /Step \{step \+ 1\} of \{STEPS\.length\}/);
+  assert.match(directWizard, /Draft saved just now/);
   assert.match(directWizard, /Recovery link/);
+  assert.match(directWizard, /EarlyMatchNotice/);
+  assert.match(directWizard, /Possible existing record found/);
   assert.match(directWizard, /relatedStudentCandidates/);
   assert.match(directWizard, /Guardian and sibling resolution/);
   assert.match(directWizard, /directAdmit/);
@@ -70,16 +90,29 @@ test('M1 entry creates one unified admission case for direct and review workflow
   assert.match(directWizard, /admissionCasesApi\.updateCase/);
   assert.match(directWizard, /api\.uploadFile\(file, 'admissions', caseId\)/);
   assert.match(directWizard, /Add another student/);
+  assert.match(directWizard, /Open follow-up checklist/);
+  assert.match(directWizard, /Select gender/);
+  assert.match(directWizard, /Select relationship/);
+  assert.match(directWizard, /Date of birth \(BS\)/);
+  assert.match(directWizard, /toGregorianDateFromBs/);
+  assert.match(reviewForm, /Select gender/);
+  assert.match(reviewForm, /Select relationship/);
+  assert.match(reviewForm, /Admission date \(BS\)/);
+  assert.match(reviewForm, /toGregorianDateFromBs/);
+  assert.doesNotMatch(directWizard + reviewForm, /gender: 'FEMALE'|guardianRelation: 'mother'/);
   assert.match(reviewForm, /admissionCasesApi\.createCase/);
   assert.match(reviewForm, /admissionCaseIdRef/);
   assert.match(reviewForm, /MARK_READY_FOR_REVIEW/);
   assert.match(queues, /listQueues/);
   assert.match(queues, /Ready to Admit/);
+  assert.match(queues, /More filters/);
+  assert.match(queues, /query\.data\.total > query\.data\.limit/);
   assert.match(caseApi, /\/admissions\/cases/);
   assert.match(caseApi, /\/direct-admit/);
   assert.match(caseApi, /\/finalize/);
   assert.match(admissionsPage, /AdmissionCaseQueues/);
   assert.match(admissionsPage, /New admission/);
+  assert.doesNotMatch(dashboardShell, /'\/dashboard\/admissions': 'students'/);
   assert.match(policySettings, /Rules for selected admissions/);
   assert.match(policySettings, /GRADE_11_12/);
   assert.match(mobileRouter, /snapshotKey: 'admissions'/);

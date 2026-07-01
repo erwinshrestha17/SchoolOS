@@ -14,7 +14,6 @@ import { SupportOverrideBanner } from '../platform/SupportOverrideBanner';
 
 const MODULE_LANDING_SUMMARIES: Record<string, OperationalSummaryRouteModule> = {
   '/dashboard/students': 'students',
-  '/dashboard/admissions': 'students',
   '/dashboard/attendance': 'attendance',
   '/dashboard/fees': 'fees',
   '/dashboard/academics': 'academics',
