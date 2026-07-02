@@ -156,12 +156,9 @@ export class HomeworkAttachmentAccessService {
       return;
     }
 
-    const assignment =
-      attachment.submission?.homework ?? attachment.assignment;
+    const assignment = attachment.submission?.homework ?? attachment.assignment;
     if (!assignment) {
-      throw new ForbiddenException(
-        'Homework attachment is outside your scope',
-      );
+      throw new ForbiddenException('Homework attachment is outside your scope');
     }
 
     if (
@@ -254,9 +251,7 @@ export class HomeworkAttachmentAccessService {
         student: {
           lifecycleStatus: StudentLifecycleStatus.ACTIVE,
           classId: assignment.classId,
-          ...(assignment.sectionId
-            ? { sectionId: assignment.sectionId }
-            : {}),
+          ...(assignment.sectionId ? { sectionId: assignment.sectionId } : {}),
         },
       },
       include: {
@@ -287,6 +282,5 @@ export class HomeworkAttachmentAccessService {
         'Homework attachment is outside your child class scope',
       );
     }
-
   }
 }

@@ -2,10 +2,11 @@
 
 import { formatBsDate, formatBsDateTime, type GeneratedStudentDocumentMeta, type StudentDocument } from '@schoolos/core';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { SectionCard } from '@/components/ui/section-card';
 import {
+  Archive,
   FileText,
   Download,
   ExternalLink,
@@ -18,6 +19,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { openProtectedFile } from '@/lib/api/client';
@@ -49,14 +51,35 @@ export function DocumentsTab({
   generatedDocuments,
   onOpenPdf,
 }: DocumentsTabProps) {
+  const queryClient = useQueryClient();
   const [openingDocumentId, setOpeningDocumentId] = useState<string | null>(
     null,
   );
   const [documentAccessError, setDocumentAccessError] = useState('');
+  const [generatedDocumentToRevoke, setGeneratedDocumentToRevoke] =
+    useState<GeneratedStudentDocumentMeta | null>(null);
+  const [generatedDocumentRevokeReason, setGeneratedDocumentRevokeReason] =
+    useState('');
   const historyQuery = useQuery({
     queryKey: ['student-document-history', studentId],
     queryFn: () => api.listStudentDocumentHistory(studentId),
     enabled: Boolean(studentId),
+  });
+  const revokeGeneratedDocumentMutation = useMutation({
+    mutationFn: ({
+      documentId,
+      reason,
+    }: {
+      documentId: string;
+      reason: string;
+    }) => api.revokeGeneratedStudentDocument(studentId, documentId, { reason }),
+    onSuccess: () => {
+      setGeneratedDocumentToRevoke(null);
+      setGeneratedDocumentRevokeReason('');
+      void queryClient.invalidateQueries({
+        queryKey: ['student-profile', studentId],
+      });
+    },
   });
   const documentChecklist = buildDocumentChecklist(documents);
   const documentRiskCounts = documentChecklist.reduce(
@@ -96,13 +119,21 @@ export function DocumentsTab({
       >
         <div className="grid gap-3">
           {generatedTypes.map(([kind, label, actionLabel]) => {
-            const isGenerated = generatedDocuments.some(
+            const generatedDocument = generatedDocuments.find(
               (doc) => doc.kind === kind,
             );
+            const activeGeneratedDocument = generatedDocuments.find(
+              (doc) => doc.kind === kind && !doc.revokedAt,
+            );
+            const isGenerated = Boolean(activeGeneratedDocument);
+            const revokedGeneratedDocument =
+              !activeGeneratedDocument && generatedDocument?.revokedAt
+                ? generatedDocument
+                : null;
             return (
               <div
                 key={kind}
-                className="group flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 p-4 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-bg)]"
+                className="group flex flex-col gap-4 rounded-2xl border border-slate-100 bg-slate-50/50 p-4 transition hover:border-[var(--color-mod-admissions-border)] hover:bg-[var(--color-mod-admissions-bg)] sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="flex items-center gap-3">
                   <div
@@ -120,18 +151,40 @@ export function DocumentsTab({
                     <p className="text-[0.7rem] text-slate-500 font-medium">
                       {isGenerated
                         ? 'Protected PDF can be regenerated or opened'
+                        : revokedGeneratedDocument
+                          ? `Revoked on ${formatDateOnly(revokedGeneratedDocument.revokedAt)}`
                         : 'Available when backend document rules pass'}
                     </p>
+                    {activeGeneratedDocument?.retentionUntil ? (
+                      <p className="mt-1 text-[0.65rem] font-semibold text-slate-400">
+                        Retention until {formatDateOnly(activeGeneratedDocument.retentionUntil)}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onOpenPdf(kind)}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-white px-3 text-xs font-black text-slate-600 shadow-sm transition hover:bg-[var(--color-mod-admissions-accent)] hover:text-white"
-                >
-                  <ExternalLink size={16} />
-                  {actionLabel}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpenPdf(kind)}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-white px-3 text-xs font-black text-slate-600 shadow-sm transition hover:bg-[var(--color-mod-admissions-accent)] hover:text-white"
+                  >
+                    <ExternalLink size={16} />
+                    {actionLabel}
+                  </button>
+                  {activeGeneratedDocument ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGeneratedDocumentToRevoke(activeGeneratedDocument);
+                        setGeneratedDocumentRevokeReason('');
+                      }}
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-danger-100 bg-white px-3 text-xs font-black text-danger-700 shadow-sm transition hover:bg-danger-50"
+                    >
+                      <Archive size={16} />
+                      Revoke
+                    </button>
+                  ) : null}
+                </div>
               </div>
             );
           })}
@@ -305,7 +358,7 @@ export function DocumentsTab({
 
       <SectionCard
         title="Document Audit Trail"
-        description="Tenant-scoped upload, view, verification, archive, and delete history for this student."
+        description="Tenant-scoped upload, view, verification, archive, and generated-document revoke history for this student."
       >
         {historyQuery.isLoading ? (
           <div className="grid gap-3">
@@ -366,6 +419,46 @@ export function DocumentsTab({
           </div>
         )}
       </SectionCard>
+      <ConfirmDialog
+        isOpen={Boolean(generatedDocumentToRevoke)}
+        title="Revoke generated document?"
+        description={`Revoke ${generatedDocumentToRevoke?.fileName ?? 'this generated document'} and keep the backend audit record. The PDF can be regenerated later if backend rules allow it.`}
+        confirmLabel="Revoke document"
+        destructive
+        isConfirming={revokeGeneratedDocumentMutation.isPending}
+        confirmDisabled={generatedDocumentRevokeReason.trim().length < 5}
+        onClose={() => {
+          setGeneratedDocumentToRevoke(null);
+          setGeneratedDocumentRevokeReason('');
+        }}
+        onConfirm={() => {
+          if (!generatedDocumentToRevoke) return;
+          revokeGeneratedDocumentMutation.mutate({
+            documentId: generatedDocumentToRevoke.id,
+            reason: generatedDocumentRevokeReason.trim(),
+          });
+        }}
+      >
+        {revokeGeneratedDocumentMutation.isError ? (
+          <div className="mb-3 rounded-2xl border border-danger-100 bg-danger-50 p-3 text-sm font-semibold text-danger-700">
+            {revokeGeneratedDocumentMutation.error instanceof Error
+              ? revokeGeneratedDocumentMutation.error.message
+              : 'The generated document could not be revoked.'}
+          </div>
+        ) : null}
+        <label className="block text-sm font-bold text-slate-700">
+          Revoke reason
+          <textarea
+            rows={3}
+            value={generatedDocumentRevokeReason}
+            onChange={(event) =>
+              setGeneratedDocumentRevokeReason(event.target.value)
+            }
+            placeholder="Why should this generated document be revoked?"
+            className="mt-2 font-normal"
+          />
+        </label>
+      </ConfirmDialog>
     </div>
   );
 }

@@ -284,14 +284,10 @@ export class AssessmentRetakesService {
     dto: ScheduleAssessmentRetakeDto,
     actor: AuthContext,
   ) {
-    const retake = await this.getMutableRetake(
-      assessmentRetakeId,
-      actor,
-      [
-        AssessmentRetakeStatus.APPROVED,
-        AssessmentRetakeStatus.SCHEDULED,
-      ],
-    );
+    const retake = await this.getMutableRetake(assessmentRetakeId, actor, [
+      AssessmentRetakeStatus.APPROVED,
+      AssessmentRetakeStatus.SCHEDULED,
+    ]);
     const startsAt = new Date(dto.startsAt);
     const endsAt = new Date(dto.endsAt);
     if (endsAt <= startsAt) {
@@ -384,9 +380,7 @@ export class AssessmentRetakesService {
 
     const useRetake =
       dto.decision === AssessmentRetakeResultDecision.USE_RETAKE;
-    const nextMarks = useRetake
-      ? retake.attemptMarks
-      : retake.originalMarks;
+    const nextMarks = useRetake ? retake.attemptMarks : retake.originalMarks;
     const nextStatus = useRetake
       ? MarkEntryStatus.SUBMITTED
       : retake.originalStatus;
@@ -488,9 +482,7 @@ export class AssessmentRetakesService {
   private async getMutableRetake(
     assessmentRetakeId: string,
     actor: AuthContext,
-    allowed:
-      | AssessmentRetakeStatus
-      | ReadonlyArray<AssessmentRetakeStatus>,
+    allowed: AssessmentRetakeStatus | ReadonlyArray<AssessmentRetakeStatus>,
   ) {
     const retake = await this.prisma.assessmentRetake.findFirst({
       where: { id: assessmentRetakeId, tenantId: actor.tenantId },
@@ -572,18 +564,17 @@ export class AssessmentRetakesService {
       throw new ForbiddenException('Staff record not found in this tenant');
     }
 
-    const assignment =
-      await this.prisma.subjectTeacherAssignment.findFirst({
-        where: {
-          tenantId: actor.tenantId,
-          staffId: staff.id,
-          academicYearId: scope.academicYearId,
-          classId: scope.classId,
-          subjectId: scope.subjectId,
-          OR: [{ sectionId: null }, { sectionId: scope.sectionId }],
-        },
-        select: { id: true },
-      });
+    const assignment = await this.prisma.subjectTeacherAssignment.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        staffId: staff.id,
+        academicYearId: scope.academicYearId,
+        classId: scope.classId,
+        subjectId: scope.subjectId,
+        OR: [{ sectionId: null }, { sectionId: scope.sectionId }],
+      },
+      select: { id: true },
+    });
     if (!assignment) {
       throw new ForbiddenException(
         'Assessment retake access is limited to assigned subjects and classes',
@@ -606,17 +597,16 @@ export class AssessmentRetakesService {
       return { id: { in: [] } };
     }
 
-    const assignments =
-      await this.prisma.subjectTeacherAssignment.findMany({
-        where: { tenantId: actor.tenantId, staffId: staff.id },
-        select: {
-          academicYearId: true,
-          classId: true,
-          sectionId: true,
-          subjectId: true,
-        },
-        take: 500,
-      });
+    const assignments = await this.prisma.subjectTeacherAssignment.findMany({
+      where: { tenantId: actor.tenantId, staffId: staff.id },
+      select: {
+        academicYearId: true,
+        classId: true,
+        sectionId: true,
+        subjectId: true,
+      },
+      take: 500,
+    });
     if (assignments.length === 0) {
       return { id: { in: [] } };
     }
@@ -626,9 +616,7 @@ export class AssessmentRetakesService {
         examTerm: { academicYearId: assignment.academicYearId },
         classId: assignment.classId,
         subjectId: assignment.subjectId,
-        ...(assignment.sectionId
-          ? { sectionId: assignment.sectionId }
-          : {}),
+        ...(assignment.sectionId ? { sectionId: assignment.sectionId } : {}),
       })),
     };
   }

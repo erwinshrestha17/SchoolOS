@@ -133,10 +133,20 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   });
 
   const guardianRemoveMutation = useMutation({
-    mutationFn: ({ guardianId, reason, newPrimaryGuardianId }: { guardianId: string; reason: string; newPrimaryGuardianId?: string | null }) =>
+    mutationFn: ({
+      guardianId,
+      reason,
+      confirmFileAccessReview,
+      newPrimaryGuardianId,
+    }: {
+      guardianId: string;
+      reason: string;
+      confirmFileAccessReview: true;
+      newPrimaryGuardianId?: string | null;
+    }) =>
       api.removeStudentGuardianAccess(studentId, guardianId, {
         reason,
-        confirmFileAccessReview: true,
+        confirmFileAccessReview,
         newPrimaryGuardianId,
       }),
     onSuccess: () => {
@@ -305,8 +315,8 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
               onAddGuardian={() => setIsAddingGuardian(true)}
               onCancelAdd={() => setIsAddingGuardian(false)}
               onCreateGuardian={(body) => guardianCreateMutation.mutate(body)}
-              onRemoveGuardian={(guardianId, reason, newPrimaryGuardianId) =>
-                guardianRemoveMutation.mutate({ guardianId, reason, newPrimaryGuardianId })
+              onRemoveGuardian={(guardianId, reason, confirmFileAccessReview, newPrimaryGuardianId) =>
+                guardianRemoveMutation.mutate({ guardianId, reason, confirmFileAccessReview, newPrimaryGuardianId })
               }
             />
           </TabsContent>

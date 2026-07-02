@@ -87,7 +87,7 @@ describe('Phase 3B Library frontend contracts', () => {
       /\/library\/copies\/\$\{encodeURIComponent\(copyId\)\}\/archive/,
     );
     const clientApi = read('lib/api/client.ts');
-    assert.match(clientApi, /credentials:\s*'include'/);
+    assert.match(clientApi, /credentials:\s*["']include["']/);
     assert.match(libraryApi, /downloadCsv/);
     assert.doesNotMatch(libraryApi, /Authorization:\s*`Bearer/);
   });
@@ -131,9 +131,9 @@ describe('Phase 3B Library frontend contracts', () => {
 
     assert.match(workspace, /<KpiGrid/);
     assert.match(workspace, /value=\{stats\.availableCopies\}/);
-    assert.match(workspace, /availableCopies: 'Unavailable' as const/);
-    assert.match(workspace, /issuedCopies: 'Unavailable' as const/);
-    assert.match(workspace, /lostDamaged: 'Unavailable' as const/);
+    assert.match(workspace, /availableCopies:\s*["']Unavailable["'] as const/);
+    assert.match(workspace, /issuedCopies:\s*["']Unavailable["'] as const/);
+    assert.match(workspace, /lostDamaged:\s*["']Unavailable["'] as const/);
     assert.match(workspace, /Needs copy-status summary/);
     assert.match(workspace, /Remaining Issues/);
     assert.match(workspace, /listPageSize/);

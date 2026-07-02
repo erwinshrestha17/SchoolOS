@@ -119,7 +119,6 @@ export function ApplicationReviewWorkspace({
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
               <Avatar
-                src={student.photoUrl}
                 initials={(student.fullNameEn ?? "ST").slice(0, 2)}
                 size="xl"
               />

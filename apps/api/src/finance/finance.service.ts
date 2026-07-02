@@ -6963,19 +6963,6 @@ export class FinanceService {
       );
       pdf = download.content;
       fileAssetId = existingFile.id;
-      if (
-        receipt.fileAssetId !== existingFile.id ||
-        receipt.fileStatus !== ReceiptFileStatus.AVAILABLE
-      ) {
-        await this.prisma.receipt.update({
-          where: { id: receipt.id },
-          data: {
-            fileAssetId: existingFile.id,
-            fileStatus: ReceiptFileStatus.AVAILABLE,
-            fileGeneratedAt: receipt.fileGeneratedAt ?? new Date(),
-          },
-        });
-      }
     } else {
       pdf = buildReceiptPdf(pdfData);
 
@@ -6997,21 +6984,7 @@ export class FinanceService {
           },
         });
         fileAssetId = asset.id;
-        await this.prisma.receipt.update({
-          where: { id: receipt.id },
-          data: {
-            fileAssetId: asset.id,
-            fileStatus: ReceiptFileStatus.AVAILABLE,
-            fileGeneratedAt: new Date(),
-          },
-        });
       } catch {
-        await this.prisma.receipt.update({
-          where: { id: receipt.id },
-          data: {
-            fileStatus: ReceiptFileStatus.UNAVAILABLE,
-          },
-        });
         throw new ConflictException(
           'Receipt file is temporarily unavailable. Retry regeneration later.',
         );

@@ -9,6 +9,7 @@ const read = (path) => readFileSync(join(webRoot, path), 'utf8');
 test('M1 workspaces expose real route-backed operations', () => {
   const api = read('lib/api/students.ts');
   const documentsWorkspace = read('components/m1/student-documents-workspace.tsx');
+  const applicationReview = read('components/m1/application-review-workspace.tsx');
   const documentsErrorBoundary = read('app/dashboard/admissions/documents/error.tsx');
   const routes = [
     'app/dashboard/admissions/documents/page.tsx',
@@ -31,7 +32,7 @@ test('M1 workspaces expose real route-backed operations', () => {
   assert.match(api, /\/admissions\/bulk-import\/batches/);
   assert.match(api, /\/admissions\/m1\/import-review\/queue/);
   assert.match(api, /\/students\/document-expiry\/templates/);
-  assert.match(documentsWorkspace, /confirmFileAccessReview: true/);
+  assert.match(documentsWorkspace, /confirmFileAccessReview: guardianRemovalAccessReviewed/);
   assert.match(documentsWorkspace, /requestedStudentId/);
   assert.match(documentsWorkspace, /requestedDocumentId/);
   assert.match(documentsWorkspace, /requestedKind/);
@@ -43,6 +44,8 @@ test('M1 workspaces expose real route-backed operations', () => {
   assert.match(documentsWorkspace, /We could not load admission documents right now/);
   assert.match(documentsWorkspace, /Your admission records have not been changed/);
   assert.doesNotMatch(documentsWorkspace, /title="Missing" value="Unavailable"/);
+  assert.doesNotMatch(documentsWorkspace, /src=\{student\.photoUrl\}|src=\{profileQuery\.data\.student\.photoUrl\}/);
+  assert.doesNotMatch(applicationReview, /src=\{student\.photoUrl\}/);
   assert.match(documentsErrorBoundary, /M1PageHeader/);
   assert.match(documentsErrorBoundary, /onAction=\{reset\}/);
   assert.match(documentsErrorBoundary, /Return to admissions/);
@@ -51,6 +54,7 @@ test('M1 workspaces expose real route-backed operations', () => {
 
 test('M1 entry creates one unified admission case for direct and review workflows', () => {
   const legacyPipeline = read('components/admissions/admissions-pipeline.tsx');
+  const applicationPipelinePage = read('app/dashboard/admissions/applications/page.tsx');
   const legacyApplicationForm = read('components/m1/admission-application-form.tsx');
   const entryPage = read('app/dashboard/admissions/new/page.tsx');
   const entry = read('components/m1/admission-entry.tsx');
@@ -59,11 +63,21 @@ test('M1 entry creates one unified admission case for direct and review workflow
   const queues = read('components/m1/admission-case-queues.tsx');
   const caseApi = read('lib/api/admission-cases.ts');
   const admissionsPage = read('app/dashboard/admissions/page.tsx');
+  const moduleNav = read('components/m1/m1-module-nav.tsx');
   const dashboardShell = read('components/layout/dashboard-shell.tsx');
   const policySettings = read('components/settings/admission-policy-settings.tsx');
   const mobileRouter = read('../schoolos_mobile/lib/app/router.dart');
 
   assert.match(legacyPipeline, /listAdmissionApplications/);
+  assert.match(legacyPipeline, /isAdmissionCaseDisplayStatus/);
+  assert.match(legacyPipeline, /isLegacyApplicationStatus/);
+  assert.match(legacyPipeline, /Continue in admission case/);
+  assert.match(legacyPipeline, /application\.status === "ADMITTED"/);
+  assert.match(legacyPipeline, /NEXT_STATUSES\[application\.status\]/);
+  assert.match(applicationPipelinePage, /AdmissionsPipeline/);
+  assert.match(applicationPipelinePage, /Application pipeline/);
+  assert.doesNotMatch(applicationPipelinePage, /legacy admission applications/);
+  assert.match(applicationPipelinePage, /\/dashboard\/admissions\/new/);
   assert.match(legacyApplicationForm, /createAdmissionApplication/);
   assert.match(entryPage, /AdmissionEntry/);
   assert.match(entryPage, /caseId/);
@@ -112,6 +126,8 @@ test('M1 entry creates one unified admission case for direct and review workflow
   assert.match(caseApi, /\/finalize/);
   assert.match(admissionsPage, /AdmissionCaseQueues/);
   assert.match(admissionsPage, /New admission/);
+  assert.match(admissionsPage, /\/dashboard\/admissions\/applications/);
+  assert.match(moduleNav, /\/dashboard\/admissions\/applications/);
   assert.doesNotMatch(dashboardShell, /'\/dashboard\/admissions': 'students'/);
   assert.match(policySettings, /Rules for selected admissions/);
   assert.match(policySettings, /GRADE_11_12/);
@@ -129,9 +145,31 @@ test('M1 high-risk workflows remain server controlled and protected', () => {
   assert.match(duplicates, /previewDuplicateStudentMerge/);
   assert.match(duplicates, /mergeDuplicateStudent/);
   assert.match(duplicates, /Mark Not Duplicate — unavailable/);
-  assert.match(documents, /ProtectedFileButton/);
+  assert.match(documents, /StudentDocumentAccessButton/);
+  assert.match(documents, /api\.previewStudentDocument\(studentId, document\.id\)/);
+  assert.match(documents, /api\.downloadStudentDocument\(studentId, document\.id\)/);
+  assert.match(documents, /openProtectedFile\(access\.fileAssetId/);
+  assert.match(documents, /downloadProtectedFile\(access\.fileAssetId/);
+  assert.match(documents, /api\.archiveStudentDocument\(documentId, \{ reason \}\)/);
+  assert.match(documents, /Archive reason/);
+  assert.match(documents, /archiveReason\.trim\(\)\.length < 5/);
+  assert.match(documents, /BsDateField/);
+  assert.match(documents, /toGregorianDateFromBs\(parseBsDateInput\(uploadExpiryDateBs\)\)/);
+  assert.match(documents, /expiryDate: metadata\.expiryDate/);
+  assert.match(documents, /notes: metadata\.notes/);
+  assert.match(documents, /reason: metadata\.reason/);
+  assert.match(documents, /Uploading now will create a replacement record/);
+  assert.match(documents, /uploadReason\.trim\(\)\.length < 5/);
   assert.match(documents, /removeStudentGuardianAccess/);
+  assert.match(documents, /guardianRemovalAccessReviewed/);
+  assert.match(documents, /confirmFileAccessReview: guardianRemovalAccessReviewed/);
+  assert.match(documents, /guardianRemovalReplacementId/);
+  assert.match(documents, /newPrimaryGuardianId: guardianToRemove\.isPrimary \? guardianRemovalReplacementId : null/);
+  assert.match(documents, /I reviewed guardian portal and protected-file access/);
+  assert.match(documents, /A student must have at least one guardian/);
   assert.match(documents, /Expiry reminders/);
+  assert.doesNotMatch(documents, /fileAssetId=\{selectedDocument\.fileId\}|fileAssetId=\{document\.fileId\}/);
+  assert.doesNotMatch(documents, /api\.deleteStudentDocument/);
   assert.match(qr, /StudentQrCard/);
   assert.match(iemis, /CSV Import History/);
   assert.match(iemis, /Import Review Queue/);

@@ -12,31 +12,37 @@ function read(relativePath) {
 }
 
 describe('reference dashboard foundation', () => {
-  it('keeps the repository-grounded UI/API alignment audit', () => {
-    const auditPath = join(
+  it('keeps the active repository-grounded web design and readiness sources', () => {
+    const designPath = join(
       repoRoot,
-      'docs/implementation/WEB_UI_API_ALIGNMENT_AUDIT.md',
+      'docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md',
     );
-    assert.equal(existsSync(auditPath), true);
-    const audit = readFileSync(auditPath, 'utf8');
+    const readinessPath = join(
+      repoRoot,
+      'docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md',
+    );
+    assert.equal(existsSync(designPath), true);
+    assert.equal(existsSync(readinessPath), true);
+    const design = readFileSync(designPath, 'utf8');
+    const readiness = readFileSync(readinessPath, 'utf8');
     for (const marker of [
-      'M1 Admissions & Students',
-      'M2 Attendance',
-      'M3 Fees & Receipts',
-      'M4 Academics',
-      'M5 Activity Feed',
-      'M6 Homework & Timetable',
-      'M7 HR & Payroll',
+      'M1 Admissions and Student Profiles',
+      'M2 Smart Attendance',
+      'M3 Fees and Receipts',
+      'M4 Academics, Exams, CAS, Report Cards',
+      'M5 Activity Feed and Milestones',
+      'M6 Homework and Timetable',
+      'M7 HR and Payroll',
       'M8 Library',
       'M9 Transport',
       'M10 Canteen',
-      'M11 Accounting',
-      'M12 Notices & Communication',
-      'Internal QA ready',
+      'M11 Accounting and Finance',
+      'M12 Notifications, Notices, Communication, Chat',
     ]) {
-      assert.match(audit, new RegExp(marker.replace(/[&/]/g, '\\$&')));
+      assert.match(design, new RegExp(marker.replace(/[&/]/g, '\\$&')));
     }
-    assert.match(audit, /cannot be used as seed or fallback production truth/);
+    assert.match(design, /never fake production behavior/);
+    assert.match(readiness, /Internal QA-ready/);
   });
 
   it('provides the requested shared dashboard composition primitives', () => {
@@ -113,9 +119,10 @@ describe('reference dashboard foundation', () => {
 
     assert.match(layout, /prefix: '\/dashboard\/communications'/);
     assert.match(sidebar, /href: '\/dashboard\/communications'/);
-    assert.match(communications, /communicationsApi\.listNotificationDeliveryFailures/);
+    assert.match(communications, /communicationsApi\.getCommunicationsSummary/);
     assert.match(communications, /messagingApi\.listParentTeacherThreads/);
-    assert.match(communications, /A safe provider-health contract is not exposed/);
+    assert.match(communications, /summary\.providerStatus/);
+    assert.match(communications, /summary\?\.providerHealth/);
     assert.doesNotMatch(communications, /setTimeout|setInterval/);
   });
 });

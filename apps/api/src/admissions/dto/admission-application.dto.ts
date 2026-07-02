@@ -33,6 +33,25 @@ export const ADMISSION_APPLICATION_STATUSES = [
 export type AdmissionApplicationStatus =
   (typeof ADMISSION_APPLICATION_STATUSES)[number];
 
+export const ADMISSION_CASE_DISPLAY_STATUSES = [
+  'DRAFT',
+  'NEEDS_INFORMATION',
+  'READY_TO_ADMIT',
+  'WAITING_FOR_REVIEW',
+  'APPROVED',
+  'ADMITTED',
+  'NOT_ADMITTED',
+  'CLOSED',
+] as const;
+
+export const ADMISSION_APPLICATION_FILTER_STATUSES = [
+  ...ADMISSION_APPLICATION_STATUSES,
+  ...ADMISSION_CASE_DISPLAY_STATUSES,
+] as const;
+
+export type AdmissionApplicationFilterStatus =
+  (typeof ADMISSION_APPLICATION_FILTER_STATUSES)[number];
+
 export class ListAdmissionApplicationsDto {
   @IsOptional()
   @IsInt()
@@ -48,8 +67,8 @@ export class ListAdmissionApplicationsDto {
   limit?: number = 25;
 
   @IsOptional()
-  @IsIn(ADMISSION_APPLICATION_STATUSES)
-  status?: AdmissionApplicationStatus;
+  @IsIn(ADMISSION_APPLICATION_FILTER_STATUSES)
+  status?: AdmissionApplicationFilterStatus;
 
   @IsOptional()
   @IsString()

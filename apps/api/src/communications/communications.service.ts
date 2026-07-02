@@ -30,6 +30,7 @@ import { CreateEventDto } from './dto/create-event.dto';
 import { CreateNoticeDto } from './dto/create-notice.dto';
 import {
   CreateCommunicationTemplateDto,
+  ListCommunicationTemplatesQueryDto,
   UpdateCommunicationTemplateDto,
 } from './dto/communication-template.dto';
 import { CaptureConsentDto } from './dto/capture-consent.dto';
@@ -790,14 +791,33 @@ export class CommunicationsService {
     };
   }
 
-  async listCommunicationTemplates(actor: AuthContext) {
-    return this.prisma.communicationTemplate.findMany({
-      where: {
-        tenantId: actor.tenantId,
-      },
-      select: TEMPLATE_SELECT,
-      orderBy: [{ key: 'asc' }, { version: 'desc' }],
-    });
+  async listCommunicationTemplates(
+    query: ListCommunicationTemplatesQueryDto,
+    actor: AuthContext,
+  ) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const where = {
+      tenantId: actor.tenantId,
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.communicationTemplate.findMany({
+        where,
+        select: TEMPLATE_SELECT,
+        orderBy: [{ key: 'asc' }, { version: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.communicationTemplate.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
   }
 
   async createCommunicationTemplate(

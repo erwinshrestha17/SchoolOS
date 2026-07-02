@@ -71,6 +71,7 @@ describe('CommunicationsService', () => {
       },
       communicationTemplate: {
         findMany: jest.fn(),
+        count: jest.fn(),
         aggregate: jest.fn(),
         create: jest.fn(),
         findFirst: jest.fn(),
@@ -130,6 +131,36 @@ describe('CommunicationsService', () => {
       redisService,
       fileRegistryService,
     );
+  });
+
+  it('lists communication templates with tenant-scoped server pagination', async () => {
+    prisma.communicationTemplate.findMany.mockResolvedValue([
+      { id: 'template-1' },
+    ]);
+    prisma.communicationTemplate.count.mockResolvedValue(21);
+
+    const result = await service.listCommunicationTemplates(
+      { page: 2, limit: 20 },
+      actor,
+    );
+
+    expect(prisma.communicationTemplate.findMany).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-1' },
+      select: expect.any(Object),
+      orderBy: [{ key: 'asc' }, { version: 'desc' }],
+      skip: 20,
+      take: 20,
+    });
+    expect(prisma.communicationTemplate.count).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-1' },
+    });
+    expect(result).toEqual({
+      items: [{ id: 'template-1' }],
+      total: 21,
+      page: 2,
+      limit: 20,
+      hasNextPage: false,
+    });
   });
 
   it('creates event delivery records for the resolved class or section audience', async () => {

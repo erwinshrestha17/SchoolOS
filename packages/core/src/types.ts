@@ -104,14 +104,29 @@ export type AdmissionCreationResult = {
   } | null;
 };
 
+export const LEGACY_ADMISSION_APPLICATION_STATUSES = [
+  "INQUIRY",
+  "APPLICATION",
+  "DOCUMENT_PENDING",
+  "ENTRANCE_INTERVIEW",
+  "ACCEPTED",
+  "ENROLLED",
+  "REJECTED",
+] as const;
+
+export type LegacyAdmissionApplicationStatus =
+  (typeof LEGACY_ADMISSION_APPLICATION_STATUSES)[number];
+
 export const ADMISSION_APPLICATION_STATUSES = [
-  'INQUIRY',
-  'APPLICATION',
-  'DOCUMENT_PENDING',
-  'ENTRANCE_INTERVIEW',
-  'ACCEPTED',
-  'ENROLLED',
-  'REJECTED',
+  ...LEGACY_ADMISSION_APPLICATION_STATUSES,
+  "DRAFT",
+  "NEEDS_INFORMATION",
+  "READY_TO_ADMIT",
+  "WAITING_FOR_REVIEW",
+  "APPROVED",
+  "ADMITTED",
+  "NOT_ADMITTED",
+  "CLOSED",
 ] as const;
 
 export type AdmissionApplicationStatus =
@@ -250,7 +265,7 @@ export type BulkAdmissionImportResult = {
   failed: number;
   results: Array<{
     rowNumber: number;
-    status: 'created' | 'validated' | 'failed';
+    status: "created" | "validated" | "failed";
     studentId?: string;
     studentSystemId?: string;
     errors?: string[];
@@ -280,7 +295,7 @@ export type AttendanceOperationalSummary = {
     classId: string;
     sectionId: string | null;
     submittedAt: string | null;
-    totals: AttendanceSummary['totals'];
+    totals: AttendanceSummary["totals"];
   };
   studentMonthly: {
     studentId: string;
@@ -305,10 +320,10 @@ export type AttendanceConflictReviewResult = {
 };
 
 export type AttendanceCorrectionStatus =
-  | 'PENDING'
-  | 'APPROVED'
-  | 'REJECTED'
-  | 'CANCELLED';
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "CANCELLED";
 
 export type DefaulterReminderResult = {
   requested: number;
@@ -360,7 +375,7 @@ export type NotificationDeliveryFailureSummary = {
   title: string;
   lastFailureReason: string | null;
   retryCount: number;
-  retryStatus: 'retryable' | 'pending' | 'not_retryable';
+  retryStatus: "retryable" | "pending" | "not_retryable";
   lastRetryAt: string | null;
   failedAt: string | null;
   createdAt: string;
@@ -394,18 +409,18 @@ export type GuardianConsentStatus = {
 };
 
 export type CommunicationProviderMode =
-  | 'disabled'
-  | 'dev-log'
-  | 'mock'
-  | 'configured';
+  | "disabled"
+  | "dev-log"
+  | "mock"
+  | "configured";
 
 export type CommunicationProviderHealth =
-  | 'healthy'
-  | 'degraded'
-  | 'unavailable';
+  | "healthy"
+  | "degraded"
+  | "unavailable";
 
 export type CommunicationProviderDiagnosticChannel = {
-  channel: 'EMAIL' | 'SMS' | 'PUSH';
+  channel: "EMAIL" | "SMS" | "PUSH";
   label: string;
   mode: CommunicationProviderMode;
   health: CommunicationProviderHealth;
@@ -417,11 +432,11 @@ export type CommunicationProviderDiagnosticChannel = {
   lastValidatedAt: string | null;
   lastEventAt: string | null;
   callbackStatus:
-    | 'not_applicable'
-    | 'not_configured'
-    | 'configured'
-    | 'recent'
-    | 'failing';
+    | "not_applicable"
+    | "not_configured"
+    | "configured"
+    | "recent"
+    | "failing";
   lastCallbackAt: string | null;
   message: string;
 };
@@ -446,17 +461,17 @@ export type CommunicationsSummary = {
 };
 
 export type CommunicationTemplateCategory =
-  | 'GENERAL'
-  | 'HOLIDAY'
-  | 'EMERGENCY'
-  | 'FEES'
-  | 'EXAMS'
-  | 'TRANSPORT_DELAY'
-  | 'EVENT';
+  | "GENERAL"
+  | "HOLIDAY"
+  | "EMERGENCY"
+  | "FEES"
+  | "EXAMS"
+  | "TRANSPORT_DELAY"
+  | "EVENT";
 
-export type CommunicationTemplateChannel = 'IN_APP' | 'PUSH' | 'SMS' | 'EMAIL';
+export type CommunicationTemplateChannel = "IN_APP" | "PUSH" | "SMS" | "EMAIL";
 
-export type CommunicationTemplateStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+export type CommunicationTemplateStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 
 export type CommunicationTemplateSummary = {
   id: string;
@@ -477,10 +492,13 @@ export type CommunicationTemplateSummary = {
   updatedAt: string;
 };
 
+export type CommunicationTemplatePage =
+  PaginatedResponse<CommunicationTemplateSummary>;
+
 export type PromotionResult = {
   studentId: string;
   studentName: string;
-  status: 'promoted' | 'skipped' | 'failed';
+  status: "promoted" | "skipped" | "failed";
   reason?: string;
 };
 
@@ -491,10 +509,10 @@ export type PublishingResult = {
 };
 
 export type TimetableVersionStatus =
-  | 'DRAFT'
-  | 'PUBLISHED'
-  | 'LOCKED'
-  | 'ARCHIVED';
+  | "DRAFT"
+  | "PUBLISHED"
+  | "LOCKED"
+  | "ARCHIVED";
 
 export type TimetableValidationIssue = {
   type: string;
@@ -525,7 +543,7 @@ export type HomeworkAssignmentSummary = {
   assignedDate?: string;
   dueDate?: string;
   dueAt: string;
-  status?: 'DRAFT' | 'ASSIGNED' | 'CLOSED' | 'CANCELLED';
+  status?: "DRAFT" | "ASSIGNED" | "CLOSED" | "CANCELLED";
   attachmentMetadata?: Record<string, unknown> | null;
   maxScore: number | null;
   attachmentCount?: number;
@@ -561,7 +579,7 @@ export type HomeworkAttachmentSummary = {
     originalFilename: string;
     mimeType: string;
     sizeBytes: number;
-    status: 'PENDING' | 'UPLOADED' | 'FAILED' | 'DELETED';
+    status: "PENDING" | "UPLOADED" | "FAILED" | "DELETED";
   } | null;
 };
 
@@ -596,15 +614,15 @@ export type HomeworkSubmissionPage = {
   summary: HomeworkSubmissionCounts;
 };
 
-export type ParentTeacherThreadStatus = 'OPEN' | 'CLOSED' | 'ESCALATED';
+export type ParentTeacherThreadStatus = "OPEN" | "CLOSED" | "ESCALATED";
 
-export type ParentTeacherMessagePriority = 'NORMAL' | 'IMPORTANT' | 'EMERGENCY';
+export type ParentTeacherMessagePriority = "NORMAL" | "IMPORTANT" | "EMERGENCY";
 
-export type ParentTeacherMessageStatus = 'SENT' | 'DELIVERED' | 'READ';
+export type ParentTeacherMessageStatus = "SENT" | "DELIVERED" | "READ";
 
-export type ParentTeacherSenderRole = 'PARENT' | 'TEACHER' | 'ADMIN';
+export type ParentTeacherSenderRole = "PARENT" | "TEACHER" | "ADMIN";
 
-export type ChatAvailabilityAppliesToRole = 'TEACHER' | 'PARENT' | 'BOTH';
+export type ChatAvailabilityAppliesToRole = "TEACHER" | "PARENT" | "BOTH";
 
 export type PaginatedResult<T> = {
   items: T[];
@@ -619,7 +637,7 @@ export type ParentTeacherThreadCreateResult = {
   created: boolean;
 };
 
-export type FileStatus = 'PENDING' | 'UPLOADED' | 'FAILED' | 'DELETED';
+export type FileStatus = "PENDING" | "UPLOADED" | "FAILED" | "DELETED";
 
 export type FileAssetSummary = {
   id: string;

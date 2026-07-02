@@ -1,10 +1,13 @@
 "use client";
 
 import {
+  ADMISSION_CASE_DISPLAY_STATUSES,
   formatBsDate,
   formatBsDateTime,
+  LEGACY_ADMISSION_APPLICATION_STATUSES,
   type AdmissionApplication,
   type AdmissionApplicationStatus,
+  type LegacyAdmissionApplicationStatus,
 } from "@schoolos/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -34,6 +37,14 @@ const APPLICATION_STATUSES: Array<{
   value: AdmissionApplicationStatus;
   label: string;
 }> = [
+  { value: "DRAFT", label: "Draft" },
+  { value: "NEEDS_INFORMATION", label: "Needs Information" },
+  { value: "WAITING_FOR_REVIEW", label: "Waiting Review" },
+  { value: "READY_TO_ADMIT", label: "Ready to Admit" },
+  { value: "APPROVED", label: "Approved" },
+  { value: "ADMITTED", label: "Admitted" },
+  { value: "NOT_ADMITTED", label: "Not Admitted" },
+  { value: "CLOSED", label: "Closed" },
   { value: "INQUIRY", label: "Inquiry" },
   { value: "APPLICATION", label: "Application" },
   { value: "DOCUMENT_PENDING", label: "Documents Pending" },
@@ -44,8 +55,8 @@ const APPLICATION_STATUSES: Array<{
 ];
 
 const NEXT_STATUSES: Record<
-  AdmissionApplicationStatus,
-  AdmissionApplicationStatus[]
+  LegacyAdmissionApplicationStatus,
+  LegacyAdmissionApplicationStatus[]
 > = {
   INQUIRY: ["APPLICATION", "DOCUMENT_PENDING", "REJECTED"],
   APPLICATION: [
@@ -117,7 +128,7 @@ export function AdmissionsPipeline() {
       reason,
     }: {
       applicationId: string;
-      nextStatus: AdmissionApplicationStatus;
+      nextStatus: LegacyAdmissionApplicationStatus;
       reason?: string;
     }) =>
       api.updateAdmissionApplicationStatus(applicationId, {
@@ -192,18 +203,18 @@ export function AdmissionsPipeline() {
           description="Derived age label for this page, not an official KPI"
         />
         <KpiCard
-          title="Application stages"
-          value={APPLICATION_STATUSES.length}
+          title="Admission workflow"
+          value="One case"
           icon={<UserRound size={18} />}
           tone="neutral"
-          description="Backend workflow statuses"
+          description="New admissions continue through one unified case"
         />
       </KpiGrid>
 
       <div className="grid min-h-[580px] gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="space-y-4 border-b border-slate-100 bg-slate-50/70 p-4">
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_190px]">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_190px_190px]">
               <label className="relative">
                 <span className="sr-only">Search applications</span>
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -230,31 +241,23 @@ export function AdmissionsPipeline() {
                   <option key={schoolClass.id} value={schoolClass.id}>
                     {schoolClass.name}
                   </option>
-                ))}
+                  ))}
               </select>
-            </div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              <FilterButton
-                active={status === ""}
-                onClick={() => {
-                  setStatus("");
+              <select
+                value={status}
+                onChange={(event) => {
+                  setStatus(event.target.value as AdmissionApplicationStatus | "");
                   setPage(1);
                 }}
+                aria-label="Filter by application stage"
               >
-                All
-              </FilterButton>
-              {APPLICATION_STATUSES.map((item) => (
-                <FilterButton
-                  key={item.value}
-                  active={status === item.value}
-                  onClick={() => {
-                    setStatus(item.value);
-                    setPage(1);
-                  }}
-                >
-                  {item.label}
-                </FilterButton>
-              ))}
+                <option value="">All application stages</option>
+                {APPLICATION_STATUSES.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -288,7 +291,7 @@ export function AdmissionsPipeline() {
             />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px] text-left text-sm">
+              <table className="w-full min-w-[640px] text-left text-sm">
                 <thead className="bg-slate-50 text-[0.68rem] font-black uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-4 py-3">Applicant</th>
@@ -297,7 +300,6 @@ export function AdmissionsPipeline() {
                     <th className="px-4 py-3">Stage</th>
                     <th className="px-4 py-3">Duplicate review</th>
                     <th className="px-4 py-3">Updated</th>
-                    <th className="px-4 py-3">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -315,12 +317,23 @@ export function AdmissionsPipeline() {
                         }
                       >
                         <td className="px-4 py-3">
-                          <strong className="block text-slate-900">
-                            {application.fullNameEn}
-                          </strong>
-                          <span className="text-xs text-slate-500">
-                            {application.source || "Source not recorded"}
-                          </span>
+                          <button
+                            type="button"
+                            className="group min-h-11 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-admissions-border)]"
+                            onClick={() => {
+                              setSelectedId(application.id);
+                              setActionError("");
+                              setRejectionReason("");
+                            }}
+                          >
+                            <strong className="flex items-center gap-1 text-slate-900 group-hover:text-[var(--color-mod-admissions-text)]">
+                              {application.fullNameEn}
+                              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                            </strong>
+                            <span className="text-xs text-slate-500">
+                              {applicationSourceLabel(application.source)}
+                            </span>
+                          </button>
                         </td>
                         <td className="px-4 py-3">
                           <span className="block font-semibold text-slate-700">
@@ -352,21 +365,6 @@ export function AdmissionsPipeline() {
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-500">
                           {formatBsDateTime(application.updatedAt)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedId(application.id);
-                              setActionError("");
-                              setRejectionReason("");
-                            }}
-                          >
-                            Review
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
                         </td>
                       </tr>
                     );
@@ -483,11 +481,14 @@ function ApplicationInspector({
   setRejectionReason: (value: string) => void;
   actionError: string;
   mutationPending: boolean;
-  onTransition: (status: AdmissionApplicationStatus) => void;
+  onTransition: (status: LegacyAdmissionApplicationStatus) => void;
   onEnrolled: () => void;
 }) {
   const duplicateMatches = application.duplicateReview?.matches ?? [];
-  const nextStatuses = NEXT_STATUSES[application.status];
+  const isUnifiedCaseStatus = isAdmissionCaseDisplayStatus(application.status);
+  const nextStatuses = isLegacyApplicationStatus(application.status)
+    ? NEXT_STATUSES[application.status]
+    : [];
 
   return (
     <div className="space-y-5">
@@ -589,6 +590,15 @@ function ApplicationInspector({
         )}
       </div>
 
+      {isUnifiedCaseStatus ? (
+        <Link
+          href={`/dashboard/admissions/cases/${application.id}`}
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-soft)] px-4 text-sm font-bold text-[var(--color-mod-admissions-text)] transition hover:bg-white"
+        >
+          Continue in admission case
+        </Link>
+      ) : null}
+
       {application.status === "ACCEPTED" ? (
         <EnrollmentConversion
           application={application}
@@ -596,7 +606,9 @@ function ApplicationInspector({
         />
       ) : null}
 
-      {application.status === "ENROLLED" && application.convertedStudentId ? (
+      {(application.status === "ENROLLED" ||
+        application.status === "ADMITTED") &&
+      application.convertedStudentId ? (
         <div className="rounded-xl border border-success-200 bg-success-50 p-4">
           <div className="flex items-center gap-2 text-success-800">
             <CheckCircle2 className="h-4 w-4" />
@@ -651,7 +663,9 @@ function ApplicationInspector({
         </div>
       ) : null}
 
-      {application.status === "REJECTED" && application.rejectedReason ? (
+      {(application.status === "REJECTED" ||
+        application.status === "NOT_ADMITTED") &&
+      application.rejectedReason ? (
         <div className="rounded-xl border border-danger-200 bg-danger-50 p-3">
           <p className="text-xs font-black uppercase tracking-wide text-danger-700">
             Rejection reason
@@ -946,30 +960,6 @@ function EnrollmentConversion({
   );
 }
 
-function FilterButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`min-h-9 whitespace-nowrap rounded-lg px-3 text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] ${
-        active
-          ? "bg-[var(--color-mod-admissions-accent)] text-white"
-          : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
 function InspectorRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-3">
@@ -1013,8 +1003,20 @@ function academicYearNameFor(
   );
 }
 
-function transitionLabel(status: AdmissionApplicationStatus) {
-  const labels: Record<AdmissionApplicationStatus, string> = {
+function applicationSourceLabel(source: string | null) {
+  if (!source) return "Source not recorded";
+  const labels: Record<string, string> = {
+    OFFICE_WALK_IN: "Office walk-in",
+    PARENT_ONLINE: "Parent online",
+    PHONE_INQUIRY: "Phone inquiry",
+    TRANSFER_REQUEST: "Transfer request",
+    IMPORT: "Import",
+  };
+  return labels[source] ?? source;
+}
+
+function transitionLabel(status: LegacyAdmissionApplicationStatus) {
+  const labels: Record<LegacyAdmissionApplicationStatus, string> = {
     INQUIRY: "Move to inquiry",
     APPLICATION: "Move to application",
     DOCUMENT_PENDING: "Mark documents pending",
@@ -1024,6 +1026,22 @@ function transitionLabel(status: AdmissionApplicationStatus) {
     REJECTED: "Reject application",
   };
   return labels[status];
+}
+
+function isLegacyApplicationStatus(
+  status: AdmissionApplicationStatus,
+): status is LegacyAdmissionApplicationStatus {
+  return (LEGACY_ADMISSION_APPLICATION_STATUSES as readonly string[]).includes(
+    status,
+  );
+}
+
+function isAdmissionCaseDisplayStatus(
+  status: AdmissionApplicationStatus,
+) {
+  return (ADMISSION_CASE_DISPLAY_STATUSES as readonly string[]).includes(
+    status,
+  );
 }
 
 function replaceApplication(

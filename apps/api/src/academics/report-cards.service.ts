@@ -92,11 +92,7 @@ export class ReportCardsService {
       );
     }
 
-    await this.assertNoActiveRetakes(
-      actor,
-      dto.examTermId,
-      dto.studentId,
-    );
+    await this.assertNoActiveRetakes(actor, dto.examTermId, dto.studentId);
 
     const existingReportCard = await this.prisma.reportCard.findUnique({
       where: {
@@ -686,11 +682,7 @@ export class ReportCardsService {
       throw new NotFoundException('Student not found in this tenant');
     }
 
-    await this.assertNoActiveRetakes(
-      actor,
-      dto.examTermId,
-      dto.studentId,
-    );
+    await this.assertNoActiveRetakes(actor, dto.examTermId, dto.studentId);
 
     const [components, marks] = await Promise.all([
       this.prisma.assessmentComponent.findMany({

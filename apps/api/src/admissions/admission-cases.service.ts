@@ -1383,8 +1383,7 @@ export class AdmissionCasesService {
       }
       if (
         guardianName &&
-        linkedGuardianName?.trim().toLowerCase() ===
-          guardianName.toLowerCase()
+        linkedGuardianName?.trim().toLowerCase() === guardianName.toLowerCase()
       ) {
         reasons.push('Guardian name matches an existing guardian.');
       }

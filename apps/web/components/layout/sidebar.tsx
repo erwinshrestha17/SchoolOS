@@ -3,12 +3,14 @@
 import type { PermissionKey } from '@schoolos/core';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import {
   BookOpen,
   Bus,
   Calculator,
   CalendarCheck,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleUserRound,
@@ -48,6 +50,7 @@ export type NavItem = {
 
 export type NavGroup = {
   label: string;
+  icon: LucideIcon;
   items: NavItem[];
 };
 
@@ -110,11 +113,13 @@ function getRequiredModuleForHref(href: string): string | null {
  */
 export const dashboardNavGroups: NavGroup[] = [
   {
-    label: 'Overview',
-    items: [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }],
+    label: 'Home',
+    icon: LayoutDashboard,
+    items: [{ href: '/dashboard', label: 'Home', icon: LayoutDashboard }],
   },
   {
-    label: 'People',
+    label: 'Students',
+    icon: Users,
     items: [
       {
         href: '/dashboard/students',
@@ -131,43 +136,8 @@ export const dashboardNavGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Academics',
-    items: [
-      {
-        href: '/dashboard/academics',
-        label: 'Academics',
-        icon: GraduationCap,
-        permissions: academicPermissions,
-      },
-      {
-        href: '/dashboard/academics/exams',
-        label: 'Exams & Results',
-        icon: FileCheck2,
-        permissions: academicPermissions,
-        activeWhen: [
-          '/dashboard/academics/exams',
-          '/dashboard/academics/cas',
-          '/dashboard/academics/report-cards',
-        ],
-      },
-      {
-        href: '/dashboard/homework',
-        label: 'Homework & Timetable',
-        icon: CalendarDays,
-        permissions: homeworkAndTimetablePermissions,
-        moduleKeys: ['homework', 'timetable'],
-        activeWhen: ['/dashboard/homework', '/dashboard/timetable'],
-      },
-      {
-        href: '/dashboard/learning',
-        label: 'Learning',
-        icon: BookOpen,
-        permissions: learningPermissions,
-      },
-    ],
-  },
-  {
     label: 'Daily Operations',
+    icon: CalendarCheck,
     items: [
       {
         href: '/dashboard/attendance',
@@ -188,15 +158,12 @@ export const dashboardNavGroups: NavGroup[] = [
         activeWhen: ['/dashboard/fees', '/dashboard/finance'],
       },
       {
-        href: '/dashboard/communications',
-        label: 'Notices & Communication',
-        icon: MessageSquare,
-        permissions: communicationsPermissions,
-        activeWhen: [
-          '/dashboard/communications',
-          '/dashboard/notices',
-          '/dashboard/messages',
-        ],
+        href: '/dashboard/homework',
+        label: 'Homework & Timetable',
+        icon: CalendarDays,
+        permissions: homeworkAndTimetablePermissions,
+        moduleKeys: ['homework', 'timetable'],
+        activeWhen: ['/dashboard/homework', '/dashboard/timetable'],
       },
       {
         href: '/dashboard/activity',
@@ -204,17 +171,40 @@ export const dashboardNavGroups: NavGroup[] = [
         icon: Images,
         permissions: ['activity_feed:read', 'activity_feed:create'],
       },
+    ],
+  },
+  {
+    label: 'Academics',
+    icon: GraduationCap,
+    items: [
       {
-        href: '/dashboard/messages',
-        label: 'Messages',
-        icon: MessageSquare,
-        permissions: ['messaging:create', 'messaging:manage'],
-        moduleKeys: ['notices'],
+        href: '/dashboard/academics',
+        label: 'Academics',
+        icon: GraduationCap,
+        permissions: academicPermissions,
+      },
+      {
+        href: '/dashboard/academics/exams',
+        label: 'Exams & Results',
+        icon: FileCheck2,
+        permissions: academicPermissions,
+        activeWhen: [
+          '/dashboard/academics/exams',
+          '/dashboard/academics/cas',
+          '/dashboard/academics/report-cards',
+        ],
+      },
+      {
+        href: '/dashboard/learning',
+        label: 'Learning',
+        icon: BookOpen,
+        permissions: learningPermissions,
       },
     ],
   },
   {
-    label: 'Campus Services',
+    label: 'School Operations',
+    icon: School,
     items: [
       {
         href: '/dashboard/library',
@@ -245,7 +235,8 @@ export const dashboardNavGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Workforce & Finance',
+    label: 'Staff & Finance',
+    icon: UserCog,
     items: [
       {
         href: '/dashboard/hr',
@@ -273,7 +264,32 @@ export const dashboardNavGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Insights',
+    label: 'Communication',
+    icon: MessageSquare,
+    items: [
+      {
+        href: '/dashboard/communications',
+        label: 'Notices & Communication',
+        icon: MessageSquare,
+        permissions: communicationsPermissions,
+        activeWhen: [
+          '/dashboard/communications',
+          '/dashboard/notices',
+          '/dashboard/messages',
+        ],
+      },
+      {
+        href: '/dashboard/messages',
+        label: 'Messages',
+        icon: MessageSquare,
+        permissions: ['messaging:create', 'messaging:manage'],
+        moduleKeys: ['notices'],
+      },
+    ],
+  },
+  {
+    label: 'Reports',
+    icon: ClipboardList,
     items: [
       {
         href: '/dashboard/reports',
@@ -397,6 +413,21 @@ function SidebarContent({
   onMobileClose: () => void;
   onToggle?: () => void;
 }) {
+  const activeGroupLabel = useMemo(() => {
+    return groups.find((group) =>
+      group.items.some((item) => isActiveNavItem(item, pathname)),
+    )?.label;
+  }, [groups, pathname]);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(
+    activeGroupLabel ?? groups[0]?.label ?? null,
+  );
+
+  useEffect(() => {
+    if (activeGroupLabel) {
+      setExpandedGroup(activeGroupLabel);
+    }
+  }, [activeGroupLabel]);
+
   return (
     <div
       className={cn(
@@ -444,35 +475,45 @@ function SidebarContent({
         aria-label="School operations navigation"
       >
         {groups.map((group) => (
-          <section key={group.label} className="mb-5 last:mb-0">
-            {!collapsed && (
-              <p className="px-2.5 pb-2 text-[0.65rem] font-bold uppercase tracking-[0.08em] text-slate-500">
-                {group.label}
-              </p>
-            )}
-            <div className="space-y-1">
-              {group.items.map((item) => (
-                <NavEntry
-                  key={item.href}
-                  collapsed={collapsed}
-                  item={item}
-                  pathname={pathname}
-                  onMobileClose={onMobileClose}
-                />
-              ))}
-            </div>
-          </section>
+          <NavGroupSection
+            key={group.label}
+            collapsed={collapsed}
+            expanded={expandedGroup === group.label}
+            group={group}
+            pathname={pathname}
+            onExpand={() => {
+              if (collapsed && onToggle) {
+                onToggle();
+                setExpandedGroup(group.label);
+                return;
+              }
+              setExpandedGroup((current) =>
+                current === group.label ? null : group.label,
+              );
+            }}
+            onMobileClose={onMobileClose}
+          />
         ))}
       </nav>
 
       <footer className="border-t border-slate-200 px-3 py-3">
         {settingsItem ? (
-          <NavEntry
-            collapsed={collapsed}
-            item={settingsItem}
-            pathname={pathname}
-            onMobileClose={onMobileClose}
-          />
+          <section className="mb-2">
+            <p
+              className={cn(
+                'px-2.5 pb-2 text-[0.65rem] font-bold uppercase tracking-[0.08em] text-slate-500',
+                collapsed && 'sr-only',
+              )}
+            >
+              Settings
+            </p>
+            <NavEntry
+              collapsed={collapsed}
+              item={settingsItem}
+              pathname={pathname}
+              onMobileClose={onMobileClose}
+            />
+          </section>
         ) : null}
 
         <div
@@ -517,6 +558,85 @@ function SidebarContent({
         )}
       </footer>
     </div>
+  );
+}
+
+function NavGroupSection({
+  collapsed,
+  expanded,
+  group,
+  pathname,
+  onExpand,
+  onMobileClose,
+}: {
+  collapsed: boolean;
+  expanded: boolean;
+  group: NavGroup;
+  pathname: string | null;
+  onExpand: () => void;
+  onMobileClose: () => void;
+}) {
+  const GroupIcon = group.icon;
+  const active = group.items.some((item) => isActiveNavItem(item, pathname));
+
+  return (
+    <section className="mb-2 last:mb-0">
+      <button
+        type="button"
+        className={cn(
+          'group flex min-h-11 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[0.8rem] font-bold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 focus:ring-offset-white',
+          collapsed && 'justify-center px-0',
+          active
+            ? 'bg-[var(--primary-soft)] text-[var(--primary-dark)]'
+            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950',
+        )}
+        aria-expanded={!collapsed ? expanded : undefined}
+        aria-label={collapsed ? group.label : undefined}
+        title={collapsed ? group.label : undefined}
+        onClick={onExpand}
+      >
+        <GroupIcon
+          size={18}
+          className={cn(
+            'shrink-0 transition-colors',
+            active ? 'text-[var(--primary)]' : 'text-slate-500 group-hover:text-slate-800',
+          )}
+          aria-hidden="true"
+        />
+        <span
+          className={cn(
+            'min-w-0 flex-1 truncate text-left transition-all duration-200',
+            collapsed ? 'w-0 overflow-hidden opacity-0' : 'opacity-100',
+          )}
+        >
+          {group.label}
+        </span>
+        {!collapsed ? (
+          <ChevronDown
+            size={15}
+            className={cn(
+              'shrink-0 text-slate-400 transition-transform duration-200',
+              expanded && 'rotate-180',
+            )}
+            aria-hidden="true"
+          />
+        ) : null}
+      </button>
+
+      {!collapsed && expanded ? (
+        <div className="mt-1 space-y-1 border-l border-slate-100 pl-3">
+          {group.items.map((item) => (
+            <NavEntry
+              key={item.href}
+              collapsed={false}
+              item={item}
+              pathname={pathname}
+              onMobileClose={onMobileClose}
+            />
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
 }
 

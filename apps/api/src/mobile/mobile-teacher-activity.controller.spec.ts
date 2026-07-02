@@ -77,9 +77,10 @@ describe('MobileTeacherActivityController', () => {
       expect.objectContaining({ items: [{ id: 'post-1' }] }),
     );
 
-    expect(
-      activityFeedService.listTeacherMobileStudents,
-    ).toHaveBeenCalledWith(actor, studentsQuery);
+    expect(activityFeedService.listTeacherMobileStudents).toHaveBeenCalledWith(
+      actor,
+      studentsQuery,
+    );
     expect(activityFeedService.listTeacherMobilePosts).toHaveBeenCalledWith(
       actor,
       postsQuery,
@@ -116,9 +117,9 @@ describe('MobileTeacherActivityController', () => {
       id: 'milestone-1',
     } as never);
 
-    await expect(
-      controller.createPost(post as never, actor),
-    ).resolves.toEqual({ id: 'post-1' });
+    await expect(controller.createPost(post as never, actor)).resolves.toEqual({
+      id: 'post-1',
+    });
     await expect(
       controller.createMilestone(milestone as never, actor),
     ).resolves.toEqual({ id: 'milestone-1' });

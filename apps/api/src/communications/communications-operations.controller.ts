@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
@@ -17,6 +18,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from './communications.service';
 import {
   CreateCommunicationTemplateDto,
+  ListCommunicationTemplatesQueryDto,
   UpdateCommunicationTemplateDto,
 } from './dto/communication-template.dto';
 
@@ -40,8 +42,11 @@ export class CommunicationsOperationsController {
 
   @Get('templates')
   @Permissions('communications:manage_templates')
-  listTemplates(@CurrentAuth() auth: AuthContext) {
-    return this.communicationsService.listCommunicationTemplates(auth);
+  listTemplates(
+    @Query() query: ListCommunicationTemplatesQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.communicationsService.listCommunicationTemplates(query, auth);
   }
 
   @Post('templates')

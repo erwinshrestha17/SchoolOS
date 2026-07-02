@@ -100,10 +100,7 @@ export class ResultPublishingService {
     });
 
     const blockOnDues = await this.shouldBlockPublishingOnDues(actor);
-    const activeRetakeKeys = await this.getActiveRetakeKeys(
-      actor,
-      reportCards,
-    );
+    const activeRetakeKeys = await this.getActiveRetakeKeys(actor, reportCards);
     const results: PublishingReadinessRow[] = [];
 
     for (const card of reportCards) {
@@ -116,9 +113,7 @@ export class ResultPublishingService {
       }
 
       if (
-        activeRetakeKeys.has(
-          this.retakeKey(card.studentId, card.examTermId),
-        )
+        activeRetakeKeys.has(this.retakeKey(card.studentId, card.examTermId))
       ) {
         blockedReasons.push('A retest or make-up lifecycle is still active');
       }
@@ -208,9 +203,7 @@ export class ResultPublishingService {
 
     for (const card of cards) {
       if (
-        activeRetakeKeys.has(
-          this.retakeKey(card.studentId, card.examTermId),
-        )
+        activeRetakeKeys.has(this.retakeKey(card.studentId, card.examTermId))
       ) {
         results.skipped++;
         results.failed.push({

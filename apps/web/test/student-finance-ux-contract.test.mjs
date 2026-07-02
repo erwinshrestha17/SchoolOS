@@ -28,15 +28,16 @@ describe('Student profile to finance collection UX contract', () => {
     const financeApi = read('lib/api/finance.ts');
 
     assert.match(financeApi, /\/fees\/students\/\$\{encodeURIComponent\(studentId\)\}\/collection-context/);
-    assert.match(page, /if \(studentId && canCollectPayments\) \{\s*setActiveTab\('collection'\);/);
+    assert.match(page, /if \(studentId && canCollectPayments\) \{\s*setActiveTab\(["']collection["']\);/);
     assert.match(page, /enabled: canCollectPayments && Boolean\(studentId\)/);
     assert.match(page, /studentId \? null : \(\s*<KpiGrid/);
-    assert.match(page, /params\.delete\('studentId'\)/);
-    assert.match(page, /params\.delete\('source'\)/);
-    assert.match(page, /params\.delete\('invoiceId'\)/);
-    assert.match(page, /key=\{studentId \? `student-\$\{studentId\}` : 'invoice-search'\}/);
-    assert.match(section, /isStudentContextMode \? studentCollectionContext\?\.invoices \?\? \[\]/);
-    assert.match(counter, /Collecting fees for: \{studentContext\.name\} · \{studentContext\.studentSystemId\}/);
+    assert.match(page, /params\.delete\(["']studentId["']\)/);
+    assert.match(page, /params\.delete\(["']source["']\)/);
+    assert.match(page, /params\.delete\(["']invoiceId["']\)/);
+    assert.match(page, /key=\{studentId \? `student-\$\{studentId\}` : ["']invoice-search["']\}/);
+    assert.match(section, /isStudentContextMode\s*\?\s*\(studentCollectionContext\?\.invoices \?\? \[\]\)/);
+    assert.match(counter, /Collecting fees for:\s*\{studentContext\.name\}/);
+    assert.match(counter, /\{studentContext\.studentSystemId\}/);
     assert.match(counter, /invoices\.length === 1 && selectedInvoiceId !== invoices\[0\]\.id/);
     assert.match(counter, /Choose an invoice to collect payment\./);
     assert.match(counter, /This student has no outstanding invoices\./);

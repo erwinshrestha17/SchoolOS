@@ -19,13 +19,14 @@ describe('school operations sidebar', () => {
 
   it('uses the consolidated school-operating information architecture', () => {
     for (const label of [
-      'Overview',
-      'People',
+      'Home',
       'Academics',
       'Daily Operations',
-      'Campus Services',
-      'Workforce & Finance',
-      'Insights',
+      'School Operations',
+      'Staff & Finance',
+      'Communication',
+      'Reports',
+      'Settings',
       'Fees & Receipts',
       'Notices & Communication',
       'Homework & Timetable',
@@ -35,7 +36,14 @@ describe('school operations sidebar', () => {
       assert.match(sidebar, new RegExp(`label: '${label}'`));
     }
 
-    assert.doesNotMatch(sidebar, /label: 'Communication'/);
+    assert.match(sidebar, /function NavGroupSection/);
+    assert.match(sidebar, /aria-expanded=\{!collapsed \? expanded : undefined\}/);
+    assert.match(sidebar, /expandedGroup === group\.label/);
+    assert.doesNotMatch(sidebar, /label: 'Overview'/);
+    assert.doesNotMatch(sidebar, /label: 'People'/);
+    assert.doesNotMatch(sidebar, /label: 'Campus Services'/);
+    assert.doesNotMatch(sidebar, /label: 'Workforce & Finance'/);
+    assert.doesNotMatch(sidebar, /label: 'Insights'/);
     assert.doesNotMatch(sidebar, /label: 'CAS Records'/);
     assert.doesNotMatch(sidebar, /label: 'Report Cards'/);
   });

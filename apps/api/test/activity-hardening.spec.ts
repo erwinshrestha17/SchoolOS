@@ -194,6 +194,18 @@ describe('Activity Hardening Verification', () => {
     it('triggers compression job after post creation', async () => {
       prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
       prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+      prisma.student.findMany.mockResolvedValue([
+        {
+          id: 'student-1',
+          guardianLinks: [
+            {
+              guardian: {
+                consents: [{ granted: true, revokedAt: null }],
+              },
+            },
+          ],
+        },
+      ]);
       storageService.saveBase64Object.mockResolvedValue({
         objectKey: 'orig.jpg',
         sizeBytes: 100,
@@ -211,7 +223,7 @@ describe('Activity Hardening Verification', () => {
           title: 'Test',
           caption: 'Test',
           category: ActivityCategory.GENERAL,
-          studentIds: [],
+          studentIds: ['student-1'],
           attachments: [
             {
               fileName: 'a.jpg',

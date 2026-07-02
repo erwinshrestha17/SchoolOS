@@ -300,11 +300,7 @@ export class AcademicsController {
     @Body() dto: ApproveAssessmentRetakeDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.assessmentRetakesService.approve(
-      assessmentRetakeId,
-      dto,
-      auth,
-    );
+    return this.assessmentRetakesService.approve(assessmentRetakeId, dto, auth);
   }
 
   @Post('assessment-retakes/:assessmentRetakeId/reject')
@@ -314,11 +310,7 @@ export class AcademicsController {
     @Body() dto: RejectAssessmentRetakeDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.assessmentRetakesService.reject(
-      assessmentRetakeId,
-      dto,
-      auth,
-    );
+    return this.assessmentRetakesService.reject(assessmentRetakeId, dto, auth);
   }
 
   @Post('assessment-retakes/:assessmentRetakeId/schedule')
@@ -370,11 +362,7 @@ export class AcademicsController {
     @Body() dto: CancelAssessmentRetakeDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.assessmentRetakesService.cancel(
-      assessmentRetakeId,
-      dto,
-      auth,
-    );
+    return this.assessmentRetakesService.cancel(assessmentRetakeId, dto, auth);
   }
 
   @Get('marks/student/:studentId')

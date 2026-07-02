@@ -245,7 +245,7 @@ describe("SchoolOS web production contracts", () => {
   it("keeps the staff self-service profile shell tokenized and API-backed", () => {
     const staffDashboard = read("components/staff/staff-dashboard.tsx");
 
-    assert.match(staffDashboard, /api\.getMyProfile/);
+    assert.match(staffDashboard, /api\s*\.getMyProfile/);
     assert.match(staffDashboard, /useSession/);
     assert.match(staffDashboard, /maskStaffBankAccount/);
     assert.match(staffDashboard, /Account \(masked\)/);
@@ -594,7 +594,7 @@ describe("SchoolOS web production contracts", () => {
       "Record Absence",
       "timetable-substitution-slots",
       "api.listTimetable",
-      "mode={selectedSub ? 'assign' : 'create'}",
+      'mode={selectedSub ? "assign" : "create"}',
       "Select a class before recording an absence",
       "Seed default chart accounts?",
       "Cancel substitution?",
@@ -637,7 +637,7 @@ describe("SchoolOS web production contracts", () => {
       financeApi,
       /\/reports\/export-history\/\$\{encodeURIComponent\(id\)\}\/retry/,
     );
-    assert.match(financeApi, /method:\s*'POST'/);
+    assert.match(financeApi, /method:\s*["']POST["']/);
 
     for (const marker of [
       "handleRetrySnapshot",
@@ -651,11 +651,11 @@ describe("SchoolOS web production contracts", () => {
       assert.ok(reportsPage.includes(marker), `Missing marker: ${marker}`);
     }
 
-    assert.match(reportsPage, /snapshot\.status === 'FAILED'/);
-    assert.match(reportsPage, /snapshot\.status === 'CANCELLED'/);
+    assert.match(reportsPage, /snapshot\.status === ["']FAILED["']/);
+    assert.match(reportsPage, /snapshot\.status === ["']CANCELLED["']/);
     assert.match(
       reportsPage,
-      /invalidateQueries\(\{\s*queryKey:\s*\['report-snapshots'\]/,
+      /invalidateQueries\(\{\s*queryKey:\s*\[["']report-snapshots["']/,
     );
   });
 
@@ -809,7 +809,7 @@ describe("SchoolOS web production contracts", () => {
   it("uses cookie credentials instead of bearer tokens for browser API calls", () => {
     const apiClient = read("lib/api/client.ts");
 
-    assert.match(apiClient, /credentials:\s*'include'/);
+    assert.match(apiClient, /credentials:\s*["']include["']/);
     assert.doesNotMatch(apiClient, /Authorization:\s*`Bearer/);
     assert.doesNotMatch(apiClient, /getAccessToken/);
   });
@@ -986,8 +986,8 @@ describe("SchoolOS web production contracts", () => {
     assert.match(dashboard, /Needs attention today/);
     assert.match(dashboard, /Today at a glance/);
     assert.match(dashboard, /Module readiness/);
-    assert.match(dashboard, /'\/dashboard\/fees'/);
-    assert.doesNotMatch(dashboard, /'\/dashboard\/finance'/);
+    assert.match(dashboard, /["']\/dashboard\/fees["']/);
+    assert.doesNotMatch(dashboard, /["']\/dashboard\/finance["']/);
     assert.doesNotMatch(
       dashboard,
       /blur-3xl|bg-indigo-500|rounded-\[|shadow-xl|shadow-2xl|primary-(50|100|200|500|600|700|800|900)/,
@@ -1016,7 +1016,7 @@ describe("SchoolOS web production contracts", () => {
     ];
 
     for (const route of requiredRoutes) {
-      assert.match(dashboard, new RegExp(`'${route}'`));
+      assert.match(dashboard, new RegExp(`["']${route}["']`));
     }
   });
 
@@ -1455,6 +1455,11 @@ describe("SchoolOS web production contracts", () => {
     assert.match(detailPage, /Rejected document needs replacement/);
     assert.match(detailPage, /Expires in/);
     assert.match(detailPage, /generatedDocuments/);
+    assert.match(detailPage, /api\.revokeGeneratedStudentDocument\(studentId, documentId, \{ reason \}\)/);
+    assert.match(detailPage, /generatedDocumentRevokeReason\.trim\(\)\.length < 5/);
+    assert.match(detailPage, /Revoke generated document/);
+    assert.match(detailPage, /Retention until/);
+    assert.match(detailPage, /revokedAt/);
     assert.match(
       detailPage,
       /Scanned copies and attachments provided during enrollment/,
@@ -1480,8 +1485,31 @@ describe("SchoolOS web production contracts", () => {
     assert.match(detailPage, /openUploadedDocument\(doc\.id\)/);
     assert.doesNotMatch(detailPage, /window\.open\(access\.url/);
     assert.match(detailPage, /formatDocumentStatus\(doc\.status\)/);
-    assert.match(detailPage, /ProtectedFileButton/);
-    assert.match(detailPage, /fileAssetId=\{selectedDocument\.fileId\}/);
+    assert.match(detailPage, /StudentDocumentAccessButton/);
+    assert.match(
+      detailPage,
+      /api\.previewStudentDocument\(studentId, document\.id\)/,
+    );
+    assert.match(
+      detailPage,
+      /api\.downloadStudentDocument\(studentId, document\.id\)/,
+    );
+    assert.match(detailPage, /downloadProtectedFile\(access\.fileAssetId/);
+    assert.match(detailPage, /api\.archiveStudentDocument\(documentId, \{ reason \}\)/);
+    assert.match(detailPage, /Archive reason/);
+    assert.match(detailPage, /archiveReason\.trim\(\)\.length < 5/);
+    assert.match(detailPage, /BsDateField/);
+    assert.match(detailPage, /toGregorianDateFromBs\(parseBsDateInput\(uploadExpiryDateBs\)\)/);
+    assert.match(detailPage, /expiryDate: metadata\.expiryDate/);
+    assert.match(detailPage, /notes: metadata\.notes/);
+    assert.match(detailPage, /reason: metadata\.reason/);
+    assert.match(detailPage, /Uploading now will create a replacement record/);
+    assert.match(detailPage, /uploadReason\.trim\(\)\.length < 5/);
+    assert.doesNotMatch(
+      detailPage,
+      /fileAssetId=\{selectedDocument\.fileId\}|fileAssetId=\{document\.fileId\}/,
+    );
+    assert.doesNotMatch(detailPage, /api\.deleteStudentDocument/);
     assert.doesNotMatch(detailPage, /href="#"/);
     assert.match(apiClient, /revokeGeneratedStudentDocument:/);
     assert.match(apiClient, /openStudentDocumentPdf[\s\S]*openPdfBlob/);
@@ -1727,16 +1755,16 @@ describe("SchoolOS web production contracts", () => {
     assert.match(financeForm, /Refund \/ Reverse/);
     assert.match(
       financeForm,
-      /This creates a reversal\/refund record\. It does not edit the original payment/,
+      /This creates a reversal\/refund record\.\s+It does not edit the\s+original payment/,
     );
-    assert.match(financeForm, /api\.refundPayment/);
+    assert.match(financeForm, /api\.requestPaymentRefund/);
     assert.match(financeForm, /REFUND/);
     assert.match(
       financeForm,
       /Search by name, SCH-YYYY-NNNN, or invoice number/,
     );
     assert.match(financeForm, /Confirm Payment & Generate Receipt/);
-    assert.match(financeForm, /No fake production IDs are used/);
+    assert.match(financeForm, /No fake\s+production IDs are used/);
     assert.match(collectionCounter, /Invoice breakdown/);
     assert.match(collectionCounter, /Student name not set/);
     assert.match(collectionCounter, /Class not set/);
@@ -1781,7 +1809,7 @@ describe("SchoolOS web production contracts", () => {
     assert.match(financeForm, /api\.finalizeCashierClose/);
     assert.match(
       financeForm,
-      /Closing records the day-end cash position\. It does not edit payments/,
+      /Closing records the day-end cash position\.\s+It does not edit\s+payments/,
     );
     assert.match(financeForm, /Actual cash counted/);
     assert.match(financeForm, /Expected cash amount/);
@@ -1870,7 +1898,7 @@ describe("SchoolOS web production contracts", () => {
     const financeForm = read("components/forms/finance-form.tsx");
 
     assert.match(financeForm, /Export Fee Collection CSV/);
-    assert.match(financeForm, /api\.exportReport\('fee-collection-report'/);
+    assert.match(financeForm, /api\.exportReport\(["']fee-collection-report["']/);
     assert.match(financeForm, /History & Reports/);
   });
 
@@ -1878,7 +1906,7 @@ describe("SchoolOS web production contracts", () => {
     const financeForm = read("components/forms/finance-form.tsx");
 
     assert.match(financeForm, /Export Defaulter Aging CSV/);
-    assert.match(financeForm, /api\.exportReport\('defaulter-aging-report'/);
+    assert.match(financeForm, /api\.exportReport\(["']defaulter-aging-report["']/);
     assert.match(financeForm, /asOfDate: new Date\(\)\.toISOString\(\)/);
   });
 
@@ -1914,7 +1942,7 @@ describe("SchoolOS web production contracts", () => {
     );
 
     for (const marker of [
-      "api.downloadReport('dues-table-report'",
+      'api.downloadReport("dues-table-report"',
       "finance-dues-csv-export",
       "Clear filters",
       "exportMutation.error.message",
@@ -2081,7 +2109,7 @@ describe("SchoolOS web production contracts", () => {
 
     assert.match(canteenClient, /getSpendingControl:/);
     assert.match(canteenClient, /\/canteen\/spending-controls\/student\//);
-    assert.match(canteenWorkspace, /queryKey: \['canteen-control'/);
+    assert.match(canteenWorkspace, /queryKey: \[["']canteen-control["']/);
     assert.match(canteenWorkspace, /controlStudentQuery\.data/);
     assert.match(canteenWorkspace, /No saved control/);
     assert.match(canteenWorkspace, /Blocked menu item IDs/);
@@ -2434,7 +2462,7 @@ describe("SchoolOS web production contracts", () => {
 
     assert.match(activityForm, /Attach 1 to 5 images/);
     assert.match(activityForm, /selectedFiles\.length > 5/);
-    assert.match(activityForm, /file\.type\.startsWith\('image\/'\)/);
+    assert.match(activityForm, /file\.type\.startsWith\(["']image\/["']\)/);
     assert.match(activityForm, /10MB/);
   });
 
@@ -2508,16 +2536,16 @@ describe("SchoolOS web production contracts", () => {
 
     for (const source of [activityForm, activityDetail]) {
       for (const marker of [
-        "queryKey: ['activity-posts']",
-        "queryKey: ['parent-activity-posts']",
-        "queryKey: ['dashboard-activity-posts']",
+        'queryKey: ["activity-posts"]',
+        'queryKey: ["parent-activity-posts"]',
+        'queryKey: ["dashboard-activity-posts"]',
       ]) {
         assert.ok(source.includes(marker), `Missing cache marker: ${marker}`);
       }
     }
 
-    assert.match(activityForm, /queryKey: \['activity-gallery'\]/);
-    assert.match(activityDetail, /queryKey: \['activity-gallery'\]/);
+    assert.match(activityForm, /queryKey: \[["']activity-gallery["']\]/);
+    assert.match(activityDetail, /queryKey: \[["']activity-gallery["']\]/);
   });
 
   it("keeps M5 activity feed surfaces tokenized and production-backed", () => {
@@ -2802,7 +2830,7 @@ describe("SchoolOS web production contracts", () => {
       /permissions: \['hr:read', 'payroll:read', 'payroll:manage'\]/,
     );
     assert.match(payrollPage, /PayrollDashboardPage/);
-    assert.match(payrollPage, /api\.listPayrollRuns/);
+    assert.match(payrollPage, /api\.getPayrollDashboardSummary/);
     assert.match(hrOverview, /No run processed/);
     assert.doesNotMatch(hrOverview, /\bN\/A\b/);
     assert.match(
@@ -2822,7 +2850,10 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(hrPage, /api\.listLeaveRequests/);
     assert.match(payrollPage, /<ModuleHeader/);
     assert.match(payrollPage, /<KpiGrid/);
-    assert.match(payrollPage, /api\.getPayrollReportSummary/);
+    assert.match(
+      read("app/dashboard/payroll/reports/page.tsx"),
+      /api\.getPayrollReportSummary/,
+    );
     assert.match(payrollPage, /salary disbursement remains outside this workspace/i);
     assert.doesNotMatch(payrollPage, /statuses: \['PAID'\]/);
     assert.doesNotMatch(payrollPage, /markPayrollRunPaid|Mark Paid|Disbursement Account Code/);

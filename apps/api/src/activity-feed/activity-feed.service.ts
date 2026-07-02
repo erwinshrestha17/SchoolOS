@@ -647,27 +647,23 @@ export class ActivityFeedService {
       throw new ForbiddenException('Active teacher profile is required');
     }
 
-    const assignments =
-      await this.prisma.subjectTeacherAssignment.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          staffId: staff.id,
-          academicYear: { isCurrent: true },
-        },
-        select: {
-          academicYearId: true,
-          classId: true,
-          sectionId: true,
-          academicYear: { select: { name: true } },
-          class: { select: { name: true, level: true } },
-          section: { select: { name: true } },
-        },
-        orderBy: [
-          { class: { level: 'asc' } },
-          { section: { name: 'asc' } },
-        ],
-        take: 200,
-      });
+    const assignments = await this.prisma.subjectTeacherAssignment.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        staffId: staff.id,
+        academicYear: { isCurrent: true },
+      },
+      select: {
+        academicYearId: true,
+        classId: true,
+        sectionId: true,
+        academicYear: { select: { name: true } },
+        class: { select: { name: true, level: true } },
+        section: { select: { name: true } },
+      },
+      orderBy: [{ class: { level: 'asc' } }, { section: { name: 'asc' } }],
+      take: 200,
+    });
 
     const scopes = new Map<
       string,
@@ -773,8 +769,7 @@ export class ActivityFeedService {
       items: students.map((student) => ({
         id: student.id,
         studentSystemId: student.studentSystemId,
-        fullName:
-          `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+        fullName: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
         rollNumber: student.rollNumber,
         mediaConsentGranted: hasCurrentPhotoConsent(student.guardianLinks),
       })),
@@ -887,9 +882,7 @@ export class ActivityFeedService {
       );
     }
     if (
-      students.some(
-        (student) => !hasCurrentPhotoConsent(student.guardianLinks),
-      )
+      students.some((student) => !hasCurrentPhotoConsent(student.guardianLinks))
     ) {
       throw new ForbiddenException(
         'Activity media cannot be uploaded for a student without active photo consent',
@@ -2054,9 +2047,9 @@ function hasCurrentPhotoConsent(
 function isDatabaseErrorCode(error: unknown, code: string) {
   return Boolean(
     error &&
-      typeof error === 'object' &&
-      'code' in error &&
-      (error as { code?: unknown }).code === code,
+    typeof error === 'object' &&
+    'code' in error &&
+    (error as { code?: unknown }).code === code,
   );
 }
 

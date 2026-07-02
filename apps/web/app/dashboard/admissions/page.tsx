@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Upload, UserPlus } from 'lucide-react';
+import { ClipboardList, Upload, UserPlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
 import { AdmissionCaseQueues } from '../../../components/m1/admission-case-queues';
@@ -27,6 +27,11 @@ export default function AdmissionsPage() {
           </Link>
         ) : undefined}
         moreActionItems={canCreateAdmission ? [
+          {
+            label: 'Application pipeline',
+            icon: <ClipboardList className="h-4 w-4" />,
+            onClick: () => router.push('/dashboard/admissions/applications'),
+          },
           {
             label: 'Import admissions',
             icon: <Upload className="h-4 w-4" />,

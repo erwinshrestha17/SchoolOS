@@ -27,4 +27,39 @@ describe('Student profile edit controls', () => {
     assert.match(edit, /Disability support recorded/);
     assert.doesNotMatch(edit, /type="radio"/);
   });
+
+  it('keeps guardian unlinking reasoned, primary-safe, and file-access reviewed', () => {
+    const detail = read('components/students/student-detail-page.tsx');
+    const guardians = read('components/students/profile/tabs/guardians-tab.tsx');
+
+    assert.match(detail, /confirmFileAccessReview: true/);
+    assert.match(detail, /confirmFileAccessReview,/);
+    assert.match(detail, /newPrimaryGuardianId/);
+    assert.match(guardians, /Add guardian/);
+    assert.match(guardians, /forcePrimary=\{guardians\.length === 0\}/);
+    assert.match(guardians, /Primary Contact Guardian required for first guardian/);
+    assert.match(guardians, /New primary guardian/);
+    assert.match(guardians, /replacementGuardianId/);
+    assert.match(guardians, /confirmedAccessReview/);
+    assert.match(guardians, /I reviewed guardian portal and protected-file access/);
+    assert.match(guardians, /reason\.trim\(\)\.length < 5/);
+    assert.doesNotMatch(guardians, /window\.confirm|confirm\(/);
+  });
+
+  it('keeps generated document revocation reasoned and backend-backed', () => {
+    const documents = read('components/students/profile/tabs/documents-tab.tsx');
+    const api = read('lib/api/students.ts');
+
+    assert.match(api, /revokeGeneratedStudentDocument:/);
+    assert.match(documents, /api\.revokeGeneratedStudentDocument\(studentId, documentId, \{ reason \}\)/);
+    assert.match(documents, /generatedDocumentRevokeReason\.trim\(\)\.length < 5/);
+    assert.match(documents, /Revoke generated document/);
+    assert.match(documents, /Retention until/);
+    assert.match(documents, /revokedAt/);
+    assert.match(documents, /queryKey: \['student-profile', studentId\]/);
+    assert.match(documents, /generated-document revoke history/);
+    assert.doesNotMatch(documents, /window\.confirm|confirm\(/);
+    assert.doesNotMatch(documents, /storageObjectKey|pdfUrl/);
+    assert.doesNotMatch(documents, /delete history/);
+  });
 });

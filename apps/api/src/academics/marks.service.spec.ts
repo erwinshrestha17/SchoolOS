@@ -109,11 +109,7 @@ describe('MarksService', () => {
     expect(prisma.student.findMany).toHaveBeenCalledWith({
       where: {
         id: {
-          in: [
-            'student-draft',
-            'student-absent',
-            'student-withheld',
-          ],
+          in: ['student-draft', 'student-absent', 'student-withheld'],
         },
         tenantId: actor.tenantId,
         classId: 'class-1',
@@ -201,9 +197,9 @@ describe('MarksService', () => {
         }),
       },
       student: {
-        findMany: jest.fn().mockResolvedValue([
-          { id: 'student-1', tenantId: actor.tenantId },
-        ]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 'student-1', tenantId: actor.tenantId }]),
       },
     };
     const marksService = new MarksService(

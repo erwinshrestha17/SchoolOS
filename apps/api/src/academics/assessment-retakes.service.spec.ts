@@ -6,10 +6,7 @@ import {
   MarkEntryStatus,
   Prisma,
 } from '@prisma/client';
-import {
-  ConflictException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
 import { AssessmentRetakesService } from './assessment-retakes.service';
 

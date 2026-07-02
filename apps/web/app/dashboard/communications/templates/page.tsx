@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
 import type {
   CommunicationTemplateCategory,
   CommunicationTemplateChannel,
   CommunicationTemplateSummary,
-} from '@schoolos/core';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+} from "@schoolos/core";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
   CheckCircle2,
@@ -13,39 +13,43 @@ import {
   Mail,
   Plus,
   Save,
-} from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
-import { useSession } from '@/components/session-provider';
-import { Button } from '@/components/ui/button';
-import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState } from '@/components/ui/error-state';
-import { FormField, TextArea } from '@/components/ui/form-field';
-import { Input } from '@/components/ui/input';
-import { LoadingState } from '@/components/ui/loading-state';
-import { ModuleHeader } from '@/components/ui/module-header';
-import { ModuleTabs } from '@/components/ui/module-tabs';
-import { PermissionState } from '@/components/ui/permission-state';
-import { SectionCard } from '@/components/ui/section-card';
-import { Select } from '@/components/ui/select';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { communicationsApi } from '@/lib/api/communications';
+} from "lucide-react";
+import { useMemo, useState } from "react";
+import { DashboardPageShell } from "@/components/dashboard/dashboard-page-shell";
+import { useSession } from "@/components/session-provider";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { FormField, TextArea } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { LoadingState } from "@/components/ui/loading-state";
+import { ModuleHeader } from "@/components/ui/module-header";
+import { ModuleTabs } from "@/components/ui/module-tabs";
+import { PermissionState } from "@/components/ui/permission-state";
+import { SectionCard } from "@/components/ui/section-card";
+import { Select } from "@/components/ui/select";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { communicationsApi } from "@/lib/api/communications";
+
+const PAGE_SIZE = 20;
 
 const categories: CommunicationTemplateCategory[] = [
-  'GENERAL',
-  'HOLIDAY',
-  'EMERGENCY',
-  'FEES',
-  'EXAMS',
-  'TRANSPORT_DELAY',
-  'EVENT',
+  "GENERAL",
+  "HOLIDAY",
+  "EMERGENCY",
+  "FEES",
+  "EXAMS",
+  "TRANSPORT_DELAY",
+  "EVENT",
 ];
 
 const channels: CommunicationTemplateChannel[] = [
-  'IN_APP',
-  'PUSH',
-  'SMS',
-  'EMAIL',
+  "IN_APP",
+  "PUSH",
+  "SMS",
+  "EMAIL",
 ];
 
 type TemplateDraft = {
@@ -57,36 +61,48 @@ type TemplateDraft = {
   body: string;
 };
 
+type PendingTemplateAction = {
+  action: "publish" | "archive";
+  template: CommunicationTemplateSummary;
+};
+
 const emptyDraft: TemplateDraft = {
-  key: 'holiday-notice',
-  category: 'HOLIDAY',
-  channel: 'IN_APP',
-  language: 'en',
-  title: '',
-  body: '',
+  key: "holiday-notice",
+  category: "HOLIDAY",
+  channel: "IN_APP",
+  language: "en",
+  title: "",
+  body: "",
 };
 
 export default function CommunicationTemplatesPage() {
   const queryClient = useQueryClient();
   const { session } = useSession();
   const permissions = new Set(session?.user.permissions ?? []);
-  const canManageTemplates = permissions.has('communications:manage_templates');
+  const canManageTemplates = permissions.has("communications:manage_templates");
   const [draft, setDraft] = useState<TemplateDraft>(emptyDraft);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(
     null,
   );
   const [feedback, setFeedback] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pendingAction, setPendingAction] =
+    useState<PendingTemplateAction | null>(null);
 
   const templatesQuery = useQuery({
-    queryKey: ['communications', 'templates'],
-    queryFn: communicationsApi.listCommunicationTemplates,
+    queryKey: ["communications", "templates", page],
+    queryFn: () =>
+      communicationsApi.listCommunicationTemplates({
+        page,
+        limit: PAGE_SIZE,
+      }),
     enabled: canManageTemplates,
   });
 
   const selectedTemplate = useMemo(
     () =>
-      templatesQuery.data?.find(
+      templatesQuery.data?.items.find(
         (template) => template.id === editingTemplateId,
       ) ?? null,
     [editingTemplateId, templatesQuery.data],
@@ -102,7 +118,7 @@ export default function CommunicationTemplatesPage() {
         key: draft.key.trim().toLowerCase(),
         category: draft.category,
         channel: draft.channel,
-        language: draft.language.trim() || 'en',
+        language: draft.language.trim() || "en",
         title: draft.title.trim(),
         body: draft.body.trim(),
       };
@@ -116,13 +132,13 @@ export default function CommunicationTemplatesPage() {
     onSuccess: (template) => {
       setFeedback(
         editingTemplateId
-          ? 'Template draft updated.'
+          ? "Template draft updated."
           : `Draft version ${template.version} created.`,
       );
       setFormError(null);
       setEditingTemplateId(template.id);
       void queryClient.invalidateQueries({
-        queryKey: ['communications', 'templates'],
+        queryKey: ["communications", "templates"],
       });
     },
     onError: (error) => {
@@ -130,7 +146,7 @@ export default function CommunicationTemplatesPage() {
       setFormError(
         error instanceof Error
           ? error.message
-          : 'Template could not be saved. Review the fields and try again.',
+          : "Template could not be saved. Review the fields and try again.",
       );
     },
   });
@@ -138,21 +154,37 @@ export default function CommunicationTemplatesPage() {
   const publishMutation = useMutation({
     mutationFn: communicationsApi.publishCommunicationTemplate,
     onSuccess: () => {
-      setFeedback('Template published.');
+      setFeedback("Template published.");
+      setPendingAction(null);
       void queryClient.invalidateQueries({
-        queryKey: ['communications', 'templates'],
+        queryKey: ["communications", "templates"],
       });
+    },
+    onError: (error) => {
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : "Template could not be published. Try again.",
+      );
     },
   });
 
   const archiveMutation = useMutation({
     mutationFn: communicationsApi.archiveCommunicationTemplate,
     onSuccess: () => {
-      setFeedback('Template archived.');
+      setFeedback("Template archived.");
       setEditingTemplateId(null);
+      setPendingAction(null);
       void queryClient.invalidateQueries({
-        queryKey: ['communications', 'templates'],
+        queryKey: ["communications", "templates"],
       });
+    },
+    onError: (error) => {
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : "Template could not be archived. Try again.",
+      );
     },
   });
 
@@ -178,23 +210,11 @@ export default function CommunicationTemplatesPage() {
   }
 
   function publishTemplate(template: CommunicationTemplateSummary) {
-    if (
-      window.confirm(
-        `Publish version ${template.version} of ${template.key}? Published templates are available to notice authors.`,
-      )
-    ) {
-      publishMutation.mutate(template.id);
-    }
+    setPendingAction({ action: "publish", template });
   }
 
   function archiveTemplate(template: CommunicationTemplateSummary) {
-    if (
-      window.confirm(
-        `Archive version ${template.version} of ${template.key}? Archived templates stay in history but should not be reused.`,
-      )
-    ) {
-      archiveMutation.mutate(template.id);
-    }
+    setPendingAction({ action: "archive", template });
   }
 
   return (
@@ -215,13 +235,13 @@ export default function CommunicationTemplatesPage() {
       <ModuleTabs
         items={[
           {
-            href: '/dashboard/communications',
-            label: 'Notices',
+            href: "/dashboard/communications",
+            label: "Notices",
             icon: FileText,
           },
           {
-            href: '/dashboard/communications/templates',
-            label: 'Templates',
+            href: "/dashboard/communications/templates",
+            label: "Templates",
             icon: Mail,
           },
         ]}
@@ -249,61 +269,69 @@ export default function CommunicationTemplatesPage() {
                 message="Communication templates could not be loaded. Try again."
                 onRetry={() => void templatesQuery.refetch()}
               />
-            ) : templatesQuery.data?.length ? (
-              <div className="divide-y divide-slate-100">
-                {templatesQuery.data.map((template) => (
-                  <div
-                    key={template.id}
-                    className="grid gap-4 py-4 lg:grid-cols-[minmax(0,1fr)_auto]"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => loadDraft(template)}
-                      className="min-w-0 text-left"
+            ) : templatesQuery.data?.items.length ? (
+              <div>
+                <div className="divide-y divide-slate-100">
+                  {templatesQuery.data.items.map((template) => (
+                    <div
+                      key={template.id}
+                      className="grid gap-4 py-4 lg:grid-cols-[minmax(0,1fr)_auto]"
                     >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-black text-slate-950">
-                          {template.title}
+                      <button
+                        type="button"
+                        onClick={() => loadDraft(template)}
+                        className="min-w-0 text-left"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-sm font-black text-slate-950">
+                            {template.title}
+                          </p>
+                          <StatusBadge status={template.status} />
+                        </div>
+                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                          {template.key} · v{template.version} ·{" "}
+                          {formatEnum(template.category)} ·{" "}
+                          {formatEnum(template.channel)}
                         </p>
-                        <StatusBadge status={template.status} />
+                        <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">
+                          {template.body}
+                        </p>
+                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {template.status === "DRAFT" ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => publishTemplate(template)}
+                            isLoading={publishMutation.isPending}
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                            Publish
+                          </Button>
+                        ) : null}
+                        {template.status !== "ARCHIVED" ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => archiveTemplate(template)}
+                            isLoading={archiveMutation.isPending}
+                          >
+                            <Archive className="h-4 w-4" />
+                            Archive
+                          </Button>
+                        ) : null}
                       </div>
-                      <p className="mt-1 text-xs font-semibold text-slate-500">
-                        {template.key} · v{template.version} ·{' '}
-                        {formatEnum(template.category)} ·{' '}
-                        {formatEnum(template.channel)}
-                      </p>
-                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">
-                        {template.body}
-                      </p>
-                    </button>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {template.status === 'DRAFT' ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => publishTemplate(template)}
-                          isLoading={publishMutation.isPending}
-                        >
-                          <CheckCircle2 className="h-4 w-4" />
-                          Publish
-                        </Button>
-                      ) : null}
-                      {template.status !== 'ARCHIVED' ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => archiveTemplate(template)}
-                          isLoading={archiveMutation.isPending}
-                        >
-                          <Archive className="h-4 w-4" />
-                          Archive
-                        </Button>
-                      ) : null}
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <TablePagination
+                  page={templatesQuery.data.page ?? page}
+                  pageSize={templatesQuery.data.limit ?? PAGE_SIZE}
+                  total={templatesQuery.data.total}
+                  onPageChange={setPage}
+                />
               </div>
             ) : (
               <EmptyState
@@ -315,11 +343,11 @@ export default function CommunicationTemplatesPage() {
 
           <div className="space-y-6">
             <SectionCard
-              title={editingTemplateId ? 'Edit Draft' : 'New Draft Version'}
+              title={editingTemplateId ? "Edit Draft" : "New Draft Version"}
               description={
-                selectedTemplate?.status && selectedTemplate.status !== 'DRAFT'
-                  ? 'Published and archived templates are read-only. Create a new draft version before changing wording.'
-                  : 'Draft templates can be edited until they are published.'
+                selectedTemplate?.status && selectedTemplate.status !== "DRAFT"
+                  ? "Published and archived templates are read-only. Create a new draft version before changing wording."
+                  : "Draft templates can be edited until they are published."
               }
             >
               <div className="space-y-4">
@@ -427,11 +455,11 @@ export default function CommunicationTemplatesPage() {
                   isLoading={saveMutation.isPending}
                   disabled={
                     selectedTemplate?.status !== undefined &&
-                    selectedTemplate.status !== 'DRAFT'
+                    selectedTemplate.status !== "DRAFT"
                   }
                 >
                   <Save className="h-4 w-4" />
-                  {editingTemplateId ? 'Save Draft' : 'Create Draft'}
+                  {editingTemplateId ? "Save Draft" : "Create Draft"}
                 </Button>
               </div>
             </SectionCard>
@@ -442,35 +470,73 @@ export default function CommunicationTemplatesPage() {
             >
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-sm font-black text-slate-950">
-                  {draft.title.trim() || 'Template title'}
+                  {draft.title.trim() || "Template title"}
                 </p>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                  {draft.body.trim() || 'Template body preview'}
+                  {draft.body.trim() || "Template body preview"}
                 </p>
               </div>
             </SectionCard>
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={pendingAction !== null}
+        title={
+          pendingAction?.action === "archive"
+            ? "Archive communication template?"
+            : "Publish communication template?"
+        }
+        description={
+          pendingAction?.action === "archive"
+            ? `Archive version ${pendingAction.template.version} of ${pendingAction.template.key}? Archived templates stay in history but should not be reused.`
+            : pendingAction
+              ? `Publish version ${pendingAction.template.version} of ${pendingAction.template.key}? Published templates are available to notice authors.`
+              : ""
+        }
+        confirmLabel={
+          pendingAction?.action === "archive" ? "Archive" : "Publish"
+        }
+        variant={pendingAction?.action === "archive" ? "warning" : "default"}
+        isConfirming={
+          pendingAction?.action === "archive"
+            ? archiveMutation.isPending
+            : publishMutation.isPending
+        }
+        onConfirm={() => {
+          if (!pendingAction) return;
+          if (pendingAction.action === "archive") {
+            archiveMutation.mutate(pendingAction.template.id);
+          } else {
+            publishMutation.mutate(pendingAction.template.id);
+          }
+        }}
+        onClose={() => {
+          if (!archiveMutation.isPending && !publishMutation.isPending) {
+            setPendingAction(null);
+          }
+        }}
+      />
     </DashboardPageShell>
   );
 }
 
 function validateDraft(draft: TemplateDraft) {
   if (!/^[a-z0-9][a-z0-9-_]*[a-z0-9]$/.test(draft.key.trim())) {
-    return 'Use a lowercase key with letters, numbers, hyphens, or underscores.';
+    return "Use a lowercase key with letters, numbers, hyphens, or underscores.";
   }
   if (!/^[a-z]{2}(-[A-Z]{2})?$/.test(draft.language.trim())) {
-    return 'Use a language code such as en or ne-NP.';
+    return "Use a language code such as en or ne-NP.";
   }
-  if (draft.title.trim().length < 2) return 'Enter a template title.';
-  if (draft.body.trim().length < 2) return 'Enter template body text.';
+  if (draft.title.trim().length < 2) return "Enter a template title.";
+  if (draft.body.trim().length < 2) return "Enter template body text.";
   return null;
 }
 
 function formatEnum(value: string) {
   return value
     .toLowerCase()
-    .replace(/_/g, ' ')
+    .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
