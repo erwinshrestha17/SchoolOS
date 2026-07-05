@@ -646,6 +646,38 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'teacher homework hides the create action entirely with zero assigned scopes',
+    (tester) async {
+      // A teacher with no real subjectTeacherAssignment rows for the current
+      // academic year must have no way to create homework at all — not a
+      // dropdown offering nothing, not a disabled-but-visible button, no
+      // create affordance whatsoever.
+      final snapshot = TeacherHomeworkSnapshot(
+        items: const [],
+        scopes: const [],
+        total: 0,
+        lastUpdated: DateTime(2026, 6, 19, 8),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            teacherHomeworkProvider.overrideWith(
+              (ref, query) async => snapshot,
+            ),
+          ],
+          child: const MaterialApp(home: TeacherHomeworkScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FloatingActionButton), findsNothing);
+      expect(find.text('Create'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('teacher homework cached mode blocks write attempts', (
     tester,
   ) async {

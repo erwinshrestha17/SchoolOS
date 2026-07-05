@@ -222,6 +222,170 @@ describe('Homework Hardening', () => {
         },
       });
     });
+
+    it('should allow a properly assigned subject teacher to create homework', async () => {
+      const p = prisma as any;
+      const teacherActor: AuthContext = {
+        ...actor,
+        roles: ['subject_teacher'],
+      };
+
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
+      p.class.findFirst.mockResolvedValue({
+        id: 'class-1',
+        tenantId: 'tenant-a',
+      });
+      p.subject.findFirst.mockResolvedValue({
+        id: 'sub-1',
+        tenantId: 'tenant-a',
+        classId: 'class-1',
+      });
+      p.staff.findFirst.mockResolvedValue({
+        id: 'teacher-1',
+        tenantId: 'tenant-a',
+        userId: 'user-1',
+      });
+
+      // A real assignment exists for this exact class/section/subject.
+      p.subjectTeacherAssignment.findFirst.mockResolvedValue({
+        id: 'assignment-1',
+        tenantId: 'tenant-a',
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        subjectId: 'sub-1',
+        staffId: 'teacher-1',
+      });
+
+      const result = (await homeworkService.createAssignment(
+        {
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'sub-1',
+          title: 'My subject',
+          instructions: 'Test',
+          dueDate: '2026-12-31',
+        },
+        teacherActor,
+      )) as any;
+
+      expect(result.id).toBeDefined();
+      expect(p.subjectTeacherAssignment.findFirst).toHaveBeenCalledWith({
+        where: {
+          tenantId: 'tenant-a',
+          academicYearId: 'year-1',
+          subjectId: 'sub-1',
+          staffId: 'teacher-1',
+          classId: 'class-1',
+          OR: [{ sectionId: 'section-1' }, { sectionId: null }],
+        },
+      });
+    });
+
+    it('should let an admin create homework for any class without an assignment check', async () => {
+      const p = prisma as any;
+      const adminActor: AuthContext = { ...actor, roles: ['admin'] };
+
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
+      p.class.findFirst.mockResolvedValue({
+        id: 'class-1',
+        tenantId: 'tenant-a',
+      });
+      p.subject.findFirst.mockResolvedValue({
+        id: 'sub-1',
+        tenantId: 'tenant-a',
+        classId: 'class-1',
+      });
+      p.staff.findFirst.mockResolvedValue({
+        id: 'admin-staff-1',
+        tenantId: 'tenant-a',
+        userId: 'user-1',
+      });
+
+      const result = (await homeworkService.createAssignment(
+        {
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          subjectId: 'sub-1',
+          title: 'Admin-created homework',
+          instructions: 'Test',
+          dueDate: '2026-12-31',
+        },
+        adminActor,
+      )) as any;
+
+      expect(result.id).toBeDefined();
+      expect(p.subjectTeacherAssignment.findFirst).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Teacher Mobile Homework Scopes Contract', () => {
+    it("lists only the current teacher's own assigned class/section/subject combinations", async () => {
+      const p = prisma as any;
+      const teacherActor: AuthContext = {
+        ...actor,
+        roles: ['subject_teacher'],
+      };
+
+      p.staff.findFirst.mockResolvedValue({
+        id: 'teacher-1',
+        tenantId: 'tenant-a',
+        userId: 'user-1',
+      });
+      p.subjectTeacherAssignment.findMany.mockResolvedValue([
+        {
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'sub-1',
+          academicYear: { name: '2026-2027' },
+          class: { name: 'Grade 3' },
+          section: { name: 'A' },
+          subject: { name: 'Mathematics' },
+        },
+      ]);
+
+      const result =
+        await homeworkService.listTeacherMobileHomeworkScopes(teacherActor);
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toMatchObject({
+        classId: 'class-1',
+        className: 'Grade 3',
+        sectionId: 'section-1',
+        sectionName: 'A',
+        subjectId: 'sub-1',
+        subjectName: 'Mathematics',
+      });
+      // Must query scoped to this exact teacher's staff record and tenant,
+      // never a tenant-wide or cross-teacher listing.
+      expect(p.subjectTeacherAssignment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: 'tenant-a',
+            staffId: 'teacher-1',
+            academicYear: { isCurrent: true },
+          }),
+        }),
+      );
+    });
+
+    it('rejects when the actor has no active teacher/staff profile', async () => {
+      const p = prisma as any;
+      p.staff.findFirst.mockResolvedValue(null);
+
+      await expect(
+        homeworkService.listTeacherMobileHomeworkScopes(actor),
+      ).rejects.toThrow();
+      expect(p.subjectTeacherAssignment.findMany).not.toHaveBeenCalled();
+    });
   });
 
   describe('Parent and student list scoping', () => {
