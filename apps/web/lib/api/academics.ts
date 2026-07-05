@@ -10,6 +10,7 @@ import type {
   CasRecordSummary,
   ClassSummary,
   ExamTermSummary,
+  HomeworkAssignmentPage,
   HomeworkAssignmentSummary,
   HomeworkSubmissionSummary,
   MarkEntrySummary,
@@ -97,6 +98,23 @@ export type HomeworkMissingLateReportRow = {
   section?: string | null;
   dueDate: string;
   status: string;
+};
+
+export type HomeworkListParams = {
+  studentId?: string;
+  classId?: string;
+  sectionId?: string;
+  academicYearId?: string;
+  subjectId?: string;
+  teacherId?: string;
+  status?: string;
+  search?: string;
+  dueFrom?: string;
+  dueTo?: string;
+  sortBy?: 'dueDate' | 'assignedDate' | 'createdAt' | 'title';
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
 };
 
 export const academicsApi = {
@@ -603,16 +621,12 @@ export const academicsApi = {
       `/timetable/substitutions/${encodeURIComponent(id)}/complete`,
       { method: 'PATCH', json: {} },
     ),
-  listHomework: (params?: {
-    studentId?: string;
-    classId?: string;
-    sectionId?: string;
-    academicYearId?: string;
-    subjectId?: string;
-    teacherId?: string;
-    status?: string;
-  }) =>
-    request<HomeworkAssignmentSummary[]>(withQuery('/homework', params ?? {})),
+  listHomeworkPage: (params?: HomeworkListParams) =>
+    request<HomeworkAssignmentPage>(withQuery('/homework', params ?? {})),
+  listHomework: (params?: HomeworkListParams) =>
+    request<HomeworkAssignmentPage>(withQuery('/homework', params ?? {})).then(
+      (result) => result.items,
+    ),
   listHomeworkTemplates: (params?: {
     classId?: string;
     subjectId?: string;
