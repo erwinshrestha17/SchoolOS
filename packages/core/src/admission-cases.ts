@@ -1,25 +1,37 @@
 export const ADMISSION_CASE_DISPLAY_STATUSES = [
-  'DRAFT',
-  'NEEDS_INFORMATION',
-  'READY_TO_ADMIT',
-  'WAITING_FOR_REVIEW',
-  'APPROVED',
-  'ADMITTED',
-  'NOT_ADMITTED',
-  'CLOSED',
+  "DRAFT",
+  "NEEDS_INFORMATION",
+  "READY_TO_ADMIT",
+  "WAITING_FOR_REVIEW",
+  "APPROVED",
+  "ADMITTED",
+  "NOT_ADMITTED",
+  "CLOSED",
 ] as const;
 
 export const ADMISSION_CASE_SOURCES = [
-  'OFFICE_WALK_IN',
-  'PARENT_ONLINE',
-  'PHONE_INQUIRY',
-  'TRANSFER_REQUEST',
-  'IMPORT',
+  "OFFICE_WALK_IN",
+  "PARENT_ONLINE",
+  "PHONE_INQUIRY",
+  "TRANSFER_REQUEST",
+  "IMPORT",
+] as const;
+
+export const ADMISSION_CASE_REVIEW_ACTIONS = [
+  "REQUEST_INFORMATION",
+  "ASSIGN_REVIEWER",
+  "MARK_READY_FOR_REVIEW",
+  "APPROVE",
+  "REJECT",
+  "ESCALATE_TO_PRINCIPAL",
+  "CLOSE",
 ] as const;
 
 export type AdmissionCaseDisplayStatus =
   (typeof ADMISSION_CASE_DISPLAY_STATUSES)[number];
 export type AdmissionCaseSource = (typeof ADMISSION_CASE_SOURCES)[number];
+export type AdmissionCaseReviewAction =
+  (typeof ADMISSION_CASE_REVIEW_ACTIONS)[number];
 
 export type AdmissionCaseDocumentReference = {
   fileId: string;
@@ -28,7 +40,7 @@ export type AdmissionCaseDocumentReference = {
 };
 
 export type AdmissionPolicyRule = {
-  admissionMode: 'DIRECT_ALLOWED' | 'REVIEW_REQUIRED';
+  admissionMode: "DIRECT_ALLOWED" | "REVIEW_REQUIRED";
   academicYearId?: string;
   gradeBand?: string;
   classId?: string;
@@ -76,7 +88,7 @@ export type AdmissionCaseEligibility = {
     matchReasons: string[];
   }>;
   policyRequirements: {
-    admissionMode: 'DIRECT_ALLOWED' | 'REVIEW_REQUIRED';
+    admissionMode: "DIRECT_ALLOWED" | "REVIEW_REQUIRED";
     requireDocumentReview: boolean;
     requireInterview: boolean;
     requirePrincipalApproval: boolean;
@@ -102,11 +114,25 @@ export type AdmissionCaseEligibility = {
     message: string | null;
   };
   capacityStatus: {
-    state: 'NOT_CONFIGURED' | 'AVAILABLE' | 'FULL';
+    state: "NOT_CONFIGURED" | "AVAILABLE" | "FULL";
     capacity: number | null;
     enrolled: number | null;
   } | null;
   nextActionLabel: string;
+};
+
+export type AdmissionCaseReviewHistoryItem = {
+  action: AdmissionCaseReviewAction;
+  reason: string | null;
+  at: string;
+  byUserId: string;
+};
+
+export type AdmissionCaseReview = {
+  reviewerUserId: string | null;
+  dueDate: string | null;
+  history: AdmissionCaseReviewHistoryItem[];
+  availableActions: AdmissionCaseReviewAction[];
 };
 
 export type AdmissionCase = {
@@ -118,7 +144,7 @@ export type AdmissionCase = {
     firstNameNp: string | null;
     lastNameNp: string | null;
     dateOfBirth: string | null;
-    gender: 'MALE' | 'FEMALE' | 'OTHER' | null;
+    gender: "MALE" | "FEMALE" | "OTHER" | null;
   };
   guardian: {
     fullName: string | null;
@@ -142,6 +168,7 @@ export type AdmissionCase = {
   displayStatus: AdmissionCaseDisplayStatus;
   admittedStudentId: string | null;
   followUps: Array<{ code: string; label: string; blocking: boolean }>;
+  review: AdmissionCaseReview;
   createdAt: string;
   updatedAt: string;
 } & AdmissionCaseEligibility;
@@ -152,7 +179,7 @@ export type CreateAdmissionCasePayload = {
   firstNameNp?: string;
   lastNameNp?: string;
   dateOfBirth?: string;
-  gender?: 'MALE' | 'FEMALE' | 'OTHER';
+  gender?: "MALE" | "FEMALE" | "OTHER";
   guardianFullName?: string;
   guardianRelation?: string;
   guardianPhone?: string;
@@ -180,4 +207,11 @@ export type UpdateAdmissionCasePayload = Partial<CreateAdmissionCasePayload>;
 export type DirectAdmitAdmissionCasePayload = UpdateAdmissionCasePayload & {
   overrideDuplicate?: boolean;
   overrideReason?: string;
+};
+
+export type ReviewAdmissionCasePayload = {
+  action: AdmissionCaseReviewAction;
+  reviewerUserId?: string;
+  reason?: string;
+  dueDate?: string;
 };

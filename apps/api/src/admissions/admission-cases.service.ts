@@ -13,6 +13,10 @@ import {
   Prisma,
   StudentLifecycleStatus,
 } from '@prisma/client';
+import {
+  ADMISSION_CASE_REVIEW_ACTIONS,
+  type AdmissionCaseReviewAction,
+} from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
 import { ConfigService } from '../config/config.service';
@@ -58,6 +62,16 @@ const ADMITTABLE_STORAGE_STATUSES = [
   'APPROVED',
   'ACCEPTED',
 ] as const;
+const ADMISSION_CASE_REVIEW_ACTION_SET = new Set<string>(
+  ADMISSION_CASE_REVIEW_ACTIONS,
+);
+const REVIEW_ACTIONS_REQUIRING_REASON = new Set<AdmissionCaseReviewAction>([
+  'REQUEST_INFORMATION',
+  'APPROVE',
+  'REJECT',
+  'ESCALATE_TO_PRINCIPAL',
+  'CLOSE',
+]);
 
 const LEGACY_DISPLAY_STATUS: Partial<Record<string, AdmissionDisplayStatus>> = {
   INQUIRY: 'DRAFT',
@@ -484,6 +498,11 @@ export class AdmissionCasesService {
     dto: ReviewAdmissionCaseDto,
     actor: AuthContext,
   ) {
+    if (!actor.permissions.includes('students:manage_lifecycle')) {
+      throw new ForbiddenException(
+        'You do not have permission to review admission cases.',
+      );
+    }
     const current = await this.findTenantCase(caseId, actor);
     if (TERMINAL_STATUSES.has(current.status)) {
       throw new BadRequestException(
@@ -491,21 +510,54 @@ export class AdmissionCasesService {
       );
     }
     if (
-      ['REQUEST_INFORMATION', 'REJECT'].includes(dto.action) &&
-      !dto.reason?.trim()
+      REVIEW_ACTIONS_REQUIRING_REASON.has(dto.action) &&
+      (dto.reason?.trim().length ?? 0) < 5
     ) {
       throw new BadRequestException(
-        'A clear reason is required for this action.',
+        'A clear reason of at least five characters is required for this action.',
+      );
+    }
+    if (dto.action === 'ASSIGN_REVIEWER' && !dto.reviewerUserId) {
+      throw new BadRequestException(
+        'Choose an authorized reviewer for this admission case.',
+      );
+    }
+    if (
+      dto.action !== 'ASSIGN_REVIEWER' &&
+      (dto.reviewerUserId || dto.dueDate)
+    ) {
+      throw new BadRequestException(
+        'Reviewer and due date can only be changed by the assign reviewer action.',
       );
     }
     if (dto.reviewerUserId) {
       const reviewer = await this.prisma.user.findFirst({
-        where: { id: dto.reviewerUserId, tenantId: actor.tenantId },
+        where: {
+          id: dto.reviewerUserId,
+          tenantId: actor.tenantId,
+          status: 'ACTIVE',
+          userRoles: {
+            some: {
+              tenantId: actor.tenantId,
+              role: {
+                tenantId: actor.tenantId,
+                rolePermissions: {
+                  some: {
+                    permission: {
+                      resource: 'students',
+                      action: 'manage_lifecycle',
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
         select: { id: true },
       });
       if (!reviewer) {
         throw new BadRequestException(
-          'The selected reviewer does not belong to this school.',
+          'Choose an active reviewer who can manage admission decisions for this school.',
         );
       }
     }
@@ -541,6 +593,16 @@ export class AdmissionCasesService {
         );
       }
     }
+    const availableActions = this.availableReviewActions(
+      current,
+      evaluation,
+      actor,
+    );
+    if (!availableActions.includes(dto.action)) {
+      throw new ConflictException(
+        `The ${this.reviewActionLabel(dto.action)} action is not available while this case is ${this.displayStatus(current.status).toLowerCase().replaceAll('_', ' ')}.`,
+      );
+    }
 
     const metadata = this.readMetadata(current.duplicateReview);
     const notes = metadata.review?.notes ?? [];
@@ -561,36 +623,47 @@ export class AdmissionCasesService {
       },
     };
 
-    const statusByAction: Record<ReviewAdmissionCaseDto['action'], string> = {
-      REQUEST_INFORMATION: 'NEEDS_INFORMATION',
-      ASSIGN_REVIEWER: 'WAITING_FOR_REVIEW',
-      MARK_READY_FOR_REVIEW: 'WAITING_FOR_REVIEW',
-      APPROVE: 'APPROVED',
-      REJECT: 'NOT_ADMITTED',
-      ESCALATE_TO_PRINCIPAL: 'WAITING_FOR_REVIEW',
-      CLOSE: 'CLOSED',
-    };
-    const nextStatus = statusByAction[dto.action];
+    const nextStatus = this.reviewActionStatus(dto.action, current.status);
 
-    await this.prisma.admissionApplication.update({
-      where: { id: current.id },
-      data: {
-        status: nextStatus,
-        rejectedReason:
-          dto.action === 'REJECT' ? (dto.reason?.trim() ?? null) : null,
-        duplicateReview: nextMetadata as Prisma.InputJsonValue,
-        updatedById: actor.userId,
-      },
-    });
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.admissionApplication.updateMany({
+        where: {
+          id: current.id,
+          tenantId: actor.tenantId,
+          status: current.status,
+          updatedAt: current.updatedAt,
+        },
+        data: {
+          status: nextStatus,
+          rejectedReason:
+            dto.action === 'REJECT' ? (dto.reason?.trim() ?? null) : null,
+          duplicateReview: nextMetadata as Prisma.InputJsonValue,
+          updatedById: actor.userId,
+        },
+      });
+      if (updated.count !== 1) {
+        throw new ConflictException(
+          'This admission case changed while it was being reviewed. Refresh and try again.',
+        );
+      }
 
-    await this.auditService.record({
-      action: `admission_case_${dto.action.toLowerCase()}`,
-      resource: 'admission_case',
-      resourceId: current.id,
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      before: { status: current.status },
-      after: { status: nextStatus, reason: dto.reason?.trim() ?? null },
+      await this.auditService.record(
+        {
+          action: `admission_case_${dto.action.toLowerCase()}`,
+          resource: 'admission_case',
+          resourceId: current.id,
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          before: { status: current.status },
+          after: {
+            status: nextStatus,
+            reason: dto.reason?.trim() ?? null,
+            reviewerUserId: dto.reviewerUserId ?? null,
+            dueDate: dto.dueDate ?? null,
+          },
+        },
+        tx,
+      );
     });
 
     return this.getCase(current.id, actor);
@@ -979,7 +1052,23 @@ export class AdmissionCasesService {
       capacityStatus: evaluation.capacityStatus,
       nextActionLabel: this.nextActionLabel(record, evaluation, displayStatus),
       followUps: metadata.followUps ?? this.followUps(metadata, evaluation),
-      review: metadata.review ?? null,
+      review: {
+        reviewerUserId: metadata.review?.reviewerUserId ?? null,
+        dueDate: metadata.review?.dueDate ?? null,
+        history: (metadata.review?.notes ?? [])
+          .filter((item) => ADMISSION_CASE_REVIEW_ACTION_SET.has(item.action))
+          .map((item) => ({
+            action: item.action as AdmissionCaseReviewAction,
+            reason: item.reason ?? null,
+            at: item.at,
+            byUserId: item.byUserId,
+          })),
+        availableActions: this.availableReviewActions(
+          record,
+          evaluation,
+          actor,
+        ),
+      },
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
       admittedStudentId: record.convertedStudentId,
@@ -1475,6 +1564,79 @@ export class AdmissionCasesService {
     return DISPLAY_STATUSES.has(status as AdmissionDisplayStatus)
       ? (status as AdmissionDisplayStatus)
       : 'DRAFT';
+  }
+
+  private availableReviewActions(
+    record: AdmissionCaseRecord,
+    evaluation: AdmissionEvaluation,
+    actor: AuthContext,
+  ): AdmissionCaseReviewAction[] {
+    if (
+      !actor.permissions.includes('students:manage_lifecycle') ||
+      TERMINAL_STATUSES.has(record.status)
+    ) {
+      return [];
+    }
+
+    const displayStatus = this.displayStatus(record.status);
+    if (displayStatus === 'APPROVED' || displayStatus === 'ADMITTED') {
+      return [];
+    }
+
+    const actions: AdmissionCaseReviewAction[] = ['ASSIGN_REVIEWER'];
+    if (
+      ['DRAFT', 'NEEDS_INFORMATION', 'READY_TO_ADMIT'].includes(displayStatus)
+    ) {
+      actions.push('MARK_READY_FOR_REVIEW', 'CLOSE');
+      return actions;
+    }
+
+    if (displayStatus === 'WAITING_FOR_REVIEW') {
+      actions.push(
+        'REQUEST_INFORMATION',
+        'REJECT',
+        'ESCALATE_TO_PRINCIPAL',
+        'CLOSE',
+      );
+      const principalApprovalAllowed =
+        !evaluation.requiresApproval ||
+        actor.roles.some((role) =>
+          ['principal', 'platform_super_admin'].includes(role),
+        );
+      const documentBlock =
+        evaluation.missingRequiredDocuments.length > 0 &&
+        !evaluation.policyRequirements.allowAdmissionWithDocumentsPending;
+      if (
+        principalApprovalAllowed &&
+        evaluation.missingRequiredFields.length === 0 &&
+        !documentBlock &&
+        !this.capacityBlocksAdmission(evaluation)
+      ) {
+        actions.push('APPROVE');
+      }
+    }
+
+    return actions;
+  }
+
+  private reviewActionStatus(
+    action: AdmissionCaseReviewAction,
+    currentStatus: string,
+  ) {
+    const statusByAction: Record<AdmissionCaseReviewAction, string> = {
+      REQUEST_INFORMATION: 'NEEDS_INFORMATION',
+      ASSIGN_REVIEWER: currentStatus,
+      MARK_READY_FOR_REVIEW: 'WAITING_FOR_REVIEW',
+      APPROVE: 'APPROVED',
+      REJECT: 'NOT_ADMITTED',
+      ESCALATE_TO_PRINCIPAL: 'WAITING_FOR_REVIEW',
+      CLOSE: 'CLOSED',
+    };
+    return statusByAction[action];
+  }
+
+  private reviewActionLabel(action: AdmissionCaseReviewAction) {
+    return action.toLowerCase().replaceAll('_', ' ');
   }
 
   private nextStatusAfterSave(status: string, evaluation: AdmissionEvaluation) {

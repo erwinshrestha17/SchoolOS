@@ -10,9 +10,14 @@ import {
   IsString,
   MaxLength,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { Gender } from '@prisma/client';
+import {
+  ADMISSION_CASE_REVIEW_ACTIONS,
+  type AdmissionCaseReviewAction,
+} from '@schoolos/core';
 import {
   IsDateOfBirth,
   IsNepalPhone,
@@ -59,16 +64,6 @@ export const ADMISSION_REQUIRED_FIELDS = [
   'nationalStudentId',
   'emergencyName',
   'emergencyPhone',
-] as const;
-
-export const ADMISSION_REVIEW_ACTIONS = [
-  'REQUEST_INFORMATION',
-  'ASSIGN_REVIEWER',
-  'MARK_READY_FOR_REVIEW',
-  'APPROVE',
-  'REJECT',
-  'ESCALATE_TO_PRINCIPAL',
-  'CLOSE',
 ] as const;
 
 export type AdmissionSource = (typeof ADMISSION_SOURCES)[number];
@@ -286,10 +281,10 @@ export class DirectAdmitAdmissionCaseDto extends UpdateAdmissionCaseDto {
 export class FinalizeAdmissionCaseDto extends DirectAdmitAdmissionCaseDto {}
 
 export class ReviewAdmissionCaseDto {
-  @IsIn(ADMISSION_REVIEW_ACTIONS)
-  action!: (typeof ADMISSION_REVIEW_ACTIONS)[number];
+  @IsIn(ADMISSION_CASE_REVIEW_ACTIONS)
+  action!: AdmissionCaseReviewAction;
 
-  @IsOptional() @IsString() reviewerUserId?: string;
-  @IsOptional() @IsString() @MaxLength(1000) reason?: string;
+  @IsOptional() @IsString() @MaxLength(100) reviewerUserId?: string;
+  @IsOptional() @IsString() @MinLength(5) @MaxLength(1000) reason?: string;
   @IsOptional() @IsDateString() dueDate?: string;
 }

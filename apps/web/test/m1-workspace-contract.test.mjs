@@ -1,23 +1,34 @@
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import test from 'node:test';
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import test from "node:test";
 
-const webRoot = new URL('..', import.meta.url).pathname;
-const read = (path) => readFileSync(join(webRoot, path), 'utf8');
+const webRoot = new URL("..", import.meta.url).pathname;
+const read = (path) => readFileSync(join(webRoot, path), "utf8");
 
-test('M1 workspaces expose real route-backed operations', () => {
-  const api = read('lib/api/students.ts');
-  const documentsWorkspace = read('components/m1/student-documents-workspace.tsx');
-  const applicationReview = read('components/m1/application-review-workspace.tsx');
-  const documentsErrorBoundary = read('app/dashboard/admissions/documents/error.tsx');
+test("M1 workspaces expose real route-backed operations", () => {
+  const api = read("lib/api/students.ts");
+  const documentsWorkspace = read(
+    "components/m1/student-documents-workspace.tsx",
+  );
+  const applicationReview = read(
+    "components/m1/application-review-workspace.tsx",
+  );
+  const applicationReviewPage = read(
+    "app/dashboard/admissions/applications/[applicationId]/page.tsx",
+  );
+  const documentsErrorBoundary = read(
+    "app/dashboard/admissions/documents/error.tsx",
+  );
   const routes = [
-    'app/dashboard/admissions/documents/page.tsx',
-    'app/dashboard/admissions/duplicates/page.tsx',
-    'app/dashboard/admissions/iemis/page.tsx',
-    'app/dashboard/admissions/qr/page.tsx',
-    'app/dashboard/admissions/review/page.tsx',
-  ].map(read).join('\n');
+    "app/dashboard/admissions/documents/page.tsx",
+    "app/dashboard/admissions/duplicates/page.tsx",
+    "app/dashboard/admissions/iemis/page.tsx",
+    "app/dashboard/admissions/qr/page.tsx",
+    "app/dashboard/admissions/review/page.tsx",
+  ]
+    .map(read)
+    .join("\n");
 
   assert.match(routes, /StudentDocumentsWorkspace/);
   assert.match(routes, /DuplicateCandidatesWorkspace/);
@@ -32,46 +43,101 @@ test('M1 workspaces expose real route-backed operations', () => {
   assert.match(api, /\/admissions\/bulk-import\/batches/);
   assert.match(api, /\/admissions\/m1\/import-review\/queue/);
   assert.match(api, /\/students\/document-expiry\/templates/);
-  assert.match(documentsWorkspace, /confirmFileAccessReview: guardianRemovalAccessReviewed/);
+  assert.match(
+    documentsWorkspace,
+    /confirmFileAccessReview: guardianRemovalAccessReviewed/,
+  );
   assert.match(documentsWorkspace, /requestedStudentId/);
   assert.match(documentsWorkspace, /requestedDocumentId/);
   assert.match(documentsWorkspace, /requestedKind/);
-  assert.match(documentsWorkspace, /api\.getStudentProfile\(requestedStudentId!\)/);
-  assert.match(documentsWorkspace, /The linked student record can still load from the protected profile route/);
+  assert.match(
+    documentsWorkspace,
+    /api\.getStudentProfile\(requestedStudentId!\)/,
+  );
+  assert.match(
+    documentsWorkspace,
+    /The linked student record can still load from the protected profile route/,
+  );
   assert.match(documentsWorkspace, /DocumentWorkspaceFailure/);
   assert.match(documentsWorkspace, /ApiRequestError/);
   assert.match(documentsWorkspace, /ModuleLockedState/);
-  assert.match(documentsWorkspace, /We could not load admission documents right now/);
-  assert.match(documentsWorkspace, /Your admission records have not been changed/);
-  assert.doesNotMatch(documentsWorkspace, /title="Missing" value="Unavailable"/);
-  assert.doesNotMatch(documentsWorkspace, /src=\{student\.photoUrl\}|src=\{profileQuery\.data\.student\.photoUrl\}/);
+  assert.match(
+    documentsWorkspace,
+    /We could not load admission documents right now/,
+  );
+  assert.match(
+    documentsWorkspace,
+    /Your admission records have not been changed/,
+  );
+  assert.doesNotMatch(
+    documentsWorkspace,
+    /title="Missing" value="Unavailable"/,
+  );
+  assert.doesNotMatch(
+    documentsWorkspace,
+    /src=\{student\.photoUrl\}|src=\{profileQuery\.data\.student\.photoUrl\}/,
+  );
   assert.doesNotMatch(applicationReview, /src=\{student\.photoUrl\}/);
+  assert.match(applicationReviewPage, /ApplicationReviewWorkspace/);
+  assert.match(applicationReviewPage, /admissionCaseId=\{applicationId\}/);
+  assert.match(
+    applicationReview,
+    /admissionCasesApi\.getCase\(admissionCaseId\)/,
+  );
+  assert.match(
+    applicationReview,
+    /admissionCasesApi\.reviewCase\(admissionCaseId, payload\)/,
+  );
+  assert.match(applicationReview, /admissionCase\.review\.availableActions/);
+  assert.match(applicationReview, /students:manage_lifecycle/);
+  assert.match(applicationReview, /reviewerUserId: session\.user\.id/);
+  assert.match(
+    applicationReview,
+    /Reviewer scoring and interview scheduling are not shown/,
+  );
+  assert.doesNotMatch(
+    applicationReview,
+    /api\.getStudentProfile|api\.listAdmissions/,
+  );
   assert.match(documentsErrorBoundary, /M1PageHeader/);
   assert.match(documentsErrorBoundary, /onAction=\{reset\}/);
   assert.match(documentsErrorBoundary, /Return to admissions/);
-  assert.match(documentsErrorBoundary, /Your admission records have not been changed/);
+  assert.match(
+    documentsErrorBoundary,
+    /Your admission records have not been changed/,
+  );
 });
 
-test('M1 entry creates one unified admission case for direct and review workflows', () => {
-  const legacyPipeline = read('components/admissions/admissions-pipeline.tsx');
-  const applicationPipelinePage = read('app/dashboard/admissions/applications/page.tsx');
-  const legacyApplicationForm = read('components/m1/admission-application-form.tsx');
-  const entryPage = read('app/dashboard/admissions/new/page.tsx');
-  const entry = read('components/m1/admission-entry.tsx');
-  const directWizard = read('components/m1/admission-case-wizard.tsx');
-  const reviewForm = read('components/m1/admission-review-case-form.tsx');
-  const queues = read('components/m1/admission-case-queues.tsx');
-  const caseApi = read('lib/api/admission-cases.ts');
-  const admissionsPage = read('app/dashboard/admissions/page.tsx');
-  const moduleNav = read('components/m1/m1-module-nav.tsx');
-  const dashboardShell = read('components/layout/dashboard-shell.tsx');
-  const policySettings = read('components/settings/admission-policy-settings.tsx');
-  const mobileRouter = read('../schoolos_mobile/lib/app/router.dart');
+test("M1 entry creates one unified admission case for direct and review workflows", () => {
+  const legacyPipeline = read("components/admissions/admissions-pipeline.tsx");
+  const applicationPipelinePage = read(
+    "app/dashboard/admissions/applications/page.tsx",
+  );
+  const legacyApplicationForm = read(
+    "components/m1/admission-application-form.tsx",
+  );
+  const entryPage = read("app/dashboard/admissions/new/page.tsx");
+  const entry = read("components/m1/admission-entry.tsx");
+  const directWizard = read("components/m1/admission-case-wizard.tsx");
+  const reviewForm = read("components/m1/admission-review-case-form.tsx");
+  const queues = read("components/m1/admission-case-queues.tsx");
+  const caseApi = read("lib/api/admission-cases.ts");
+  const admissionsPage = read("app/dashboard/admissions/page.tsx");
+  const moduleNav = read("components/m1/m1-module-nav.tsx");
+  const dashboardShell = read("components/layout/dashboard-shell.tsx");
+  const policySettings = read(
+    "components/settings/admission-policy-settings.tsx",
+  );
+  const mobileRouter = read("../schoolos_mobile/lib/app/router.dart");
 
   assert.match(legacyPipeline, /listAdmissionApplications/);
   assert.match(legacyPipeline, /isAdmissionCaseDisplayStatus/);
   assert.match(legacyPipeline, /isLegacyApplicationStatus/);
-  assert.match(legacyPipeline, /Continue in admission case/);
+  assert.match(legacyPipeline, /Open review workspace/);
+  assert.match(
+    legacyPipeline,
+    /\/dashboard\/admissions\/applications\/\$\{application\.id\}/,
+  );
   assert.match(legacyPipeline, /application\.status === "ADMITTED"/);
   assert.match(legacyPipeline, /NEXT_STATUSES\[application\.status\]/);
   assert.match(applicationPipelinePage, /AdmissionsPipeline/);
@@ -90,7 +156,10 @@ test('M1 entry creates one unified admission case for direct and review workflow
   assert.match(entry, /Continue an existing application/);
   assert.match(entry, /Transfer or special review/);
   assert.match(entry, /Import admissions/);
-  assert.match(directWizard, /SchoolOS checks placement, policy requirements, and possible duplicates/);
+  assert.match(
+    directWizard,
+    /SchoolOS checks placement, policy requirements, and possible duplicates/,
+  );
   assert.match(directWizard, /Saving admission draft/);
   assert.match(directWizard, /Step \{step \+ 1\} of \{STEPS\.length\}/);
   assert.match(directWizard, /Draft saved just now/);
@@ -113,7 +182,10 @@ test('M1 entry creates one unified admission case for direct and review workflow
   assert.match(reviewForm, /Select relationship/);
   assert.match(reviewForm, /Admission date \(BS\)/);
   assert.match(reviewForm, /toGregorianDateFromBs/);
-  assert.doesNotMatch(directWizard + reviewForm, /gender: 'FEMALE'|guardianRelation: 'mother'/);
+  assert.doesNotMatch(
+    directWizard + reviewForm,
+    /gender: 'FEMALE'|guardianRelation: 'mother'/,
+  );
   assert.match(reviewForm, /admissionCasesApi\.createCase/);
   assert.match(reviewForm, /admissionCaseIdRef/);
   assert.match(reviewForm, /MARK_READY_FOR_REVIEW/);
@@ -132,29 +204,44 @@ test('M1 entry creates one unified admission case for direct and review workflow
   assert.match(policySettings, /Rules for selected admissions/);
   assert.match(policySettings, /GRADE_11_12/);
   assert.match(mobileRouter, /snapshotKey: 'admissions'/);
-  assert.doesNotMatch(directWizard + reviewForm + caseApi, /publicUrl|objectKey/);
+  assert.doesNotMatch(
+    directWizard + reviewForm + caseApi,
+    /publicUrl|objectKey/,
+  );
 });
 
-test('M1 high-risk workflows remain server controlled and protected', () => {
-  const duplicates = read('components/m1/duplicate-candidates-workspace.tsx');
-  const documents = read('components/m1/student-documents-workspace.tsx');
-  const qr = read('components/m1/qr-id-workspace.tsx');
-  const iemis = read('components/m1/iemis-readiness-workspace.tsx');
-  const admissionCase = read('components/m1/admission-case-detail.tsx');
+test("M1 high-risk workflows remain server controlled and protected", () => {
+  const duplicates = read("components/m1/duplicate-candidates-workspace.tsx");
+  const documents = read("components/m1/student-documents-workspace.tsx");
+  const qr = read("components/m1/qr-id-workspace.tsx");
+  const iemis = read("components/m1/iemis-readiness-workspace.tsx");
+  const admissionCase = read("components/m1/admission-case-detail.tsx");
 
   assert.match(duplicates, /previewDuplicateStudentMerge/);
   assert.match(duplicates, /mergeDuplicateStudent/);
   assert.match(duplicates, /Mark Not Duplicate — unavailable/);
   assert.match(documents, /StudentDocumentAccessButton/);
-  assert.match(documents, /api\.previewStudentDocument\(studentId, document\.id\)/);
-  assert.match(documents, /api\.downloadStudentDocument\(studentId, document\.id\)/);
+  assert.match(
+    documents,
+    /api\.previewStudentDocument\(studentId, document\.id\)/,
+  );
+  assert.match(
+    documents,
+    /api\.downloadStudentDocument\(studentId, document\.id\)/,
+  );
   assert.match(documents, /openProtectedFile\(access\.fileAssetId/);
   assert.match(documents, /downloadProtectedFile\(access\.fileAssetId/);
-  assert.match(documents, /api\.archiveStudentDocument\(documentId, \{ reason \}\)/);
+  assert.match(
+    documents,
+    /api\.archiveStudentDocument\(documentId, \{ reason \}\)/,
+  );
   assert.match(documents, /Archive reason/);
   assert.match(documents, /archiveReason\.trim\(\)\.length < 5/);
   assert.match(documents, /BsDateField/);
-  assert.match(documents, /toGregorianDateFromBs\(parseBsDateInput\(uploadExpiryDateBs\)\)/);
+  assert.match(
+    documents,
+    /toGregorianDateFromBs\(parseBsDateInput\(uploadExpiryDateBs\)\)/,
+  );
   assert.match(documents, /expiryDate: metadata\.expiryDate/);
   assert.match(documents, /notes: metadata\.notes/);
   assert.match(documents, /reason: metadata\.reason/);
@@ -162,13 +249,25 @@ test('M1 high-risk workflows remain server controlled and protected', () => {
   assert.match(documents, /uploadReason\.trim\(\)\.length < 5/);
   assert.match(documents, /removeStudentGuardianAccess/);
   assert.match(documents, /guardianRemovalAccessReviewed/);
-  assert.match(documents, /confirmFileAccessReview: guardianRemovalAccessReviewed/);
+  assert.match(
+    documents,
+    /confirmFileAccessReview: guardianRemovalAccessReviewed/,
+  );
   assert.match(documents, /guardianRemovalReplacementId/);
-  assert.match(documents, /newPrimaryGuardianId: guardianToRemove\.isPrimary \? guardianRemovalReplacementId : null/);
-  assert.match(documents, /I reviewed guardian portal and protected-file access/);
+  assert.match(
+    documents,
+    /newPrimaryGuardianId: guardianToRemove\.isPrimary \? guardianRemovalReplacementId : null/,
+  );
+  assert.match(
+    documents,
+    /I reviewed guardian portal and protected-file access/,
+  );
   assert.match(documents, /A student must have at least one guardian/);
   assert.match(documents, /Expiry reminders/);
-  assert.doesNotMatch(documents, /fileAssetId=\{selectedDocument\.fileId\}|fileAssetId=\{document\.fileId\}/);
+  assert.doesNotMatch(
+    documents,
+    /fileAssetId=\{selectedDocument\.fileId\}|fileAssetId=\{document\.fileId\}/,
+  );
   assert.doesNotMatch(documents, /api\.deleteStudentDocument/);
   assert.match(qr, /StudentQrCard/);
   assert.match(iemis, /CSV Import History/);
@@ -176,12 +275,17 @@ test('M1 high-risk workflows remain server controlled and protected', () => {
   assert.match(admissionCase, /Finalize admission/);
   assert.match(admissionCase, /Duplicate override/);
   assert.match(admissionCase, /canOverrideDuplicate/);
-  assert.doesNotMatch(duplicates + documents + qr + iemis + admissionCase, /publicUrl|objectKey/);
+  assert.match(admissionCase, /admissionCase\.review\.availableActions/);
+  assert.doesNotMatch(admissionCase, /Admission review approved\./);
+  assert.doesNotMatch(
+    duplicates + documents + qr + iemis + admissionCase,
+    /publicUrl|objectKey/,
+  );
 });
 
-test('M1 student roster uses backend summary, safe filters, and paginated roster contract', () => {
-  const page = read('app/dashboard/students/page.tsx');
-  const directory = read('components/forms/student-directory.tsx');
+test("M1 student roster uses backend summary, safe filters, and paginated roster contract", () => {
+  const page = read("app/dashboard/students/page.tsx");
+  const directory = read("components/forms/student-directory.tsx");
 
   assert.match(page, /api\.getStudentModuleSummary\(filters\)/);
   assert.match(page, /limit: STUDENT_ROSTER_PAGE_SIZE/);
@@ -191,5 +295,8 @@ test('M1 student roster uses backend summary, safe filters, and paginated roster
   assert.match(directory, /Page \{currentPage\} of \{totalPages\}/);
   assert.match(directory, /value="ARCHIVED"/);
   assert.match(directory, /value="MERGED"/);
-  assert.doesNotMatch(directory, /value="INACTIVE"|value="WITHDRAWN"|value="DEACTIVATED"|value="GRADUATED"/);
+  assert.doesNotMatch(
+    directory,
+    /value="INACTIVE"|value="WITHDRAWN"|value="DEACTIVATED"|value="GRADUATED"/,
+  );
 });

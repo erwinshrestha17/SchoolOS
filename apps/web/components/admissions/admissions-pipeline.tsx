@@ -241,12 +241,14 @@ export function AdmissionsPipeline() {
                   <option key={schoolClass.id} value={schoolClass.id}>
                     {schoolClass.name}
                   </option>
-                  ))}
+                ))}
               </select>
               <select
                 value={status}
                 onChange={(event) => {
-                  setStatus(event.target.value as AdmissionApplicationStatus | "");
+                  setStatus(
+                    event.target.value as AdmissionApplicationStatus | "",
+                  );
                   setPage(1);
                 }}
                 aria-label="Filter by application stage"
@@ -328,7 +330,10 @@ export function AdmissionsPipeline() {
                           >
                             <strong className="flex items-center gap-1 text-slate-900 group-hover:text-[var(--color-mod-admissions-text)]">
                               {application.fullNameEn}
-                              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                              <ChevronRight
+                                className="h-4 w-4"
+                                aria-hidden="true"
+                              />
                             </strong>
                             <span className="text-xs text-slate-500">
                               {applicationSourceLabel(application.source)}
@@ -592,10 +597,10 @@ function ApplicationInspector({
 
       {isUnifiedCaseStatus ? (
         <Link
-          href={`/dashboard/admissions/cases/${application.id}`}
+          href={`/dashboard/admissions/applications/${application.id}`}
           className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-soft)] px-4 text-sm font-bold text-[var(--color-mod-admissions-text)] transition hover:bg-white"
         >
-          Continue in admission case
+          Open review workspace
         </Link>
       ) : null}
 
@@ -1036,9 +1041,7 @@ function isLegacyApplicationStatus(
   );
 }
 
-function isAdmissionCaseDisplayStatus(
-  status: AdmissionApplicationStatus,
-) {
+function isAdmissionCaseDisplayStatus(status: AdmissionApplicationStatus) {
   return (ADMISSION_CASE_DISPLAY_STATUSES as readonly string[]).includes(
     status,
   );

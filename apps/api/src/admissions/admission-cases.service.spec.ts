@@ -476,6 +476,206 @@ describe('AdmissionCasesService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('exposes only backend-authorized review actions and an empty typed history', async () => {
+    const prisma = buildPrisma();
+    const service = buildService(prisma);
+
+    const result = await service.getCase('case-a', actor);
+
+    expect(result.review).toEqual({
+      reviewerUserId: null,
+      dueDate: null,
+      history: [],
+      availableActions: ['ASSIGN_REVIEWER', 'MARK_READY_FOR_REVIEW', 'CLOSE'],
+    });
+
+    const readOnlyResult = await service.getCase('case-a', {
+      ...actor,
+      permissions: [],
+    });
+    expect(readOnlyResult.review.availableActions).toEqual([]);
+  });
+
+  it('requires a reason and the waiting-for-review stage before approval', async () => {
+    const prisma = buildPrisma();
+    const auditService = { record: jest.fn() };
+    const service = buildService(prisma, { auditService });
+
+    await expect(
+      service.reviewCase('case-a', { action: 'APPROVE' }, actor),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.reviewCase(
+        'case-a',
+        { action: 'APPROVE', reason: 'All requirements were reviewed.' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.admissionApplication.updateMany).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('records a reasoned approval with tenant and concurrency predicates in one transaction', async () => {
+    const waitingCase = {
+      ...admissionCase,
+      status: 'WAITING_FOR_REVIEW',
+    };
+    const prisma = buildPrisma({
+      admissionApplication: {
+        findFirst: jest.fn().mockResolvedValue(waitingCase),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    });
+    const auditService = { record: jest.fn() };
+    const service = buildService(prisma, { auditService });
+
+    await service.reviewCase(
+      'case-a',
+      {
+        action: 'APPROVE',
+        reason: 'Identity, placement, and duplicate checks were reviewed.',
+      },
+      actor,
+    );
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.admissionApplication.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'case-a',
+          tenantId: 'tenant-a',
+          status: 'WAITING_FOR_REVIEW',
+          updatedAt: waitingCase.updatedAt,
+        },
+        data: expect.objectContaining({
+          status: 'APPROVED',
+          updatedById: 'user-a',
+        }),
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'admission_case_approve',
+        tenantId: 'tenant-a',
+        resourceId: 'case-a',
+        after: expect.objectContaining({
+          status: 'APPROVED',
+          reason: 'Identity, placement, and duplicate checks were reviewed.',
+        }),
+      }),
+      prisma,
+    );
+  });
+
+  it('assigns review ownership without changing the admission stage', async () => {
+    const waitingCase = {
+      ...admissionCase,
+      status: 'WAITING_FOR_REVIEW',
+    };
+    const prisma = buildPrisma({
+      admissionApplication: {
+        findFirst: jest.fn().mockResolvedValue(waitingCase),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    });
+    prisma.user.findFirst.mockResolvedValue({ id: actor.userId });
+    const service = buildService(prisma);
+
+    await service.reviewCase(
+      'case-a',
+      { action: 'ASSIGN_REVIEWER', reviewerUserId: actor.userId },
+      actor,
+    );
+
+    expect(prisma.admissionApplication.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'WAITING_FOR_REVIEW',
+          duplicateReview: expect.objectContaining({
+            review: expect.objectContaining({
+              reviewerUserId: 'user-a',
+            }),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('rejects reviewer assignment outside the active authorized tenant users', async () => {
+    const prisma = buildPrisma();
+    prisma.user.findFirst.mockResolvedValue(null);
+    const service = buildService(prisma);
+
+    await expect(
+      service.reviewCase(
+        'case-a',
+        { action: 'ASSIGN_REVIEWER', reviewerUserId: 'user-other-tenant' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 'user-other-tenant',
+          tenantId: 'tenant-a',
+          status: 'ACTIVE',
+        }),
+      }),
+    );
+    expect(prisma.admissionApplication.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('does not write an audit event when a concurrent review update loses the race', async () => {
+    const waitingCase = {
+      ...admissionCase,
+      status: 'WAITING_FOR_REVIEW',
+    };
+    const prisma = buildPrisma({
+      admissionApplication: {
+        findFirst: jest.fn().mockResolvedValue(waitingCase),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+    });
+    const auditService = { record: jest.fn() };
+    const service = buildService(prisma, { auditService });
+
+    await expect(
+      service.reviewCase(
+        'case-a',
+        {
+          action: 'REJECT',
+          reason: 'The application did not meet the recorded requirements.',
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('fails closed before a review write when the case belongs to another tenant', async () => {
+    const prisma = buildPrisma({
+      admissionApplication: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn(),
+      },
+    });
+    const auditService = { record: jest.fn() };
+    const service = buildService(prisma, { auditService });
+
+    await expect(
+      service.reviewCase(
+        'case-other-tenant',
+        {
+          action: 'REJECT',
+          reason: 'The application belongs to a different school.',
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.admissionApplication.updateMany).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
   it('rejects policy scopes that do not belong to the authenticated tenant', async () => {
     const prisma = buildPrisma();
     prisma.class.findMany.mockResolvedValue([]);

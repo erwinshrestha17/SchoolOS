@@ -17,6 +17,10 @@ interface AuditLogInput {
   requestId?: string | null;
 }
 
+type AuditPrismaClient =
+  | Pick<PrismaService, 'auditLog'>
+  | Prisma.TransactionClient;
+
 @Injectable()
 export class AuditService {
   constructor(
@@ -24,10 +28,10 @@ export class AuditService {
     private readonly cls: ClsService,
   ) {}
 
-  async record(input: AuditLogInput) {
+  async record(input: AuditLogInput, client: AuditPrismaClient = this.prisma) {
     const requestId = input.requestId ?? this.cls.get(REQUEST_ID_KEY);
 
-    await this.prisma.auditLog.create({
+    await client.auditLog.create({
       data: {
         action: input.action,
         resource: input.resource,
