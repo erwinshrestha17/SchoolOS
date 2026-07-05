@@ -21,6 +21,7 @@ import { useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { admissionCasesApi } from "../../lib/api/admission-cases";
 import { Button } from "../ui/button";
+import { ConfirmDialog } from "../ui/confirm-dialog";
 import { ErrorState } from "../ui/error-state";
 import { ProtectedFileButton } from "../ui/protected-file";
 import { SectionCard } from "../ui/section-card";
@@ -33,11 +34,16 @@ export function AdmissionCaseDetail({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [reviewAction, setReviewAction] = useState<
-    ReviewAdmissionCasePayload["action"] | null
+    Exclude<ReviewAdmissionCasePayload["action"], "REJECT"> | null
   >(null);
   const [reason, setReason] = useState("");
   const [confirmDuplicateOverride, setConfirmDuplicateOverride] =
     useState(false);
+  // "Not admit" is a hard-to-reverse decision on a real applicant, so it gets
+  // its own confirmation dialog and destructive styling instead of sharing
+  // the inline reason panel used by the reversible review actions.
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   const caseQuery = useQuery({
     queryKey: ["admission-case", admissionCaseId],
@@ -59,6 +65,8 @@ export function AdmissionCaseDetail({
     onSuccess: async () => {
       setReviewAction(null);
       setReason("");
+      setRejectDialogOpen(false);
+      setRejectReason("");
       await refresh();
     },
   });
@@ -353,13 +361,11 @@ export function AdmissionCaseDetail({
       {reviewAction ? (
         <SectionCard
           title={
-            reviewAction === "REJECT"
-              ? "Do not admit this case"
-              : reviewAction === "REQUEST_INFORMATION"
-                ? "Request information"
-                : reviewAction === "APPROVE"
-                  ? "Approve this admission case"
-                  : "Review this admission"
+            reviewAction === "REQUEST_INFORMATION"
+              ? "Request information"
+              : reviewAction === "APPROVE"
+                ? "Approve this admission case"
+                : "Review this admission"
           }
           description="A reason is recorded in the admission audit history."
         >
@@ -443,8 +449,8 @@ export function AdmissionCaseDetail({
           {availableReviewActions.has("REJECT") ? (
             <Button
               type="button"
-              variant="outline"
-              onClick={() => setReviewAction("REJECT")}
+              variant="destructive"
+              onClick={() => setRejectDialogOpen(true)}
             >
               <AlertTriangle className="h-4 w-4" />
               Not admit
@@ -495,6 +501,44 @@ export function AdmissionCaseDetail({
           ) : null}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={rejectDialogOpen}
+        title="Do not admit this applicant?"
+        description="This records a final decision on the admission case and is kept in the admission audit history. It does not delete any saved information, but the family will need to start a new application to be reconsidered."
+        confirmLabel="Do not admit"
+        destructive
+        isConfirming={reviewMutation.isPending}
+        confirmDisabled={rejectReason.trim().length < 5}
+        onClose={() => {
+          setRejectDialogOpen(false);
+          setRejectReason("");
+        }}
+        onConfirm={() =>
+          reviewMutation.mutate({
+            action: "REJECT",
+            reason: rejectReason.trim(),
+          })
+        }
+      >
+        <label className="block space-y-2 text-sm font-bold text-slate-700">
+          <span>Reason</span>
+          <textarea
+            rows={4}
+            value={rejectReason}
+            onChange={(event) => setRejectReason(event.target.value)}
+            placeholder="Write a clear school-office reason."
+          />
+        </label>
+        {rejectDialogOpen && reviewMutation.isError ? (
+          <p
+            className="mt-2 text-sm font-semibold text-danger-700"
+            role="alert"
+          >
+            {readError(reviewMutation.error)}
+          </p>
+        ) : null}
+      </ConfirmDialog>
     </section>
   );
 }

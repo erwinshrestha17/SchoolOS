@@ -302,7 +302,7 @@ export const dashboardNavGroups: NavGroup[] = [
   },
 ];
 
-const settingsNavItem: NavItem = {
+export const settingsNavItem: NavItem = {
   href: '/dashboard/settings',
   label: 'Settings',
   icon: Settings,
@@ -792,7 +792,7 @@ function NavEntry({
   );
 }
 
-function canDisplayNavItem(
+export function canDisplayNavItem(
   item: NavItem,
   session: ReturnType<typeof useSession>['session'],
   hasModule: (module: string) => boolean,

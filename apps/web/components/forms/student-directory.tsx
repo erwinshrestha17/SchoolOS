@@ -17,6 +17,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { SectionCard } from '../ui/section-card';
 import { Badge } from '../ui/badge';
 import { Avatar } from '../ui/avatar';
+import { Drawer } from '../ui/drawer';
 import { LoadingState } from '../ui/loading-state';
 import { EmptyState } from '../ui/empty-state';
 import { ErrorState } from '../ui/error-state';
@@ -40,7 +41,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   ClipboardCheck,
-  X,
   QrCode,
 } from 'lucide-react';
 import { StatusChip } from '../dashboard/status-chip';
@@ -117,16 +117,23 @@ export function StudentDirectory({
   const pageSize = studentsResponse?.limit ?? 25;
   const hasNextPage = studentsResponse?.hasNextPage ?? false;
   const totalPages = Math.max(1, Math.ceil(totalStudents / pageSize));
-  const [academicYearId, setAcademicYearId] = useState('');
-  const [classId, setClassId] = useState('');
-  const [sectionId, setSectionId] = useState('');
-  const [status, setStatus] = useState('');
-  const [search, setSearch] = useState('');
-  const deferredSearch = useDeferredValue(search);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedStudentId = searchParams.get('student');
+  // Read the filter UI's initial values from the URL (once, on mount) so the
+  // dropdowns/search box reflect a restored link/refresh instead of always
+  // starting blank while the underlying query results are already filtered.
+  const [academicYearId, setAcademicYearId] = useState(
+    () => searchParams.get('academicYearId') ?? '',
+  );
+  const [classId, setClassId] = useState(() => searchParams.get('classId') ?? '');
+  const [sectionId, setSectionId] = useState(
+    () => searchParams.get('sectionId') ?? '',
+  );
+  const [status, setStatus] = useState(() => searchParams.get('status') ?? '');
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
+  const deferredSearch = useDeferredValue(search);
 
   const currentAcademicYear = academicYears.find((year) => year.isCurrent);
   const selectedAcademicYear =
@@ -742,15 +749,20 @@ export function StudentDirectory({
         </div>
       )}
 
-      {selectedStudent ? (
-        <aside className="fixed inset-y-0 right-0 z-40 w-full max-w-[360px] overflow-y-auto border-l border-slate-200 bg-white p-5 shadow-lg xl:top-16" aria-label="Selected student inspector">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <h2 className="text-sm font-black text-slate-950">Student Inspector</h2>
-            <button type="button" aria-label="Close student inspector" onClick={() => updateSelectedStudent()} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"><X className="h-4 w-4" /></button>
-          </div>
-          <StudentInspector student={selectedStudent} admission={admissionBySystemId.get(selectedStudent.studentSystemId)} onOpenPdf={onOpenPdf} />
-        </aside>
-      ) : null}
+      <Drawer
+        isOpen={Boolean(selectedStudent)}
+        onClose={() => updateSelectedStudent()}
+        title="Student Inspector"
+        width="sm"
+      >
+        {selectedStudent ? (
+          <StudentInspector
+            student={selectedStudent}
+            admission={admissionBySystemId.get(selectedStudent.studentSystemId)}
+            onOpenPdf={onOpenPdf}
+          />
+        ) : null}
+      </Drawer>
     </div>
   );
 }

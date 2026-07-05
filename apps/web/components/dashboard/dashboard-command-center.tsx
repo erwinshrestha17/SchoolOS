@@ -29,6 +29,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { prioritizeByAttention } from "../../lib/dashboard/prioritize-by-attention";
 import { cn } from "../../lib/utils";
 import { resolveOperationalSummaryAction } from "../ui/operational-summary";
 import { SectionCard } from "../ui/section-card";
@@ -254,9 +255,20 @@ export function DashboardCommandCenter({
     (item) => item.count > 0,
   );
   const pulseCards = buildPulseCards(dashboard, moduleMap);
-  const dailyModules = orderedModules(moduleMap, DAILY_MODULES);
-  const academicModules = orderedModules(moduleMap, ACADEMIC_MODULES);
-  const queueModules = orderedModules(moduleMap, QUEUE_MODULES);
+  // Within each section, whichever module most urgently needs attention
+  // today leads — a cashier's Daily operations naturally opens on Fees when
+  // collections are overdue, a teacher's on Attendance when a register is
+  // unsubmitted — using each module's own real attentionItems, not a
+  // guessed role.
+  const dailyModules = prioritizeByAttention(
+    orderedModules(moduleMap, DAILY_MODULES),
+  );
+  const academicModules = prioritizeByAttention(
+    orderedModules(moduleMap, ACADEMIC_MODULES),
+  );
+  const queueModules = prioritizeByAttention(
+    orderedModules(moduleMap, QUEUE_MODULES),
+  );
 
   return (
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">

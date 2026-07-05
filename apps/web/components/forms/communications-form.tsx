@@ -24,6 +24,7 @@ import { FileUploader } from "../ui/file-uploader";
 import { FilterBar } from "../ui/filter-bar";
 import { ModuleTabs } from "../dashboard/module-tabs";
 import { cn } from "../../lib/utils";
+import { estimateSmsSegments } from "../../lib/sms-segments";
 import {
   RefreshCcw,
   AlertCircle,
@@ -662,7 +663,9 @@ function NoticesSection({
   noticeError: string | null;
   noticeSuccess: string | null;
 }) {
-  const characterCount = notice.body.trim().length;
+  const trimmedBody = notice.body.trim();
+  const characterCount = trimmedBody.length;
+  const smsEstimate = estimateSmsSegments(trimmedBody);
 
   return (
     <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
@@ -693,7 +696,11 @@ function NoticesSection({
 
           <FormField
             label="Notice Content"
-            description={`${characterCount} characters`}
+            description={
+              smsEstimate.segments > 0
+                ? `${characterCount} characters · about ${smsEstimate.segments} SMS message${smsEstimate.segments === 1 ? "" : "s"} per guardian if sent by SMS (estimate only${smsEstimate.encoding === "UCS-2" ? " — Unicode text uses shorter messages" : ""})`
+                : `${characterCount} characters`
+            }
           >
             <textarea
               rows={6}

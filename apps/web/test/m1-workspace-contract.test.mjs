@@ -281,6 +281,20 @@ test("M1 high-risk workflows remain server controlled and protected", () => {
     duplicates + documents + qr + iemis + admissionCase,
     /publicUrl|objectKey/,
   );
+
+  // "Not admit" is a hard-to-reverse decision on a real applicant: it must
+  // use the shared destructive-confirmation dialog, not the same inline
+  // reason panel as the reversible Approve/Request-information actions.
+  assert.match(admissionCase, /import { ConfirmDialog } from "..\/ui\/confirm-dialog"/);
+  assert.match(admissionCase, /variant="destructive"/);
+  assert.match(admissionCase, /rejectDialogOpen/);
+  assert.match(admissionCase, /<ConfirmDialog/);
+  assert.match(admissionCase, /Do not admit this applicant\?/);
+  assert.match(admissionCase, /confirmDisabled=\{rejectReason\.trim\(\)\.length < 5\}/);
+  assert.match(
+    admissionCase,
+    /reviewMutation\.mutate\(\{\s*action: "REJECT"/,
+  );
 });
 
 test("M1 student roster uses backend summary, safe filters, and paginated roster contract", () => {

@@ -1,4 +1,10 @@
 import type { AuthSession, PermissionKey } from '@schoolos/core';
+import {
+  clearRecentlyViewed as clearRecentlyViewedEntries,
+  readRecentlyViewed as readRecentlyViewedEntries,
+  recordRecentlyViewed as recordRecentlyViewedEntry,
+  type RecentlyViewedEntry,
+} from './recently-viewed';
 
 const SESSION_STORAGE_KEY = 'schoolos.auth-session';
 export const SESSION_CLEARED_EVENT = 'schoolos:session-cleared';
@@ -86,6 +92,23 @@ export function storeSession(
 
 export function clearStoredSession() {
   storeSession(null);
+}
+
+export function readRecentlyViewed(): RecentlyViewedEntry[] {
+  if (typeof window === 'undefined') return [];
+  return readRecentlyViewedEntries(window.localStorage);
+}
+
+export function recordRecentlyViewed(
+  entry: Omit<RecentlyViewedEntry, 'viewedAt'>,
+): RecentlyViewedEntry[] {
+  if (typeof window === 'undefined') return [];
+  return recordRecentlyViewedEntry(window.localStorage, entry);
+}
+
+export function clearRecentlyViewed(): void {
+  if (typeof window === 'undefined') return;
+  clearRecentlyViewedEntries(window.localStorage);
 }
 
 export async function readAttendanceDraft(key: string | null) {

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import type { OperationalSummaryRouteModule } from '@schoolos/core';
+import { CommandPalette } from './command-palette';
 import { GlobalAside } from './global-aside';
 import { TopBar } from './top-bar';
 import { useSession } from '../session-provider';
@@ -68,6 +69,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         mobileOpen={mobileOpen}
         onMobileClose={closeMobileNavigation}
       />
+      <CommandPalette />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <SupportOverrideBanner />

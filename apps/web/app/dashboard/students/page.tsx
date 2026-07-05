@@ -10,6 +10,7 @@ import { DashboardPageShell } from '../../../components/dashboard/dashboard-page
 import { ModuleHeader } from '../../../components/ui/module-header';
 import Link from 'next/link';
 import { M1ModuleNav } from '../../../components/m1/m1-module-nav';
+import { useUrlFilters } from '../../../lib/hooks/use-url-filters';
 
 const STUDENT_ROSTER_PAGE_SIZE = 25;
 
@@ -20,14 +21,16 @@ export default function StudentsPage() {
   const canManageStudentLifecycle = hasPermissions(['students:manage_lifecycle']);
   const canReadStudents = hasPermissions(['students:read']);
 
-  const [filters, setFilters] = useState<{
-    academicYearId?: string;
-    classId?: string;
-    sectionId?: string;
-    status?: string;
-    search?: string;
-    page?: number;
-  }>({ page: 1 });
+  // URL-backed so refreshing, using browser back/forward, or sharing a link
+  // to a filtered roster (e.g. "Grade 6, Section A, page 2") preserves it.
+  const [filters, setFilters] = useUrlFilters({
+    academicYearId: '',
+    classId: '',
+    sectionId: '',
+    status: '',
+    search: '',
+    page: 1,
+  });
 
   const admissionsQuery = useQuery({
     queryKey: ['admissions'],

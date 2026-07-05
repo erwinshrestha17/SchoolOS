@@ -9,7 +9,8 @@ import {
 } from "@/lib/api";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRecentlyViewed } from "@/lib/hooks/use-recently-viewed";
 import { PageHeader } from "@/components/ui/page-header";
 import { ProtectedFileButton } from "@/components/ui/protected-file";
 import {
@@ -36,6 +37,19 @@ export default function NoticeDetailPage() {
     queryFn: () => api.listNoticeUnreadRecipients(noticeId),
     enabled: Boolean(noticeId),
   });
+
+  const { record: recordRecentlyViewed } = useRecentlyViewed();
+
+  useEffect(() => {
+    if (!noticeQuery.data) return;
+    recordRecentlyViewed({
+      kind: "notice",
+      id: noticeId,
+      label: noticeQuery.data.title,
+      href: `/dashboard/notices/${noticeId}`,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noticeId, noticeQuery.data?.title]);
 
   if (noticeQuery.isLoading) {
     return (

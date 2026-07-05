@@ -628,7 +628,9 @@ export function withQuery(path: string, params: Record<string, any>) {
   const searchParams = new URLSearchParams();
 
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null) {
+    // An empty string is always "no filter" by convention throughout this
+    // app's filter/query-param usage, never a distinct value to send.
+    if (value !== undefined && value !== null && value !== '') {
       searchParams.set(key, String(value));
     }
   }

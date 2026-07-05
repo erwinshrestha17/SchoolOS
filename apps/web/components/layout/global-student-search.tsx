@@ -1,10 +1,11 @@
 'use client';
 
-import type { ApiResponse } from '@schoolos/core';
+import type { ApiResponse, InvoiceSummary } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
-import { Search } from 'lucide-react';
+import { FileText, Search, UserRound } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { api } from '../../lib/api';
 import { useSession } from '../session-provider';
 
 const API_BASE_URL =
@@ -23,11 +24,25 @@ type StudentSearchResult = {
   lifecycleStatus: string;
 };
 
+/**
+ * A single navigable search result. Kept as a union (rather than two
+ * separate lists) so arrow-key navigation and Enter-to-open work across
+ * every result type consistently.
+ */
+type SearchResultEntry =
+  | { kind: 'student'; key: string; student: StudentSearchResult }
+  | { kind: 'invoice'; key: string; invoice: InvoiceSummary };
+
 export function GlobalStudentSearch() {
   const router = useRouter();
   const pathname = usePathname();
   const { hasPermissions } = useSession();
   const canSearchStudents = hasPermissions(['students:read']);
+  // Only cashiers/accountants can look up invoices (matches the backend's
+  // own `payments:collect` guard on GET /fees/invoices) — do not widen this
+  // to a broader finance permission the endpoint doesn't actually accept.
+  const canSearchInvoices = hasPermissions(['payments:collect']);
+  const canSearchAnything = canSearchStudents || canSearchInvoices;
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -64,13 +79,35 @@ export function GlobalStudentSearch() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const searchQuery = useQuery({
+  const studentSearchQuery = useQuery({
     queryKey: ['global-student-search', debouncedQuery],
     queryFn: () => searchStudents(debouncedQuery),
     enabled: canSearchStudents && debouncedQuery.length >= 2,
   });
 
-  const results = searchQuery.data ?? [];
+  const invoiceSearchQuery = useQuery({
+    queryKey: ['global-invoice-search', debouncedQuery],
+    queryFn: () => api.listInvoices({ search: debouncedQuery, limit: 5 }),
+    enabled: canSearchInvoices && debouncedQuery.length >= 2,
+  });
+
+  const results: SearchResultEntry[] = [
+    ...(studentSearchQuery.data ?? []).map((student) => ({
+      kind: 'student' as const,
+      key: `student-${student.id}`,
+      student,
+    })),
+    ...(invoiceSearchQuery.data ?? []).map((invoice) => ({
+      kind: 'invoice' as const,
+      key: `invoice-${invoice.id}`,
+      invoice,
+    })),
+  ];
+
+  const isSearching =
+    (canSearchStudents && studentSearchQuery.isLoading) ||
+    (canSearchInvoices && invoiceSearchQuery.isLoading);
+  const searchError = studentSearchQuery.error ?? invoiceSearchQuery.error;
 
   function clearSearch() {
     setOpen(false);
@@ -79,15 +116,29 @@ export function GlobalStudentSearch() {
     setActiveIndex(0);
   }
 
-  function goToStudent(studentId: string) {
+  function goToResult(entry: SearchResultEntry) {
     clearSearch();
-    router.push(`/dashboard/students/${encodeURIComponent(studentId)}`);
+    if (entry.kind === 'student') {
+      router.push(`/dashboard/students/${encodeURIComponent(entry.student.id)}`);
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set('invoiceId', entry.invoice.id);
+    if (entry.invoice.studentId) {
+      params.set('studentId', entry.invoice.studentId);
+    }
+    router.push(`/dashboard/finance?${params.toString()}`);
   }
+
+  const placeholder = canSearchInvoices
+    ? 'Search students or invoices...'
+    : 'Search students by name, ID, phone...';
 
   return (
     <div className="relative max-w-md flex-1" ref={containerRef}>
       <label htmlFor="global-student-search" className="sr-only">
-        Search students
+        Search students{canSearchInvoices ? ' or invoices' : ''}
       </label>
       <Search
         size={16}
@@ -96,10 +147,14 @@ export function GlobalStudentSearch() {
       <input
         id="global-student-search"
         type="text"
-        placeholder="Search students by name, ID, phone..."
+        placeholder={placeholder}
         className="search-input"
-        aria-label="Search students by name, ID, admission number, or guardian phone"
-        disabled={!canSearchStudents}
+        aria-label={
+          canSearchInvoices
+            ? 'Search students or invoices by name, ID, invoice number, or guardian phone'
+            : 'Search students by name, ID, admission number, or guardian phone'
+        }
+        disabled={!canSearchAnything}
         value={query}
         onChange={(event) => {
           setQuery(event.target.value);
@@ -130,67 +185,95 @@ export function GlobalStudentSearch() {
             event.preventDefault();
             const selected = results[activeIndex];
             if (selected) {
-              goToStudent(selected.id);
+              goToResult(selected);
             }
           }
         }}
       />
 
-      {open && canSearchStudents && query.trim().length > 0 ? (
+      {open && canSearchAnything && query.trim().length > 0 ? (
         <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg">
           {query.trim().length < 2 ? (
             <div className="px-4 py-3 text-sm text-gray-500">
               Type at least 2 characters to search.
             </div>
-          ) : searchQuery.isLoading ? (
+          ) : isSearching ? (
             <div className="px-4 py-3 text-sm text-gray-500">
-              Searching students...
+              Searching...
             </div>
-          ) : searchQuery.isError ? (
+          ) : searchError ? (
             <div className="px-4 py-3 text-sm text-danger-700">
-              Could not search students: {searchQuery.error.message}
+              Could not search: {searchError.message}
             </div>
           ) : results.length === 0 ? (
             <div className="px-4 py-4 text-sm text-gray-500">
-              No student found for “{debouncedQuery}”.
+              No match found for “{debouncedQuery}”.
             </div>
           ) : (
-            <div className="max-h-96 overflow-y-auto py-2" data-testid="global-student-search-results">
-              {results.map((student, index) => (
-                <button
-                  key={student.id}
-                  type="button"
-                  data-testid="global-student-search-result"
-                  className={`grid w-full gap-1 px-4 py-3 text-left transition hover:bg-[var(--primary-soft)] ${
-                    index === activeIndex
-                      ? 'bg-[var(--primary-soft)]'
-                      : 'bg-white'
-                  }`}
-                  onMouseEnter={() => setActiveIndex(index)}
-                  onClick={() => goToStudent(student.id)}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="truncate text-sm font-semibold text-gray-950">
-                      {student.fullNameEn}
+            <div
+              className="max-h-96 overflow-y-auto py-2"
+              data-testid="global-student-search-results"
+            >
+              {results.map((entry, index) =>
+                entry.kind === 'student' ? (
+                  <button
+                    key={entry.key}
+                    type="button"
+                    data-testid="global-student-search-result"
+                    className={`grid w-full gap-1 px-4 py-3 text-left transition hover:bg-[var(--primary-soft)] ${
+                      index === activeIndex ? 'bg-[var(--primary-soft)]' : 'bg-white'
+                    }`}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => goToResult(entry)}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="flex min-w-0 items-center gap-1.5 truncate text-sm font-semibold text-gray-950">
+                        <UserRound size={13} className="shrink-0 text-gray-400" />
+                        <span className="truncate">{entry.student.fullNameEn}</span>
+                      </p>
+                      <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[0.68rem] font-semibold text-gray-600">
+                        {entry.student.studentSystemId}
+                      </span>
+                    </div>
+                    <p className="truncate text-xs text-gray-500">
+                      {entry.student.className}
+                      {entry.student.sectionName ? ` - ${entry.student.sectionName}` : ''}
+                      {entry.student.rollNumber ? ` / Roll ${entry.student.rollNumber}` : ''}
+                      {entry.student.admissionNumber
+                        ? ` / Admission ${entry.student.admissionNumber}`
+                        : ''}
                     </p>
-                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[0.68rem] font-semibold text-gray-600">
-                      {student.studentSystemId}
-                    </span>
-                  </div>
-                  <p className="truncate text-xs text-gray-500">
-                    {student.className}
-                    {student.sectionName ? ` - ${student.sectionName}` : ''}
-                    {student.rollNumber ? ` / Roll ${student.rollNumber}` : ''}
-                    {student.admissionNumber
-                      ? ` / Admission ${student.admissionNumber}`
-                      : ''}
-                  </p>
-                  <p className="truncate text-xs text-gray-400">
-                    {student.guardianName || 'Guardian unavailable'}
-                    {student.guardianPhone ? ` / ${student.guardianPhone}` : ''}
-                  </p>
-                </button>
-              ))}
+                    <p className="truncate text-xs text-gray-400">
+                      {entry.student.guardianName || 'Guardian unavailable'}
+                      {entry.student.guardianPhone ? ` / ${entry.student.guardianPhone}` : ''}
+                    </p>
+                  </button>
+                ) : (
+                  <button
+                    key={entry.key}
+                    type="button"
+                    data-testid="global-invoice-search-result"
+                    className={`grid w-full gap-1 px-4 py-3 text-left transition hover:bg-[var(--primary-soft)] ${
+                      index === activeIndex ? 'bg-[var(--primary-soft)]' : 'bg-white'
+                    }`}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => goToResult(entry)}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="flex min-w-0 items-center gap-1.5 truncate text-sm font-semibold text-gray-950">
+                        <FileText size={13} className="shrink-0 text-gray-400" />
+                        <span className="truncate">{entry.invoice.invoiceNumber}</span>
+                      </p>
+                      <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[0.68rem] font-semibold text-gray-600">
+                        {entry.invoice.status}
+                      </span>
+                    </div>
+                    <p className="truncate text-xs text-gray-500">
+                      {entry.invoice.student?.name ?? 'Student unavailable'}
+                    </p>
+                  </button>
+                ),
+              )}
             </div>
           )}
         </div>

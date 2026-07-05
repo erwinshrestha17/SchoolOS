@@ -11,6 +11,8 @@ type ToastProps = {
   tone?: ToastTone;
   onDismiss?: () => void;
   className?: string;
+  /** A single follow-up action, e.g. "Undo" for a just-completed reversible change. */
+  action?: { label: string; onClick: () => void };
 };
 
 const toneClasses: Record<ToastTone, string> = {
@@ -33,6 +35,7 @@ export function Toast({
   tone = 'info',
   onDismiss,
   className,
+  action,
 }: ToastProps) {
   const Icon = toneIcons[tone];
 
@@ -49,6 +52,15 @@ export function Toast({
       <div className="min-w-0 flex-1">
         <p className="text-sm font-bold">{title}</p>
         {description ? <p className="mt-1 text-sm opacity-85">{description}</p> : null}
+        {action ? (
+          <button
+            type="button"
+            className="mt-2 text-sm font-bold underline underline-offset-2 opacity-90 transition hover:opacity-100"
+            onClick={action.onClick}
+          >
+            {action.label}
+          </button>
+        ) : null}
       </div>
       {onDismiss ? (
         <button

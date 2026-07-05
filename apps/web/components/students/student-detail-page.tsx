@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { MoreHorizontal, ShieldCheck } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useRecentlyViewed } from '@/lib/hooks/use-recently-viewed';
 import { LoadingState } from '@/components/ui/loading-state';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ActionMenu } from '@/components/ui/action-menu';
@@ -80,6 +81,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
 
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
+  const { record: recordRecentlyViewed } = useRecentlyViewed();
 
   useEffect(() => {
     if (searchParams.get('edit') === 'true') {
@@ -100,6 +102,24 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     queryFn: () => api.getStudentProfile(studentId),
     enabled: Boolean(studentId),
   });
+
+  useEffect(() => {
+    const student = profileQuery.data?.student;
+    if (!student) return;
+    const label =
+      student.fullNameEn ||
+      `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''}`.trim() ||
+      'Student';
+    recordRecentlyViewed({
+      kind: 'student',
+      id: studentId,
+      label,
+      href: `/dashboard/students/${studentId}`,
+    });
+    // Only record when the loaded student identity changes, not on every
+    // background refetch/re-render of the same profile.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentId, profileQuery.data?.student.fullNameEn]);
 
   const feeClearanceQuery = useQuery({
     queryKey: ['student-fee-clearance', studentId],

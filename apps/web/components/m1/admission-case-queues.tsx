@@ -21,6 +21,7 @@ import { Button } from "../ui/button";
 import { ErrorState } from "../ui/error-state";
 import { formatBsDate } from "@schoolos/core";
 import { useSession } from "../session-provider";
+import { useUrlFilters } from "../../lib/hooks/use-url-filters";
 
 const QUEUES: Array<{
   id: AdmissionCaseQueue;
@@ -52,10 +53,25 @@ const PRIMARY_QUEUE_IDS = new Set<AdmissionCaseQueue>([
 
 export function AdmissionCaseQueues() {
   const { hasPermissions } = useSession();
-  const [queue, setQueue] = useState<AdmissionCaseQueue>("NEEDS_INFORMATION");
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [submittedSearch, setSubmittedSearch] = useState("");
+  // URL-backed so refreshing, using browser back/forward, or sharing a link
+  // to a specific queue/page/search preserves it — this is the daily
+  // admissions-staff working list, re-visited many times a day.
+  const [filters, setFilters] = useUrlFilters<{
+    queue: AdmissionCaseQueue;
+    page: number;
+    search: string;
+  }>({
+    queue: "NEEDS_INFORMATION",
+    page: 1,
+    search: "",
+  });
+  // Guard against a stale/hand-edited URL naming a queue that no longer exists.
+  const queue = QUEUES.some((item) => item.id === filters.queue)
+    ? filters.queue
+    : "NEEDS_INFORMATION";
+  const page = filters.page;
+  const submittedSearch = filters.search;
+  const [search, setSearch] = useState(submittedSearch);
   const canCreateAdmission = hasPermissions([
     "enrollments:create",
     "students:create",
@@ -98,10 +114,7 @@ export function AdmissionCaseQueues() {
             <button
               key={item.id}
               type="button"
-              onClick={() => {
-                setQueue(item.id);
-                setPage(1);
-              }}
+              onClick={() => setFilters({ queue: item.id, page: 1 })}
               className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-4 text-sm font-bold transition ${selected ? "border-[var(--color-mod-admissions-accent)] bg-blue-50 text-slate-950" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
             >
               <Icon className="h-4 w-4" />
@@ -117,8 +130,10 @@ export function AdmissionCaseQueues() {
           value={PRIMARY_QUEUE_IDS.has(queue) ? "" : queue}
           onChange={(event) => {
             if (!event.target.value) return;
-            setQueue(event.target.value as AdmissionCaseQueue);
-            setPage(1);
+            setFilters({
+              queue: event.target.value as AdmissionCaseQueue,
+              page: 1,
+            });
           }}
           className="min-h-11 !w-44 shrink-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700"
         >
@@ -145,8 +160,7 @@ export function AdmissionCaseQueues() {
           className="flex min-w-[min(100%,20rem)] items-center gap-2"
           onSubmit={(event) => {
             event.preventDefault();
-            setPage(1);
-            setSubmittedSearch(search);
+            setFilters({ search, page: 1 });
           }}
         >
           <label className="sr-only" htmlFor="admission-queue-search">
@@ -254,8 +268,7 @@ export function AdmissionCaseQueues() {
                 className="mt-4"
                 onClick={() => {
                   setSearch("");
-                  setSubmittedSearch("");
-                  setPage(1);
+                  setFilters({ search: "", page: 1 });
                 }}
               >
                 Clear search
@@ -272,10 +285,7 @@ export function AdmissionCaseQueues() {
                 type="button"
                 variant="outline"
                 className="mt-4"
-                onClick={() => {
-                  setQueue("NEEDS_INFORMATION");
-                  setPage(1);
-                }}
+                onClick={() => setFilters({ queue: "NEEDS_INFORMATION", page: 1 })}
               >
                 View needs information
               </Button>
@@ -295,7 +305,7 @@ export function AdmissionCaseQueues() {
               type="button"
               variant="outline"
               disabled={page <= 1 || query.isFetching}
-              onClick={() => setPage((current) => current - 1)}
+              onClick={() => setFilters({ page: page - 1 })}
             >
               <ChevronLeft className="h-4 w-4" />
               Previous
@@ -304,7 +314,7 @@ export function AdmissionCaseQueues() {
               type="button"
               variant="outline"
               disabled={!query.data.hasNextPage || query.isFetching}
-              onClick={() => setPage((current) => current + 1)}
+              onClick={() => setFilters({ page: page + 1 })}
             >
               Next
               <ChevronRight className="h-4 w-4" />

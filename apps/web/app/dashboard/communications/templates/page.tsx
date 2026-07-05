@@ -31,6 +31,7 @@ import { SectionCard } from "@/components/ui/section-card";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { Toast } from "@/components/ui/toast";
 import { communicationsApi } from "@/lib/api/communications";
 
 const PAGE_SIZE = 20;
@@ -62,7 +63,7 @@ type TemplateDraft = {
 };
 
 type PendingTemplateAction = {
-  action: "publish" | "archive";
+  action: "archive";
   template: CommunicationTemplateSummary;
 };
 
@@ -84,7 +85,9 @@ export default function CommunicationTemplatesPage() {
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(
     null,
   );
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<
+    { message: string; undo?: () => void } | null
+  >(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pendingAction, setPendingAction] =
@@ -130,11 +133,11 @@ export default function CommunicationTemplatesPage() {
         : communicationsApi.createCommunicationTemplate(payload);
     },
     onSuccess: (template) => {
-      setFeedback(
-        editingTemplateId
+      setFeedback({
+        message: editingTemplateId
           ? "Template draft updated."
           : `Draft version ${template.version} created.`,
-      );
+      });
       setFormError(null);
       setEditingTemplateId(template.id);
       void queryClient.invalidateQueries({
@@ -153,9 +156,15 @@ export default function CommunicationTemplatesPage() {
 
   const publishMutation = useMutation({
     mutationFn: communicationsApi.publishCommunicationTemplate,
-    onSuccess: () => {
-      setFeedback("Template published.");
-      setPendingAction(null);
+    onSuccess: (template) => {
+      // Publishing only makes the template selectable by notice authors —
+      // it has no effect on anyone until a notice is actually sent, and
+      // archiving reverses it instantly. A full confirmation dialog is
+      // disproportionate friction for that; toast+undo is enough.
+      setFeedback({
+        message: "Template published.",
+        undo: () => archiveMutation.mutate(template.id),
+      });
       void queryClient.invalidateQueries({
         queryKey: ["communications", "templates"],
       });
@@ -172,7 +181,7 @@ export default function CommunicationTemplatesPage() {
   const archiveMutation = useMutation({
     mutationFn: communicationsApi.archiveCommunicationTemplate,
     onSuccess: () => {
-      setFeedback("Template archived.");
+      setFeedback({ message: "Template archived." });
       setEditingTemplateId(null);
       setPendingAction(null);
       void queryClient.invalidateQueries({
@@ -210,7 +219,7 @@ export default function CommunicationTemplatesPage() {
   }
 
   function publishTemplate(template: CommunicationTemplateSummary) {
-    setPendingAction({ action: "publish", template });
+    publishMutation.mutate(template.id);
   }
 
   function archiveTemplate(template: CommunicationTemplateSummary) {
@@ -444,9 +453,22 @@ export default function CommunicationTemplatesPage() {
                   </p>
                 ) : null}
                 {feedback ? (
-                  <p className="rounded-xl border border-success-100 bg-success-50 px-3 py-2 text-sm font-semibold text-success-700">
-                    {feedback}
-                  </p>
+                  <Toast
+                    tone="success"
+                    title={feedback.message}
+                    onDismiss={() => setFeedback(null)}
+                    action={
+                      feedback.undo
+                        ? {
+                            label: "Undo",
+                            onClick: () => {
+                              feedback.undo?.();
+                              setFeedback(null);
+                            },
+                          }
+                        : undefined
+                    }
+                  />
                 ) : null}
 
                 <Button
@@ -483,37 +505,21 @@ export default function CommunicationTemplatesPage() {
 
       <ConfirmDialog
         isOpen={pendingAction !== null}
-        title={
-          pendingAction?.action === "archive"
-            ? "Archive communication template?"
-            : "Publish communication template?"
-        }
+        title="Archive communication template?"
         description={
-          pendingAction?.action === "archive"
+          pendingAction
             ? `Archive version ${pendingAction.template.version} of ${pendingAction.template.key}? Archived templates stay in history but should not be reused.`
-            : pendingAction
-              ? `Publish version ${pendingAction.template.version} of ${pendingAction.template.key}? Published templates are available to notice authors.`
-              : ""
+            : ""
         }
-        confirmLabel={
-          pendingAction?.action === "archive" ? "Archive" : "Publish"
-        }
-        variant={pendingAction?.action === "archive" ? "warning" : "default"}
-        isConfirming={
-          pendingAction?.action === "archive"
-            ? archiveMutation.isPending
-            : publishMutation.isPending
-        }
+        confirmLabel="Archive"
+        variant="warning"
+        isConfirming={archiveMutation.isPending}
         onConfirm={() => {
           if (!pendingAction) return;
-          if (pendingAction.action === "archive") {
-            archiveMutation.mutate(pendingAction.template.id);
-          } else {
-            publishMutation.mutate(pendingAction.template.id);
-          }
+          archiveMutation.mutate(pendingAction.template.id);
         }}
         onClose={() => {
-          if (!archiveMutation.isPending && !publishMutation.isPending) {
+          if (!archiveMutation.isPending) {
             setPendingAction(null);
           }
         }}

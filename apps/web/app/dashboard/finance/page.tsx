@@ -34,6 +34,7 @@ import { ModuleHeader } from "@/components/ui/module-header";
 import { ModuleTabs } from "@/components/ui/module-tabs";
 import { PermissionState } from "@/components/ui/permission-state";
 import { api } from "@/lib/api";
+import { useRecentlyViewed } from "@/lib/hooks/use-recently-viewed";
 import { useSession } from "@/components/session-provider";
 
 type FinanceTab =
@@ -103,6 +104,24 @@ export default function FinancePage() {
     },
     enabled: canCollectPayments && Boolean(studentId),
   });
+  const { record: recordRecentlyViewed } = useRecentlyViewed();
+  const viewedInvoice = initialInvoiceId
+    ? studentCollectionContextQuery.data?.invoices.find(
+        (invoice) => invoice.id === initialInvoiceId,
+      )
+    : undefined;
+
+  useEffect(() => {
+    if (!initialInvoiceId || !viewedInvoice) return;
+    recordRecentlyViewed({
+      kind: "invoice",
+      id: initialInvoiceId,
+      label: viewedInvoice.invoiceNumber,
+      href: `/dashboard/finance?invoiceId=${initialInvoiceId}${studentId ? `&studentId=${studentId}` : ""}`,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialInvoiceId, viewedInvoice?.invoiceNumber]);
+
   const summaryQuery = useQuery({
     queryKey: ["finance-dashboard-summary", schoolDay.gregorianDate],
     queryFn: () =>
