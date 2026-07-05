@@ -21,12 +21,14 @@ import {
   LayoutDashboard,
   MessageSquare,
   School,
+  Search,
   Settings,
   UserCog,
   UserPlus,
   Users,
   Utensils,
   Wallet,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -272,11 +274,10 @@ export const dashboardNavGroups: NavGroup[] = [
         label: 'Notices & Communication',
         icon: MessageSquare,
         permissions: communicationsPermissions,
-        activeWhen: [
-          '/dashboard/communications',
-          '/dashboard/notices',
-          '/dashboard/messages',
-        ],
+        // '/dashboard/messages' is intentionally not claimed here: the
+        // Messages item below owns that route so exactly one entry lights
+        // up as active.
+        activeWhen: ['/dashboard/communications', '/dashboard/notices'],
       },
       {
         href: '/dashboard/messages',
@@ -336,6 +337,12 @@ export function Sidebar({
     ? settingsNavItem
     : null;
 
+  const activeHref = useMemo(() => {
+    const allItems = visibleGroups.flatMap((group) => group.items);
+    if (visibleSettings) allItems.push(visibleSettings);
+    return computeActiveHref(allItems, pathname);
+  }, [visibleGroups, visibleSettings, pathname]);
+
   const schoolName = session?.tenant.name ?? 'School workspace';
   const roleLabel = formatRole(session?.user.roles[0] ?? 'school_user');
   const userLabel = session?.user.email ?? 'Signed-in school user';
@@ -366,7 +373,7 @@ export function Sidebar({
         <SidebarContent
           collapsed={false}
           groups={visibleGroups}
-          pathname={pathname}
+          activeHref={activeHref}
           schoolName={schoolName}
           roleLabel={roleLabel}
           settingsItem={visibleSettings}
@@ -379,7 +386,7 @@ export function Sidebar({
         <SidebarContent
           collapsed={collapsed}
           groups={visibleGroups}
-          pathname={pathname}
+          activeHref={activeHref}
           schoolName={schoolName}
           roleLabel={roleLabel}
           settingsItem={visibleSettings}
@@ -395,7 +402,7 @@ export function Sidebar({
 function SidebarContent({
   collapsed,
   groups,
-  pathname,
+  activeHref,
   schoolName,
   roleLabel,
   settingsItem,
@@ -405,7 +412,7 @@ function SidebarContent({
 }: {
   collapsed: boolean;
   groups: NavGroup[];
-  pathname: string | null;
+  activeHref: string | null;
   schoolName: string;
   roleLabel: string;
   settingsItem: NavItem | null;
@@ -413,20 +420,54 @@ function SidebarContent({
   onMobileClose: () => void;
   onToggle?: () => void;
 }) {
-  const activeGroupLabel = useMemo(() => {
-    return groups.find((group) =>
-      group.items.some((item) => isActiveNavItem(item, pathname)),
-    )?.label;
-  }, [groups, pathname]);
-  const [expandedGroup, setExpandedGroup] = useState<string | null>(
-    activeGroupLabel ?? groups[0]?.label ?? null,
+  const activeGroupLabel = useMemo(
+    () =>
+      groups.find((group) => group.items.some((item) => item.href === activeHref))
+        ?.label,
+    [groups, activeHref],
+  );
+
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+    () => new Set(activeGroupLabel ? [activeGroupLabel] : []),
   );
 
   useEffect(() => {
-    if (activeGroupLabel) {
-      setExpandedGroup(activeGroupLabel);
-    }
+    if (!activeGroupLabel) return;
+    setExpandedGroups((current) => {
+      if (current.has(activeGroupLabel)) return current;
+      const next = new Set(current);
+      next.add(activeGroupLabel);
+      return next;
+    });
   }, [activeGroupLabel]);
+
+  const [query, setQuery] = useState('');
+  const normalizedQuery = query.trim().toLowerCase();
+  const isSearching = normalizedQuery.length > 0;
+
+  const visibleGroups = useMemo(() => {
+    if (!isSearching) return groups;
+    return groups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) =>
+          item.label.toLowerCase().includes(normalizedQuery),
+        ),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [groups, isSearching, normalizedQuery]);
+
+  function toggleGroup(label: string) {
+    setExpandedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      return next;
+    });
+  }
 
   return (
     <div
@@ -470,30 +511,78 @@ function SidebarContent({
         )}
       </header>
 
+      {!collapsed && (
+        <div className="border-b border-slate-200 px-3 py-2.5">
+          <label className="sr-only" htmlFor="sidebar-nav-search">
+            Find a workspace
+          </label>
+          <div className="relative">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+              aria-hidden="true"
+            />
+            <input
+              id="sidebar-nav-search"
+              type="text"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Find a workspace..."
+              className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-7 text-[0.8rem] font-medium text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--primary)] focus:bg-white focus:ring-2 focus:ring-[var(--primary-soft)]"
+            />
+            {query ? (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700"
+                aria-label="Clear search"
+              >
+                <X size={13} aria-hidden="true" />
+              </button>
+            ) : null}
+          </div>
+        </div>
+      )}
+
       <nav
-        className="flex-1 overflow-y-auto px-3 py-4 scrollbar-hide"
+        className="flex-1 overflow-y-auto px-3 py-3 scrollbar-hide"
         aria-label="School operations navigation"
       >
-        {groups.map((group) => (
-          <NavGroupSection
-            key={group.label}
-            collapsed={collapsed}
-            expanded={expandedGroup === group.label}
-            group={group}
-            pathname={pathname}
-            onExpand={() => {
-              if (collapsed && onToggle) {
-                onToggle();
-                setExpandedGroup(group.label);
-                return;
-              }
-              setExpandedGroup((current) =>
-                current === group.label ? null : group.label,
-              );
-            }}
-            onMobileClose={onMobileClose}
-          />
-        ))}
+        {isSearching && visibleGroups.length === 0 ? (
+          <p className="px-2.5 py-6 text-center text-xs font-semibold text-slate-400">
+            No workspace matches &ldquo;{query.trim()}&rdquo;.
+          </p>
+        ) : null}
+
+        {visibleGroups.map((group) =>
+          group.items.length === 1 ? (
+            <div key={group.label} className="mb-1 last:mb-0">
+              <NavEntry
+                collapsed={collapsed}
+                item={group.items[0]}
+                activeHref={activeHref}
+                onMobileClose={onMobileClose}
+              />
+            </div>
+          ) : (
+            <NavGroupSection
+              key={group.label}
+              collapsed={collapsed}
+              expanded={isSearching || expandedGroups.has(group.label)}
+              group={group}
+              activeHref={activeHref}
+              onExpand={() => {
+                if (collapsed && onToggle) {
+                  onToggle();
+                  setExpandedGroups((current) => new Set(current).add(group.label));
+                  return;
+                }
+                toggleGroup(group.label);
+              }}
+              onMobileClose={onMobileClose}
+            />
+          ),
+        )}
       </nav>
 
       <footer className="border-t border-slate-200 px-3 py-3">
@@ -510,7 +599,7 @@ function SidebarContent({
             <NavEntry
               collapsed={collapsed}
               item={settingsItem}
-              pathname={pathname}
+              activeHref={activeHref}
               onMobileClose={onMobileClose}
             />
           </section>
@@ -565,30 +654,27 @@ function NavGroupSection({
   collapsed,
   expanded,
   group,
-  pathname,
+  activeHref,
   onExpand,
   onMobileClose,
 }: {
   collapsed: boolean;
   expanded: boolean;
   group: NavGroup;
-  pathname: string | null;
+  activeHref: string | null;
   onExpand: () => void;
   onMobileClose: () => void;
 }) {
   const GroupIcon = group.icon;
-  const active = group.items.some((item) => isActiveNavItem(item, pathname));
+  const active = group.items.some((item) => item.href === activeHref);
 
   return (
-    <section className="mb-2 last:mb-0">
+    <section className="mb-1 last:mb-0">
       <button
         type="button"
         className={cn(
-          'group flex min-h-11 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[0.8rem] font-bold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 focus:ring-offset-white',
+          'group flex min-h-9 w-full items-center gap-3 rounded-lg px-2.5 py-1.5 transition-colors duration-150 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 focus:ring-offset-white',
           collapsed && 'justify-center px-0',
-          active
-            ? 'bg-[var(--primary-soft)] text-[var(--primary-dark)]'
-            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950',
         )}
         aria-expanded={!collapsed ? expanded : undefined}
         aria-label={collapsed ? group.label : undefined}
@@ -596,16 +682,17 @@ function NavGroupSection({
         onClick={onExpand}
       >
         <GroupIcon
-          size={18}
+          size={17}
           className={cn(
             'shrink-0 transition-colors',
-            active ? 'text-[var(--primary)]' : 'text-slate-500 group-hover:text-slate-800',
+            active ? 'text-[var(--primary)]' : 'text-slate-500 group-hover:text-slate-700',
           )}
           aria-hidden="true"
         />
         <span
           className={cn(
-            'min-w-0 flex-1 truncate text-left transition-all duration-200',
+            'min-w-0 flex-1 truncate text-left text-[0.68rem] font-extrabold uppercase tracking-[0.06em] transition-all duration-200',
+            active ? 'text-slate-700' : 'text-slate-500',
             collapsed ? 'w-0 overflow-hidden opacity-0' : 'opacity-100',
           )}
         >
@@ -613,7 +700,7 @@ function NavGroupSection({
         </span>
         {!collapsed ? (
           <ChevronDown
-            size={15}
+            size={14}
             className={cn(
               'shrink-0 text-slate-400 transition-transform duration-200',
               expanded && 'rotate-180',
@@ -624,13 +711,13 @@ function NavGroupSection({
       </button>
 
       {!collapsed && expanded ? (
-        <div className="mt-1 space-y-1 border-l border-slate-100 pl-3">
+        <div className="mt-0.5 space-y-0.5 border-l border-slate-100 pl-3">
           {group.items.map((item) => (
             <NavEntry
               key={item.href}
               collapsed={false}
               item={item}
-              pathname={pathname}
+              activeHref={activeHref}
               onMobileClose={onMobileClose}
             />
           ))}
@@ -643,16 +730,16 @@ function NavGroupSection({
 function NavEntry({
   collapsed,
   item,
-  pathname,
+  activeHref,
   onMobileClose,
 }: {
   collapsed: boolean;
   item: NavItem;
-  pathname: string | null;
+  activeHref: string | null;
   onMobileClose: () => void;
 }) {
   const Icon = item.icon;
-  const active = isActiveNavItem(item, pathname);
+  const active = isActiveNavItem(item, activeHref);
   const content = (
     <>
       {active && (
@@ -725,20 +812,40 @@ function canDisplayNavItem(
   return moduleKeys.length === 0 || moduleKeys.some((module) => hasModule(module));
 }
 
-function isActiveNavItem(item: NavItem, pathname: string | null) {
-  if (!pathname) return false;
+/**
+ * Resolves the single most specific navigation match for the current route.
+ * Exact matches always beat prefix matches, and longer/more specific
+ * candidates beat shorter ones, so exactly one item is ever highlighted even
+ * when several items' routes overlap (e.g. a parent module route and one of
+ * its more specific sub-routes).
+ */
+function computeActiveHref(items: NavItem[], pathname: string | null): string | null {
+  if (!pathname) return null;
 
-  if (item.activeWhen?.length) {
-    return item.activeWhen.some(
-      (route) => pathname === route || pathname.startsWith(`${route}/`),
-    );
+  let bestHref: string | null = null;
+  let bestScore = -1;
+
+  for (const item of items) {
+    const candidates = item.activeWhen?.length ? item.activeWhen : [item.href];
+    for (const candidate of candidates) {
+      let score = -1;
+      if (pathname === candidate) {
+        score = candidate.length + 10_000;
+      } else if (candidate !== '/dashboard' && pathname.startsWith(`${candidate}/`)) {
+        score = candidate.length;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        bestHref = item.href;
+      }
+    }
   }
 
-  if (item.href === '/dashboard') {
-    return pathname === item.href;
-  }
+  return bestHref;
+}
 
-  return pathname === item.href || pathname.startsWith(`${item.href}/`);
+function isActiveNavItem(item: NavItem, activeHref: string | null) {
+  return item.href === activeHref;
 }
 
 function formatRole(role: string) {

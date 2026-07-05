@@ -271,6 +271,70 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('principal admissions snapshot shows attention items without a '
+      'fake navigable chevron', (tester) async {
+    final sharedPrefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPreferencesServiceProvider.overrideWithValue(
+            AppPreferencesService(sharedPrefs),
+          ),
+          tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authProvider.overrideWith((ref) {
+            return _FakeAuthNotifier(
+              ref.watch(tokenStorageServiceProvider),
+              ref.watch(authRepositoryProvider),
+              ref.watch(appPreferencesServiceProvider),
+            );
+          }),
+          principalSnapshotProvider.overrideWith((ref, key) async {
+            return {
+              'metrics': {
+                'waitingForReview': 3,
+                'approvedReadyToAdmit': 1,
+                'documentsPending': 2,
+                'duplicateWarnings': 1,
+              },
+              'items': [
+                {
+                  'id': 'waiting-review',
+                  'title': 'Admissions needing review',
+                  'detail': '3 cases awaiting a school decision',
+                  'status': 'attention',
+                  'route': '/principal/admissions/review',
+                },
+                {
+                  'id': 'duplicate-warnings',
+                  'title': 'Duplicate warnings',
+                  'detail': '1 case needs duplicate review',
+                  'status': 'attention',
+                  'route': '/principal/admissions/duplicates',
+                },
+              ],
+            };
+          }),
+        ],
+        child: const MaterialApp(
+          home: PrincipalSnapshotScreen(
+            snapshotKey: 'admissions',
+            title: 'Admissions',
+            subtitle: 'Pending admission and review attention',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Admissions needing review'), findsOneWidget);
+    expect(find.text('Duplicate warnings'), findsOneWidget);
+    // These items carry a backend `route` that has no matching mobile
+    // GoRoute, so the row must not show a chevron implying it is tappable.
+    expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('teacher attendance paints assigned roster content', (
     tester,
   ) async {

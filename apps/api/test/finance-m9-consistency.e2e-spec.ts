@@ -198,7 +198,7 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
 
     it('returns existing idempotent payment without creating a duplicate journal', async () => {
       seedInvoice();
-      (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+      (prisma.payment.findUnique as jest.Mock).mockResolvedValue({
         id: 'pay-existing',
         invoiceId: 'inv-1',
         amount: new Prisma.Decimal(1000),
@@ -470,6 +470,18 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
       amount: new Prisma.Decimal(1000),
       refunds: [],
       receipt: { receiptNumber: 'RCP-1' },
+      invoice: { id: 'inv-1', paidAt: new Date() },
+    });
+    // The optimistic reversal claim runs a state-backed updateMany against
+    // prisma.payment, so the payment must also exist in mock state (not just
+    // the overridden findFirst response) for the claim to find and update it.
+    prisma.__state.payments.push({
+      id: 'pay-1',
+      tenantId,
+      invoiceId: 'inv-1',
+      amount: new Prisma.Decimal(1000),
+      status: PaymentStatus.SUCCESS,
+      reversedAt: null,
     });
   }
 

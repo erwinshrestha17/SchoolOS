@@ -159,7 +159,7 @@ class ParentConsentsScreen extends ConsumerWidget {
   }
 }
 
-class _ConsentStatusSection extends StatelessWidget {
+class _ConsentStatusSection extends ConsumerWidget {
   const _ConsentStatusSection({
     required this.consents,
     required this.onDecision,
@@ -170,7 +170,7 @@ class _ConsentStatusSection extends StatelessWidget {
   onDecision;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return consents.when(
       loading: () => const PortalCard(
         child: Text(
@@ -178,9 +178,10 @@ class _ConsentStatusSection extends StatelessWidget {
           style: TextStyle(color: ParentPortalColors.muted),
         ),
       ),
-      error: (_, _) => const _ConsentUnavailable(
+      error: (_, _) => _ConsentUnavailable(
         title: 'Could not load consent status',
         message: 'Please try again in a moment.',
+        onRetry: () => ref.invalidate(parentConsentStatusProvider),
       ),
       data: (items) => Column(
         children: [

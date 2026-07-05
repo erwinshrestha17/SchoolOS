@@ -71,8 +71,21 @@ class _ChildFeesSection extends ConsumerWidget {
     final summary = ref.watch(parentDashboardSummaryProvider(child.id));
     return summary.when(
       loading: () => const PortalLoadingState(),
-      error: (_, _) =>
-          PortalCard(child: Text('Could not load fees for ${child.name}.')),
+      error: (_, _) => PortalCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Could not load fees for ${child.name}.'),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () =>
+                  ref.invalidate(parentDashboardSummaryProvider(child.id)),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try again'),
+            ),
+          ],
+        ),
+      ),
       data: (summary) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

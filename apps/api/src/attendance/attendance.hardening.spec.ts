@@ -13,6 +13,12 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SettingsService } from '../settings/settings.service';
 import { AuthContext } from '../auth/auth.types';
 
+function daysAgo(count: number): Date {
+  const date = new Date();
+  date.setDate(date.getDate() - count);
+  return date;
+}
+
 describe('Attendance Hardening', () => {
   let service: AttendanceService;
   let prisma: PrismaService;
@@ -613,17 +619,17 @@ describe('Attendance Hardening', () => {
           {
             studentId: 'student-2',
             status: AttendanceStatus.LATE,
-            attendanceSession: { attendanceDate: new Date('2026-06-05') },
+            attendanceSession: { attendanceDate: daysAgo(5) },
           },
           {
             studentId: 'student-2',
             status: AttendanceStatus.LATE,
-            attendanceSession: { attendanceDate: new Date('2026-06-04') },
+            attendanceSession: { attendanceDate: daysAgo(4) },
           },
           {
             studentId: 'student-2',
             status: AttendanceStatus.LATE,
-            attendanceSession: { attendanceDate: new Date('2026-06-03') },
+            attendanceSession: { attendanceDate: daysAgo(3) },
           },
         ]);
 

@@ -161,6 +161,7 @@ describe('Attendance Hardening (E2E)', () => {
         firstNameEn: 'Student',
         lastNameEn: 'One',
         studentSystemId: 'ST-1',
+        lifecycleStatus: 'ACTIVE',
       },
       {
         id: 'student-2',
@@ -170,6 +171,7 @@ describe('Attendance Hardening (E2E)', () => {
         firstNameEn: 'Student',
         lastNameEn: 'Two',
         studentSystemId: 'ST-2',
+        lifecycleStatus: 'ACTIVE',
       },
       {
         id: 'student-other-tenant',
@@ -179,6 +181,7 @@ describe('Attendance Hardening (E2E)', () => {
         firstNameEn: 'Student',
         lastNameEn: 'Other',
         studentSystemId: 'ST-OTHER',
+        lifecycleStatus: 'ACTIVE',
       },
     ];
 

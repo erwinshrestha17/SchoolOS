@@ -64,11 +64,11 @@ function makePrisma() {
     makeStudent('student-2', 'Sita', 'Thapa', '2'),
   ];
   const sessions = [
-    makeSession(new Date(2026, 4, 1), [
+    makeSession(new Date(Date.UTC(2026, 4, 1)), [
       ['student-1', AttendanceStatus.PRESENT],
       ['student-2', AttendanceStatus.PRESENT],
     ]),
-    makeSession(new Date(2026, 4, 2), [
+    makeSession(new Date(Date.UTC(2026, 4, 2)), [
       ['student-1', AttendanceStatus.LATE],
       ['student-2', AttendanceStatus.PRESENT],
     ]),
@@ -77,7 +77,7 @@ function makePrisma() {
     {
       id: 'holiday-1',
       tenantId,
-      calendarDate: new Date(2026, 4, 3),
+      calendarDate: new Date(Date.UTC(2026, 4, 3)),
       isWorkingDay: false,
     },
   ];

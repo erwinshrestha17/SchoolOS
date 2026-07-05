@@ -1880,18 +1880,12 @@ class _ItemList extends StatelessWidget {
                       : Text(_itemSubtitle(item)),
                   trailing:
                       actionBuilder?.call(item) ??
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (_string(item['status']).isNotEmpty)
-                            StatusChip(
+                      (_string(item['status']).isNotEmpty
+                          ? StatusChip(
                               status: _statusType(_string(item['status'])),
                               label: _string(item['status']),
-                            ),
-                          const SizedBox(width: AppSpacing.sm),
-                          const Icon(Icons.chevron_right_rounded),
-                        ],
-                      ),
+                            )
+                          : null),
                 ),
                 if (item != items.last) const Divider(height: 1),
               ],

@@ -1048,6 +1048,15 @@ export function createPrismaMock() {
           (m) => m.studentId === item.id,
         );
 
+        // 3. Populate enrollments (kept in sync with the separate
+        // state.enrollments array so relational where-clauses such as
+        // `enrollments: { some: { status: 'ACTIVE' } }` can match).
+        if (!Array.isArray(item.enrollments)) {
+          enriched.enrollments = state.enrollments.filter(
+            (e) => e.studentId === item.id,
+          );
+        }
+
         return enriched;
       };
 
@@ -1076,32 +1085,34 @@ export function createPrismaMock() {
         findMany: jest.fn((q: PrismaQuery) =>
           Promise.resolve(
             state.students
-              .filter((item) => matchesWhere(item, q.where))
-              .map(enrichStudentRelations),
+              .map(enrichStudentRelations)
+              .filter((item) => matchesWhere(item, q.where)),
           ),
         ),
         findFirst: jest.fn((q: PrismaQuery) => {
-          const found = state.students.find((item) =>
-            matchesWhere(item, q.where),
-          );
-          return Promise.resolve(enrichStudentRelations(found));
+          const found = state.students
+            .map(enrichStudentRelations)
+            .find((item) => matchesWhere(item, q.where));
+          return Promise.resolve(found);
         }),
         findFirstOrThrow: jest.fn((q: PrismaQuery) => {
-          const found = state.students.find((item) =>
-            matchesWhere(item, q.where),
-          );
+          const found = state.students
+            .map(enrichStudentRelations)
+            .find((item) => matchesWhere(item, q.where));
           if (!found) throw new Error('Student not found');
-          return Promise.resolve(enrichStudentRelations(found));
+          return Promise.resolve(found);
         }),
         count: jest.fn((q: PrismaQuery) =>
           Promise.resolve(
-            state.students.filter((item) => matchesWhere(item, q.where)).length,
+            state.students
+              .map(enrichStudentRelations)
+              .filter((item) => matchesWhere(item, q.where)).length,
           ),
         ),
         findUnique: jest.fn((q: PrismaQuery) => {
-          const found = state.students.find((item) =>
-            matchesWhere(item, q.where),
-          );
+          const found = state.students
+            .map(enrichStudentRelations)
+            .find((item) => matchesWhere(item, q.where));
           if (!found) return Promise.resolve(null);
           return Promise.resolve({
             ...enrichStudentRelations(found),
@@ -1577,6 +1588,13 @@ export function createPrismaMock() {
     examTerm: {
       findFirst: jest.fn(() => Promise.resolve(null)),
     },
+    assessmentRetake: {
+      findFirst: jest.fn(() => Promise.resolve(null)),
+      findMany: jest.fn(() => Promise.resolve([])),
+      count: jest.fn(() => Promise.resolve(0)),
+      create: jest.fn((q: any) => Promise.resolve(q.data || {})),
+      update: jest.fn((q: any) => Promise.resolve(q.data || {})),
+    },
     invoice: {
       count: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
@@ -1645,6 +1663,43 @@ export function createPrismaMock() {
           ),
         ),
       ),
+      findUnique: jest.fn((q: PrismaQuery) => {
+        const tenantIdIdempotencyKey = q.where?.tenantId_idempotencyKey as
+          | { tenantId?: string; idempotencyKey?: string }
+          | undefined;
+        if (tenantIdIdempotencyKey) {
+          return Promise.resolve(
+            state.payments.find(
+              (item) =>
+                item.tenantId === tenantIdIdempotencyKey.tenantId &&
+                item.idempotencyKey === tenantIdIdempotencyKey.idempotencyKey,
+            ) ?? null,
+          );
+        }
+        return Promise.resolve(
+          state.payments.find((item) => item.id === q.where?.id) ?? null,
+        );
+      }),
+      aggregate: jest.fn((q: PrismaQuery) => {
+        const matches = state.payments.filter((item) => {
+          const where = q.where ?? {};
+          return Object.entries(where).every(([key, value]) => {
+            if (value === undefined) return true;
+            if (key === 'paidAt' || key === 'invoice') return true;
+            return (item as Record<string, unknown>)[key] === value;
+          });
+        });
+        const sum = matches.reduce(
+          (total, item) =>
+            total +
+            Number(
+              (item as { amount?: Prisma.Decimal | number | string }).amount ??
+                0,
+            ),
+          0,
+        );
+        return Promise.resolve({ _sum: { amount: new Prisma.Decimal(sum) } });
+      }),
       create: jest.fn((q: PrismaQuery) => {
         const data = q.data ?? {};
         const item = {
@@ -1680,10 +1735,7 @@ export function createPrismaMock() {
       updateMany: jest.fn((q: PrismaQuery) => {
         let count = 0;
         for (const item of state.payments) {
-          if (
-            (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
-            (!q.where?.studentId || item.studentId === q.where.studentId)
-          ) {
+          if (matchesWhere(item, q.where)) {
             Object.assign(item, q.data ?? {});
             count += 1;
           }
