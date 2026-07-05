@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/constants/app_routes.dart';
 import '../../domain/parent_portal_models.dart';
+import '../widgets/last_updated_label.dart';
 import '../widgets/parent_portal_widgets.dart';
 
 class ParentPortalChildrenTab extends StatelessWidget {
@@ -53,11 +54,9 @@ class ParentPortalChildrenTab extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 14),
-              Text(
-                'Last updated ${data.lastUpdated}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: ParentPortalColors.muted,
-                ),
+              LastUpdatedLabel(
+                lastUpdated: data.lastUpdated,
+                isOffline: data.fromCache,
               ),
             ],
           ),

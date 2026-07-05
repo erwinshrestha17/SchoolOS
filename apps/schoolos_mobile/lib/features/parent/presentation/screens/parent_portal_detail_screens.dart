@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/constants/app_routes.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../application/parent_providers.dart';
 import '../../application/parent_portal_providers.dart';
 import '../../domain/parent_models.dart';
@@ -217,7 +218,7 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                     _timeline(
                       Icons.notifications_rounded,
                       'Last updated',
-                      data.lastUpdated,
+                      NepaliBsCalendar.formatNepalTime(data.lastUpdated),
                       ParentPortalColors.purple,
                       last: true,
                     ),

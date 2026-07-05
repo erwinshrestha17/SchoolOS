@@ -75,7 +75,6 @@ final principalSnapshotProvider = FutureProvider.autoDispose
         'academics' => await repository.getAcademicsReadiness(),
         'transport' => await repository.getTransportAlerts(),
         'escalations' => await repository.getEscalations(),
-        'students' => await repository.searchStudents(),
         'reports' => await repository.getReportsSnapshot(),
         'tasks' => await repository.getTasks(),
         'walkthroughs' => await repository.getClassroomWalkthroughs(),

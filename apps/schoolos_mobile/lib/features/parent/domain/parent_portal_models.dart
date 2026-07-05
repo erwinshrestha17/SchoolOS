@@ -118,6 +118,7 @@ class ParentPortalData {
     required this.parentName,
     required this.schoolName,
     required this.lastUpdated,
+    this.fromCache = false,
     this.activeChildId,
     required this.children,
     required this.homework,
@@ -129,7 +130,8 @@ class ParentPortalData {
 
   final String parentName;
   final String schoolName;
-  final String lastUpdated;
+  final DateTime lastUpdated;
+  final bool fromCache;
   final String? activeChildId;
   final List<ParentPortalChild> children;
   final List<ParentPortalHomework> homework;

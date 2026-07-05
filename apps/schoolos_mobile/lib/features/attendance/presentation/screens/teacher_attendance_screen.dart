@@ -286,6 +286,30 @@ class _AttendanceSubmitSummary extends StatelessWidget {
   }
 }
 
+Future<bool> _confirmDiscardUnsaved(BuildContext context, String action) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Discard unsaved attendance?'),
+      content: Text(
+        'You have attendance changes that have not been submitted yet. '
+        'If you $action now, those changes will be lost.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Keep editing'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Discard'),
+        ),
+      ],
+    ),
+  );
+  return confirmed ?? false;
+}
+
 IconData _submitActionIcon(TeacherAttendanceState state) {
   if (state.isOffline) return Icons.save_rounded;
   return switch (state.syncStatus) {
@@ -324,10 +348,13 @@ class _TeacherAttendanceHeader extends StatelessWidget {
                   child: Text('${item.name} • ${item.subject}'),
                 ),
             ],
-            onChanged: (value) {
-              if (value != null) {
-                controller.selectClass(value);
+            onChanged: (value) async {
+              if (value == null || value == state.selectedClassId) return;
+              if (state.hasUnsavedChanges &&
+                  !await _confirmDiscardUnsaved(context, 'switch classes')) {
+                return;
               }
+              controller.selectClass(value);
             },
           ),
           const SizedBox(height: AppSpacing.md),
@@ -351,9 +378,15 @@ class _TeacherAttendanceHeader extends StatelessWidget {
                     firstDate: DateTime(2024),
                     lastDate: DateTime.now(),
                   );
-                  if (picked != null) {
-                    await controller.selectDate(picked);
+                  if (picked == null || !context.mounted) return;
+                  if (state.hasUnsavedChanges &&
+                      !await _confirmDiscardUnsaved(
+                        context,
+                        'change the date',
+                      )) {
+                    return;
                   }
+                  await controller.selectDate(picked);
                 },
                 icon: const Icon(Icons.calendar_today_rounded),
                 label: const Text('Change'),

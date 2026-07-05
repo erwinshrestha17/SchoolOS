@@ -52,10 +52,19 @@ class ParentPortalRepository {
       limit: 30,
     );
 
+    final dashboardValues = dashboards.values;
+    final fromCache = dashboardValues.any((dashboard) => dashboard.fromCache);
+    final lastUpdated = dashboardValues.isEmpty
+        ? DateTime.now()
+        : dashboardValues
+              .map((dashboard) => dashboard.lastUpdated)
+              .reduce((a, b) => a.isBefore(b) ? a : b);
+
     return ParentPortalData(
       parentName: parentName,
       schoolName: schoolName,
-      lastUpdated: _formatTime(DateTime.now()),
+      lastUpdated: lastUpdated,
+      fromCache: fromCache,
       activeChildId: resolvedActiveChildId,
       children: [
         for (final child in children)

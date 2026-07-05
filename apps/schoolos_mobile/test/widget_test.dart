@@ -323,14 +323,14 @@ void main() {
         overrides: [
           testOperationalSummaryOverride,
           parentPortalDataProvider.overrideWith(
-            (ref) async => const ParentPortalData(
+            (ref) async => ParentPortalData(
               parentName: 'Erwin Shrestha',
               schoolName: 'greenfield',
-              lastUpdated: '6:19 PM',
+              lastUpdated: DateTime(2024, 1, 1, 18, 19),
               totalFeesDue: 4500,
               overdueFeesCount: 1,
               unreadUpdates: 1,
-              children: [
+              children: const [
                 ParentPortalChild(
                   id: 'aarav',
                   name: 'Aarav Shrestha',

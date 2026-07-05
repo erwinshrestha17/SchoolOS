@@ -57,7 +57,7 @@ ParentPortalData _portalData(String activeChildId) {
   return ParentPortalData(
     parentName: 'Parent',
     schoolName: 'School',
-    lastUpdated: 'now',
+    lastUpdated: DateTime(2024, 1, 1, 9, 30),
     activeChildId: activeChildId,
     children: const [
       ParentPortalChild(

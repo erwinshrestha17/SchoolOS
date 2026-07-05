@@ -108,11 +108,36 @@ class TeacherMessageThreadScreen extends ConsumerStatefulWidget {
 class _TeacherMessageThreadScreenState
     extends ConsumerState<TeacherMessageThreadScreen> {
   final TextEditingController _replyController = TextEditingController();
+  bool _isSending = false;
 
   @override
   void dispose() {
     _replyController.dispose();
     super.dispose();
+  }
+
+  Future<void> _sendReply() async {
+    final text = _replyController.text.trim();
+    if (text.isEmpty || _isSending) return;
+    setState(() => _isSending = true);
+    try {
+      await ref
+          .read(teacherRepositoryProvider)
+          .sendMessage(widget.threadId, text);
+      _replyController.clear();
+      ref.invalidate(teacherMessageDetailProvider(widget.threadId));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Reply could not be sent. Check your connection and try again.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
   }
 
   @override
@@ -179,7 +204,7 @@ class _TeacherMessageThreadScreenState
                     Expanded(
                       child: TextField(
                         controller: _replyController,
-                        enabled: value.availability.isAvailable,
+                        enabled: value.availability.isAvailable && !_isSending,
                         decoration: InputDecoration(
                           hintText: value.availability.isAvailable
                               ? 'Reply to parent'
@@ -192,20 +217,19 @@ class _TeacherMessageThreadScreenState
                     const SizedBox(width: AppSpacing.sm),
                     IconButton.filled(
                       tooltip: 'Send reply',
-                      onPressed: value.availability.isAvailable
-                          ? () async {
-                              final text = _replyController.text.trim();
-                              if (text.isEmpty) return;
-                              await ref
-                                  .read(teacherRepositoryProvider)
-                                  .sendMessage(widget.threadId, text);
-                              _replyController.clear();
-                              ref.invalidate(
-                                teacherMessageDetailProvider(widget.threadId),
-                              );
-                            }
+                      onPressed: value.availability.isAvailable && !_isSending
+                          ? _sendReply
                           : null,
-                      icon: const Icon(Icons.send_rounded),
+                      icon: _isSending
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.send_rounded),
                     ),
                   ],
                 ),

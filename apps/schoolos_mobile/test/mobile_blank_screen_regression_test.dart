@@ -17,11 +17,15 @@ import 'package:schoolos_mobile/features/attendance/presentation/screens/teacher
 import 'package:schoolos_mobile/features/principal/application/principal_providers.dart';
 import 'package:schoolos_mobile/features/principal/presentation/screens/principal_screens.dart';
 import 'package:schoolos_mobile/features/teacher/application/teacher_providers.dart';
+import 'package:schoolos_mobile/features/teacher/data/teacher_repository.dart';
 import 'package:schoolos_mobile/features/teacher/domain/teacher_models.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_activity_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_class_hub_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_homework_screen.dart';
+import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_messages_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/widgets/teacher_app_widgets.dart';
+
+class _MockTeacherRepository extends Mock implements TeacherRepository {}
 
 class _MockAttendanceRepository extends Mock implements AttendanceRepository {}
 
@@ -443,6 +447,120 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  const secondAssignedClass = TeacherClassSection(
+    id: 'year-1:class-2:section-1',
+    academicYearId: 'year-1',
+    classId: 'class-2',
+    sectionId: 'section-1',
+    name: 'Grade 4 - B',
+    subject: 'Science',
+  );
+
+  Future<TeacherAttendanceController> pumpTeacherAttendanceWithTwoClasses(
+    WidgetTester tester, {
+    required _MockAttendanceRepository repository,
+  }) async {
+    tester.view.physicalSize = const Size(320, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    when(() => repository.getTeacherToday(any())).thenAnswer(
+      (_) async => TeacherTodaySnapshot(
+        date: DateTime(2026, 6, 19),
+        periods: const [],
+        classes: const [assignedClass, secondAssignedClass],
+        pendingAttendanceCount: 1,
+        lastUpdated: DateTime(2026, 6, 19, 8),
+      ),
+    );
+    when(
+      () => repository.loadDraftAttendance(any(), any()),
+    ).thenAnswer((_) async => null);
+    when(() => repository.getClassAttendanceSheet(any(), any())).thenAnswer(
+      (_) async => TeacherRosterSnapshot(
+        entries: const [student],
+        attendance: const TeacherAttendanceMeta(
+          isSubmitted: false,
+          isLocked: false,
+          conflictStatus: 'NONE',
+        ),
+        isWorkingDay: true,
+        lastUpdated: DateTime(2026, 6, 19, 8),
+      ),
+    );
+    final controller = TeacherAttendanceController(
+      repository: repository,
+      isOnline: true,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          teacherAttendanceControllerProvider.overrideWith((ref) => controller),
+        ],
+        child: const MaterialApp(home: TeacherAttendanceScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    controller.markStudent(student.studentId, AttendanceStatus.absent);
+    await tester.pumpAndSettle();
+    expect(controller.state.hasUnsavedChanges, isTrue);
+
+    return controller;
+  }
+
+  testWidgets(
+    'teacher attendance keeps unsaved marks when the class switch is cancelled',
+    (tester) async {
+      final repository = _MockAttendanceRepository();
+      final controller = await pumpTeacherAttendanceWithTwoClasses(
+        tester,
+        repository: repository,
+      );
+
+      await tester.tap(find.text('Grade 3 - A • Mathematics').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Grade 4 - B • Science').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Discard unsaved attendance?'), findsOneWidget);
+      await tester.tap(find.text('Keep editing'));
+      await tester.pumpAndSettle();
+
+      verifyNever(
+        () => repository.getClassAttendanceSheet(secondAssignedClass, any()),
+      );
+      expect(controller.state.selectedClassId, assignedClass.id);
+      expect(controller.state.hasUnsavedChanges, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'teacher attendance discards unsaved marks and switches class on confirm',
+    (tester) async {
+      final repository = _MockAttendanceRepository();
+      final controller = await pumpTeacherAttendanceWithTwoClasses(
+        tester,
+        repository: repository,
+      );
+
+      await tester.tap(find.text('Grade 3 - A • Mathematics').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Grade 4 - B • Science').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Discard unsaved attendance?'), findsOneWidget);
+      await tester.tap(find.text('Discard'));
+      await tester.pumpAndSettle();
+
+      expect(controller.state.selectedClassId, secondAssignedClass.id);
+      expect(controller.state.hasUnsavedChanges, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('teacher class hub opens homework create and review with context', (
     tester,
   ) async {
@@ -764,4 +882,61 @@ void main() {
     expect(find.text('Assigned class'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'teacher message reply surfaces a retry-able error instead of failing silently',
+    (tester) async {
+      const thread = TeacherMessageThread(
+        id: 'thread-1',
+        title: 'Sunita Rai',
+        context: 'Asha Rai • Grade 3 - A',
+        preview: 'Thank you',
+        updatedAt: null,
+        status: 'OPEN',
+      );
+      const availability = TeacherChatAvailability(
+        isAvailable: true,
+        notice: 'Available now',
+        sla: 'Replies within 24 hours',
+      );
+      final detail = TeacherMessageDetail(
+        thread: thread,
+        messages: const [],
+        availability: availability,
+      );
+      final repository = _MockTeacherRepository();
+      when(
+        () => repository.sendMessage(any(), any()),
+      ).thenThrow(Exception('network down'));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            teacherRepositoryProvider.overrideWithValue(repository),
+            teacherMessageDetailProvider(
+              thread.id,
+            ).overrideWith((ref) async => detail),
+          ],
+          child: const MaterialApp(
+            home: TeacherMessageThreadScreen(threadId: 'thread-1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'Please call me back');
+      await tester.tap(find.byIcon(Icons.send_rounded));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(
+        find.text(
+          'Reply could not be sent. Check your connection and try again.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Please call me back'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

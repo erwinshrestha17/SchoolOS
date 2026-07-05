@@ -224,11 +224,11 @@ void main() {
             ),
             apiClientProvider.overrideWithValue(_ParentScreenApiClient()),
             parentPortalDataProvider.overrideWith(
-              (ref) async => const ParentPortalData(
+              (ref) async => ParentPortalData(
                 parentName: 'Parent',
                 schoolName: 'School',
-                lastUpdated: 'now',
-                children: [
+                lastUpdated: DateTime(2024, 1, 1, 9, 30),
+                children: const [
                   ParentPortalChild(
                     id: 'child-1',
                     name: 'Asha Rai',
@@ -292,11 +292,11 @@ void main() {
           ),
           apiClientProvider.overrideWithValue(_ParentScreenApiClient()),
           parentPortalDataProvider.overrideWith(
-            (ref) async => const ParentPortalData(
+            (ref) async => ParentPortalData(
               parentName: 'Parent',
               schoolName: 'School',
-              lastUpdated: 'now',
-              children: [
+              lastUpdated: DateTime(2024, 1, 1, 9, 30),
+              children: const [
                 ParentPortalChild(
                   id: 'child-1',
                   name: 'Asha Rai',

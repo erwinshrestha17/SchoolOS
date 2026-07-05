@@ -799,7 +799,6 @@ class _SnapshotBody extends ConsumerWidget {
     if (snapshotKey == 'notice') {
       return _EmergencyNoticeBody(data: data, ref: ref);
     }
-    if (snapshotKey == 'students') return _StudentsBody(data: data);
     if (snapshotKey == 'reports') return _ReportsBody(data: data);
     if (snapshotKey == 'tasks') return _TasksBody(data: data);
     if (snapshotKey == 'walkthroughs') return _WalkthroughsBody(data: data);
@@ -917,59 +916,6 @@ class _EmergencyNoticeBody extends StatelessWidget {
                 'High-impact sends are submitted through the backend preview, approval, and delivery workflow.',
           ),
           color: AppColors.info,
-        ),
-      ],
-    );
-  }
-}
-
-class _StudentsBody extends StatelessWidget {
-  const _StudentsBody({required this.data});
-  final Map<String, dynamic> data;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _CacheBanner(data: data),
-        TextField(
-          enabled: false,
-          decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.search_rounded),
-            hintText: 'Search name, admission no., guardian phone',
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadius.xl),
-              borderSide: BorderSide.none,
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        SectionHeader(title: 'Search results (${_list(data['items']).length})'),
-        const SizedBox(height: AppSpacing.sm),
-        _ItemList(
-          items: _list(data['items'])
-              .map(
-                (item) => {
-                  'id': item['id'],
-                  'title': item['name'],
-                  'subtitle':
-                      '${item['classLabel']} - Guardian: ${item['guardianName'] ?? 'Not available'}',
-                  'detail':
-                      'Attendance: ${item['attendanceSummary']} | Fee: ${item['feeRisk']}',
-                  'status': item['feeRisk'],
-                },
-              )
-              .toList(),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _ActionRow(
-          icon: Icons.person_add_alt_1_rounded,
-          title: 'Recent admissions',
-          subtitle:
-              '${data['recentAdmissions'] ?? 0} new students in the last 7 days',
         ),
       ],
     );
