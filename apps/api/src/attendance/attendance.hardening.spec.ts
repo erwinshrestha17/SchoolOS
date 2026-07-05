@@ -12,6 +12,7 @@ import { CommunicationsService } from '../communications/communications.service'
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SettingsService } from '../settings/settings.service';
 import { AuthContext } from '../auth/auth.types';
+import { permissionCatalog, systemRolePermissions } from '@schoolos/core';
 
 function daysAgo(count: number): Date {
   const date = new Date();
@@ -241,6 +242,27 @@ describe('Attendance Hardening', () => {
 
       const result = await service.submitAttendance(dto, mockAdminActor);
       expect(result).toBeDefined();
+    });
+
+    it('should be a real, catalog-registered permission that admin/principal can actually be granted', () => {
+      // Regression guard: the checks above only exercise a hand-crafted
+      // AuthContext.permissions array, which would pass even if
+      // 'attendance:override_lock' were never assignable through the real
+      // permission system. Confirm it is registered in the catalog and
+      // actually flows to the roles meant to use this escape hatch.
+      const isRegistered = permissionCatalog.some(
+        (permission) =>
+          permission.resource === 'attendance' &&
+          permission.action === 'override_lock',
+      );
+      expect(isRegistered).toBe(true);
+
+      expect(systemRolePermissions.admin).toContain(
+        'attendance:override_lock',
+      );
+      expect(systemRolePermissions.principal).toContain(
+        'attendance:override_lock',
+      );
     });
   });
 

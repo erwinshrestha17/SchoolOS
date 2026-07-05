@@ -680,6 +680,13 @@ export const academicsApi = {
         json: {},
       },
     ),
+  deleteHomework: (id: string) =>
+    request<{ deleted: true; id: string } | HomeworkAssignmentSummary>(
+      `/homework/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      },
+    ),
   previewHomeworkReminders: (id: string) =>
     request<unknown>(`/homework/${encodeURIComponent(id)}/reminders/preview`),
   sendHomeworkReminders: (id: string) =>

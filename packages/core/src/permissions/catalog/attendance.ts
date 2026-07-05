@@ -20,6 +20,11 @@ export const attendancePermissions = [
     description: "Manage all attendance sessions and review workflows",
   },
   {
+    resource: "attendance",
+    action: "override_lock",
+    description: "Edit or submit attendance sessions after their lock cutoff",
+  },
+  {
     resource: "attendance:staff",
     action: "update",
     description: "Update staff attendance records",

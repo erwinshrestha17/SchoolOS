@@ -27,6 +27,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
+import { ConfirmDialog } from '../../ui/confirm-dialog';
 import { AssessmentRetakeRequestDialog } from '../assessment-retake-request-dialog';
 
 type Props = {
@@ -46,6 +47,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
   const [saveSuccess, setSaveSuccess] = useState<number | null>(null);
   const [retakeMark, setRetakeMark] = useState<MarkEntrySummary | null>(null);
   const [retakeSuccess, setRetakeSuccess] = useState(false);
+  const [pendingFilterChange, setPendingFilterChange] = useState<(() => void) | null>(null);
 
   const subjectsQuery = useQuery({ 
     queryKey: ['subjects', filters.classId], 
@@ -103,6 +105,28 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
   }, [marks, statuses, remarks]);
 
   const canSave = changedEntries.length > 0 && !batchMut.isPending && !isLocked;
+  const hasUnsavedChanges = changedEntries.length > 0;
+
+  // Reads the real per-mark lock state the backend computes (a mark can stay
+  // individually locked even after the exam term itself reopens), not just
+  // the coarser exam-term-level lock.
+  const lockedStudentIds = useMemo(
+    () =>
+      new Set(
+        (existingMarksQuery.data ?? [])
+          .filter((mark: any) => mark.isLocked)
+          .map((mark: any) => mark.studentId),
+      ),
+    [existingMarksQuery.data],
+  );
+
+  const requestFilterChange = (apply: () => void) => {
+    if (hasUnsavedChanges) {
+      setPendingFilterChange(() => apply);
+    } else {
+      apply();
+    }
+  };
 
   const handleSave = () => {
     if (!canSave) return;
@@ -136,8 +160,11 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Exam Term</label>
             <select 
               data-testid="filter-exam-term"
-              value={filters.examTermId} 
-              onChange={(e) => setFilters(c => ({ ...c, examTermId: e.target.value, assessmentComponentId: '' }))}
+              value={filters.examTermId}
+              onChange={(e) => {
+                const value = e.target.value;
+                requestFilterChange(() => setFilters(c => ({ ...c, examTermId: value, assessmentComponentId: '' })));
+              }}
               className="premium-input bg-white"
             >
               <option value="">Select Exam</option>
@@ -148,8 +175,11 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Class</label>
             <select 
               data-testid="filter-class"
-              value={filters.classId} 
-              onChange={(e) => setFilters(c => ({ ...c, classId: e.target.value, sectionId: '' }))}
+              value={filters.classId}
+              onChange={(e) => {
+                const value = e.target.value;
+                requestFilterChange(() => setFilters(c => ({ ...c, classId: value, sectionId: '' })));
+              }}
               className="premium-input bg-white"
             >
               <option value="">Select Class</option>
@@ -160,8 +190,11 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Subject</label>
             <select 
               data-testid="filter-subject"
-              value={filters.subjectId} 
-              onChange={(e) => setFilters(c => ({ ...c, subjectId: e.target.value, assessmentComponentId: '' }))}
+              value={filters.subjectId}
+              onChange={(e) => {
+                const value = e.target.value;
+                requestFilterChange(() => setFilters(c => ({ ...c, subjectId: value, assessmentComponentId: '' })));
+              }}
               className="premium-input bg-white"
             >
               <option value="">Select Subject</option>
@@ -172,8 +205,11 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Component</label>
             <select 
               data-testid="filter-component"
-              value={filters.assessmentComponentId} 
-              onChange={(e) => setFilters(c => ({ ...c, assessmentComponentId: e.target.value }))}
+              value={filters.assessmentComponentId}
+              onChange={(e) => {
+                const value = e.target.value;
+                requestFilterChange(() => setFilters(c => ({ ...c, assessmentComponentId: value })));
+              }}
               className="premium-input bg-white"
             >
               <option value="">Select Component</option>
@@ -247,6 +283,20 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
         </div>
       )}
 
+      {!isLocked && lockedStudentIds.size > 0 && (
+        <div className="p-6 bg-amber-50 border border-amber-100 rounded-2xl flex items-center gap-4 text-amber-800 animate-in fade-in duration-500">
+          <Lock size={24} className="text-amber-500" />
+          <div>
+            <p className="text-sm font-black tracking-tight uppercase">
+              {lockedStudentIds.size} student{lockedStudentIds.size === 1 ? '' : 's'} still locked
+            </p>
+            <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest mt-0.5">
+              Marked students were finalized while the term was locked and need an approved correction request before they can be edited again.
+            </p>
+          </div>
+        </div>
+      )}
+
       {filters.assessmentComponentId ? (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
@@ -286,11 +336,12 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
                     const numericValue = currentValue.trim() === '' ? null : Number(currentValue);
                     const isInvalid = numericValue !== null && (numericValue < 0 || numericValue > maxMarks);
                     const passed = passMarks === null || (existing && Number(existing.marksObtained) >= passMarks);
+                    const isStudentLocked = lockedStudentIds.has(student.id);
 
                     return (
                       <tr key={student.id} className={cn(
                         "group transition-all hover:bg-slate-50/50",
-                        isLocked && "opacity-60"
+                        (isLocked || isStudentLocked) && "opacity-60"
                       )}>
                         <td className="py-4 px-6 text-[10px] font-black text-slate-300">{index + 1}</td>
                         <td className="py-4 px-6">
@@ -299,7 +350,10 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
                                  <User size={18} />
                               </div>
                               <div className="flex flex-col">
-                                 <span className="text-sm font-bold text-slate-900">{student.fullNameEn || student.fullName}</span>
+                                 <span className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
+                                   {student.fullNameEn || student.fullName}
+                                   {isStudentLocked && <Lock size={12} className="shrink-0 text-amber-500" />}
+                                 </span>
                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{student.studentSystemId}</span>
                               </div>
                            </div>
@@ -310,10 +364,12 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
                               {statusOptions.map(opt => (
                                 <button
                                   key={opt.value}
+                                  disabled={isLocked || isStudentLocked}
                                   onClick={() => setStatuses(c => ({ ...c, [student.id]: opt.value }))}
                                   className={cn(
                                     "h-8 w-8 rounded-lg flex items-center justify-center text-[10px] font-black transition-all active:scale-90",
-                                    currentStatus === opt.value ? opt.color : "bg-slate-100 text-slate-300 hover:bg-slate-200"
+                                    currentStatus === opt.value ? opt.color : "bg-slate-100 text-slate-300 hover:bg-slate-200",
+                                    (isLocked || isStudentLocked) && "pointer-events-none opacity-60"
                                   )}
                                   title={opt.value}
                                 >
@@ -345,14 +401,14 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
                                 min={0}
                                 max={maxMarks}
                                 value={currentValue}
-                                disabled={isLocked || currentStatus === 'ABSENT'}
+                                disabled={isLocked || isStudentLocked || currentStatus === 'ABSENT'}
                                 placeholder={existing ? String(Number(existing.marksObtained)) : '0.0'}
                                 className={cn(
                                   "w-full rounded-2xl border px-4 py-3 text-sm font-black transition-all focus:ring-4 text-center tracking-tighter",
-                                  isInvalid 
-                                    ? "border-rose-300 bg-rose-50 text-rose-600 focus:ring-rose-100" 
+                                  isInvalid
+                                    ? "border-rose-300 bg-rose-50 text-rose-600 focus:ring-rose-100"
                                     : "border-slate-100 bg-slate-50 focus:bg-white focus:border-[var(--color-mod-academics-accent)] focus:ring-[var(--color-mod-academics-border)]",
-                                  currentStatus === 'ABSENT' && "bg-slate-100 border-transparent text-slate-300 cursor-not-allowed"
+                                  (currentStatus === 'ABSENT' || isStudentLocked) && "bg-slate-100 border-transparent text-slate-300 cursor-not-allowed"
                                 )}
                                 onChange={(e) => {
                                   const val = e.target.value;
@@ -378,7 +434,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
                            <input
                             type="text"
                             value={remarks[student.id] ?? existing?.remarks ?? ''}
-                            disabled={isLocked}
+                            disabled={isLocked || isStudentLocked}
                             placeholder="Add observation..."
                             className="w-full rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs font-medium focus:bg-white focus:border-[var(--color-mod-academics-accent)] transition-all"
                             onChange={(e) => setRemarks(c => ({ ...c, [student.id]: e.target.value }))}
@@ -456,6 +512,22 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
           if (!open) setRetakeMark(null);
         }}
         onRequested={() => setRetakeSuccess(true)}
+      />
+
+      <ConfirmDialog
+        isOpen={pendingFilterChange !== null}
+        title="Discard unsaved marks?"
+        description="You have marks changes that have not been saved yet. Switching the exam, class, subject, or component now will discard them."
+        confirmLabel="Discard changes"
+        variant="destructive"
+        onConfirm={() => {
+          pendingFilterChange?.();
+          setMarks({});
+          setStatuses({});
+          setRemarks({});
+          setPendingFilterChange(null);
+        }}
+        onClose={() => setPendingFilterChange(null)}
       />
     </div>
   );

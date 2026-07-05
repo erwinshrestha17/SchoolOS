@@ -47,6 +47,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
   const activeTab = searchParams.get("tab") || "submissions";
 
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [notice, setNotice] = useState<HomeworkNotice | null>(null);
@@ -76,6 +77,22 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
       setNotice({
         title: "Could not cancel homework",
         description: error.message || "Failed to cancel homework",
+        tone: "danger",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.deleteHomework(homeworkId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["homework-list"] });
+      router.push("/dashboard/homework");
+    },
+    onError: (error: any) => {
+      setShowDeleteDialog(false);
+      setNotice({
+        title: "Could not delete draft",
+        description: error.message || "Failed to delete this draft",
         tone: "danger",
       });
     },
@@ -214,15 +231,26 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            className="rounded-2xl font-bold"
-            onClick={() => setShowCancelDialog(true)}
-            disabled={homework.status === "CANCELLED"}
-          >
-            <Trash2 className="mr-2 h-5 w-5 text-red-500" />
-            Cancel Assignment
-          </Button>
+          {homework.status === "DRAFT" ? (
+            <Button
+              variant="outline"
+              className="rounded-2xl font-bold"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2 className="mr-2 h-5 w-5 text-red-500" />
+              Delete Draft
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className="rounded-2xl font-bold"
+              onClick={() => setShowCancelDialog(true)}
+              disabled={homework.status === "CANCELLED"}
+            >
+              <Trash2 className="mr-2 h-5 w-5 text-red-500" />
+              Cancel Assignment
+            </Button>
+          )}
         </div>
       </div>
 
@@ -530,6 +558,17 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
         description="Are you sure you want to cancel this assignment? This action cannot be undone and students will no longer be able to submit."
         confirmLabel="Cancel Assignment"
         variant="destructive"
+      />
+
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={() => deleteMutation.mutate()}
+        title="Delete Draft"
+        description="This draft was never published, so it will be permanently deleted with no record left behind. This cannot be undone."
+        confirmLabel="Delete Draft"
+        variant="destructive"
+        isConfirming={deleteMutation.isPending}
       />
 
       <HomeworkReviewModal

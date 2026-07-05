@@ -82,7 +82,7 @@ test.describe.serial('SchoolOS Academic Workflow Smoke Tests', () => {
   });
 
   test('Exams: Management and components', async ({ page }) => {
-    await page.goto('/dashboard/exams');
+    await page.goto('/dashboard/academics/exams');
     await expect(page.getByRole('heading', { name: /Exam Terms/i })).toBeVisible();
     
     // Check empty state or list
@@ -96,7 +96,7 @@ test.describe.serial('SchoolOS Academic Workflow Smoke Tests', () => {
   });
 
   test('Marks Entry: Roster filters', async ({ page }) => {
-    await page.goto('/dashboard/marks-entry');
+    await page.goto('/dashboard/academics/marks');
     await expect(page.getByText(/Select context to begin/i)).toBeVisible();
     
     // Verify filters exist

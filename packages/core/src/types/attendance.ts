@@ -26,6 +26,13 @@ export type AttendanceRoster = {
   section: SectionSummary | null;
   attendanceDate: string;
   calendarDay: AttendanceCalendarDayView;
+  attendanceState: {
+    submittedAt: string | null;
+    lockAt: string | null;
+    isSubmitted: boolean;
+    isLocked: boolean;
+    conflictStatus: string;
+  };
   existingSession: {
     id: string;
     submittedAt: string | null;
@@ -33,7 +40,6 @@ export type AttendanceRoster = {
     conflictStatus: string;
   } | null;
   students: AttendanceRosterStudent[];
-  status?: string;
 };
 
 export type AttendanceAnalytics = {

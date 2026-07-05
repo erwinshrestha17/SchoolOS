@@ -327,7 +327,19 @@ export function AttendanceForm() {
 
   const presentPercent =
     totals.total > 0 ? Math.round((totals.present / totals.total) * 100) : 0;
-  const submissionStatus = rosterQuery.data?.status || "NOT_STARTED";
+  const attendanceState = rosterQuery.data?.attendanceState;
+  const isLocked = attendanceState?.isLocked ?? false;
+  const hasConflict = Boolean(
+    attendanceState?.conflictStatus &&
+      attendanceState.conflictStatus !== "NONE",
+  );
+  const submissionStatus = hasConflict
+    ? "CONFLICT"
+    : isLocked
+      ? "LOCKED"
+      : attendanceState?.isSubmitted
+        ? "SUBMITTED"
+        : "NOT_STARTED";
 
   const markAllPresent = () => {
     setExceptions({});
@@ -681,11 +693,28 @@ export function AttendanceForm() {
               />
             </div>
 
-            <div className="rounded-xl border border-info-100 bg-info-50 px-4 py-3 text-sm text-info-800">
-              Everyone is present by default. Mark exceptions only when a
-              student is absent, late, sick leave, excused leave, or unexcused
-              leave.
-            </div>
+            {isLocked ? (
+              <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700">
+                <AlertCircle size={20} className="shrink-0 text-slate-500" />
+                <span>
+                  This day is locked and can no longer be edited or
+                  resubmitted here.{" "}
+                  <Link
+                    href="/dashboard/attendance/corrections"
+                    className="underline hover:no-underline"
+                  >
+                    Request a correction
+                  </Link>{" "}
+                  if this record needs to change.
+                </span>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-info-100 bg-info-50 px-4 py-3 text-sm text-info-800">
+                Everyone is present by default. Mark exceptions only when a
+                student is absent, late, sick leave, excused leave, or
+                unexcused leave.
+              </div>
+            )}
 
             <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
               {visibleRoster.map((student) => (
@@ -694,6 +723,7 @@ export function AttendanceForm() {
                   student={student}
                   status={exceptions[student.id] ?? "PRESENT"}
                   remark={remarks[student.id] ?? ""}
+                  disabled={isLocked}
                   onStatusChange={(status) => {
                     setHasDraftChanges(true);
                     setExceptions((current) => {
@@ -757,7 +787,10 @@ export function AttendanceForm() {
             type="button"
             onClick={() => setIsConfirmOpen(true)}
             disabled={
-              mutation.isPending || roster.length === 0 || futureDateBlocked
+              mutation.isPending ||
+              roster.length === 0 ||
+              futureDateBlocked ||
+              isLocked
             }
             className="flex items-center gap-3 rounded-xl bg-[var(--color-mod-attendance-accent)] px-10 py-4 text-sm font-black text-white shadow-lg shadow-[var(--color-mod-attendance-border)]/40 transition-all hover:scale-105 hover:bg-[var(--color-mod-attendance-text)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
           >
@@ -766,7 +799,7 @@ export function AttendanceForm() {
             ) : (
               <Save size={20} />
             )}
-            Submit Attendance
+            {isLocked ? "Day Locked" : "Submit Attendance"}
           </button>
         </div>
       )}

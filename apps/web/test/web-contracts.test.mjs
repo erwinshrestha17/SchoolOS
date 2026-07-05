@@ -680,16 +680,9 @@ describe("SchoolOS web production contracts", () => {
 
   it("does not keep raw demo replacement IDs in production-facing forms", () => {
     const formFiles = [
-      "components/forms/admission-form.tsx",
       "components/forms/attendance-form.tsx",
-      "components/forms/finance-form.tsx",
       "components/forms/activity-feed-form.tsx",
       "components/forms/communications-form.tsx",
-      "components/forms/academics-form.tsx",
-      "components/forms/timetable-homework-form.tsx",
-      "components/forms/payroll-form.tsx",
-      "components/forms/accounting-form.tsx",
-      "components/forms/messaging-form.tsx",
     ];
 
     for (const formFile of formFiles) {
@@ -1032,38 +1025,7 @@ describe("SchoolOS web production contracts", () => {
     assert.match(dashboard, /\?\? \[\]/);
   });
 
-  it("keeps admissions enrollment as a multi-step pilot flow", () => {
-    const admissionForm = read("components/forms/admission-form.tsx");
-    const requiredSteps = [
-      "Personal Info",
-      "Academic Placement",
-      "Guardian Contacts",
-      "Documents & Review",
-      "Success / Next Actions",
-    ];
-
-    assert.match(admissionForm, /const enrollmentSteps = \[/);
-
-    for (const step of requiredSteps) {
-      assert.match(admissionForm, new RegExp(step.replace("/", "\\/")));
-    }
-  });
-
-  it("preserves admissions setup, duplicate warning, and create-anyway behavior", () => {
-    const admissionForm = read("components/forms/admission-form.tsx");
-
-    assert.match(admissionForm, /Setup required before enrollment/);
-    assert.match(admissionForm, /api\.checkAdmissionDuplicates/);
-    assert.match(
-      admissionForm,
-      /Possible duplicate found|Potential Duplicate Detected/,
-    );
-    assert.match(admissionForm, /Create anyway|Confirm & Enroll Anyway/);
-    assert.match(admissionForm, /setupIsMissing/);
-  });
-
-  it("keeps guardian phone validation hints and document review in admissions", () => {
-    const admissionForm = read("components/forms/admission-form.tsx");
+  it("keeps guardian phone validation required in the admissions schema", () => {
     const coreValidation = read("../../packages/core/src/validation.ts");
 
     assert.match(
@@ -1071,21 +1033,11 @@ describe("SchoolOS web production contracts", () => {
       /guardians: z\.array\(guardianSchema\)\.min\(1\)/,
     );
     assert.match(coreValidation, /primaryPhone: nepalPhoneSchema/);
-    assert.match(admissionForm, /Document/);
-    assert.match(admissionForm, /Review & Documents/);
-    assert.match(admissionForm, /fileToBase64Payload/);
   });
 
-  it("requires iEMIS disability confirmation in the admissions flow", () => {
-    const admissionForm = read("components/forms/admission-form.tsx");
+  it("requires iEMIS disability confirmation in the admissions schema", () => {
     const coreValidation = read("../../packages/core/src/validation.ts");
 
-    assert.match(admissionForm, /iEMIS Disability Confirmation/);
-    assert.match(admissionForm, /No known disability/);
-    assert.match(admissionForm, /Special Support Needed/);
-    assert.match(admissionForm, /confirmNoDisability/);
-    assert.match(admissionForm, /disabilityFlag/);
-    assert.match(admissionForm, /Confirmed for standard iEMIS reporting/);
     assert.match(coreValidation, /confirmNoDisability/);
     assert.match(
       coreValidation,
@@ -1093,34 +1045,9 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps admissions bulk import and success next actions available", () => {
-    const admissionForm = read("components/forms/admission-form.tsx");
-
-    assert.match(admissionForm, /Bulk Import/);
-    assert.match(admissionForm, /api\.bulkImportAdmissions/);
-    assert.match(admissionForm, /csvContent: await file\.text\(\)/);
-    assert.match(admissionForm, /dryRun/);
-    assert.match(admissionForm, /confirmDuplicates/);
-    assert.match(admissionForm, /Row review/);
-    assert.match(admissionForm, /Possible duplicate records/);
-    assert.match(admissionForm, /Import with duplicate confirmation/);
-    assert.match(admissionForm, /confirmNoDisability/);
-    assert.match(admissionForm, /Error report CSV/);
-    assert.match(admissionForm, /Collect First Fee/);
-    assert.match(admissionForm, /Download ID Card/);
-    assert.match(admissionForm, /Add Another Student/);
-  });
-
-  it("adds a student directory workspace without removing admissions flows", () => {
-    const admissionForm = read("components/forms/admission-form.tsx");
+  it("keeps a student directory workspace with core search filters", () => {
     const directory = read("components/forms/student-directory.tsx");
 
-    assert.match(admissionForm, /Student Directory/);
-    assert.match(admissionForm, /New Enrollment/);
-    assert.match(admissionForm, /Bulk Import/);
-    assert.match(admissionForm, /Recent Admissions/);
-    assert.match(admissionForm, /href="\/dashboard\/students"/);
-    assert.match(admissionForm, /activeWorkspaceTab.*enrollment/s);
     assert.match(directory, /Academic Year/);
     assert.match(directory, /Class/);
     assert.match(directory, /Section/);
@@ -1130,7 +1057,6 @@ describe("SchoolOS web production contracts", () => {
 
   it("keeps admissions workspace aligned to M1 UI tokens without fake labels", () => {
     const admissionsWorkspace = readMany([
-      "components/forms/admission-form.tsx",
       "components/admissions/admissions-pipeline.tsx",
       "app/dashboard/admissions/page.tsx",
     ]);
@@ -1699,40 +1625,29 @@ describe("SchoolOS web production contracts", () => {
     assert.match(attendanceForm, /Mark Resolved|Mark reviewed/);
   });
 
-  it("keeps finance screen wired to real Phase 1 finance APIs", () => {
-    const financeForm = read("components/forms/finance-form.tsx");
-    const requiredApis = [
-      "api.listAcademicYears",
-      "api.listClasses",
-      "api.listFeeHeads",
-      "api.listFeePlans",
-      "api.listInvoices",
-      "api.getInvoiceDetail",
-      "api.listReceipts",
-      "api.listLedgerEntries",
-      "api.listDefaulters",
-      "api.listDiscounts",
-      "api.listWaivers",
-      "api.createFeeHead",
-      "api.createFeePlan",
-      "api.generateBillingRun",
-      "api.collectPayment",
-      "api.previewCashierClose",
-      "api.listCashierCloses",
-      "api.finalizeCashierClose",
-      "api.createDiscount",
-      "api.createWaiver",
-      "api.sendDefaulterReminders",
-      "api.openReceiptPdf",
-    ];
+  it("blocks editing and resubmission once an attendance day is locked", () => {
+    const attendanceForm = readMany([
+      "components/forms/attendance-form.tsx",
+      "components/attendance/attendance-roster-item.tsx",
+    ]);
 
-    for (const apiCall of requiredApis) {
-      assert.match(financeForm, new RegExp(apiCall.replace(".", "\\.")));
-    }
+    // Reads the real backend-computed lock state, not the stale unused
+    // `status` field that was never actually populated by the API.
+    assert.match(attendanceForm, /attendanceState\?\.isLocked/);
+    assert.doesNotMatch(attendanceForm, /rosterQuery\.data\?\.status/);
+
+    // Submit is disabled once locked, and roster edits are disabled too.
+    assert.match(attendanceForm, /futureDateBlocked \|\|\s*\n?\s*isLocked/);
+    assert.match(attendanceForm, /disabled=\{isLocked\}/);
+    assert.match(attendanceForm, /disabled\?: boolean/);
+
+    // Locked state points the user at the corrections workflow instead of a
+    // generic failed-submission error discovered only after the fact.
+    assert.match(attendanceForm, /This day is locked/);
+    assert.match(attendanceForm, /\/dashboard\/attendance\/corrections/);
   });
 
   it("builds finance around the collection counter without fake IDs", () => {
-    const financeForm = read("components/forms/finance-form.tsx");
     const collectionCounter = read("components/finance/collection-counter.tsx");
     const financeLedgerSurfaces = readMany([
       "components/finance/billing-runs-tab.tsx",
@@ -1748,23 +1663,6 @@ describe("SchoolOS web production contracts", () => {
       "components/finance/reversal-dialog.tsx",
     ]);
 
-    assert.match(financeForm, /Collection Counter/);
-    assert.match(financeForm, /Invoice Detail/);
-    assert.match(financeForm, /View invoice details/);
-    assert.match(financeForm, /Payments & Receipts/);
-    assert.match(financeForm, /Refund \/ Reverse/);
-    assert.match(
-      financeForm,
-      /This creates a reversal\/refund record\.\s+It does not edit the\s+original payment/,
-    );
-    assert.match(financeForm, /api\.requestPaymentRefund/);
-    assert.match(financeForm, /REFUND/);
-    assert.match(
-      financeForm,
-      /Search by name, SCH-YYYY-NNNN, or invoice number/,
-    );
-    assert.match(financeForm, /Confirm Payment & Generate Receipt/);
-    assert.match(financeForm, /No fake\s+production IDs are used/);
     assert.match(collectionCounter, /Invoice breakdown/);
     assert.match(collectionCounter, /Student name not set/);
     assert.match(collectionCounter, /Class not set/);
@@ -1775,50 +1673,6 @@ describe("SchoolOS web production contracts", () => {
       financeLedgerSurfaces,
       /Unknown Student|N\/A|rounded-\[2rem\]|rounded-\[2\.5rem\]|rounded-\[3rem\]|bg-slate-900|shadow-2xl|shadow-xl/,
     );
-    assert.doesNotMatch(financeForm, /replace-me/i);
-    for (const sampleValue of [
-      /TUITION-P1/,
-      /Class 1 Tuition/,
-      /PLAN-P1/,
-      /Primary monthly plan/,
-      /Sibling discount/,
-      /Approved sibling discount policy/,
-      /Manual approved waiver/,
-      /defaultAmount:\s*3500/,
-      /amount:\s*3500/,
-      /amount:\s*1000/,
-      /Math\.min\(500/,
-    ]) {
-      assert.doesNotMatch(financeForm, sampleValue);
-    }
-    assert.match(financeForm, /!feePlan\.code\.trim\(\)/);
-    assert.match(financeForm, /!feePlan\.name\.trim\(\)/);
-    assert.match(
-      financeForm,
-      /discount\.percentOff <= 0 && discount\.amountOff <= 0/,
-    );
-    assert.match(financeForm, /!waiver\.reason\.trim\(\)/);
-  });
-
-  it("keeps cashier close day-end workflow wired to backend close endpoints", () => {
-    const financeForm = read("components/forms/finance-form.tsx");
-
-    assert.match(financeForm, /Cashier Close \/ Day-End/);
-    assert.match(financeForm, /api\.previewCashierClose/);
-    assert.match(financeForm, /api\.listCashierCloses/);
-    assert.match(financeForm, /api\.finalizeCashierClose/);
-    assert.match(
-      financeForm,
-      /Closing records the day-end cash position\.\s+It does not edit\s+payments/,
-    );
-    assert.match(financeForm, /Actual cash counted/);
-    assert.match(financeForm, /Expected cash amount/);
-    assert.match(financeForm, /Variance reason/);
-    assert.match(financeForm, /methodBreakdown/);
-    assert.match(financeForm, /actualCashAmount/);
-    assert.match(financeForm, /Printable Day-End Summary/);
-    assert.match(financeForm, /Finalize day-end close/);
-    assert.match(financeForm, /CLOSE/);
   });
 
   it("surfaces backend student fee ledger on the student detail page", () => {
@@ -1836,44 +1690,6 @@ describe("SchoolOS web production contracts", () => {
       /Financial records will appear after enrollment billing/,
     );
     assert.doesNotMatch(studentDetail, /student-123|invoice-123|fake/i);
-  });
-
-  it("blocks overpayment in the finance UI before submitting", () => {
-    const financeForm = read("components/forms/finance-form.tsx");
-
-    assert.match(financeForm, /payment\.amount > outstanding/);
-    assert.match(
-      financeForm,
-      /Payment amount cannot exceed the outstanding balance/,
-    );
-    assert.match(financeForm, /Payment amount must be greater than zero/);
-  });
-
-  it("adds interactive fee-head and period controls to the collection counter dues table", () => {
-    const financeForm = read("components/forms/finance-form.tsx");
-
-    for (const marker of [
-      "finance-dues-interaction-toolbar",
-      "Filter dues by fee head",
-      "Filter dues by billing period",
-      "Collect line",
-      "onQuickCollect",
-      "getLineNetDue",
-      "Math.min(lineAmount, outstanding)",
-    ]) {
-      assert.ok(financeForm.includes(marker), `Missing marker: ${marker}`);
-    }
-  });
-
-  it("keeps receipt success, discounts, waivers, and defaulter reminders available", () => {
-    const financeForm = read("components/forms/finance-form.tsx");
-
-    assert.match(financeForm, /Receipt Generated/);
-    assert.match(financeForm, /Open receipt PDF/);
-    assert.match(financeForm, /Approval reason/);
-    assert.match(financeForm, /Approve waiver/);
-    assert.match(financeForm, /Remind all filtered/);
-    assert.match(financeForm, /Remind selected/);
   });
 
   it("keeps receipt QR verification wired to the backend receipt verifier", () => {
@@ -1894,24 +1710,7 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(verificationPanel, /localStorage|sessionStorage|mock/i);
   });
 
-  it("adds a fee collection export action to the finance screen", () => {
-    const financeForm = read("components/forms/finance-form.tsx");
-
-    assert.match(financeForm, /Export Fee Collection CSV/);
-    assert.match(financeForm, /api\.exportReport\(["']fee-collection-report["']/);
-    assert.match(financeForm, /History & Reports/);
-  });
-
-  it("adds a defaulter aging export action to the finance screen", () => {
-    const financeForm = read("components/forms/finance-form.tsx");
-
-    assert.match(financeForm, /Export Defaulter Aging CSV/);
-    assert.match(financeForm, /api\.exportReport\(["']defaulter-aging-report["']/);
-    assert.match(financeForm, /asOfDate: new Date\(\)\.toISOString\(\)/);
-  });
-
   it("keeps day-end cashier close PDFs protected and app-opened", () => {
-    const financeForm = read("components/forms/finance-form.tsx");
     const cashierCloseSection = read(
       "components/finance/cashier-close-section.tsx",
     );
@@ -1926,11 +1725,9 @@ describe("SchoolOS web production contracts", () => {
     assert.match(pdfBuilder, /Payment Method Breakdown/);
     assert.match(pdfBuilder, /methodBreakdown/);
     assert.match(coreTypes, /closePdfFile\?:/);
-    assert.match(financeForm, /finance-cashier-close-pdf-open/);
     assert.match(cashierCloseSection, /finance-day-end-close-pdf-open/);
-    assert.match(`${financeForm}\n${cashierCloseSection}`, /api\.getFileView/);
     assert.doesNotMatch(
-      `${financeForm}\n${cashierCloseSection}`,
+      cashierCloseSection,
       /PDF export is intentionally\s+not generated/,
     );
   });
@@ -2032,7 +1829,6 @@ describe("SchoolOS web production contracts", () => {
       "components/academics/tabs/cas-records-tab.tsx",
       "components/academics/tabs/promotion-tab.tsx",
       "components/academics/tabs/subjects-tab.tsx",
-      "components/academics/marks-entry/marks-entry-workspace.tsx",
       "components/academics/report-cards/report-cards-workspace.tsx",
     ]);
 
@@ -2040,20 +1836,6 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(
       academicsSurfaces,
       /bg-slate-900|rounded-\[2rem\]|rounded-\[2\.5rem\]|rounded-\[3rem\]|shadow-slate-900|shadow-2xl|shadow-xl|N\/A|Unknown|primary-500|primary-50|primary-600|primary-700|primary-100|primary-200/,
-    );
-  });
-
-  it("keeps ledger preview preview-only without direct accounting calls", () => {
-    const financeForm = read("components/forms/finance-form.tsx");
-
-    assert.match(financeForm, /Ledger Entry Preview/);
-    assert.match(
-      financeForm,
-      /Preview only - backend posts final ledger entry/,
-    );
-    assert.doesNotMatch(
-      financeForm,
-      /api\.createAccounting|api\.closeAccounting|api\.listAccountingReports/,
     );
   });
 

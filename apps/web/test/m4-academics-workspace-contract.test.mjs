@@ -93,4 +93,23 @@ describe('M4 academics workspace contract', () => {
       /withQuery\('\/academics\/cas-records', activeFilters\)/,
     );
   });
+
+  it('guards unsaved marks against silent loss and respects per-student locks', () => {
+    const workspace = read(
+      'components/academics/tabs/marks-entry-tab.tsx',
+    );
+
+    // Switching exam/class/subject/component context must not silently
+    // discard marks that have not been saved yet.
+    assert.match(workspace, /hasUnsavedChanges/);
+    assert.match(workspace, /requestFilterChange/);
+    assert.match(workspace, /Discard unsaved marks\?/);
+
+    // Reads the real per-mark lock state the backend computes (a mark can
+    // stay individually locked even after the exam term itself reopens),
+    // not just the coarser exam-term-level lock.
+    assert.match(workspace, /lockedStudentIds/);
+    assert.match(workspace, /mark\.isLocked/);
+    assert.match(workspace, /isStudentLocked/);
+  });
 });

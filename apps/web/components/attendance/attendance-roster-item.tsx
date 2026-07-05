@@ -21,6 +21,7 @@ interface AttendanceRosterItemProps {
   remark?: string;
   onStatusChange: (status: AttendanceStatus) => void;
   onRemarkChange: (remark: string) => void;
+  disabled?: boolean;
 }
 
 export function AttendanceRosterItem({
@@ -29,6 +30,7 @@ export function AttendanceRosterItem({
   remark,
   onStatusChange,
   onRemarkChange,
+  disabled = false,
 }: AttendanceRosterItemProps) {
   const isPresent = status === 'PRESENT';
   const isAbsent = status === 'ABSENT';
@@ -48,7 +50,8 @@ export function AttendanceRosterItem({
       isPresent && "border-slate-100",
       isAbsent && "border-danger-100 bg-danger-50/10",
       isLate && "border-warning-100 bg-warning-50/10",
-      isLeave && "border-info-100 bg-info-50/10"
+      isLeave && "border-info-100 bg-info-50/10",
+      disabled && "opacity-60"
     )}>
       
       {/* Student Details and Avatar */}
@@ -83,11 +86,12 @@ export function AttendanceRosterItem({
 
       {/* P A L V status buttons */}
       <div className="mt-4 grid grid-cols-4 gap-1.5 rounded-xl border border-slate-100 bg-slate-50 p-1.5">
-         <button 
+         <button
            type="button"
-           onClick={() => onStatusChange('PRESENT')} 
+           disabled={disabled}
+           onClick={() => onStatusChange('PRESENT')}
            className={cn(
-             "flex flex-col items-center justify-center py-2 rounded-xl transition-all font-bold",
+             "flex flex-col items-center justify-center py-2 rounded-xl transition-all font-bold disabled:cursor-not-allowed",
              isPresent
                ? "bg-success-500 text-white shadow-md shadow-success-500/20"
                : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/50"
@@ -97,11 +101,12 @@ export function AttendanceRosterItem({
            <span className="text-[0.55rem] uppercase tracking-tighter opacity-70">Present</span>
          </button>
          
-         <button 
+         <button
            type="button"
-           onClick={() => onStatusChange('ABSENT')} 
+           disabled={disabled}
+           onClick={() => onStatusChange('ABSENT')}
            className={cn(
-             "flex flex-col items-center justify-center py-2 rounded-xl transition-all font-bold",
+             "flex flex-col items-center justify-center py-2 rounded-xl transition-all font-bold disabled:cursor-not-allowed",
              isAbsent
                ? "bg-danger-500 text-white shadow-md shadow-danger-500/20"
                : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/50"
@@ -111,11 +116,12 @@ export function AttendanceRosterItem({
            <span className="text-[0.55rem] uppercase tracking-tighter opacity-70">Absent</span>
          </button>
          
-         <button 
+         <button
            type="button"
-           onClick={() => onStatusChange('LATE')} 
+           disabled={disabled}
+           onClick={() => onStatusChange('LATE')}
            className={cn(
-             "flex flex-col items-center justify-center py-2 rounded-xl transition-all font-bold",
+             "flex flex-col items-center justify-center py-2 rounded-xl transition-all font-bold disabled:cursor-not-allowed",
              isLate
                ? "bg-warning-500 text-white shadow-md shadow-warning-500/20"
                : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/50"
@@ -125,11 +131,12 @@ export function AttendanceRosterItem({
            <span className="text-[0.55rem] uppercase tracking-tighter opacity-70">Late</span>
          </button>
          
-         <button 
+         <button
            type="button"
-           onClick={() => onStatusChange('SICK_LEAVE')} 
+           disabled={disabled}
+           onClick={() => onStatusChange('SICK_LEAVE')}
            className={cn(
-             "flex flex-col items-center justify-center py-2 rounded-xl transition-all font-bold",
+             "flex flex-col items-center justify-center py-2 rounded-xl transition-all font-bold disabled:cursor-not-allowed",
              isLeave
                ? "bg-info-500 text-white shadow-md shadow-info-500/20"
                : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/50"
@@ -145,10 +152,11 @@ export function AttendanceRosterItem({
         <div className="mt-3.5 space-y-2 border-t border-slate-100 pt-3 animate-in slide-in-from-top-2 duration-300">
            <input
             type="text"
+            disabled={disabled}
             value={remark || ''}
             onChange={(e) => onRemarkChange(e.target.value)}
             placeholder="Write brief remark..."
-            className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs font-medium outline-none transition-all placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[var(--color-mod-attendance-border)]"
+            className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs font-medium outline-none transition-all placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[var(--color-mod-attendance-border)] disabled:cursor-not-allowed"
            />
            
            {/* If Leave, show leave sub-kinds */}
@@ -162,9 +170,10 @@ export function AttendanceRosterItem({
                  <button
                    key={leaveType.key}
                    type="button"
+                   disabled={disabled}
                    onClick={() => onStatusChange(leaveType.key as AttendanceStatus)}
                    className={cn(
-                     "px-2.5 py-1 text-[0.62rem] font-bold rounded-lg border transition-all uppercase tracking-wider",
+                     "px-2.5 py-1 text-[0.62rem] font-bold rounded-lg border transition-all uppercase tracking-wider disabled:cursor-not-allowed",
                      status === leaveType.key
                        ? "bg-info-50 border-info-100 text-info-700 font-extrabold"
                        : "bg-white/40 border-slate-200 text-slate-500 hover:bg-white"
