@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tooltip } from '@/components/ui/tooltip';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -1734,9 +1735,16 @@ function InvoicePlaceholderRow() {
         <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 rounded-lg font-bold">PAID</Badge>
       </td>
       <td className="px-6 py-4 text-right">
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-slate-900">
-           <MoreVertical size={16} />
-        </Button>
+        <Tooltip content="More actions">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="More actions"
+            className="h-8 w-8 rounded-lg text-slate-400 hover:text-slate-900"
+          >
+            <MoreVertical size={16} />
+          </Button>
+        </Tooltip>
       </td>
     </tr>
   );

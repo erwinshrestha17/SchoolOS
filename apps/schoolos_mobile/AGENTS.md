@@ -66,6 +66,18 @@ What can I safely do from my phone?
 What needs attention today?
 ```
 
+### Summary card rule (no web KPI grids)
+
+Do not copy web KPI grids into Flutter. Per persona, show task signals instead:
+
+- Parent: no KPI cards; urgent child cards only ("Fee due", "Absent today", "New notice", "Report card published").
+- Teacher: 1-3 task signals — next class, attendance pending, homework awaiting review.
+- Principal: a small attention summary is fine — approvals pending, attendance gap, urgent transport/notice issue.
+- Driver: no KPI dashboard; assigned trip, next stop, boarding/deboarding progress, GPS freshness.
+- Staff: no KPI wall; leave balance, attendance state, payslip availability where permitted.
+
+Same backing rule as web (see `apps/web/AGENTS.md` KPI design rule): backend-owned, tenant/permission-filtered, time-bound, honest about unavailable/loading/locked state. The mobile difference is presentation only — dense KPI grids, not the underlying safety rules.
+
 ---
 
 ## 3. Non-Negotiables

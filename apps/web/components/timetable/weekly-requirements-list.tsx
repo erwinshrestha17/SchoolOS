@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Edit3, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip } from '@/components/ui/tooltip';
 import type { SubjectWeeklyRequirementSummary } from '@schoolos/core';
 
 type RequirementFormState = {
@@ -242,25 +243,27 @@ export function WeeklyRequirementsList({ filters }: { filters: any }) {
       className: 'text-right',
       cell: (row: SubjectWeeklyRequirementSummary) => (
         <div className="flex justify-end gap-2">
+          <Tooltip content="Edit weekly requirement">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="rounded-xl"
+              onClick={() => openEditForm(row)}
+              aria-label="Edit weekly requirement"
+            >
+              <Edit3 className="h-4 w-4" />
+            </Button>
+          </Tooltip>
           <Button
             type="button"
             variant="outline"
-            size="icon"
-            className="rounded-xl"
-            onClick={() => openEditForm(row)}
-            aria-label="Edit weekly requirement"
-          >
-            <Edit3 className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="rounded-xl border-rose-100 text-rose-600 hover:border-rose-200 hover:bg-rose-50"
+            size="sm"
+            className="gap-2 rounded-xl border-rose-100 text-rose-600 hover:border-rose-200 hover:bg-rose-50"
             onClick={() => setDeleteTarget(row)}
-            aria-label="Delete weekly requirement"
           >
             <Trash2 className="h-4 w-4" />
+            Delete
           </Button>
         </div>
       ),

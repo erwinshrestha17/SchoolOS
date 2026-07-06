@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { Upload, X, FileText, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip } from '@/components/ui/tooltip';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -122,17 +123,20 @@ export function FileUploader({
                 </span>
                 <CheckCircle2 className="h-4 w-4 text-success-500" />
               </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRemove(file.id);
-                }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              <Tooltip content={`Remove ${file.name}`}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Remove ${file.name}`}
+                  className="h-8 w-8 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemove(file.id);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </Tooltip>
             </div>
           ))}
         </div>

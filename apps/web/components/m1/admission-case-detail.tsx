@@ -439,7 +439,6 @@ export function AdmissionCaseDetail({
           {availableReviewActions.has("APPROVE") ? (
             <Button
               type="button"
-              variant="outline"
               onClick={() => setReviewAction("APPROVE")}
             >
               <ClipboardCheck className="h-4 w-4" />
@@ -453,7 +452,7 @@ export function AdmissionCaseDetail({
               onClick={() => setRejectDialogOpen(true)}
             >
               <AlertTriangle className="h-4 w-4" />
-              Not admit
+              Do not admit
             </Button>
           ) : null}
           {canFinalize ? (

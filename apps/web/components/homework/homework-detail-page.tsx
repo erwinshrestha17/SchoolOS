@@ -26,6 +26,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DataTable } from "@/components/ui/data-table";
 import { ActionMenu } from "@/components/ui/action-menu";
@@ -211,15 +212,18 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard/homework">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full h-10 w-10"
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </Button>
-          </Link>
+          <Tooltip content="Back to homework">
+            <Link href="/dashboard/homework">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Back to homework"
+                className="rounded-full h-10 w-10"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </Button>
+            </Link>
+          </Tooltip>
           <div className="flex flex-col">
             <h1 className="text-3xl font-black tracking-tight text-slate-900 italic uppercase">
               Homework Detail
@@ -333,8 +337,8 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                         </div>
                         <Button
                           variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 rounded-xl text-slate-400 hover:text-[var(--color-mod-homework-text)] hover:bg-[var(--color-mod-homework-bg)]"
+                          size="sm"
+                          className="gap-2 rounded-xl text-slate-500 hover:text-[var(--color-mod-homework-text)] hover:bg-[var(--color-mod-homework-bg)]"
                           onClick={async () => {
                             try {
                               await api.openHomeworkAttachmentPreview(
@@ -351,6 +355,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                           }}
                         >
                           <Download className="h-4 w-4" />
+                          View
                         </Button>
                       </div>
                     ))}

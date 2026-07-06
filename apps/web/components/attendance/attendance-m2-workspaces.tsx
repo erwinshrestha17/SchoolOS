@@ -40,6 +40,7 @@ import { AttendanceCorrectionReview } from "./attendance-correction-review";
 import { DashboardPageShell } from "@/components/dashboard/dashboard-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { FilterBar } from "@/components/ui/filter-bar";
@@ -680,10 +681,14 @@ export function AttendanceCorrectionsQueueWorkspace() {
         title="Attendance Corrections"
         description="Review and manage requests to correct attendance records."
         primaryAction={
-          <Button variant="outline">
-            <Download className="h-4 w-4" />
-            Export queue
-          </Button>
+          <Tooltip content="No export contract for this queue yet">
+            <span className="inline-flex">
+              <Button variant="outline" disabled>
+                <Download className="h-4 w-4" />
+                Export queue
+              </Button>
+            </span>
+          </Tooltip>
         }
       >
         <KpiGrid className="sm:grid-cols-2 lg:grid-cols-5">
@@ -854,7 +859,7 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
               disabled={reason.trim().length < 8 || approveMutation.isPending}
             >
               <CheckCircle2 className="h-4 w-4" />
-              Approve Request
+              {approveMutation.isPending ? "Approving..." : "Approve"}
             </Button>
             <Button
               variant="destructive"
@@ -862,7 +867,7 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
               disabled={reason.trim().length < 8 || rejectMutation.isPending}
             >
               <XCircle className="h-4 w-4" />
-              Reject Request
+              {rejectMutation.isPending ? "Rejecting..." : "Reject"}
             </Button>
           </div>
         }

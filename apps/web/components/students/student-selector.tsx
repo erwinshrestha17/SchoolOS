@@ -76,6 +76,8 @@ export function StudentSelector({
                   e.stopPropagation();
                   onSelect('');
                 }}
+                title="Clear selected student"
+                aria-label="Clear selected student"
                 className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
                 <X size={14} />

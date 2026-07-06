@@ -111,7 +111,7 @@ Money: backend/database totals only. Money writes are idempotent and audited. Co
 
 Notifications: source modules emit normalized events and never call SMS/email/push providers directly. M12 owns recipient resolution, templates, preferences, channel routing, delivery attempts, retries, provider callbacks, read state, and notification-center behavior.
 
-Web: one screen = one main job; real APIs only; no fake production data; server-side pagination for growing lists; states for loading/empty/error/success/permission/module locked/validation/file unavailable/queued/partial failure; high-risk actions need confirmation and reason where required.
+Web: one screen = one main job; real APIs only; no fake production data; server-side pagination for growing lists; states for loading/empty/error/success/permission/module locked/validation/file unavailable/queued/partial failure; high-risk actions need confirmation and reason where required. KPIs only where backend-owned, time-bound, actionable (real drill-through), and honest (never fake `0` for unavailable/locked) — see `apps/web/AGENTS.md` KPI design rule; mobile never copies web KPI grids (`apps/schoolos_mobile/AGENTS.md`).
 
 Mobile: companion app only; persona-first; purpose-limited APIs only; no admin-shaped mobile payloads; safe offline reads only; visible sync states for approved idempotent writes. Broad Student App access is permitted only for active Bachelor or Master enrollments after backend-owned eligibility, enrollment, entitlement, role, self-scope, and tenant checks exist; Preschool through Grade 12 students get controlled learning/session access only.
 

@@ -60,4 +60,21 @@ describe("M6 homework list contract", () => {
     assert.match(page, /canCreateHomework/);
     assert.match(page, /canReviewHomework/);
   });
+
+  it("sources the Due Today and Substitutions KPI cards from the real M6 operational summary", () => {
+    const page = read("app/dashboard/homework/page.tsx");
+
+    // The generic bounded operational-summary contract already computes
+    // these two metrics — no more hardcoded "no contract exposed" text.
+    assert.match(page, /api\.getModuleSummary\("homework-timetable"\)/);
+    assert.match(page, /homeworkDueToday/);
+    assert.match(page, /unassignedSubstitutionsToday/);
+    assert.doesNotMatch(
+      page,
+      /No module-owned due-soon summary contract is exposed/,
+    );
+    assert.doesNotMatch(page, /Open the scoped substitution workspace/);
+    assert.match(page, /href="\/dashboard\/homework"/);
+    assert.match(page, /href="\/dashboard\/timetable\/substitutions"/);
+  });
 });

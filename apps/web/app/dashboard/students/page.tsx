@@ -138,7 +138,7 @@ export default function StudentsPage() {
             className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
           >
             <UserPlus size={18} />
-            New Admission
+            New admission
           </Link>
         }
       >

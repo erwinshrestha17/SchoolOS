@@ -9,6 +9,7 @@ import {
 } from '../../lib/api/client';
 import { cn } from '../../lib/utils';
 import { Button, type ButtonProps } from './button';
+import { Tooltip } from './tooltip';
 
 type ProtectedFileAction = 'preview' | 'download';
 type ProtectedFileStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -179,30 +180,35 @@ export function ProtectedFileButton({
   });
   const Icon = action === 'download' ? Download : ExternalLink;
   const text = label || actionText(action);
+  const accessibleName = ariaLabel || text;
+
+  const button = (
+    <Button
+      {...buttonProps}
+      type="button"
+      variant={variant}
+      size={size}
+      disabled={disabled || !fileAssetId}
+      onClick={() => void protectedFile.run()}
+      aria-label={accessibleName}
+    >
+      {protectedFile.isLoading ? (
+        <>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {size === 'icon' ? null : loadingLabel || loadingText(action)}
+        </>
+      ) : children || (
+        <>
+          <Icon className="h-4 w-4" />
+          {text}
+        </>
+      )}
+    </Button>
+  );
 
   return (
     <span className="inline-flex flex-col">
-      <Button
-        {...buttonProps}
-        type="button"
-        variant={variant}
-        size={size}
-        disabled={disabled || !fileAssetId}
-        onClick={() => void protectedFile.run()}
-        aria-label={ariaLabel || text}
-      >
-        {protectedFile.isLoading ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {size === 'icon' ? null : loadingLabel || loadingText(action)}
-          </>
-        ) : children || (
-          <>
-            <Icon className="h-4 w-4" />
-            {text}
-          </>
-        )}
-      </Button>
+      {size === 'icon' ? <Tooltip content={accessibleName}>{button}</Tooltip> : button}
       {showStatus ? (
         <ProtectedFileStatusText
           message={protectedFile.message}

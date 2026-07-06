@@ -108,6 +108,21 @@ export default function HomeworkPage() {
   const canCreateHomework = grantedPermissions.has("homework:create");
   const canReviewHomework = grantedPermissions.has("homework:review");
 
+  const operationalSummaryQuery = useQuery({
+    queryKey: ["operational-summary", "homework-timetable"],
+    queryFn: () => api.getModuleSummary("homework-timetable"),
+  });
+  const operationalSummary = operationalSummaryQuery.data;
+  const isOperationalSummaryReady =
+    operationalSummary?.status === "ready" ||
+    operationalSummary?.status === "empty";
+  const operationalMetric = (key: string) => {
+    if (operationalSummaryQuery.isLoading) return "Loading";
+    if (!isOperationalSummaryReady) return "Unavailable";
+    const value = operationalSummary?.summary[key];
+    return value === null || value === undefined ? "Unavailable" : value;
+  };
+
   const academicYearsQuery = useQuery({
     queryKey: ["academic-years"],
     queryFn: api.listAcademicYears,
@@ -515,11 +530,16 @@ export default function HomeworkPage() {
             }
           />
           <KpiCard
-            title="Due Soon"
-            value="Unavailable"
+            title="Homework Due Today"
+            value={operationalMetric("homeworkDueToday")}
             icon={<Bell size={20} />}
-            tone="neutral"
-            description="No module-owned due-soon summary contract is exposed."
+            tone={
+              Number(operationalSummary?.summary.homeworkDueToday) > 0
+                ? "warning"
+                : "neutral"
+            }
+            href="/dashboard/homework"
+            description="Published homework due by end of today."
           />
           <KpiCard
             title="Pending Submissions"
@@ -545,11 +565,18 @@ export default function HomeworkPage() {
             description="Open timetable validation for backend conflict truth."
           />
           <KpiCard
-            title="Substitutions"
-            value="Unavailable"
+            title="Unassigned Substitutions"
+            value={operationalMetric("unassignedSubstitutionsToday")}
             icon={<Users size={20} />}
-            tone="neutral"
-            description="Open the scoped substitution workspace."
+            tone={
+              Number(
+                operationalSummary?.summary.unassignedSubstitutionsToday,
+              ) > 0
+                ? "warning"
+                : "neutral"
+            }
+            href="/dashboard/timetable/substitutions"
+            description="Today's substitutions still needing a covering teacher."
           />
           <KpiCard
             title="Teacher Workload"

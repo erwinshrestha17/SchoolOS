@@ -314,3 +314,81 @@ test("M1 student roster uses backend summary, safe filters, and paginated roster
     /value="INACTIVE"|value="WITHDRAWN"|value="DEACTIVATED"|value="GRADUATED"/,
   );
 });
+
+test("M1 Admissions overview shows a real, actionable, honest KPI grid", () => {
+  const page = read("app/dashboard/admissions/page.tsx");
+  const header = read("components/m1/m1-page-header.tsx");
+
+  // Uses the same bounded, permission-filtered operational-summary contract
+  // already computed backend-side, not a browser total or a fake placeholder.
+  assert.match(page, /api\.getModuleSummary\('students'\)/);
+  assert.match(page, /applicationsNeedingReview/);
+  assert.match(page, /unverifiedDocuments/);
+  assert.match(page, /duplicateCandidates/);
+  assert.match(page, /iemisReadinessBlockers/);
+
+  // Honest states: real backend zero is fine, but loading/locked/unavailable
+  // must never render as a fabricated 0.
+  assert.match(page, /summaryQuery\.isLoading\) return 'Loading'/);
+  assert.match(page, /return 'Unavailable'/);
+
+  // Every card opens a real, existing filtered queue.
+  assert.match(page, /href="\/dashboard\/admissions"/);
+  assert.match(page, /href="\/dashboard\/students\/documents"/);
+  assert.match(page, /href="\/dashboard\/students\/duplicates"/);
+  assert.match(page, /href="\/dashboard\/students\/iemis"/);
+
+  // The header component threads the KPI grid through without disturbing
+  // task pages (documents/duplicates/iemis/etc.) that reuse the same header
+  // but never pass a kpiGrid prop.
+  assert.match(header, /kpiGrid\?: ReactNode/);
+});
+
+test("student directory row actions use the shared keyboard-accessible ActionMenu, not a hover-only menu", () => {
+  const directory = read("components/forms/student-directory.tsx");
+
+  // The old pattern was a CSS group-hover dropdown with no click/focus
+  // toggle — unusable by keyboard. Every row action must go through the
+  // shared ActionMenu component instead of a module-specific reimplementation.
+  assert.doesNotMatch(directory, /group\/actions/);
+  assert.doesNotMatch(directory, /group-hover\/actions:block/);
+  assert.match(directory, /label=\{`Open actions for \$\{studentName\}`\}/);
+  assert.match(directory, /label: 'Edit Student'/);
+  assert.match(directory, /label: 'Edit Guardian'/);
+  assert.match(directory, /label: 'ID Card'/);
+  assert.match(directory, /label: 'Documents'/);
+  assert.match(directory, /label: 'Attendance'/);
+});
+
+test("admission case review actions have consistent visual risk hierarchy across both review surfaces", () => {
+  const caseDetail = read("components/m1/admission-case-detail.tsx");
+  const reviewWorkspace = read("components/m1/application-review-workspace.tsx");
+
+  // Approve is the common, positive path — it must read as the primary
+  // action (no explicit variant = default/filled), not the same visual
+  // weight as a neutral action like "Request information".
+  assert.doesNotMatch(
+    caseDetail,
+    /variant="outline"\s*\n\s*onClick=\{\(\) => setReviewAction\("APPROVE"\)\}/,
+  );
+
+  // Reject ("Do not admit") must be visually destructive in both places
+  // real applicants can be rejected from, not just one.
+  assert.match(caseDetail, /variant="destructive"/);
+  assert.match(
+    reviewWorkspace,
+    /action === "REJECT"\s*\n\s*\? "destructive"/,
+  );
+
+  // Wording must match within a single flow: the button that opens the
+  // confirm dialog and the dialog's own confirm label must agree.
+  assert.match(caseDetail, />\s*Do not admit\s*</);
+  assert.match(caseDetail, /confirmLabel="Do not admit"/);
+});
+
+test("clear-selection and low-risk row icon buttons carry an accessible name", () => {
+  const selector = read("components/students/student-selector.tsx");
+
+  assert.match(selector, /aria-label="Clear selected student"/);
+  assert.match(selector, /title="Clear selected student"/);
+});

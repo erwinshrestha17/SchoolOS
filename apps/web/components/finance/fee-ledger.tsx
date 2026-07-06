@@ -115,8 +115,10 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
         <div className="flex items-center gap-1">
           {inv.receiptNumber && (
             <button
+              type="button"
               className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-900 transition-all active:scale-90"
               title="Print Receipt"
+              aria-label="Print Receipt"
               onClick={() =>
                 setSelectedReceipt({
                   id: inv.receiptId!,

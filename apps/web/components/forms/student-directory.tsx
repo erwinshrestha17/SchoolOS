@@ -642,53 +642,56 @@ export function StudentDirectory({
                       <Wallet size={14} />
                       Fees Ledger
                     </Link>
-                    <div className="relative group/actions">
-                      <button
-                        type="button"
-                        aria-label={`Open actions for ${studentName}`}
-                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
-                      >
-                        <MoreHorizontal size={16} />
-                      </button>
-                      <div className="absolute right-0 top-full z-10 mt-2 hidden w-48 origin-top-right rounded-xl border border-slate-200 bg-white p-2 shadow-md group-hover/actions:block animate-in fade-in zoom-in-95">
-                        <Link
-                          href={`/dashboard/students/${encodeURIComponent(student.id)}?edit=true`}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
-                        >
-                          <UserPlus size={14} className="text-slate-400" />
-                          Edit Student
-                        </Link>
-                        <Link
-                          href={`/dashboard/students/${encodeURIComponent(student.id)}?tab=Guardians`}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
-                        >
-                          <ContactRound size={14} className="text-slate-400" />
-                          Edit Guardian
-                        </Link>
+                    <ActionMenu
+                      label={`Open actions for ${studentName}`}
+                      items={[
+                        {
+                          label: 'Edit Student',
+                          icon: <UserPlus size={14} />,
+                          onClick: () =>
+                            router.push(
+                              `/dashboard/students/${encodeURIComponent(student.id)}?edit=true`,
+                            ),
+                        },
+                        {
+                          label: 'Edit Guardian',
+                          icon: <ContactRound size={14} />,
+                          onClick: () =>
+                            router.push(
+                              `/dashboard/students/${encodeURIComponent(student.id)}?tab=Guardians`,
+                            ),
+                        },
+                        {
+                          label: 'ID Card',
+                          icon: <FileText size={14} />,
+                          onClick: () => onOpenPdf(student.id, 'id-card'),
+                        },
+                        {
+                          label: 'Documents',
+                          icon: <FolderOpen size={14} />,
+                          onClick: () =>
+                            router.push(
+                              `/dashboard/students/${encodeURIComponent(student.id)}?tab=Documents`,
+                            ),
+                        },
+                        {
+                          label: 'Attendance',
+                          icon: <BookOpenText size={14} />,
+                          onClick: () =>
+                            router.push(
+                              `/dashboard/students/${encodeURIComponent(student.id)}?tab=Attendance`,
+                            ),
+                        },
+                      ]}
+                      trigger={
                         <button
                           type="button"
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
-                        onClick={(event) => { event.stopPropagation(); onOpenPdf(student.id, 'id-card'); }}
+                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
                         >
-                          <FileText size={14} className="text-slate-400" />
-                          ID Card
+                          <MoreHorizontal size={16} />
                         </button>
-                        <Link
-                          href={`/dashboard/students/${encodeURIComponent(student.id)}?tab=Documents`}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
-                        >
-                          <FolderOpen size={14} className="text-slate-400" />
-                          Documents
-                        </Link>
-                        <Link
-                          href={`/dashboard/students/${encodeURIComponent(student.id)}?tab=Attendance`}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
-                        >
-                          <BookOpenText size={14} className="text-slate-400" />
-                          Attendance
-                        </Link>
-                      </div>
-                    </div>
+                      }
+                    />
                   </div>
                 </div>
               );

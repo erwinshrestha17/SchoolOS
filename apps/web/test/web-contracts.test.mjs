@@ -1753,7 +1753,7 @@ describe("SchoolOS web production contracts", () => {
     for (const marker of [
       "api.downloadReport('defaulter-aging-report'",
       "finance-defaulter-aging-csv-export",
-      "Export Aging CSV",
+      "Export Summary",
       "exportMutation.error.message",
     ]) {
       assert.ok(

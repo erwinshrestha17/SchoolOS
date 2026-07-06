@@ -7,6 +7,7 @@ import { AlertCircle, CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 import { useSession } from "@/components/session-provider";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { SectionCard } from "@/components/ui/section-card";
@@ -497,21 +498,17 @@ function ApprovalRequestCard({
             className="min-h-20 w-full rounded-xl border border-slate-200 p-3 text-sm"
           />
           <div className="flex gap-2">
-            <button
+            <Button type="button" onClick={() => onDecision("APPROVED")}>
+              Approve
+            </Button>
+            <Button
               type="button"
-              onClick={() => onDecision("APPROVED")}
-              className="rounded-xl bg-success-700 px-4 py-2 text-xs font-black uppercase tracking-widest text-white"
-            >
-              Approve and execute
-            </button>
-            <button
-              type="button"
+              variant="destructive"
               disabled={!reviewNote.trim()}
               onClick={() => onDecision("REJECTED")}
-              className="rounded-xl border border-danger-200 px-4 py-2 text-xs font-black uppercase tracking-widest text-danger-700 disabled:opacity-40"
             >
               Reject
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}

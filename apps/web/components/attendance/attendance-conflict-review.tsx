@@ -3,6 +3,7 @@
 import type { AttendanceConflict } from '@schoolos/core';
 import { SectionCard } from '@/components/ui/section-card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2 } from 'lucide-react';
@@ -60,7 +61,9 @@ export function AttendanceConflictReview({
             </div>
 
             {!conflict.reviewedAt && (
-              <button
+              <Button
+                type="button"
+                size="sm"
                 onClick={() =>
                   reviewMutation.mutate({
                     id: conflict.id,
@@ -69,17 +72,10 @@ export function AttendanceConflictReview({
                   })
                 }
                 disabled={reviewMutation.isPending}
-                className="flex items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-attendance-accent)] px-4 py-2 text-xs font-bold text-white transition-all hover:bg-[var(--color-mod-attendance-text)] disabled:opacity-50"
               >
-                {reviewMutation.isPending ? (
-                  'Resolving...'
-                ) : (
-                  <>
-                    <CheckCircle2 size={14} />
-                    Mark Resolved
-                  </>
-                )}
-              </button>
+                <CheckCircle2 size={14} />
+                {reviewMutation.isPending ? 'Resolving...' : 'Mark Resolved'}
+              </Button>
             )}
           </div>
         ))}

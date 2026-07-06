@@ -1,16 +1,28 @@
 'use client';
 
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Clock, ChevronRight, Download, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LoadingState } from '@/components/ui/loading-state';
 
 export function DefaulterAgingSummary() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const defaultersQuery = useQuery({
     queryKey: ['defaulters'],
     queryFn: () => api.listDefaulters(),
   });
+
+  const viewBucket = (bucketKey: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('defaulterAgingBucket', bucketKey);
+    router.push(`/dashboard/finance?${params.toString()}`, { scroll: false });
+    document
+      .getElementById('defaulter-queue')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   const exportMutation = useMutation({
     mutationFn: () =>
       api.downloadReport('defaulter-aging-report', {
@@ -60,7 +72,7 @@ export function DefaulterAgingSummary() {
           data-testid="finance-defaulter-aging-csv-export"
         >
           <Download size={14} />
-          {exportMutation.isPending ? 'Exporting...' : 'Export Aging CSV'}
+          {exportMutation.isPending ? 'Exporting...' : 'Export Summary'}
         </button>
       </div>
 
@@ -101,7 +113,11 @@ export function DefaulterAgingSummary() {
             </div>
             
             <div className="mt-6 flex items-center justify-between pt-4 border-t border-slate-50">
-               <button className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors flex items-center gap-1">
+               <button
+                 type="button"
+                 onClick={() => viewBucket(b.key)}
+                 className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors flex items-center gap-1"
+               >
                  View List
                  <ChevronRight size={12} />
                </button>

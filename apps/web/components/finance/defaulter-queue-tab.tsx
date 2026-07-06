@@ -15,6 +15,7 @@ export function DefaulterQueueTab() {
 
   const classId = searchParams.get("defaulterClassId") ?? "";
   const feeHeadId = searchParams.get("defaulterFeeHeadId") ?? "";
+  const agingBucket = searchParams.get("defaulterAgingBucket") ?? "";
   const search = searchParams.get("defaulterSearch") ?? "";
   const page = Math.max(
     1,
@@ -36,11 +37,19 @@ export function DefaulterQueueTab() {
   });
 
   const defaultersQuery = useQuery({
-    queryKey: ["defaulters-queue", classId, feeHeadId, search, page],
+    queryKey: [
+      "defaulters-queue",
+      classId,
+      feeHeadId,
+      agingBucket,
+      search,
+      page,
+    ],
     queryFn: () =>
       api.listDefaulters({
         classId: classId || null,
         feeHeadId: feeHeadId || null,
+        agingBucket: agingBucket || null,
         search: search || null,
         page,
         limit: 25,
@@ -52,6 +61,7 @@ export function DefaulterQueueTab() {
       Record<
         | "defaulterClassId"
         | "defaulterFeeHeadId"
+        | "defaulterAgingBucket"
         | "defaulterSearch"
         | "defaulterPage",
         string | number
@@ -90,6 +100,7 @@ export function DefaulterQueueTab() {
           asOfDate: new Date().toISOString(),
           classId: classId || undefined,
           feeHeadId: feeHeadId || undefined,
+          agingBucket: agingBucket || undefined,
         },
       });
     } catch (error) {
@@ -139,7 +150,7 @@ export function DefaulterQueueTab() {
             onClick={onExportAgingCsv}
           >
             <Download size={14} />
-            {isExporting ? "Exporting..." : "Export Aging CSV"}
+            {isExporting ? "Exporting..." : "Export Queue"}
           </button>
         </div>
       }
@@ -147,7 +158,7 @@ export function DefaulterQueueTab() {
       <div className="space-y-6">
         {/* Filters */}
         <div className="flex flex-col gap-4 sm:flex-row justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
-          <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-4">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 Search
@@ -197,6 +208,24 @@ export function DefaulterQueueTab() {
                     {h.code} · {h.name}
                   </option>
                 ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Aging
+              </label>
+              <select
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
+                value={agingBucket}
+                onChange={(e) => {
+                  updateFilters({ defaulterAgingBucket: e.target.value });
+                }}
+              >
+                <option value="">All Aging</option>
+                <option value="0-30">0-30 Days</option>
+                <option value="31-60">31-60 Days</option>
+                <option value="61-90">61-90 Days</option>
+                <option value="90+">90+ Days</option>
               </select>
             </div>
           </div>

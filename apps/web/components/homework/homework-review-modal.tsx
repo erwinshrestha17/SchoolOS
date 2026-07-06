@@ -136,10 +136,10 @@ export function HomeworkReviewModal({
                         </span>
                       </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-9 w-9 rounded-xl text-slate-400 hover:text-[var(--color-mod-homework-text)] hover:bg-[var(--color-mod-homework-bg)]"
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2 rounded-xl text-slate-500 hover:text-[var(--color-mod-homework-text)] hover:bg-[var(--color-mod-homework-bg)]"
                       onClick={async () => {
                         try {
                           await api.openHomeworkAttachmentPreview(attachment.id);
@@ -149,6 +149,7 @@ export function HomeworkReviewModal({
                       }}
                     >
                       <Download className="h-4 w-4" />
+                      View
                     </Button>
                   </div>
                 ))}

@@ -68,7 +68,12 @@ export function AttendanceRosterItem({
           <div className="flex items-center gap-2">
             <h4 className="font-bold text-slate-900 truncate tracking-tight">{student.fullNameEn}</h4>
             {student.hasMedicalAlert && (
-              <span className="h-2 w-2 rounded-full bg-danger-500 animate-pulse" title="Medical Alert" />
+              <span
+                role="img"
+                aria-label="Medical alert"
+                title="Medical Alert"
+                className="h-2 w-2 rounded-full bg-danger-500 animate-pulse"
+              />
             )}
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">

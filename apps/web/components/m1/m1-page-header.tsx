@@ -9,12 +9,14 @@ export function M1PageHeader({
   primaryAction,
   secondaryActions,
   moreActionItems,
+  kpiGrid,
 }: {
   title: string;
   description: string;
   primaryAction?: ReactNode;
   secondaryActions?: ReactNode;
   moreActionItems?: ActionMenuItem[];
+  kpiGrid?: ReactNode;
 }) {
   return (
     <ModuleHeader
@@ -30,6 +32,7 @@ export function M1PageHeader({
       }
       moreActionItems={moreActionItems}
     >
+      {kpiGrid ? <div className="mb-5">{kpiGrid}</div> : null}
       <M1ModuleNav />
     </ModuleHeader>
   );

@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ClipboardCheck,
   ClipboardList,
-  FileCheck2,
   FileText,
   GraduationCap,
   History,
@@ -16,7 +16,6 @@ import {
   PencilLine,
   RotateCcw,
   Settings,
-  ShieldCheck,
 } from 'lucide-react';
 import { useSession } from '@/components/session-provider';
 import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
@@ -24,6 +23,7 @@ import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { ModuleHeader } from '@/components/ui/module-header';
 import { ModuleTabs } from '@/components/ui/module-tabs';
 import { SectionCard } from '@/components/ui/section-card';
+import { api } from '@/lib/api';
 
 const workspaceTabs = [
   { href: '/dashboard/academics', label: 'Subjects', icon: ClipboardCheck },
@@ -102,6 +102,21 @@ export default function AcademicsOverviewPage() {
   const canManageReportCards =
     hasPermissions(['academics:manage_report_cards']) || canManageAcademics;
 
+  const summaryQuery = useQuery({
+    queryKey: ['operational-summary', 'academics'],
+    queryFn: () => api.getModuleSummary('academics'),
+  });
+  const summary = summaryQuery.data;
+  const isReady = summary?.status === 'ready' || summary?.status === 'empty';
+
+  const metricValue = (key: string) => {
+    if (summaryQuery.isLoading) return 'Loading';
+    if (!isReady) return 'Unavailable';
+    const value = summary?.summary[key];
+    return value === null || value === undefined ? 'Unavailable' : value;
+  };
+  const isPositive = (key: string) => Number(summary?.summary[key]) > 0;
+
   return (
     <DashboardPageShell>
       <ModuleHeader
@@ -162,13 +177,41 @@ export default function AcademicsOverviewPage() {
             : []),
         ]}
       >
-        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-          <KpiCard title="Active Terms" value="Unavailable" icon={<ClipboardList size={20} />} tone="neutral" description="Needs a real M4 summary API." />
-          <KpiCard title="Marks Pending" value="Unavailable" icon={<PencilLine size={20} />} tone="neutral" description="Needs a real M4 summary API." />
-          <KpiCard title="Draft Marks" value="Unavailable" icon={<ShieldCheck size={20} />} tone="neutral" description="Needs a real M4 summary API." />
-          <KpiCard title="Report Cards Generated" value="Unavailable" icon={<FileCheck2 size={20} />} tone="neutral" description="Needs a real M4 summary API." />
-          <KpiCard title="Publish Blockers" value="Unavailable" icon={<AlertTriangle size={20} />} tone="neutral" description="Needs a real M4 summary API." />
-          <KpiCard title="Active Subjects" value="Unavailable" icon={<GraduationCap size={20} />} tone="neutral" description="Needs a real M4 summary API." />
+        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            title="Marks Entry Open"
+            value={metricValue('marksOpen')}
+            icon={<PencilLine size={20} />}
+            tone={isPositive('marksOpen') ? 'warning' : 'neutral'}
+            href="/dashboard/academics/marks"
+            description="Unlocked mark entries across active terms."
+          />
+          <KpiCard
+            title="Mark Lock Requests"
+            value={metricValue('pendingMarkLocks')}
+            icon={<Lock size={20} />}
+            tone={isPositive('pendingMarkLocks') ? 'warning' : 'neutral'}
+            href="/dashboard/academics/marks"
+            description="Lock requests awaiting review."
+          />
+          <KpiCard
+            title="Report Cards Unpublished"
+            value={metricValue('reportCardPublishBlockers')}
+            icon={<AlertTriangle size={20} />}
+            tone={
+              isPositive('reportCardPublishBlockers') ? 'warning' : 'neutral'
+            }
+            href="/dashboard/academics/report-cards"
+            description="Current-term report cards not yet published."
+          />
+          <KpiCard
+            title="Promotion Ready"
+            value={metricValue('promotionReady')}
+            icon={<GraduationCap size={20} />}
+            tone={isPositive('promotionReady') ? 'info' : 'neutral'}
+            href="/dashboard/academics/promotion"
+            description="Students with a backend-calculated ready decision."
+          />
         </KpiGrid>
       </ModuleHeader>
 

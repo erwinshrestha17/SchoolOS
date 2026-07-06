@@ -4,6 +4,7 @@ import { useState } from "react";
 import { SubstitutionSummaryPanel } from "../substitution-summary-panel";
 import { SubstitutionsList } from "../substitutions-list";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -31,14 +32,17 @@ export function SubstitutionsTab() {
         </div>
 
         <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={prevDay}
-            className="rounded-xl h-10 w-10"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
+          <Tooltip content="Previous day">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={prevDay}
+              aria-label="Previous day"
+              className="rounded-xl h-10 w-10"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+          </Tooltip>
 
           <label className="flex h-10 w-[240px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-left text-xs font-black uppercase tracking-tight text-slate-700">
             <CalendarIcon className="h-4 w-4 text-[var(--color-mod-homework-text)]" />
@@ -53,14 +57,17 @@ export function SubstitutionsTab() {
             />
           </label>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={nextDay}
-            className="rounded-xl h-10 w-10"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </Button>
+          <Tooltip content="Next day">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={nextDay}
+              aria-label="Next day"
+              className="rounded-xl h-10 w-10"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+          </Tooltip>
         </div>
       </div>
 

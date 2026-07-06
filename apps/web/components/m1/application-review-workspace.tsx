@@ -347,7 +347,13 @@ export function ApplicationReviewWorkspace({
                 <Button
                   key={action}
                   type="button"
-                  variant={action === "APPROVE" ? "default" : "outline"}
+                  variant={
+                    action === "APPROVE"
+                      ? "default"
+                      : action === "REJECT"
+                        ? "destructive"
+                        : "outline"
+                  }
                   onClick={() => {
                     setSelectedAction(action);
                     setReason("");

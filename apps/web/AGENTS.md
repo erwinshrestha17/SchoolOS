@@ -214,7 +214,7 @@ Used for students, invoices, staff, books, vehicles, notices, journals, and user
 Rules:
 
 - Header.
-- KPI strip where useful.
+- KPI strip where useful (see KPI design rule below).
 - Tabs if needed.
 - Filter bar.
 - Table with server pagination.
@@ -227,6 +227,45 @@ Rules:
 - Secondary row actions in `More`.
 - Destructive row actions separated with confirmation.
 - Sensitive columns hidden unless permission allows.
+
+### KPI design rule
+
+Use KPIs only to help a user prioritize, detect risk, or choose the next workflow. Not to decorate a screen into looking like a dashboard.
+
+**Only the module landing/overview page is KPI-driven.** Every detailed work page is task-first: filters, table/grid, workflow state, validation, audit, one main action. Max 4-6 KPI cards on a desktop overview.
+
+A KPI must be all four:
+
+- Backend-owned, tenant- and permission-filtered.
+- Time/context-bound: today, selected academic year, term, fiscal period, or active trip.
+- Actionable: opens a real filtered queue or workspace on click.
+- Honest: unavailable/loading/locked/partial data never renders as `0`.
+
+Litmus test: *what is wrong or pending, and where do I go to fix it?* If a card cannot answer that, remove it. No summary API -> explicit unavailable state or omit, never a placeholder `0`. No drill-through -> it is not a KPI; use a status badge, queue row, or workflow banner instead.
+
+M4 Academics and Accounting are especially strict: never compute counts, readiness percentages, grades, balances, or money totals from browser-loaded lists. Bounded backend summaries only.
+
+| Module | KPIs go on | Recommended cards | Never on |
+|---|---|---|---|
+| M0 Platform Core | Platform operator overview only | Active/suspended tenants, onboarding blockers, unhealthy providers, failed queue jobs, storage/export issues | Tenant onboarding wizard, provider setup, queue-job detail, support override, audit detail |
+| M1 Admissions & Student Profiles | Admissions overview, student ops overview | Pending admissions, missing documents, duplicate candidates, approval queue, iEMIS readiness | Admission wizard, student profile, guardian editor, document upload, duplicate-resolution detail, QR detail |
+| M2 Smart Attendance | Attendance overview, principal triage | Classes not submitted, completion today, absent/late students, corrections pending, anomalies | Teacher attendance register, correction form, monthly register, individual student history |
+| M3 Fees & Receipts | Fees overview, cashier dashboard, principal finance snapshot | Collection today, outstanding dues, pending reversals/refunds, cashier-close status, reconciliation exceptions | Payment collection screen, receipt detail, student ledger, reversal form, cashier-close form |
+| M4 Academics/Exams/Report Cards | Academic overview only | Upcoming exam terms, marks sheets pending, locked-sheet corrections, result readiness, report-card job status | Marks-entry grid, CAS entry, grade setup, result detail, report-card detail, promotion decision page |
+| M5 Activity Feed & Milestones | Activity/admin moderation overview | Draft posts, moderation queue, failed media processing, consent blocks, parent delivery issues | Activity composer, gallery, post detail, milestone editor, media preview |
+| M6 Homework & Timetable | Homework overview, timetable overview | Homework due soon, submissions awaiting review, unpublished homework, timetable conflicts, substitutions today | Homework composer, submission review, timetable builder, conflict-resolution screen, version detail |
+| M7 HR & Payroll | HR overview, payroll overview | Staff present, staff on leave, pending leave approvals, contracts expiring, payroll-run state | Staff profile, salary structure editor, payroll-run detail, payslip detail, leave decision form |
+| M8 Library | Library overview | Loans due/overdue, reservations waiting, issues/returns today, lost/damaged items, fine-review queue | Book detail, copy management, issue/return counter, borrower history, fine detail |
+| M9 Transport | Transport dashboard | Trips today, active/delayed/stale trips, students without assignment, expiring vehicle documents, boarding exceptions | Route editor, vehicle form, trip operation screen, driver assignment, parent transport page |
+| M10 Canteen | Canteen manager dashboard | POS sales today, meals served, low-stock items, low-wallet alerts, allergy alerts, pending vendor bills | POS sale, QR serving/scanning, wallet top-up, stock adjustment, vendor bill form |
+| M11 Accounting & Finance | Accounting overview, principal read-only finance snapshot | Period status, vouchers awaiting approval, reconciliation exceptions, receivables/payables, report snapshot status | Voucher editor, journal-entry detail, reconciliation workspace, account setup, fiscal-close workflow |
+| M12 Notifications/Notices/Chat | Communication operations dashboard | Notices scheduled, failed deliveries, unread high-priority notices, open escalations, provider/queue health | Notice composer, recipient preview, delivery-log detail, chat thread, moderation case detail |
+| M13 Learning Layer | Teacher/admin learning overview | Active sessions, activities awaiting launch/review, session issues, submissions needing review | Activity editor, live classroom session, student activity screen, parent learning summary |
+| M14 AI / Intelligence | None until explicitly approved | None | Do not create KPI or analytics UI yet |
+
+Implementation priority (core operational workspaces first, then academics/finance, then HR/extended ops): (1) Principal Home cross-module attention, (2) M1 Admissions, (3) M2 Attendance, (4) M3 Fees, (5) M4 Academics, (6) M6 Homework & Timetable, (7) M12 Communication. Then M7, M8, M9, M10, M11, M13 as those workspaces are polished.
+
+Replace KPIs with the record/workflow state itself on task pages, e.g.: forms (stepper, draft/saved state, validation errors), registers/grids (`Marked 28 of 30`, `Saving`, `Submitted`, `Locked`), financial workflows (payment status, balance due, idempotency/pending confirmation, audit status), queues (server total, active filters, pending/failed count), detail pages (lifecycle status, audit timeline, protected-file state). Mobile: one urgent task card, not a KPI wall.
 
 ---
 

@@ -23,16 +23,25 @@ describe('M4 academics workspace contract', () => {
     assert.match(page, /label: 'Publishing'/);
   });
 
-  it('does not present browser-derived M4 totals or readiness as official', () => {
+  it('sources KPI cards from the real bounded module-summary API, not a browser total or a fake placeholder', () => {
     const page = read('app/dashboard/academics/page.tsx');
 
-    assert.doesNotMatch(page, /useQuery/);
+    // A real, module-owned, bounded backend summary contract already exists
+    // (GET /dashboard/academics/summary via getModuleSummary) — the overview
+    // must use it instead of the "Needs a real M4 summary API" stub.
+    assert.match(page, /getModuleSummary\('academics'\)/);
+    assert.doesNotMatch(page, /Needs a real M4 summary API/);
     assert.doesNotMatch(page, /getStepProgress/);
     assert.doesNotMatch(page, /reportsQuery\.data\?\.length/);
-    assert.match(page, /Needs a real M4 summary API/);
     assert.match(page, /Official readiness remains backend-owned/);
-    assert.match(page, /Draft Marks/);
-    assert.match(page, /Active Subjects/);
+
+    // Honest states: never a bare fabricated value, always Loading/Unavailable
+    // driven by the query's own status, and real drill-through hrefs.
+    assert.match(page, /summaryQuery\.isLoading\) return 'Loading'/);
+    assert.match(page, /'Unavailable'/);
+    assert.match(page, /href="\/dashboard\/academics\/marks"/);
+    assert.match(page, /href="\/dashboard\/academics\/report-cards"/);
+    assert.match(page, /href="\/dashboard\/academics\/promotion"/);
   });
 
   it('links only to existing M4 workspaces and preserves protected workflow language', () => {

@@ -45,6 +45,15 @@ type FinanceTab =
   | "reports"
   | "setup";
 
+const FINANCE_TABS: FinanceTab[] = [
+  "collection",
+  "ledger",
+  "reversals",
+  "close",
+  "reports",
+  "setup",
+];
+
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-NP", {
     style: "currency",
@@ -70,15 +79,24 @@ export default function FinancePage() {
   const invoicePage = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
   const invoiceSearch = searchParams.get("search")?.trim() ?? "";
   const schoolDay = getNepalSchoolDay();
+  const tabParam = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<FinanceTab>(() =>
-    canCollectPayments
-      ? "collection"
-      : canManageFees
-        ? "ledger"
-        : canCloseCashier
-          ? "close"
-          : "collection",
+    tabParam && (FINANCE_TABS as string[]).includes(tabParam)
+      ? (tabParam as FinanceTab)
+      : canCollectPayments
+        ? "collection"
+        : canManageFees
+          ? "ledger"
+          : canCloseCashier
+            ? "close"
+            : "collection",
   );
+
+  useEffect(() => {
+    if (tabParam && (FINANCE_TABS as string[]).includes(tabParam)) {
+      setActiveTab(tabParam as FinanceTab);
+    }
+  }, [tabParam]);
 
   const invoicesQuery = useQuery({
     queryKey: ["invoices", invoicePage, invoiceSearch],
@@ -313,6 +331,11 @@ export default function FinancePage() {
               }
               icon={<Wallet size={20} />}
               tone="success"
+              href={
+                canCollectPayments
+                  ? "/dashboard/finance?tab=collection"
+                  : undefined
+              }
               description="Net confirmed collection from the backend."
             />
             <KpiCard
@@ -328,6 +351,7 @@ export default function FinancePage() {
               }
               icon={<Wallet size={20} />}
               tone="neutral"
+              href={canManageFees ? "/dashboard/finance?tab=reports" : undefined}
               description="Backend-owned outstanding balance."
             />
             <KpiCard
@@ -343,6 +367,7 @@ export default function FinancePage() {
               tone={
                 summaryQuery.data?.overdue.studentCount ? "warning" : "neutral"
               }
+              href={canManageFees ? "/dashboard/finance?tab=reports" : undefined}
               description={
                 summaryQuery.data
                   ? `${formatCurrency(Number(summaryQuery.data.overdue.amount))} overdue.`
@@ -359,6 +384,11 @@ export default function FinancePage() {
               icon={<ShieldAlert size={20} />}
               tone={
                 summaryQuery.data?.pendingApprovalCount ? "warning" : "neutral"
+              }
+              href={
+                canUseCorrectionWorkflow
+                  ? "/dashboard/finance?tab=reversals"
+                  : undefined
               }
               description="Refund and reversal requests needing attention."
             />
@@ -377,6 +407,7 @@ export default function FinancePage() {
                   ? "warning"
                   : "neutral"
               }
+              href={canCloseCashier ? "/dashboard/finance?tab=close" : undefined}
               description="Backend-owned close state for the selected school day."
             />
             <KpiCard
@@ -390,6 +421,11 @@ export default function FinancePage() {
               }
               icon={<Receipt size={20} />}
               tone="neutral"
+              href={
+                canManageFees && canReadReceipts
+                  ? "/dashboard/finance?tab=ledger"
+                  : undefined
+              }
               description={`Bounded to ${formatBsDate(schoolDay.startUtc)}.`}
             />
           </KpiGrid>
@@ -463,7 +499,9 @@ export default function FinancePage() {
           {activeTab === "reports" && canManageFees ? (
             <div className="space-y-8">
               <DefaulterAgingSummary />
-              <DefaulterQueueTab />
+              <div id="defaulter-queue">
+                <DefaulterQueueTab />
+              </div>
               <DuesAnalysisSection />
             </div>
           ) : null}

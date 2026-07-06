@@ -137,4 +137,68 @@ describe("M3 fees workspace contract", () => {
       /handleCreateWaiver[\s\S]{0,270}waiverMutation\.mutate\(/,
     );
   });
+
+  it("makes every fees overview KPI card open its real filtered tab", () => {
+    const page = read("app/dashboard/finance/page.tsx");
+
+    // Every KPI card must drill through, not sit as an inert stat — reading
+    // the tab from the URL on load closes the loop for a card's href.
+    assert.match(page, /searchParams\.get\("tab"\)/);
+    assert.match(page, /setActiveTab\(tabParam as FinanceTab\)/);
+    assert.match(page, /href=\{\s*canCollectPayments\s*\n?\s*\?\s*"\/dashboard\/finance\?tab=collection"/);
+    assert.match(page, /href=\{canManageFees \? "\/dashboard\/finance\?tab=reports" : undefined\}/);
+    assert.match(
+      page,
+      /href=\{\s*canUseCorrectionWorkflow\s*\n?\s*\?\s*"\/dashboard\/finance\?tab=reversals"/,
+    );
+    assert.match(page, /href=\{canCloseCashier \? "\/dashboard\/finance\?tab=close" : undefined\}/);
+    assert.match(
+      page,
+      /href=\{\s*canManageFees && canReadReceipts\s*\n?\s*\?\s*"\/dashboard\/finance\?tab=ledger"/,
+    );
+  });
+
+  it("uses the shared Button component with proper destructive styling for refund/reversal decisions", () => {
+    const approvalQueue = read("components/finance/finance-approval-queue.tsx");
+
+    // Real-money refund/reversal decisions must not be hand-rolled buttons
+    // with ad-hoc colors — they must use the shared Button component so the
+    // destructive variant is consistent with the rest of the app.
+    assert.match(approvalQueue, /import \{ Button \} from "@\/components\/ui\/button"/);
+    assert.doesNotMatch(approvalQueue, /className="rounded-xl bg-success-700/);
+    assert.doesNotMatch(approvalQueue, /className="rounded-xl border border-danger-200/);
+    assert.match(approvalQueue, /<Button type="button" onClick=\{\(\) => onDecision\("APPROVED"\)\}>/);
+    assert.match(approvalQueue, /variant="destructive"/);
+  });
+
+  it("wires the defaulter aging 'View List' shortcut to a real filtered queue, not a dead click", () => {
+    const agingSummary = read("components/finance/defaulter-aging-summary.tsx");
+    const queueTab = read("components/finance/defaulter-queue-tab.tsx");
+    const financePage = read("app/dashboard/finance/page.tsx");
+
+    assert.match(agingSummary, /onClick=\{\(\) => viewBucket\(b\.key\)\}/);
+    assert.match(agingSummary, /defaulterAgingBucket/);
+    assert.match(queueTab, /agingBucket = searchParams\.get\("defaulterAgingBucket"\)/);
+    assert.match(queueTab, /agingBucket: agingBucket \|\| null/);
+    assert.match(financePage, /id="defaulter-queue"/);
+  });
+
+  it("gives the two defaulter export buttons distinct, accurate labels for their different scope", () => {
+    const agingSummary = read("components/finance/defaulter-aging-summary.tsx");
+    const queueTab = read("components/finance/defaulter-queue-tab.tsx");
+
+    // One exports the whole unfiltered aging summary, the other exports the
+    // currently-filtered queue — they must not share the exact same label.
+    assert.match(agingSummary, /'Export Summary'/);
+    assert.match(queueTab, /"Export Queue"/);
+    assert.doesNotMatch(agingSummary, /Export Aging CSV/);
+    assert.doesNotMatch(queueTab, /Export Aging CSV/);
+  });
+
+  it("gives the fee ledger's icon-only print action both a title and an aria-label", () => {
+    const feeLedger = read("components/finance/fee-ledger.tsx");
+
+    assert.match(feeLedger, /title="Print Receipt"/);
+    assert.match(feeLedger, /aria-label="Print Receipt"/);
+  });
 });

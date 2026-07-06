@@ -7,6 +7,7 @@ import { CheckCircle2, ClipboardCheck, XCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatDateTime } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LoadingState } from '@/components/ui/loading-state';
 import { SectionCard } from '@/components/ui/section-card';
@@ -181,28 +182,27 @@ export function AttendanceCorrectionReview({
                 </div>
 
                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => reviewCorrection(correction.id, 'APPROVED')}
                     disabled={isBusy || reviewReason.trim().length < 3}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
                   >
                     <CheckCircle2 size={15} />
                     {activeReview?.action === 'APPROVED' && isBusy
                       ? 'Approving...'
                       : 'Approve'}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="destructive"
                     onClick={() => reviewCorrection(correction.id, 'REJECTED')}
                     disabled={isBusy || reviewReason.trim().length < 3}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-danger-100 bg-danger-50 px-4 text-xs font-black uppercase tracking-widest text-danger-700 transition-colors hover:bg-danger-100 disabled:opacity-50"
                   >
                     <XCircle size={15} />
                     {activeReview?.action === 'REJECTED' && isBusy
                       ? 'Rejecting...'
                       : 'Reject'}
-                  </button>
+                  </Button>
                 </div>
               </article>
             );
