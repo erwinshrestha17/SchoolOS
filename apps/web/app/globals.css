@@ -23,10 +23,8 @@
   --info: #0284C7;
   --info-soft: #E0F2FE;
 
-  /* Aliases for core design components compatibility */
-  --accent: var(--primary);
-  --accent-dark: var(--danger);
-  --teal: var(--success);
+  /* Focus ring derived from brand primary */
+  --focus-ring: rgba(21, 94, 239, 0.18);
 }
 
 /* ─── Tailwind v4 theme configuration ─── */
@@ -189,7 +187,7 @@
 }
 
 html {
-  background: #f9fafb;
+  background: var(--background);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -245,7 +243,7 @@ select:focus,
 textarea:focus {
   outline: none;
   border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 button {
@@ -263,12 +261,15 @@ button:disabled {
   border: 1px solid var(--line);
   background: var(--surface);
   border-radius: var(--radius-2xl);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-.shell-card:hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+/* Hover feedback only for interactive cards (links/buttons); static cards stay calm. */
+a.shell-card:hover,
+button.shell-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 12px 20px -12px rgba(15, 23, 42, 0.18);
 }
 
 .shell-card-elevated {
@@ -276,18 +277,6 @@ button:disabled {
   background: var(--surface);
   border-radius: var(--radius-2xl);
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
-}
-
-.glass-panel {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-}
-
-.glass-panel-dark {
-  background: rgba(15, 23, 42, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* ─── Shared control helpers ─── */
@@ -311,15 +300,15 @@ button:disabled {
 }
 
 .btn-primary {
-  border: 1px solid #0f172a;
-  background: #0f172a;
+  border: 1px solid var(--primary);
+  background: var(--primary);
   color: #ffffff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #1e293b;
-  transform: translateY(-1px);
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
 }
 
 .btn-secondary {
@@ -513,7 +502,7 @@ button:disabled {
 .search-input:focus {
   background: white;
   border-color: var(--color-primary-400);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 3px var(--focus-ring);
   outline: none;
 }
 
@@ -531,21 +520,20 @@ button:disabled {
 /* ─── Premium utility classes ─── */
 .premium-input {
   border: 1px solid #e2e8f0;
-  border-radius: 1rem;
+  border-radius: var(--radius-xl);
   background: #ffffff;
   padding: 0.75rem 1rem;
   font-size: 0.8125rem;
-  font-weight: 700;
+  font-weight: 600;
   color: #0f172a;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   outline: none;
 }
 
 .premium-input:focus {
-  border-color: #0f172a;
-  box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.05);
-  transform: translateY(-1px);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .premium-input::placeholder {
@@ -557,36 +545,5 @@ button:disabled {
   background: #f8fafc;
   color: #94a3b8;
   cursor: not-allowed;
-  transform: none;
   box-shadow: none;
-}
-
-.text-balance {
-  text-wrap: balance;
-}
-
-.font-black {
-  font-weight: 900;
-}
-
-.tracking-tighter {
-  letter-spacing: 0;
-}
-
-.tracking-tight {
-  letter-spacing: 0;
-}
-
-/* ─── Refined Card ─── */
-.shell-card {
-  border: 1px solid #f1f5f9;
-  background: #ffffff;
-  border-radius: 1rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.shell-card:hover {
-  box-shadow: 0 12px 20px -12px rgba(15, 23, 42, 0.18);
-  border-color: #e2e8f0;
 }

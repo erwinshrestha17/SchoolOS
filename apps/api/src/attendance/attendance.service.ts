@@ -2920,14 +2920,31 @@ export class AttendanceService {
 
   async getRoster(
     actor: AuthContext,
-    academicYearId: string,
+    academicYearId: string | undefined,
     classId: string,
     sectionId?: string,
     attendanceDate?: string,
   ) {
+    // Teachers cannot list academic years (academic_years:read is
+    // admin-scoped), so an omitted year resolves to the tenant's current one.
+    const resolvedAcademicYearId =
+      academicYearId ||
+      (
+        await this.prisma.academicYear.findFirst({
+          where: { tenantId: actor.tenantId, isCurrent: true },
+          select: { id: true },
+        })
+      )?.id;
+
+    if (!resolvedAcademicYearId) {
+      throw new NotFoundException(
+        'No current academic year is set for this school',
+      );
+    }
+
     const { academicYear, classroom, section } =
       await this.validateAttendanceScope(actor, {
-        academicYearId,
+        academicYearId: resolvedAcademicYearId,
         classId,
         sectionId,
       });
@@ -2948,7 +2965,7 @@ export class AttendanceService {
           enrollments: {
             some: {
               tenantId: actor.tenantId,
-              academicYearId,
+              academicYearId: resolvedAcademicYearId,
               classId,
               sectionId: sectionId ?? null,
               status: EnrollmentStatus.ACTIVE,
@@ -2967,7 +2984,7 @@ export class AttendanceService {
       this.prisma.attendanceSession.findFirst({
         where: {
           tenantId: actor.tenantId,
-          academicYearId,
+          academicYearId: resolvedAcademicYearId,
           classId,
           sectionId: sectionId ?? null,
           attendanceDate: parsedAttendanceDate,

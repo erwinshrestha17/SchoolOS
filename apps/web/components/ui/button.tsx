@@ -8,15 +8,15 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 export function Button({ className, variant = 'default', size = 'default', isLoading, children, disabled, ...props }: ButtonProps) {
-  const baseStyles = "inline-flex items-center justify-center whitespace-nowrap rounded-2xl text-sm font-bold ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]";
-  
+  const baseStyles = "inline-flex items-center justify-center whitespace-nowrap rounded-2xl text-sm font-bold ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]";
+
   const variants = {
     default: "bg-[var(--primary)] text-white hover:bg-[var(--primary-dark)] shadow-sm",
     outline: "border-2 border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700",
     secondary: "bg-slate-100 text-slate-900 hover:bg-slate-200",
     ghost: "hover:bg-slate-100 hover:text-slate-900",
     link: "text-slate-900 underline-offset-4 hover:underline",
-    destructive: "bg-rose-600 text-white hover:bg-rose-700 shadow-sm",
+    destructive: "bg-rose-600 text-white hover:bg-rose-700 shadow-sm focus-visible:ring-rose-600",
   };
 
   const sizes = {
@@ -30,12 +30,13 @@ export function Button({ className, variant = 'default', size = 'default', isLoa
     <button
       className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
       disabled={disabled || isLoading}
+      aria-busy={isLoading || undefined}
       {...props}
     >
       {isLoading ? (
         <span className="flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading...
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          {children}
         </span>
       ) : children}
     </button>

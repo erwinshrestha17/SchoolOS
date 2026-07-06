@@ -93,7 +93,7 @@ export function TenantRegistrationForm() {
           ) : null}
 
           {errors[field.name] ? (
-            <p className="mt-2 text-sm text-[var(--accent-dark)]">
+            <p className="mt-2 text-sm text-[var(--danger)]">
               {String(errors[field.name]?.message ?? '')}
             </p>
           ) : null}
@@ -103,7 +103,7 @@ export function TenantRegistrationForm() {
       <button
         type="submit"
         disabled={mutation.isPending}
-        className="rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-600 px-5 py-3 font-semibold text-white shadow-md shadow-indigo-200 transition-all hover:from-indigo-600 hover:to-violet-700 hover:shadow-lg hover:shadow-indigo-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+        className="rounded-2xl bg-[var(--primary)] px-5 py-3 font-semibold text-white shadow-md shadow-[var(--primary-soft)] transition-all hover:bg-[var(--primary-dark)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
       >
         {mutation.isPending
           ? 'Creating school workspace...'
@@ -111,14 +111,14 @@ export function TenantRegistrationForm() {
       </button>
 
       {mutation.isSuccess ? (
-        <p className="text-sm text-[var(--teal)]">
+        <p className="text-sm text-[var(--success)]">
           School workspace created. Default roles, accounts, fee heads, and
           academic year are created on the API side.
         </p>
       ) : null}
 
       {mutation.isError ? (
-        <p className="text-sm text-[var(--accent-dark)]">
+        <p className="text-sm text-[var(--danger)]">
           {mutation.error.message}
         </p>
       ) : null}

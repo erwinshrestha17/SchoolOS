@@ -385,10 +385,6 @@ export function AttendanceMarkWorkspace() {
         accentColor="emerald"
         variant="light"
       />
-      <LockedRecordBanner
-        label="Lock-window states are backend enforced"
-        reason="Open, locked, override-required, correction-window, and expired states are returned by attendance roster/session APIs where supported. This daily form preserves entries on recoverable failures."
-      />
       <AttendanceForm />
     </DashboardPageShell>
   );

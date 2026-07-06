@@ -22,7 +22,8 @@ import {
 
 export const attendanceApi = {
   getAttendanceRoster: (params: {
-    academicYearId: string;
+    /** Omitted = the backend resolves the tenant's current academic year. */
+    academicYearId?: string;
     classId: string;
     sectionId?: string | null;
     attendanceDate?: string | null;

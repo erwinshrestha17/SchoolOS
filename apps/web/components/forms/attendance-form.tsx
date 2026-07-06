@@ -5,6 +5,7 @@ import { formatNepalTime, toBsDateFromGregorian } from "@schoolos/core";
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { ApiRequestError } from "@/lib/api/client";
 import {
   clearAttendanceDraft,
   readAttendanceDraft,
@@ -19,6 +20,7 @@ import { AttendanceRosterItem } from "@/components/attendance/attendance-roster-
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import { PermissionDenied } from "@/components/ui/permission-denied";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { LoadingState } from "@/components/ui/loading-state";
 import {
@@ -87,6 +89,9 @@ export function AttendanceForm() {
     queryKey: ["academic-years"],
     queryFn: api.listAcademicYears,
   });
+  // Teachers may not hold academic_years:read; the roster API resolves the
+  // tenant's current academic year server-side when the param is omitted.
+  const yearListUnavailable = academicYearsQuery.isError;
   const classesQuery = useQuery({
     queryKey: ["classes"],
     queryFn: api.listClasses,
@@ -106,13 +111,15 @@ export function AttendanceForm() {
     ],
     queryFn: () =>
       api.getAttendanceRoster({
-        academicYearId,
+        academicYearId: academicYearId || undefined,
         classId,
         sectionId: sectionId || null,
         attendanceDate: new Date(attendanceDate).toISOString(),
       }),
     enabled: Boolean(
-      academicYearId && classId && !isFutureDate(attendanceDate),
+      (academicYearId || yearListUnavailable) &&
+        classId &&
+        !isFutureDate(attendanceDate),
     ),
   });
 
@@ -160,11 +167,46 @@ export function AttendanceForm() {
     }
   }, [academicYearsQuery.data, academicYearId]);
 
+  // When the year list is unreadable, the roster API resolves the current
+  // year server-side; adopt its id so drafts and submissions stay scoped.
   useEffect(() => {
-    if (classesQuery.data?.[0] && !classId) {
+    const resolvedYearId = rosterQuery.data?.academicYear?.id;
+    if (resolvedYearId && !academicYearId) {
+      setAcademicYearId(resolvedYearId);
+    }
+  }, [rosterQuery.data?.academicYear?.id, academicYearId]);
+
+  useEffect(() => {
+    if (classId) return;
+
+    // A teacher lands on a section they can actually mark (class-teacher
+    // section first, then subject-teaching section); everyone else starts
+    // on the first class so the roster area is never blank without context.
+    const mySection =
+      sectionsQuery.data?.find((section) => section.isAssignedClassTeacher) ??
+      sectionsQuery.data?.find((section) => section.isAssignedSubjectTeacher);
+    if (mySection) {
+      const myClassId = mySection.classId ?? mySection.class?.id;
+      if (myClassId) {
+        setClassId(myClassId);
+        setSectionId(mySection.id);
+        return;
+      }
+    }
+
+    if (
+      (sectionsQuery.isSuccess || sectionsQuery.isError) &&
+      classesQuery.data?.[0]
+    ) {
       setClassId(classesQuery.data[0].id);
     }
-  }, [classesQuery.data, classId]);
+  }, [
+    classesQuery.data,
+    classId,
+    sectionsQuery.data,
+    sectionsQuery.isSuccess,
+    sectionsQuery.isError,
+  ]);
 
   useEffect(() => {
     if (!rosterQuery.data) return;
@@ -476,11 +518,15 @@ export function AttendanceForm() {
         </div>
       )}
 
-      <AttendanceHeader
-        total={totals.total}
-        presentPercent={presentPercent}
-        exceptions={totals.absent + totals.late + totals.leave}
-      />
+      {/* Roster state strip appears only once a real roster is loaded;
+          rendering zeros before class selection reads as fake data. */}
+      {roster.length > 0 ? (
+        <AttendanceHeader
+          total={totals.total}
+          presentPercent={presentPercent}
+          exceptions={totals.absent + totals.late + totals.leave}
+        />
+      ) : null}
 
       <FilterBar
         label="Attendance Filters"
@@ -491,20 +537,34 @@ export function AttendanceForm() {
             <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
               Academic Year
             </label>
-            <select
-              value={academicYearId}
-              onChange={(e) => setAcademicYearId(e.target.value)}
-              className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
-              aria-label="Academic Year"
-            >
-              <option value="">Select Year</option>
-              {academicYearsQuery.data?.map((y) => (
-                <option key={y.id} value={y.id}>
-                  {y.name}
-                  {y.isCurrent ? " (Current)" : ""}
-                </option>
-              ))}
-            </select>
+            {yearListUnavailable ? (
+              <input
+                type="text"
+                readOnly
+                value={
+                  rosterQuery.data?.academicYear?.name ??
+                  "Current academic year"
+                }
+                title="Attendance is marked in the school's current academic year."
+                className="premium-input bg-slate-50 text-slate-600"
+                aria-label="Academic Year (current year, set by the school)"
+              />
+            ) : (
+              <select
+                value={academicYearId}
+                onChange={(e) => setAcademicYearId(e.target.value)}
+                className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
+                aria-label="Academic Year"
+              >
+                <option value="">Select Year</option>
+                {academicYearsQuery.data?.map((y) => (
+                  <option key={y.id} value={y.id}>
+                    {y.name}
+                    {y.isCurrent ? " (Current)" : ""}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -629,11 +689,24 @@ export function AttendanceForm() {
         {rosterQuery.isLoading ? (
           <LoadingState label="Loading roster..." />
         ) : rosterQuery.isError ? (
-          <ErrorState
-            title="Attendance roster could not load"
-            message="Please check the selected class, section, and date, then try again."
-            onRetry={() => void rosterQuery.refetch()}
-          />
+          rosterQuery.error instanceof ApiRequestError &&
+          rosterQuery.error.statusCode === 403 ? (
+            <PermissionDenied
+              title="This roster is not available to your account"
+              description={
+                rosterQuery.error.message ||
+                "Attendance marking is limited to assigned class teachers. Ask a school administrator if you believe you should have access."
+              }
+              resource="Attendance roster"
+              showNavigation={false}
+            />
+          ) : (
+            <ErrorState
+              title="Attendance roster could not load"
+              error={rosterQuery.error}
+              onRetry={() => void rosterQuery.refetch()}
+            />
+          )
         ) : futureDateBlocked ? (
           <EmptyState
             title="Date Not Allowed"

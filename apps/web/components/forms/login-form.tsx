@@ -85,7 +85,7 @@ export function LoginForm() {
           Enter the school code provided by your school administrator.
         </p>
         {errors.tenantSlug ? (
-          <p className="mt-2 text-sm text-[var(--accent-dark)]">
+          <p className="mt-2 text-sm text-[var(--danger)]">
             {errors.tenantSlug.message}
           </p>
         ) : null}
@@ -103,7 +103,7 @@ export function LoginForm() {
           autoComplete="email"
         />
         {errors.email ? (
-          <p className="mt-2 text-sm text-[var(--accent-dark)]">
+          <p className="mt-2 text-sm text-[var(--danger)]">
             {errors.email.message}
           </p>
         ) : null}
@@ -121,7 +121,7 @@ export function LoginForm() {
           autoComplete="current-password"
         />
         {errors.password ? (
-          <p className="mt-2 text-sm text-[var(--accent-dark)]">
+          <p className="mt-2 text-sm text-[var(--danger)]">
             {errors.password.message}
           </p>
         ) : null}
@@ -130,23 +130,23 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={mutation.isPending}
-        className="rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-600 px-5 py-3 font-semibold text-white shadow-md shadow-indigo-200 transition-all hover:from-indigo-600 hover:to-violet-700 hover:shadow-lg hover:shadow-indigo-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+        className="rounded-2xl bg-[var(--primary)] px-5 py-3 font-semibold text-white shadow-md shadow-[var(--primary-soft)] transition-all hover:bg-[var(--primary-dark)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
       >
         {mutation.isPending ? "Signing in..." : "Sign in"}
       </button>
 
       {mutation.isError ? (
-        <p className="text-sm text-[var(--accent-dark)]">
+        <p className="text-sm text-[var(--danger)]">
           {mutation.error.message}
         </p>
       ) : null}
 
       {challengeMessage ? (
-        <p className="text-sm text-[var(--accent)]">{challengeMessage}</p>
+        <p className="text-sm text-[var(--primary)]">{challengeMessage}</p>
       ) : null}
 
       {mutation.isSuccess && !challengeMessage ? (
-        <p className="text-sm text-[var(--teal)]">Login request completed.</p>
+        <p className="text-sm text-[var(--success)]">Login request completed.</p>
       ) : null}
     </form>
   );

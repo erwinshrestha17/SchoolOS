@@ -50,8 +50,10 @@ export class AttendanceController {
   @Permissions('attendance:read')
   getRoster(
     @CurrentAuth() auth: AuthContext,
-    @Query('academicYearId') academicYearId: string,
     @Query('classId') classId: string,
+    // Optional: teachers without academic_years:read cannot list years, so
+    // the service falls back to the tenant's current academic year.
+    @Query('academicYearId') academicYearId?: string,
     @Query('sectionId') sectionId?: string,
     @Query('attendanceDate') attendanceDate?: string,
   ) {

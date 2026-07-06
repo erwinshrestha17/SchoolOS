@@ -899,6 +899,7 @@ describe("SchoolOS web production contracts", () => {
 
   it("uses authenticated session metadata and real shell APIs in the header", () => {
     const header = read("components/layout/header.tsx");
+    const bell = read("components/layout/notification-bell.tsx");
 
     assert.match(
       header,
@@ -906,7 +907,15 @@ describe("SchoolOS web production contracts", () => {
     );
     assert.match(header, /session\?\.tenant\.name/);
     assert.match(header, /api\.listAcademicYears/);
-    assert.match(header, /api\.listNotificationDeliveries/);
+    // The academic-year chip is an honest read-only indicator of the
+    // backend-owned current year; it must not pretend to switch context.
+    assert.match(header, /currentAcademicYear/);
+    assert.doesNotMatch(header, /setSelectedAcademicYearId/);
+    // Notification data is owned by the bell itself; the header must not
+    // duplicate delivery fetches it never renders.
+    assert.match(header, /<NotificationBell/);
+    assert.doesNotMatch(header, /api\.listNotificationDeliveries/);
+    assert.match(bell, /api\.getNotificationCenter/);
     assert.match(header, /void logout\(\)/);
     assert.doesNotMatch(header, /const unreadCount = 3/);
     assert.doesNotMatch(header, /2081-82|2080-81|2079-80/);
@@ -984,8 +993,15 @@ describe("SchoolOS web production contracts", () => {
       dashboardPrimitives,
       /rounded-\[2rem\]|bg-slate-950|shadow-xl|shadow-2xl/,
     );
-    assert.match(globals, /\.tracking-tight\s*\{\s*letter-spacing: 0;/);
-    assert.match(globals, /\.shell-card\s*\{[\s\S]*border-radius: 1rem;/);
+    // Tailwind utilities must not be globally overridden by custom hacks.
+    assert.doesNotMatch(globals, /\.tracking-tight(er)?\s*\{/);
+    assert.doesNotMatch(globals, /\.font-black\s*\{/);
+    // One canonical .shell-card definition, driven by design tokens.
+    assert.strictEqual(globals.match(/^\.shell-card\s*\{/gm)?.length, 1);
+    assert.match(globals, /\.shell-card\s*\{[\s\S]*?border-radius: var\(--radius-2xl\);/);
+    // Focus rings derive from the brand primary, not an off-brand indigo.
+    assert.match(globals, /--focus-ring: rgba\(21, 94, 239/);
+    assert.doesNotMatch(globals, /rgba\(99, 102, 241/);
   });
 
   it("keeps admin dashboard quick actions on existing Phase 1 routes", () => {

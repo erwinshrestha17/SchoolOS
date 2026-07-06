@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { ReceiptVerificationPanel } from "./receipt-verification-panel";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ErrorState } from "@/components/ui/error-state";
+import { SearchInput } from "@/components/ui/search-input";
 import { ReprintDialog } from "./reprint-dialog";
 import { useSession } from "@/components/session-provider";
 
@@ -72,31 +73,27 @@ export function LedgerSection() {
       <ReceiptVerificationPanel />
 
       <FilterBar label="Ledger Filters">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-          <input
-            type="text"
+        <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
+          <SearchInput
+            label="Search billing history"
             placeholder="Search by invoice or student..."
             value={search}
-            onChange={(event) =>
-              updateFilters({ ledgerSearch: event.target.value })
-            }
-            className="w-full text-sm bg-white border-slate-200 rounded-xl px-4 py-2"
+            debounceMs={300}
+            onChange={(value) => updateFilters({ ledgerSearch: value })}
           />
           <select
             value={status}
             onChange={(event) =>
               updateFilters({ ledgerStatus: event.target.value })
             }
-            className="w-full text-sm bg-white border-slate-200 rounded-xl px-4 py-2"
+            aria-label="Invoice status"
+            className="h-11 w-full rounded-lg border-slate-200 bg-white px-4 py-2 text-sm"
           >
             <option value="">All Statuses</option>
             <option value="PAID">Paid</option>
             <option value="PARTIAL">Partial</option>
             <option value="ISSUED">Issued</option>
             <option value="VOID">Void</option>
-          </select>
-          <select className="w-full text-sm bg-white border-slate-200 rounded-xl px-4 py-2">
-            <option value="">All Academic Years</option>
           </select>
         </div>
       </FilterBar>
@@ -146,13 +143,13 @@ export function LedgerSection() {
         title="Receipt History"
         description="Tenant-scoped protected receipts with server-side search and paging."
       >
-        <input
-          value={receiptSearch}
-          onChange={(event) =>
-            updateFilters({ receiptSearch: event.target.value })
-          }
+        <SearchInput
+          label="Search receipts"
           placeholder="Search receipt, invoice or student"
-          className="mb-4 h-11 w-full rounded-xl border border-slate-200 px-4 text-sm"
+          value={receiptSearch}
+          debounceMs={300}
+          onChange={(value) => updateFilters({ receiptSearch: value })}
+          className="mb-4"
         />
         {receiptsQuery.isLoading ? (
           <p className="py-8 text-center text-sm font-semibold text-slate-500">

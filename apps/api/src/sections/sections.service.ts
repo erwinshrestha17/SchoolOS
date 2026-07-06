@@ -16,18 +16,31 @@ export class SectionsService {
   ) {}
 
   async listSections(actor: AuthContext) {
-    const sections = await this.prisma.section.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        class: true,
-        _count: {
-          select: {
-            students: true,
+    const [sections, staff] = await Promise.all([
+      this.prisma.section.findMany({
+        where: { tenantId: actor.tenantId },
+        include: {
+          class: true,
+          _count: {
+            select: {
+              students: true,
+            },
           },
         },
-      },
-      orderBy: [{ class: { level: 'asc' } }, { name: 'asc' }],
-    });
+        orderBy: [{ class: { level: 'asc' } }, { name: 'asc' }],
+      }),
+      this.prisma.staff.findFirst({
+        where: { userId: actor.userId, tenantId: actor.tenantId },
+        select: { id: true },
+      }),
+    ]);
+
+    const subjectAssignments = staff
+      ? await this.prisma.subjectTeacherAssignment.findMany({
+          where: { tenantId: actor.tenantId, staffId: staff.id },
+          select: { classId: true, sectionId: true },
+        })
+      : [];
 
     return sections.map((section) => ({
       id: section.id,
@@ -38,6 +51,16 @@ export class SectionsService {
         name: section.class.name,
       },
       studentCount: section._count.students,
+      // Lets teacher-facing screens default to the caller's own section
+      // without exposing staff ids to the browser.
+      isAssignedClassTeacher: Boolean(
+        staff && section.classTeacherId === staff.id,
+      ),
+      isAssignedSubjectTeacher: subjectAssignments.some(
+        (assignment) =>
+          assignment.sectionId === section.id ||
+          (!assignment.sectionId && assignment.classId === section.classId),
+      ),
     }));
   }
 

@@ -61,6 +61,17 @@ const formatCurrency = (amount: number) =>
     maximumFractionDigits: 0,
   }).format(amount);
 
+const CASHIER_CLOSE_STATE_LABELS: Record<string, string> = {
+  NOT_STARTED: "Not started",
+  OPEN: "Open",
+  PENDING_REVIEW: "Pending review",
+  CLOSED: "Closed",
+};
+
+const formatCashierCloseState = (state: string) =>
+  CASHIER_CLOSE_STATE_LABELS[state] ??
+  state.replaceAll("_", " ").toLowerCase().replace(/^./, (c) => c.toUpperCase());
+
 export default function FinancePage() {
   const { hasPermissions, session } = useSession();
   const router = useRouter();
@@ -229,9 +240,11 @@ export default function FinancePage() {
           },
         ]
       : []),
+    ...(canManageFees
+      ? [{ value: "setup", label: "Discounts & Setup", icon: Settings }]
+      : []),
     ...(canUseCorrectionWorkflow
       ? [
-          { value: "setup", label: "Discounts & Setup", icon: Settings },
           {
             value: "reversals",
             label: "Refunds / Reversals",
@@ -320,14 +333,13 @@ export default function FinancePage() {
           <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
             <KpiCard
               title="Collected Today"
+              loading={summaryQuery.isLoading}
               value={
-                summaryQuery.isLoading
-                  ? "Loading"
-                  : summaryQuery.data
-                    ? formatCurrency(
-                        Number(summaryQuery.data.collectedToday.netAmount),
-                      )
-                    : "Unavailable"
+                summaryQuery.data
+                  ? formatCurrency(
+                      Number(summaryQuery.data.collectedToday.netAmount),
+                    )
+                  : "Unavailable"
               }
               icon={<Wallet size={20} />}
               tone="success"
@@ -340,14 +352,11 @@ export default function FinancePage() {
             />
             <KpiCard
               title="Total Due"
+              loading={summaryQuery.isLoading}
               value={
-                summaryQuery.isLoading
-                  ? "Loading"
-                  : summaryQuery.data
-                    ? formatCurrency(
-                        Number(summaryQuery.data.outstanding.amount),
-                      )
-                    : "Unavailable"
+                summaryQuery.data
+                  ? formatCurrency(Number(summaryQuery.data.outstanding.amount))
+                  : "Unavailable"
               }
               icon={<Wallet size={20} />}
               tone="neutral"
@@ -356,12 +365,11 @@ export default function FinancePage() {
             />
             <KpiCard
               title="Overdue Students"
+              loading={canManageFees && summaryQuery.isLoading}
               value={
                 !canManageFees
                   ? "Restricted"
-                  : summaryQuery.isLoading
-                    ? "Loading"
-                    : (summaryQuery.data?.overdue.studentCount ?? "Unavailable")
+                  : (summaryQuery.data?.overdue.studentCount ?? "Unavailable")
               }
               icon={<FileText size={20} />}
               tone={
@@ -376,11 +384,8 @@ export default function FinancePage() {
             />
             <KpiCard
               title="Pending Corrections"
-              value={
-                summaryQuery.isLoading
-                  ? "Loading"
-                  : (summaryQuery.data?.pendingApprovalCount ?? "Unavailable")
-              }
+              loading={summaryQuery.isLoading}
+              value={summaryQuery.data?.pendingApprovalCount ?? "Unavailable"}
               icon={<ShieldAlert size={20} />}
               tone={
                 summaryQuery.data?.pendingApprovalCount ? "warning" : "neutral"
@@ -394,12 +399,13 @@ export default function FinancePage() {
             />
             <KpiCard
               title="Cashier Close Status"
+              loading={canCloseCashier && summaryQuery.isLoading}
               value={
                 !canCloseCashier
                   ? "Restricted"
-                  : summaryQuery.isLoading
-                    ? "Loading"
-                    : (summaryQuery.data?.cashierClose.state ?? "Unavailable")
+                  : summaryQuery.data
+                    ? formatCashierCloseState(summaryQuery.data.cashierClose.state)
+                    : "Unavailable"
               }
               icon={<History size={20} />}
               tone={
@@ -412,12 +418,11 @@ export default function FinancePage() {
             />
             <KpiCard
               title="Receipts Issued"
+              loading={canReadReceipts && summaryQuery.isLoading}
               value={
                 !canReadReceipts
                   ? "Restricted"
-                  : summaryQuery.isLoading
-                    ? "Loading"
-                    : (summaryQuery.data?.receiptsIssued ?? "Unavailable")
+                  : (summaryQuery.data?.receiptsIssued ?? "Unavailable")
               }
               icon={<Receipt size={20} />}
               tone="neutral"

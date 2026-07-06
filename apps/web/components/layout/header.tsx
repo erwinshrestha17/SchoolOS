@@ -28,12 +28,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
   const router = useRouter();
   const { hasPermissions, session, status, logout } = useSession();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [yearMenuOpen, setYearMenuOpen] = useState(false);
-  const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<
-    string | null
-  >(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const yearMenuRef = useRef<HTMLDivElement>(null);
 
   const canReadAcademicYears = hasPermissions(['academic_years:read']);
   const canReadNotifications = hasPermissions(['notices:read']);
@@ -44,18 +39,9 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
     enabled: status === 'authenticated' && canReadAcademicYears,
   });
 
-  const deliveriesQuery = useQuery({
-    queryKey: ['header-notification-deliveries'],
-    queryFn: api.listNotificationDeliveries,
-    enabled: status === 'authenticated' && canReadNotifications,
-  });
-
   const academicYears = academicYearsQuery.data ?? [];
   const currentAcademicYear =
     academicYears.find((year) => year.isCurrent) ?? academicYears[0];
-  const selectedAcademicYear =
-    academicYears.find((year) => year.id === selectedAcademicYearId) ??
-    currentAcademicYear;
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -65,22 +51,10 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
       ) {
         setUserMenuOpen(false);
       }
-      if (
-        yearMenuRef.current &&
-        !yearMenuRef.current.contains(e.target as Node)
-      ) {
-        setYearMenuOpen(false);
-      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    if (!selectedAcademicYearId && currentAcademicYear) {
-      setSelectedAcademicYearId(currentAcademicYear.id);
-    }
-  }, [currentAcademicYear, selectedAcademicYearId]);
 
   const initials = session?.user.email
     ? session.user.email
@@ -129,72 +103,22 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
       </div>
 
       <div className="ml-auto flex items-center gap-3">
-        <div className="relative" ref={yearMenuRef}>
-          <button
-            type="button"
-            onClick={() => setYearMenuOpen(!yearMenuOpen)}
-            className="hidden h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-[var(--primary-soft)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 disabled:opacity-50 sm:flex"
-            disabled={!canReadAcademicYears || academicYears.length === 0}
-            aria-expanded={yearMenuOpen}
-            aria-haspopup="menu"
-            aria-label="Select academic year"
+        {canReadAcademicYears && currentAcademicYear ? (
+          <div
+            className="hidden h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm sm:flex"
+            title="Active academic year. Change it in School Settings."
           >
             <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
               AY
             </span>
-            <span>{selectedAcademicYear?.name ?? 'Not set'}</span>
-            <ChevronDown
-              size={14}
-              className={cn(
-                'text-slate-400 transition-transform duration-200',
-                yearMenuOpen && 'rotate-180',
-              )}
-            />
-          </button>
-
-          {yearMenuOpen && (
-            <div
-              className="dropdown-menu animate-scale-in"
-              role="menu"
-              style={{ minWidth: '180px' }}
-            >
-              <div className="border-b border-slate-50 px-3 py-2">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Select Academic Year
-                </p>
-              </div>
-              <div className="p-1">
-                {academicYears.map((year) => (
-                  <button
-                    key={year.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedAcademicYearId(year.id);
-                      setYearMenuOpen(false);
-                    }}
-                    className={cn(
-                      'dropdown-item w-full transition-all duration-150',
-                      year.id === selectedAcademicYear?.id
-                        ? 'bg-[var(--primary-soft)] text-[var(--primary-dark)] font-bold'
-                        : 'text-slate-600',
-                    )}
-                    role="menuitem"
-                  >
-                    <span className="flex-1 text-left">{year.name}</span>
-                    {year.isCurrent && (
-                      <Badge
-                        variant="success"
-                        className="h-4.5 px-1.5 text-[0.6rem]"
-                      >
-                        Current
-                      </Badge>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+            <span>{currentAcademicYear.name}</span>
+            {currentAcademicYear.isCurrent ? (
+              <Badge variant="success" className="h-4.5 px-1.5 text-[0.6rem]">
+                Current
+              </Badge>
+            ) : null}
+          </div>
+        ) : null}
 
         <NotificationBell enabled={canReadNotifications} />
 

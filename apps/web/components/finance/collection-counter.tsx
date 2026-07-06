@@ -97,6 +97,19 @@ export function CollectionCounter({
   const [reference, setReference] = useState("");
   const [remarks, setRemarks] = useState("");
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
+  const [searchInput, setSearchInput] = useState(searchQuery);
+
+  // Debounce the server-side invoice search so the counter does not fire a
+  // request (and a URL update) on every keystroke.
+  useEffect(() => {
+    setSearchInput(searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (searchInput === searchQuery) return;
+    const timeoutId = window.setTimeout(() => onSearch(searchInput), 300);
+    return () => window.clearTimeout(timeoutId);
+  }, [searchInput, searchQuery, onSearch]);
 
   const selectedInvoice = useMemo(
     () => invoices.find((inv) => inv.id === selectedInvoiceId) || null,
@@ -216,9 +229,9 @@ export function CollectionCounter({
                 />
                 <Input
                   type="text"
-                  value={searchQuery}
+                  value={searchInput}
                   onChange={(e) => {
-                    onSearch(e.target.value);
+                    setSearchInput(e.target.value);
                   }}
                   placeholder="Find student or invoice..."
                   className="pl-12 h-14 rounded-2xl border-slate-100 bg-slate-50/50 focus:bg-white transition-all shadow-sm"
@@ -451,21 +464,26 @@ export function CollectionCounter({
                     </div>
                   )}
 
-                  <div className="grid gap-8 md:grid-cols-2">
+                  <div className="grid gap-8 2xl:grid-cols-2">
                     <div className="space-y-6">
                       <div className="space-y-3">
                         <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">
                           Collection Amount
                         </label>
-                        <div className="relative group">
-                          <span className="absolute left-6 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400 pointer-events-none transition-colors group-focus-within:text-[var(--color-mod-fees-accent)]">
+                        <div className="group flex h-20 items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/50 px-5 transition-all focus-within:bg-white focus-within:ring-4 focus-within:ring-[var(--color-mod-fees-accent)]/10">
+                          <span className="shrink-0 text-sm font-black text-slate-400 transition-colors group-focus-within:text-[var(--color-mod-fees-accent)]">
                             NPR
                           </span>
-                          <Input
+                          <input
                             type="number"
+                            min={0}
                             value={amount}
                             onChange={(e) => setAmount(Number(e.target.value))}
-                            className="pl-20 text-3xl font-black h-20 rounded-2xl border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-[var(--color-mod-fees-accent)]/10 transition-all"
+                            // A scroll over a focused number input silently
+                            // changes the value — unacceptable for money.
+                            onWheel={(e) => e.currentTarget.blur()}
+                            aria-label="Collection amount in NPR"
+                            className="h-full w-full min-w-0 border-0 bg-transparent p-0 text-3xl font-black text-slate-900 shadow-none outline-none focus:shadow-none focus:ring-0"
                           />
                         </div>
                       </div>
@@ -526,8 +544,9 @@ export function CollectionCounter({
                           <button
                             key={m.id}
                             onClick={() => setMethod(m.id)}
+                            aria-pressed={method === m.id}
                             className={cn(
-                              "flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-300",
+                              "flex items-center gap-3 p-3 rounded-2xl border-2 transition-all duration-300",
                               method === m.id
                                 ? "bg-[var(--color-mod-fees-bg)] border-[var(--color-mod-fees-border)] text-[var(--color-mod-fees-text)] shadow-sm"
                                 : "bg-white border-slate-100 text-slate-600 hover:border-[var(--color-mod-fees-border)]",
@@ -535,13 +554,13 @@ export function CollectionCounter({
                           >
                             <div
                               className={cn(
-                                "h-8 w-8 rounded-lg flex items-center justify-center",
+                                "h-8 w-8 shrink-0 rounded-lg flex items-center justify-center",
                                 method === m.id ? "bg-white" : "bg-slate-50",
                               )}
                             >
                               {m.icon}
                             </div>
-                            <span className="text-[0.7rem] font-black uppercase tracking-wider">
+                            <span className="min-w-0 text-left text-xs font-bold leading-tight">
                               {m.label}
                             </span>
                           </button>
@@ -573,7 +592,7 @@ export function CollectionCounter({
                           amount <= 0 ||
                           amount > invoiceDetailQuery.data.outstandingAmount
                         }
-                        className="flex items-center gap-3 px-12 py-4 bg-[var(--color-mod-fees-accent)] text-white rounded-2xl font-black text-sm shadow-sm transition-all hover:bg-[var(--color-mod-fees-text)] active:scale-95 disabled:opacity-50"
+                        className="flex items-center gap-3 whitespace-nowrap rounded-2xl bg-[var(--color-mod-fees-accent)] px-8 py-4 text-sm font-black text-white shadow-sm transition-all hover:bg-[var(--color-mod-fees-text)] active:scale-95 disabled:opacity-50"
                       >
                         <CheckSquare size={20} />
                         {isSubmitting

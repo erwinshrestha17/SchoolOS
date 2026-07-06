@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { CollectionCounter } from "./collection-counter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -97,9 +97,35 @@ export function CollectionSection({
       }
       void queryClient.invalidateQueries({ queryKey: ["receipts"] });
       void queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      // Keep the header KPIs (collected today, receipts issued, close state)
+      // honest right after a collection instead of waiting for a reload.
+      void queryClient.invalidateQueries({
+        queryKey: ["finance-dashboard-summary"],
+      });
     },
   });
+
+  const receiptBannerRef = useRef<HTMLDivElement>(null);
+  const paymentErrorRef = useRef<HTMLDivElement>(null);
+
+  // The dashboard scrolls inside #dashboard-main, not the window, so bring
+  // the payment outcome (receipt or failure) into view explicitly — the
+  // cashier is otherwise left looking at the bottom of the form.
+  useEffect(() => {
+    if (!lastReceipt) return;
+    receiptBannerRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [lastReceipt]);
+
+  useEffect(() => {
+    if (!paymentMutation.isError) return;
+    paymentErrorRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [paymentMutation.isError]);
 
   const visibleInvoices = isStudentContextMode
     ? (studentCollectionContext?.invoices ?? [])
@@ -132,7 +158,10 @@ export function CollectionSection({
   return (
     <div className="space-y-8">
       {lastReceipt && (
-        <div className="animate-in slide-in-from-top-4 flex items-center justify-between rounded-xl border border-success-100 bg-success-50 p-6 shadow-sm duration-500">
+        <div
+          ref={receiptBannerRef}
+          className="animate-in slide-in-from-top-4 flex items-center justify-between rounded-xl border border-success-100 bg-success-50 p-6 shadow-sm duration-500"
+        >
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success-500 text-white shadow-lg shadow-success-500/20">
               <CheckCircle2 size={24} />
@@ -184,7 +213,10 @@ export function CollectionSection({
       ) : null}
 
       {paymentMutation.isError && (
-        <div className="animate-fade-in flex items-center gap-4 rounded-xl border border-danger-100 bg-danger-50 p-6 text-sm font-bold text-danger-800">
+        <div
+          ref={paymentErrorRef}
+          className="animate-fade-in flex items-center gap-4 rounded-xl border border-danger-100 bg-danger-50 p-6 text-sm font-bold text-danger-800"
+        >
           <AlertCircle size={24} className="text-danger-500" />
           <div className="flex flex-col">
             <span className="text-[0.65rem] uppercase tracking-widest text-danger-600 mb-1">

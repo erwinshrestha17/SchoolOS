@@ -96,6 +96,57 @@ describe('attendance production hardening', () => {
     );
   });
 
+  it('resolves the tenant current academic year when none is provided', async () => {
+    const student = buildStudent({
+      rollNumber: 1,
+      guardianLinks: [],
+      severeAllergies: null,
+      medicalConditions: null,
+      specialNeeds: null,
+    });
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-current' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
+      students: [student],
+    });
+
+    await service.getRoster(
+      teacherActor,
+      undefined,
+      'class-1',
+      'section-1',
+      '2026-04-28',
+    );
+
+    expect(prisma.academicYear.findFirst).toHaveBeenCalledWith({
+      where: { tenantId: teacherActor.tenantId, isCurrent: true },
+      select: { id: true },
+    });
+    expect(prisma.student.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          enrollments: {
+            some: expect.objectContaining({ academicYearId: 'ay-current' }),
+          },
+        }),
+      }),
+    );
+  });
+
+  it('rejects an omitted academic year when no current year is set', async () => {
+    const { service, prisma } = buildService({
+      academicYear: null,
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      students: [],
+    });
+
+    await expect(
+      service.getRoster(teacherActor, undefined, 'class-1'),
+    ).rejects.toThrow('No current academic year is set for this school');
+    expect(prisma.student.findMany).not.toHaveBeenCalled();
+  });
+
   it('builds the school-facing monthly register from a BS month boundary', async () => {
     const { service, prisma } = buildService({
       classroom: { id: 'class-1', name: 'Grade 1' },

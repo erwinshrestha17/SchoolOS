@@ -261,6 +261,7 @@ async function main() {
 
   await seedChartAccounts(tenant.id);
   await seedAccountingReportMappings(tenant.id);
+  await seedFiscalYear(tenant.id);
   await seedFeeHeads(tenant.id);
 
   await seedUsersWithRoles(tenant.id);
@@ -632,6 +633,83 @@ async function seedAccountingReportMappings(tenantId: string) {
       },
     });
   }
+}
+
+async function seedFiscalYear(tenantId: string) {
+  console.log('Seeding demo fiscal year with open monthly periods...');
+
+  // Payment, receipt, and accounting postings require an OPEN fiscal period
+  // covering the posting date (AccountingPostingService.ensurePostingPeriodIsOpen).
+  // Keep the demo evergreen: 12 monthly periods centered on the seed date.
+  const now = new Date();
+  const startDate = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 6, 1),
+  );
+  const endDate = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 6, 0),
+  );
+
+  const existing = await prisma.fiscalYear.findFirst({
+    where: {
+      tenantId,
+      startDate: { lte: now },
+      endDate: { gte: now },
+    },
+  });
+
+  if (existing) {
+    console.log(`- Fiscal year "${existing.name}" already covers today.`);
+    return;
+  }
+
+  const periods: {
+    tenantId: string;
+    label: string;
+    periodNumber: number;
+    startDate: Date;
+    endDate: Date;
+  }[] = [];
+  const cursor = new Date(startDate);
+  let periodNumber = 1;
+
+  while (cursor <= endDate && periodNumber <= 12) {
+    const periodStart = new Date(cursor);
+    const periodEnd = new Date(
+      Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 0),
+    );
+
+    periods.push({
+      tenantId,
+      label: `${String(periodStart.getUTCFullYear())}-${String(
+        periodStart.getUTCMonth() + 1,
+      ).padStart(2, '0')}`,
+      periodNumber,
+      startDate: periodStart,
+      endDate: periodEnd > endDate ? endDate : periodEnd,
+    });
+
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    periodNumber += 1;
+  }
+
+  const fiscalYear = await prisma.fiscalYear.create({
+    data: {
+      tenantId,
+      name: `Demo FY ${String(startDate.getUTCFullYear())}/${String(
+        endDate.getUTCFullYear(),
+      ).slice(-2)}`,
+      startDate,
+      endDate,
+      periods: { create: periods },
+    },
+    include: { periods: true },
+  });
+
+  console.log(
+    `- Created "${fiscalYear.name}" with ${String(
+      fiscalYear.periods.length,
+    )} open periods.`,
+  );
 }
 
 async function seedFeeHeads(tenantId: string) {
