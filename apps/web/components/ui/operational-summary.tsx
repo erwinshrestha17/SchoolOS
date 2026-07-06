@@ -11,7 +11,6 @@ import {
 import { AlertTriangle, ArrowRight, Clock3, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
-import { Button } from "./button";
 import { ErrorState } from "./error-state";
 import { LoadingState } from "./loading-state";
 import { ModuleLockedState } from "./module-locked-state";
@@ -339,17 +338,15 @@ export function OperationalSummaryError({ onRetry }: { onRetry: () => void }) {
 
 export function RefreshSummaryButton({ onClick }: { onClick: () => void }) {
   return (
-    <Button
+    <button
       type="button"
-      size="sm"
-      variant="outline"
-      className="w-9 px-0"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border-2 border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2"
       onClick={onClick}
       aria-label="Refresh dashboard"
       title="Refresh dashboard"
     >
-      <RefreshCw className="h-4 w-4" aria-hidden="true" />
-    </Button>
+      <RefreshCw size={18} strokeWidth={2.25} />
+    </button>
   );
 }
 
