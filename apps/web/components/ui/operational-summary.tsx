@@ -339,9 +339,16 @@ export function OperationalSummaryError({ onRetry }: { onRetry: () => void }) {
 
 export function RefreshSummaryButton({ onClick }: { onClick: () => void }) {
   return (
-    <Button type="button" size="sm" variant="outline" onClick={onClick}>
-      <RefreshCw className="h-4 w-4" />
-      Refresh
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className="w-9 px-0"
+      onClick={onClick}
+      aria-label="Refresh dashboard"
+      title="Refresh dashboard"
+    >
+      <RefreshCw className="h-4 w-4" aria-hidden="true" />
     </Button>
   );
 }

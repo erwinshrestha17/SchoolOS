@@ -21,7 +21,6 @@ import {
   UserRound,
   Wallet,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 type StudentProfileTabShortcut = 'Overview' | 'Attendance' | 'Fees' | 'Documents' | 'Guardians';
 
@@ -201,9 +200,12 @@ export function ProfileHeader({
             align="right"
             label="Student profile actions"
             trigger={
-              <button type="button" className={secondaryActionClass}>
+              <button
+                type="button"
+                className="flex h-11 w-11 items-center justify-center self-end rounded-xl border border-slate-200 bg-white p-0 text-slate-700 shadow-sm transition hover:border-[var(--color-mod-admissions-accent)] hover:bg-[var(--color-mod-admissions-bg)] hover:text-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
+                title="More actions"
+              >
                 <MoreHorizontal size={18} aria-hidden="true" />
-                More actions
               </button>
             }
             items={[
@@ -246,11 +248,6 @@ export function ProfileHeader({
     </SectionCard>
   );
 }
-
-const secondaryActionClass = cn(
-  'flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition',
-  'hover:border-[var(--color-mod-admissions-accent)] hover:bg-[var(--color-mod-admissions-bg)] hover:text-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2',
-);
 
 function initials(name: string) {
   return name
