@@ -681,10 +681,6 @@ export type SectionSummary = {
   };
   capacity: number | null;
   studentCount?: number;
-  /** True when the requesting user is this section's class teacher. */
-  isAssignedClassTeacher?: boolean;
-  /** True when the requesting user teaches a subject in this section. */
-  isAssignedSubjectTeacher?: boolean;
 };
 
 export type SubjectSummary = {
