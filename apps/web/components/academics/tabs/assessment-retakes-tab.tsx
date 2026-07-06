@@ -27,6 +27,7 @@ import {
 import { academicsApi } from '@/lib/api/academics';
 import { BsDateField } from '@/components/ui/bs-date-field';
 import { Button } from '@/components/ui/button';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
   Dialog,
   DialogContent,
@@ -598,21 +599,32 @@ function RetakeActions({
   if (retake.status === 'REQUESTED') {
     return (
       <>
-        <IconAction
-          title="Approve request"
-          icon={<Check className="h-4 w-4" />}
+        <Button
+          type="button"
+          size="sm"
           onClick={() => onAction('approve', retake)}
-        />
-        <IconAction
-          title="Reject request"
-          icon={<X className="h-4 w-4" />}
+        >
+          <Check className="mr-1.5 h-4 w-4" />
+          Approve
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="destructive"
           onClick={() => onAction('reject', retake)}
-        />
-        <IconAction
-          title="Cancel request"
-          icon={<Ban className="h-4 w-4" />}
+        >
+          <X className="mr-1.5 h-4 w-4" />
+          Reject
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
           onClick={() => onAction('cancel', retake)}
-        />
+        >
+          <Ban className="mr-1.5 h-4 w-4" />
+          Cancel
+        </Button>
       </>
     );
   }
@@ -668,17 +680,18 @@ function IconAction({
   onClick: () => void;
 }) {
   return (
-    <Button
-      type="button"
-      size="icon"
-      variant="outline"
-      className="h-9 w-9 rounded-lg p-0"
-      title={title}
-      aria-label={title}
-      onClick={onClick}
-    >
-      {icon}
-    </Button>
+    <Tooltip content={title}>
+      <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        className="h-9 w-9 rounded-lg p-0"
+        aria-label={title}
+        onClick={onClick}
+      >
+        {icon}
+      </Button>
+    </Tooltip>
   );
 }
 

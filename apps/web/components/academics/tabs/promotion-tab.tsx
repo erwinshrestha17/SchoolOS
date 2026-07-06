@@ -23,6 +23,15 @@ import {
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Toast, ToastTone } from '@/components/ui/toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 type PromotionNotice = {
   title: string;
@@ -56,6 +65,7 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [notice, setNotice] = useState<PromotionNotice | null>(null);
+  const [detailStudent, setDetailStudent] = useState<PromotionReadiness | null>(null);
 
   const readinessQuery = useQuery({
     queryKey: ['promotion-readiness', promo.academicYearId, promo.fromClassId, filters.sectionId, filters.status],
@@ -362,11 +372,9 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
                                   <Lock size={14} />
                                </div>
                              )}
-                             <button 
+                             <button
                               className="h-8 px-4 rounded-xl bg-[var(--color-mod-academics-surface)] text-[10px] font-black uppercase tracking-widest text-[var(--color-mod-academics-accent)] hover:bg-[var(--color-mod-academics-accent)] hover:text-white transition-all active:scale-95"
-                              onClick={() => {
-                                // Scroll to marks/results if review needed
-                              }}
+                              onClick={() => setDetailStudent(s)}
                              >
                                 Details
                              </button>
@@ -421,6 +429,54 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
         onConfirm={confirmBatchPromote}
         onClose={() => setConfirmOpen(false)}
       />
+
+      <Dialog open={detailStudent !== null} onOpenChange={(open: boolean) => !open && setDetailStudent(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{detailStudent?.studentName}</DialogTitle>
+            <DialogDescription>
+              {detailStudent?.studentSystemId} — Grade {detailStudent?.grade}, GPA {detailStudent?.gpa.toFixed(2)}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 p-6">
+            <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Outstanding Balance</span>
+              <span className={cn(
+                "text-sm font-black",
+                (detailStudent?.outstandingBalance ?? 0) > 0 ? "text-rose-600" : "text-emerald-600",
+              )}>
+                {(detailStudent?.outstandingBalance ?? 0) > 0
+                  ? `Rs ${detailStudent?.outstandingBalance.toLocaleString()}`
+                  : 'Cleared'}
+              </span>
+            </div>
+
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">
+                {detailStudent?.status === 'READY' ? 'Notes' : 'Blocking checks'}
+              </p>
+              {detailStudent?.reasons.length ? (
+                <ul className="space-y-1.5">
+                  {detailStudent.reasons.map((reason, index) => (
+                    <li key={index} className="text-sm font-medium text-slate-700">
+                      • {reason}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm font-medium text-slate-400">No outstanding checks.</p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDetailStudent(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

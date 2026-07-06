@@ -121,4 +121,84 @@ describe('M4 academics workspace contract', () => {
     assert.match(workspace, /mark\.isLocked/);
     assert.match(workspace, /isStudentLocked/);
   });
+
+  it('requires explicit confirmation before bypassing an exam-term security lock', () => {
+    const lockTab = read('components/academics/tabs/marks-lock-tab.tsx');
+
+    // Unlocking a locked exam term re-opens marks for correction — this is
+    // an explicitly high-risk action that must never fire directly from a
+    // single click, unlike every other icon-only/no-confirmation gap found
+    // in this module.
+    assert.match(lockTab, /import \{ ConfirmDialog \} from '@\/components\/ui\/confirm-dialog'/);
+    assert.match(lockTab, /showUnlockConfirm/);
+    assert.doesNotMatch(
+      lockTab,
+      /onClick=\{\(\) => unlockMutation\.mutate\(\{ id: unlockForm\.examTermId/,
+    );
+    assert.match(lockTab, /<ConfirmDialog[\s\S]{0,500}variant="destructive"/);
+    assert.doesNotMatch(lockTab, /🔒|🔓/);
+  });
+
+  it('uses the shared Button component for mark-lock review decisions', () => {
+    const lockTab = read('components/academics/tabs/marks-lock-tab.tsx');
+
+    assert.match(lockTab, /import \{ Button \} from '@\/components\/ui\/button'/);
+    assert.match(lockTab, /variant="destructive"[\s\S]{0,400}Reject/);
+  });
+
+  it('shows visible text for retest approve/reject/cancel decisions instead of icon-only controls', () => {
+    const retakesTab = read('components/academics/tabs/assessment-retakes-tab.tsx');
+
+    // Approve/Reject are on the explicit list of actions that must never be
+    // icon-only, regardless of how low-risk the surrounding flow looks.
+    assert.doesNotMatch(
+      retakesTab,
+      /<IconAction[\s\S]{0,40}title="Approve request"/,
+    );
+    assert.doesNotMatch(
+      retakesTab,
+      /<IconAction[\s\S]{0,40}title="Reject request"/,
+    );
+    assert.match(retakesTab, />\s*Approve\s*</);
+    assert.match(retakesTab, /variant="destructive"[\s\S]{0,150}Reject/);
+    assert.match(retakesTab, /import \{ Tooltip \} from '@\/components\/ui\/tooltip'/);
+  });
+
+  it('wires a real Unpublish control to the previously-unreachable unpublish mutation', () => {
+    const publishingTab = read('components/academics/tabs/result-publishing-tab.tsx');
+
+    // unpublishMut existed with a real mutationFn and onSuccess/onError
+    // handling but had no button anywhere calling .mutate on it.
+    assert.match(publishingTab, /handleBatchUnpublish/);
+    assert.match(publishingTab, /confirmBatchUnpublish/);
+    assert.match(publishingTab, /onClick=\{handleBatchUnpublish\}/);
+    assert.match(publishingTab, /\n\s*Unpublish\s*\n/);
+  });
+
+  it('requires confirmation before deleting a CAS observation and labels the action visibly', () => {
+    const casTab = read('components/academics/tabs/cas-records-tab.tsx');
+
+    // Delete is on the explicit list of actions that must never be
+    // icon-only, and this delete previously fired with zero confirmation.
+    assert.doesNotMatch(casTab, /onClick=\{\(\) => deleteMutation\.mutate\(record\.id\)\}/);
+    assert.match(casTab, /setDeleteTarget/);
+    assert.match(casTab, /import \{ ConfirmDialog \} from '@\/components\/ui\/confirm-dialog'/);
+    assert.match(casTab, /variant="destructive"[\s\S]{0,80}Delete/);
+  });
+
+  it('wires the promotion readiness "Details" button to a real dialog instead of a dead click', () => {
+    const promotionTab = read('components/academics/tabs/promotion-tab.tsx');
+
+    assert.doesNotMatch(promotionTab, /Scroll to marks\/results if review needed/);
+    assert.match(promotionTab, /onClick=\{\(\) => setDetailStudent\(s\)\}/);
+    assert.match(promotionTab, /detailStudent\?\.reasons/);
+  });
+
+  it('removes the duplicate local Loader2 SVG and remaining lock emoji from exam terms', () => {
+    const examTermsTab = read('components/academics/tabs/exam-terms-tab.tsx');
+
+    assert.doesNotMatch(examTermsTab, /function Loader2/);
+    assert.match(examTermsTab, /Loader2\s*$/m);
+    assert.doesNotMatch(examTermsTab, /🔒|🔓/);
+  });
 });

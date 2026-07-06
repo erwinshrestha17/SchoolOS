@@ -32,7 +32,7 @@ type ResultDeliveryNotice = {
   tone: ToastTone;
 };
 
-type ConfirmAction = 'publish' | 'notify';
+type ConfirmAction = 'publish' | 'notify' | 'unpublish';
 
 type Props = {
   academicYears: any[];
@@ -119,6 +119,7 @@ export function ResultPublishingTab({
         description: 'Selected results were removed from dashboards.',
         tone: 'success',
       });
+      setConfirmAction(null);
       setSelectedIds(new Set());
     },
     onError: (error: any) => {
@@ -191,6 +192,27 @@ export function ResultPublishingTab({
     notifyMut.mutate({ reportCardIds: notified.map(r => r.reportCardId) });
   };
 
+  const handleBatchUnpublish = () => {
+    if (selectedIds.size === 0) return;
+    const unpublishable = records.filter(r => selectedIds.has(r.reportCardId) && r.publishStatus === 'PUBLISHED');
+
+    if (unpublishable.length === 0) {
+      setNotice({
+        title: 'No published results selected',
+        description: 'Only PUBLISHED results can be unpublished.',
+        tone: 'warning',
+      });
+      return;
+    }
+
+    setConfirmAction('unpublish');
+  };
+
+  const confirmBatchUnpublish = () => {
+    const unpublishable = records.filter(r => selectedIds.has(r.reportCardId) && r.publishStatus === 'PUBLISHED');
+    unpublishMut.mutate({ reportCardIds: unpublishable.map(r => r.reportCardId) });
+  };
+
   const toggleSelectAll = () => {
     if (selectedIds.size === records.length) setSelectedIds(new Set());
     else setSelectedIds(new Set(records.map(r => r.reportCardId)));
@@ -207,6 +229,9 @@ export function ResultPublishingTab({
     r => selectedIds.has(r.reportCardId) && r.reportStatus === 'LOCKED' && r.publishStatus !== 'PUBLISHED',
   ).length;
   const notifyCount = records.filter(
+    r => selectedIds.has(r.reportCardId) && r.publishStatus === 'PUBLISHED',
+  ).length;
+  const unpublishCount = records.filter(
     r => selectedIds.has(r.reportCardId) && r.publishStatus === 'PUBLISHED',
   ).length;
 
@@ -229,7 +254,15 @@ export function ResultPublishingTab({
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Dashboard Visibility & Notifications</p>
            </div>
            <div className="flex flex-wrap gap-3">
-              <button 
+              <button
+                onClick={handleBatchUnpublish}
+                disabled={selectedIds.size === 0 || unpublishMut.isPending}
+                className="h-12 px-6 rounded-2xl bg-white border border-rose-200 flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] text-rose-600 hover:bg-rose-50 transition-all disabled:opacity-30"
+              >
+                {unpublishMut.isPending ? <Loader2 className="animate-spin" size={16} /> : <EyeOff size={16} />}
+                Unpublish
+              </button>
+              <button
                 onClick={handleBatchNotify}
                 disabled={selectedIds.size === 0 || notifyMut.isPending}
                 className="h-12 px-6 rounded-2xl bg-white border border-slate-200 flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-30"
@@ -237,7 +270,7 @@ export function ResultPublishingTab({
                 {notifyMut.isPending ? <Loader2 className="animate-spin" size={16} /> : <Bell size={16} />}
                 Notify Guardians
               </button>
-              <button 
+              <button
                 onClick={handleBatchPublish}
                 disabled={selectedIds.size === 0 || publishMut.isPending}
                 className="h-12 px-8 rounded-2xl bg-[var(--color-mod-academics-accent)] text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-[var(--color-mod-academics-text)] transition-all active:scale-95 disabled:opacity-30"
@@ -447,15 +480,36 @@ export function ResultPublishingTab({
 
       <ConfirmDialog
         isOpen={confirmAction !== null}
-        title={confirmAction === 'publish' ? 'Publish Result Visibility' : 'Notify Guardians'}
+        title={
+          confirmAction === 'publish'
+            ? 'Publish Result Visibility'
+            : confirmAction === 'unpublish'
+              ? 'Unpublish Results'
+              : 'Notify Guardians'
+        }
         description={
           confirmAction === 'publish'
             ? `Publish ${publishableCount} locked results to parent and student dashboards?`
-            : `Queue result notifications for ${notifyCount} published results?`
+            : confirmAction === 'unpublish'
+              ? `Remove ${unpublishCount} published results from parent and student dashboards?`
+              : `Queue result notifications for ${notifyCount} published results?`
         }
-        confirmLabel={confirmAction === 'publish' ? 'Publish Results' : 'Notify Guardians'}
-        isConfirming={publishMut.isPending || notifyMut.isPending}
-        onConfirm={confirmAction === 'publish' ? confirmBatchPublish : confirmBatchNotify}
+        confirmLabel={
+          confirmAction === 'publish'
+            ? 'Publish Results'
+            : confirmAction === 'unpublish'
+              ? 'Unpublish Results'
+              : 'Notify Guardians'
+        }
+        variant={confirmAction === 'unpublish' ? 'destructive' : undefined}
+        isConfirming={publishMut.isPending || notifyMut.isPending || unpublishMut.isPending}
+        onConfirm={
+          confirmAction === 'publish'
+            ? confirmBatchPublish
+            : confirmAction === 'unpublish'
+              ? confirmBatchUnpublish
+              : confirmBatchNotify
+        }
         onClose={() => setConfirmAction(null)}
       />
     </div>

@@ -22,6 +22,8 @@ import {
   Shield
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 type Props = {
   exams: ExamTermSummary[];
@@ -49,6 +51,7 @@ export function MarksLockTab({ exams }: Props) {
   const [unlockForm, setUnlockForm] = useState({ examTermId: '', reason: '' });
   const [reviewNote, setReviewNote] = useState<Record<string, string>>({});
   const [successMessage, setSuccessMessage] = useState('');
+  const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
 
   const requestsQuery = useQuery({
     queryKey: ['mark-lock-requests', filters],
@@ -105,7 +108,8 @@ export function MarksLockTab({ exams }: Props) {
     onSuccess: () => {
       invalidate();
       setUnlockForm((current) => ({ ...current, reason: '' }));
-      showSuccess('Security lock bypassed successfully.');
+      setShowUnlockConfirm(false);
+      showSuccess('Exam term unlocked successfully.');
     },
   });
 
@@ -135,7 +139,7 @@ export function MarksLockTab({ exams }: Props) {
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Exam Context</label>
               <select value={filters.examTermId} onChange={(e) => setFilters(c => ({ ...c, examTermId: e.target.value }))} className="premium-input bg-white">
                 <option value="">All Exams</option>
-                {exams.map((exam) => <option key={exam.id} value={exam.id}>{exam.name} {exam.isLocked ? '🔒' : '🔓'}</option>)}
+                {exams.map((exam) => <option key={exam.id} value={exam.id}>{exam.name} {exam.isLocked ? '(Locked)' : '(Open)'}</option>)}
               </select>
            </div>
            <div className="space-y-2">
@@ -186,7 +190,7 @@ export function MarksLockTab({ exams }: Props) {
             <div className="space-y-4">
                <select value={requestForm.examTermId} onChange={(e) => setRequestForm(c => ({ ...c, examTermId: e.target.value }))} className="premium-input bg-slate-50">
                  <option value="">Select Exam</option>
-                 {exams.map((exam) => <option key={exam.id} value={exam.id}>{exam.name} {exam.isLocked ? '🔒' : '🔓'}</option>)}
+                 {exams.map((exam) => <option key={exam.id} value={exam.id}>{exam.name} {exam.isLocked ? '(Locked)' : '(Open)'}</option>)}
                </select>
 
                {selectedRequestExam && (
@@ -227,8 +231,8 @@ export function MarksLockTab({ exams }: Props) {
                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 mb-4 transition-transform group-hover:-rotate-12">
                   <Unlock size={24} />
                </div>
-               <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">Security Bypass</h3>
-               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Unlock exam terms (Authorized Only)</p>
+               <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">Unlock Exam Term</h3>
+               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Reopen a locked exam term (Authorized Only)</p>
             </div>
 
             <div className="space-y-4">
@@ -245,13 +249,14 @@ export function MarksLockTab({ exams }: Props) {
                 className="premium-input bg-slate-50 py-4 text-xs font-medium min-h-[100px]"
                />
 
-               <button 
-                onClick={() => unlockMutation.mutate({ id: unlockForm.examTermId, reason: unlockForm.reason || undefined })}
+               <button
+                type="button"
+                onClick={() => setShowUnlockConfirm(true)}
                 disabled={!unlockForm.examTermId || !unlockForm.reason.trim() || unlockMutation.isPending}
                 className="w-full h-14 rounded-2xl border border-amber-200 bg-amber-50 text-amber-700 flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs shadow-sm hover:bg-amber-100 active:scale-95 transition-all disabled:opacity-30"
                >
                  {unlockMutation.isPending ? <Loader2 className="animate-spin" size={18} /> : <Shield size={18} />}
-                 Bypass Security Lock
+                 Unlock Exam Term
                </button>
             </div>
          </section>
@@ -329,20 +334,25 @@ export function MarksLockTab({ exams }: Props) {
                             className="w-full bg-white rounded-xl border border-slate-100 p-3 text-[10px] font-medium focus:ring-4 focus:ring-[var(--color-mod-academics-border)] transition-all"
                            />
                            <div className="flex gap-2">
-                              <button 
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="flex-1"
                                 onClick={() => reviewMutation.mutate({ id: request.id, status: 'APPROVED' })}
                                 disabled={reviewMutation.isPending}
-                                className="flex-1 h-10 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/10 hover:bg-emerald-700 transition-all active:scale-95"
                               >
                                 Approve
-                              </button>
-                              <button 
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="destructive"
+                                className="flex-1"
                                 onClick={() => reviewMutation.mutate({ id: request.id, status: 'REJECTED' })}
                                 disabled={reviewMutation.isPending}
-                                className="flex-1 h-10 rounded-xl border border-rose-100 bg-rose-50 text-rose-600 text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all active:scale-95"
                               >
                                 Reject
-                              </button>
+                              </Button>
                            </div>
                         </div>
                      )}
@@ -362,6 +372,19 @@ export function MarksLockTab({ exams }: Props) {
             ))}
          </div>
       </section>
+
+      <ConfirmDialog
+        isOpen={showUnlockConfirm}
+        title="Unlock exam term"
+        description={`This bypasses the security lock on ${selectedUnlockExam?.name || 'this exam term'} and allows marks to be corrected again. The action is recorded in the audit log.`}
+        confirmLabel="Unlock Exam Term"
+        variant="destructive"
+        isConfirming={unlockMutation.isPending}
+        onConfirm={() =>
+          unlockMutation.mutate({ id: unlockForm.examTermId, reason: unlockForm.reason || undefined })
+        }
+        onClose={() => setShowUnlockConfirm(false)}
+      />
     </div>
   );
 }

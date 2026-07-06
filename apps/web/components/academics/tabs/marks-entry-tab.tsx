@@ -168,7 +168,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
               className="premium-input bg-white"
             >
               <option value="">Select Exam</option>
-              {exams.map((e: any) => <option key={e.id} value={e.id}>{e.name}{e.isLocked ? ' 🔒' : ''}</option>)}
+              {exams.map((e: any) => <option key={e.id} value={e.id}>{e.name}{e.isLocked ? ' (Locked)' : ''}</option>)}
             </select>
           </div>
           <div className="space-y-2">

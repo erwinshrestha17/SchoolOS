@@ -14,7 +14,8 @@ import {
   Info,
   CheckCircle2,
   AlertCircle,
-  Clock
+  Clock,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SectionCard } from '@/components/ui/section-card';
@@ -154,7 +155,7 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
                   className="premium-input bg-slate-50 border-slate-100"
                 >
                   <option value="">Select term</option>
-                  {exams.map((e: any) => <option key={e.id} value={e.id}>{e.name}{e.isLocked ? ' 🔒' : ''}</option>)}
+                  {exams.map((e: any) => <option key={e.id} value={e.id}>{e.name}{e.isLocked ? ' (Locked)' : ''}</option>)}
                 </select>
               </div>
               <div className="space-y-2">
@@ -300,23 +301,5 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
         </div>
       </section>
     </div>
-  );
-}
-
-function Loader2({ size, className }: { size?: number, className?: string }) {
-  return (
-    <svg 
-      className={cn("animate-spin", className)} 
-      width={size} 
-      height={size} 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="3" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
   );
 }

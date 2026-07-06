@@ -31,6 +31,8 @@ import {
   Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 type Props = {
   academicYears: AcademicYearSummary[];
@@ -119,6 +121,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
   const [batchDraft, setBatchDraft] = useState<BatchDraft>({});
   const [batchNotes, setBatchNotes] = useState<Record<string, string>>({});
   const [successMessage, setSuccessMessage] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<CasRecordSummary | null>(null);
 
   const sectionsForClass = useMemo(
     () => allSections.filter((section) => section.classId === filters.classId || section.classId === cas.classId),
@@ -194,6 +197,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
     mutationFn: (id: string) => api.deleteCasRecord(id),
     onSuccess: () => {
       invalidate();
+      setDeleteTarget(null);
       setSuccessMessage('Observation deleted successfully.');
       window.setTimeout(() => setSuccessMessage(''), 5000);
     },
@@ -575,18 +579,24 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
                     </td>
                     <td className="py-4 px-8 text-right">
                        <div className="flex items-center justify-end gap-2">
-                          <button 
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
                             onClick={() => { setEditingId(record.id); startEdit(record); }}
-                            className="h-8 w-8 rounded-xl flex items-center justify-center bg-[var(--color-mod-academics-surface)] text-[var(--color-mod-academics-accent)] hover:bg-[var(--color-mod-academics-accent)] hover:text-white transition-all active:scale-90"
                           >
-                             <Edit3 size={14} />
-                          </button>
-                          <button 
-                            onClick={() => deleteMutation.mutate(record.id)}
-                            className="h-8 w-8 rounded-xl flex items-center justify-center bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white transition-all active:scale-90"
+                             <Edit3 size={14} className="mr-1.5" />
+                             Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => setDeleteTarget(record)}
                           >
-                             <Trash2 size={14} />
-                          </button>
+                             <Trash2 size={14} className="mr-1.5" />
+                             Delete
+                          </Button>
                        </div>
                     </td>
                   </tr>
@@ -595,6 +605,21 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
             </table>
          </div>
       </section>
+
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        title="Delete observation"
+        description={
+          deleteTarget
+            ? `Permanently delete this ${deleteTarget.category} observation for ${deleteTarget.student?.firstNameEn ?? ''} ${deleteTarget.student?.lastNameEn ?? ''}?`.trim()
+            : ''
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+        isConfirming={deleteMutation.isPending}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+        onClose={() => setDeleteTarget(null)}
+      />
     </div>
   );
 
