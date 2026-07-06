@@ -1,9 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { MoreHorizontal } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { Button } from './button';
 import { ActionMenu, type ActionMenuItem } from './action-menu';
 
 export type ModuleHeaderProps = {
@@ -65,18 +63,6 @@ export function ModuleHeader({
               <ActionMenu
                 items={moreActionItems ?? []}
                 label="Open more actions"
-                trigger={
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-9 px-0"
-                    aria-label="More actions"
-                    title="More actions"
-                  >
-                    <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                }
               />
             ) : null}
           </div>
