@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildFilterQuery, parseUrlFilters } from "../lib/hooks/url-filters.ts";
+import {
+  buildFilterHref,
+  buildFilterQuery,
+  parseUrlFilters,
+} from "../lib/hooks/url-filters.ts";
 
 describe("URL filter state (parseUrlFilters)", () => {
   it("falls back to defaults when nothing is in the URL", () => {
@@ -98,5 +102,33 @@ describe("URL filter state (buildFilterQuery)", () => {
     const params = new URLSearchParams(query);
     assert.equal(params.get("page"), "2");
     assert.equal(params.get("search"), "aarav");
+  });
+});
+
+describe("URL filter state (buildFilterHref)", () => {
+  it("does not navigate when the requested query already matches the URL", () => {
+    assert.equal(
+      buildFilterHref(
+        "/dashboard/students",
+        "academicYearId=year-1&page=2",
+        "academicYearId=year-1&page=2",
+      ),
+      null,
+    );
+  });
+
+  it("builds a replacement href only when filters change", () => {
+    assert.equal(
+      buildFilterHref(
+        "/dashboard/students",
+        "academicYearId=year-1",
+        "academicYearId=year-1&page=2",
+      ),
+      "/dashboard/students?academicYearId=year-1&page=2",
+    );
+    assert.equal(
+      buildFilterHref("/dashboard/students", "search=aarav", ""),
+      "/dashboard/students",
+    );
   });
 });

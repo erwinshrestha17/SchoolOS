@@ -1,7 +1,9 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useRef } from "react";
 import {
+  buildFilterHref,
   buildFilterQuery,
   parseUrlFilters,
   type FilterDefaults,
@@ -28,18 +30,35 @@ export function useUrlFilters<T extends FilterDefaults>(
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const currentQuery = searchParams.toString();
+  const defaultsRef = useRef(defaults);
+  defaultsRef.current = defaults;
 
   const values = parseUrlFilters(defaults, searchParams);
 
-  function setFilters(
-    updates: Partial<FilterValues<T>>,
-    options?: { resetPage?: boolean },
-  ) {
-    const query = buildFilterQuery(defaults, searchParams, updates, options);
-    router.replace(query ? `${pathname}?${query}` : pathname, {
-      scroll: false,
-    });
-  }
+  const setFilters = useCallback(
+    (
+      updates: Partial<FilterValues<T>>,
+      options?: { resetPage?: boolean },
+    ) => {
+      const query = buildFilterQuery(
+        defaultsRef.current,
+        new URLSearchParams(currentQuery),
+        updates,
+        options,
+      );
+      const nextHref = buildFilterHref(pathname, currentQuery, query);
+
+      if (!nextHref) {
+        return;
+      }
+
+      router.replace(nextHref, {
+        scroll: false,
+      });
+    },
+    [currentQuery, pathname, router],
+  );
 
   return [values, setFilters];
 }

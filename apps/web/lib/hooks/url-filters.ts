@@ -74,3 +74,21 @@ export function buildFilterQuery<T extends FilterDefaults>(
 
   return params.toString();
 }
+
+/**
+ * Returns the next client-navigation target, or null when the requested
+ * filters already match the current URL. Next.js treats router.replace calls
+ * to the current href as navigations, so callers must not issue a no-op
+ * replace from an effect.
+ */
+export function buildFilterHref(
+  pathname: string,
+  currentQuery: string,
+  nextQuery: string,
+): string | null {
+  if (nextQuery === currentQuery) {
+    return null;
+  }
+
+  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
+}
