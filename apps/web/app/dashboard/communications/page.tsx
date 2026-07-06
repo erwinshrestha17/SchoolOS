@@ -24,7 +24,7 @@ import { SectionCard } from '@/components/ui/section-card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingState } from '@/components/ui/loading-state';
-import { PermissionState } from '@/components/ui/permission-state';
+import { PermissionDenied } from '@/components/ui/permission-denied';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useSession } from '@/components/session-provider';
 import { communicationsApi } from '@/lib/api/communications';
@@ -267,7 +267,8 @@ export default function CommunicationsPage() {
           description="Latest school notices and delivery status."
         >
           {!canReadNotices ? (
-            <PermissionState
+            <PermissionDenied
+              showNavigation={false}
               className="min-h-56 border-0 p-4 shadow-none"
               title="Notices are restricted"
               description="You do not have permission to view school notices."
@@ -313,7 +314,8 @@ export default function CommunicationsPage() {
           description="Parent-teacher threads remain relationship- and policy-scoped."
         >
           {!canUseChat ? (
-            <PermissionState
+            <PermissionDenied
+              showNavigation={false}
               className="min-h-56 border-0 p-4 shadow-none"
               title="Chat is restricted"
               description="You do not have permission to view parent-teacher conversations."

@@ -37,11 +37,11 @@ const moduleLabels: Record<OperationalSummaryRouteModule, string> = {
 /** Never navigate with an arbitrary route sent by an API response. */
 const APPROVED_DASHBOARD_ROUTES = new Set([
   "/dashboard/students",
-  "/dashboard/students/documents",
-  "/dashboard/students/duplicates",
-  "/dashboard/students/qr",
-  "/dashboard/students/iemis",
   "/dashboard/admissions",
+  "/dashboard/admissions/documents",
+  "/dashboard/admissions/duplicates",
+  "/dashboard/admissions/qr",
+  "/dashboard/admissions/iemis",
   "/dashboard/attendance",
   "/dashboard/attendance/daily",
   "/dashboard/attendance/corrections",
@@ -336,16 +336,23 @@ export function OperationalSummaryError({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-export function RefreshSummaryButton({ onClick }: { onClick: () => void }) {
+export function RefreshSummaryButton({
+  onClick,
+  isLoading,
+}: {
+  onClick: () => void;
+  isLoading?: boolean;
+}) {
   return (
     <button
       type="button"
-      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border-2 border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border-2 border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
       onClick={onClick}
-      aria-label="Refresh dashboard"
-      title="Refresh dashboard"
+      disabled={isLoading}
+      aria-label={isLoading ? "Refreshing dashboard" : "Refresh dashboard"}
+      title={isLoading ? "Refreshing dashboard" : "Refresh dashboard"}
     >
-      <RefreshCw size={18} strokeWidth={2.25} />
+      <RefreshCw size={18} strokeWidth={2.25} className={isLoading ? "animate-spin" : undefined} />
     </button>
   );
 }

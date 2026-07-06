@@ -550,8 +550,8 @@ export type M2AttendancePolicyResponse = {
 };
 
 export type M2AttendanceStatesResponse = {
-  persisted: Array<{ value: string; label: string; persisted: boolean }>;
-  virtual: Array<{ value: string; label: string; persisted: boolean }>;
+  persisted: Array<{ code: string; label: string; persisted: boolean }>;
+  virtual: Array<{ code: string; label: string; persisted: boolean }>;
   supportPolicy: string;
 };
 

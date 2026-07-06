@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -99,6 +100,7 @@ const attendanceTabs = [
 ];
 
 export function AttendanceOverviewWorkspace() {
+  const router = useRouter();
   const analyticsQuery = useQuery({
     queryKey: ["attendance-analytics"],
     queryFn: api.listAttendanceAnalytics,
@@ -146,9 +148,7 @@ export function AttendanceOverviewWorkspace() {
         title="Smart Attendance"
         description="Track daily attendance, late arrivals, corrections, and alerts across the school."
         primaryAction={
-          <Button
-            onClick={() => window.location.assign("/dashboard/attendance/mark")}
-          >
+          <Button onClick={() => router.push("/dashboard/attendance/mark")}>
             <CalendarCheck className="h-4 w-4" />
             Mark Attendance
           </Button>
@@ -157,20 +157,17 @@ export function AttendanceOverviewWorkspace() {
           {
             label: "Bulk actions",
             icon: <Users size={16} />,
-            onClick: () =>
-              window.location.assign("/dashboard/attendance/register"),
+            onClick: () => router.push("/dashboard/attendance/register"),
           },
           {
             label: "Exports and reports",
             icon: <Download size={16} />,
-            onClick: () =>
-              window.location.assign("/dashboard/attendance/reports"),
+            onClick: () => router.push("/dashboard/attendance/reports"),
           },
           {
             label: "Settings",
             icon: <Settings size={16} />,
-            onClick: () =>
-              window.location.assign("/dashboard/settings/attendance"),
+            onClick: () => router.push("/dashboard/settings/attendance"),
           },
         ]}
       >
@@ -255,21 +252,13 @@ export function AttendanceOverviewWorkspace() {
 
       <FilterBar
         label="Attendance Filters"
-        description="Filters are URL-ready; backend summaries remain the source of truth."
+        description="Backend summaries remain the source of truth for this overview."
       >
-        <div className="grid gap-3 md:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-4">
           <InputLike label="Date" value={today} />
           <InputLike label="Class" value="All classes" />
           <InputLike label="Section" value="All sections" />
           <InputLike label="Status" value="All statuses" />
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
-            <input
-              className="premium-input pl-9"
-              placeholder="Search by student, class, teacher..."
-              aria-label="Search attendance workspace"
-            />
-          </div>
         </div>
       </FilterBar>
 
@@ -443,6 +432,7 @@ export function AttendanceRegisterWorkspace({
 }: {
   monthly?: boolean;
 }) {
+  const router = useRouter();
   const [academicYearId, setAcademicYearId] = useState("");
   const [classId, setClassId] = useState("");
   const [sectionId, setSectionId] = useState("");
@@ -543,8 +533,7 @@ export function AttendanceRegisterWorkspace({
           {
             label: "Review corrections",
             icon: <ClipboardCheck size={16} />,
-            onClick: () =>
-              window.location.assign("/dashboard/attendance/corrections"),
+            onClick: () => router.push("/dashboard/attendance/corrections"),
           },
         ]}
       >
@@ -1553,7 +1542,7 @@ export function AttendanceSettingsWorkspace() {
                 [
                   "Half-day rule",
                   statesQuery.data?.persisted.some(
-                    (state) => state.value === "HALF_DAY",
+                    (state) => state.code === "HALF_DAY",
                   )
                     ? "Supported"
                     : "Unavailable",
@@ -1561,7 +1550,7 @@ export function AttendanceSettingsWorkspace() {
                 [
                   "Leave categories",
                   statesQuery.data?.persisted
-                    .filter((state) => state.value.includes("LEAVE"))
+                    .filter((state) => state.code.includes("LEAVE"))
                     .map((state) => state.label)
                     .join(", ") ?? "Loading",
                 ],

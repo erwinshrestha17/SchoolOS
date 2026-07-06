@@ -10,6 +10,15 @@ interface PermissionDeniedProps {
   description?: string;
   resource?: string;
   action?: string;
+  className?: string;
+  /**
+   * Route-level permission walls (the dashboard/platform layouts) show Go
+   * Back / Return Home since they replace the whole page. Inline
+   * section-level restrictions (e.g. one tab of a module page) render
+   * alongside content the user can still act on, so navigation actions
+   * don't apply there.
+   */
+  showNavigation?: boolean;
 }
 
 export function PermissionDenied({
@@ -17,6 +26,8 @@ export function PermissionDenied({
   description = "You don't have the necessary permissions to access this resource or perform this action.",
   resource,
   action,
+  className,
+  showNavigation = true,
 }: PermissionDeniedProps) {
   const router = useRouter();
 
@@ -25,17 +36,20 @@ export function PermissionDenied({
       tone="permission"
       title={title}
       description={description}
+      className={className}
       secondaryAction={
-        <>
-          <Button type="button" variant="outline" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4" />
-            Go Back
-          </Button>
-          <Button type="button" onClick={() => router.push('/dashboard')}>
-            <Home className="h-4 w-4" />
-            Return Home
-          </Button>
-        </>
+        showNavigation ? (
+          <>
+            <Button type="button" variant="outline" onClick={() => router.back()}>
+              <ArrowLeft className="h-4 w-4" />
+              Go Back
+            </Button>
+            <Button type="button" onClick={() => router.push('/dashboard')}>
+              <Home className="h-4 w-4" />
+              Return Home
+            </Button>
+          </>
+        ) : undefined
       }
     >
       {(resource || action) && (

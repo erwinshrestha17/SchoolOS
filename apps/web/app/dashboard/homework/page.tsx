@@ -35,13 +35,13 @@ import { FilterBar } from "../../../components/dashboard/filter-bar";
 import { DataTable } from "../../../components/ui/data-table";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { ActionMenu } from "../../../components/ui/action-menu";
-import { LoadingState } from "../../../components/dashboard/loading-state";
-import { EmptyState } from "../../../components/dashboard/empty-state";
-import { ErrorState } from "../../../components/dashboard/error-state";
+import { LoadingState } from "../../../components/ui/loading-state";
+import { EmptyState } from "../../../components/ui/empty-state";
+import { ErrorState } from "../../../components/ui/error-state";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Select } from "../../../components/ui/select";
-import { PermissionState } from "../../../components/ui/permission-state";
+import { PermissionDenied } from "../../../components/ui/permission-denied";
 import { useSession } from "../../../components/session-provider";
 import { useRouter } from "next/navigation";
 import { ModuleHeader } from "../../../components/ui/module-header";
@@ -235,7 +235,8 @@ export default function HomeworkPage() {
     homeworkQuery.error.statusCode === 403
   ) {
     return (
-      <PermissionState
+      <PermissionDenied
+        showNavigation={false}
         title="Homework access restricted"
         description="Your current role cannot view homework assignments in this school."
       />

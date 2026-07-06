@@ -18,7 +18,7 @@ import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ModuleHeader } from '@/components/ui/module-header';
 import { ModuleTabs } from '@/components/ui/module-tabs';
-import { PermissionState } from '@/components/ui/permission-state';
+import { PermissionDenied } from '@/components/ui/permission-denied';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { communicationsApi } from '@/lib/api/communications';
@@ -139,7 +139,8 @@ export default function ProviderDiagnosticsPage() {
       />
 
       {!canReadDeliveries ? (
-        <PermissionState
+        <PermissionDenied
+          showNavigation={false}
           className="mt-6"
           title="Provider diagnostics are restricted"
           description="You do not have permission to view notification delivery diagnostics."

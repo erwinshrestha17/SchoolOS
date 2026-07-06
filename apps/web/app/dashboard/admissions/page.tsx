@@ -84,7 +84,7 @@ export default function AdmissionsPage() {
                   ? 'warning'
                   : 'neutral'
               }
-              href="/dashboard/students/documents"
+              href="/dashboard/admissions/documents"
               description="Active student documents not yet verified."
             />
             <KpiCard
@@ -96,7 +96,7 @@ export default function AdmissionsPage() {
                   ? 'warning'
                   : 'neutral'
               }
-              href="/dashboard/students/duplicates"
+              href="/dashboard/admissions/duplicates"
               description="Import rows flagged as likely duplicates."
             />
             <KpiCard
@@ -108,7 +108,7 @@ export default function AdmissionsPage() {
                   ? 'warning'
                   : 'neutral'
               }
-              href="/dashboard/students/iemis"
+              href="/dashboard/admissions/iemis"
               description="Active enrollments missing an admission number."
             />
           </KpiGrid>

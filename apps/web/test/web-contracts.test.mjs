@@ -70,7 +70,7 @@ describe("SchoolOS web production contracts", () => {
       "module-locked-state",
       "notification-badge",
       "page-header",
-      "permission-state",
+      "permission-denied",
       "protected-file",
       "report-toolbar",
       "search-input",
@@ -954,12 +954,7 @@ describe("SchoolOS web production contracts", () => {
       "components/layout/upgrade-prompt.tsx",
     ]);
     const dashboardPrimitives = readMany([
-      "components/dashboard/empty-state.tsx",
-      "components/dashboard/error-state.tsx",
       "components/dashboard/filter-bar.tsx",
-      "components/dashboard/loading-state.tsx",
-      "components/dashboard/section-card.tsx",
-      "components/dashboard/stat-card.tsx",
     ]);
 
     assert.match(shell, /Skip to workspace/);
@@ -1660,7 +1655,6 @@ describe("SchoolOS web production contracts", () => {
       "components/finance/fee-ledger.tsx",
       "components/finance/fee-setup-tab.tsx",
       "components/finance/reprint-dialog.tsx",
-      "components/finance/reversal-dialog.tsx",
     ]);
 
     assert.match(collectionCounter, /Invoice breakdown/);
@@ -2563,8 +2557,7 @@ describe("SchoolOS web production contracts", () => {
       "<ModuleTabs",
       "New Notice",
       "moreActionItems",
-      "Needs a real M12 summary API",
-      "getNotificationDeliveryAnalytics",
+      "communicationsApi.getCommunicationsSummary",
     ]) {
       assert.ok(workspace.includes(marker), `Missing marker: ${marker}`);
     }

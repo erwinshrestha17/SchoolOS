@@ -59,6 +59,26 @@ describe("shared icon accessibility primitives", () => {
     assert.match(reviewModal, />\s*View\s*</);
   });
 
+  it("renders a real icon plus loading state on the dashboard Refresh control, never a blank button", () => {
+    const summary = read("components/ui/operational-summary.tsx");
+
+    assert.match(summary, /export function RefreshSummaryButton/);
+    assert.match(summary, /<RefreshCw size=\{18\}/);
+    assert.match(summary, /aria-label=\{isLoading \? "Refreshing dashboard" : "Refresh dashboard"\}/);
+    assert.match(summary, /title=\{isLoading \? "Refreshing dashboard" : "Refresh dashboard"\}/);
+    assert.match(summary, /disabled=\{isLoading\}/);
+  });
+
+  it("gives the ActionMenu default icon-only trigger both an aria-label and a title", () => {
+    const actionMenu = read("components/ui/action-menu.tsx");
+
+    // This is the canonical trigger every ModuleHeader "More Actions" menu
+    // renders when no custom trigger is supplied — an aria-label alone is
+    // not enough for a mouse user with no visible text on the button.
+    assert.match(actionMenu, /<MoreHorizontal size=\{18\}/);
+    assert.match(actionMenu, /aria-label=\{label\}\s*\n\s*title=\{label\}/);
+  });
+
   it("gives back/navigation icon buttons a tooltip and accessible name", () => {
     const detailPage = read("components/homework/homework-detail-page.tsx");
     const newHomeworkPage = read("app/dashboard/homework/new/page.tsx");

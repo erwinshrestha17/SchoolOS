@@ -104,4 +104,39 @@ describe('OperationalSummaryService', () => {
       }),
     );
   });
+
+  it('omits the module next-action when nothing needs attention', async () => {
+    entitlements.getEntitlements.mockResolvedValue({
+      modules: ['fees'],
+    } as never);
+
+    const summary = await service.getModuleSummary('m3_fees', actor);
+
+    // Every enabled module previously always contributed a static
+    // "Open <module>" action regardless of whether there was anything to
+    // review, which made the dashboard's next-actions list just re-list
+    // every enabled module instead of genuine follow-up work.
+    expect(summary.attentionItems).toHaveLength(0);
+    expect(summary.nextActions).toEqual([]);
+  });
+
+  it('surfaces the module next-action only when an attention item exists', async () => {
+    entitlements.getEntitlements.mockResolvedValue({
+      modules: ['fees'],
+    } as never);
+    (
+      prisma as unknown as { invoice: { count: jest.Mock } }
+    ).invoice.count.mockResolvedValue(3);
+
+    const summary = await service.getModuleSummary('m3_fees', actor);
+
+    expect(summary.attentionItems.length).toBeGreaterThan(0);
+    expect(summary.nextActions).toEqual([
+      {
+        key: 'open_m3_fees',
+        label: 'Open Fees',
+        route: '/dashboard/fees',
+      },
+    ]);
+  });
 });

@@ -13,7 +13,7 @@ import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ModuleHeader } from '@/components/ui/module-header';
 import { ModuleTabs } from '@/components/ui/module-tabs';
-import { PermissionState } from '@/components/ui/permission-state';
+import { PermissionDenied } from '@/components/ui/permission-denied';
 import { SectionCard } from '@/components/ui/section-card';
 import { Select } from '@/components/ui/select';
 import { communicationsApi } from '@/lib/api/communications';
@@ -155,7 +155,8 @@ export default function CommunicationRecipientsPage() {
       />
 
       {!canPreviewRecipients ? (
-        <PermissionState
+        <PermissionDenied
+          showNavigation={false}
           className="mt-6"
           title="Recipient preview is restricted"
           description="You need notice creation permission to preview recipients."

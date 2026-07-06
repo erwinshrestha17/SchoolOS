@@ -110,7 +110,7 @@ describe("M3 fees workspace contract", () => {
     const close = read("components/finance/cashier-close-section.tsx");
     const reprint = read("components/finance/reprint-dialog.tsx");
 
-    assert.match(page, /PermissionState/);
+    assert.match(page, /PermissionDenied/);
     assert.match(page, /Loading/);
     assert.match(page, /Unavailable/);
     assert.match(

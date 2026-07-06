@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ClipboardCheck,
   ClipboardList,
+  Eye,
   FileText,
   GraduationCap,
   History,
@@ -35,7 +36,7 @@ const workspaceTabs = [
   { href: '/dashboard/academics/report-cards', label: 'Report Cards', icon: FileText },
   { href: '/dashboard/academics/promotion', label: 'Promotion', icon: GraduationCap },
   { href: '/dashboard/academics/publishing', label: 'Publishing', icon: Megaphone },
-  { href: '/dashboard/academics/results', label: 'Results', icon: Megaphone },
+  { href: '/dashboard/academics/results', label: 'Results', icon: Eye },
 ];
 
 const workflowSections = [

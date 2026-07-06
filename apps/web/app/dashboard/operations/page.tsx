@@ -19,7 +19,7 @@ import { ModuleHeader } from '@/components/ui/module-header';
 import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { ModuleTabs } from '@/components/ui/module-tabs';
 import { SectionCard } from '@/components/ui/section-card';
-import { PermissionState } from '@/components/ui/permission-state';
+import { PermissionDenied } from '@/components/ui/permission-denied';
 import { useSession } from '@/components/session-provider';
 import { canteenApi } from '@/lib/api/canteen';
 import { libraryApi } from '@/lib/api/library';
@@ -79,7 +79,8 @@ export default function OperationsPage() {
 
   if (!canUseLibrary && !canUseTransport && !canUseCanteen) {
     return (
-      <PermissionState
+      <PermissionDenied
+        showNavigation={false}
         title="School operations are restricted"
         description="You do not have permission to open Library, Transport, or Canteen operations."
       />

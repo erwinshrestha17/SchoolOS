@@ -334,9 +334,9 @@ test("M1 Admissions overview shows a real, actionable, honest KPI grid", () => {
 
   // Every card opens a real, existing filtered queue.
   assert.match(page, /href="\/dashboard\/admissions"/);
-  assert.match(page, /href="\/dashboard\/students\/documents"/);
-  assert.match(page, /href="\/dashboard\/students\/duplicates"/);
-  assert.match(page, /href="\/dashboard\/students\/iemis"/);
+  assert.match(page, /href="\/dashboard\/admissions\/documents"/);
+  assert.match(page, /href="\/dashboard\/admissions\/duplicates"/);
+  assert.match(page, /href="\/dashboard\/admissions\/iemis"/);
 
   // The header component threads the KPI grid through without disturbing
   // task pages (documents/duplicates/iemis/etc.) that reuse the same header

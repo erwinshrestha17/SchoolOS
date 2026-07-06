@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
+  CheckCircle2,
   Clock3,
+  Mail,
   MessageSquare,
   Send,
   ShieldAlert,
-  UsersRound,
 } from 'lucide-react';
-import { api } from '../../lib/api';
+import { communicationsApi } from '../../lib/api/communications';
 import { DashboardPageShell } from '../dashboard/dashboard-page-shell';
 import { CommunicationsForm } from '../forms/communications-form';
 import { DeliveryRetryPanel } from '../forms/delivery-retry-panel';
@@ -28,15 +29,13 @@ export function NoticesWorkspace({
   initialSection?: NoticeWorkspaceSection;
 }) {
   const router = useRouter();
-  const analyticsQuery = useQuery({
-    queryKey: ['notification-delivery-analytics'],
-    queryFn: api.getNotificationDeliveryAnalytics,
+  const summaryQuery = useQuery({
+    queryKey: ['communications-summary'],
+    queryFn: communicationsApi.getCommunicationsSummary,
   });
-  const failedDeliveries = getStatusCount(analyticsQuery.data?.byStatus, 'FAILED');
-  const retryPending = getStatusCount(
-    analyticsQuery.data?.byStatus,
-    'RETRY_PENDING',
-  );
+  const summary = summaryQuery.data;
+  const summaryValue = (value: number | undefined) =>
+    summaryQuery.isLoading ? 'Loading' : summaryQuery.isError ? 'Unavailable' : (value ?? 'Unavailable');
 
   return (
     <DashboardPageShell>
@@ -71,53 +70,62 @@ export function NoticesWorkspace({
           },
         ]}
       >
-        <KpiGrid className="sm:grid-cols-2 xl:grid-cols-5">
+        <KpiGrid className="sm:grid-cols-2 xl:grid-cols-6">
           <KpiCard
-            title="Scheduled Notices"
-            value="Unavailable"
-            icon={<Clock3 size={20} />}
+            title="Sent Today"
+            value={summaryValue(summary?.sentToday)}
+            icon={<Send size={20} />}
             tone="neutral"
-            description="Needs a real M12 summary API."
+            description="Notices sent in the current Nepal school day."
+          />
+          <KpiCard
+            title="Scheduled"
+            value={summaryValue(summary?.scheduledNotices)}
+            icon={<Clock3 size={20} />}
+            tone={(summary?.scheduledNotices ?? 0) > 0 ? 'info' : 'neutral'}
+            description="Notices waiting for their scheduled send time."
           />
           <KpiCard
             title="Failed Deliveries"
-            value={
-              analyticsQuery.isLoading
-                ? 'Loading'
-                : analyticsQuery.isError
-                  ? 'Unavailable'
-                  : failedDeliveries
-            }
+            value={summaryValue(summary?.failedDeliveries)}
             icon={<AlertTriangle size={20} />}
-            tone={failedDeliveries ? 'danger' : 'neutral'}
-            description="Tenant-scoped delivery analytics from the backend."
-          />
-          <KpiCard
-            title="Retry Pending"
-            value={
-              analyticsQuery.isLoading
-                ? 'Loading'
-                : analyticsQuery.isError
-                  ? 'Unavailable'
-                  : retryPending
-            }
-            icon={<ShieldAlert size={20} />}
-            tone={retryPending ? 'warning' : 'neutral'}
-            description="Backend delivery records waiting for retry completion."
+            tone={(summary?.failedDeliveries ?? 0) > 0 ? 'danger' : 'neutral'}
+            description="Failed or retry-pending delivery records."
           />
           <KpiCard
             title="Unread High-Impact"
-            value="Unavailable"
-            icon={<UsersRound size={20} />}
-            tone="neutral"
-            description="Needs a real M12 summary API."
+            value={summaryValue(summary?.unreadHighImpactNotices)}
+            icon={<Mail size={20} />}
+            tone={(summary?.unreadHighImpactNotices ?? 0) > 0 ? 'warning' : 'neutral'}
+            description="Unread urgent or emergency delivery rows."
           />
           <KpiCard
             title="Escalated Chats"
-            value="Unavailable"
-            icon={<MessageSquare size={20} />}
-            tone="neutral"
-            description="Needs a real M12 summary API."
+            value={summaryValue(summary?.escalatedChatCount)}
+            icon={<ShieldAlert size={20} />}
+            tone={(summary?.escalatedChatCount ?? 0) > 0 ? 'warning' : 'neutral'}
+            description="Relationship-scoped chat escalations."
+          />
+          <KpiCard
+            title="Provider Status"
+            value={
+              summaryQuery.isLoading
+                ? 'Loading'
+                : summaryQuery.isError
+                  ? 'Unavailable'
+                  : summary
+                    ? formatProviderMode(summary.providerStatus)
+                    : 'Unavailable'
+            }
+            icon={<CheckCircle2 size={20} />}
+            tone={
+              summary?.providerHealth === 'degraded'
+                ? 'warning'
+                : summary?.providerHealth === 'healthy'
+                  ? 'success'
+                  : 'neutral'
+            }
+            description="Current notification delivery mode."
           />
         </KpiGrid>
       </ModuleHeader>
@@ -143,9 +151,6 @@ export function NoticesWorkspace({
   );
 }
 
-function getStatusCount(
-  rows: Array<{ status: string; count: number }> | undefined,
-  status: string,
-) {
-  return rows?.find((row) => row.status === status)?.count ?? 0;
+function formatProviderMode(value: string) {
+  return value.replace('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

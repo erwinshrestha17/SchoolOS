@@ -13,10 +13,13 @@ import { ErrorBoundary } from '../ui/error-boundary';
 import { ModuleOperationalSummary } from '../ui/module-operational-summary';
 import { SupportOverrideBanner } from '../platform/SupportOverrideBanner';
 
+// Students, attendance, and fees already render their own module-specific,
+// backend-owned KPI grid inside the page header. Injecting the generic
+// cross-module summary above them duplicated the same signals (sometimes
+// with different numbers for the same concept) before the module header
+// even appeared. Keep the generic summary only for landing pages that do
+// not yet have their own KPI grid.
 const MODULE_LANDING_SUMMARIES: Record<string, OperationalSummaryRouteModule> = {
-  '/dashboard/students': 'students',
-  '/dashboard/attendance': 'attendance',
-  '/dashboard/fees': 'fees',
   '/dashboard/academics': 'academics',
   '/dashboard/activity': 'activity',
   '/dashboard/homework': 'homework-timetable',

@@ -46,7 +46,12 @@ export default function PlatformDashboard() {
         eyebrow="Platform control plane"
         title="Operator Attention Dashboard"
         description="Tenant lifecycle, provider readiness, queues, usage warning review, and SchoolOS SaaS operations. School fee collection is not shown here."
-        primaryAction={<RefreshSummaryButton onClick={() => void summaryQuery.refetch()} />}
+        primaryAction={
+          <RefreshSummaryButton
+            onClick={() => void summaryQuery.refetch()}
+            isLoading={summaryQuery.isFetching}
+          />
+        }
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

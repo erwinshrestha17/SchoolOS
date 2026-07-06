@@ -181,8 +181,9 @@ export function ActionMenu({
   ) : (
     <button
       type="button"
-      className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-800"
+      className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)] focus-visible:ring-offset-2"
       aria-label={label}
+      title={label}
       aria-expanded={open}
       aria-haspopup="menu"
       onClick={handleTriggerClick}

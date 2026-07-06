@@ -13,6 +13,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useSession } from '../../../../components/session-provider';
+import { PermissionDenied } from '../../../../components/ui/permission-denied';
 import { api } from '../../../../lib/api';
 import { cn } from '../../../../lib/utils';
 
@@ -159,7 +160,8 @@ export default function PayrollReportsPage() {
 
   if (status === 'authenticated' && !canReadReports) {
     return (
-      <PermissionState
+      <PermissionDenied
+        showNavigation={false}
         title="Payroll reports are restricted"
         description="Ask an administrator for payroll report permission before viewing salary totals, PF, TDS, or exports."
       />
@@ -481,19 +483,6 @@ function EmptyState({ title, description }: { title: string; description: string
   );
 }
 
-function PermissionState({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
-      <div className="flex items-start gap-3">
-        <ShieldCheck className="text-amber-600" size={22} />
-        <div>
-          <h2 className="font-bold text-amber-950">{title}</h2>
-          <p className="mt-1 text-sm leading-relaxed text-amber-800">{description}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function compactFilters(filters: PayrollReportFilters) {
   return Object.fromEntries(

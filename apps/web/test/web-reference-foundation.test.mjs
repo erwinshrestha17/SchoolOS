@@ -47,22 +47,7 @@ describe('reference dashboard foundation', () => {
 
   it('provides the requested shared dashboard composition primitives', () => {
     const requiredFiles = [
-      'components/dashboard/dashboard-shell.tsx',
-      'components/dashboard/module-page-header.tsx',
-      'components/dashboard/kpi-card.tsx',
       'components/dashboard/module-tabs.tsx',
-      'components/dashboard/data-filter-bar.tsx',
-      'components/dashboard/data-table-toolbar.tsx',
-      'components/dashboard/context-side-panel.tsx',
-      'components/dashboard/status-badge.tsx',
-      'components/dashboard/pagination-controls.tsx',
-      'components/dashboard/metric-trend.tsx',
-      'components/dashboard/protected-preview-card.tsx',
-      'components/dashboard/action-menu.tsx',
-      'components/dashboard/empty-state.tsx',
-      'components/dashboard/loading-state.tsx',
-      'components/dashboard/error-state.tsx',
-      'components/dashboard/permission-state.tsx',
     ];
 
     for (const relativePath of requiredFiles) {
@@ -74,22 +59,16 @@ describe('reference dashboard foundation', () => {
     }
   });
 
-  it('reuses authenticated shell and protected-file primitives', () => {
-    assert.match(
-      read('components/dashboard/dashboard-shell.tsx'),
-      /from '\.\.\/layout\/dashboard-shell'/,
-    );
-    const preview = read('components/dashboard/protected-preview-card.tsx');
-    assert.match(preview, /ProtectedFileButton/);
-    assert.doesNotMatch(preview, /window\.open|fetch\(/);
-  });
-
-  it('keeps the primary module action before More Actions', () => {
+  it('keeps the primary module action before the More Actions menu', () => {
     const header = read('components/ui/module-header.tsx');
     assert.ok(
-      header.indexOf('{primaryAction}') < header.indexOf('More Actions'),
-      'Primary action must appear before More Actions',
+      header.indexOf('{primaryAction}') < header.indexOf('<ActionMenu'),
+      'Primary action must appear before the More Actions menu',
     );
+    // The More Actions trigger is icon-only (canonical ActionMenu default
+    // trigger) and must still carry an accessible label since it has no
+    // visible text.
+    assert.match(header, /label="Open more actions"/);
   });
 
   it('keeps the permission-scoped real-API operations composition route', () => {

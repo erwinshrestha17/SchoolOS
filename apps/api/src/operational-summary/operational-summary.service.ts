@@ -271,6 +271,10 @@ export class OperationalSummaryService {
           ? 'empty'
           : 'ready';
 
+    const attentionItems = metrics
+      .flatMap((metric) => (metric.attention ? [metric.attention] : []))
+      .slice(0, 10);
+
     return {
       generatedAt: new Date().toISOString(),
       schoolDay: day.gregorianDate,
@@ -280,17 +284,24 @@ export class OperationalSummaryService {
       summary: Object.fromEntries(
         metrics.map((metric) => [metric.key, metric.value]),
       ),
-      attentionItems: metrics
-        .flatMap((metric) => (metric.attention ? [metric.attention] : []))
-        .slice(0, 10),
+      attentionItems,
       recentItems: recent.items,
-      nextActions: [
-        {
-          key: `open_${module}`,
-          label: `Open ${config.label}`,
-          route: config.route,
-        },
-      ],
+      // Only surface a dashboard shortcut for this module when it genuinely
+      // has something to review. Otherwise every enabled module always
+      // contributed a generic "Open <module>" action, which made the
+      // dashboard's cross-module next-actions list just re-list every
+      // sidebar destination instead of the work that actually needs
+      // attention today.
+      nextActions:
+        attentionItems.length > 0
+          ? [
+              {
+                key: `open_${module}`,
+                label: `Open ${config.label}`,
+                route: config.route,
+              },
+            ]
+          : [],
       nextCursor: null,
     };
   }

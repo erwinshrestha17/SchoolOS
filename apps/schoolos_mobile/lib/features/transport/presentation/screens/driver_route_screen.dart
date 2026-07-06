@@ -330,48 +330,88 @@ class _StudentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final medicalNote = _studentMedicalNote(student);
+
     return AppCard(
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _IconTile(
-            icon: Icons.person_rounded,
-            color: _studentColor(student.status),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _IconTile(
+                icon: Icons.person_rounded,
+                color: _studentColor(student.status),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      student.name ?? student.studentSystemId ?? 'Student',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      _studentMeta(student),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.slate500),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              StatusChip(
+                status: _studentStatus(student.status),
+                label: _label(student.status),
+              ),
+            ],
           ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
+          if (medicalNote.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  student.name ?? student.studentSystemId ?? 'Student',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                Icon(
+                  Icons.medical_information_outlined,
+                  size: 16,
+                  color: AppColors.warningDark,
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  _studentMeta(student),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: AppColors.slate500),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    medicalNote,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.warningDark,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          StatusChip(
-            status: _studentStatus(student.status),
-            label: _label(student.status),
-          ),
+          ],
         ],
       ),
     );
   }
+}
+
+String _studentMedicalNote(DriverManifestStudent student) {
+  final parts = [
+    if ((student.medicalConditions ?? '').trim().isNotEmpty)
+      student.medicalConditions!.trim(),
+    if ((student.severeAllergies ?? '').trim().isNotEmpty)
+      student.severeAllergies!.trim(),
+  ];
+  return parts.join(' - ');
 }
 
 class _IconTile extends StatelessWidget {

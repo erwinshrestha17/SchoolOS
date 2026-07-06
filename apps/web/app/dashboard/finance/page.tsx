@@ -32,7 +32,7 @@ import { DashboardPageShell } from "@/components/dashboard/dashboard-page-shell"
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { ModuleTabs } from "@/components/ui/module-tabs";
-import { PermissionState } from "@/components/ui/permission-state";
+import { PermissionDenied } from "@/components/ui/permission-denied";
 import { api } from "@/lib/api";
 import { useRecentlyViewed } from "@/lib/hooks/use-recently-viewed";
 import { useSession } from "@/components/session-provider";
@@ -481,7 +481,8 @@ export default function FinancePage() {
                 onPageChange={(page) => updateInvoiceListParams({ page })}
               />
             ) : (
-              <PermissionState
+              <PermissionDenied
+                showNavigation={false}
                 title="Fee collection is restricted"
                 description="You do not have permission to collect payments. Contact the school administrator if you need cashier access."
               />

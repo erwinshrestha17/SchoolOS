@@ -53,7 +53,12 @@ export default function DashboardPage() {
             </>
           ) : undefined
         }
-        primaryAction={<RefreshSummaryButton onClick={() => void dashboardQuery.refetch()} />}
+        primaryAction={
+          <RefreshSummaryButton
+            onClick={() => void dashboardQuery.refetch()}
+            isLoading={dashboardQuery.isFetching}
+          />
+        }
         moreActionItems={quickActions.length ? quickActions : undefined}
       />
 
