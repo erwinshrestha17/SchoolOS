@@ -21,7 +21,10 @@ export * from './api/operational-summary';
 export * from './api/school-settings';
 
 import { authApi } from './api/auth';
-import { academicsApi } from './api/academics';
+import {
+  academicsApi,
+  type HomeworkReminderBatchSummary,
+} from './api/academics';
 import { studentsApi } from './api/students';
 import { attendanceApi } from './api/attendance';
 import { financeApi } from './api/finance';
@@ -41,9 +44,34 @@ import { operationalSummaryApi } from './api/operational-summary';
 import { schoolSettingsApi } from './api/school-settings';
 import { filesApi } from './api/client';
 
+function normalizeHomeworkReminderBatches(
+  result: unknown,
+): HomeworkReminderBatchSummary[] {
+  if (Array.isArray(result)) {
+    return result as HomeworkReminderBatchSummary[];
+  }
+
+  if (
+    result !== null &&
+    typeof result === 'object' &&
+    'items' in result &&
+    Array.isArray(result.items)
+  ) {
+    return result.items as HomeworkReminderBatchSummary[];
+  }
+
+  throw new Error('Homework reminder batch response is malformed.');
+}
+
 export const api = {
   ...authApi,
   ...academicsApi,
+  listHomeworkReminderBatches: async (
+    ...args: Parameters<typeof academicsApi.listHomeworkReminderBatches>
+  ) =>
+    normalizeHomeworkReminderBatches(
+      await academicsApi.listHomeworkReminderBatches(...args),
+    ),
   ...studentsApi,
   ...attendanceApi,
   ...financeApi,
