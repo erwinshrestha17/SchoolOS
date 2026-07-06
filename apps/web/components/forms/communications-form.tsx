@@ -419,7 +419,10 @@ export function CommunicationsForm({
       return;
     }
 
-    if (notice.priority === "EMERGENCY" && !recipientPreview) {
+    const isHighImpactNotice =
+      notice.priority === "EMERGENCY" || notice.audienceType === "ALL";
+
+    if (isHighImpactNotice && !recipientPreview) {
       setNoticeError(
         "Preview recipients before publishing this high-impact notice.",
       );
@@ -427,7 +430,7 @@ export function CommunicationsForm({
       return;
     }
 
-    if (notice.priority === "EMERGENCY" && !highImpactConfirmed) {
+    if (isHighImpactNotice && !highImpactConfirmed) {
       setNoticeError(
         "Confirm the recipient preview before publishing this high-impact notice.",
       );
@@ -880,12 +883,19 @@ function NoticesSection({
               tone="error"
               message="Emergency notices use backend-selected high-impact delivery channels. Preview and confirm recipients before publishing."
             />
+          ) : notice.audienceType === "ALL" ? (
+            <InlineMessage
+              tone="error"
+              message="This notice goes to the whole school. Preview and confirm recipients before publishing."
+            />
           ) : null}
 
           <RecipientPreviewPanel
             preview={preview}
             isPending={previewPending}
-            isHighImpact={notice.priority === "EMERGENCY"}
+            isHighImpact={
+              notice.priority === "EMERGENCY" || notice.audienceType === "ALL"
+            }
             confirmed={highImpactConfirmed}
             onConfirmedChange={setHighImpactConfirmed}
             onPreview={previewRecipients}

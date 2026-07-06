@@ -124,4 +124,17 @@ describe("M3 fees workspace contract", () => {
     assert.match(close, /already be closed/i);
     assert.match(reprint, /temporarily unavailable|Failed to reprint receipt/i);
   });
+
+  it("requires confirmation before approving a fee waiver", () => {
+    const waivers = read("components/finance/discounts-waivers-tab.tsx");
+
+    // Waiving fees is a real-money action just like payment collection,
+    // reversal, and cashier close — it must not submit directly on click.
+    assert.match(waivers, /isConfirmingWaiver/);
+    assert.match(waivers, /Confirm fee waiver/);
+    assert.doesNotMatch(
+      waivers,
+      /handleCreateWaiver[\s\S]{0,270}waiverMutation\.mutate\(/,
+    );
+  });
 });

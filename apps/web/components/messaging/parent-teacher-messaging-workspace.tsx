@@ -31,6 +31,14 @@ import { ModuleTabs } from "@/components/ui/module-tabs";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { DashboardPageShell } from "@/components/dashboard/dashboard-page-shell";
 import { SectionCard } from "@/components/ui/section-card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type MessageStatusFilter = "" | "OPEN" | "ESCALATED" | "CLOSED";
 
@@ -57,6 +65,7 @@ export function ParentTeacherMessagingWorkspace({
   const [moderationReason, setModerationReason] = useState("");
   const [reportReason, setReportReason] = useState("");
   const [successNotice, setSuccessNotice] = useState("");
+  const [isConfirmingClose, setIsConfirmingClose] = useState(false);
 
   const roles = session?.user.roles ?? [];
   const isModerator = roles.some((role) =>
@@ -157,6 +166,7 @@ export function ParentTeacherMessagingWorkspace({
       }),
     onSuccess: () => {
       setModerationReason("");
+      setIsConfirmingClose(false);
       setSuccessNotice("Thread closed with an audited moderation reason.");
       void queryClient.invalidateQueries({
         queryKey: ["parent-teacher-thread", activeThreadId],
@@ -495,7 +505,7 @@ export function ParentTeacherMessagingWorkspace({
                       onChange={setModerationReason}
                       onSubmit={() => {
                         if (moderationReason.trim().length >= 3)
-                          closeMutation.mutate();
+                          setIsConfirmingClose(true);
                       }}
                       secondaryAction={() => escalateMutation.mutate()}
                       buttonLabel="Close"
@@ -531,6 +541,39 @@ export function ParentTeacherMessagingWorkspace({
           </SectionCard>
         </div>
       </div>
+
+      <Dialog open={isConfirmingClose} onOpenChange={setIsConfirmingClose}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Confirm thread close</DialogTitle>
+            <DialogDescription>
+              Replies will be disabled for both the parent and teacher. This
+              surface intentionally has no reopen action — a new thread would
+              be needed if communication must continue.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 rounded-xl border border-warning-100 bg-warning-50 p-4 text-sm text-warning-900">
+            <p>Reason: {moderationReason || "—"}</p>
+          </div>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setIsConfirmingClose(false)}
+              className="rounded-xl px-4 py-2 text-sm font-bold text-slate-600"
+            >
+              Review again
+            </button>
+            <button
+              type="button"
+              disabled={closeMutation.isPending}
+              onClick={() => closeMutation.mutate()}
+              className="rounded-xl bg-danger-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {closeMutation.isPending ? "Closing..." : "Close thread"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardPageShell>
   );
 }

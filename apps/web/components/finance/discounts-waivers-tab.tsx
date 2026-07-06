@@ -7,6 +7,14 @@ import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { SectionCard } from "@/components/ui/section-card";
 import { Loader2, Plus, Check, AlertCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export function DiscountsWaiversTab() {
   const queryClient = useQueryClient();
@@ -46,6 +54,7 @@ export function DiscountsWaiversTab() {
   // Success States
   const [discountSuccess, setDiscountSuccess] = useState(false);
   const [waiverSuccess, setWaiverSuccess] = useState(false);
+  const [isConfirmingWaiver, setIsConfirmingWaiver] = useState(false);
 
   // Queries
   const feeHeadsQuery = useQuery({
@@ -136,6 +145,7 @@ export function DiscountsWaiversTab() {
         amount: 0,
         reason: "",
       });
+      setIsConfirmingWaiver(false);
       setWaiverSuccess(true);
       setTimeout(() => setWaiverSuccess(false), 3000);
     },
@@ -163,6 +173,15 @@ export function DiscountsWaiversTab() {
       (inv) => inv.id === waiver.invoiceId,
     );
     if (!selectedInvoice || waiver.amount <= 0 || !waiver.reason) return;
+
+    setIsConfirmingWaiver(true);
+  };
+
+  const submitWaiver = () => {
+    const selectedInvoice = invoicesQuery.data?.find(
+      (inv) => inv.id === waiver.invoiceId,
+    );
+    if (!selectedInvoice) return;
 
     waiverMutation.mutate({
       studentId: selectedInvoice.student?.id || "",
@@ -734,6 +753,41 @@ export function DiscountsWaiversTab() {
           )}
         </SectionCard>
       </div>
+
+      <Dialog open={isConfirmingWaiver} onOpenChange={setIsConfirmingWaiver}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Confirm fee waiver</DialogTitle>
+            <DialogDescription>
+              This permanently reduces the amount owed on this invoice. This
+              action cannot be undone from this screen.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 rounded-xl border border-warning-100 bg-warning-50 p-4 text-sm text-warning-900">
+            <p>Invoice: {selectedInvoiceObj?.invoiceNumber ?? "—"}</p>
+            <p>Student: {selectedInvoiceObj?.student?.name ?? "—"}</p>
+            <p>Waiver amount: {formatCurrency(waiver.amount)}</p>
+            <p>Reason: {waiver.reason || "—"}</p>
+          </div>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setIsConfirmingWaiver(false)}
+              className="rounded-xl px-4 py-2 text-sm font-bold text-slate-600"
+            >
+              Review again
+            </button>
+            <button
+              type="button"
+              disabled={waiverMutation.isPending}
+              onClick={submitWaiver}
+              className="rounded-xl bg-[var(--color-mod-fees-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {waiverMutation.isPending ? "Approving..." : "Approve waiver"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
