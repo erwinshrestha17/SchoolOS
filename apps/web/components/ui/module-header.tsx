@@ -66,9 +66,15 @@ export function ModuleHeader({
                 items={moreActionItems ?? []}
                 label="Open more actions"
                 trigger={
-                  <Button type="button" variant="outline" size="sm">
-                    <MoreHorizontal className="h-4 w-4" />
-                    More Actions
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-9 px-0"
+                    aria-label="More actions"
+                    title="More actions"
+                  >
+                    <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                   </Button>
                 }
               />
