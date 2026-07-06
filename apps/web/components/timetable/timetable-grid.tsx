@@ -103,8 +103,10 @@ export function TimetableGrid({ filters, activeVersionId }: { filters: any, acti
                 return (
                   <td key={`${day.value}-${period.id}`} className="border-b border-slate-200 p-3">
                     {slot ? (
-                      <div 
-                        className="h-full min-h-[100px] cursor-pointer rounded-2xl border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-soft)]/40 p-4 transition-all hover:bg-[var(--color-mod-homework-soft)] hover:shadow-sm"
+                      <button
+                        type="button"
+                        aria-label={`${subjectName} with ${staffName} in ${roomName}. Open to assign a substitute.`}
+                        className="h-full min-h-[100px] w-full cursor-pointer rounded-2xl border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-soft)]/40 p-4 text-left transition-all hover:bg-[var(--color-mod-homework-soft)] hover:shadow-sm"
                         onClick={() => {
                           setSelectedSlot(slot);
                           setIsModalOpen(true);
@@ -134,7 +136,7 @@ export function TimetableGrid({ filters, activeVersionId }: { filters: any, acti
                             </span>
                           </div>
                         )}
-                      </div>
+                      </button>
                     ) : (
                       <div className="h-full min-h-[100px] rounded-2xl border-2 border-dashed border-slate-100 flex items-center justify-center opacity-20 group-hover:opacity-100 transition-opacity">
                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">Empty</span>

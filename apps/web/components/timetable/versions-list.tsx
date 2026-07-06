@@ -9,8 +9,11 @@ import { ActionMenu } from "@/components/ui/action-menu";
 import { LoadingState } from "@/components/ui/loading-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Toast, type ToastTone } from "@/components/ui/toast";
-import { CheckCircle2, Lock, Archive, History } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { CheckCircle2, Lock, Archive } from "lucide-react";
 import { formatBsDate } from "@schoolos/core";
+
+type VersionAction = "publish" | "lock" | "archive";
 
 export function TimetableVersionsList({
   academicYearId,
@@ -23,6 +26,11 @@ export function TimetableVersionsList({
     description?: string;
     tone: ToastTone;
   } | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<{
+    action: VersionAction;
+    id: string;
+    versionName: string;
+  } | null>(null);
 
   const versionsQuery = useQuery({
     queryKey: ["timetable-versions", academicYearId],
@@ -33,6 +41,7 @@ export function TimetableVersionsList({
   const publishMutation = useMutation({
     mutationFn: (id: string) => api.publishTimetableVersion(id),
     onSuccess: () => {
+      setConfirmTarget(null);
       setNotice({
         title: "Version published",
         description:
@@ -53,6 +62,7 @@ export function TimetableVersionsList({
   const lockMutation = useMutation({
     mutationFn: (id: string) => api.lockTimetableVersion(id),
     onSuccess: () => {
+      setConfirmTarget(null);
       setNotice({
         title: "Version locked",
         description: "The timetable version is locked for audit-safe changes.",
@@ -72,6 +82,7 @@ export function TimetableVersionsList({
   const archiveMutation = useMutation({
     mutationFn: (id: string) => api.archiveTimetableVersion(id),
     onSuccess: () => {
+      setConfirmTarget(null);
       setNotice({
         title: "Version archived",
         description: "The timetable version has been moved out of active use.",
@@ -87,6 +98,37 @@ export function TimetableVersionsList({
       });
     },
   });
+
+  const confirmMutation =
+    confirmTarget?.action === "publish"
+      ? publishMutation
+      : confirmTarget?.action === "lock"
+        ? lockMutation
+        : archiveMutation;
+
+  const CONFIRM_COPY: Record<
+    VersionAction,
+    { title: string; description: (versionName: string) => string; confirmLabel: string }
+  > = {
+    publish: {
+      title: "Publish Timetable Version",
+      description: (versionName) =>
+        `Publish "${versionName}"? It will become the active timetable for school operations.`,
+      confirmLabel: "Publish Version",
+    },
+    lock: {
+      title: "Lock Timetable Version",
+      description: (versionName) =>
+        `Lock "${versionName}" for audit-safe changes? Further edits will require an explicit unlock.`,
+      confirmLabel: "Lock Version",
+    },
+    archive: {
+      title: "Archive Timetable Version",
+      description: (versionName) =>
+        `Archive "${versionName}"? It will be moved out of active use.`,
+      confirmLabel: "Archive Version",
+    },
+  };
 
   if (!academicYearId) {
     return (
@@ -130,26 +172,23 @@ export function TimetableVersionsList({
             {
               label: "Publish",
               icon: <CheckCircle2 className="h-4 w-4" />,
-              onClick: () => publishMutation.mutate(row.id),
+              onClick: () =>
+                setConfirmTarget({ action: "publish", id: row.id, versionName: row.versionName }),
               disabled: row.status === "PUBLISHED" || row.status === "ARCHIVED",
             },
             {
               label: "Lock",
               icon: <Lock className="h-4 w-4" />,
-              onClick: () => lockMutation.mutate(row.id),
+              onClick: () =>
+                setConfirmTarget({ action: "lock", id: row.id, versionName: row.versionName }),
               disabled: row.status === "LOCKED" || row.status === "ARCHIVED",
             },
             {
               label: "Archive",
               icon: <Archive className="h-4 w-4" />,
-              onClick: () => archiveMutation.mutate(row.id),
+              onClick: () =>
+                setConfirmTarget({ action: "archive", id: row.id, versionName: row.versionName }),
               disabled: row.status === "ARCHIVED",
-            },
-            {
-              label: "Duplicate",
-              icon: <History className="h-4 w-4" />,
-              onClick: () => {},
-              disabled: true,
             },
           ]}
         />
@@ -177,6 +216,20 @@ export function TimetableVersionsList({
       ) : (
         <DataTable columns={columns} data={versionsQuery.data || []} />
       )}
+
+      <ConfirmDialog
+        isOpen={confirmTarget !== null}
+        onClose={() => setConfirmTarget(null)}
+        onConfirm={() => confirmTarget && confirmMutation.mutate(confirmTarget.id)}
+        title={confirmTarget ? CONFIRM_COPY[confirmTarget.action].title : ""}
+        description={
+          confirmTarget
+            ? CONFIRM_COPY[confirmTarget.action].description(confirmTarget.versionName)
+            : ""
+        }
+        confirmLabel={confirmTarget ? CONFIRM_COPY[confirmTarget.action].confirmLabel : "Confirm"}
+        isConfirming={confirmMutation.isPending}
+      />
     </div>
   );
 }

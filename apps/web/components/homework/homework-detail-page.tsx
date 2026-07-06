@@ -49,6 +49,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
 
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showReminderDialog, setShowReminderDialog] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [notice, setNotice] = useState<HomeworkNotice | null>(null);
@@ -102,6 +103,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
   const sendReminderMutation = useMutation({
     mutationFn: () => api.sendHomeworkReminders(homeworkId),
     onSuccess: () => {
+      setShowReminderDialog(false);
       setNotice({
         title: "Reminders sent",
         description: "Student reminder notifications were queued.",
@@ -463,7 +465,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                     <Button
                       size="lg"
                       className="rounded-xl bg-[var(--color-mod-homework-accent)] font-bold px-8 text-white shadow-sm hover:bg-[var(--color-mod-homework-text)]"
-                      onClick={() => sendReminderMutation.mutate()}
+                      onClick={() => setShowReminderDialog(true)}
                       disabled={
                         sendReminderMutation.isPending ||
                         homework.status === "CLOSED"
@@ -574,6 +576,16 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
         confirmLabel="Delete Draft"
         variant="destructive"
         isConfirming={deleteMutation.isPending}
+      />
+
+      <ConfirmDialog
+        isOpen={showReminderDialog}
+        onClose={() => setShowReminderDialog(false)}
+        onConfirm={() => sendReminderMutation.mutate()}
+        title="Send Reminders Now"
+        description="This queues a reminder notification to every student who has not yet submitted this assignment."
+        confirmLabel="Send Reminders"
+        isConfirming={sendReminderMutation.isPending}
       />
 
       <HomeworkReviewModal

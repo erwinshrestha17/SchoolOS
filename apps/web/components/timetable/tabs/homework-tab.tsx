@@ -21,6 +21,7 @@ import { FilterBar } from "../../ui/filter-bar";
 import { PageState } from "../../ui/page-state";
 import { AuditInfo } from "../../ui/audit-info";
 import { FormField, Input, Select, TextArea } from "../../ui/form-field";
+import { ConfirmDialog } from "../../ui/confirm-dialog";
 import {
   Plus,
   BookOpen,
@@ -100,6 +101,10 @@ export function HomeworkTab({
     string | null
   >(null);
   const [statusFilter, setStatusFilter] = useState("");
+  const [confirmAssignment, setConfirmAssignment] = useState<{
+    action: "assign" | "reminder";
+    id: string;
+  } | null>(null);
 
   const homeworkQuery = useQuery({
     queryKey: ["homework", classId, statusFilter],
@@ -130,7 +135,10 @@ export function HomeworkTab({
 
   const assignMutation = useMutation({
     mutationFn: api.assignHomework,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["homework"] }),
+    onSuccess: () => {
+      setConfirmAssignment(null);
+      queryClient.invalidateQueries({ queryKey: ["homework"] });
+    },
   });
 
   const closeMutation = useMutation({
@@ -140,7 +148,10 @@ export function HomeworkTab({
 
   const reminderMutation = useMutation({
     mutationFn: api.sendHomeworkReminders,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["homework"] }),
+    onSuccess: () => {
+      setConfirmAssignment(null);
+      queryClient.invalidateQueries({ queryKey: ["homework"] });
+    },
   });
 
   const selectedAssignment = homeworkQuery.data?.find(
@@ -334,7 +345,10 @@ export function HomeworkTab({
                       type="button"
                       className="flex h-9 items-center gap-2 rounded-full border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] px-4 text-[10px] font-black uppercase tracking-widest text-[var(--color-mod-homework-text)] transition-colors hover:bg-white"
                       onClick={() =>
-                        assignMutation.mutate(selectedAssignment.id)
+                        setConfirmAssignment({
+                          action: "assign",
+                          id: selectedAssignment.id,
+                        })
                       }
                       disabled={
                         selectedAssignment.status !== "DRAFT" ||
@@ -348,7 +362,10 @@ export function HomeworkTab({
                       type="button"
                       className="flex h-9 items-center gap-2 rounded-full bg-amber-50 px-4 text-[10px] font-black uppercase tracking-widest text-amber-700 transition-colors hover:bg-amber-100"
                       onClick={() =>
-                        reminderMutation.mutate(selectedAssignment.id)
+                        setConfirmAssignment({
+                          action: "reminder",
+                          id: selectedAssignment.id,
+                        })
                       }
                       disabled={
                         selectedAssignment.status !== "ASSIGNED" ||
@@ -504,6 +521,39 @@ export function HomeworkTab({
           error={createHomeworkMutation.error?.message}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={confirmAssignment !== null}
+        onClose={() => setConfirmAssignment(null)}
+        onConfirm={() => {
+          if (!confirmAssignment) return;
+          if (confirmAssignment.action === "assign") {
+            assignMutation.mutate(confirmAssignment.id);
+          } else {
+            reminderMutation.mutate(confirmAssignment.id);
+          }
+        }}
+        title={
+          confirmAssignment?.action === "assign"
+            ? "Assign Homework"
+            : "Send Reminder"
+        }
+        description={
+          confirmAssignment?.action === "assign"
+            ? "This makes the assignment visible to students and opens it for submissions."
+            : "This queues a reminder notification to students for this assignment."
+        }
+        confirmLabel={
+          confirmAssignment?.action === "assign"
+            ? "Assign Homework"
+            : "Send Reminder"
+        }
+        isConfirming={
+          confirmAssignment?.action === "assign"
+            ? assignMutation.isPending
+            : reminderMutation.isPending
+        }
+      />
     </div>
   );
 }

@@ -29,6 +29,7 @@ import { Badge } from "../../ui/badge";
 import { EmptyState } from "../../ui/empty-state";
 import { LoadingState } from "../../ui/loading-state";
 import { FormField, Input, TextArea } from "../../ui/form-field";
+import { Tooltip } from "../../ui/tooltip";
 import { cn } from "../../../lib/utils";
 
 type HomeworkAttachment = {
@@ -515,13 +516,16 @@ function SubmissionForm({
               <span className="truncate flex-1 text-[11px] font-bold text-slate-700 uppercase tracking-tight">
                 {a.fileName}
               </span>
-              <button
-                type="button"
-                onClick={() => removeAttachment(a.id)}
-                className="h-8 w-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-              >
-                <X size={14} />
-              </button>
+              <Tooltip content={`Remove ${a.fileName}`}>
+                <button
+                  type="button"
+                  aria-label={`Remove ${a.fileName}`}
+                  onClick={() => removeAttachment(a.id)}
+                  className="h-8 w-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </Tooltip>
             </div>
           ))}
           {isUploading && (
