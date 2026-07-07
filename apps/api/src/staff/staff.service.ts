@@ -460,6 +460,11 @@ export class StaffService {
         },
       },
       orderBy: [{ joiningDate: 'desc' }, { firstName: 'asc' }],
+      // Bounded generously rather than paginated: callers (staff directory,
+      // faculty-assignment dropdowns) expect the full roster in one shot.
+      // 1000 comfortably covers any real school while still guarding against
+      // unbounded growth per the pagination-hardening gate.
+      take: 1000,
     });
 
     return staff.map((member) => ({

@@ -450,6 +450,10 @@ export class AcademicsFoundationService {
         },
       },
       orderBy: [{ class: { level: 'asc' } }, { code: 'asc' }],
+      // Bounded generously rather than paginated: the curriculum catalog is
+      // fetched whole for cascading class/subject pickers. 1000 comfortably
+      // covers any real school's full subject list across every grade.
+      take: 1000,
     });
   }
 

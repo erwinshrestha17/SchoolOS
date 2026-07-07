@@ -392,7 +392,7 @@ export function resourceInclude() {
     fileAsset: {
       select: {
         id: true,
-        fileName: true,
+        originalFilename: true,
         mimeType: true,
         sizeBytes: true,
         module: true,
@@ -425,7 +425,12 @@ function toResourceResponse(resource: LearningResourceDetail) {
     activity: resource.activity,
     subject: resource.subject,
     topic: resource.topic,
-    fileAsset: resource.fileAsset,
+    fileAsset: resource.fileAsset
+      ? {
+          ...resource.fileAsset,
+          fileName: resource.fileAsset.originalFilename ?? null,
+        }
+      : resource.fileAsset,
   };
 }
 

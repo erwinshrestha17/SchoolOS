@@ -156,6 +156,11 @@ export class AcademicsService {
         section: true,
       },
       orderBy: [{ createdAt: 'desc' }],
+      // Bounded generously rather than paginated: consumers expect the full
+      // assignment list in one shot. 2000 comfortably covers every
+      // subject x section x academic-year combination a real school
+      // accumulates.
+      take: 2000,
     });
   }
 
