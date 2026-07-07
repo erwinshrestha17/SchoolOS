@@ -70,10 +70,6 @@ function monthStart(value: Date) {
   return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), 1));
 }
 
-function monthEnd(value: Date) {
-  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth() + 1, 0));
-}
-
 function monthToken(value: Date) {
   return `${value.getUTCFullYear()}${String(value.getUTCMonth() + 1).padStart(2, '0')}`;
 }
@@ -236,7 +232,6 @@ async function seedStudentMonthlyInvoices({
   tenantId,
   academicYearId,
   classId,
-  feePlanId,
   components,
   feeHeadIds,
   now,
@@ -244,13 +239,11 @@ async function seedStudentMonthlyInvoices({
   tenantId: string;
   academicYearId: string;
   classId: string;
-  feePlanId: string;
   components: FeeComponent[];
   feeHeadIds: Map<string, { id: string }>;
   now: Date;
 }) {
   const currentMonthStart = monthStart(now);
-  const currentMonthEnd = monthEnd(now);
   const token = monthToken(now);
   const dueDate = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 15),
@@ -394,10 +387,7 @@ async function seedStudentMonthlyInvoices({
     });
   }
 
-  return {
-    enrollmentCount: enrollments.length,
-    billingWindow: { currentMonthStart, currentMonthEnd },
-  };
+  return { enrollmentCount: enrollments.length };
 }
 
 async function main() {
@@ -425,7 +415,9 @@ async function main() {
   const classes = await prisma.class.findMany({
     where: {
       tenantId: tenant.id,
-      name: { in: Object.keys(gradeMonthlyFeeTotals).map((grade) => `Class ${grade}`) },
+      name: {
+        in: Object.keys(gradeMonthlyFeeTotals).map((grade) => `Class ${grade}`),
+      },
     },
     select: { id: true, name: true, level: true },
     orderBy: { level: 'asc' },
@@ -489,7 +481,6 @@ async function main() {
       tenantId: tenant.id,
       academicYearId: academicYear.id,
       classId: cls.id,
-      feePlanId: feePlan.id,
       components,
       feeHeadIds,
       now,
