@@ -156,7 +156,6 @@ export class AcademicsService {
         section: true,
       },
       orderBy: [{ createdAt: 'desc' }],
-      take: 100,
     });
   }
 

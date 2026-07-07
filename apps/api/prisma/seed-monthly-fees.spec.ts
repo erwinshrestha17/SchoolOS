@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-describe('monthly Grade 1-10 fee seed', () => {
+describe('monthly Grade 1-12 fee seed', () => {
   const source = readFileSync(join(__dirname, 'seed-monthly-fees.ts'), 'utf8');
   const packageJson = readFileSync(join(__dirname, '..', 'package.json'), 'utf8');
 
-  it('keeps deterministic monthly fee totals for every Grade 1-10 plan', () => {
+  it('keeps deterministic monthly fee totals for every Grade 1-12 plan', () => {
     const expectedTotals = [
       '1: 3500',
       '2: 3600',
@@ -17,9 +17,11 @@ describe('monthly Grade 1-10 fee seed', () => {
       '8: 5000',
       '9: 5500',
       '10: 6000',
+      '11: 6500',
+      '12: 7000',
     ];
 
-    expect(source).toContain('const canonicalStudentCount = 601');
+    expect(source).toContain('const canonicalStudentCount = 689');
     expect(source).toContain("const canonicalAdmissionPrefix = 'EA-2083-'");
     for (const total of expectedTotals) {
       expect(source).toContain(total);

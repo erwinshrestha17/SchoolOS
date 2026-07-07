@@ -4,7 +4,7 @@ import { join } from 'node:path';
 describe('canonical development seed', () => {
   const source = readFileSync(join(__dirname, 'seed.ts'), 'utf8');
 
-  it('keeps the Everest Academy Class 1-10 distribution deterministic', () => {
+  it('keeps the Everest Academy Class 1-12 distribution deterministic', () => {
     const expectedCounts = [
       ["'Class 1'", 'A: 28, B: 30'],
       ["'Class 2'", 'A: 29, B: 32'],
@@ -16,10 +16,12 @@ describe('canonical development seed', () => {
       ["'Class 8'", 'A: 32, B: 28'],
       ["'Class 9'", 'A: 31, B: 30'],
       ["'Class 10'", 'A: 29, B: 32'],
+      ["'Class 11'", 'A: 24, B: 22'],
+      ["'Class 12'", 'A: 22, B: 20'],
     ];
 
     expect(source).toContain('name: `Class ${index + 1}`');
-    expect(source).toContain('const expectedCanonicalStudentCount = 601');
+    expect(source).toContain('const expectedCanonicalStudentCount = 689');
     for (const [className, counts] of expectedCounts) {
       expect(source).toContain(`${className}: { ${counts} }`);
     }

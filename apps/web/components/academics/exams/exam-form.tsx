@@ -85,11 +85,19 @@ export function ExamForm({
         </FormField>
 
         <FormField label="Start Date" error={errors.startsOn?.message}>
-          <Input type="date" {...register('startsOn')} />
+          <Input
+            type="date"
+            className="[color-scheme:light] [&::-webkit-calendar-picker-indicator]:opacity-60"
+            {...register('startsOn')}
+          />
         </FormField>
 
         <FormField label="End Date" error={errors.endsOn?.message}>
-          <Input type="date" {...register('endsOn')} />
+          <Input
+            type="date"
+            className="[color-scheme:light] [&::-webkit-calendar-picker-indicator]:opacity-60"
+            {...register('endsOn')}
+          />
         </FormField>
 
         <FormField label="Weighting (%)" error={errors.weightPercent?.message} description="Influence of this exam on final grade">

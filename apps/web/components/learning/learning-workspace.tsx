@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatBsDateTime } from "@schoolos/core";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Archive,
   BookOpenCheck,
@@ -104,9 +105,8 @@ export function LearningWorkspace({
   initialTab = "overview",
   activityId,
 }: LearningWorkspaceProps) {
-  const [activeTab, setActiveTab] = useState<LearningTab>(
-    activityId ? "builder" : initialTab,
-  );
+  const router = useRouter();
+  const activeTab: LearningTab = activityId ? "builder" : initialTab;
   const [filters, setFilters] = useState({
     classId: "",
     sectionId: "",
@@ -228,13 +228,13 @@ export function LearningWorkspace({
   function selectActivity(activity: LearningActivity) {
     setEditingActivityId(activity.id);
     setForm(activityToForm(activity));
-    setActiveTab("builder");
+    router.push(`/dashboard/learning/activities/${activity.id}`);
   }
 
   function resetBuilder() {
     setEditingActivityId(null);
     setForm({ ...emptyActivityForm, questions: [{ ...emptyQuestion }] });
-    setActiveTab("builder");
+    router.push("/dashboard/learning/activities/new");
   }
 
   function submitActivity(event: FormEvent<HTMLFormElement>) {
@@ -280,43 +280,9 @@ export function LearningWorkspace({
     if (!currentActivity) return;
     setForm(activityToForm(currentActivity));
   }, [currentActivity]);
-  const activityTabs = useMemo(
-    () => [
-      { key: "overview" as const, label: "Overview" },
-      { key: "activities" as const, label: "Activities" },
-      {
-        key: "builder" as const,
-        label: editingActivityId ? "Edit activity" : "Builder",
-      },
-      { key: "resources" as const, label: "Resources" },
-      { key: "sessions" as const, label: "Sessions" },
-      { key: "board" as const, label: "Smart board" },
-      { key: "lab" as const, label: "Computer lab" },
-      { key: "progress" as const, label: "Progress" },
-    ],
-    [editingActivityId],
-  );
-
   return (
     <div className="space-y-6">
       {notice && <Notice message={notice} onDismiss={() => setNotice(null)} />}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {activityTabs.map((tab) => (
-          <button
-            type="button"
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={cn(
-              "shrink-0 rounded-xl border px-4 py-2 text-sm font-bold transition",
-              activeTab === tab.key
-                ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
-                : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800",
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
 
       {activeTab === "overview" && (
         <section className="space-y-5">
@@ -353,7 +319,7 @@ export function LearningWorkspace({
             isLoading={activitiesQuery.isLoading}
             onSelect={selectActivity}
             onArchive={(id) => archiveActivityMutation.mutate(id)}
-            onLaunch={() => setActiveTab("sessions")}
+            onLaunch={() => router.push("/dashboard/learning/sessions")}
           />
         </section>
       )}
@@ -435,7 +401,7 @@ export function LearningWorkspace({
             isLoading={activitiesQuery.isLoading}
             onSelect={selectActivity}
             onArchive={(id) => archiveActivityMutation.mutate(id)}
-            onLaunch={() => setActiveTab("sessions")}
+            onLaunch={() => router.push("/dashboard/learning/sessions")}
           />
         </section>
       )}
@@ -674,7 +640,7 @@ export function LearningWorkspace({
                 {currentActivity && (
                   <button
                     type="button"
-                    onClick={() => setActiveTab("sessions")}
+                    onClick={() => router.push("/dashboard/learning/sessions")}
                     className="inline-flex h-11 items-center gap-2 rounded-xl border border-emerald-100 bg-white px-5 text-sm font-black text-emerald-800 hover:bg-emerald-50"
                   >
                     <MonitorPlay size={17} />

@@ -225,8 +225,8 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
               <CalendarCheck size={20} />
            </div>
            <div>
-              <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">Operational Registry</h3>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Existing Exam Definitions</p>
+              <h3 className="text-base font-bold text-slate-900">Exam Terms</h3>
+              <p className="text-sm text-slate-500">Existing exam definitions for this academic year.</p>
            </div>
            <div className="h-px flex-1 bg-slate-100" />
         </div>
@@ -242,7 +242,7 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
             <div key={e.id} className="group relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[var(--color-mod-academics-border)]">
               <div className="flex items-start justify-between mb-6">
                 <div className="space-y-1">
-                  <h4 className="text-xl font-black uppercase tracking-tight text-slate-900 italic leading-none">{e.name}</h4>
+                  <h4 className="text-lg font-bold leading-none text-slate-900">{e.name}</h4>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{e.academicYear?.name ?? 'Year'}</p>
                 </div>
                 <div className={cn(

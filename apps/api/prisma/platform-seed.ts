@@ -1,9 +1,4 @@
-import {
-  PrismaClient,
-  AuthMethod,
-  UserStatus,
-  TenantSubscriptionStatus,
-} from '@prisma/client';
+import { PrismaClient, AuthMethod, UserStatus } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
 import 'dotenv/config';
@@ -23,7 +18,6 @@ const prisma = new PrismaClient({ adapter });
 const platformEmail = process.env.PLATFORM_SEED_EMAIL || 'admin@schoolos.io';
 const platformPassword = process.env.PLATFORM_SEED_PASSWORD || 'SchoolOS@2026';
 const platformRole = 'platform_super_admin';
-const demoTenantSlug = 'pilot-school-demo';
 
 async function main() {
   console.log('--- M0 Platform Core Seed: Starting ---');
@@ -142,67 +136,6 @@ async function main() {
   });
 
   console.log('✅ Platform plans seeded.');
-
-  // 4. Seed Nepal Demo Tenant (Pilot)
-  const demoTenant = await prisma.tenant.upsert({
-    where: { slug: demoTenantSlug },
-    update: { isActive: true },
-    create: {
-      name: 'Nepal Pilot Academy',
-      slug: demoTenantSlug,
-      plan: 'standard',
-      isActive: true,
-      panNumber: '600123456',
-    },
-  });
-
-  // Assign Subscription
-  const existingSub = await (prisma as any).tenantSubscription.findFirst({
-    where: { tenantId: demoTenant.id },
-  });
-
-  if (!existingSub) {
-    await (prisma as any).tenantSubscription.create({
-      data: {
-        tenantId: demoTenant.id,
-        planId: standardPlan.id,
-        status: TenantSubscriptionStatus.ACTIVE,
-        startsAt: new Date(),
-        renewsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      },
-    });
-  }
-
-  // Setup Billing Profile
-  await (prisma as any).tenantBillingProfile.upsert({
-    where: { tenantId: demoTenant.id },
-    update: {},
-    create: {
-      tenantId: demoTenant.id,
-      billingContactName: 'Bishal Thapa',
-      billingEmail: 'billing@nepalpilot.edu.np',
-      billingAddress: 'Kathmandu, Nepal',
-      panVatNumber: '600123456',
-      preferredBillingCycle: 'MONTHLY',
-    },
-  });
-
-  console.log(`✅ Demo tenant "${demoTenant.name}" seeded.`);
-
-  // 5. Seed Onboarding Overrides for Demo
-  await (prisma as any).tenantOnboardingChecklistOverride.upsert({
-    where: {
-      tenantId_itemKey: { tenantId: demoTenant.id, itemKey: 'file_storage' },
-    },
-    update: {},
-    create: {
-      tenantId: demoTenant.id,
-      itemKey: 'file_storage',
-      completed: true,
-      reason: 'Auto-configured by platform seed',
-      updatedBy: operator.id,
-    },
-  });
 
   console.log('--- M0 Platform Core Seed: Completed ---');
 }

@@ -18,7 +18,7 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter });
 
 const canonicalAdmissionPrefix = 'EA-2083-';
-const canonicalStudentCount = 601;
+const canonicalStudentCount = 689;
 
 const gradeMonthlyFeeTotals: Record<number, number> = {
   1: 3500,
@@ -31,6 +31,8 @@ const gradeMonthlyFeeTotals: Record<number, number> = {
   8: 5000,
   9: 5500,
   10: 6000,
+  11: 6500,
+  12: 7000,
 };
 
 const feeHeadDefinitions = [
@@ -392,7 +394,7 @@ async function seedStudentMonthlyInvoices({
 
 async function main() {
   assertDevelopmentSeedAllowed();
-  console.log('🌱 Seeding monthly fee plans and invoices for Grade 1-10...');
+  console.log('🌱 Seeding monthly fee plans and invoices for Grade 1-12...');
 
   const tenant = await prisma.tenant.findUnique({
     where: { slug: 'default-school' },
@@ -424,7 +426,7 @@ async function main() {
   });
 
   if (classes.length !== Object.keys(gradeMonthlyFeeTotals).length) {
-    throw new Error('Monthly fee seed expected Class 1 through Class 10.');
+    throw new Error('Monthly fee seed expected Class 1 through Class 12.');
   }
 
   const now = new Date();
@@ -495,7 +497,7 @@ async function main() {
   }
 
   console.log(
-    `✅ Seeded monthly fee plans, assignments, and invoices for ${seededStudents} Grade 1-10 students.`,
+    `✅ Seeded monthly fee plans, assignments, and invoices for ${seededStudents} Grade 1-12 students.`,
   );
 }
 

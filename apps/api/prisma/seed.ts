@@ -82,6 +82,8 @@ type CanonicalStudent = {
   sectionName: string;
   rollNumber: number;
   admissionNumber: string;
+  firstNameEn: string;
+  lastNameEn: string;
   guardianUserId: string;
   guardianId: string;
 };
@@ -115,6 +117,8 @@ const canonicalDriverPassword =
   process.env.SCHOOLOS_DEMO_DRIVER_PASSWORD ?? localDemoPassword;
 const canonicalStaffPassword =
   process.env.SCHOOLOS_DEMO_STAFF_PASSWORD ?? localDemoPassword;
+const hrManagerPassword =
+  process.env.SCHOOLOS_DEMO_HR_PASSWORD ?? localDemoPassword;
 const canonicalStudentPassword =
   process.env.SCHOOLOS_DEMO_STUDENT_PASSWORD ?? localDemoPassword;
 const platformSeedPassword =
@@ -164,13 +168,18 @@ const seedUsers: SeedUser[] = [
     password: canonicalStaffPassword,
   },
   {
+    roleName: 'hr_manager',
+    email: 'hr@schoolos.com',
+    password: hrManagerPassword,
+  },
+  {
     roleName: 'driver',
     email: 'driver@schoolos.com',
     password: canonicalDriverPassword,
   },
 ];
 
-const classDefinitions = Array.from({ length: 10 }, (_, index) => ({
+const classDefinitions = Array.from({ length: 12 }, (_, index) => ({
   name: `Class ${index + 1}`,
   level: index + 1,
 }));
@@ -188,9 +197,11 @@ const canonicalSectionCounts: Record<string, Record<string, number>> = {
   'Class 8': { A: 32, B: 28 },
   'Class 9': { A: 31, B: 30 },
   'Class 10': { A: 29, B: 32 },
+  'Class 11': { A: 24, B: 22 },
+  'Class 12': { A: 22, B: 20 },
 };
 
-const expectedCanonicalStudentCount = 601;
+const expectedCanonicalStudentCount = 689;
 const canonicalAdmissionPrefix = 'EA-2083';
 
 const firstNames = [
@@ -220,6 +231,30 @@ const firstNames = [
   'Sunita',
   'Ujjwal',
   'Yogita',
+  'Aayush',
+  'Anjali',
+  'Bikash',
+  'Bimala',
+  'Chandra',
+  'Dilip',
+  'Gita',
+  'Hari',
+  'Indira',
+  'Jeevan',
+  'Kabita',
+  'Krishna',
+  'Laxmi',
+  'Madan',
+  'Nawaraj',
+  'Pooja',
+  'Rajesh',
+  'Sabina',
+  'Santosh',
+  'Tara',
+  'Umesh',
+  'Vishal',
+  'Yamuna',
+  'Bishnu',
 ];
 
 const lastNames = [
@@ -240,6 +275,23 @@ const lastNames = [
   'Tamang',
   'Thapa',
   'Yadav',
+  'Basnet',
+  'Bhattarai',
+  'Chhetri',
+  'Dahal',
+  'Dangol',
+  'Ghimire',
+  'Joshi',
+  'Magar',
+  'Neupane',
+  'Pandey',
+  'Regmi',
+  'Subedi',
+  'Acharya',
+  'Bajracharya',
+  'Limbu',
+  'Pradhan',
+  'Shakya',
 ];
 
 function date(value: string) {
@@ -266,6 +318,7 @@ async function main() {
 
   await seedUsersWithRoles(tenant.id);
   await seedRepresentativeStaffProfiles(tenant.id);
+  await seedNonPortalSupportStaff(tenant.id);
   await seedClassesAndSections(tenant.id);
   await seedSubjects(tenant.id);
   await seedCanonicalSchoolDataset(tenant.id, academicYear.id);
@@ -319,10 +372,7 @@ async function cleanupLegacyData(tenantId: string) {
   const legacyStudents = await prisma.student.findMany({
     where: {
       tenantId,
-      OR: [
-        { studentSystemId: { startsWith: 'S2024-' } },
-        { studentSystemId: { startsWith: 'SCH-2026-' } },
-      ],
+      studentSystemId: { not: { startsWith: canonicalAdmissionPrefix } },
       lifecycleStatus: 'ACTIVE',
     },
     select: { id: true },
@@ -797,7 +847,16 @@ async function seedRepresentativeStaffProfiles(tenantId: string) {
       firstName: 'Rojina',
       lastName: 'Maharjan',
       gender: Gender.FEMALE,
-      designation: 'Front Desk Staff',
+      designation: 'Receptionist',
+      department: 'Administration',
+    },
+    {
+      email: 'hr@schoolos.com',
+      employeeId: 'EA-HR-001',
+      firstName: 'Bishnu',
+      lastName: 'Bhattarai',
+      gender: Gender.MALE,
+      designation: 'HR Manager',
       department: 'Administration',
     },
   ];
@@ -816,6 +875,103 @@ async function seedRepresentativeStaffProfiles(tenantId: string) {
         `Missing representative staff user for ${staffSeed.email}`,
       );
     }
+    await upsertStaffProfile({
+      tenantId,
+      userId: user.id,
+      employeeId: staffSeed.employeeId,
+      firstName: staffSeed.firstName,
+      lastName: staffSeed.lastName,
+      gender: staffSeed.gender,
+      designation: staffSeed.designation,
+      department: staffSeed.department,
+    });
+  }
+}
+
+async function seedNonPortalSupportStaff(tenantId: string) {
+  console.log('Seeding non-portal support staff (guard/cook/cleaner)...');
+
+  const role = await prisma.role.findUnique({
+    where: { tenantId_name: { tenantId, name: 'support_staff' } },
+  });
+  if (!role) {
+    throw new Error('Missing support_staff role for non-portal staff seed');
+  }
+
+  const staffSeeds = [
+    {
+      email: 'guard1@schoolos.internal',
+      employeeId: 'EA-GRD-001',
+      firstName: 'Bir',
+      lastName: 'Thapa',
+      gender: Gender.MALE,
+      designation: 'Security Guard',
+      department: 'Facilities',
+    },
+    {
+      email: 'guard2@schoolos.internal',
+      employeeId: 'EA-GRD-002',
+      firstName: 'Jit',
+      lastName: 'Rana',
+      gender: Gender.MALE,
+      designation: 'Security Guard',
+      department: 'Facilities',
+    },
+    {
+      email: 'cook1@schoolos.internal',
+      employeeId: 'EA-CK-001',
+      firstName: 'Kanchi',
+      lastName: 'Tamang',
+      gender: Gender.FEMALE,
+      designation: 'Cook',
+      department: 'Canteen',
+    },
+    {
+      email: 'cook2@schoolos.internal',
+      employeeId: 'EA-CK-002',
+      firstName: 'Devi',
+      lastName: 'Gurung',
+      gender: Gender.FEMALE,
+      designation: 'Cook',
+      department: 'Canteen',
+    },
+    {
+      email: 'cleaner1@schoolos.internal',
+      employeeId: 'EA-CLN-001',
+      firstName: 'Maili',
+      lastName: 'Magar',
+      gender: Gender.FEMALE,
+      designation: 'Cleaner',
+      department: 'Facilities',
+    },
+    {
+      email: 'cleaner2@schoolos.internal',
+      employeeId: 'EA-CLN-002',
+      firstName: 'Purna',
+      lastName: 'Lama',
+      gender: Gender.MALE,
+      designation: 'Cleaner',
+      department: 'Facilities',
+    },
+    {
+      email: 'cleaner3@schoolos.internal',
+      employeeId: 'EA-CLN-003',
+      firstName: 'Sarita',
+      lastName: 'Chhetri',
+      gender: Gender.FEMALE,
+      designation: 'Cleaner',
+      department: 'Facilities',
+    },
+  ];
+
+  for (const staffSeed of staffSeeds) {
+    const user = await ensureSeedUserWithRole({
+      tenantId,
+      email: staffSeed.email,
+      password: canonicalStaffPassword,
+      roleId: role.id,
+      status: UserStatus.SUSPENDED,
+    });
     await upsertStaffProfile({
       tenantId,
       userId: user.id,
@@ -885,11 +1041,13 @@ async function ensureSeedUserWithRole({
   email,
   password,
   roleId,
+  status = UserStatus.ACTIVE,
 }: {
   tenantId: string;
   email: string;
   password: string;
   roleId: string;
+  status?: UserStatus;
 }) {
   let passwordHash = passwordHashCache.get(password);
   if (!passwordHash) {
@@ -907,7 +1065,7 @@ async function ensureSeedUserWithRole({
     update: {
       passwordHash,
       authMethod: AuthMethod.PASSWORD,
-      status: UserStatus.ACTIVE,
+      status,
       failedLoginCount: 0,
       lockedUntil: null,
     },
@@ -916,7 +1074,7 @@ async function ensureSeedUserWithRole({
       email,
       passwordHash,
       authMethod: AuthMethod.PASSWORD,
-      status: UserStatus.ACTIVE,
+      status,
     },
   });
 
@@ -953,25 +1111,28 @@ async function seedSubjects(tenantId: string) {
     if (!grade) continue;
 
     for (const subject of subjectDefinitionsForGrade(grade)) {
+      const canonicalCode = `C${grade.toString().padStart(2, '0')}-${subject.code}`;
+      const data = {
+        name: subject.name,
+        code: canonicalCode,
+        type: subject.type,
+        hasPractical: isPracticalSubject(subject.name),
+        theoryMarks: isPracticalSubject(subject.name) ? 75 : 100,
+        practicalMarks: isPracticalSubject(subject.name) ? 25 : null,
+        passMarks: 35,
+      };
+
       const existingByName = await prisma.subject.findFirst({
         where: { tenantId, classId: cls.id, name: subject.name },
       });
 
       if (existingByName) {
+        // Migrate any legacy/manually-created subject row onto the
+        // canonical code instead of leaving its old code in place, so a
+        // stray duplicate never lingers alongside the canonical row.
         await prisma.subject.update({
           where: { id: existingByName.id },
-          data: {
-            code: existingByName.code,
-            type: subject.type,
-            hasPractical: subject.name.toLowerCase().includes('science'),
-            theoryMarks: subject.name.toLowerCase().includes('science')
-              ? 75
-              : 100,
-            practicalMarks: subject.name.toLowerCase().includes('science')
-              ? 25
-              : null,
-            passMarks: 35,
-          },
+          data,
         });
         continue;
       }
@@ -981,36 +1142,11 @@ async function seedSubjects(tenantId: string) {
           tenantId_classId_code: {
             tenantId,
             classId: cls.id,
-            code: `C${grade.toString().padStart(2, '0')}-${subject.code}`,
+            code: canonicalCode,
           },
         },
-        update: {
-          name: subject.name,
-          type: subject.type,
-          hasPractical: subject.name.toLowerCase().includes('science'),
-          theoryMarks: subject.name.toLowerCase().includes('science')
-            ? 75
-            : 100,
-          practicalMarks: subject.name.toLowerCase().includes('science')
-            ? 25
-            : null,
-          passMarks: 35,
-        },
-        create: {
-          tenantId,
-          classId: cls.id,
-          name: subject.name,
-          code: `C${grade.toString().padStart(2, '0')}-${subject.code}`,
-          type: subject.type,
-          hasPractical: subject.name.toLowerCase().includes('science'),
-          theoryMarks: subject.name.toLowerCase().includes('science')
-            ? 75
-            : 100,
-          practicalMarks: subject.name.toLowerCase().includes('science')
-            ? 25
-            : null,
-          passMarks: 35,
-        },
+        update: data,
+        create: { tenantId, classId: cls.id, ...data },
       });
     }
   }
@@ -1068,20 +1204,44 @@ function subjectDefinitionsForGrade(grade: number): SeedSubject[] {
     ];
   }
 
+  if (grade <= 10) {
+    return [
+      { name: 'Nepali', code: 'NEP', type: 'CORE' },
+      { name: 'English', code: 'ENG', type: 'CORE' },
+      { name: 'Mathematics', code: 'MATH', type: 'CORE' },
+      { name: 'Science and Technology', code: 'SCITECH', type: 'CORE' },
+      { name: 'Social Studies', code: 'SOC', type: 'CORE' },
+      { name: 'Computer and ICT', code: 'ICT', type: 'CORE' },
+      { name: 'Health and Physical Education', code: 'HPE', type: 'CORE' },
+      {
+        name: 'Account Economics and Optional Mathematics',
+        code: 'ACCECO',
+        type: 'OPTIONAL',
+      },
+    ];
+  }
+
   return [
     { name: 'Nepali', code: 'NEP', type: 'CORE' },
     { name: 'English', code: 'ENG', type: 'CORE' },
+    { name: 'Physics', code: 'PHY', type: 'CORE' },
+    { name: 'Chemistry', code: 'CHE', type: 'CORE' },
     { name: 'Mathematics', code: 'MATH', type: 'CORE' },
-    { name: 'Science and Technology', code: 'SCITECH', type: 'CORE' },
-    { name: 'Social Studies', code: 'SOC', type: 'CORE' },
-    { name: 'Computer and ICT', code: 'ICT', type: 'CORE' },
+    { name: 'Biology', code: 'BIO', type: 'CORE' },
+    { name: 'Computer Science', code: 'CS', type: 'CORE' },
     { name: 'Health and Physical Education', code: 'HPE', type: 'CORE' },
-    {
-      name: 'Account Economics and Optional Mathematics',
-      code: 'ACCECO',
-      type: 'OPTIONAL',
-    },
   ];
+}
+
+function isPracticalSubject(name: string) {
+  const lower = name.toLowerCase();
+  return (
+    lower.includes('science') ||
+    lower === 'physics' ||
+    lower === 'chemistry' ||
+    lower === 'biology' ||
+    lower === 'computer science'
+  );
 }
 
 async function seedCanonicalSchoolDataset(
@@ -1128,6 +1288,7 @@ async function seedCanonicalSchoolDataset(
     roles.parent,
     classes,
   );
+  await linkSiblingFamilies(tenantId, students);
   await seedCanonicalTeacherAssignments(
     tenantId,
     academicYearId,
@@ -1265,7 +1426,7 @@ async function retireCanonicalOverflowStudents(
 
 async function seedCanonicalClassTeachers(tenantId: string, roleId: string) {
   const teachers = new Map<string, CanonicalTeacher>();
-  for (let grade = 1; grade <= 10; grade += 1) {
+  for (let grade = 1; grade <= 12; grade += 1) {
     for (const section of sectionNames) {
       const email = `classteacher.${grade}${section.toLowerCase()}@schoolos.com`;
       const user = await ensureSeedUserWithRole({
@@ -1305,11 +1466,20 @@ async function seedCanonicalSubjectTeachers(tenantId: string, roleId: string) {
     'computer',
     'hpe',
     'optional',
+    'physics',
+    'chemistry',
+    'biology',
   ];
   const pools = new Map<string, CanonicalTeacher[]>();
   for (const subjectKey of subjectKeys) {
     const poolSize =
-      subjectKey === 'mathematics' || subjectKey === 'english' ? 10 : 8;
+      subjectKey === 'mathematics' || subjectKey === 'english'
+        ? 10
+        : subjectKey === 'physics' ||
+            subjectKey === 'chemistry' ||
+            subjectKey === 'biology'
+          ? 3
+          : 8;
     const pool: CanonicalTeacher[] = [];
     for (let index = 1; index <= poolSize; index += 1) {
       const representativeEmail =
@@ -1358,6 +1528,7 @@ async function seedCanonicalStudents(
   }>,
 ) {
   const students: CanonicalStudent[] = [];
+  let globalStudentIndex = 0;
   for (const cls of classes) {
     const grade = classGrade(cls.name);
     if (!grade) continue;
@@ -1369,6 +1540,8 @@ async function seedCanonicalStudents(
       for (let roll = 1; roll <= count; roll += 1) {
         const code = canonicalStudentCode(grade, sectionName, roll);
         const gender = (grade + roll) % 2 === 0 ? Gender.FEMALE : Gender.MALE;
+        const uniqueName = uniqueStudentName(globalStudentIndex);
+        globalStudentIndex += 1;
         const guardianEmail = `guardian.${guardianEmailCode(grade, sectionName, roll)}@schoolos.test`;
         const guardianUser = await ensureSeedUserWithRole({
           tenantId,
@@ -1377,9 +1550,9 @@ async function seedCanonicalStudents(
           roleId: parentRoleId,
         });
         const primaryPhone = guardianPhone(grade, sectionName, roll);
-        const fullName = `${guardianName(grade, roll)} ${studentLastName(grade, roll)}`;
+        const fullName = `${guardianName(grade, roll)} ${uniqueName.last}`;
         const existingGuardian = await prisma.guardian.findFirst({
-          where: { tenantId, primaryPhone, fullName },
+          where: { tenantId, userId: guardianUser.id },
         });
         const guardianData = {
           userId: guardianUser.id,
@@ -1405,8 +1578,8 @@ async function seedCanonicalStudents(
             tenantId_studentSystemId: { tenantId, studentSystemId: code },
           },
           update: {
-            firstNameEn: studentFirstName(grade, roll),
-            lastNameEn: studentLastName(grade, roll),
+            firstNameEn: uniqueName.first,
+            lastNameEn: uniqueName.last,
             dateOfBirth: studentDob(grade, roll),
             gender,
             nationality: 'Nepali',
@@ -1430,8 +1603,8 @@ async function seedCanonicalStudents(
           create: {
             tenantId,
             studentSystemId: code,
-            firstNameEn: studentFirstName(grade, roll),
-            lastNameEn: studentLastName(grade, roll),
+            firstNameEn: uniqueName.first,
+            lastNameEn: uniqueName.last,
             dateOfBirth: studentDob(grade, roll),
             gender,
             nationality: 'Nepali',
@@ -1510,6 +1683,8 @@ async function seedCanonicalStudents(
           sectionName,
           rollNumber: roll,
           admissionNumber: code,
+          firstNameEn: uniqueName.first,
+          lastNameEn: uniqueName.last,
           guardianUserId: guardianUser.id,
           guardianId: guardian.id,
         });
@@ -1517,6 +1692,77 @@ async function seedCanonicalStudents(
     }
   }
   return students;
+}
+
+async function linkSiblingFamilies(
+  tenantId: string,
+  students: CanonicalStudent[],
+) {
+  const byKey = new Map(
+    students.map((student) => [
+      `${sectionKey(student.className, student.sectionName)}-${student.rollNumber}`,
+      student,
+    ]),
+  );
+
+  // Fixed, non-overlapping sibling pairs (each grade used at most once as an
+  // anchor and at most once as a child) so families stay 2 children, not a
+  // chain of every grade 2 apart sharing one guardian.
+  const siblingGradePairs: Array<[number, number]> = [
+    [1, 3],
+    [2, 4],
+    [5, 7],
+    [6, 8],
+    [9, 11],
+    [10, 12],
+  ];
+
+  for (const [anchorGrade, childGrade] of siblingGradePairs) {
+    for (const sectionName of sectionNames) {
+      const anchorRoll = sectionName === 'A' ? 5 : 6;
+      const child = byKey.get(
+        `${sectionKey(`Class ${childGrade}`, sectionName)}-${anchorRoll}`,
+      );
+      const anchor = byKey.get(
+        `${sectionKey(`Class ${anchorGrade}`, sectionName)}-${anchorRoll}`,
+      );
+      if (!child || !anchor || child.guardianId === anchor.guardianId)
+        continue;
+
+      const orphanGuardianId = child.guardianId;
+      const orphanGuardianUserId = child.guardianUserId;
+
+      const alreadyLinkedToAnchor = await prisma.studentGuardian.findUnique({
+        where: {
+          studentId_guardianId: {
+            studentId: child.id,
+            guardianId: anchor.guardianId,
+          },
+        },
+      });
+      if (alreadyLinkedToAnchor) {
+        await prisma.studentGuardian.deleteMany({
+          where: { tenantId, studentId: child.id, guardianId: orphanGuardianId },
+        });
+      } else {
+        await prisma.studentGuardian.updateMany({
+          where: { tenantId, studentId: child.id, guardianId: orphanGuardianId },
+          data: { guardianId: anchor.guardianId },
+        });
+      }
+
+      const stillReferenced = await prisma.studentGuardian.count({
+        where: { tenantId, guardianId: orphanGuardianId },
+      });
+      if (stillReferenced === 0) {
+        await prisma.guardian.deleteMany({ where: { id: orphanGuardianId } });
+        await prisma.user.deleteMany({ where: { id: orphanGuardianUserId } });
+      }
+
+      child.guardianId = anchor.guardianId;
+      child.guardianUserId = anchor.guardianUserId;
+    }
+  }
 }
 
 async function seedCanonicalTeacherAssignments(
@@ -2931,6 +3177,9 @@ function subjectTeacherFirstName(subjectKey: string, index: number) {
     computer: ['Sudeep', 'Rojina', 'Bibek', 'Anju'],
     hpe: ['Kamal', 'Nisha', 'Sanjay', 'Laxmi'],
     optional: ['Rajan', 'Sabita', 'Umesh', 'Kalpana'],
+    physics: ['Dinesh', 'Sarala', 'Bijay'],
+    chemistry: ['Ramchandra', 'Anupama', 'Sudip'],
+    biology: ['Devendra', 'Ranjana', 'Prem'],
   };
   return (
     bySubject[subjectKey]?.[(index - 1) % bySubject[subjectKey].length] ??
@@ -2954,6 +3203,9 @@ function subjectPoolKey(subjectName: string) {
   if (lower.includes('nepali')) return 'nepali';
   if (lower.includes('english')) return 'english';
   if (lower.includes('math')) return 'mathematics';
+  if (lower === 'physics') return 'physics';
+  if (lower === 'chemistry') return 'chemistry';
+  if (lower === 'biology') return 'biology';
   if (lower.includes('science')) return 'science';
   if (lower.includes('social') || lower.includes('moral')) return 'social';
   if (
@@ -3130,12 +3382,20 @@ function guardianName(grade: number, roll: number) {
   return names[(grade + roll) % names.length];
 }
 
-function studentFirstName(grade: number, roll: number) {
-  return firstNames[(grade * 3 + roll) % firstNames.length];
-}
-
-function studentLastName(grade: number, roll: number) {
-  return lastNames[(grade * 5 + roll) % lastNames.length];
+function uniqueStudentName(globalIndex: number) {
+  const capacity = firstNames.length * lastNames.length;
+  if (globalIndex >= capacity) {
+    throw new Error(
+      `Name pool exhausted: ${firstNames.length} first names x ${lastNames.length} last names cannot cover ${globalIndex + 1} students uniquely.`,
+    );
+  }
+  // Scatter via a coprime multiplier so adjacent students don't cluster on
+  // the same surname (a plain mixed-radix index repeats the same last name
+  // for firstNames.length consecutive students in a row).
+  const permuted = (globalIndex * 131) % capacity;
+  const firstIdx = permuted % firstNames.length;
+  const lastIdx = Math.floor(permuted / firstNames.length) % lastNames.length;
+  return { first: firstNames[firstIdx], last: lastNames[lastIdx] };
 }
 
 function studentDob(grade: number, roll: number) {
@@ -3438,13 +3698,13 @@ async function validateCanonicalSeed(tenantId: string, academicYearId: string) {
     0,
   );
 
-  if (classRows.length !== 10)
+  if (classRows.length !== 12)
     throw new Error(
-      `Canonical seed expected 10 classes, found ${classRows.length}`,
+      `Canonical seed expected 12 classes, found ${classRows.length}`,
     );
-  if (activeSectionCount !== 20)
+  if (activeSectionCount !== 24)
     throw new Error(
-      `Canonical seed expected 20 sections, found ${activeSectionCount}`,
+      `Canonical seed expected 24 sections, found ${activeSectionCount}`,
     );
   if (canonicalStudents.length !== expectedCanonicalStudentCount) {
     throw new Error(
@@ -3456,9 +3716,9 @@ async function validateCanonicalSeed(tenantId: string, academicYearId: string) {
       `Canonical seed expected ${expectedCanonicalStudentCount} guardian links, found ${guardianLinks}`,
     );
   }
-  if (classTeacherSectionCount !== 20) {
+  if (classTeacherSectionCount !== 24) {
     throw new Error(
-      `Canonical seed expected 20 class teacher assignments, found ${classTeacherSectionCount}`,
+      `Canonical seed expected 24 class teacher assignments, found ${classTeacherSectionCount}`,
     );
   }
   if (subjectAssignments < expectedSubjectAssignments) {
@@ -4032,37 +4292,6 @@ async function seedDemoTenantFeatureOverrides(tenantId: string) {
 async function seedPlatformInfrastructure() {
   console.log('Seeding platform infrastructure...');
 
-  // 1. Create a few more tenants
-  const trialTenant = await prisma.tenant.upsert({
-    where: { slug: 'trial-school' },
-    update: {
-      name: 'Trial Academy',
-      plan: 'free',
-      isActive: true,
-    },
-    create: {
-      name: 'Trial Academy',
-      slug: 'trial-school',
-      plan: 'free',
-      isActive: true,
-    },
-  });
-
-  const suspendedTenant = await prisma.tenant.upsert({
-    where: { slug: 'suspended-school' },
-    update: {
-      name: 'Suspended Academy',
-      plan: 'standard',
-      isActive: false,
-    },
-    create: {
-      name: 'Suspended Academy',
-      slug: 'suspended-school',
-      plan: 'standard',
-      isActive: false,
-    },
-  });
-
   // 2. Create Platform Plans
   const plans = [
     { key: 'free', name: 'Free Tier', priceNpr: 0, billingCycle: 'ANNUAL' },
@@ -4334,7 +4563,7 @@ async function seedPlatformInfrastructure() {
       {
         action: 'TENANT_STATUS_CHANGE',
         resource: 'tenant',
-        resourceId: trialTenant.id,
+        resourceId: defaultTenant.id,
         reason: 'Trial period review',
       },
       {

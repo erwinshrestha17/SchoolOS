@@ -450,7 +450,6 @@ export class AcademicsFoundationService {
         },
       },
       orderBy: [{ class: { level: 'asc' } }, { code: 'asc' }],
-      take: 100,
     });
   }
 

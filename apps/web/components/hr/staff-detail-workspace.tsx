@@ -1,6 +1,6 @@
 'use client';
 
-import { formatBsDate, formatNepalTime } from '@schoolos/core';
+import { formatBsDate, formatNepalTime, type PayrollMoneyAmount } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   Save, 
@@ -27,6 +27,7 @@ import { cn } from '../../lib/utils';
 import { Badge } from '../ui/badge';
 import { Toast } from '../ui/toast';
 import { FormField, Input, TextArea } from '../ui/form-field';
+import { useSession } from '../session-provider';
 
 // Dialog Modals
 import { StaffLifecycleDialog } from './staff-lifecycle-dialog';
@@ -37,8 +38,26 @@ import { LeaveReviewDialog } from './leave-review-dialog';
 import { LeaveBalanceAdjustDialog } from './leave-balance-adjust-dialog';
 import { SalaryStructureDialog } from './salary-structure-dialog';
 
+// The backend nulls out salary/payroll figures (with a `masked: true` flag)
+// for viewers without sensitive-HR access — never call .toLocaleString() on
+// those directly, or it throws for exactly the accounts most likely to open
+// this tab without full payroll permission.
+function formatMaskableNpr(value: PayrollMoneyAmount | null | undefined) {
+  if (value === null || value === undefined) return 'Restricted';
+  return `NPR ${Number(value).toLocaleString()}`;
+}
+
 export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
   const queryClient = useQueryClient();
+  const { hasPermissions } = useSession();
+  // Mirrors the backend's canSeeSensitiveStaffData gate (apps/api staff.service.ts).
+  // Viewers without this access receive partially-masked PAN/bank values and
+  // fully-nulled salary figures — those must never be treated as editable or
+  // round-tripped back to the server.
+  const canSeeSensitiveHrData =
+    hasPermissions(['hr:manage']) ||
+    hasPermissions(['payroll:manage']) ||
+    hasPermissions(['payroll:salary:read']);
   const staffQuery = useQuery({
     queryKey: ['staff-detail', staffId],
     queryFn: () => api.getStaffDetail(staffId),
@@ -120,16 +139,25 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
         address: draft.address.trim(),
         department: optionalTrim(draft.department),
         designation: optionalTrim(draft.designation),
-        bankName: optionalTrim(draft.bankName),
-        bankAccount: optionalTrim(draft.bankAccount),
         emergencyContactName: optionalTrim(draft.emergencyName),
         emergencyContactPhone: optionalTrim(draft.emergencyPhone),
         emergencyContactRelation: optionalTrim(draft.emergencyRelation),
         qualifications: optionalTrim(draft.qualifications),
         experience: optionalTrim(draft.experience),
         teacherRegistryId: optionalTrim(draft.teacherRegistryId),
-        citizenshipNo: optionalTrim(draft.citizenshipNo),
-        panNumber: optionalTrim(draft.panNumber),
+        // The backend partially masks these three fields for viewers without
+        // sensitive-HR access (e.g. "12****89"). Never send them back unless
+        // this viewer received the real value — otherwise saving any other
+        // field on this form would silently overwrite the real PAN/bank
+        // details with the masked placeholder string.
+        ...(canSeeSensitiveHrData
+          ? {
+              bankName: optionalTrim(draft.bankName),
+              bankAccount: optionalTrim(draft.bankAccount),
+              citizenshipNo: optionalTrim(draft.citizenshipNo),
+              panNumber: optionalTrim(draft.panNumber),
+            }
+          : {}),
       });
     },
     onSuccess: () => {
@@ -447,18 +475,28 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                     />
                   </FormField>
                   <FormField label="Citizenship / National ID">
-                    <Input 
-                      value={draft.citizenshipNo} 
-                      disabled={staff.status === 'TERMINATED'}
+                    <Input
+                      value={draft.citizenshipNo}
+                      disabled={staff.status === 'TERMINATED' || !canSeeSensitiveHrData}
                       onChange={(e: any) => setDraft(c => ({ ...c, citizenshipNo: e.target.value }))}
                     />
+                    {!canSeeSensitiveHrData && (
+                      <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
+                        Masked. Requires HR or payroll sensitive-data access to view or edit.
+                      </p>
+                    )}
                   </FormField>
                   <FormField label="PAN Number">
-                    <Input 
-                      value={draft.panNumber} 
-                      disabled={staff.status === 'TERMINATED'}
+                    <Input
+                      value={draft.panNumber}
+                      disabled={staff.status === 'TERMINATED' || !canSeeSensitiveHrData}
                       onChange={(e: any) => setDraft(c => ({ ...c, panNumber: e.target.value }))}
                     />
+                    {!canSeeSensitiveHrData && (
+                      <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
+                        Masked. Requires HR or payroll sensitive-data access to view or edit.
+                      </p>
+                    )}
                   </FormField>
                 </div>
 
@@ -470,18 +508,28 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                 </h3>
                 <div className="grid md:grid-cols-2 gap-6">
                   <FormField label="Bank Name">
-                    <Input 
-                      value={draft.bankName} 
-                      disabled={staff.status === 'TERMINATED'}
+                    <Input
+                      value={draft.bankName}
+                      disabled={staff.status === 'TERMINATED' || !canSeeSensitiveHrData}
                       onChange={(e: any) => setDraft(c => ({ ...c, bankName: e.target.value }))}
                     />
+                    {!canSeeSensitiveHrData && (
+                      <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
+                        Requires HR or payroll sensitive-data access to edit.
+                      </p>
+                    )}
                   </FormField>
                   <FormField label="Account Number">
-                    <Input 
-                      value={draft.bankAccount} 
-                      disabled={staff.status === 'TERMINATED'}
+                    <Input
+                      value={draft.bankAccount}
+                      disabled={staff.status === 'TERMINATED' || !canSeeSensitiveHrData}
                       onChange={(e: any) => setDraft(c => ({ ...c, bankAccount: e.target.value }))}
                     />
+                    {!canSeeSensitiveHrData && (
+                      <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
+                        Masked. Requires HR or payroll sensitive-data access to view or edit.
+                      </p>
+                    )}
                   </FormField>
                 </div>
               </section>
@@ -729,7 +777,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                               {structure.pfEnabled ? 'PF' : 'No PF'} • {structure.tdsEnabled ? 'TDS' : 'No TDS'}
                             </td>
                             <td className="px-5 py-3.5 text-right font-black text-slate-900">
-                              NPR {structure.basicSalary.toLocaleString()}
+                              {formatMaskableNpr(structure.basicSalary)}
                             </td>
                             <td className="px-5 py-3.5">
                               <Badge variant="outline" className={cn(
@@ -807,9 +855,11 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                             <td className="px-5 py-3.5 font-bold text-slate-900">
                               {line.payrollRun?.periodMonth}/{line.payrollRun?.periodYear}
                             </td>
-                            <td className="px-5 py-3.5 text-slate-600 font-medium">NPR {line.grossSalary.toLocaleString()}</td>
-                            <td className="px-5 py-3.5 text-rose-600 font-medium">- NPR {line.deductions.toLocaleString()}</td>
-                            <td className="px-5 py-3.5 text-right font-black text-slate-900">NPR {line.netSalary.toLocaleString()}</td>
+                            <td className="px-5 py-3.5 text-slate-600 font-medium">{formatMaskableNpr(line.grossSalary)}</td>
+                            <td className="px-5 py-3.5 text-rose-600 font-medium">
+                              {line.deductions === null || line.deductions === undefined ? 'Restricted' : `- NPR ${Number(line.deductions).toLocaleString()}`}
+                            </td>
+                            <td className="px-5 py-3.5 text-right font-black text-slate-900">{formatMaskableNpr(line.netSalary)}</td>
                             <td className="px-5 py-3.5">
                               <Badge className={cn(
                                 "font-bold text-[8px] uppercase tracking-widest",
@@ -856,7 +906,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                 <div className="flex justify-between items-center gap-4 py-2">
                   <span className="text-xs text-slate-400 font-medium">Active Salary Structure</span>
                   <span className="text-xs font-bold text-emerald-600">
-                    {activeSalaryStructure ? `NPR ${activeSalaryStructure.basicSalary.toLocaleString()}` : 'Not configured'}
+                    {activeSalaryStructure ? formatMaskableNpr(activeSalaryStructure.basicSalary) : 'Not configured'}
                   </span>
                 </div>
               </div>

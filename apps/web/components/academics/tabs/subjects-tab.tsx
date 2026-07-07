@@ -1,32 +1,29 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { api } from '../../../lib/api';
-import { 
-  BookOpen, 
-  UserPlus, 
-  Plus, 
-  Trash2, 
-  CheckCircle2, 
-  AlertCircle, 
-  Loader2, 
-  Users, 
-  Layers,
-  GraduationCap,
-  Award,
+import {
+  BookOpen,
+  UserPlus,
+  Plus,
+  CheckCircle2,
+  AlertCircle,
+  Users,
+  Filter,
   Zap,
-  Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { FormField, Input, Select } from '@/components/ui/form-field';
+import { Button } from '@/components/ui/button';
 
-import { 
-  AcademicYearSummary, 
-  ClassSummary, 
-  SectionSummary, 
-  StaffSummary, 
-  SubjectSummary, 
-  TeacherAssignmentSummary 
+import {
+  AcademicYearSummary,
+  ClassSummary,
+  SectionSummary,
+  StaffSummary,
+  SubjectSummary,
+  TeacherAssignmentSummary,
 } from '@schoolos/core';
 
 type Props = {
@@ -38,10 +35,11 @@ type Props = {
   assignments: TeacherAssignmentSummary[];
 };
 
-export function SubjectsTab({ academicYears, classes, allSections, staff, subjects, assignments }: Props) {
+export function SubjectsTab({ academicYears, classes, allSections, staff, subjects }: Props) {
   const queryClient = useQueryClient();
   const [subject, setSubject] = useState({ classId: '', code: '', name: '', type: 'CORE', theoryMarks: 100, passMarks: 35 });
-  const [assign, setAssign] = useState({ academicYearId: '', subjectId: '', staffId: '', classId: '', sectionId: '' });
+  const [assign, setAssign] = useState({ academicYearId: '', classId: '', subjectId: '', staffId: '', sectionId: '' });
+  const [rosterClassId, setRosterClassId] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
   const invalidate = () => {
@@ -54,189 +52,325 @@ export function SubjectsTab({ academicYears, classes, allSections, staff, subjec
     setTimeout(() => setSuccessMessage(''), 5000);
   };
 
-  const subjectMut = useMutation({ 
-    mutationFn: api.createSubject, 
+  const subjectMut = useMutation({
+    mutationFn: api.createSubject,
     onSuccess: () => {
       invalidate();
       setSubject({ classId: '', code: '', name: '', type: 'CORE', theoryMarks: 100, passMarks: 35 });
       showSuccess('Subject created successfully.');
-    } 
+    },
   });
-  
-  const assignMut = useMutation({ 
-    mutationFn: api.createTeacherAssignment, 
+
+  const assignMut = useMutation({
+    mutationFn: api.createTeacherAssignment,
     onSuccess: () => {
       invalidate();
       showSuccess('Teacher assigned successfully.');
-    } 
+      setAssign((c) => ({ ...c, staffId: '' }));
+    },
   });
 
-  const sectionsForClass = useMemo(() => allSections.filter((s: SectionSummary) => s.classId === assign.classId), [allSections, assign.classId]);
+  const sectionsForClass = useMemo(
+    () => allSections.filter((s: SectionSummary) => s.classId === assign.classId),
+    [allSections, assign.classId],
+  );
+  const subjectsForAssignClass = useMemo(
+    () => subjects.filter((s) => s.classId === assign.classId),
+    [subjects, assign.classId],
+  );
+  const selectedSubject = subjects.find((s) => s.id === assign.subjectId);
   const currentYear = academicYears.find((y: AcademicYearSummary) => y.isCurrent) ?? academicYears[0];
+  const rosterSubjects = rosterClassId ? subjects.filter((s) => s.classId === rosterClassId) : subjects;
 
   return (
-    <div className="space-y-10 animate-fade-in">
-      {/* Header & Feedback */}
-      <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-         <div>
-            <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Academic Catalog</h2>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Subjects & Instructional Assignments</p>
-         </div>
-         {successMessage && (
-           <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-lg shadow-emerald-500/5 animate-in slide-in-from-right-4">
-              <CheckCircle2 size={18} />
-              <span className="text-xs font-black uppercase tracking-widest">{successMessage}</span>
-           </div>
-         )}
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-xl font-black tracking-tight text-slate-900">Academic Catalog</h2>
+          <p className="mt-1 text-sm font-semibold text-slate-500">Subjects and instructional assignments.</p>
+        </div>
+        {successMessage && (
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700">
+            <CheckCircle2 size={16} />
+            {successMessage}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-         {/* Define Subject */}
-         <section className="group relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[var(--color-mod-academics-border)]">
-            <div className="mb-6">
-               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-academics-bg)] text-[var(--color-mod-academics-accent)]">
-                  <BookOpen size={24} />
-               </div>
-               <h3 className="text-xl font-black tracking-tight text-slate-900">New Subject</h3>
-               <p className="mt-1 text-sm font-semibold text-slate-500">Add to the master curriculum.</p>
+        {/* New Subject */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-6 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--color-mod-academics-bg)] text-[var(--color-mod-academics-accent)]">
+              <BookOpen size={20} />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">New Subject</h3>
+              <p className="text-sm text-slate-500">Add a subject to a grade&apos;s curriculum.</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <FormField label="Grade Level">
+              <Select value={subject.classId} onChange={(e) => setSubject((c) => ({ ...c, classId: e.target.value }))}>
+                <option value="">Select a class first</option>
+                {classes.map((c: ClassSummary) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </Select>
+            </FormField>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label="Subject Code">
+                <Input
+                  value={subject.code}
+                  onChange={(e) => setSubject((c) => ({ ...c, code: e.target.value.toUpperCase() }))}
+                  placeholder="e.g. ENG-101"
+                />
+              </FormField>
+              <FormField label="Subject Name">
+                <Input
+                  value={subject.name}
+                  onChange={(e) => setSubject((c) => ({ ...c, name: e.target.value }))}
+                  placeholder="e.g. English"
+                />
+              </FormField>
             </div>
 
-            <div className="space-y-4">
-               <select value={subject.classId} onChange={(e) => setSubject(c => ({ ...c, classId: e.target.value }))} className="premium-input bg-slate-50">
-                  <option value="">Select Grade Level</option>
-                  {classes.map((c: ClassSummary) => <option key={c.id} value={c.id}>{c.name}</option>)}
-               </select>
-
-               <div className="grid gap-4 md:grid-cols-2">
-                  <input value={subject.code} onChange={(e) => setSubject(c => ({ ...c, code: e.target.value }))} placeholder="Code (e.g. ENG-101)" className="premium-input bg-slate-50 uppercase font-black" />
-                  <input value={subject.name} onChange={(e) => setSubject(c => ({ ...c, name: e.target.value }))} placeholder="Subject Name" className="premium-input bg-slate-50 font-black italic" />
-               </div>
-
-               <div className="grid gap-4 md:grid-cols-3">
-                  <select value={subject.type} onChange={(e) => setSubject(c => ({ ...c, type: e.target.value }))} className="premium-input bg-slate-50">
-                    <option value="CORE">Core</option>
-                    <option value="ELECTIVE">Elective</option>
-                    <option value="OPTIONAL">Optional</option>
-                  </select>
-                  <input type="number" value={subject.theoryMarks} onChange={(e) => setSubject(c => ({ ...c, theoryMarks: Number(e.target.value) }))} placeholder="Theory Marks" className="premium-input bg-slate-50" />
-                  <input type="number" value={subject.passMarks} onChange={(e) => setSubject(c => ({ ...c, passMarks: Number(e.target.value) }))} placeholder="Pass Marks" className="premium-input bg-slate-50" />
-               </div>
-
-               <button 
-                onClick={() => subjectMut.mutate(subject)}
-                disabled={!subject.classId || !subject.code || !subject.name || subjectMut.isPending}
-                className="flex h-12 w-full items-center justify-center gap-3 rounded-xl bg-[var(--color-mod-academics-accent)] text-xs font-black uppercase tracking-widest text-white shadow-sm transition-all hover:bg-[var(--color-mod-academics-text)] disabled:opacity-30"
-               >
-                 {subjectMut.isPending ? <Loader2 className="animate-spin" size={18} /> : <Plus size={18} />}
-                 Register Subject
-               </button>
-            </div>
-         </section>
-
-         {/* Assign Teacher */}
-         <section className="group relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[var(--color-mod-academics-border)]">
-            <div className="mb-6">
-               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-academics-bg)] text-[var(--color-mod-academics-accent)]">
-                  <UserPlus size={24} />
-               </div>
-               <h3 className="text-xl font-black tracking-tight text-slate-900">Faculty Assignment</h3>
-               <p className="mt-1 text-sm font-semibold text-slate-500">Delegate instructional responsibility.</p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <FormField label="Type">
+                <Select value={subject.type} onChange={(e) => setSubject((c) => ({ ...c, type: e.target.value }))}>
+                  <option value="CORE">Core</option>
+                  <option value="ELECTIVE">Elective</option>
+                  <option value="OPTIONAL">Optional</option>
+                </Select>
+              </FormField>
+              <FormField label="Theory Marks">
+                <Input
+                  type="number"
+                  value={subject.theoryMarks}
+                  onChange={(e) => setSubject((c) => ({ ...c, theoryMarks: Number(e.target.value) }))}
+                />
+              </FormField>
+              <FormField label="Pass Marks">
+                <Input
+                  type="number"
+                  value={subject.passMarks}
+                  onChange={(e) => setSubject((c) => ({ ...c, passMarks: Number(e.target.value) }))}
+                />
+              </FormField>
             </div>
 
-            <div className="space-y-4">
-               <select value={assign.academicYearId || currentYear?.id || ''} onChange={(e) => setAssign(c => ({ ...c, academicYearId: e.target.value }))} className="premium-input bg-slate-50">
-                 {academicYears.map((y: AcademicYearSummary) => <option key={y.id} value={y.id}>{y.name}</option>)}
-               </select>
+            <Button
+              className="w-full"
+              onClick={() => subjectMut.mutate(subject)}
+              disabled={!subject.classId || !subject.code || !subject.name || subjectMut.isPending}
+              isLoading={subjectMut.isPending}
+            >
+              <Plus size={18} className="mr-1.5" />
+              Register Subject
+            </Button>
+            {subjectMut.isError && (
+              <p className="flex items-center gap-1 text-xs font-bold text-red-600">
+                <AlertCircle size={12} /> {(subjectMut.error as Error).message}
+              </p>
+            )}
+          </div>
+        </section>
 
-               <div className="grid gap-4 md:grid-cols-2">
-                  <select value={assign.subjectId} onChange={(e) => { const s = subjects.find(x => x.id === e.target.value); setAssign(c => ({ ...c, subjectId: e.target.value, classId: s?.classId ?? c.classId })); }} className="premium-input bg-slate-50">
-                    <option value="">Subject</option>
-                    {subjects.map((s: any) => <option key={s.id} value={s.id}>{s.code} — {s.name}</option>)}
-                  </select>
-                  <select value={assign.staffId} onChange={(e) => setAssign(c => ({ ...c, staffId: e.target.value }))} className="premium-input bg-slate-50">
-                    <option value="">Select Faculty</option>
-                    {staff.map((s: StaffSummary) => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
-                  </select>
-               </div>
-
-               <select value={assign.sectionId} onChange={(e) => setAssign(c => ({ ...c, sectionId: e.target.value }))} className="premium-input bg-slate-50">
-                  <option value="">Entire Grade Level</option>
-                  {sectionsForClass.map((s: SectionSummary) => <option key={s.id} value={s.id}>{s.name}</option>)}
-               </select>
-
-               <button 
-                onClick={() => assignMut.mutate({ ...assign, academicYearId: assign.academicYearId || currentYear?.id, sectionId: assign.sectionId || null })}
-                disabled={!assign.subjectId || !assign.staffId || assignMut.isPending}
-                className="flex h-12 w-full items-center justify-center gap-3 rounded-xl bg-[var(--color-mod-academics-accent)] text-xs font-black uppercase tracking-widest text-white shadow-sm transition-all hover:bg-[var(--color-mod-academics-text)] disabled:opacity-30"
-               >
-                 {assignMut.isPending ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
-                 Activate Assignment
-               </button>
+        {/* Faculty Assignment */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-6 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--color-mod-academics-bg)] text-[var(--color-mod-academics-accent)]">
+              <UserPlus size={20} />
             </div>
-         </section>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Faculty Assignment</h3>
+              <p className="text-sm text-slate-500">Assign a teacher to a class&apos;s subject.</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <FormField label="Academic Year">
+              <Select
+                value={assign.academicYearId || currentYear?.id || ''}
+                onChange={(e) => setAssign((c) => ({ ...c, academicYearId: e.target.value }))}
+              >
+                {academicYears.map((y: AcademicYearSummary) => (
+                  <option key={y.id} value={y.id}>{y.name}</option>
+                ))}
+              </Select>
+            </FormField>
+
+            <FormField label="Class">
+              <Select
+                value={assign.classId}
+                onChange={(e) => setAssign((c) => ({ ...c, classId: e.target.value, subjectId: '', sectionId: '' }))}
+              >
+                <option value="">Select a class first</option>
+                {classes.map((c: ClassSummary) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </Select>
+            </FormField>
+
+            <FormField
+              label="Subject"
+              description={!assign.classId ? 'Choose a class above to see its subjects.' : undefined}
+            >
+              <Select
+                value={assign.subjectId}
+                disabled={!assign.classId}
+                onChange={(e) => setAssign((c) => ({ ...c, subjectId: e.target.value }))}
+              >
+                <option value="">{assign.classId ? 'Select subject' : 'Select a class first'}</option>
+                {subjectsForAssignClass.map((s) => (
+                  <option key={s.id} value={s.id}>{s.code} — {s.name}</option>
+                ))}
+              </Select>
+            </FormField>
+
+            {selectedSubject && (
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Currently assigned</p>
+                {(selectedSubject.teacherAssignments?.length ?? 0) > 0 ? (
+                  <div className="mt-1.5 flex flex-wrap gap-2">
+                    {selectedSubject.teacherAssignments!.map((a: TeacherAssignmentSummary) => (
+                      <span
+                        key={a.id}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700"
+                      >
+                        <Users size={12} className="text-slate-400" />
+                        {a.staff?.firstName} {a.staff?.lastName}
+                        {!a.sectionId && ' · entire grade'}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm font-semibold text-slate-400">No teacher assigned yet.</p>
+                )}
+              </div>
+            )}
+
+            <FormField label="Section" description="Leave unset to assign across the entire grade level.">
+              <Select
+                value={assign.sectionId}
+                disabled={!assign.classId}
+                onChange={(e) => setAssign((c) => ({ ...c, sectionId: e.target.value }))}
+              >
+                <option value="">Entire grade level</option>
+                {sectionsForClass.map((s: SectionSummary) => (
+                  <option key={s.id} value={s.id}>Section {s.name}</option>
+                ))}
+              </Select>
+            </FormField>
+
+            <FormField label="Faculty">
+              <Select value={assign.staffId} onChange={(e) => setAssign((c) => ({ ...c, staffId: e.target.value }))}>
+                <option value="">Select faculty</option>
+                {staff.map((s: StaffSummary) => (
+                  <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>
+                ))}
+              </Select>
+            </FormField>
+
+            <Button
+              className="w-full"
+              onClick={() => assignMut.mutate({ ...assign, academicYearId: assign.academicYearId || currentYear?.id, sectionId: assign.sectionId || null })}
+              disabled={!assign.subjectId || !assign.staffId || assignMut.isPending}
+              isLoading={assignMut.isPending}
+            >
+              <Zap size={18} className="mr-1.5" />
+              Activate Assignment
+            </Button>
+            {assignMut.isError && (
+              <p className="flex items-center gap-1 text-xs font-bold text-red-600">
+                <AlertCircle size={12} /> {(assignMut.error as Error).message}
+              </p>
+            )}
+          </div>
+        </section>
       </div>
 
-      {/* Catalog Grid */}
+      {/* Curriculum Roster */}
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-         <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-            <div>
-               <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic text-[18px]">Curriculum Roster</h3>
-               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">{subjects.length} Subjects Registered</p>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/50 p-6">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Curriculum Roster</h3>
+            <p className="text-sm text-slate-500">{rosterSubjects.length} of {subjects.length} subjects</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter size={16} className="text-slate-400" />
+            <Select value={rosterClassId} onChange={(e) => setRosterClassId(e.target.value)} className="h-10 w-48">
+              <option value="">All classes</option>
+              {classes.map((c: ClassSummary) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
+          {rosterSubjects.length === 0 ? (
+            <div className="col-span-full py-16 text-center text-slate-400">
+              <BookOpen className="mx-auto mb-3 h-10 w-10 opacity-20" />
+              <p className="text-sm font-bold">
+                {rosterClassId ? 'No subjects for this class yet.' : 'No subjects in the catalog yet.'}
+              </p>
             </div>
-         </div>
-
-         <div className="p-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {subjects.length === 0 ? (
-               <div className="col-span-full py-20 text-center text-slate-300">
-                  <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-10" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">Master catalog is empty</p>
-               </div>
-            ) : subjects.map((s: SubjectSummary) => (
-               <div key={s.id} className="group relative rounded-2xl border border-slate-100 bg-white p-6 transition-all hover:border-[var(--color-mod-academics-border)] hover:shadow-lg hover:shadow-[var(--color-mod-academics-border)]/40">
-                  <div className="flex items-start justify-between mb-4">
-                     <div className="flex flex-col">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.class?.name ?? 'General'}</span>
-                        <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight italic">{s.code} — {s.name}</h4>
-                     </div>
-                     <div className="h-8 px-2 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center">
-                        <span className="text-[10px] font-black text-indigo-600">{s.theoryMarks}</span>
-                     </div>
+          ) : (
+            rosterSubjects.map((s: SubjectSummary) => (
+              <div
+                key={s.id}
+                className="rounded-xl border border-slate-100 p-5 transition hover:border-[var(--color-mod-academics-border)] hover:shadow-sm"
+              >
+                <div className="mb-3 flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{s.class?.name ?? 'General'}</p>
+                    <h4 className="text-sm font-bold text-slate-900">{s.code} — {s.name}</h4>
                   </div>
+                  <span className="rounded-lg bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-600">{s.theoryMarks}</span>
+                </div>
 
-                  <div className="flex flex-wrap gap-2">
-                     <span className={cn(
-                        "px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border",
-                        s.type === 'CORE' ? "bg-[var(--color-mod-academics-bg)] text-[var(--color-mod-academics-text)] border-[var(--color-mod-academics-border)]" : "bg-slate-50 text-slate-500 border-slate-100"
-                     )}>
-                        {s.type}
-                     </span>
-                     {s.passMarks && (
-                        <span className="px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 border border-emerald-100">
-                           Pass: {s.passMarks}
+                <div className="flex flex-wrap gap-2">
+                  <span
+                    className={cn(
+                      'rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                      s.type === 'CORE'
+                        ? 'border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-bg)] text-[var(--color-mod-academics-text)]'
+                        : 'border-slate-200 bg-slate-50 text-slate-500',
+                    )}
+                  >
+                    {s.type}
+                  </span>
+                  {s.passMarks && (
+                    <span className="rounded-md border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-600">
+                      Pass {s.passMarks}
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-4 border-t border-slate-100 pt-3">
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Faculty</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(s.teacherAssignments?.length ?? 0) > 0 ? (
+                      s.teacherAssignments!.map((a: TeacherAssignmentSummary) => (
+                        <span
+                          key={a.id}
+                          className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-600"
+                        >
+                          {a.staff?.firstName} {a.staff?.lastName}
                         </span>
-                     )}
+                      ))
+                    ) : (
+                      <span className="text-xs font-medium italic text-slate-300">No faculty assigned</span>
+                    )}
                   </div>
-
-                  <div className="mt-6 pt-4 border-t border-slate-50">
-                     <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-2">Faculty Assignments</p>
-                     <div className="flex flex-wrap gap-1.5">
-                        {(s.teacherAssignments?.length ?? 0) > 0 ? (
-                           s.teacherAssignments?.map((a: TeacherAssignmentSummary) => (
-                              <div key={a.id} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-50 border border-slate-100">
-                                 <div className="h-4 w-4 rounded-full bg-slate-200 flex items-center justify-center">
-                                    <Users size={8} className="text-slate-500" />
-                                 </div>
-                                 <span className="text-[9px] font-bold text-slate-600">{a.staff?.firstName}</span>
-                              </div>
-                           ))
-                        ) : (
-                           <span className="text-[9px] font-medium text-slate-300 italic">No faculty assigned</span>
-                        )}
-                     </div>
-                  </div>
-               </div>
-            ))}
-         </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </section>
     </div>
   );
