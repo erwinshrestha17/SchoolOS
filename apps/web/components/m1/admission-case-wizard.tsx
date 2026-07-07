@@ -133,6 +133,14 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
   }
 
   useEffect(() => {
+    // The office admits many students in a row, almost always into the
+    // school's current year — pre-select it so staff never re-pick it.
+    if (form.academicYearId || !academicYearsQuery.data) return;
+    const currentYear = academicYearsQuery.data.find((year) => year.isCurrent) ?? academicYearsQuery.data[0];
+    if (currentYear) update('academicYearId', currentYear.id);
+  }, [academicYearsQuery.data, form.academicYearId]);
+
+  useEffect(() => {
     const recovered = recoveryQuery.data;
     if (!recovered || hydratedCaseIdRef.current === recovered.id) return;
     hydratedCaseIdRef.current = recovered.id;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../../lib/api";
 import {
   formatBsDate,
@@ -123,6 +123,9 @@ export function TimetableBuilderTab({
         startsAt: c.endsAt,
         endsAt: calculateNextEnd(c.endsAt),
       }));
+      // Keep the conflict panel current after every edit — it must stay
+      // visible while editing, not only after an explicit "Validate" click.
+      if (activeVersionId) validateVersionMut.mutate(activeVersionId);
     },
   });
 
@@ -209,7 +212,7 @@ export function TimetableBuilderTab({
     (section) => section.classId === classId,
   );
   const rooms = roomsQuery.data ?? [];
-  const versions = versionsQuery.data ?? [];
+  const versions = versionsQuery.data?.items ?? [];
   const activeVersionId = selectedVersionId || versions[0]?.id || "";
   const activeVersion = versions.find(
     (version) => version.id === activeVersionId,
@@ -220,6 +223,17 @@ export function TimetableBuilderTab({
     archiveVersionMut.error?.message ||
     createVersionMut.error?.message ||
     validateVersionMut.error?.message;
+
+  // The conflict panel must stay visible while editing, not only after an
+  // explicit "Validate" click — auto-check as soon as a version is active.
+  // Clear stale results first so switching versions never shows the
+  // previous version's conflicts while the new check is in flight.
+  useEffect(() => {
+    if (!activeVersionId) return;
+    setValidationResult(null);
+    validateVersionMut.mutate(activeVersionId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeVersionId]);
 
   const gridByDay = daysOfWeek.reduce(
     (acc, day) => {
@@ -427,49 +441,56 @@ export function TimetableBuilderTab({
             </SectionCard>
           </div>
 
-          {validationResult && (
+          {activeVersionId && (
             <SectionCard
               title="Conflict Validation"
+              description="Stays current automatically as you add slots — no manual re-check needed."
               className={cn(
                 "border-2",
-                validationResult.valid
-                  ? "border-emerald-100"
-                  : "border-red-100",
+                !validationResult
+                  ? "border-slate-100"
+                  : validationResult.valid
+                    ? "border-emerald-100"
+                    : "border-red-100",
               )}
             >
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  {validationResult.valid ? (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5 text-red-500" />
-                  )}
-                  <p
-                    className={cn(
-                      "text-sm font-black uppercase tracking-widest",
-                      validationResult.valid
-                        ? "text-emerald-700"
-                        : "text-red-700",
+              {!validationResult ? (
+                <LoadingState label="Checking for conflicts..." />
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    {validationResult.valid ? (
+                      <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                    ) : (
+                      <AlertCircle className="h-5 w-5 text-red-500" />
                     )}
-                  >
-                    {validationResult.valid
-                      ? "No blocking conflicts"
-                      : `${validationResult.errors.length} conflict(s) found`}
-                  </p>
-                </div>
-                {!validationResult.valid && (
-                  <div className="grid gap-2">
-                    {validationResult.errors.slice(0, 3).map((issue) => (
-                      <div
-                        key={`${issue.type}-${issue.conflictingSlotId ?? issue.message}`}
-                        className="rounded-xl border border-red-100 bg-red-50/50 p-3 text-xs font-medium text-red-700"
-                      >
-                        {issue.message}
-                      </div>
-                    ))}
+                    <p
+                      className={cn(
+                        "text-sm font-black uppercase tracking-widest",
+                        validationResult.valid
+                          ? "text-emerald-700"
+                          : "text-red-700",
+                      )}
+                    >
+                      {validationResult.valid
+                        ? "No blocking conflicts"
+                        : `${validationResult.errors.length} conflict(s) found`}
+                    </p>
                   </div>
-                )}
-              </div>
+                  {!validationResult.valid && (
+                    <div className="grid gap-2">
+                      {validationResult.errors.slice(0, 3).map((issue) => (
+                        <div
+                          key={`${issue.type}-${issue.conflictingSlotId ?? issue.message}`}
+                          className="rounded-xl border border-red-100 bg-red-50/50 p-3 text-xs font-medium text-red-700"
+                        >
+                          {issue.message}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </SectionCard>
           )}
 
@@ -481,7 +502,7 @@ export function TimetableBuilderTab({
                 variant="secondary"
                 className="text-[10px] font-black uppercase tracking-widest"
               >
-                {substitutionsQuery.data?.length ?? 0} Records
+                {substitutionsQuery.data?.meta.total ?? 0} Records
               </Badge>
             }
           >
@@ -496,9 +517,9 @@ export function TimetableBuilderTab({
                   "Substitution records could not be loaded."
                 }
               />
-            ) : substitutionsQuery.data?.length ? (
+            ) : substitutionsQuery.data?.items.length ? (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {substitutionsQuery.data.slice(0, 6).map((item) => (
+                {substitutionsQuery.data.items.slice(0, 6).map((item) => (
                   <div
                     key={item.id}
                     className="space-y-1 rounded-2xl border border-slate-100 bg-slate-50/50 p-4"

@@ -5,9 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
-  ClipboardCheck,
   ClipboardList,
-  Eye,
   FileText,
   GraduationCap,
   History,
@@ -19,25 +17,13 @@ import {
   Settings,
 } from 'lucide-react';
 import { useSession } from '@/components/session-provider';
+import { academicsWorkspaceTabs } from '@/components/academics/academics-tabs';
 import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
 import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { ModuleHeader } from '@/components/ui/module-header';
 import { ModuleTabs } from '@/components/ui/module-tabs';
 import { SectionCard } from '@/components/ui/section-card';
 import { api } from '@/lib/api';
-
-const workspaceTabs = [
-  { href: '/dashboard/academics', label: 'Subjects', icon: ClipboardCheck },
-  { href: '/dashboard/academics/exam-terms', label: 'Exam Terms', icon: ClipboardList },
-  { href: '/dashboard/academics/marks', label: 'Marks Entry', icon: PencilLine },
-  { href: '/dashboard/academics/retakes', label: 'Retests', icon: RotateCcw },
-  { href: '/dashboard/academics/cas', label: 'CAS', icon: Layers3 },
-  { href: '/dashboard/academics/locks', label: 'Locks', icon: Lock },
-  { href: '/dashboard/academics/report-cards', label: 'Report Cards', icon: FileText },
-  { href: '/dashboard/academics/promotion', label: 'Promotion', icon: GraduationCap },
-  { href: '/dashboard/academics/publishing', label: 'Publishing', icon: Megaphone },
-  { href: '/dashboard/academics/results', label: 'Results', icon: Eye },
-];
 
 const workflowSections = [
   {
@@ -111,7 +97,6 @@ export default function AcademicsOverviewPage() {
   const isReady = summary?.status === 'ready' || summary?.status === 'empty';
 
   const metricValue = (key: string) => {
-    if (summaryQuery.isLoading) return 'Loading';
     if (!isReady) return 'Unavailable';
     const value = summary?.summary[key];
     return value === null || value === undefined ? 'Unavailable' : value;
@@ -181,6 +166,7 @@ export default function AcademicsOverviewPage() {
         <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             title="Marks Entry Open"
+            loading={summaryQuery.isLoading}
             value={metricValue('marksOpen')}
             icon={<PencilLine size={20} />}
             tone={isPositive('marksOpen') ? 'warning' : 'neutral'}
@@ -189,6 +175,7 @@ export default function AcademicsOverviewPage() {
           />
           <KpiCard
             title="Mark Lock Requests"
+            loading={summaryQuery.isLoading}
             value={metricValue('pendingMarkLocks')}
             icon={<Lock size={20} />}
             tone={isPositive('pendingMarkLocks') ? 'warning' : 'neutral'}
@@ -197,6 +184,7 @@ export default function AcademicsOverviewPage() {
           />
           <KpiCard
             title="Report Cards Unpublished"
+            loading={summaryQuery.isLoading}
             value={metricValue('reportCardPublishBlockers')}
             icon={<AlertTriangle size={20} />}
             tone={
@@ -207,6 +195,7 @@ export default function AcademicsOverviewPage() {
           />
           <KpiCard
             title="Promotion Ready"
+            loading={summaryQuery.isLoading}
             value={metricValue('promotionReady')}
             icon={<GraduationCap size={20} />}
             tone={isPositive('promotionReady') ? 'info' : 'neutral'}
@@ -217,7 +206,7 @@ export default function AcademicsOverviewPage() {
       </ModuleHeader>
 
       <div className="space-y-6">
-        <ModuleTabs items={workspaceTabs} accentColor="purple" variant="light" />
+        <ModuleTabs items={academicsWorkspaceTabs} accentColor="purple" variant="light" />
 
         <SectionCard
           title="Academic workflow"

@@ -55,8 +55,8 @@ export default function TimetablePage() {
     queryFn: () => api.listTimetableVersions({ academicYearId: filters.academicYearId }),
   });
 
-  const activeVersion = versionsQuery.data?.find(v => v.status === 'PUBLISHED');
-  const draftVersions = versionsQuery.data?.filter(v => v.status === 'DRAFT');
+  const activeVersion = versionsQuery.data?.items.find(v => v.status === 'PUBLISHED');
+  const draftVersions = versionsQuery.data?.items.filter(v => v.status === 'DRAFT');
   const validationQuery = useQuery({
     queryKey: ['timetable-validation-summary', activeVersion?.id],
     queryFn: () => api.validateTimetableVersion(activeVersion!.id),
@@ -112,7 +112,7 @@ export default function TimetablePage() {
     },
     {
       title: 'Substitutions',
-      value: substitutionStatsQuery.data?.length ?? 0,
+      value: substitutionStatsQuery.data?.meta.total ?? 0,
       icon: <Users className="h-5 w-5" />,
       loading: substitutionStatsQuery.isLoading,
       tone: 'info' as const,

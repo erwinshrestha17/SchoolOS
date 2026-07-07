@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { AcademicsWorkspace } from '@/components/academics/academics-workspace';
+import { academicsWorkspaceTabs } from '@/components/academics/academics-tabs';
+import { ModuleTabs } from '@/components/ui/module-tabs';
 import { PageHeader } from '@/components/ui/page-header';
 
 export default function MarksEntryPage() {
@@ -19,6 +21,7 @@ export default function MarksEntryPage() {
           </Link>
         }
       />
+      <ModuleTabs items={academicsWorkspaceTabs} accentColor="purple" variant="light" className="mb-6" />
       <AcademicsWorkspace initialSection="Marks Entry" />
     </div>
   );

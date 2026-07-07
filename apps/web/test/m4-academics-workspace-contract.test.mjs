@@ -4,10 +4,20 @@ import { describe, it } from 'node:test';
 
 const webRoot = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, webRoot), 'utf8');
+const readMany = (paths) => paths.map(read).join('\n');
+
+// The overview's tab bar is shared with every academics sub-route via
+// components/academics/academics-tabs.tsx, so route/label assertions must
+// look at both files together, not just the overview page in isolation.
+const overviewAndTabs = () =>
+  readMany([
+    'app/dashboard/academics/page.tsx',
+    'components/academics/academics-tabs.tsx',
+  ]);
 
 describe('M4 academics workspace contract', () => {
   it('uses the shared module workspace with one primary marks action', () => {
-    const page = read('app/dashboard/academics/page.tsx');
+    const page = overviewAndTabs();
 
     assert.match(page, /<ModuleHeader/);
     assert.match(page, /<KpiGrid/);
@@ -35,9 +45,12 @@ describe('M4 academics workspace contract', () => {
     assert.doesNotMatch(page, /reportsQuery\.data\?\.length/);
     assert.match(page, /Official readiness remains backend-owned/);
 
-    // Honest states: never a bare fabricated value, always Loading/Unavailable
-    // driven by the query's own status, and real drill-through hrefs.
-    assert.match(page, /summaryQuery\.isLoading\) return 'Loading'/);
+    // Honest states: never a bare fabricated value, always a shared skeleton
+    // while loading (not the literal word "Loading" as a value) or
+    // Unavailable, driven by the query's own status, with real drill-through
+    // hrefs.
+    assert.match(page, /loading=\{summaryQuery\.isLoading\}/);
+    assert.doesNotMatch(page, /isLoading\) return 'Loading'/);
     assert.match(page, /'Unavailable'/);
     assert.match(page, /href="\/dashboard\/academics\/marks"/);
     assert.match(page, /href="\/dashboard\/academics\/report-cards"/);
@@ -45,7 +58,7 @@ describe('M4 academics workspace contract', () => {
   });
 
   it('links only to existing M4 workspaces and preserves protected workflow language', () => {
-    const page = read('app/dashboard/academics/page.tsx');
+    const page = overviewAndTabs();
 
     for (const route of [
       '/dashboard/academics/exam-terms',

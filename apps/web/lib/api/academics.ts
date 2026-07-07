@@ -25,11 +25,14 @@ import type {
   SubjectWeeklyRequirementSummary,
   TeacherAssignmentSummary,
   TeacherAvailabilitySummary,
-  TeacherWorkloadSummary,
+  TeacherWorkloadPage,
   TimetablePeriodSummary,
+  TimetableSlotPage,
   TimetableSlotSummary,
+  TimetableSubstitutionPage,
   TimetableSubstitutionSummary,
   TimetableValidationResult,
+  TimetableVersionPage,
   TimetableVersionSummary,
 } from '@schoolos/core';
 import {
@@ -420,7 +423,7 @@ export const academicsApi = {
       json: body,
     }),
   listTimetable: (params?: { classId?: string | null }) =>
-    request<TimetableSlotSummary[]>(withQuery('/timetable', params ?? {})),
+    request<TimetableSlotPage>(withQuery('/timetable', params ?? {})),
   getTeacherTimetable: (
     teacherId: string,
     params?: { dayOfWeek?: number; academicYearId?: string },
@@ -432,7 +435,7 @@ export const academicsApi = {
       ),
     ),
   listTeacherWorkload: () =>
-    request<TeacherWorkloadSummary[]>('/timetable/workload'),
+    request<TeacherWorkloadPage>('/timetable/workload'),
   createTimetableSlot: (body: JsonBody) =>
     request<TimetableSlotSummary>('/timetable', { method: 'POST', json: body }),
   listTimetablePeriods: (params?: { academicYearId?: string }) =>
@@ -482,7 +485,7 @@ export const academicsApi = {
     page?: number;
     limit?: number;
   }) =>
-    request<TimetableVersionSummary[]>(
+    request<TimetableVersionPage>(
       withQuery('/timetable/versions', params ?? {}),
     ),
   createTimetableVersion: (body: JsonBody) =>
@@ -596,7 +599,7 @@ export const academicsApi = {
     page?: number;
     limit?: number;
   }) =>
-    request<TimetableSubstitutionSummary[]>(
+    request<TimetableSubstitutionPage>(
       withQuery('/timetable/substitutions', params ?? {}),
     ),
   getSubstitutionSummary: (params?: { date?: string }) =>

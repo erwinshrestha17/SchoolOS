@@ -93,15 +93,19 @@ describe('reference dashboard foundation', () => {
 
   it('adds a permission-scoped communications composition route', () => {
     const communications = read('app/dashboard/communications/page.tsx');
+    const noticesWorkspace = read('components/notices/notices-workspace.tsx');
     const layout = read('app/dashboard/layout.tsx');
     const sidebar = read('components/layout/sidebar.tsx');
 
+    // /dashboard/notices is the single canonical M12 overview; the older
+    // /dashboard/communications route now redirects there so there is only
+    // one KPI-fetching "home" experience for this module.
     assert.match(layout, /prefix: '\/dashboard\/communications'/);
-    assert.match(sidebar, /href: '\/dashboard\/communications'/);
-    assert.match(communications, /communicationsApi\.getCommunicationsSummary/);
-    assert.match(communications, /messagingApi\.listParentTeacherThreads/);
-    assert.match(communications, /summary\.providerStatus/);
-    assert.match(communications, /summary\?\.providerHealth/);
-    assert.doesNotMatch(communications, /setTimeout|setInterval/);
+    assert.match(sidebar, /href: '\/dashboard\/notices'/);
+    assert.match(communications, /redirect\('\/dashboard\/notices'\)/);
+    assert.match(noticesWorkspace, /communicationsApi\.getCommunicationsSummary/);
+    assert.match(noticesWorkspace, /summary\.providerStatus/);
+    assert.match(noticesWorkspace, /summary\?\.providerHealth/);
+    assert.doesNotMatch(noticesWorkspace, /setTimeout|setInterval/);
   });
 });

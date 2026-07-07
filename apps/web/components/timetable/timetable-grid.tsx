@@ -50,7 +50,7 @@ export function TimetableGrid({ filters, activeVersionId }: { filters: any, acti
   }
 
   const periods = periodsQuery.data || [];
-  const timetable = timetableQuery.data || [];
+  const timetable = timetableQuery.data?.items ?? [];
 
   if (periods.length === 0) {
     return (

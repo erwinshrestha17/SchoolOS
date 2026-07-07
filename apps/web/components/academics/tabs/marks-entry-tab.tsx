@@ -34,11 +34,10 @@ type Props = {
   academicYears: any[];
   classes: any[];
   allSections: any[];
-  students: any[];
   exams: any[];
 };
 
-export function MarksEntryTab({ academicYears, classes, allSections, students, exams }: Props) {
+export function MarksEntryTab({ academicYears, classes, allSections, exams }: Props) {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState({ examTermId: '', classId: '', sectionId: '', subjectId: '', assessmentComponentId: '' });
   const [marks, setMarks] = useState<Record<string, string>>({});
@@ -67,6 +66,12 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
     enabled: Boolean(filters.examTermId && filters.classId && filters.assessmentComponentId),
   });
 
+  const rosterQuery = useQuery({
+    queryKey: ['students', 'roster', filters.classId, filters.sectionId],
+    queryFn: () => api.listStudents({ classId: filters.classId, sectionId: filters.sectionId || undefined, limit: 1000 }),
+    enabled: Boolean(filters.classId),
+  });
+
   const batchMut = useMutation({
     mutationFn: (payload: any) => api.batchEnterMarks(payload),
     onSuccess: (data) => {
@@ -85,13 +90,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
   const maxMarks = selectedComponent ? Number(selectedComponent.maxMarks) : 100;
   const passMarks = selectedComponent ? Number(selectedComponent.passMarks) : null;
 
-  const studentsForClass = useMemo(() => {
-    return students.filter((s: any) => {
-      const matchesClass = s.classId === filters.classId || s.class?.id === filters.classId;
-      const matchesSection = !filters.sectionId || s.sectionId === filters.sectionId || s.section?.id === filters.sectionId;
-      return matchesClass && matchesSection;
-    });
-  }, [students, filters.classId, filters.sectionId]);
+  const studentsForClass = rosterQuery.data?.items ?? [];
 
   const changedEntries = useMemo(() => {
     const studentIds = new Set([...Object.keys(marks), ...Object.keys(statuses), ...Object.keys(remarks)]);
@@ -223,10 +222,12 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
              >
                 <Search size={20} />
              </button>
-             <button 
+             <button
+              type="button"
+              disabled={!canSave}
               className={cn(
                 "flex-1 h-12 rounded-2xl flex items-center justify-center gap-2 font-black uppercase tracking-widest text-xs transition-all active:scale-95",
-                canSave ? "bg-[var(--color-mod-academics-accent)] text-white shadow-sm hover:bg-[var(--color-mod-academics-text)]" : "bg-slate-100 text-slate-300 pointer-events-none"
+                canSave ? "bg-[var(--color-mod-academics-accent)] text-white shadow-sm hover:bg-[var(--color-mod-academics-text)]" : "bg-slate-100 text-slate-300 disabled:cursor-not-allowed"
               )}
               onClick={handleSave}
              >
@@ -314,7 +315,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {existingMarksQuery.isLoading ? (
+                {existingMarksQuery.isLoading || rosterQuery.isLoading ? (
                   <tr>
                     <td colSpan={8} className="py-20 text-center">
                        <Loader2 className="h-10 w-10 animate-spin text-[var(--color-mod-academics-accent)] mx-auto opacity-20" />
@@ -351,7 +352,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
                               </div>
                               <div className="flex flex-col">
                                  <span className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
-                                   {student.fullNameEn || student.fullName}
+                                   {student.fullNameEn}
                                    {isStudentLocked && <Lock size={12} className="shrink-0 text-amber-500" />}
                                  </span>
                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{student.studentSystemId}</span>

@@ -44,13 +44,8 @@ export default function ProviderDiagnosticsPage() {
         <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             title="Provider Mode"
-            value={
-              diagnosticsQuery.isLoading
-                ? 'Loading'
-                : diagnostics
-                  ? formatMode(diagnostics.overallMode)
-                  : 'Unavailable'
-            }
+            loading={diagnosticsQuery.isLoading}
+            value={diagnostics ? formatMode(diagnostics.overallMode) : 'Unavailable'}
             icon={<Settings size={20} />}
             tone={
               diagnostics?.overallMode === 'configured' ? 'success' : 'neutral'
@@ -59,13 +54,8 @@ export default function ProviderDiagnosticsPage() {
           />
           <KpiCard
             title="Health"
-            value={
-              diagnosticsQuery.isLoading
-                ? 'Loading'
-                : diagnostics
-                  ? formatMode(diagnostics.health)
-                  : 'Unavailable'
-            }
+            loading={diagnosticsQuery.isLoading}
+            value={diagnostics ? formatMode(diagnostics.health) : 'Unavailable'}
             icon={<Activity size={20} />}
             tone={
               diagnostics?.health === 'degraded'
@@ -78,15 +68,14 @@ export default function ProviderDiagnosticsPage() {
           />
           <KpiCard
             title="Failed"
+            loading={diagnosticsQuery.isLoading}
             value={
               diagnostics
                 ? diagnostics.channels.reduce(
                     (total, channel) => total + channel.failedCount,
                     0,
                   )
-                : diagnosticsQuery.isLoading
-                  ? 'Loading'
-                  : 'Unavailable'
+                : 'Unavailable'
             }
             icon={<AlertTriangle size={20} />}
             tone={
@@ -98,15 +87,14 @@ export default function ProviderDiagnosticsPage() {
           />
           <KpiCard
             title="Retryable"
+            loading={diagnosticsQuery.isLoading}
             value={
               diagnostics
                 ? diagnostics.channels.reduce(
                     (total, channel) => total + channel.retryableCount,
                     0,
                   )
-                : diagnosticsQuery.isLoading
-                  ? 'Loading'
-                  : 'Unavailable'
+                : 'Unavailable'
             }
             icon={<RefreshCcw size={20} />}
             tone={

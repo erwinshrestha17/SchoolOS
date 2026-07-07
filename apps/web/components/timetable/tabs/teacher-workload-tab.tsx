@@ -19,23 +19,35 @@ import {
   Search
 } from 'lucide-react';
 
+type WorkloadSummary = {
+  teacherCount: number;
+  totalPeriods: number;
+  totalTeachingMinutes: number;
+  totalWeeklyHours: number;
+};
+
 type Props = {
   workload: TeacherWorkloadSummary[];
+  // Backend-owned totals across the full filtered set. `workload` itself is
+  // just the current page, so page-local math would silently under-report
+  // once a school has more teachers than fit on one page.
+  summary?: WorkloadSummary;
   isLoading: boolean;
 };
 
-export function TeacherWorkloadTab({ workload, isLoading }: Props) {
+export function TeacherWorkloadTab({ workload, summary, isLoading }: Props) {
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
-  
+
   const availabilityQuery = useQuery({
     queryKey: ['teacher-availability', selectedTeacherId],
     queryFn: () => api.listTeacherAvailability(selectedTeacherId),
     enabled: Boolean(selectedTeacherId),
   });
 
-  const totalHours = workload.reduce((acc, curr) => acc + (curr.teachingMinutes / 60), 0);
-  const avgSlots = workload.length > 0 
-    ? workload.reduce((acc, curr) => acc + curr.slotCount, 0) / workload.length / 5 
+  const totalHours = summary?.totalWeeklyHours ?? workload.reduce((acc, curr) => acc + (curr.teachingMinutes / 60), 0);
+  const teacherCount = summary?.teacherCount ?? workload.length;
+  const avgSlots = workload.length > 0
+    ? workload.reduce((acc, curr) => acc + curr.slotCount, 0) / workload.length / 5
     : 0;
   const workloadDistribution = [...workload]
     .sort((a, b) => b.teachingMinutes - a.teachingMinutes)
@@ -61,7 +73,7 @@ export function TeacherWorkloadTab({ workload, isLoading }: Props) {
         />
         <StatCard
           title="Active Teachers"
-          value={workload.length}
+          value={teacherCount}
           icon={<Users className="h-5 w-5" />}
         />
       </div>

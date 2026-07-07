@@ -30,7 +30,6 @@ export default function AdmissionsPage() {
   const isReady = summary?.status === 'ready' || summary?.status === 'empty';
 
   const metricValue = (key: string) => {
-    if (summaryQuery.isLoading) return 'Loading';
     if (!isReady) return 'Unavailable';
     const value = summary?.summary[key];
     return value === null || value === undefined ? 'Unavailable' : value;
@@ -65,6 +64,7 @@ export default function AdmissionsPage() {
           <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard
               title="Pending Admissions"
+              loading={summaryQuery.isLoading}
               value={metricValue('applicationsNeedingReview')}
               icon={<ClipboardList size={20} />}
               tone={
@@ -77,6 +77,7 @@ export default function AdmissionsPage() {
             />
             <KpiCard
               title="Missing Documents"
+              loading={summaryQuery.isLoading}
               value={metricValue('unverifiedDocuments')}
               icon={<FileWarning size={20} />}
               tone={
@@ -89,6 +90,7 @@ export default function AdmissionsPage() {
             />
             <KpiCard
               title="Duplicate Candidates"
+              loading={summaryQuery.isLoading}
               value={metricValue('duplicateCandidates')}
               icon={<ScanSearch size={20} />}
               tone={
@@ -101,6 +103,7 @@ export default function AdmissionsPage() {
             />
             <KpiCard
               title="iEMIS Readiness"
+              loading={summaryQuery.isLoading}
               value={metricValue('iemisReadinessBlockers')}
               icon={<FileWarning size={20} />}
               tone={

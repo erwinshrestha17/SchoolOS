@@ -548,7 +548,10 @@ describe("SchoolOS web production contracts", () => {
     assert.match(timetablePage, /timetable-validation-summary/);
     assert.match(timetablePage, /timetable-substitutions-summary/);
     assert.match(timetablePage, /validationQuery\.data\.errors\.length/);
-    assert.match(timetablePage, /substitutionStatsQuery\.data\?\.length/);
+    // The substitutions endpoint returns a paginated envelope ({ items, meta
+    // }); meta.total is the real backend-computed count, not just the
+    // current page's item count.
+    assert.match(timetablePage, /substitutionStatsQuery\.data\?\.meta\.total/);
     assert.doesNotMatch(
       timetablePage,
       /title:\s*'Conflicts'[\s\S]*?value:\s*0/,
@@ -1493,7 +1496,6 @@ describe("SchoolOS web production contracts", () => {
     ]);
     const reportCardSurfaces = readMany([
       "components/academics/report-cards/report-cards-workspace.tsx",
-      "components/academics/tabs/report-cards-tab.tsx",
     ]);
 
     assert.match(apiClient, /async function openPdfBlob/);

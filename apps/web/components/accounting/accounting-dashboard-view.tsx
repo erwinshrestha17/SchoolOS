@@ -82,12 +82,12 @@ export function AccountingDashboardView() {
         ]}
       >
         <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-          <KpiCard title="Fiscal Year Status" value={fiscalYearsQuery.isLoading ? 'Loading' : activeFiscalYear?.status ?? 'Unavailable'} icon={<Clock size={20} />} tone={activeFiscalYear?.status === 'OPEN' ? 'success' : 'neutral'} description={activeFiscalYear?.name ?? 'Fiscal year is not configured.'} />
+          <KpiCard title="Fiscal Year Status" loading={fiscalYearsQuery.isLoading} value={activeFiscalYear?.status ?? 'Unavailable'} icon={<Clock size={20} />} tone={activeFiscalYear?.status === 'OPEN' ? 'success' : 'neutral'} description={activeFiscalYear?.name ?? 'Fiscal year is not configured.'} />
           <KpiCard title="Pending Journals" value="Unavailable" icon={<FileText size={20} />} tone="neutral" description="Needs a bounded journal summary." />
           <KpiCard title="Unreconciled Items" value="Unavailable" icon={<Landmark size={20} />} tone="neutral" description="Select an account in reconciliation." />
           <KpiCard title="Mapping Issues" value="Unavailable" icon={<AlertCircle size={20} />} tone="neutral" description="Needs a bounded M11 mapping summary." />
           <KpiCard title="Export Jobs" value="Unavailable" icon={<History size={20} />} tone="neutral" description="Open reports for backend job status." />
-          <KpiCard title="Trial Balance Readiness" value={summaryQuery.isLoading ? 'Loading' : summaryQuery.data ? (summaryQuery.data.balanced ? 'Ready' : 'Needs review') : 'Unavailable'} icon={<CheckCircle2 size={20} />} tone={summaryQuery.data?.balanced ? 'success' : 'warning'} description="Backend double-entry balance check." />
+          <KpiCard title="Trial Balance Readiness" loading={summaryQuery.isLoading} value={summaryQuery.data ? (summaryQuery.data.balanced ? 'Ready' : 'Needs review') : 'Unavailable'} icon={<CheckCircle2 size={20} />} tone={summaryQuery.data?.balanced ? 'success' : 'warning'} description="Backend double-entry balance check." />
         </KpiGrid>
       </ModuleHeader>
 

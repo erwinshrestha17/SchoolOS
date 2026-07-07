@@ -208,13 +208,13 @@ export function TimetableVersionsList({
         />
       ) : null}
 
-      {versionsQuery.data?.length === 0 ? (
+      {(versionsQuery.data?.items.length ?? 0) === 0 ? (
         <EmptyState
           title="No versions found"
           description="Create your first timetable version to start scheduling classes."
         />
       ) : (
-        <DataTable columns={columns} data={versionsQuery.data || []} />
+        <DataTable columns={columns} data={versionsQuery.data?.items ?? []} />
       )}
 
       <ConfirmDialog

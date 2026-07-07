@@ -56,7 +56,7 @@ export function SubstitutionsList({ filters }: { filters: any }) {
     queryFn: () => api.listTimetable({ classId: filters.classId }),
     enabled: Boolean(filters.classId),
   });
-  const slotOptions = slotQuery.data ?? [];
+  const slotOptions = slotQuery.data?.items ?? [];
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => api.cancelSubstitution(id),
@@ -232,14 +232,14 @@ export function SubstitutionsList({ filters }: { filters: any }) {
         </p>
       ) : null}
 
-      {substitutionsQuery.data?.length === 0 ? (
+      {(substitutionsQuery.data?.items.length ?? 0) === 0 ? (
         <EmptyState
           title="No substitutions found"
           description="Everything looks normal. No teacher absences recorded."
           icon={<Users className="h-8 w-8" />}
         />
       ) : (
-        <DataTable columns={columns} data={substitutionsQuery.data || []} />
+        <DataTable columns={columns} data={substitutionsQuery.data?.items ?? []} />
       )}
 
       <TimetableSubstitutionModal

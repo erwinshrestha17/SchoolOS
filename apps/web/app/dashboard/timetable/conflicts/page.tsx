@@ -31,7 +31,7 @@ export default function TimetableConflictsPage() {
       }),
   });
 
-  const versions = versionsQuery.data ?? [];
+  const versions = versionsQuery.data?.items ?? [];
   const activeVersion = versions.find((version) => version.status === 'PUBLISHED');
   const selectedVersion =
     versions.find((version) => version.id === selectedVersionId) ??

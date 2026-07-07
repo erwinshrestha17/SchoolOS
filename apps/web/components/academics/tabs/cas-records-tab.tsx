@@ -38,7 +38,6 @@ type Props = {
   academicYears: AcademicYearSummary[];
   classes: ClassSummary[];
   allSections: SectionSummary[];
-  students: StudentProfile[];
   subjects: SubjectSummary[];
 };
 
@@ -106,7 +105,7 @@ function makeDefaultForm(academicYears: AcademicYearSummary[]): CasFormState {
   };
 }
 
-export function CasRecordsTab({ academicYears, classes, allSections, students, subjects }: Props) {
+export function CasRecordsTab({ academicYears, classes, allSections, subjects }: Props) {
   const { status } = useSession();
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState(() => ({
@@ -143,23 +142,25 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
     [subjects, filters.classId],
   );
 
-  const formStudentsForClass = useMemo(() => {
-    return (students as StudentRosterRow[])
-      .filter((student) => {
-        const matchesClass = student.class?.id === cas.classId;
-        const matchesSection = !cas.sectionId || getStudentSectionId(student) === cas.sectionId;
-        return matchesClass && matchesSection;
-      })
-      .sort((a, b) => (a.rollNumber ?? 9999) - (b.rollNumber ?? 9999));
-  }, [students, cas.classId, cas.sectionId]);
+  const formRosterQuery = useQuery({
+    queryKey: ['students', 'roster', cas.classId, cas.sectionId],
+    queryFn: () => api.listStudents({ classId: cas.classId, sectionId: cas.sectionId || undefined, limit: 1000 }),
+    enabled: Boolean(cas.classId),
+  });
 
-  const filterStudentsForClass = useMemo(() => {
-    return (students as StudentRosterRow[]).filter((student) => {
-      const matchesClass = !filters.classId || student.class?.id === filters.classId;
-      const matchesSection = !filters.sectionId || getStudentSectionId(student) === filters.sectionId;
-      return matchesClass && matchesSection;
-    });
-  }, [students, filters.classId, filters.sectionId]);
+  const filterRosterQuery = useQuery({
+    queryKey: ['students', 'roster', filters.classId, filters.sectionId],
+    queryFn: () => api.listStudents({ classId: filters.classId, sectionId: filters.sectionId || undefined, limit: 1000 }),
+    enabled: Boolean(filters.classId),
+  });
+
+  const formStudentsForClass = useMemo(() => {
+    return ((formRosterQuery.data?.items ?? []) as StudentRosterRow[])
+      .slice()
+      .sort((a, b) => (a.rollNumber ?? 9999) - (b.rollNumber ?? 9999));
+  }, [formRosterQuery.data]);
+
+  const filterStudentsForClass = (filterRosterQuery.data?.items ?? []) as StudentRosterRow[];
 
   const casRecordsQuery = useQuery({
     queryKey: ['cas-records', filters],

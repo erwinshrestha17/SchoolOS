@@ -270,13 +270,14 @@ export const dashboardNavGroups: NavGroup[] = [
     icon: MessageSquare,
     items: [
       {
-        href: '/dashboard/communications',
+        href: '/dashboard/notices',
         label: 'Notices & Communication',
         icon: MessageSquare,
         permissions: communicationsPermissions,
         // '/dashboard/messages' is intentionally not claimed here: the
         // Messages item below owns that route so exactly one entry lights
-        // up as active.
+        // up as active. '/dashboard/communications' redirects to
+        // '/dashboard/notices', the single canonical M12 overview.
         activeWhen: ['/dashboard/communications', '/dashboard/notices'],
       },
       {

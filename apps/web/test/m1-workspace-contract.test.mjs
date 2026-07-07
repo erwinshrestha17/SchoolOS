@@ -328,9 +328,11 @@ test("M1 Admissions overview shows a real, actionable, honest KPI grid", () => {
   assert.match(page, /iemisReadinessBlockers/);
 
   // Honest states: real backend zero is fine, but loading/locked/unavailable
-  // must never render as a fabricated 0.
-  assert.match(page, /summaryQuery\.isLoading\) return 'Loading'/);
+  // must never render as a fabricated 0. Loading uses the shared KpiCard
+  // skeleton (loading prop), not the literal word "Loading" as a value.
+  assert.match(page, /loading=\{summaryQuery\.isLoading\}/);
   assert.match(page, /return 'Unavailable'/);
+  assert.doesNotMatch(page, /isLoading\) return 'Loading'/);
 
   // Every card opens a real, existing filtered queue.
   assert.match(page, /href="\/dashboard\/admissions"/);

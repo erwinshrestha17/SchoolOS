@@ -177,8 +177,8 @@ export function WeeklyRequirementsList({ filters }: { filters: any }) {
   if (requirementsQuery.isLoading) return <LoadingState />;
 
   const getAssignedCount = (subjectId: string, sectionId: string | null) => {
-    return timetableQuery.data?.filter(slot => 
-      slot.subjectId === subjectId && 
+    return timetableQuery.data?.items.filter(slot =>
+      slot.subjectId === subjectId &&
       (!sectionId || slot.sectionId === sectionId)
     ).length ?? 0;
   };

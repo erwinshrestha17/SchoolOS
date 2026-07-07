@@ -30,7 +30,7 @@ export function StudentTimetableTab() {
     queryFn: () => api.listTimetable({}),
   });
 
-  const timetable = timetableQuery.data ?? [];
+  const timetable = timetableQuery.data?.items ?? [];
   const daysWithSlots = new Set(timetable.map((slot: any) => slot.dayOfWeek)).size;
 
   // Group timetable by day

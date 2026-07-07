@@ -174,13 +174,8 @@ export function AttendanceOverviewWorkspace() {
         <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           <KpiCard
             title="Attendance today"
-            value={
-              analyticsQuery.isLoading
-                ? "Loading"
-                : attendanceRate === null
-                  ? "Unavailable"
-                  : `${attendanceRate}%`
-            }
+            loading={analyticsQuery.isLoading}
+            value={attendanceRate === null ? "Unavailable" : `${attendanceRate}%`}
             icon={<Users size={20} />}
             tone="info"
             href="/dashboard/attendance/mark"
@@ -188,44 +183,32 @@ export function AttendanceOverviewWorkspace() {
           />
           <KpiCard
             title="Classes pending"
-            value={
-              anomaliesQuery.isLoading
-                ? "Loading"
-                : (pendingClasses ?? "Unavailable")
-            }
+            loading={anomaliesQuery.isLoading}
+            value={pendingClasses ?? "Unavailable"}
             icon={<AlertTriangle size={20} />}
             tone={pendingClasses ? "warning" : "neutral"}
             href="/dashboard/attendance/anomalies"
           />
           <KpiCard
             title="Absent students"
-            value={
-              analyticsQuery.isLoading
-                ? "Loading"
-                : (totals?.absent ?? "Unavailable")
-            }
+            loading={analyticsQuery.isLoading}
+            value={totals?.absent ?? "Unavailable"}
             icon={<XCircle size={20} />}
             tone="danger"
             href="/dashboard/attendance/follow-ups"
           />
           <KpiCard
             title="Late arrivals"
-            value={
-              analyticsQuery.isLoading
-                ? "Loading"
-                : (totals?.late ?? "Unavailable")
-            }
+            loading={analyticsQuery.isLoading}
+            value={totals?.late ?? "Unavailable"}
             icon={<FileClock size={20} />}
             tone="warning"
             href="/dashboard/attendance/follow-ups"
           />
           <KpiCard
             title="Pending corrections"
-            value={
-              correctionsQuery.isLoading
-                ? "Loading"
-                : (correctionsQuery.data?.total ?? "Unavailable")
-            }
+            loading={correctionsQuery.isLoading}
+            value={correctionsQuery.data?.total ?? "Unavailable"}
             icon={<ClipboardCheck size={20} />}
             tone={
               (correctionsQuery.data?.total ?? 0) > 0 ? "warning" : "neutral"
@@ -679,13 +662,15 @@ export function AttendanceCorrectionsQueueWorkspace() {
         <KpiGrid className="sm:grid-cols-2 lg:grid-cols-5">
           <KpiCard
             title="Pending requests"
-            value={correctionsQuery.data?.total ?? "Loading"}
+            loading={correctionsQuery.isLoading}
+            value={correctionsQuery.data?.total ?? "Unavailable"}
             icon={<ClipboardCheck size={20} />}
             tone="warning"
           />
           <KpiCard
             title="Reviewed audit rows"
-            value={auditQuery.data?.total ?? "Loading"}
+            loading={auditQuery.isLoading}
+            value={auditQuery.data?.total ?? "Unavailable"}
             icon={<FileText size={20} />}
             tone="info"
           />
@@ -1234,27 +1219,31 @@ export function AttendanceStudentProfileWorkspace({
       <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           title="Overall attendance"
+          loading={summaryQuery.isLoading}
           value={
-            summary ? `${Math.round(summary.percentage * 10) / 10}%` : "Loading"
+            summary ? `${Math.round(summary.percentage * 10) / 10}%` : "Unavailable"
           }
           icon={<BarChart3 size={20} />}
           tone="success"
         />
         <KpiCard
           title="Present"
-          value={summary?.totals.present ?? "Loading"}
+          loading={summaryQuery.isLoading}
+          value={summary?.totals.present ?? "Unavailable"}
           icon={<CheckCircle2 size={20} />}
           tone="success"
         />
         <KpiCard
           title="Absent"
-          value={summary?.totals.absent ?? "Loading"}
+          loading={summaryQuery.isLoading}
+          value={summary?.totals.absent ?? "Unavailable"}
           icon={<XCircle size={20} />}
           tone="danger"
         />
         <KpiCard
           title="Late"
-          value={summary?.totals.late ?? "Loading"}
+          loading={summaryQuery.isLoading}
+          value={summary?.totals.late ?? "Unavailable"}
           icon={<FileClock size={20} />}
           tone="warning"
         />
@@ -1321,23 +1310,26 @@ export function AttendanceReportsWorkspace() {
         <KpiGrid className="sm:grid-cols-2 lg:grid-cols-5">
           <KpiCard
             title="School attendance rate"
+            loading={analyticsQuery.isLoading}
             value={
               analytics
                 ? `${analytics.monthlyAttendance.attendancePercent}%`
-                : "Loading"
+                : "Unavailable"
             }
             icon={<Users size={20} />}
             tone="info"
           />
           <KpiCard
             title="Students below 80%"
-            value={analytics?.below80Warnings?.length ?? "Loading"}
+            loading={analyticsQuery.isLoading}
+            value={analytics?.below80Warnings?.length ?? "Unavailable"}
             icon={<AlertTriangle size={20} />}
             tone="warning"
           />
           <KpiCard
             title="Avg late arrivals"
-            value={analytics?.todaySummary.totals.late ?? "Loading"}
+            loading={analyticsQuery.isLoading}
+            value={analytics?.todaySummary.totals.late ?? "Unavailable"}
             icon={<FileClock size={20} />}
             tone="warning"
           />
@@ -1349,7 +1341,8 @@ export function AttendanceReportsWorkspace() {
           />
           <KpiCard
             title="Leave utilization"
-            value={analytics?.todaySummary.totals.leave ?? "Loading"}
+            loading={analyticsQuery.isLoading}
+            value={analytics?.todaySummary.totals.leave ?? "Unavailable"}
             icon={<CalendarCheck size={20} />}
             tone="info"
           />
@@ -1533,7 +1526,7 @@ export function AttendanceSettingsWorkspace() {
                 ["Default mark state", "Present by daily attendance default"],
                 [
                   "Late follow-up threshold",
-                  String(policy?.lateFollowUpThreshold ?? "Loading"),
+                  String(policy?.lateFollowUpThreshold ?? "Unavailable"),
                 ],
                 [
                   "Half-day rule",
@@ -1548,7 +1541,7 @@ export function AttendanceSettingsWorkspace() {
                   statesQuery.data?.persisted
                     .filter((state) => state.code.includes("LEAVE"))
                     .map((state) => state.label)
-                    .join(", ") ?? "Loading",
+                    .join(", ") ?? "Unavailable",
                 ],
               ]}
             />
@@ -1594,7 +1587,7 @@ export function AttendanceSettingsWorkspace() {
                 ],
                 [
                   "Channels",
-                  policy?.parentNotificationChannels.join(", ") ?? "Loading",
+                  policy?.parentNotificationChannels.join(", ") ?? "Unavailable",
                 ],
                 [
                   "Provider state",
@@ -1617,7 +1610,7 @@ export function AttendanceSettingsWorkspace() {
         <SectionCard title="Policy Summary">
           <SummaryRows
             rows={[
-              ["Rule highlights", statesQuery.data?.supportPolicy ?? "Loading"],
+              ["Rule highlights", statesQuery.data?.supportPolicy ?? "Unavailable"],
               [
                 "Audit history",
                 "Policy updates recorded by backend audit service",
