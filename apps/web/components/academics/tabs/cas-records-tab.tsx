@@ -317,8 +317,8 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between mb-8">
            <div>
-              <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Continuous Assessment</h2>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Behavioral & Formative Observations</p>
+              <h2 className="text-xl font-black tracking-tight text-slate-900">Continuous Assessment</h2>
+              <p className="mt-1 text-sm font-semibold text-slate-500">Behavioral and formative observations.</p>
            </div>
            {successMessage && (
              <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-lg shadow-emerald-500/5 animate-in slide-in-from-right-4">
@@ -375,8 +375,8 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-academics-surface)] text-[var(--color-mod-academics-accent)] mb-4 transition-transform group-hover:rotate-12">
                      <Edit3 size={24} />
                   </div>
-                  <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">{editingId ? 'Modify Record' : 'Single Entry'}</h3>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Individual observation recording</p>
+                  <h3 className="text-base font-bold text-slate-900">{editingId ? 'Modify Record' : 'Single Entry'}</h3>
+                  <p className="mt-1 text-sm text-slate-500">Individual observation recording.</p>
                </div>
 
                <div className="space-y-4">
@@ -448,8 +448,8 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
             <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
                <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                   <div>
-                    <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">Batch Roster</h3>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Multi-student entry for {cas.category}</p>
+                    <h3 className="text-base font-bold text-slate-900">Batch Roster</h3>
+                    <p className="mt-1 text-sm text-slate-500">Multi-student entry for {cas.category}.</p>
                   </div>
                   <button 
                     onClick={saveBatch}
@@ -485,7 +485,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
                          <tr key={student.id} className="group hover:bg-slate-50/50 transition-colors">
                            <td className="py-4 px-8">
                               <div className="flex flex-col">
-                                 <span className="text-sm font-black text-slate-900 uppercase tracking-tight italic">{getStudentName(student)}</span>
+                                 <span className="text-sm font-bold text-slate-900">{getStudentName(student)}</span>
                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Roll #{student.rollNumber ?? '—'} · {student.studentSystemId}</span>
                               </div>
                            </td>
@@ -531,8 +531,8 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
                <Clock size={20} />
             </div>
             <div>
-               <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">Operational Logs</h3>
-               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Audit trail of assessments</p>
+               <h3 className="text-base font-bold text-slate-900">Assessment History</h3>
+               <p className="mt-1 text-sm text-slate-500">Audit trail of recorded observations.</p>
             </div>
             <div className="h-px flex-1 bg-slate-100 mx-4" />
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">{records.length} Records found</span>

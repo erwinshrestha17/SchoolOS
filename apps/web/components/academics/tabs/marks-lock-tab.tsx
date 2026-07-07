@@ -123,8 +123,8 @@ export function MarksLockTab({ exams }: Props) {
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between mb-8">
            <div>
-              <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Security & Locks</h2>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Operational Data Integrity Control</p>
+              <h2 className="text-xl font-black tracking-tight text-slate-900">Security &amp; Locks</h2>
+              <p className="mt-1 text-sm font-semibold text-slate-500">Exam data integrity control.</p>
            </div>
            {successMessage && (
              <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-lg shadow-emerald-500/5">
@@ -158,7 +158,7 @@ export function MarksLockTab({ exams }: Props) {
               </div>
               <div>
                  <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Pending Reviews</p>
-                 <p className="text-xl font-black text-amber-900 tracking-tighter italic">{pendingRequests.length}</p>
+                 <p className="text-xl font-black text-amber-900 tracking-tight">{pendingRequests.length}</p>
               </div>
            </div>
            <div className="p-4 rounded-2xl border border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-surface)] flex items-center gap-4">
@@ -167,7 +167,7 @@ export function MarksLockTab({ exams }: Props) {
               </div>
               <div>
                  <p className="text-[10px] font-black text-[var(--color-mod-academics-accent)] uppercase tracking-widest">Locked Terms</p>
-                 <p className="text-xl font-black text-[var(--color-mod-academics-text)] tracking-tighter italic">{exams.filter(e => e.isLocked).length}</p>
+                 <p className="text-xl font-black text-[var(--color-mod-academics-text)] tracking-tight">{exams.filter(e => e.isLocked).length}</p>
               </div>
            </div>
         </div>
@@ -183,8 +183,8 @@ export function MarksLockTab({ exams }: Props) {
                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-academics-surface)] text-[var(--color-mod-academics-accent)] mb-4 transition-transform group-hover:rotate-12">
                   <ShieldCheck size={24} />
                </div>
-               <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">Request Integrity Check</h3>
-               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Submit for administrative review</p>
+               <h3 className="text-base font-bold text-slate-900">Request Integrity Check</h3>
+               <p className="mt-1 text-sm text-slate-500">Submit for administrative review.</p>
             </div>
 
             <div className="space-y-4">
@@ -231,8 +231,8 @@ export function MarksLockTab({ exams }: Props) {
                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 mb-4 transition-transform group-hover:-rotate-12">
                   <Unlock size={24} />
                </div>
-               <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">Unlock Exam Term</h3>
-               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Reopen a locked exam term (Authorized Only)</p>
+               <h3 className="text-base font-bold text-slate-900">Unlock Exam Term</h3>
+               <p className="mt-1 text-sm text-slate-500">Reopen a locked exam term (authorized only).</p>
             </div>
 
             <div className="space-y-4">
@@ -269,8 +269,8 @@ export function MarksLockTab({ exams }: Props) {
                <History size={20} />
             </div>
             <div>
-               <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic text-[18px]">Security Log History</h3>
-               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Audit trail of all lock operations</p>
+               <h3 className="text-base font-bold text-slate-900">Security Log History</h3>
+               <p className="mt-1 text-sm text-slate-500">Audit trail of all lock operations.</p>
             </div>
          </div>
 
@@ -301,7 +301,7 @@ export function MarksLockTab({ exams }: Props) {
                                request.status === 'UNLOCKED' ? <Unlock size={10} /> : <Clock size={10} />}
                               {request.status}
                            </div>
-                           <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight italic">{request.examTerm?.name}</h4>
+                           <h4 className="text-sm font-bold text-slate-900">{request.examTerm?.name}</h4>
                         </div>
                         
                         <div className="flex items-start gap-3">
