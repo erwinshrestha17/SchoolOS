@@ -980,6 +980,26 @@ enum GeneratedDocumentStatus {
   ARCHIVED
 }
 
+enum AdmissionPolicyStatus {
+  DRAFT
+  ACTIVE
+  SCHEDULED
+  EXPIRED
+  ARCHIVED
+  NEEDS_REVIEW
+}
+
+enum AdmissionPolicyApplicantType {
+  NEW
+  TRANSFER
+  BOTH
+}
+
+enum AdmissionDocumentTiming {
+  BEFORE_REVIEW
+  BEFORE_ENROLLMENT
+}
+
 enum DataExportJobStatus {
   QUEUED
   RUNNING

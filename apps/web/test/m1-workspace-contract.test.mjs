@@ -125,9 +125,8 @@ test("M1 entry creates one unified admission case for direct and review workflow
   const admissionsPage = read("app/dashboard/admissions/page.tsx");
   const moduleNav = read("components/m1/m1-module-nav.tsx");
   const dashboardShell = read("components/layout/dashboard-shell.tsx");
-  const policySettings = read(
-    "components/settings/admission-policy-settings.tsx",
-  );
+  const policyList = read("components/settings/admission-policy-list.tsx");
+  const policyWizard = read("components/settings/admission-policy-wizard.tsx");
   const mobileRouter = read("../schoolos_mobile/lib/app/router.dart");
 
   assert.match(legacyPipeline, /listAdmissionApplications/);
@@ -151,7 +150,7 @@ test("M1 entry creates one unified admission case for direct and review workflow
   assert.match(entry, /initialCaseId/);
   assert.match(entry, /AdmissionReviewCaseForm/);
   assert.doesNotMatch(entry, /AdmissionApplicationForm/);
-  assert.match(entry, /admissionCasesApi\.getPolicy/);
+  assert.match(entry, /admissionPoliciesApi\.list/);
   assert.match(entry, /School-office admission/);
   assert.match(entry, /Continue an existing application/);
   assert.match(entry, /Transfer or special review/);
@@ -201,8 +200,9 @@ test("M1 entry creates one unified admission case for direct and review workflow
   assert.match(admissionsPage, /\/dashboard\/admissions\/applications/);
   assert.match(moduleNav, /\/dashboard\/admissions\/applications/);
   assert.doesNotMatch(dashboardShell, /'\/dashboard\/admissions': 'students'/);
-  assert.match(policySettings, /Rules for selected admissions/);
-  assert.match(policySettings, /GRADE_11_12/);
+  assert.match(policyList, /Create Admission Policy/);
+  assert.match(policyWizard, /Who Can Apply/);
+  assert.match(policyWizard, /GRADE_11_12/);
   assert.match(mobileRouter, /snapshotKey: 'admissions'/);
   assert.doesNotMatch(
     directWizard + reviewForm + caseApi,

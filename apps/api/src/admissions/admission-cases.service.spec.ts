@@ -55,11 +55,64 @@ const admissionCase = {
   updatedAt: new Date(),
 };
 
+const defaultPolicyVersion = {
+  id: 'version-default',
+  policyId: 'policy-default',
+  admissionMode: 'DIRECT_ALLOWED',
+  requiredFields: [],
+  requireSection: false,
+  requireDocumentReview: false,
+  requireInterview: false,
+  requirePrincipalApproval: false,
+  requireTransferCertificate: false,
+  requirePriorMarksheet: false,
+  requireStreamOrMarksReview: false,
+  allowAdmissionWithDocumentsPending: true,
+  enforceCapacityWhenAvailable: false,
+  documentRequirements: [],
+  policy: { id: 'policy-default', name: 'School Default' },
+};
+
+// Overrides the mocked resolved policy for a single test, mirroring how a
+// named ACTIVE AdmissionPolicy + its current version would resolve.
+function mockPolicy(prisma: any, rule: Record<string, unknown>) {
+  const version = { ...defaultPolicyVersion, ...rule };
+  prisma.admissionPolicy.findMany.mockResolvedValue([
+    {
+      id: 'policy-default',
+      name: 'School Default',
+      isDefault: true,
+      academicYearId: null,
+      classId: null,
+      gradeBand: null,
+      source: null,
+      applicantType: 'BOTH',
+      currentVersionId: 'version-default',
+    },
+  ]);
+  prisma.admissionPolicyVersion.findFirst.mockResolvedValue(version);
+}
+
 function buildPrisma(overrides: Record<string, any> = {}) {
   const prisma: any = {
-    tenantSetting: {
+    admissionPolicy: {
       findFirst: jest.fn().mockResolvedValue(null),
-      upsert: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: 'policy-default',
+          name: 'School Default',
+          isDefault: true,
+          academicYearId: null,
+          classId: null,
+          gradeBand: null,
+          source: null,
+          applicantType: 'BOTH',
+          currentVersionId: 'version-default',
+        },
+      ]),
+    },
+    admissionPolicyVersion: {
+      findFirst: jest.fn().mockResolvedValue(defaultPolicyVersion),
     },
     admissionApplication: {
       findFirst: jest.fn().mockResolvedValue(admissionCase),
@@ -239,16 +292,8 @@ describe('AdmissionCasesService', () => {
   });
 
   it('moves review-required policy cases out of direct admission', async () => {
-    const prisma = buildPrisma({
-      tenantSetting: {
-        findFirst: jest.fn().mockResolvedValue({
-          value: {
-            defaultPolicy: { admissionMode: 'REVIEW_REQUIRED' },
-            overrides: [],
-          },
-        }),
-      },
-    });
+    const prisma = buildPrisma();
+    mockPolicy(prisma, { admissionMode: 'REVIEW_REQUIRED' });
     const service = buildService(prisma);
 
     await expect(
@@ -384,12 +429,7 @@ describe('AdmissionCasesService', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
-    prisma.tenantSetting.findFirst.mockResolvedValue({
-      value: {
-        defaultPolicy: { admissionMode: 'REVIEW_REQUIRED' },
-        overrides: [],
-      },
-    });
+    mockPolicy(prisma, { admissionMode: 'REVIEW_REQUIRED' });
     await expect(
       service.directAdmit(
         'case-a',
@@ -456,14 +496,9 @@ describe('AdmissionCasesService', () => {
 
   it('enforces principal-only approval when the resolved policy requires it', async () => {
     const prisma = buildPrisma();
-    prisma.tenantSetting.findFirst.mockResolvedValue({
-      value: {
-        defaultPolicy: {
-          admissionMode: 'REVIEW_REQUIRED',
-          requirePrincipalApproval: true,
-        },
-        overrides: [],
-      },
+    mockPolicy(prisma, {
+      admissionMode: 'REVIEW_REQUIRED',
+      requirePrincipalApproval: true,
     });
     const service = buildService(prisma);
 
@@ -674,47 +709,6 @@ describe('AdmissionCasesService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.admissionApplication.updateMany).not.toHaveBeenCalled();
     expect(auditService.record).not.toHaveBeenCalled();
-  });
-
-  it('rejects policy scopes that do not belong to the authenticated tenant', async () => {
-    const prisma = buildPrisma();
-    prisma.class.findMany.mockResolvedValue([]);
-    const auditService = { record: jest.fn() };
-    const service = buildService(prisma, { auditService });
-
-    await expect(
-      service.updatePolicy(
-        {
-          defaultPolicy: { admissionMode: 'DIRECT_ALLOWED' },
-          overrides: [
-            { admissionMode: 'REVIEW_REQUIRED', classId: 'class-other' },
-          ],
-        },
-        actor,
-      ),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(prisma.tenantSetting.upsert).not.toHaveBeenCalled();
-    expect(auditService.record).not.toHaveBeenCalled();
-  });
-
-  it('inherits school defaults into a scoped rule instead of resetting unspecified controls', async () => {
-    const prisma = buildPrisma();
-    prisma.tenantSetting.findFirst.mockResolvedValue({
-      value: {
-        defaultPolicy: {
-          admissionMode: 'DIRECT_ALLOWED',
-          requireDocumentReview: true,
-          allowAdmissionWithDocumentsPending: true,
-        },
-        overrides: [{ classId: 'class-a', admissionMode: 'DIRECT_ALLOWED' }],
-      },
-    });
-    const service = buildService(prisma);
-
-    const result = await service.getCase('case-a', actor);
-
-    expect(result.policyRequirements.requireDocumentReview).toBe(true);
-    expect(result.requiresReview).toBe(true);
   });
 
   it('does not require a section merely because the class has sections', async () => {

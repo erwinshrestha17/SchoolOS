@@ -996,6 +996,26 @@ enum GeneratedDocumentStatus {
   ARCHIVED
 }
 
+enum AdmissionPolicyStatus {
+  DRAFT
+  ACTIVE
+  SCHEDULED
+  EXPIRED
+  ARCHIVED
+  NEEDS_REVIEW
+}
+
+enum AdmissionPolicyApplicantType {
+  NEW
+  TRANSFER
+  BOTH
+}
+
+enum AdmissionDocumentTiming {
+  BEFORE_REVIEW
+  BEFORE_ENROLLMENT
+}
+
 enum DataExportJobStatus {
   QUEUED
   RUNNING
@@ -1685,6 +1705,100 @@ model MoodLog {
   student Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, classId, sectionId, logDate])
+}
+
+
+// ─── Compiled from schema/admission-policy.prisma ───
+model AdmissionPolicy {
+  id                String                       @id @default(uuid())
+  tenantId          String
+  name              String
+  slug              String?
+  status            AdmissionPolicyStatus        @default(DRAFT)
+  academicYearId    String?
+  classId           String?
+  gradeBand         String?
+  applicantType     AdmissionPolicyApplicantType @default(BOTH)
+  source            String?
+  isDefault         Boolean                      @default(false)
+  currentVersionId  String?                      @unique
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+  archivedAt        DateTime?
+
+  tenant         Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy      User?                    @relation("CreatedAdmissionPolicies", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy      User?                    @relation("UpdatedAdmissionPolicies", fields: [updatedById], references: [id], onDelete: SetNull)
+  versions       AdmissionPolicyVersion[] @relation("PolicyVersions")
+  currentVersion AdmissionPolicyVersion?  @relation("CurrentPolicyVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+  @@index([tenantId, academicYearId, classId])
+}
+
+model AdmissionPolicyVersion {
+  id                                 String                @id @default(uuid())
+  tenantId                           String
+  policyId                           String
+  version                            Int
+  status                             AdmissionPolicyStatus @default(DRAFT)
+  admissionMode                      String                @default("REVIEW_REQUIRED")
+  transferStudent                    Boolean?
+  requiredFields                     String[]              @default([])
+  requireSection                     Boolean               @default(false)
+  requireDocumentReview              Boolean               @default(false)
+  requireInterview                   Boolean               @default(false)
+  requirePrincipalApproval           Boolean               @default(false)
+  requireTransferCertificate         Boolean               @default(false)
+  requirePriorMarksheet              Boolean               @default(false)
+  requireStreamOrMarksReview         Boolean               @default(false)
+  allowAdmissionWithDocumentsPending Boolean               @default(true)
+  enforceCapacityWhenAvailable       Boolean               @default(false)
+  capacityOverride                   Int?
+  approvalLevel                      String?
+  notesForOffice                     String?               @db.Text
+  activatedAt                        DateTime?
+  activatedById                      String?
+  createdById                        String?
+  createdAt                          DateTime              @default(now())
+
+  tenant               Tenant                               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  policy               AdmissionPolicy                      @relation("PolicyVersions", fields: [policyId], references: [id], onDelete: Cascade)
+  currentOf            AdmissionPolicy?                     @relation("CurrentPolicyVersion")
+  createdBy            User?                                @relation("CreatedAdmissionPolicyVersions", fields: [createdById], references: [id], onDelete: SetNull)
+  activatedBy          User?                                @relation("ActivatedAdmissionPolicyVersions", fields: [activatedById], references: [id], onDelete: SetNull)
+  documentRequirements AdmissionPolicyDocumentRequirement[]
+  applications         AdmissionApplication[]
+
+  @@unique([policyId, version])
+  @@index([tenantId, policyId, createdAt])
+  @@index([tenantId, status])
+}
+
+model AdmissionPolicyDocumentRequirement {
+  id                           String                  @id @default(uuid())
+  tenantId                     String
+  policyVersionId              String
+  documentKind                 String
+  label                        String
+  isRequired                   Boolean                 @default(true)
+  requiresOriginalVerification Boolean                 @default(false)
+  timing                       AdmissionDocumentTiming @default(BEFORE_ENROLLMENT)
+  expiresAfterDays             Int?
+  canBeWaived                  Boolean                 @default(false)
+  waivableByRoleKeys           String[]                @default([])
+  sortOrder                    Int                     @default(0)
+  createdAt                    DateTime                @default(now())
+  updatedAt                    DateTime                @updatedAt
+
+  tenant  Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  version AdmissionPolicyVersion @relation(fields: [policyVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([policyVersionId, documentKind])
+  @@index([tenantId, policyVersionId])
 }
 
 
@@ -2467,6 +2581,10 @@ model User {
   analyticsRefreshJobs           AnalyticsRefreshJob[]            @relation("AnalyticsRefreshRequesters")
   createdDocumentTemplates       DocumentTemplate[]               @relation("CreatedDocumentTemplates")
   createdDocumentTemplateVersions DocumentTemplateVersion[]        @relation("CreatedDocumentTemplateVersions")
+  createdAdmissionPolicies       AdmissionPolicy[]                @relation("CreatedAdmissionPolicies")
+  updatedAdmissionPolicies       AdmissionPolicy[]                @relation("UpdatedAdmissionPolicies")
+  createdAdmissionPolicyVersions AdmissionPolicyVersion[]         @relation("CreatedAdmissionPolicyVersions")
+  activatedAdmissionPolicyVersions AdmissionPolicyVersion[]       @relation("ActivatedAdmissionPolicyVersions")
   generatedDocuments             GeneratedDocument[]              @relation("GeneratedDocumentActors")
   documentPrintHistory           DocumentPrintHistory[]           @relation("DocumentPrintActors")
   documentAccessLogs             DocumentAccessLog[]              @relation("DocumentAccessActors")
@@ -5761,17 +5879,21 @@ model AdmissionApplication {
   duplicateReview     Json?
   convertedStudentId  String?
   rejectedReason      String?
+  policyVersionId        String?
+  policyResolutionReason String?
   createdById         String?
   updatedById         String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  policyVersion AdmissionPolicyVersion? @relation(fields: [policyVersionId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, status, createdAt])
   @@index([tenantId, classId, status])
   @@index([tenantId, guardianPhone])
   @@index([tenantId, convertedStudentId])
+  @@index([tenantId, policyVersionId])
 }
 
 model StudentDocumentExpiryTemplate {
@@ -6049,6 +6171,9 @@ model Tenant {
   admissionImportBatches        AdmissionImportBatch[]
   admissionImportRows           AdmissionImportRow[]
   admissionApplications         AdmissionApplication[]
+  admissionPolicies              AdmissionPolicy[]
+  admissionPolicyVersions        AdmissionPolicyVersion[]
+  admissionPolicyDocumentRequirements AdmissionPolicyDocumentRequirement[]
   studentDocumentExpiryTemplates StudentDocumentExpiryTemplate[]
   staffDocuments                StaffDocument[]
   staffLifecycleEvents          StaffLifecycleEvent[]

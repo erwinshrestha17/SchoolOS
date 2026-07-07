@@ -1,14 +1,14 @@
 import Link from 'next/link';
 import { DashboardPageShell } from '../../../../components/dashboard/dashboard-page-shell';
 import { M1PageHeader } from '../../../../components/m1/m1-page-header';
-import { AdmissionPolicySettings } from '../../../../components/settings/admission-policy-settings';
+import { AdmissionPolicyList } from '../../../../components/settings/admission-policy-list';
 
 export default function AdmissionSettingsPage() {
   return (
     <DashboardPageShell>
       <M1PageHeader
-        title="Admission settings"
-        description="Choose when the school can admit a student directly and when admission review is needed."
+        title="Admission Policies"
+        description="Set admission requirements for each class, program, or applicant type."
         secondaryActions={
           <Link
             href="/dashboard/settings"
@@ -18,7 +18,7 @@ export default function AdmissionSettingsPage() {
           </Link>
         }
       />
-      <AdmissionPolicySettings />
+      <AdmissionPolicyList />
     </DashboardPageShell>
   );
 }

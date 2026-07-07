@@ -326,6 +326,26 @@ export const GeneratedDocumentStatus = {
   ARCHIVED: 'ARCHIVED',
 } as const;
 
+export const AdmissionPolicyStatus = {
+  DRAFT: 'DRAFT',
+  ACTIVE: 'ACTIVE',
+  SCHEDULED: 'SCHEDULED',
+  EXPIRED: 'EXPIRED',
+  ARCHIVED: 'ARCHIVED',
+  NEEDS_REVIEW: 'NEEDS_REVIEW',
+} as const;
+
+export const AdmissionPolicyApplicantType = {
+  NEW: 'NEW',
+  TRANSFER: 'TRANSFER',
+  BOTH: 'BOTH',
+} as const;
+
+export const AdmissionDocumentTiming = {
+  BEFORE_REVIEW: 'BEFORE_REVIEW',
+  BEFORE_ENROLLMENT: 'BEFORE_ENROLLMENT',
+} as const;
+
 export const DataExportJobStatus = {
   QUEUED: 'QUEUED',
   RUNNING: 'RUNNING',

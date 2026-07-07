@@ -120,6 +120,14 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
     onSuccess: (result) => setAdmissionResult(result),
   });
 
+  const selectPolicyMutation = useMutation({
+    mutationFn: (policyId: string) => admissionCasesApi.updateCase(caseId!, { policyId }),
+    onSuccess: (saved) => {
+      setCaseData(saved);
+      setLocalError('');
+    },
+  });
+
   const setupError = academicYearsQuery.isError || classesQuery.isError || sectionsQuery.isError || recoveryQuery.isError;
   const setupLoading = academicYearsQuery.isLoading || classesQuery.isLoading || sectionsQuery.isLoading || recoveryQuery.isLoading;
 
@@ -183,6 +191,7 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
     }
     if (step === 1) {
       if (!form.academicYearId || !form.classId || !form.admissionDate) return 'Choose the academic year, class, and admission date.';
+      if (caseData?.policy.ambiguous) return 'Choose the correct admission policy before continuing.';
     }
     return '';
   }
@@ -282,6 +291,34 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
         </div>
       ) : null}
       {autosaveError ? <p className="rounded-xl border border-warning-200 bg-warning-50 p-3 text-sm font-semibold text-warning-900" role="status">We could not save this admission draft. Your entered details are still here. Try again.</p> : null}
+
+      {caseData?.policy && !caseData.policy.ambiguous ? (
+        <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
+          <p className="font-bold">Applied policy: {caseData.policy.policyName ?? 'School default'}</p>
+          <p className="mt-0.5 text-xs">{caseData.policy.reason}</p>
+        </div>
+      ) : null}
+
+      {caseData?.policy?.ambiguous ? (
+        <div className="rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-900">
+          <p className="font-bold">We found two possible admission policies.</p>
+          <p className="mt-1">Choose the correct policy before continuing.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {caseData.policy.candidates.map((candidate) => (
+              <Button
+                key={candidate.policyId}
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={selectPolicyMutation.isPending}
+                onClick={() => selectPolicyMutation.mutate(candidate.policyId)}
+              >
+                {candidate.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {step === 0 ? (
         <SectionCard title="Student and guardian" description="Start with the information the school office needs for a normal admission.">

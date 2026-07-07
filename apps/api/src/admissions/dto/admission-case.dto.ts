@@ -83,46 +83,6 @@ export class AdmissionDocumentReferenceDto {
   title?: string;
 }
 
-export class AdmissionPolicyRuleDto {
-  @IsEnum(ADMISSION_MODES)
-  admissionMode: AdmissionMode = 'DIRECT_ALLOWED';
-
-  @IsOptional() @IsString() academicYearId?: string;
-  @IsOptional() @IsIn(ADMISSION_GRADE_BANDS) gradeBand?: string;
-  @IsOptional() @IsString() classId?: string;
-  @IsOptional() @IsEnum(ADMISSION_SOURCES) source?: AdmissionSource;
-  @IsOptional() @IsBoolean() transferStudent?: boolean;
-  @IsOptional() @IsBoolean() requireDocumentReview?: boolean;
-  @IsOptional() @IsBoolean() requireInterview?: boolean;
-  @IsOptional() @IsBoolean() requirePrincipalApproval?: boolean;
-  @IsOptional() @IsBoolean() requireTransferCertificate?: boolean;
-  @IsOptional() @IsBoolean() requirePriorMarksheet?: boolean;
-  @IsOptional() @IsBoolean() requireStreamOrMarksReview?: boolean;
-  @IsOptional() @IsBoolean() allowAdmissionWithDocumentsPending?: boolean;
-  @IsOptional() @IsBoolean() enforceCapacityWhenAvailable?: boolean;
-  @IsOptional() @IsBoolean() requireSection?: boolean;
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  requiredDocuments?: string[];
-  @IsOptional()
-  @IsArray()
-  @IsIn(ADMISSION_REQUIRED_FIELDS, { each: true })
-  requiredFields?: string[];
-}
-
-export class UpdateAdmissionPolicyDto {
-  @ValidateNested()
-  @Type(() => AdmissionPolicyRuleDto)
-  defaultPolicy!: AdmissionPolicyRuleDto;
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => AdmissionPolicyRuleDto)
-  overrides?: AdmissionPolicyRuleDto[];
-}
-
 export class CreateAdmissionCaseDto {
   @IsString()
   @NormalizePersonName()
@@ -195,6 +155,7 @@ export class CreateAdmissionCaseDto {
   @ValidateNested({ each: true })
   @Type(() => AdmissionDocumentReferenceDto)
   documents?: AdmissionDocumentReferenceDto[];
+  @IsOptional() @IsString() policyId?: string;
 }
 
 export class UpdateAdmissionCaseDto {
@@ -271,6 +232,7 @@ export class UpdateAdmissionCaseDto {
   @ValidateNested({ each: true })
   @Type(() => AdmissionDocumentReferenceDto)
   documents?: AdmissionDocumentReferenceDto[];
+  @IsOptional() @IsString() policyId?: string;
 }
 
 export class DirectAdmitAdmissionCaseDto extends UpdateAdmissionCaseDto {

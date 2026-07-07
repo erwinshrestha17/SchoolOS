@@ -1,7 +1,6 @@
 import type {
   AdmissionCase,
   AdmissionCaseEligibility,
-  AdmissionPolicy,
   CreateAdmissionCasePayload,
   DirectAdmitAdmissionCasePayload,
   ReviewAdmissionCasePayload,
@@ -39,12 +38,6 @@ export type AdmissionFollowUp = {
 };
 
 export const admissionCasesApi = {
-  getPolicy: () => request<AdmissionPolicy>("/admissions/policy"),
-  updatePolicy: (payload: AdmissionPolicy) =>
-    request<AdmissionPolicy>("/admissions/policy", {
-      method: "PUT",
-      json: payload,
-    }),
   listQueues: (query: {
     queue?: AdmissionCaseQueue;
     page?: number;

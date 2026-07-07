@@ -5,7 +5,6 @@ import {
   Param,
   Patch,
   Post,
-  Put,
   UseGuards,
 } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
@@ -22,7 +21,6 @@ import {
   FinalizeAdmissionCaseDto,
   ReviewAdmissionCaseDto,
   UpdateAdmissionCaseDto,
-  UpdateAdmissionPolicyDto,
 } from './dto/admission-case.dto';
 
 @Controller('admissions')
@@ -30,21 +28,6 @@ import {
 @Entitlement('module.students')
 export class AdmissionCasesController {
   constructor(private readonly admissionCasesService: AdmissionCasesService) {}
-
-  @Get('policy')
-  @Permissions('students:read')
-  getPolicy(@CurrentAuth() actor: AuthContext) {
-    return this.admissionCasesService.getPolicy(actor);
-  }
-
-  @Put('policy')
-  @Permissions('students:manage_lifecycle')
-  updatePolicy(
-    @Body() dto: UpdateAdmissionPolicyDto,
-    @CurrentAuth() actor: AuthContext,
-  ) {
-    return this.admissionCasesService.updatePolicy(dto, actor);
-  }
 
   @Post('cases')
   @Permissions('enrollments:create', 'students:create', 'guardians:create')

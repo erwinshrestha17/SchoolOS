@@ -14,6 +14,8 @@ import { AdmissionCaseQueuesController } from './admission-case-queues.controlle
 import { AdmissionCaseQueuesService } from './admission-case-queues.service';
 import { AdmissionCasesController } from './admission-cases.controller';
 import { AdmissionCasesService } from './admission-cases.service';
+import { AdmissionPolicyController } from './admission-policy.controller';
+import { AdmissionPolicyService } from './admission-policy.service';
 import { AdmissionsController } from './admissions.controller';
 import { AdmissionsService } from './admissions.service';
 import { M1AdmissionsHardeningController } from './m1-admissions-hardening.controller';
@@ -38,6 +40,7 @@ import { UsageModule } from '../usage/usage.module';
   controllers: [
     AdmissionsController,
     AdmissionCasesController,
+    AdmissionPolicyController,
     AdmissionCaseQueuesController,
     AdmissionCaseFollowUpsController,
     MobileAdmissionsSummaryController,
@@ -46,6 +49,7 @@ import { UsageModule } from '../usage/usage.module';
   providers: [
     AdmissionsService,
     AdmissionCasesService,
+    AdmissionPolicyService,
     AdmissionCaseQueuesService,
     AdmissionCaseFollowUpsService,
     MobileAdmissionsSummaryService,

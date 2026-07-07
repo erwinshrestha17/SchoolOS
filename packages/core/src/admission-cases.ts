@@ -1,3 +1,5 @@
+import type { AdmissionPolicyResolution } from "./admission-policies.js";
+
 export const ADMISSION_CASE_DISPLAY_STATUSES = [
   "DRAFT",
   "NEEDS_INFORMATION",
@@ -39,31 +41,6 @@ export type AdmissionCaseDocumentReference = {
   title?: string | null;
 };
 
-export type AdmissionPolicyRule = {
-  admissionMode: "DIRECT_ALLOWED" | "REVIEW_REQUIRED";
-  academicYearId?: string;
-  gradeBand?: string;
-  classId?: string;
-  source?: AdmissionCaseSource;
-  transferStudent?: boolean;
-  requireDocumentReview?: boolean;
-  requireInterview?: boolean;
-  requirePrincipalApproval?: boolean;
-  requireTransferCertificate?: boolean;
-  requirePriorMarksheet?: boolean;
-  requireStreamOrMarksReview?: boolean;
-  allowAdmissionWithDocumentsPending?: boolean;
-  enforceCapacityWhenAvailable?: boolean;
-  requireSection?: boolean;
-  requiredDocuments?: string[];
-  requiredFields?: string[];
-};
-
-export type AdmissionPolicy = {
-  defaultPolicy: AdmissionPolicyRule;
-  overrides: AdmissionPolicyRule[];
-};
-
 export type AdmissionCaseEligibility = {
   missingRequiredFields: string[];
   missingRequiredDocuments: string[];
@@ -101,6 +78,7 @@ export type AdmissionCaseEligibility = {
     requiredDocuments: string[];
     requiredFields: string[];
   };
+  policy: AdmissionPolicyResolution;
   canAdmitDirectly: boolean;
   canOverrideDuplicate: boolean;
   requiresReview: boolean;
@@ -200,6 +178,7 @@ export type CreateAdmissionCasePayload = {
   emergencyPhone?: string;
   medicalConditions?: string;
   documents?: AdmissionCaseDocumentReference[];
+  policyId?: string;
 };
 
 export type UpdateAdmissionCasePayload = Partial<CreateAdmissionCasePayload>;

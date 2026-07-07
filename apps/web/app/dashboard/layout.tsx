@@ -177,6 +177,7 @@ const dashboardRouteGates: RouteGate[] = [
       'roles:read',
       'classes:read',
       'academic_years:read',
+      'admission_policy:read',
     ],
   },
 ];

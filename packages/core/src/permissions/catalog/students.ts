@@ -25,6 +25,16 @@ export const studentsPermissions = [
     description: "Transfer, exit, archive, and manage student lifecycle transitions",
   },
   {
+    resource: "admission_policy",
+    action: "read",
+    description: "Read admission policies, versions, and document requirements",
+  },
+  {
+    resource: "admission_policy",
+    action: "manage",
+    description: "Create, edit, activate, and archive admission policies",
+  },
+  {
     resource: "students:qr",
     action: "generate",
     description: "Generate new QR credentials for students",

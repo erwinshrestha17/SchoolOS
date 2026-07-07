@@ -38,10 +38,7 @@ import {
   FinalizeAdmissionCaseDto,
   ReviewAdmissionCaseDto,
   UpdateAdmissionCaseDto,
-  UpdateAdmissionPolicyDto,
 } from './dto/admission-case.dto';
-
-const ADMISSION_POLICY_SETTING_KEY = 'admissions.policy.v1';
 const TERMINAL_STATUSES = new Set([
   'ADMITTED',
   'ENROLLED',
@@ -152,15 +149,11 @@ interface StoredCaseMetadata {
   };
   policySnapshot?: Record<string, unknown>;
   followUps?: Array<{ code: string; label: string; blocking: boolean }>;
+  selectedPolicyId?: string;
 }
 
 interface PolicyRule {
   admissionMode: 'DIRECT_ALLOWED' | 'REVIEW_REQUIRED';
-  academicYearId?: string;
-  gradeBand?: string;
-  classId?: string;
-  source?: string;
-  transferStudent?: boolean;
   requireDocumentReview?: boolean;
   requireInterview?: boolean;
   requirePrincipalApproval?: boolean;
@@ -170,13 +163,32 @@ interface PolicyRule {
   allowAdmissionWithDocumentsPending?: boolean;
   enforceCapacityWhenAvailable?: boolean;
   requireSection?: boolean;
-  requiredDocuments?: string[];
   requiredFields?: string[];
 }
 
-interface AdmissionPolicy {
-  defaultPolicy: PolicyRule;
-  overrides: PolicyRule[];
+interface ResolvedDocumentRequirement {
+  documentKind: string;
+  label: string;
+  isRequired: boolean;
+  timing: string;
+  requiresOriginalVerification: boolean;
+  canBeWaived: boolean;
+}
+
+interface ResolvedPolicyCandidate {
+  policyId: string;
+  name: string;
+}
+
+interface ResolvedPolicy {
+  policyId: string | null;
+  versionId: string | null;
+  policyName: string | null;
+  reason: string;
+  ambiguous: boolean;
+  candidates: ResolvedPolicyCandidate[];
+  rule: PolicyRule;
+  documentRequirements: ResolvedDocumentRequirement[];
 }
 
 interface AdmissionCaseRecord {
@@ -202,6 +214,7 @@ interface AdmissionCaseRecord {
   duplicateReview: Prisma.JsonValue | null;
   convertedStudentId: string | null;
   rejectedReason: string | null;
+  policyVersionId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -242,6 +255,14 @@ interface AdmissionEvaluation {
     requiredDocuments: string[];
     requiredFields: string[];
   };
+  policy: {
+    policyId: string | null;
+    versionId: string | null;
+    policyName: string | null;
+    reason: string;
+    ambiguous: boolean;
+    candidates: ResolvedPolicyCandidate[];
+  };
   canAdmitDirectly: boolean;
   canOverrideDuplicate: boolean;
   requiresReview: boolean;
@@ -259,21 +280,6 @@ interface AdmissionEvaluation {
   nextActionLabel: string;
 }
 
-const DEFAULT_POLICY: PolicyRule = {
-  admissionMode: 'DIRECT_ALLOWED',
-  requireDocumentReview: false,
-  requireInterview: false,
-  requirePrincipalApproval: false,
-  requireTransferCertificate: false,
-  requirePriorMarksheet: false,
-  requireStreamOrMarksReview: false,
-  allowAdmissionWithDocumentsPending: true,
-  enforceCapacityWhenAvailable: false,
-  requireSection: false,
-  requiredDocuments: [],
-  requiredFields: [],
-};
-
 @Injectable()
 export class AdmissionCasesService {
   constructor(
@@ -283,42 +289,6 @@ export class AdmissionCasesService {
     private readonly fileRegistryService: FileRegistryService,
     private readonly studentRecordsService: StudentRecordsService,
   ) {}
-
-  async getPolicy(actor: AuthContext) {
-    return this.loadPolicy(actor.tenantId);
-  }
-
-  async updatePolicy(dto: UpdateAdmissionPolicyDto, actor: AuthContext) {
-    const policy = this.normalizePolicy(dto);
-    await this.validatePolicyScopes(policy, actor);
-    await this.prisma.tenantSetting.upsert({
-      where: {
-        tenantId_key: {
-          tenantId: actor.tenantId,
-          key: ADMISSION_POLICY_SETTING_KEY,
-        },
-      },
-      create: {
-        tenantId: actor.tenantId,
-        key: ADMISSION_POLICY_SETTING_KEY,
-        value: policy as unknown as Prisma.InputJsonValue,
-      },
-      update: { value: policy as unknown as Prisma.InputJsonValue },
-    });
-
-    await this.auditService.record({
-      action: 'admission_policy_update',
-      resource: 'admission_policy',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      after: {
-        defaultMode: policy.defaultPolicy.admissionMode,
-        overrideCount: policy.overrides.length,
-      },
-    });
-
-    return policy;
-  }
 
   async createCase(dto: CreateAdmissionCaseDto, actor: AuthContext) {
     const metadata = this.mergeMetadata({}, dto);
@@ -360,6 +330,8 @@ export class AdmissionCasesService {
       data: {
         status: nextStatus,
         duplicateReview: nextMetadata as Prisma.InputJsonValue,
+        policyVersionId: evaluation.policy.versionId ?? undefined,
+        policyResolutionReason: evaluation.policy.reason,
         updatedById: actor.userId,
       },
     });
@@ -461,6 +433,8 @@ export class AdmissionCasesService {
           metadata,
           evaluation,
         ) as Prisma.InputJsonValue,
+        policyVersionId: evaluation.policy.versionId ?? undefined,
+        policyResolutionReason: evaluation.policy.reason,
         updatedById: actor.userId,
       },
     });
@@ -1044,6 +1018,7 @@ export class AdmissionCasesService {
       duplicateCandidates: evaluation.duplicateCandidates,
       relatedStudentCandidates: evaluation.relatedStudentCandidates,
       policyRequirements: evaluation.policyRequirements,
+      policy: evaluation.policy,
       canAdmitDirectly: evaluation.canAdmitDirectly && !reviewComplete,
       canOverrideDuplicate: evaluation.canOverrideDuplicate && !reviewComplete,
       requiresReview: evaluation.requiresReview && !reviewComplete,
@@ -1080,7 +1055,8 @@ export class AdmissionCasesService {
     actor: AuthContext,
   ): Promise<AdmissionEvaluation> {
     const metadata = this.readMetadata(record.duplicateReview);
-    const policy = await this.resolvePolicy(record, metadata, actor);
+    const resolved = await this.resolvePolicy(record, metadata, actor);
+    const policy = resolved.rule;
     const requiredFields = new Set<string>([
       'dateOfBirth',
       'gender',
@@ -1117,6 +1093,7 @@ export class AdmissionCasesService {
     );
     const requiredDocuments = this.requiredDocuments(
       policy,
+      resolved.documentRequirements,
       metadata,
       record.source,
     );
@@ -1198,6 +1175,14 @@ export class AdmissionCasesService {
       duplicateCandidates,
       relatedStudentCandidates,
       policyRequirements,
+      policy: {
+        policyId: resolved.policyId,
+        versionId: resolved.versionId,
+        policyName: resolved.policyName,
+        reason: resolved.reason,
+        ambiguous: resolved.ambiguous,
+        candidates: resolved.candidates,
+      },
       canAdmitDirectly,
       canOverrideDuplicate,
       requiresReview,
@@ -1223,8 +1208,14 @@ export class AdmissionCasesService {
     record: AdmissionCaseRecord,
     metadata: StoredCaseMetadata,
     actor: AuthContext,
-  ) {
-    const configured = await this.loadPolicy(actor.tenantId);
+  ): Promise<ResolvedPolicy> {
+    const isLocked =
+      TERMINAL_STATUSES.has(record.status) ||
+      REVIEW_LOCKED_STATUSES.has(record.status);
+    if (isLocked && record.policyVersionId) {
+      return this.loadPinnedPolicy(record.policyVersionId, actor.tenantId);
+    }
+
     const classroom = record.classId
       ? await this.prisma.class.findFirst({
           where: { id: record.classId, tenantId: actor.tenantId },
@@ -1235,14 +1226,275 @@ export class AdmissionCasesService {
     const source = this.admissionSource(record.source);
     const transferStudent =
       metadata.transferStudent ?? source === 'TRANSFER_REQUEST';
-    const matchingOverride = configured.overrides
-      .map((rule) => ({
-        rule,
-        score: this.policyScore(rule, record, gradeBand, transferStudent),
+
+    if (metadata.selectedPolicyId) {
+      const selected = await this.prisma.admissionPolicy.findFirst({
+        where: {
+          id: metadata.selectedPolicyId,
+          tenantId: actor.tenantId,
+          status: 'ACTIVE',
+          archivedAt: null,
+        },
+      });
+      if (
+        selected &&
+        this.policyScore(selected, record, gradeBand, source, transferStudent) >=
+          0
+      ) {
+        return this.loadResolvedPolicy(
+          selected,
+          actor.tenantId,
+          `Selected by admissions staff (${selected.name}).`,
+        );
+      }
+    }
+
+    const candidates = await this.prisma.admissionPolicy.findMany({
+      where: { tenantId: actor.tenantId, status: 'ACTIVE', archivedAt: null },
+    });
+    const scored = candidates
+      .map((policy) => ({
+        policy,
+        score: this.policyScore(policy, record, gradeBand, source, transferStudent),
       }))
-      .filter((candidate) => candidate.score >= 0)
-      .sort((left, right) => right.score - left.score)[0]?.rule;
-    return { ...configured.defaultPolicy, ...(matchingOverride ?? {}) };
+      .filter((entry) => entry.score >= 0);
+    if (scored.length === 0) {
+      return this.emptyResolvedPolicy(
+        'No active admission policy is configured for this school yet.',
+      );
+    }
+    const maxScore = Math.max(...scored.map((entry) => entry.score));
+    const topScorers = scored.filter((entry) => entry.score === maxScore);
+    let winner = topScorers[0];
+    if (topScorers.length > 1) {
+      if (maxScore === 0) {
+        winner =
+          topScorers.find((entry) => entry.policy.isDefault) ?? topScorers[0];
+      } else {
+        return {
+          policyId: null,
+          versionId: null,
+          policyName: null,
+          reason:
+            'We found two possible admission policies. Choose the correct policy before continuing.',
+          ambiguous: true,
+          candidates: topScorers.map((entry) => ({
+            policyId: entry.policy.id,
+            name: entry.policy.name,
+          })),
+          rule: this.emptyRule(),
+          documentRequirements: [],
+        };
+      }
+    }
+    return this.loadResolvedPolicy(
+      winner.policy,
+      actor.tenantId,
+      this.policyMatchReason(winner.policy, gradeBand, source, transferStudent),
+    );
+  }
+
+  private policyScore(
+    policy: {
+      academicYearId: string | null;
+      classId: string | null;
+      gradeBand: string | null;
+      source: string | null;
+      applicantType: string;
+      isDefault: boolean;
+    },
+    record: AdmissionCaseRecord,
+    gradeBand: string | null,
+    source: AdmissionSource,
+    transferStudent: boolean,
+  ) {
+    if (policy.isDefault) return 0;
+    let score = 0;
+    if (policy.academicYearId) {
+      if (policy.academicYearId !== record.academicYearId) return -1;
+      score += 8;
+    }
+    if (policy.classId) {
+      if (policy.classId !== record.classId) return -1;
+      score += 16;
+    }
+    if (policy.gradeBand) {
+      if (policy.gradeBand !== gradeBand) return -1;
+      score += 4;
+    }
+    if (policy.source) {
+      if (policy.source !== source) return -1;
+      score += 4;
+    }
+    if (policy.applicantType !== 'BOTH') {
+      const wantsTransfer = policy.applicantType === 'TRANSFER';
+      if (wantsTransfer !== transferStudent) return -1;
+      score += 4;
+    }
+    return score;
+  }
+
+  private policyMatchReason(
+    policy: {
+      name: string;
+      isDefault: boolean;
+      academicYearId: string | null;
+      classId: string | null;
+      gradeBand: string | null;
+      source: string | null;
+      applicantType: string;
+    },
+    gradeBand: string | null,
+    source: AdmissionSource,
+    transferStudent: boolean,
+  ) {
+    if (policy.isDefault) {
+      return 'School default — no more specific policy matched.';
+    }
+    const parts: string[] = [];
+    if (policy.classId) parts.push('class');
+    if (policy.academicYearId) parts.push('academic year');
+    if (policy.gradeBand) parts.push(`grade band (${gradeBand ?? policy.gradeBand})`);
+    if (policy.source) parts.push(`admission source (${source})`);
+    if (policy.applicantType !== 'BOTH') {
+      parts.push(
+        policy.applicantType === 'TRANSFER' ? 'transfer applicant' : 'new applicant',
+      );
+    }
+    return parts.length > 0
+      ? `Applied policy: ${policy.name} — matched on ${parts.join(', ')}.`
+      : `Applied policy: ${policy.name}.`;
+  }
+
+  private async loadResolvedPolicy(
+    policy: { id: string; name: string; currentVersionId: string | null },
+    tenantId: string,
+    reason: string,
+  ): Promise<ResolvedPolicy> {
+    if (!policy.currentVersionId) {
+      return this.emptyResolvedPolicy(
+        `"${policy.name}" has no active version yet.`,
+      );
+    }
+    const version = await this.prisma.admissionPolicyVersion.findFirst({
+      where: { id: policy.currentVersionId, tenantId },
+      include: { documentRequirements: true },
+    });
+    if (!version) {
+      return this.emptyResolvedPolicy(
+        `"${policy.name}" has no active version yet.`,
+      );
+    }
+    return {
+      policyId: policy.id,
+      versionId: version.id,
+      policyName: policy.name,
+      reason,
+      ambiguous: false,
+      candidates: [],
+      rule: this.ruleFromVersion(version),
+      documentRequirements: version.documentRequirements.map((requirement) => ({
+        documentKind: requirement.documentKind,
+        label: requirement.label,
+        isRequired: requirement.isRequired,
+        timing: requirement.timing,
+        requiresOriginalVerification: requirement.requiresOriginalVerification,
+        canBeWaived: requirement.canBeWaived,
+      })),
+    };
+  }
+
+  private async loadPinnedPolicy(
+    versionId: string,
+    tenantId: string,
+  ): Promise<ResolvedPolicy> {
+    const version = await this.prisma.admissionPolicyVersion.findFirst({
+      where: { id: versionId, tenantId },
+      include: { documentRequirements: true, policy: true },
+    });
+    if (!version) {
+      return this.emptyResolvedPolicy(
+        'The admission policy applied to this case is no longer available.',
+      );
+    }
+    return {
+      policyId: version.policyId,
+      versionId: version.id,
+      policyName: version.policy.name,
+      reason: `Applied policy: ${version.policy.name} — locked when this case was submitted for review.`,
+      ambiguous: false,
+      candidates: [],
+      rule: this.ruleFromVersion(version),
+      documentRequirements: version.documentRequirements.map((requirement) => ({
+        documentKind: requirement.documentKind,
+        label: requirement.label,
+        isRequired: requirement.isRequired,
+        timing: requirement.timing,
+        requiresOriginalVerification: requirement.requiresOriginalVerification,
+        canBeWaived: requirement.canBeWaived,
+      })),
+    };
+  }
+
+  private emptyResolvedPolicy(reason: string): ResolvedPolicy {
+    return {
+      policyId: null,
+      versionId: null,
+      policyName: null,
+      reason,
+      ambiguous: false,
+      candidates: [],
+      rule: this.emptyRule(),
+      documentRequirements: [],
+    };
+  }
+
+  private emptyRule(): PolicyRule {
+    return {
+      admissionMode: 'DIRECT_ALLOWED',
+      requireDocumentReview: false,
+      requireInterview: false,
+      requirePrincipalApproval: false,
+      requireTransferCertificate: false,
+      requirePriorMarksheet: false,
+      requireStreamOrMarksReview: false,
+      allowAdmissionWithDocumentsPending: true,
+      enforceCapacityWhenAvailable: false,
+      requireSection: false,
+      requiredFields: [],
+    };
+  }
+
+  private ruleFromVersion(version: {
+    admissionMode: string;
+    requiredFields: string[];
+    requireSection: boolean;
+    requireDocumentReview: boolean;
+    requireInterview: boolean;
+    requirePrincipalApproval: boolean;
+    requireTransferCertificate: boolean;
+    requirePriorMarksheet: boolean;
+    requireStreamOrMarksReview: boolean;
+    allowAdmissionWithDocumentsPending: boolean;
+    enforceCapacityWhenAvailable: boolean;
+  }): PolicyRule {
+    return {
+      admissionMode:
+        version.admissionMode === 'REVIEW_REQUIRED'
+          ? 'REVIEW_REQUIRED'
+          : 'DIRECT_ALLOWED',
+      requiredFields: version.requiredFields,
+      requireSection: version.requireSection,
+      requireDocumentReview: version.requireDocumentReview,
+      requireInterview: version.requireInterview,
+      requirePrincipalApproval: version.requirePrincipalApproval,
+      requireTransferCertificate: version.requireTransferCertificate,
+      requirePriorMarksheet: version.requirePriorMarksheet,
+      requireStreamOrMarksReview: version.requireStreamOrMarksReview,
+      allowAdmissionWithDocumentsPending:
+        version.allowAdmissionWithDocumentsPending,
+      enforceCapacityWhenAvailable: version.enforceCapacityWhenAvailable,
+    };
   }
 
   private async validatePlacement(
@@ -1690,13 +1942,14 @@ export class AdmissionCasesService {
 
   private requiredDocuments(
     policy: PolicyRule,
+    documentRequirements: ResolvedDocumentRequirement[],
     metadata: StoredCaseMetadata,
     source: string | null,
   ) {
     const documents = new Set(
-      (policy.requiredDocuments ?? []).map((value) =>
-        this.normalizeDocumentKind(value),
-      ),
+      documentRequirements
+        .filter((requirement) => requirement.isRequired)
+        .map((requirement) => this.normalizeDocumentKind(requirement.documentKind)),
     );
     if (
       (metadata.transferStudent ||
@@ -1761,6 +2014,7 @@ export class AdmissionCasesService {
       ...current,
       schemaVersion: 1,
       transferStudent: dto.transferStudent ?? current.transferStudent,
+      selectedPolicyId: dto.policyId ?? current.selectedPolicyId,
       guardianReceivesAlerts:
         dto.guardianReceivesAlerts ?? current.guardianReceivesAlerts,
       admissionDate: dto.admissionDate ?? current.admissionDate,
@@ -1792,100 +2046,6 @@ export class AdmissionCasesService {
     return record;
   }
 
-  private async loadPolicy(tenantId: string): Promise<AdmissionPolicy> {
-    const setting = await this.prisma.tenantSetting.findFirst({
-      where: { tenantId, key: ADMISSION_POLICY_SETTING_KEY },
-      select: { value: true },
-    });
-    return this.normalizePolicy(setting?.value);
-  }
-
-  private normalizePolicy(value: unknown): AdmissionPolicy {
-    const root = this.isRecord(value) ? value : {};
-    const defaultPolicy = this.isRecord(root.defaultPolicy)
-      ? root.defaultPolicy
-      : {};
-    const overrides = Array.isArray(root.overrides)
-      ? root.overrides.filter((rule): rule is Record<string, unknown> =>
-          this.isRecord(rule),
-        )
-      : [];
-    const normalizedDefault = this.normalizePolicyRule(
-      defaultPolicy,
-      DEFAULT_POLICY.admissionMode,
-      true,
-    );
-    return {
-      defaultPolicy: normalizedDefault,
-      overrides: overrides.map((rule) =>
-        this.normalizePolicyRule(rule, normalizedDefault.admissionMode, false),
-      ),
-    };
-  }
-
-  private normalizePolicyRule(
-    value: Record<string, unknown>,
-    fallbackMode: PolicyRule['admissionMode'],
-    includeDefaults: boolean,
-  ): PolicyRule {
-    const mode =
-      value.admissionMode === 'REVIEW_REQUIRED' ||
-      value.admissionMode === 'DIRECT_ALLOWED'
-        ? value.admissionMode
-        : fallbackMode;
-    const rule = {
-      ...(includeDefaults ? DEFAULT_POLICY : {}),
-      ...value,
-      admissionMode: mode,
-    };
-    if (Array.isArray(value.requiredDocuments)) {
-      rule.requiredDocuments = value.requiredDocuments
-        .filter((item): item is string => typeof item === 'string')
-        .map((item) => this.normalizeDocumentKind(item))
-        .filter(Boolean);
-    }
-    if (Array.isArray(value.requiredFields)) {
-      rule.requiredFields = value.requiredFields
-        .filter((item): item is string => typeof item === 'string')
-        .map((item) => item.trim())
-        .filter(Boolean);
-    }
-    return rule;
-  }
-
-  private async validatePolicyScopes(
-    policy: AdmissionPolicy,
-    actor: AuthContext,
-  ) {
-    const rules = [policy.defaultPolicy, ...policy.overrides];
-    const academicYearIds = [
-      ...new Set(rules.flatMap((rule) => rule.academicYearId ?? [])),
-    ];
-    const classIds = [...new Set(rules.flatMap((rule) => rule.classId ?? []))];
-    const [academicYears, classes] = await Promise.all([
-      academicYearIds.length
-        ? this.prisma.academicYear.findMany({
-            where: { tenantId: actor.tenantId, id: { in: academicYearIds } },
-            select: { id: true },
-          })
-        : Promise.resolve([]),
-      classIds.length
-        ? this.prisma.class.findMany({
-            where: { tenantId: actor.tenantId, id: { in: classIds } },
-            select: { id: true },
-          })
-        : Promise.resolve([]),
-    ]);
-    if (
-      academicYears.length !== academicYearIds.length ||
-      classes.length !== classIds.length
-    ) {
-      throw new BadRequestException(
-        'Admission policy scopes must use academic years and classes from this school.',
-      );
-    }
-  }
-
   private normalizeDocumentKind(value: string) {
     return value
       .trim()
@@ -1915,36 +2075,6 @@ export class AdmissionCasesService {
       return 'IMPORT';
     }
     return 'OFFICE_WALK_IN';
-  }
-
-  private policyScore(
-    rule: PolicyRule,
-    record: AdmissionCaseRecord,
-    gradeBand: string | null,
-    transferStudent: boolean,
-  ) {
-    let score = 0;
-    if (rule.academicYearId) {
-      if (rule.academicYearId !== record.academicYearId) return -1;
-      score += 8;
-    }
-    if (rule.classId) {
-      if (rule.classId !== record.classId) return -1;
-      score += 16;
-    }
-    if (rule.gradeBand) {
-      if (rule.gradeBand !== gradeBand) return -1;
-      score += 4;
-    }
-    if (rule.source) {
-      if (rule.source !== this.admissionSource(record.source)) return -1;
-      score += 4;
-    }
-    if (typeof rule.transferStudent === 'boolean') {
-      if (rule.transferStudent !== transferStudent) return -1;
-      score += 4;
-    }
-    return score;
   }
 
   private gradeBand(level: number | null) {

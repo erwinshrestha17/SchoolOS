@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ClipboardCheck, FileUp, History, Loader2, UserRoundPlus } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
-import { admissionCasesApi } from '../../lib/api/admission-cases';
+import { admissionPoliciesApi } from '../../lib/api/admission-policies';
 import { useSession } from '../session-provider';
 import { Button } from '../ui/button';
 import { ErrorState } from '../ui/error-state';
@@ -15,7 +15,7 @@ import { AdmissionReviewCaseForm } from './admission-review-case-form';
 export function AdmissionEntry({ initialMode, initialCaseId }: { initialMode?: 'direct' | 'review'; initialCaseId?: string }) {
   const { hasPermissions } = useSession();
   const [mode, setMode] = useState<'choose' | 'direct' | 'review'>(initialMode ?? 'choose');
-  const policyQuery = useQuery({ queryKey: ['admission-policy'], queryFn: admissionCasesApi.getPolicy });
+  const policyQuery = useQuery({ queryKey: ['admission-policies'], queryFn: admissionPoliciesApi.list });
   const canCreateAdmission = hasPermissions(['enrollments:create', 'students:create', 'guardians:create']);
 
   if (policyQuery.isLoading && !initialMode) {
@@ -47,7 +47,8 @@ export function AdmissionEntry({ initialMode, initialCaseId }: { initialMode?: '
   if (mode === 'direct') return <AdmissionCaseWizard initialCaseId={initialCaseId} />;
   if (mode === 'review') return <AdmissionReviewCaseForm />;
 
-  const directIsDefault = policyQuery.data?.defaultPolicy.admissionMode === 'DIRECT_ALLOWED';
+  const schoolDefaultPolicy = policyQuery.data?.policies.find((policy) => policy.isDefault);
+  const directIsDefault = schoolDefaultPolicy?.admissionMode === 'DIRECT_ALLOWED';
 
   return (
     <section>

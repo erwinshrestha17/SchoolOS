@@ -9,3 +9,4 @@ export * from './school-settings-overview.js';
 export * from './school-settings-integrations.js';
 export * from './school-academic-calendar.js';
 export * from './admission-cases.js';
+export * from './admission-policies.js';
