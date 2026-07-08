@@ -38,7 +38,11 @@ import {
   FinalizeAdmissionCaseDto,
   ReviewAdmissionCaseDto,
   UpdateAdmissionCaseDto,
+  WaiveCaseDocumentDto,
 } from './dto/admission-case.dto';
+// Upper bound on open cases scanned per document-request listing; totals
+// become a floor (scanComplete: false) beyond this rather than going stale.
+const DOCUMENT_REQUESTS_SCAN_LIMIT = 500;
 const TERMINAL_STATUSES = new Set([
   'ADMITTED',
   'ENROLLED',
@@ -150,6 +154,14 @@ interface StoredCaseMetadata {
   policySnapshot?: Record<string, unknown>;
   followUps?: Array<{ code: string; label: string; blocking: boolean }>;
   selectedPolicyId?: string;
+  documentWaivers?: StoredDocumentWaiver[];
+}
+
+interface StoredDocumentWaiver {
+  documentKind: string;
+  reason: string;
+  at: string;
+  byUserId: string;
 }
 
 interface PolicyRule {
@@ -173,11 +185,59 @@ interface ResolvedDocumentRequirement {
   timing: string;
   requiresOriginalVerification: boolean;
   canBeWaived: boolean;
+  waivableByRoleKeys: string[];
 }
 
 interface ResolvedPolicyCandidate {
   policyId: string;
   name: string;
+}
+
+interface PolicyCandidate {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  academicYearId: string | null;
+  classId: string | null;
+  gradeBand: string | null;
+  source: string | null;
+  applicantType: string;
+  currentVersionId: string | null;
+}
+
+interface ResolvableVersion {
+  id: string;
+  policyId: string;
+  admissionMode: string;
+  requiredFields: string[];
+  requireSection: boolean;
+  requireDocumentReview: boolean;
+  requireInterview: boolean;
+  requirePrincipalApproval: boolean;
+  requireTransferCertificate: boolean;
+  requirePriorMarksheet: boolean;
+  requireStreamOrMarksReview: boolean;
+  allowAdmissionWithDocumentsPending: boolean;
+  enforceCapacityWhenAvailable: boolean;
+  documentRequirements: Array<{
+    documentKind: string;
+    label: string;
+    isRequired: boolean;
+    timing: string;
+    requiresOriginalVerification: boolean;
+    canBeWaived: boolean;
+    waivableByRoleKeys: string[];
+  }>;
+  policy: { name: string };
+}
+
+// Preloaded lookup tables so bulk screens (e.g. the document request center)
+// can resolve policies for many cases without per-case queries.
+interface PolicyResolutionContext {
+  policies: PolicyCandidate[];
+  classLevelById: Map<string, number | null>;
+  classNameById: Map<string, string>;
+  versionsById: Map<string, ResolvableVersion>;
 }
 
 interface ResolvedPolicy {
@@ -228,6 +288,8 @@ interface CapacityStatus {
 interface AdmissionEvaluation {
   missingRequiredFields: string[];
   missingRequiredDocuments: string[];
+  waivedDocuments: StoredDocumentWaiver[];
+  waivableMissingDocuments: string[];
   duplicateRisk: boolean;
   duplicateCandidates: NonNullable<StoredCaseMetadata['duplicateCandidates']>;
   relatedStudentCandidates: Array<{
@@ -465,6 +527,304 @@ export class AdmissionCasesService {
       displayStatus: this.displayStatus(record.status),
       ...evaluation,
     };
+  }
+
+  async listDocumentRequests(
+    query: ListDocumentRequestsDto,
+    actor: AuthContext,
+  ) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 25;
+    const cases = await this.prisma.admissionApplication.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        status: { notIn: [...TERMINAL_STATUSES] },
+        ...(query.classId ? { classId: query.classId } : {}),
+      },
+      orderBy: { createdAt: 'asc' },
+      take: DOCUMENT_REQUESTS_SCAN_LIMIT,
+    });
+    const context = await this.buildPolicyResolutionContext(actor, cases);
+
+    const rows: Array<{
+      admissionCaseId: string;
+      applicantName: string;
+      guardianPhone: string | null;
+      classId: string | null;
+      className: string | null;
+      displayStatus: AdmissionDisplayStatus;
+      policyId: string | null;
+      policyName: string | null;
+      missingDocuments: string[];
+      daysPending: number;
+      createdAt: string;
+      updatedAt: string;
+    }> = [];
+    const documentKindFilter = query.documentKind
+      ? this.normalizeDocumentKind(query.documentKind)
+      : null;
+    for (const record of cases) {
+      const metadata = this.readMetadata(record.duplicateReview);
+      const resolved = await this.resolvePolicy(record, metadata, actor, context);
+      const required = this.requiredDocuments(
+        resolved.rule,
+        resolved.documentRequirements,
+        metadata,
+        record.source,
+      );
+      const present = new Set(
+        (metadata.documents ?? []).map((document) =>
+          this.normalizeDocumentKind(document.kind),
+        ),
+      );
+      const waived = new Set(
+        (metadata.documentWaivers ?? []).map((waiver) =>
+          this.normalizeDocumentKind(waiver.documentKind),
+        ),
+      );
+      const missingDocuments = required.filter(
+        (kind) => !present.has(kind) && !waived.has(kind),
+      );
+      if (missingDocuments.length === 0) continue;
+      if (documentKindFilter && !missingDocuments.includes(documentKindFilter)) {
+        continue;
+      }
+      if (query.policyId && resolved.policyId !== query.policyId) continue;
+      const daysPending = Math.max(
+        0,
+        Math.floor((Date.now() - record.createdAt.getTime()) / 86_400_000),
+      );
+      if (query.minDaysPending && daysPending < query.minDaysPending) continue;
+      rows.push({
+        admissionCaseId: record.id,
+        applicantName: `${record.firstNameEn} ${record.lastNameEn}`.trim(),
+        guardianPhone: record.guardianPhone,
+        classId: record.classId,
+        className: record.classId
+          ? (context.classNameById.get(record.classId) ?? null)
+          : null,
+        displayStatus: this.displayStatus(record.status),
+        policyId: resolved.policyId,
+        policyName: resolved.policyName,
+        missingDocuments,
+        daysPending,
+        createdAt: record.createdAt.toISOString(),
+        updatedAt: record.updatedAt.toISOString(),
+      });
+    }
+    rows.sort((left, right) => right.daysPending - left.daysPending);
+    const total = rows.length;
+    const start = (page - 1) * limit;
+    return {
+      items: rows.slice(start, start + limit),
+      total,
+      page,
+      limit,
+      hasNextPage: start + limit < total,
+      // When the open-case scan cap is hit the totals are a floor, not exact —
+      // the UI must say so rather than present a partial count as complete.
+      scanComplete: cases.length < DOCUMENT_REQUESTS_SCAN_LIMIT,
+    };
+  }
+
+  private async buildPolicyResolutionContext(
+    actor: AuthContext,
+    cases: AdmissionCaseRecord[],
+  ): Promise<PolicyResolutionContext> {
+    const pinnedVersionIds = [
+      ...new Set(
+        cases
+          .filter(
+            (record) =>
+              (TERMINAL_STATUSES.has(record.status) ||
+                REVIEW_LOCKED_STATUSES.has(record.status)) &&
+              record.policyVersionId,
+          )
+          .map((record) => record.policyVersionId as string),
+      ),
+    ];
+    const [policies, classes, pinnedVersions] = await Promise.all([
+      this.prisma.admissionPolicy.findMany({
+        where: { tenantId: actor.tenantId, status: 'ACTIVE', archivedAt: null },
+        include: { currentVersion: { include: { documentRequirements: true } } },
+      }),
+      this.prisma.class.findMany({
+        where: { tenantId: actor.tenantId },
+        select: { id: true, name: true, level: true },
+      }),
+      pinnedVersionIds.length
+        ? this.prisma.admissionPolicyVersion.findMany({
+            where: { tenantId: actor.tenantId, id: { in: pinnedVersionIds } },
+            include: { documentRequirements: true, policy: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const versionsById = new Map<string, ResolvableVersion>();
+    for (const policy of policies) {
+      if (policy.currentVersion) {
+        versionsById.set(policy.currentVersion.id, {
+          ...policy.currentVersion,
+          policy: { name: policy.name },
+        });
+      }
+    }
+    for (const version of pinnedVersions) {
+      versionsById.set(version.id, version);
+    }
+    return {
+      policies,
+      classLevelById: new Map(classes.map((item) => [item.id, item.level])),
+      classNameById: new Map(classes.map((item) => [item.id, item.name])),
+      versionsById,
+    };
+  }
+
+  async waiveCaseDocument(
+    caseId: string,
+    dto: WaiveCaseDocumentDto,
+    actor: AuthContext,
+  ) {
+    const current = await this.findTenantCase(caseId, actor);
+    if (TERMINAL_STATUSES.has(current.status)) {
+      throw new BadRequestException(
+        'This admission case is closed. Document requirements can no longer be waived.',
+      );
+    }
+    const reason = dto.reason?.trim() ?? '';
+    if (reason.length < 5) {
+      throw new BadRequestException(
+        'A clear reason of at least five characters is required to waive a document.',
+      );
+    }
+
+    const metadata = this.readMetadata(current.duplicateReview);
+    const resolved = await this.resolvePolicy(current, metadata, actor);
+    const kind = this.normalizeDocumentKind(dto.documentKind);
+    if (!this.actorCanWaive(kind, resolved.documentRequirements, actor)) {
+      const requirement = resolved.documentRequirements.find(
+        (item) => this.normalizeDocumentKind(item.documentKind) === kind,
+      );
+      if (!requirement?.canBeWaived) {
+        throw new BadRequestException(
+          'The applied admission policy does not allow this document to be waived.',
+        );
+      }
+      throw new ForbiddenException(
+        'Your role is not allowed to waive this document under the applied policy.',
+      );
+    }
+
+    const waivers = (metadata.documentWaivers ?? []).filter(
+      (waiver) => this.normalizeDocumentKind(waiver.documentKind) !== kind,
+    );
+    waivers.push({
+      documentKind: kind,
+      reason,
+      at: new Date().toISOString(),
+      byUserId: actor.userId,
+    });
+    return this.persistWaivers(current, metadata, waivers, actor, {
+      action: 'admission_case_document_waived',
+      documentKind: kind,
+      reason,
+    });
+  }
+
+  async removeCaseDocumentWaiver(
+    caseId: string,
+    dto: WaiveCaseDocumentDto,
+    actor: AuthContext,
+  ) {
+    const current = await this.findTenantCase(caseId, actor);
+    if (TERMINAL_STATUSES.has(current.status)) {
+      throw new BadRequestException(
+        'This admission case is closed. Document waivers can no longer be changed.',
+      );
+    }
+    const metadata = this.readMetadata(current.duplicateReview);
+    const kind = this.normalizeDocumentKind(dto.documentKind);
+    const waivers = metadata.documentWaivers ?? [];
+    if (
+      !waivers.some(
+        (waiver) => this.normalizeDocumentKind(waiver.documentKind) === kind,
+      )
+    ) {
+      throw new BadRequestException('This document has no active waiver.');
+    }
+    const nextWaivers = waivers.filter(
+      (waiver) => this.normalizeDocumentKind(waiver.documentKind) !== kind,
+    );
+    return this.persistWaivers(current, metadata, nextWaivers, actor, {
+      action: 'admission_case_document_waiver_removed',
+      documentKind: kind,
+      reason: dto.reason?.trim() || null,
+    });
+  }
+
+  private async persistWaivers(
+    current: AdmissionCaseRecord,
+    metadata: StoredCaseMetadata,
+    waivers: StoredDocumentWaiver[],
+    actor: AuthContext,
+    audit: { action: string; documentKind: string; reason: string | null },
+  ) {
+    const nextMetadata: StoredCaseMetadata = {
+      ...metadata,
+      documentWaivers: waivers,
+    };
+    const updated = await this.prisma.admissionApplication.update({
+      where: { id: current.id },
+      data: {
+        duplicateReview: nextMetadata as Prisma.InputJsonValue,
+        updatedById: actor.userId,
+      },
+    });
+    const evaluation = await this.evaluate(updated, actor);
+    const nextStatus = this.nextStatusAfterSave(updated.status, evaluation);
+    await this.prisma.admissionApplication.update({
+      where: { id: updated.id },
+      data: {
+        status: nextStatus,
+        duplicateReview: this.persistedMetadata(
+          nextMetadata,
+          evaluation,
+        ) as Prisma.InputJsonValue,
+        updatedById: actor.userId,
+      },
+    });
+    await this.auditService.record({
+      action: audit.action,
+      resource: 'admission_case',
+      resourceId: current.id,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      before: { status: current.status },
+      after: {
+        status: nextStatus,
+        documentKind: audit.documentKind,
+        reason: audit.reason,
+      },
+    });
+    return this.getCase(current.id, actor);
+  }
+
+  private actorCanWaive(
+    documentKind: string,
+    documentRequirements: ResolvedDocumentRequirement[],
+    actor: AuthContext,
+  ) {
+    if (!actor.permissions.includes('students:manage_lifecycle')) return false;
+    const kind = this.normalizeDocumentKind(documentKind);
+    const requirement = documentRequirements.find(
+      (item) => this.normalizeDocumentKind(item.documentKind) === kind,
+    );
+    if (!requirement?.canBeWaived) return false;
+    if (requirement.waivableByRoleKeys.length === 0) return true;
+    return actor.roles.some(
+      (role) =>
+        role === 'platform_super_admin' ||
+        requirement.waivableByRoleKeys.includes(role),
+    );
   }
 
   async reviewCase(
@@ -1014,6 +1374,8 @@ export class AdmissionCasesService {
       displayStatus,
       missingRequiredFields: evaluation.missingRequiredFields,
       missingRequiredDocuments: evaluation.missingRequiredDocuments,
+      waivedDocuments: evaluation.waivedDocuments,
+      waivableMissingDocuments: evaluation.waivableMissingDocuments,
       duplicateRisk: evaluation.duplicateRisk,
       duplicateCandidates: evaluation.duplicateCandidates,
       relatedStudentCandidates: evaluation.relatedStudentCandidates,
@@ -1102,8 +1464,21 @@ export class AdmissionCasesService {
         this.normalizeDocumentKind(document.kind),
       ),
     );
+    // Waivers only count while the applied policy still requires the document,
+    // so a policy/class change never leaves a stale waiver hiding a real gap.
+    const waivedDocuments = (metadata.documentWaivers ?? []).filter((waiver) =>
+      requiredDocuments.includes(this.normalizeDocumentKind(waiver.documentKind)),
+    );
+    const waivedKinds = new Set(
+      waivedDocuments.map((waiver) =>
+        this.normalizeDocumentKind(waiver.documentKind),
+      ),
+    );
     const missingRequiredDocuments = requiredDocuments.filter(
-      (kind) => !documentKinds.has(kind),
+      (kind) => !documentKinds.has(kind) && !waivedKinds.has(kind),
+    );
+    const waivableMissingDocuments = missingRequiredDocuments.filter((kind) =>
+      this.actorCanWaive(kind, resolved.documentRequirements, actor),
     );
 
     const placement = await this.validatePlacement(record, actor, false);
@@ -1171,6 +1546,8 @@ export class AdmissionCasesService {
     return {
       missingRequiredFields,
       missingRequiredDocuments,
+      waivedDocuments,
+      waivableMissingDocuments,
       duplicateRisk,
       duplicateCandidates,
       relatedStudentCandidates,
@@ -1208,34 +1585,47 @@ export class AdmissionCasesService {
     record: AdmissionCaseRecord,
     metadata: StoredCaseMetadata,
     actor: AuthContext,
+    context?: PolicyResolutionContext,
   ): Promise<ResolvedPolicy> {
     const isLocked =
       TERMINAL_STATUSES.has(record.status) ||
       REVIEW_LOCKED_STATUSES.has(record.status);
     if (isLocked && record.policyVersionId) {
-      return this.loadPinnedPolicy(record.policyVersionId, actor.tenantId);
+      return this.loadPinnedPolicy(
+        record.policyVersionId,
+        actor.tenantId,
+        context,
+      );
     }
 
-    const classroom = record.classId
-      ? await this.prisma.class.findFirst({
-          where: { id: record.classId, tenantId: actor.tenantId },
-          select: { level: true },
-        })
-      : null;
-    const gradeBand = this.gradeBand(classroom?.level ?? null);
+    const classLevel = !record.classId
+      ? null
+      : context
+        ? (context.classLevelById.get(record.classId) ?? null)
+        : ((
+            await this.prisma.class.findFirst({
+              where: { id: record.classId, tenantId: actor.tenantId },
+              select: { level: true },
+            })
+          )?.level ?? null);
+    const gradeBand = this.gradeBand(classLevel);
     const source = this.admissionSource(record.source);
     const transferStudent =
       metadata.transferStudent ?? source === 'TRANSFER_REQUEST';
 
     if (metadata.selectedPolicyId) {
-      const selected = await this.prisma.admissionPolicy.findFirst({
-        where: {
-          id: metadata.selectedPolicyId,
-          tenantId: actor.tenantId,
-          status: 'ACTIVE',
-          archivedAt: null,
-        },
-      });
+      const selected = context
+        ? (context.policies.find(
+            (policy) => policy.id === metadata.selectedPolicyId,
+          ) ?? null)
+        : await this.prisma.admissionPolicy.findFirst({
+            where: {
+              id: metadata.selectedPolicyId,
+              tenantId: actor.tenantId,
+              status: 'ACTIVE',
+              archivedAt: null,
+            },
+          });
       if (
         selected &&
         this.policyScore(selected, record, gradeBand, source, transferStudent) >=
@@ -1245,13 +1635,16 @@ export class AdmissionCasesService {
           selected,
           actor.tenantId,
           `Selected by admissions staff (${selected.name}).`,
+          context,
         );
       }
     }
 
-    const candidates = await this.prisma.admissionPolicy.findMany({
-      where: { tenantId: actor.tenantId, status: 'ACTIVE', archivedAt: null },
-    });
+    const candidates =
+      context?.policies ??
+      (await this.prisma.admissionPolicy.findMany({
+        where: { tenantId: actor.tenantId, status: 'ACTIVE', archivedAt: null },
+      }));
     const scored = candidates
       .map((policy) => ({
         policy,
@@ -1291,6 +1684,7 @@ export class AdmissionCasesService {
       winner.policy,
       actor.tenantId,
       this.policyMatchReason(winner.policy, gradeBand, source, transferStudent),
+      context,
     );
   }
 
@@ -1366,20 +1760,37 @@ export class AdmissionCasesService {
       : `Applied policy: ${policy.name}.`;
   }
 
+  private mapDocumentRequirements(
+    requirements: ResolvableVersion['documentRequirements'],
+  ): ResolvedDocumentRequirement[] {
+    return requirements.map((requirement) => ({
+      documentKind: requirement.documentKind,
+      label: requirement.label,
+      isRequired: requirement.isRequired,
+      timing: requirement.timing,
+      requiresOriginalVerification: requirement.requiresOriginalVerification,
+      canBeWaived: requirement.canBeWaived,
+      waivableByRoleKeys: requirement.waivableByRoleKeys,
+    }));
+  }
+
   private async loadResolvedPolicy(
     policy: { id: string; name: string; currentVersionId: string | null },
     tenantId: string,
     reason: string,
+    context?: PolicyResolutionContext,
   ): Promise<ResolvedPolicy> {
     if (!policy.currentVersionId) {
       return this.emptyResolvedPolicy(
         `"${policy.name}" has no active version yet.`,
       );
     }
-    const version = await this.prisma.admissionPolicyVersion.findFirst({
-      where: { id: policy.currentVersionId, tenantId },
-      include: { documentRequirements: true },
-    });
+    const version =
+      context?.versionsById.get(policy.currentVersionId) ??
+      (await this.prisma.admissionPolicyVersion.findFirst({
+        where: { id: policy.currentVersionId, tenantId },
+        include: { documentRequirements: true },
+      }));
     if (!version) {
       return this.emptyResolvedPolicy(
         `"${policy.name}" has no active version yet.`,
@@ -1393,25 +1804,23 @@ export class AdmissionCasesService {
       ambiguous: false,
       candidates: [],
       rule: this.ruleFromVersion(version),
-      documentRequirements: version.documentRequirements.map((requirement) => ({
-        documentKind: requirement.documentKind,
-        label: requirement.label,
-        isRequired: requirement.isRequired,
-        timing: requirement.timing,
-        requiresOriginalVerification: requirement.requiresOriginalVerification,
-        canBeWaived: requirement.canBeWaived,
-      })),
+      documentRequirements: this.mapDocumentRequirements(
+        version.documentRequirements,
+      ),
     };
   }
 
   private async loadPinnedPolicy(
     versionId: string,
     tenantId: string,
+    context?: PolicyResolutionContext,
   ): Promise<ResolvedPolicy> {
-    const version = await this.prisma.admissionPolicyVersion.findFirst({
-      where: { id: versionId, tenantId },
-      include: { documentRequirements: true, policy: true },
-    });
+    const version =
+      context?.versionsById.get(versionId) ??
+      (await this.prisma.admissionPolicyVersion.findFirst({
+        where: { id: versionId, tenantId },
+        include: { documentRequirements: true, policy: true },
+      }));
     if (!version) {
       return this.emptyResolvedPolicy(
         'The admission policy applied to this case is no longer available.',
@@ -1425,14 +1834,9 @@ export class AdmissionCasesService {
       ambiguous: false,
       candidates: [],
       rule: this.ruleFromVersion(version),
-      documentRequirements: version.documentRequirements.map((requirement) => ({
-        documentKind: requirement.documentKind,
-        label: requirement.label,
-        isRequired: requirement.isRequired,
-        timing: requirement.timing,
-        requiresOriginalVerification: requirement.requiresOriginalVerification,
-        canBeWaived: requirement.canBeWaived,
-      })),
+      documentRequirements: this.mapDocumentRequirements(
+        version.documentRequirements,
+      ),
     };
   }
 

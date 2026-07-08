@@ -729,4 +729,179 @@ describe('AdmissionCasesService', () => {
     expect(result.canAdmitDirectly).toBe(true);
     expect(result).not.toHaveProperty('storageStatus');
   });
+
+  const waivableRequirement = (overrides: Record<string, unknown> = {}) => ({
+    documentKind: 'TRANSFER_CERTIFICATE',
+    label: 'Transfer certificate',
+    isRequired: true,
+    timing: 'BEFORE_ENROLLMENT',
+    requiresOriginalVerification: false,
+    canBeWaived: true,
+    waivableByRoleKeys: [],
+    ...overrides,
+  });
+
+  it('waives a policy-waivable document with an audited reason and clears it from missing documents', async () => {
+    const prisma = buildPrisma({
+      admissionApplication: {
+        findFirst: jest.fn().mockResolvedValue(admissionCase),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }: any) =>
+            Promise.resolve({ ...admissionCase, ...data }),
+          ),
+      },
+    });
+    mockPolicy(prisma, { documentRequirements: [waivableRequirement()] });
+    const auditService = { record: jest.fn() };
+    const service = buildService(prisma, { auditService });
+
+    await service.waiveCaseDocument(
+      'case-a',
+      { documentKind: 'TRANSFER_CERTIFICATE', reason: 'Original verified at the desk.' },
+      actor,
+    );
+
+    expect(prisma.admissionApplication.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          duplicateReview: expect.objectContaining({
+            documentWaivers: [
+              expect.objectContaining({
+                documentKind: 'TRANSFER_CERTIFICATE',
+                reason: 'Original verified at the desk.',
+                byUserId: 'user-a',
+              }),
+            ],
+          }),
+        }),
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'admission_case_document_waived',
+        resource: 'admission_case',
+        resourceId: 'case-a',
+      }),
+    );
+  });
+
+  it('excludes waived documents from missing documents and reports them separately', async () => {
+    const prisma = buildPrisma({
+      admissionApplication: {
+        findFirst: jest.fn().mockResolvedValue({
+          ...admissionCase,
+          duplicateReview: {
+            documentWaivers: [
+              {
+                documentKind: 'TRANSFER_CERTIFICATE',
+                reason: 'Original verified at the desk.',
+                at: '2026-07-08T00:00:00.000Z',
+                byUserId: 'user-a',
+              },
+            ],
+          },
+        }),
+      },
+    });
+    mockPolicy(prisma, { documentRequirements: [waivableRequirement()] });
+    const service = buildService(prisma);
+
+    const result = await service.getCase('case-a', actor);
+
+    expect(result.missingRequiredDocuments).not.toContain('TRANSFER_CERTIFICATE');
+    expect(result.waivedDocuments).toEqual([
+      expect.objectContaining({ documentKind: 'TRANSFER_CERTIFICATE' }),
+    ]);
+  });
+
+  it('rejects waiving a document the applied policy does not mark waivable', async () => {
+    const prisma = buildPrisma();
+    mockPolicy(prisma, {
+      documentRequirements: [waivableRequirement({ canBeWaived: false })],
+    });
+    const service = buildService(prisma);
+
+    await expect(
+      service.waiveCaseDocument(
+        'case-a',
+        { documentKind: 'TRANSFER_CERTIFICATE', reason: 'Reviewed in person.' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.admissionApplication.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects waiving when the actor role is outside the policy waiver roles', async () => {
+    const prisma = buildPrisma();
+    mockPolicy(prisma, {
+      documentRequirements: [
+        waivableRequirement({ waivableByRoleKeys: ['principal'] }),
+      ],
+    });
+    const service = buildService(prisma);
+
+    await expect(
+      service.waiveCaseDocument(
+        'case-a',
+        { documentKind: 'TRANSFER_CERTIFICATE', reason: 'Reviewed in person.' },
+        { ...actor, roles: ['support_staff'] },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('removes an active waiver and refuses when none exists', async () => {
+    const withWaiver = {
+      ...admissionCase,
+      duplicateReview: {
+        documentWaivers: [
+          {
+            documentKind: 'TRANSFER_CERTIFICATE',
+            reason: 'Original verified at the desk.',
+            at: '2026-07-08T00:00:00.000Z',
+            byUserId: 'user-a',
+          },
+        ],
+      },
+    };
+    const prisma = buildPrisma({
+      admissionApplication: {
+        findFirst: jest.fn().mockResolvedValue(withWaiver),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }: any) =>
+            Promise.resolve({ ...withWaiver, ...data }),
+          ),
+      },
+    });
+    mockPolicy(prisma, { documentRequirements: [waivableRequirement()] });
+    const auditService = { record: jest.fn() };
+    const service = buildService(prisma, { auditService });
+
+    await service.removeCaseDocumentWaiver(
+      'case-a',
+      { documentKind: 'TRANSFER_CERTIFICATE' },
+      actor,
+    );
+    expect(prisma.admissionApplication.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          duplicateReview: expect.objectContaining({ documentWaivers: [] }),
+        }),
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'admission_case_document_waiver_removed' }),
+    );
+
+    const bare = buildPrisma();
+    mockPolicy(bare, { documentRequirements: [waivableRequirement()] });
+    await expect(
+      buildService(bare).removeCaseDocumentWaiver(
+        'case-a',
+        { documentKind: 'TRANSFER_CERTIFICATE' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 });

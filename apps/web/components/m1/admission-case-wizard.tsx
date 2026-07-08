@@ -434,7 +434,7 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
             </div>
           </SectionCard>
 
-          {caseData ? <EligibilityPanel admissionCase={caseData} /> : null}
+          {caseData ? <EligibilityPanel admissionCase={caseData} onCaseUpdated={setCaseData} /> : null}
           {caseData?.relatedStudentCandidates.length ? <RelatedStudentResolution admissionCase={caseData} /> : null}
           {requiresReview ? (
             <SectionCard title="Admission review required" description="This class or admission type needs review before the student can be admitted.">
@@ -458,7 +458,7 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
   );
 }
 
-function EligibilityPanel({ admissionCase }: { admissionCase: AdmissionCase }) {
+function EligibilityPanel({ admissionCase, onCaseUpdated }: { admissionCase: AdmissionCase; onCaseUpdated: (saved: AdmissionCase) => void }) {
   const documentsBlock = admissionCase.missingRequiredDocuments.length > 0 && !admissionCase.policyRequirements.allowAdmissionWithDocumentsPending;
   const blocked = admissionCase.missingRequiredFields.length > 0 || documentsBlock;
   return (
@@ -466,11 +466,89 @@ function EligibilityPanel({ admissionCase }: { admissionCase: AdmissionCase }) {
       <div className="space-y-3 text-sm">
         {blocked ? <Issue title="Information needed" items={[...admissionCase.missingRequiredFields, ...(documentsBlock ? admissionCase.missingRequiredDocuments : [])]} /> : null}
         {admissionCase.missingRequiredDocuments.length > 0 && !documentsBlock ? <Issue title="Documents can be added after admission" items={admissionCase.missingRequiredDocuments} warning /> : null}
+        {admissionCase.waivableMissingDocuments?.length ? <DocumentWaiverControls admissionCase={admissionCase} onCaseUpdated={onCaseUpdated} /> : null}
+        {admissionCase.waivedDocuments?.length ? <ActiveWaivers admissionCase={admissionCase} onCaseUpdated={onCaseUpdated} /> : null}
         {admissionCase.duplicateRisk ? <Issue title="Possible duplicate" items={admissionCase.duplicateCandidates.map((candidate) => `${candidate.fullNameEn} · ${candidate.className}${candidate.sectionName ? ` ${candidate.sectionName}` : ''}`)} warning /> : null}
         {admissionCase.requiresReview ? <Issue title="Policy review" items={[admissionCase.requiresApproval ? 'Principal approval is required.' : 'This case needs the school’s admission review.']} warning /> : null}
         {!blocked && !admissionCase.duplicateRisk && !admissionCase.requiresReview ? <div className="flex items-center gap-2 rounded-xl border border-success-200 bg-success-50 p-3 font-semibold text-success-800"><CheckCircle2 className="h-5 w-5" />Ready to admit. Optional documents and IEMIS details will remain as follow-up items.</div> : null}
       </div>
     </SectionCard>
+  );
+}
+
+function DocumentWaiverControls({ admissionCase, onCaseUpdated }: { admissionCase: AdmissionCase; onCaseUpdated: (saved: AdmissionCase) => void }) {
+  const [waivingKind, setWaivingKind] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+  const waiveMutation = useMutation({
+    mutationFn: (documentKind: string) => admissionCasesApi.waiveDocument(admissionCase.id, { documentKind, reason }),
+    onSuccess: (saved) => {
+      onCaseUpdated(saved);
+      setWaivingKind(null);
+      setReason('');
+    },
+  });
+  const waiveError = readError(waiveMutation.error);
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <p className="font-bold text-slate-800">Waive a document requirement</p>
+      <p className="mt-1 text-xs text-slate-500">The applied policy allows these documents to be waived by your role. Every waiver needs a reason and is audited.</p>
+      <div className="mt-3 space-y-2">
+        {admissionCase.waivableMissingDocuments.map((kind) => (
+          <div key={kind} className="rounded-lg border border-slate-200 bg-white p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-semibold text-slate-800">{humanize(kind)}</span>
+              {waivingKind === kind ? null : (
+                <Button type="button" variant="outline" size="sm" onClick={() => { setWaivingKind(kind); setReason(''); }}>Waive requirement</Button>
+              )}
+            </div>
+            {waivingKind === kind ? (
+              <div className="mt-3 space-y-2">
+                <label className="block text-xs font-bold text-slate-700">
+                  Reason for waiving {humanize(kind)}
+                  <input className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. Original verified in person; copy to follow" />
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" disabled={reason.trim().length < 5 || waiveMutation.isPending} onClick={() => waiveMutation.mutate(kind)}>
+                    {waiveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    Confirm waiver
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => { setWaivingKind(null); setReason(''); }}>Cancel</Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      {waiveError ? <p className="mt-2 text-xs font-semibold text-danger-700" role="alert">{waiveError}</p> : null}
+    </div>
+  );
+}
+
+function ActiveWaivers({ admissionCase, onCaseUpdated }: { admissionCase: AdmissionCase; onCaseUpdated: (saved: AdmissionCase) => void }) {
+  const removeMutation = useMutation({
+    mutationFn: (documentKind: string) => admissionCasesApi.removeDocumentWaiver(admissionCase.id, { documentKind }),
+    onSuccess: onCaseUpdated,
+  });
+  const removeError = readError(removeMutation.error);
+  return (
+    <div className="rounded-xl border border-info-100 bg-info-50 p-3">
+      <p className="font-bold text-info-800">Waived documents</p>
+      <ul className="mt-2 space-y-2">
+        {admissionCase.waivedDocuments.map((waiver) => (
+          <li key={waiver.documentKind} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-info-100 bg-white p-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">{humanize(waiver.documentKind)}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{waiver.reason}</p>
+            </div>
+            <Button type="button" variant="outline" size="sm" disabled={removeMutation.isPending} onClick={() => removeMutation.mutate(waiver.documentKind)}>
+              {removeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Remove waiver
+            </Button>
+          </li>
+        ))}
+      </ul>
+      {removeError ? <p className="mt-2 text-xs font-semibold text-danger-700" role="alert">{removeError}</p> : null}
+    </div>
   );
 }
 

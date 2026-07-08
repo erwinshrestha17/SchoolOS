@@ -41,9 +41,23 @@ export type AdmissionCaseDocumentReference = {
   title?: string | null;
 };
 
+export type AdmissionCaseDocumentWaiver = {
+  documentKind: string;
+  reason: string;
+  at: string;
+  byUserId: string;
+};
+
+export type WaiveCaseDocumentPayload = {
+  documentKind: string;
+  reason?: string;
+};
+
 export type AdmissionCaseEligibility = {
   missingRequiredFields: string[];
   missingRequiredDocuments: string[];
+  waivedDocuments: AdmissionCaseDocumentWaiver[];
+  waivableMissingDocuments: string[];
   duplicateRisk: boolean;
   duplicateCandidates: Array<{
     studentId: string;

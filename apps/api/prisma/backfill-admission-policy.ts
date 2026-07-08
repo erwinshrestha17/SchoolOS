@@ -195,12 +195,27 @@ async function createPolicyWithVersion(
   return { policy, version };
 }
 
+// The legacy TenantSetting blob is only removed here, after the relational
+// rows for the tenant verifiably exist — a standalone cleanup migration would
+// run before this script on a fresh environment and destroy the source data.
+async function removeLegacySetting(tenantId: string) {
+  const removed = await prisma.tenantSetting.deleteMany({
+    where: { tenantId, key: ADMISSION_POLICY_SETTING_KEY },
+  });
+  if (removed.count > 0) {
+    console.log(
+      `  tenant ${tenantId}: removed legacy ${ADMISSION_POLICY_SETTING_KEY} setting`,
+    );
+  }
+}
+
 async function backfillTenant(tenantId: string) {
   const existingDefault = await prisma.admissionPolicy.findFirst({
     where: { tenantId, slug: SCHOOL_DEFAULT_SLUG },
   });
   if (existingDefault) {
     console.log(`  tenant ${tenantId}: already migrated, skipping`);
+    await removeLegacySetting(tenantId);
     return;
   }
 
@@ -275,6 +290,7 @@ async function backfillTenant(tenantId: string) {
   console.log(
     `  tenant ${tenantId}: backfilled ${openCasesUpdated.count} open admission application(s)`,
   );
+  await removeLegacySetting(tenantId);
 }
 
 async function main() {

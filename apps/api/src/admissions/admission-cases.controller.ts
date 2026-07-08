@@ -21,6 +21,7 @@ import {
   FinalizeAdmissionCaseDto,
   ReviewAdmissionCaseDto,
   UpdateAdmissionCaseDto,
+  WaiveCaseDocumentDto,
 } from './dto/admission-case.dto';
 
 @Controller('admissions')
@@ -64,6 +65,34 @@ export class AdmissionCasesController {
     @CurrentAuth() actor: AuthContext,
   ) {
     return this.admissionCasesService.updateCase(admissionCaseId, dto, actor);
+  }
+
+  @Post('cases/:admissionCaseId/documents/waive')
+  @Permissions('students:manage_lifecycle')
+  waiveCaseDocument(
+    @Param('admissionCaseId') admissionCaseId: string,
+    @Body() dto: WaiveCaseDocumentDto,
+    @CurrentAuth() actor: AuthContext,
+  ) {
+    return this.admissionCasesService.waiveCaseDocument(
+      admissionCaseId,
+      dto,
+      actor,
+    );
+  }
+
+  @Post('cases/:admissionCaseId/documents/unwaive')
+  @Permissions('students:manage_lifecycle')
+  removeCaseDocumentWaiver(
+    @Param('admissionCaseId') admissionCaseId: string,
+    @Body() dto: WaiveCaseDocumentDto,
+    @CurrentAuth() actor: AuthContext,
+  ) {
+    return this.admissionCasesService.removeCaseDocumentWaiver(
+      admissionCaseId,
+      dto,
+      actor,
+    );
   }
 
   @Post('cases/:admissionCaseId/review')

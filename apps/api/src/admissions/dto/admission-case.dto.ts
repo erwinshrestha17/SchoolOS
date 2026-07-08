@@ -242,6 +242,11 @@ export class DirectAdmitAdmissionCaseDto extends UpdateAdmissionCaseDto {
 
 export class FinalizeAdmissionCaseDto extends DirectAdmitAdmissionCaseDto {}
 
+export class WaiveCaseDocumentDto {
+  @IsString() @MaxLength(80) documentKind!: string;
+  @IsOptional() @IsString() @MinLength(5) @MaxLength(1000) reason?: string;
+}
+
 export class ReviewAdmissionCaseDto {
   @IsIn(ADMISSION_CASE_REVIEW_ACTIONS)
   action!: AdmissionCaseReviewAction;

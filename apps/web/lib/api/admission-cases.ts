@@ -4,6 +4,7 @@ import type {
   CreateAdmissionCasePayload,
   DirectAdmitAdmissionCasePayload,
   ReviewAdmissionCasePayload,
+  WaiveCaseDocumentPayload,
 } from "@schoolos/core";
 import { request } from "./client";
 
@@ -86,6 +87,19 @@ export const admissionCasesApi = {
       method: "PATCH",
       json: payload,
     }),
+  waiveDocument: (admissionCaseId: string, payload: WaiveCaseDocumentPayload) =>
+    request<AdmissionCase>(
+      `/admissions/cases/${admissionCaseId}/documents/waive`,
+      { method: "POST", json: payload },
+    ),
+  removeDocumentWaiver: (
+    admissionCaseId: string,
+    payload: WaiveCaseDocumentPayload,
+  ) =>
+    request<AdmissionCase>(
+      `/admissions/cases/${admissionCaseId}/documents/unwaive`,
+      { method: "POST", json: payload },
+    ),
   reviewCase: (admissionCaseId: string, payload: ReviewAdmissionCasePayload) =>
     request<AdmissionCase>(`/admissions/cases/${admissionCaseId}/review`, {
       method: "POST",
