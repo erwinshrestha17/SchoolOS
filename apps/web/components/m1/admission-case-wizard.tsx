@@ -29,7 +29,7 @@ const EMPTY_FORM: CreateAdmissionCasePayload = {
   classId: '',
   sectionId: '',
   source: 'OFFICE_WALK_IN',
-  transferStudent: false,
+  transferStudent: undefined,
   previousSchool: '',
   notes: '',
   admissionDate: new Date().toISOString().slice(0, 10),
