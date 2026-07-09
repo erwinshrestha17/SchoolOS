@@ -123,7 +123,7 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-slate-500">No additional fields required beyond the school's standard admission form.</p>
+              <p className="text-sm text-slate-500">No additional fields required beyond the school&apos;s standard admission form.</p>
             )}
             <p className="mt-3 text-sm text-slate-600">Section required: {version?.requireSection ? 'Yes' : 'No'}</p>
           </SectionCard>

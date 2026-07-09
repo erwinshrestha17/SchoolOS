@@ -38,6 +38,22 @@ describe('CsrfGuard', () => {
     ).toBe(true);
     expect(
       guard.canActivate(
+        createContext({
+          method: 'POST',
+          path: '/api/v1/auth/forgot-password',
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      guard.canActivate(
+        createContext({
+          method: 'POST',
+          path: '/api/v1/auth/reset-password',
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      guard.canActivate(
         createContext({ method: 'POST', path: '/api/v1/tenants/register' }),
       ),
     ).toBe(true);

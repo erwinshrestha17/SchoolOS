@@ -1,5 +1,5 @@
-import type { StudentProfile } from './student.js';
-import type { PromotionResult } from './common.js';
+import type { StudentProfile } from "./student.js";
+import type { PromotionResult } from "./common.js";
 
 export type AcademicYearSummary = {
   id: string;
@@ -29,6 +29,8 @@ export type SectionSummary = {
   };
   capacity: number | null;
   studentCount?: number;
+  isAssignedClassTeacher?: boolean;
+  isAssignedSubjectTeacher?: boolean;
 };
 
 export type SubjectSummary = {
@@ -68,7 +70,7 @@ export type ExamTermSummary = {
   startsOn: string;
   endsOn: string;
   weightPercent: number;
-  status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+  status: "DRAFT" | "ACTIVE" | "ARCHIVED";
   isLocked: boolean;
   academicYear?: {
     id: string;
@@ -115,21 +117,21 @@ export type MobileExamScheduleItem = {
   publishedAt: string;
 };
 
-export type AssessmentRetakeType = 'RETEST' | 'MAKE_UP';
+export type AssessmentRetakeType = "RETEST" | "MAKE_UP";
 
 export type AssessmentRetakeStatus =
-  | 'REQUESTED'
-  | 'APPROVED'
-  | 'REJECTED'
-  | 'SCHEDULED'
-  | 'COMPLETED'
-  | 'APPLIED'
-  | 'CANCELLED';
+  | "REQUESTED"
+  | "APPROVED"
+  | "REJECTED"
+  | "SCHEDULED"
+  | "COMPLETED"
+  | "APPLIED"
+  | "CANCELLED";
 
 export type AssessmentRetakeResultDecision =
-  | 'PENDING'
-  | 'KEEP_ORIGINAL'
-  | 'USE_RETAKE';
+  | "PENDING"
+  | "KEEP_ORIGINAL"
+  | "USE_RETAKE";
 
 export type AssessmentRetakeSummary = {
   id: string;
@@ -144,7 +146,7 @@ export type AssessmentRetakeSummary = {
   status: AssessmentRetakeStatus;
   reason: string;
   originalMarks: number;
-  originalStatus: MarkEntrySummary['status'];
+  originalStatus: MarkEntrySummary["status"];
   scheduledStartsAt: string | null;
   scheduledEndsAt: string | null;
   room: string | null;
@@ -222,14 +224,14 @@ export type MarkEntrySummary = {
   studentId: string;
   marksObtained: number;
   status:
-    | 'DRAFT'
-    | 'PRESENT'
-    | 'ABSENT'
-    | 'EXCUSED'
-    | 'MISSING'
-    | 'WITHHELD'
-    | 'SUBMITTED'
-    | 'RETEST';
+    | "DRAFT"
+    | "PRESENT"
+    | "ABSENT"
+    | "EXCUSED"
+    | "MISSING"
+    | "WITHHELD"
+    | "SUBMITTED"
+    | "RETEST";
   remarks: string | null;
   isLocked: boolean;
   student?: StudentProfile;
@@ -288,9 +290,9 @@ export type PromotionReadiness = {
   percentage: number;
   grade: string;
   gpa: number;
-  status: 'READY' | 'REVIEW' | 'BLOCKED';
+  status: "READY" | "REVIEW" | "BLOCKED";
   reasons: string[];
-  recommendedAction: 'PROMOTE' | 'REVIEW' | 'HOLD';
+  recommendedAction: "PROMOTE" | "REVIEW" | "HOLD";
   lifecycleStatus: string;
   outstandingBalance: number;
 };

@@ -37,6 +37,8 @@ export class CsrfGuard implements CanActivate {
     const publicPrefixes = [
       '/api/v1/auth/login',
       '/api/v1/auth/otp/',
+      '/api/v1/auth/forgot-password',
+      '/api/v1/auth/reset-password',
       '/api/v1/auth/password-recovery/',
       '/api/v1/tenants/register',
       '/api/v1/demo-requests',

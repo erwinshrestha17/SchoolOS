@@ -74,12 +74,24 @@ class _FakeAuthRepository extends Fake implements AuthRepository {
   _FakeAuthRepository(this._client);
 
   final ApiClient _client;
+  bool changePasswordCalled = false;
 
   @override
   ApiClient get client => _client;
 
   @override
   Future<void> logout({String? refreshToken, String? installationId}) async {}
+
+  @override
+  Future<String> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmNewPassword,
+    bool logoutOtherDevices = true,
+  }) async {
+    changePasswordCalled = true;
+    return 'Password changed successfully.';
+  }
 }
 
 class _TrackingCleanup extends PrivateDataCleanupService {
@@ -140,6 +152,44 @@ void main() {
       expect(preferences.getSelectedChildId(), isNull);
       expect(preferences.getCachedUser(), isNull);
       expect(preferences.getPrivateCache('learning_session'), isNull);
+    },
+  );
+
+  test(
+    'changePasswordAndLogout clears private cache after backend success',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'app_cached_user': '{"id":"staff-user"}',
+        'app_private_read_cache_parent_portal': '{"data":{}}',
+        'schoolos.teacher_attendance_draft.class-1.2026-06-18': '{}',
+      });
+      final preferences = AppPreferencesService(
+        await SharedPreferences.getInstance(),
+      );
+      final tokenStorage = _MemoryTokenStorage()..role = 'STAFF';
+      final cleanup = _TrackingCleanup(preferences);
+      final repository = _FakeAuthRepository(_FakeApiClient());
+      final notifier = _TestAuthNotifier(
+        tokenStorage,
+        repository,
+        preferences,
+        cleanup,
+      );
+
+      final message = await notifier.changePasswordAndLogout(
+        currentPassword: 'OldPass1!',
+        newPassword: 'BetterPass1!',
+        confirmNewPassword: 'BetterPass1!',
+      );
+
+      expect(message, 'Password changed successfully.');
+      expect(repository.changePasswordCalled, isTrue);
+      expect(cleanup.called, isTrue);
+      expect(await tokenStorage.getAccessToken(), isNull);
+      expect(await tokenStorage.getRefreshToken(), isNull);
+      expect(await tokenStorage.getUserRole(), isNull);
+      expect(preferences.getCachedUser(), isNull);
+      expect(preferences.getPrivateCache('parent_portal'), isNull);
     },
   );
 }

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -7,6 +8,7 @@ import { AuthMethod, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
+import { assertStrongPassword } from '../auth/password-policy';
 import { ConfigService } from '../config/config.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -53,6 +55,7 @@ export class UsersService {
   async createManagedUser(input: CreateManagedUserInput) {
     const email = requireProfileEmail(input.email);
     const phone = optionalNepalPhone(input.phone);
+    assertStrongPassword(input.password, [email]);
     await this.ensureEmailIsAvailable(input.tenantId, email);
 
     const roles = await this.prisma.role.findMany({
@@ -79,6 +82,7 @@ export class UsersService {
         email,
         phone,
         passwordHash,
+        mustChangePassword: input.mustChangePassword ?? true,
         authMethod: AuthMethod.PASSWORD,
         status: input.status ?? UserStatus.ACTIVE,
         userRoles: {
@@ -162,6 +166,17 @@ export class UsersService {
       throw new NotFoundException('User not found in this tenant');
     }
 
+    assertStrongPassword(dto.password, [user.email]);
+
+    if (
+      user.passwordHash &&
+      (await bcrypt.compare(dto.password, user.passwordHash))
+    ) {
+      throw new BadRequestException(
+        'New password cannot be the same as current password.',
+      );
+    }
+
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
@@ -169,6 +184,9 @@ export class UsersService {
           dto.password,
           this.configService.bcryptRounds,
         ),
+        mustChangePassword: dto.requireChangeOnNextLogin ?? true,
+        failedLoginCount: 0,
+        lockedUntil: null,
       },
     });
 
@@ -182,6 +200,7 @@ export class UsersService {
       resourceId: user.id,
       after: {
         passwordReset: true,
+        mustChangePassword: dto.requireChangeOnNextLogin ?? true,
       },
     });
 
@@ -301,6 +320,7 @@ export class UsersService {
       email: user.email,
       phone: user.phone,
       status: user.status,
+      mustChangePassword: user.mustChangePassword,
       roles: user.userRoles.map(({ role }) => ({
         id: role.id,
         name: role.name,
@@ -322,6 +342,7 @@ interface CreateManagedUserInput {
   roleIds: string[];
   assignedById?: string | null;
   status?: UserStatus;
+  mustChangePassword?: boolean;
 }
 
 interface UserWithRelations {
@@ -329,6 +350,7 @@ interface UserWithRelations {
   email: string | null;
   phone: string | null;
   status: UserStatus;
+  mustChangePassword: boolean;
   lastLoginAt: Date | null;
   createdAt: Date;
   userRoles: Array<{

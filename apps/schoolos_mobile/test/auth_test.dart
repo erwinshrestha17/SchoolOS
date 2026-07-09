@@ -62,6 +62,7 @@ void main() {
             'email': 'test@school.edu',
             'roles': ['teacher'],
             'permissions': ['attendance:read'],
+            'mustChangePassword': true,
           },
         },
       );
@@ -87,6 +88,7 @@ void main() {
       expect(result.user.role, 'TEACHER');
       expect(result.user.tenantSlug, 'test');
       expect(result.user.permissions, contains('attendance:read'));
+      expect(result.user.mustChangePassword, isTrue);
       final loginPayload =
           verify(
                 () => mockApiClient.post<dynamic>(
@@ -189,6 +191,46 @@ void main() {
       expect(user.role, 'PRINCIPAL');
       expect(user.tenantId, 'tenant-1');
       expect(user.tenantSlug, 'default-school');
+    });
+
+    test('changePassword posts authenticated password payload', () async {
+      final mockResponse = Response(
+        requestOptions: RequestOptions(path: '/auth/change-password'),
+        statusCode: 200,
+        data: {
+          'message':
+              'Password changed successfully. For your security, other sessions have been signed out.',
+        },
+      );
+
+      when(
+        () => mockApiClient.post<dynamic>(
+          '/auth/change-password',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer((_) async => mockResponse);
+
+      final message = await repository.changePassword(
+        currentPassword: 'OldPass1!',
+        newPassword: 'BetterPass1!',
+        confirmNewPassword: 'BetterPass1!',
+      );
+
+      expect(message, contains('Password changed successfully'));
+      final payload =
+          verify(
+                () => mockApiClient.post<dynamic>(
+                  '/auth/change-password',
+                  data: captureAny(named: 'data'),
+                ),
+              ).captured.single
+              as Map<String, dynamic>;
+      expect(payload, {
+        'currentPassword': 'OldPass1!',
+        'newPassword': 'BetterPass1!',
+        'confirmNewPassword': 'BetterPass1!',
+        'logoutOtherDevices': true,
+      });
     });
 
     test('refreshToken returns TokenPair on successful HTTP request', () async {

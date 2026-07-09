@@ -30,6 +30,17 @@ SCHOOLOS_E2E_PLATFORM_PASSWORD=<seeded-platform-password> \
 pnpm test:web:e2e
 ```
 
+Account & Security password-change smoke uses the school admin credentials for
+non-mutating checks. The full reset/force-change/success flow mutates a
+dedicated test account only when these values are supplied:
+
+```bash
+SCHOOLOS_E2E_PASSWORD_TEST_EMAIL=<dedicated-test-user-email> \
+SCHOOLOS_E2E_PASSWORD_TEST_TEMP=<temporary-password> \
+SCHOOLOS_E2E_PASSWORD_TEST_FINAL=<final-password> \
+pnpm test:web:e2e
+```
+
 ## Persona smoke expectations
 
 Every persona smoke should prove that the user:

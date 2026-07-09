@@ -85,6 +85,28 @@ class ProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.lg),
 
+          Text(
+            'Security',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: AppColors.slate500,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              leading: const Icon(Icons.lock_reset_rounded),
+              title: const Text('Change Password'),
+              subtitle: const Text(
+                'Update this account password through SchoolOS Auth/Security.',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => context.go(AppRoutes.changePassword),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+
           // Detail Section Card
           AppCard(
             padding: EdgeInsets.zero,

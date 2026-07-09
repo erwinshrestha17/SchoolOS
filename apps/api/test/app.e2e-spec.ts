@@ -117,7 +117,7 @@ describe('School OS Auth + RBAC integration', () => {
       name: 'Green Valley School',
       slug: 'green-valley',
       adminEmail: 'admin@greenvalley.com',
-      adminPassword: 'admin12345',
+      adminPassword: 'RootAccess1!',
     });
 
     expect(registration.tenant.slug).toBe('green-valley');
@@ -128,7 +128,7 @@ describe('School OS Auth + RBAC integration', () => {
         {
           tenantSlug: 'green-valley',
           email: 'admin@greenvalley.com',
-          password: 'admin12345',
+          password: 'RootAccess1!',
         },
         adminResponse as unknown as Response,
         createRequestMock() as unknown as AuthenticatedRequest,
@@ -186,7 +186,7 @@ describe('School OS Auth + RBAC integration', () => {
         joiningDate: '2024-01-01',
         contractType: 'PERMANENT',
         email: 'teacher@greenvalley.com',
-        password: 'teacher12345',
+        password: 'StaffAccess1!',
         roleIds: [teacherRole.id as string],
       },
       adminRequest.auth as unknown as AuthContext,
@@ -200,7 +200,7 @@ describe('School OS Auth + RBAC integration', () => {
         {
           tenantSlug: 'green-valley',
           email: 'teacher@greenvalley.com',
-          password: 'teacher12345',
+          password: 'StaffAccess1!',
         },
         teacherResponse as unknown as Response,
         createRequestMock() as unknown as AuthenticatedRequest,
@@ -240,7 +240,7 @@ describe('School OS Auth + RBAC integration', () => {
         {
           tenantSlug: 'green-valley',
           email: 'teacher@greenvalley.com',
-          password: 'teacher12345',
+          password: 'StaffAccess1!',
         },
         createResponseMock() as unknown as Response,
         createRequestMock() as unknown as AuthenticatedRequest,
@@ -288,7 +288,7 @@ describe('School OS Auth + RBAC integration', () => {
         classId: createdClass.id,
         createLogin: true,
         email: 'student@greenvalley.com',
-        password: 'student12345',
+        password: 'LearnerAccess1!',
       },
       adminRequest.auth as unknown as AuthContext,
     );
@@ -301,7 +301,7 @@ describe('School OS Auth + RBAC integration', () => {
         {
           tenantSlug: 'green-valley',
           email: 'student@greenvalley.com',
-          password: 'student12345',
+          password: 'LearnerAccess1!',
         },
         studentResponse as unknown as Response,
         createRequestMock() as unknown as AuthenticatedRequest,
@@ -346,7 +346,7 @@ describe('School OS Auth + RBAC integration', () => {
         {
           tenantSlug: 'green-valley',
           email: 'student@greenvalley.com',
-          password: 'student12345',
+          password: 'LearnerAccess1!',
         },
         createResponseMock() as unknown as Response,
         createRequestMock() as unknown as AuthenticatedRequest,
@@ -397,7 +397,7 @@ describe('School OS Auth + RBAC integration', () => {
         {
           tenantSlug: 'green-valley',
           email: 'teacher@greenvalley.com',
-          password: 'teacher12345',
+          password: 'StaffAccess1!',
         },
         createResponseMock() as unknown as Response,
         createRequestMock() as unknown as AuthenticatedRequest,
@@ -427,7 +427,8 @@ describe('School OS Auth + RBAC integration', () => {
       tenantSlug: 'green-valley',
       email: 'teacher@greenvalley.com',
       code: teacherRecoveryCode,
-      newPassword: 'teacher99999',
+      newPassword: 'BetterRecovery1!',
+      confirmNewPassword: 'BetterRecovery1!',
     });
     expect(recoveryConfirmation).toEqual({ success: true });
 
@@ -436,7 +437,7 @@ describe('School OS Auth + RBAC integration', () => {
         {
           tenantSlug: 'green-valley',
           email: 'teacher@greenvalley.com',
-          password: 'teacher12345',
+          password: 'StaffAccess1!',
         },
         createResponseMock() as unknown as Response,
         createRequestMock() as unknown as AuthenticatedRequest,
@@ -448,7 +449,7 @@ describe('School OS Auth + RBAC integration', () => {
         {
           tenantSlug: 'green-valley',
           email: 'teacher@greenvalley.com',
-          password: 'teacher99999',
+          password: 'BetterRecovery1!',
         },
         createResponseMock() as unknown as Response,
         createRequestMock() as unknown as AuthenticatedRequest,
@@ -465,7 +466,7 @@ describe('School OS Auth + RBAC integration', () => {
       name: 'Blue Ridge School',
       slug: 'blue-ridge',
       adminEmail: 'admin@blueridge.com',
-      adminPassword: 'admin12345',
+      adminPassword: 'RootAccess1!',
     });
 
     const secondTenantResponse = createResponseMock();
@@ -474,7 +475,7 @@ describe('School OS Auth + RBAC integration', () => {
         {
           tenantSlug: 'blue-ridge',
           email: 'admin@blueridge.com',
-          password: 'admin12345',
+          password: 'RootAccess1!',
         },
         secondTenantResponse as unknown as Response,
         createRequestMock() as unknown as AuthenticatedRequest,

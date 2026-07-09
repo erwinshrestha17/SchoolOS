@@ -171,6 +171,37 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<String> changePasswordAndLogout({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmNewPassword,
+    bool logoutOtherDevices = true,
+  }) async {
+    state = state.copyWith(status: AuthStatus.loading);
+    try {
+      final message = await _authRepository.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+        confirmNewPassword: confirmNewPassword,
+        logoutOtherDevices: logoutOtherDevices,
+      );
+      await logout();
+      return message;
+    } catch (_) {
+      final token = await _tokenStorage.getAccessToken();
+      final role = await _tokenStorage.getUserRole();
+      state = token != null && role != null
+          ? AuthState(
+              status: AuthStatus.authenticated,
+              role: role,
+              token: token,
+              user: state.user,
+            )
+          : AuthState(status: AuthStatus.unauthenticated);
+      rethrow;
+    }
+  }
+
   /// Gracefully sign out
   Future<void> logout() async {
     state = state.copyWith(status: AuthStatus.loading);

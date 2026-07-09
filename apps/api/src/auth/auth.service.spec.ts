@@ -19,6 +19,7 @@ describe('AuthService', () => {
     email: 'admin@school.com',
     passwordHash: '',
     authMethod: AuthMethod.PASSWORD,
+    mustChangePassword: false,
     status: UserStatus.ACTIVE,
     userRoles: [
       {
@@ -268,7 +269,8 @@ describe('AuthService', () => {
       tenantSlug: 'school-a',
       email: authUser.email,
       code: '123456',
-      newPassword: 'newpassword123',
+      newPassword: 'Newpassword123!',
+      confirmNewPassword: 'Newpassword123!',
     });
 
     expect(result).toEqual({ success: true });
@@ -289,6 +291,172 @@ describe('AuthService', () => {
         revokedAt: expect.any(Date),
       },
     });
+  });
+
+  it('changes password with correct current password and revokes other sessions', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 'tenant-1',
+      slug: 'school-a',
+      name: 'School A',
+      isActive: true,
+    });
+    prisma.user.findFirst.mockResolvedValue(authUser);
+    prisma.user.findUnique.mockResolvedValue(authUser);
+    prisma.refreshToken.findFirst.mockResolvedValue({ id: 'session-current' });
+    prisma.user.update.mockResolvedValue({});
+    prisma.refreshToken.updateMany.mockResolvedValue({ count: 2 });
+
+    const result = await service.changePassword(
+      {
+        userId: authUser.id,
+        tenantId: authUser.tenantId,
+        tenantSlug: 'school-a',
+        email: authUser.email,
+        authMethod: AuthMethod.PASSWORD,
+        mustChangePassword: false,
+        roles: ['admin'],
+        permissions: [],
+      },
+      {
+        currentPassword: 'password123',
+        newPassword: 'BetterPassword1!',
+        confirmNewPassword: 'BetterPassword1!',
+        logoutOtherDevices: true,
+      },
+      response,
+      'refresh_token=refresh-token',
+    );
+
+    expect(result).toEqual({
+      success: true,
+      message:
+        'Password changed successfully. For your security, other sessions have been signed out.',
+    });
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: authUser.id },
+        data: expect.objectContaining({
+          passwordHash: expect.any(String),
+          mustChangePassword: false,
+        }),
+      }),
+    );
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: authUser.id,
+        revokedAt: null,
+        id: { not: 'session-current' },
+      },
+      data: {
+        revokedAt: expect.any(Date),
+        revokedReason: 'password_change',
+      },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'change_password',
+        tenantId: 'tenant-1',
+        userId: authUser.id,
+      }),
+    );
+  });
+
+  it('rejects wrong current password during change password', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 'tenant-1',
+      slug: 'school-a',
+      name: 'School A',
+      isActive: true,
+    });
+    prisma.user.findFirst.mockResolvedValue(authUser);
+
+    await expect(
+      service.changePassword(
+        {
+          userId: authUser.id,
+          tenantId: authUser.tenantId,
+          tenantSlug: 'school-a',
+          email: authUser.email,
+          authMethod: AuthMethod.PASSWORD,
+          mustChangePassword: false,
+          roles: ['admin'],
+          permissions: [],
+        },
+        {
+          currentPassword: 'wrong-password',
+          newPassword: 'BetterPassword1!',
+          confirmNewPassword: 'BetterPassword1!',
+          logoutOtherDevices: true,
+        },
+        response,
+      ),
+    ).rejects.toThrow('Current password is incorrect.');
+  });
+
+  it('rejects weak password during change password', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 'tenant-1',
+      slug: 'school-a',
+      name: 'School A',
+      isActive: true,
+    });
+    prisma.user.findFirst.mockResolvedValue(authUser);
+
+    await expect(
+      service.changePassword(
+        {
+          userId: authUser.id,
+          tenantId: authUser.tenantId,
+          tenantSlug: 'school-a',
+          email: authUser.email,
+          authMethod: AuthMethod.PASSWORD,
+          mustChangePassword: false,
+          roles: ['admin'],
+          permissions: [],
+        },
+        {
+          currentPassword: 'password123',
+          newPassword: 'password123',
+          confirmNewPassword: 'password123',
+          logoutOtherDevices: true,
+        },
+        response,
+      ),
+    ).rejects.toThrow('New password cannot be the same as current password.');
+  });
+
+  it('keeps other sessions when logoutOtherDevices is false', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 'tenant-1',
+      slug: 'school-a',
+      name: 'School A',
+      isActive: true,
+    });
+    prisma.user.findFirst.mockResolvedValue(authUser);
+    prisma.user.findUnique.mockResolvedValue(authUser);
+    prisma.user.update.mockResolvedValue({});
+
+    await service.changePassword(
+      {
+        userId: authUser.id,
+        tenantId: authUser.tenantId,
+        tenantSlug: 'school-a',
+        email: authUser.email,
+        authMethod: AuthMethod.PASSWORD,
+        mustChangePassword: false,
+        roles: ['admin'],
+        permissions: [],
+      },
+      {
+        currentPassword: 'password123',
+        newPassword: 'BetterPassword1!',
+        confirmNewPassword: 'BetterPassword1!',
+        logoutOtherDevices: false,
+      },
+      response,
+    );
+
+    expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
   });
 
   it('rotates refresh tokens on refresh', async () => {

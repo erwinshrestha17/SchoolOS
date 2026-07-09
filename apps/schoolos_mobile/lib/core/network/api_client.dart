@@ -259,7 +259,7 @@ class ApiClient {
                 ? data['errors'] as Map<String, dynamic>
                 : {};
             return ValidationException(
-              message: 'Please check the information entered and try again.',
+              message: _safeClientErrorMessage(backendMessage),
               code: errorCode,
               errors: errors,
             );
@@ -291,4 +291,29 @@ class ApiClient {
         );
     }
   }
+}
+
+String _safeClientErrorMessage(String message) {
+  final trimmed = message.trim();
+  if (trimmed.isEmpty) {
+    return 'Please check the information entered and try again.';
+  }
+
+  final unsafePatterns = [
+    'bcrypt',
+    'prisma',
+    'stack',
+    'token hash',
+    'database',
+    'sql',
+    'exception',
+    'undefined',
+    'null',
+  ];
+  final normalized = trimmed.toLowerCase();
+  if (unsafePatterns.any(normalized.contains)) {
+    return 'Please check the information entered and try again.';
+  }
+
+  return trimmed;
 }

@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import type { AuthSession, PermissionKey } from '@schoolos/core';
+import type { AuthSession, PermissionKey } from "@schoolos/core";
 import {
   createContext,
   PropsWithChildren,
   useContext,
   useEffect,
   useState,
-} from 'react';
-import { api, type AuthProfile } from '../lib/api';
+} from "react";
+import { api, type AuthProfile } from "../lib/api";
 import {
   type BrowserSession,
   clearStoredSession,
@@ -17,9 +17,9 @@ import {
   SESSION_CLEARED_EVENT,
   storeSession,
   toBrowserSession,
-} from '../lib/session';
+} from "../lib/session";
 
-type SessionStatus = 'loading' | 'authenticated' | 'anonymous';
+type SessionStatus = "loading" | "authenticated" | "anonymous";
 
 type SessionContextValue = {
   session: BrowserSession | null;
@@ -46,6 +46,7 @@ function browserSessionFromProfile(
       tenantSlug: profile.tenantSlug,
       email: profile.email,
       authMethod: profile.authMethod,
+      mustChangePassword: profile.mustChangePassword,
       roles: profile.roles,
       permissions: profile.permissions,
     },
@@ -55,12 +56,12 @@ function browserSessionFromProfile(
 
 export function SessionProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<BrowserSession | null>(null);
-  const [status, setStatus] = useState<SessionStatus>('loading');
+  const [status, setStatus] = useState<SessionStatus>("loading");
 
   useEffect(() => {
     function handleSessionCleared() {
       setSession(null);
-      setStatus('anonymous');
+      setStatus("anonymous");
     }
 
     window.addEventListener(SESSION_CLEARED_EVENT, handleSessionCleared);
@@ -72,7 +73,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       // Keep the UI in loading while the cookie-backed session is verified.
       // Local storage is only a browser display cache and must not be trusted
       // as proof that the httpOnly access/refresh cookies still exist.
-      setStatus('loading');
+      setStatus("loading");
     }
 
     let cancelled = false;
@@ -92,7 +93,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
           );
           storeSession(browserSession);
           setSession(browserSession);
-          setStatus('authenticated');
+          setStatus("authenticated");
           return;
         }
 
@@ -101,7 +102,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
         }
 
         setSession(null);
-        setStatus('anonymous');
+        setStatus("anonymous");
       } catch {
         if (cancelled) {
           return;
@@ -109,7 +110,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
         clearStoredSession();
         setSession(null);
-        setStatus('anonymous');
+        setStatus("anonymous");
       }
     }
 
@@ -122,19 +123,21 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, []);
 
   async function refreshSession() {
-    setStatus('loading');
+    if (!session) {
+      setStatus("loading");
+    }
 
     try {
       const refreshedSession = await api.refreshSession();
       const browserSession = toBrowserSession(refreshedSession);
       storeSession(browserSession);
       setSession(browserSession);
-      setStatus('authenticated');
+      setStatus("authenticated");
       return browserSession;
     } catch {
       clearStoredSession();
       setSession(null);
-      setStatus('anonymous');
+      setStatus("anonymous");
       return null;
     }
   }
@@ -145,7 +148,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     } finally {
       clearStoredSession();
       setSession(null);
-      setStatus('anonymous');
+      setStatus("anonymous");
     }
   }
 
@@ -153,7 +156,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     const browserSession = toBrowserSession(nextSession);
     storeSession(browserSession);
     setSession(browserSession);
-    setStatus('authenticated');
+    setStatus("authenticated");
   }
 
   function hasPermissions(permissions: PermissionKey[]) {
@@ -180,7 +183,7 @@ export function useSession() {
   const context = useContext(SessionContext);
 
   if (!context) {
-    throw new Error('useSession must be used within a SessionProvider');
+    throw new Error("useSession must be used within a SessionProvider");
   }
 
   return context;

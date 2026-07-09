@@ -15,6 +15,7 @@ import { CurrentAuth } from './decorators/current-auth.decorator';
 import { AuthService } from './auth.service';
 import type { AuthenticatedRequest } from './auth-request.interface';
 import type { AuthContext } from './auth.types';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { ConfirmMfaSetupDto } from './dto/confirm-mfa-setup.dto';
 import { ConfirmPasswordRecoveryDto } from './dto/confirm-password-recovery.dto';
 import { LoginDto } from './dto/login.dto';
@@ -87,6 +88,17 @@ export class AuthController {
     return this.authService.requestPasswordRecovery(dto);
   }
 
+  @Post('forgot-password')
+  @Throttle({
+    default: {
+      limit: AUTH_RATE_LIMIT,
+      ttl: AUTH_RATE_TTL_MS,
+    },
+  })
+  forgotPassword(@Body() dto: RequestPasswordRecoveryDto) {
+    return this.authService.requestPasswordRecovery(dto);
+  }
+
   @Post('password-recovery/confirm')
   @Throttle({
     default: {
@@ -95,6 +107,17 @@ export class AuthController {
     },
   })
   confirmPasswordRecovery(@Body() dto: ConfirmPasswordRecoveryDto) {
+    return this.authService.confirmPasswordRecovery(dto);
+  }
+
+  @Post('reset-password')
+  @Throttle({
+    default: {
+      limit: AUTH_RATE_LIMIT,
+      ttl: AUTH_RATE_TTL_MS,
+    },
+  })
+  resetPassword(@Body() dto: ConfirmPasswordRecoveryDto) {
     return this.authService.confirmPasswordRecovery(dto);
   }
 
@@ -136,6 +159,28 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@CurrentAuth() auth: AuthContext) {
     return this.authService.getProfile(auth);
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @Throttle({
+    default: {
+      limit: AUTH_RATE_LIMIT,
+      ttl: AUTH_RATE_TTL_MS,
+    },
+  })
+  changePassword(
+    @CurrentAuth() auth: AuthContext,
+    @Body() dto: ChangePasswordDto,
+    @Res({ passthrough: true }) response: Response,
+    @Headers('cookie') cookieHeader?: string,
+    @Req() request?: AuthenticatedRequest,
+  ) {
+    return this.authService.changePassword(auth, dto, response, cookieHeader, {
+      ipAddress: request?.ip,
+      userAgent: request?.headers['user-agent'],
+      requestId: request?.requestId,
+    });
   }
 
   @Post('mfa/setup/request')

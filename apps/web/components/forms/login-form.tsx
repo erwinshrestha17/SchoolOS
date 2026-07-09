@@ -41,15 +41,21 @@ export function LoginForm() {
         const isPlatformUser = result.user.roles.some((role) =>
           PLATFORM_ROLES.includes(role),
         );
-        const defaultRedirect = isPlatformUser
-          ? "/platform/dashboard"
-          : "/dashboard";
+        const defaultRedirect = result.user.mustChangePassword
+          ? isPlatformUser
+            ? "/platform/account-security"
+            : "/dashboard/account-security"
+          : isPlatformUser
+            ? "/platform/dashboard"
+            : "/dashboard";
         const requestedRedirect = searchParams.get("next");
-        const safeRedirect = resolvePostLoginRedirect(
-          requestedRedirect,
-          defaultRedirect,
-          isPlatformUser,
-        );
+        const safeRedirect = result.user.mustChangePassword
+          ? defaultRedirect
+          : resolvePostLoginRedirect(
+              requestedRedirect,
+              defaultRedirect,
+              isPlatformUser,
+            );
 
         setChallengeMessage(null);
         setAuthenticatedSession(result);
@@ -136,17 +142,26 @@ export function LoginForm() {
       </button>
 
       {mutation.isError ? (
-        <p className="text-sm text-[var(--danger)]">
-          {mutation.error.message}
-        </p>
+        <p className="text-sm text-[var(--danger)]">{mutation.error.message}</p>
       ) : null}
+
+      <div className="text-right">
+        <a
+          href="/forgot-password"
+          className="text-sm font-bold text-[var(--primary)] hover:text-[var(--primary-dark)]"
+        >
+          Forgot password?
+        </a>
+      </div>
 
       {challengeMessage ? (
         <p className="text-sm text-[var(--primary)]">{challengeMessage}</p>
       ) : null}
 
       {mutation.isSuccess && !challengeMessage ? (
-        <p className="text-sm text-[var(--success)]">Login request completed.</p>
+        <p className="text-sm text-[var(--success)]">
+          Login request completed.
+        </p>
       ) : null}
     </form>
   );

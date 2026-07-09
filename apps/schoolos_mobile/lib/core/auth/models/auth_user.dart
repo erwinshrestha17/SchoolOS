@@ -11,6 +11,7 @@ class AuthUser {
     this.roles = const [],
     this.permissions = const [],
     this.avatarUrl,
+    this.mustChangePassword = false,
   });
 
   final String id;
@@ -22,6 +23,7 @@ class AuthUser {
   final List<String> roles;
   final List<String> permissions;
   final String? avatarUrl;
+  final bool mustChangePassword;
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
     final roles = (json['roles'] as List<dynamic>? ?? const [])
@@ -80,6 +82,7 @@ class AuthUser {
       roles: roles,
       permissions: permissions,
       avatarUrl: json['avatarUrl'] as String? ?? json['avatar_url'] as String?,
+      mustChangePassword: json['mustChangePassword'] as bool? ?? false,
     );
   }
 
@@ -94,6 +97,7 @@ class AuthUser {
       'roles': roles,
       'permissions': permissions,
       'avatarUrl': avatarUrl,
+      'mustChangePassword': mustChangePassword,
     };
   }
 }

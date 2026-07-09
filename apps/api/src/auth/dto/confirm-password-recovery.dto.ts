@@ -13,4 +13,8 @@ export class ConfirmPasswordRecoveryDto {
   @IsString()
   @MinLength(8)
   newPassword!: string;
+
+  @IsString()
+  @MinLength(8)
+  confirmNewPassword!: string;
 }

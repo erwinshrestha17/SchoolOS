@@ -38,6 +38,7 @@ import '../features/parent/presentation/screens/parent_report_cards_screen.dart'
 import '../features/parent/presentation/screens/parent_timetable_screen.dart';
 import '../features/parent/presentation/screens/parent_transport_screen.dart';
 import '../features/principal/presentation/screens/principal_screens.dart';
+import '../features/profile/presentation/change_password_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/splash/splash_screen.dart';
@@ -75,6 +76,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.profile,
         builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.changePassword,
+        builder: (context, state) => const ChangePasswordScreen(),
       ),
       GoRoute(
         path: AppRoutes.settings,
@@ -438,6 +443,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
         // Role-based route guard
         final location = state.matchedLocation;
+        if (auth.user?.mustChangePassword == true &&
+            location != AppRoutes.changePassword) {
+          return AppRoutes.changePassword;
+        }
+
         final role = MobileRole.normalize(
           auth.role,
           roles: auth.user?.roles ?? const [],

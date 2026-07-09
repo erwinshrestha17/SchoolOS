@@ -21,7 +21,7 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: `pnpm build && pnpm exec next start --hostname localhost --port ${port}`,
+    command: `node_modules/.bin/next build && node_modules/.bin/next start --hostname localhost --port ${port}`,
     url: baseURL,
     reuseExistingServer: false,
     timeout: 120_000,

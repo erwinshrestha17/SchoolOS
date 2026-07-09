@@ -14,7 +14,12 @@ describe('UsersService', () => {
     prisma = {
       user: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
+      },
+      refreshToken: {
+        updateMany: jest.fn(),
       },
       role: {
         findMany: jest.fn(),
@@ -55,7 +60,7 @@ describe('UsersService', () => {
     const result = await service.createUser(
       {
         email: 'teacher@school.com',
-        password: 'password123',
+        password: 'StrongPass1!',
         roleIds: ['role-1', 'role-2'],
       },
       actor,
@@ -81,7 +86,7 @@ describe('UsersService', () => {
       service.createUser(
         {
           email: 'teacher@school.com',
-          password: 'password123',
+          password: 'StrongPass1!',
           roleIds: ['role-1'],
         },
         actor,
@@ -103,7 +108,7 @@ describe('UsersService', () => {
     await service.createUser(
       {
         email: 'shared@school.com',
-        password: 'password123',
+        password: 'StrongPass1!',
         roleIds: ['role-1'],
       },
       actor,
@@ -127,11 +132,79 @@ describe('UsersService', () => {
       service.createUser(
         {
           email: 'teacher@school.com',
-          password: 'password123',
+          password: 'StrongPass1!',
           roleIds: ['missing-role'],
         },
         actor,
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('resets password inside the actor tenant and requires change on next login', async () => {
+    prisma.user.findFirst.mockResolvedValue({
+      id: 'user-2',
+      tenantId: 'tenant-1',
+      email: 'teacher@school.com',
+      passwordHash: await bcryptHashForTest('OldPass1!'),
+    });
+    prisma.user.update.mockResolvedValue({});
+    prisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.resetPassword(
+      'user-2',
+      { password: 'NewStrongPass1!' },
+      actor,
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(prisma.user.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'user-2',
+        tenantId: 'tenant-1',
+      },
+    });
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'user-2' },
+        data: expect.objectContaining({
+          passwordHash: expect.any(String),
+          mustChangePassword: true,
+        }),
+      }),
+    );
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-2',
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: expect.any(Date),
+      },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'reset_password',
+        tenantId: 'tenant-1',
+        userId: 'admin-1',
+        resourceId: 'user-2',
+      }),
+    );
+  });
+
+  it('does not reset a cross-tenant user password', async () => {
+    prisma.user.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.resetPassword(
+        'user-cross-tenant',
+        { password: 'NewStrongPass1!' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
 });
+
+async function bcryptHashForTest(password: string) {
+  const bcrypt = await import('bcrypt');
+  return bcrypt.hash(password, 4);
+}

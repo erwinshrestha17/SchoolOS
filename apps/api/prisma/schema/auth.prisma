@@ -5,6 +5,7 @@ model User {
   email            String?
   phone            String?
   passwordHash     String?
+  mustChangePassword Boolean @default(false)
   authMethod       AuthMethod  @default(PASSWORD)
   status           UserStatus  @default(PENDING)
   lastLoginAt      DateTime?

@@ -1,5 +1,5 @@
-import type { PermissionKey } from '../permissions.js';
-import type { TenantSummary } from './common.js';
+import type { PermissionKey } from "../permissions.js";
+import type { TenantSummary } from "./common.js";
 
 export type AuthSessionUser = {
   id: string;
@@ -9,6 +9,7 @@ export type AuthSessionUser = {
   tenantSlug: string;
   email: string | null;
   authMethod: string;
+  mustChangePassword: boolean;
   roles: string[];
   permissions: PermissionKey[];
 };

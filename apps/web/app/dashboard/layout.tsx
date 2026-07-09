@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import type { PermissionKey } from '@schoolos/core';
-import { ReactNode } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { useSession } from '../../components/session-provider';
-import { useEntitlements } from '../../components/entitlements-provider';
-import { DashboardShell } from '../../components/layout/dashboard-shell';
-import { UpgradePrompt } from '../../components/layout/upgrade-prompt';
-import { PermissionDenied } from '../../components/ui/permission-denied';
+import type { PermissionKey } from "@schoolos/core";
+import { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useSession } from "../../components/session-provider";
+import { useEntitlements } from "../../components/entitlements-provider";
+import { DashboardShell } from "../../components/layout/dashboard-shell";
+import { UpgradePrompt } from "../../components/layout/upgrade-prompt";
+import { PermissionDenied } from "../../components/ui/permission-denied";
 
 type RouteGate = {
   prefix: string;
@@ -18,191 +18,187 @@ type RouteGate = {
 
 const dashboardRouteGates: RouteGate[] = [
   {
-    prefix: '/dashboard/students',
-    label: 'Students',
-    permissions: ['students:read', 'students:create'],
+    prefix: "/dashboard/students",
+    label: "Students",
+    permissions: ["students:read", "students:create"],
   },
   {
-    prefix: '/dashboard/admissions',
-    label: 'Admissions',
-    permissions: ['students:read', 'students:create'],
+    prefix: "/dashboard/admissions",
+    label: "Admissions",
+    permissions: ["students:read", "students:create"],
   },
   {
-    prefix: '/dashboard/attendance',
-    label: 'Attendance',
-    permissions: ['attendance:read', 'attendance:mark'],
+    prefix: "/dashboard/attendance",
+    label: "Attendance",
+    permissions: ["attendance:read", "attendance:mark"],
   },
   {
-    prefix: '/dashboard/academics',
-    label: 'Academics',
-    permissions: ['academics:read', 'academics:manage'],
+    prefix: "/dashboard/academics",
+    label: "Academics",
+    permissions: ["academics:read", "academics:manage"],
   },
   {
-    prefix: '/dashboard/homework',
-    label: 'Homework',
-    permissions: ['homework:read'],
+    prefix: "/dashboard/homework",
+    label: "Homework",
+    permissions: ["homework:read"],
   },
   {
-    prefix: '/dashboard/learning',
-    label: 'Learning',
+    prefix: "/dashboard/learning",
+    label: "Learning",
     permissions: [
-      'learning:read',
-      'learning:create',
-      'learning:update',
-      'learning:launch',
-      'learning:progress',
+      "learning:read",
+      "learning:create",
+      "learning:update",
+      "learning:launch",
+      "learning:progress",
     ],
   },
   {
-    prefix: '/dashboard/timetable',
-    label: 'Timetable',
-    permissions: ['timetable:read'],
+    prefix: "/dashboard/timetable",
+    label: "Timetable",
+    permissions: ["timetable:read"],
   },
   {
-    prefix: '/dashboard/fees',
-    label: 'Fees',
+    prefix: "/dashboard/fees",
+    label: "Fees",
     permissions: [
-      'fees:manage',
-      'fees:bill',
-      'payments:collect',
-      'receipts:read',
+      "fees:manage",
+      "fees:bill",
+      "payments:collect",
+      "receipts:read",
     ],
   },
   {
-    prefix: '/dashboard/finance',
-    label: 'Finance',
+    prefix: "/dashboard/finance",
+    label: "Finance",
     permissions: [
-      'fees:manage',
-      'fees:bill',
-      'payments:collect',
-      'receipts:read',
+      "fees:manage",
+      "fees:bill",
+      "payments:collect",
+      "receipts:read",
     ],
   },
   {
-    prefix: '/dashboard/activity',
-    label: 'Activity Feed',
-    permissions: ['activity_feed:read', 'activity_feed:create'],
+    prefix: "/dashboard/activity",
+    label: "Activity Feed",
+    permissions: ["activity_feed:read", "activity_feed:create"],
   },
   {
-    prefix: '/dashboard/communications',
-    label: 'Communications',
+    prefix: "/dashboard/communications",
+    label: "Communications",
     permissions: [
-      'notices:read',
-      'notices:create',
-      'messaging:create',
-      'messaging:manage',
+      "notices:read",
+      "notices:create",
+      "messaging:create",
+      "messaging:manage",
     ],
   },
   {
-    prefix: '/dashboard/notices',
-    label: 'Notices',
-    permissions: ['notices:read', 'notices:create'],
+    prefix: "/dashboard/notices",
+    label: "Notices",
+    permissions: ["notices:read", "notices:create"],
   },
   {
-    prefix: '/dashboard/messages',
-    label: 'Messages',
-    permissions: ['notices:read', 'messaging:create'],
+    prefix: "/dashboard/messages",
+    label: "Messages",
+    permissions: ["notices:read", "messaging:create"],
   },
   {
-    prefix: '/dashboard/messaging',
-    label: 'Messaging',
-    permissions: ['notices:read', 'messaging:create'],
+    prefix: "/dashboard/messaging",
+    label: "Messaging",
+    permissions: ["notices:read", "messaging:create"],
   },
   {
-    prefix: '/dashboard/hr',
-    label: 'HR',
-    permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
+    prefix: "/dashboard/hr",
+    label: "HR",
+    permissions: ["hr:read", "payroll:read", "payroll:manage"],
   },
   {
-    prefix: '/dashboard/payroll',
-    label: 'Payroll',
-    permissions: ['payroll:read', 'payroll:manage'],
+    prefix: "/dashboard/payroll",
+    label: "Payroll",
+    permissions: ["payroll:read", "payroll:manage"],
   },
   {
-    prefix: '/dashboard/accounting',
-    label: 'Accounting',
+    prefix: "/dashboard/accounting",
+    label: "Accounting",
     permissions: [
-      'accounting:read',
-      'accounting:accounts:read',
-      'accounting:reports:read',
+      "accounting:read",
+      "accounting:accounts:read",
+      "accounting:reports:read",
     ],
   },
   {
-    prefix: '/dashboard/operations',
-    label: 'School Operations',
+    prefix: "/dashboard/operations",
+    label: "School Operations",
     permissions: [
-      'library:read',
-      'library:manage',
-      'transport:read',
-      'transport:manage',
-      'transport:operate',
-      'canteen:menu:read',
-      'canteen:plans:read',
-      'canteen:enrollments:read',
+      "library:read",
+      "library:manage",
+      "transport:read",
+      "transport:manage",
+      "transport:operate",
+      "canteen:menu:read",
+      "canteen:plans:read",
+      "canteen:enrollments:read",
     ],
   },
   {
-    prefix: '/dashboard/library',
-    label: 'Library',
-    permissions: ['library:read', 'library:manage'],
+    prefix: "/dashboard/library",
+    label: "Library",
+    permissions: ["library:read", "library:manage"],
   },
   {
-    prefix: '/dashboard/transport',
-    label: 'Transport',
+    prefix: "/dashboard/transport",
+    label: "Transport",
+    permissions: ["transport:read", "transport:manage", "transport:operate"],
+  },
+  {
+    prefix: "/dashboard/canteen",
+    label: "Canteen",
     permissions: [
-      'transport:read',
-      'transport:manage',
-      'transport:operate',
+      "canteen:menu:read",
+      "canteen:plans:read",
+      "canteen:enrollments:read",
     ],
   },
   {
-    prefix: '/dashboard/canteen',
-    label: 'Canteen',
-    permissions: [
-      'canteen:menu:read',
-      'canteen:plans:read',
-      'canteen:enrollments:read',
-    ],
+    prefix: "/dashboard/reports",
+    label: "Reports",
+    permissions: ["accounting:reports:read", "library:reports:read"],
   },
   {
-    prefix: '/dashboard/reports',
-    label: 'Reports',
-    permissions: ['accounting:reports:read', 'library:reports:read'],
-  },
-  {
-    prefix: '/dashboard/settings',
-    label: 'Settings',
+    prefix: "/dashboard/settings",
+    label: "Settings",
     permissions: [
-      'settings:read',
-      'roles:read',
-      'classes:read',
-      'academic_years:read',
-      'admission_policy:read',
+      "settings:read",
+      "roles:read",
+      "classes:read",
+      "academic_years:read",
+      "admission_policy:read",
     ],
   },
 ];
 
 function getRequiredModuleForHref(href: string): string | null {
-  if (href.startsWith('/dashboard/communications')) return 'notices';
-  if (href.startsWith('/dashboard/operations')) return null;
-  if (href.startsWith('/dashboard/students')) return 'students';
-  if (href.startsWith('/dashboard/admissions')) return 'students';
-  if (href.startsWith('/dashboard/attendance')) return 'attendance';
-  if (href.startsWith('/dashboard/academics')) return 'exams';
-  if (href.startsWith('/dashboard/timetable')) return 'timetable';
-  if (href.startsWith('/dashboard/homework')) return 'homework';
-  if (href.startsWith('/dashboard/learning')) return 'learning';
-  if (href.startsWith('/dashboard/fees')) return 'fees';
-  if (href.startsWith('/dashboard/accounting')) return 'accounting';
-  if (href.startsWith('/dashboard/hr')) return 'hr';
-  if (href.startsWith('/dashboard/payroll')) return 'hr';
-  if (href.startsWith('/dashboard/library')) return 'library';
-  if (href.startsWith('/dashboard/transport')) return 'transport';
-  if (href.startsWith('/dashboard/canteen')) return 'canteen';
-  if (href.startsWith('/dashboard/notices')) return 'notices';
-  if (href.startsWith('/dashboard/activity')) return 'activity';
-  if (href.startsWith('/dashboard/messages')) return 'notices';
-  if (href.startsWith('/dashboard/reports')) return 'reports';
+  if (href.startsWith("/dashboard/communications")) return "notices";
+  if (href.startsWith("/dashboard/operations")) return null;
+  if (href.startsWith("/dashboard/students")) return "students";
+  if (href.startsWith("/dashboard/admissions")) return "students";
+  if (href.startsWith("/dashboard/attendance")) return "attendance";
+  if (href.startsWith("/dashboard/academics")) return "exams";
+  if (href.startsWith("/dashboard/timetable")) return "timetable";
+  if (href.startsWith("/dashboard/homework")) return "homework";
+  if (href.startsWith("/dashboard/learning")) return "learning";
+  if (href.startsWith("/dashboard/fees")) return "fees";
+  if (href.startsWith("/dashboard/accounting")) return "accounting";
+  if (href.startsWith("/dashboard/hr")) return "hr";
+  if (href.startsWith("/dashboard/payroll")) return "hr";
+  if (href.startsWith("/dashboard/library")) return "library";
+  if (href.startsWith("/dashboard/transport")) return "transport";
+  if (href.startsWith("/dashboard/canteen")) return "canteen";
+  if (href.startsWith("/dashboard/notices")) return "notices";
+  if (href.startsWith("/dashboard/activity")) return "activity";
+  if (href.startsWith("/dashboard/messages")) return "notices";
+  if (href.startsWith("/dashboard/reports")) return "reports";
   return null;
 }
 
@@ -224,27 +220,27 @@ function hasAnyPermission(
   return requiredPermissions.some((permission) => granted.has(permission));
 }
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { session, status, refreshSession } = useSession();
   const [showSlowSessionHelp, setShowSlowSessionHelp] = useState(false);
-  const { entitlements, hasModule, loading: entitlementsLoading } = useEntitlements();
+  const {
+    entitlements,
+    hasModule,
+    loading: entitlementsLoading,
+  } = useEntitlements();
 
   useEffect(() => {
-    if (status === 'anonymous') {
+    if (status === "anonymous") {
       router.replace(
-        `/login?next=${encodeURIComponent(pathname || '/dashboard')}`
+        `/login?next=${encodeURIComponent(pathname || "/dashboard")}`,
       );
     }
   }, [pathname, router, status]);
 
   useEffect(() => {
-    if (status !== 'loading') {
+    if (status !== "loading") {
       setShowSlowSessionHelp(false);
       return;
     }
@@ -256,7 +252,7 @@ export default function DashboardLayout({
     return () => window.clearTimeout(timeoutId);
   }, [status]);
 
-  if (status === 'loading') {
+  if (status === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
         <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -297,7 +293,7 @@ export default function DashboardLayout({
                   className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-100"
                   onClick={() =>
                     router.replace(
-                      `/login?next=${encodeURIComponent(pathname || '/dashboard')}`,
+                      `/login?next=${encodeURIComponent(pathname || "/dashboard")}`,
                     )
                   }
                 >
@@ -326,8 +322,23 @@ export default function DashboardLayout({
     );
   }
 
+  if (
+    session.user.mustChangePassword &&
+    pathname !== "/dashboard/account-security"
+  ) {
+    router.replace("/dashboard/account-security");
+    return (
+      <DashboardShell>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-950">
+          Change your temporary password before opening other SchoolOS
+          workspaces.
+        </div>
+      </DashboardShell>
+    );
+  }
+
   // Enforce frontend entitlement gating on direct URL access
-  const requiredModule = getRequiredModuleForHref(pathname || '');
+  const requiredModule = getRequiredModuleForHref(pathname || "");
   if (requiredModule && entitlementsLoading) {
     return (
       <DashboardShell>
@@ -337,7 +348,8 @@ export default function DashboardLayout({
               Checking module access
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Loading your school&apos;s enabled modules before opening this workspace.
+              Loading your school&apos;s enabled modules before opening this
+              workspace.
             </p>
           </div>
         </div>
@@ -356,9 +368,9 @@ export default function DashboardLayout({
   }
 
   const PLATFORM_ROLES = [
-    'platform_super_admin',
-    'platform_support',
-    'platform_billing_admin',
+    "platform_super_admin",
+    "platform_support",
+    "platform_billing_admin",
   ];
   const isPlatformUser = session.user.roles.some((role) =>
     PLATFORM_ROLES.includes(role),
@@ -377,7 +389,7 @@ export default function DashboardLayout({
     );
   }
 
-  const routeGate = getRouteGateForHref(pathname || '');
+  const routeGate = getRouteGateForHref(pathname || "");
   if (
     routeGate &&
     !hasAnyPermission(session.user.permissions, routeGate.permissions)
@@ -388,7 +400,7 @@ export default function DashboardLayout({
           title={`${routeGate.label} Access Restricted`}
           description="Your current role cannot open this workspace. Ask a school administrator to add the required permission, or switch to an account with the correct access."
           resource={routeGate.label}
-          action={routeGate.permissions.join(' or ')}
+          action={routeGate.permissions.join(" or ")}
         />
       </DashboardShell>
     );

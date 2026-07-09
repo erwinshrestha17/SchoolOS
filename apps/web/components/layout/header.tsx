@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useQuery } from '@tanstack/react-query';
-import { useSession } from '../session-provider';
-import { api } from '../../lib/api';
-import { GlobalStudentSearch } from './global-student-search';
-import { NotificationBell } from './notification-bell';
+import { useQuery } from "@tanstack/react-query";
+import { useSession } from "../session-provider";
+import { api } from "../../lib/api";
+import { GlobalStudentSearch } from "./global-student-search";
+import { NotificationBell } from "./notification-bell";
 import {
   ChevronDown,
   Menu,
@@ -12,13 +12,14 @@ import {
   LogOut,
   School,
   Settings,
-} from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useState, useRef, useEffect } from 'react';
+  ShieldCheck,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState, useRef, useEffect } from "react";
 
-import { Avatar } from '../ui/avatar';
-import { cn } from '../../lib/utils';
-import { Badge } from '../ui/badge';
+import { Avatar } from "../ui/avatar";
+import { cn } from "../../lib/utils";
+import { Badge } from "../ui/badge";
 
 export type HeaderProps = {
   onMobileMenuToggle: () => void;
@@ -30,13 +31,13 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  const canReadAcademicYears = hasPermissions(['academic_years:read']);
-  const canReadNotifications = hasPermissions(['notices:read']);
+  const canReadAcademicYears = hasPermissions(["academic_years:read"]);
+  const canReadNotifications = hasPermissions(["notices:read"]);
 
   const academicYearsQuery = useQuery({
-    queryKey: ['layout-academic-years'],
+    queryKey: ["layout-academic-years"],
     queryFn: api.listAcademicYears,
-    enabled: status === 'authenticated' && canReadAcademicYears,
+    enabled: status === "authenticated" && canReadAcademicYears,
   });
 
   const academicYears = academicYearsQuery.data ?? [];
@@ -52,22 +53,22 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
         setUserMenuOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const initials = session?.user.email
     ? session.user.email
-        .split('@')[0]
-        .split('.')
+        .split("@")[0]
+        .split(".")
         .map((p) => p[0]?.toUpperCase())
-        .join('')
+        .join("")
         .slice(0, 2)
-    : 'U';
+    : "U";
 
-  const displayName = session?.user.email?.split('@')[0] ?? 'User';
-  const primaryRole = session?.user.roles[0]?.replace(/_/g, ' ') ?? 'User';
-  const tenantName = session?.tenant.name ?? 'SchoolOS';
+  const displayName = session?.user.email?.split("@")[0] ?? "User";
+  const primaryRole = session?.user.roles[0]?.replace(/_/g, " ") ?? "User";
+  const tenantName = session?.tenant.name ?? "SchoolOS";
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-slate-200 bg-white/95 px-4 shadow-sm shadow-slate-200/40 backdrop-blur-md lg:px-8">
@@ -92,7 +93,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
           <div className="mt-0.5 flex items-center gap-1.5">
             <div className="h-1.5 w-1.5 rounded-full bg-success-500" />
             <p className="truncate text-xs font-semibold leading-[18px] text-slate-500">
-              {session?.tenant.slug ?? 'schoolos'} school
+              {session?.tenant.slug ?? "schoolos"} school
             </p>
           </div>
         </div>
@@ -149,8 +150,8 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
             <ChevronDown
               size={14}
               className={cn(
-                'hidden text-slate-400 transition-transform duration-200 sm:block',
-                userMenuOpen && 'rotate-180',
+                "hidden text-slate-400 transition-transform duration-200 sm:block",
+                userMenuOpen && "rotate-180",
               )}
             />
           </button>
@@ -159,7 +160,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
             <div
               className="dropdown-menu animate-scale-in"
               role="menu"
-              style={{ width: '240px' }}
+              style={{ width: "240px" }}
             >
               <div className="rounded-t-xl border-b border-slate-50 bg-slate-50/50 p-3">
                 <div className="flex items-center gap-3">
@@ -195,7 +196,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                   className="dropdown-item w-full"
                   onClick={() => {
                     setUserMenuOpen(false);
-                    router.push('/dashboard/my-profile');
+                    router.push("/dashboard/my-profile");
                   }}
                   role="menuitem"
                 >
@@ -208,12 +209,25 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                   className="dropdown-item w-full"
                   onClick={() => {
                     setUserMenuOpen(false);
-                    router.push('/dashboard/settings');
+                    router.push("/dashboard/settings");
                   }}
                   role="menuitem"
                 >
                   <Settings size={16} className="text-slate-400" />
                   <span className="font-medium">Account Settings</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="dropdown-item w-full"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    router.push("/dashboard/account-security");
+                  }}
+                  role="menuitem"
+                >
+                  <ShieldCheck size={16} className="text-slate-400" />
+                  <span className="font-medium">Account &amp; Security</span>
                 </button>
               </div>
 

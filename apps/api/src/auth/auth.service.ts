@@ -36,6 +36,7 @@ import {
   generateCsrfToken,
   parseCookie,
 } from './auth.utils';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { ConfirmMfaSetupDto } from './dto/confirm-mfa-setup.dto';
 import { ConfirmPasswordRecoveryDto } from './dto/confirm-password-recovery.dto';
 import { LoginDto } from './dto/login.dto';
@@ -43,6 +44,7 @@ import { RefreshSessionDto } from './dto/refresh-session.dto';
 import { RequestOtpLoginDto } from './dto/request-otp-login.dto';
 import { RequestPasswordRecoveryDto } from './dto/request-password-recovery.dto';
 import { VerifyOtpLoginDto } from './dto/verify-otp-login.dto';
+import { assertPasswordsMatch, assertStrongPassword } from './password-policy';
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const LOGIN_LOCK_MINUTES = 15;
@@ -232,6 +234,7 @@ export class AuthService {
   }
 
   async confirmPasswordRecovery(dto: ConfirmPasswordRecoveryDto) {
+    assertPasswordsMatch(dto.newPassword, dto.confirmNewPassword);
     const { tenant, user } = await this.resolveTenantAndUser(
       dto.tenantSlug,
       dto.email,
@@ -241,7 +244,23 @@ export class AuthService {
       throw new UnauthorizedException('Invalid recovery code');
     }
 
-    await this.consumeOtpCode(user.id, OtpPurpose.RESET, dto.code);
+    await this.consumeOtpCode(
+      user.id,
+      OtpPurpose.RESET,
+      dto.code,
+      'Your reset link is invalid or expired.',
+    );
+
+    if (await bcrypt.compare(dto.newPassword, user.passwordHash)) {
+      throw new BadRequestException(
+        'New password cannot be the same as current password.',
+      );
+    }
+
+    assertStrongPassword(
+      dto.newPassword,
+      await this.getPasswordIdentityHints(user.id, user.email),
+    );
 
     await this.prisma.user.update({
       where: { id: user.id },
@@ -250,6 +269,7 @@ export class AuthService {
           dto.newPassword,
           this.configService.bcryptRounds,
         ),
+        mustChangePassword: false,
       },
     });
 
@@ -263,6 +283,90 @@ export class AuthService {
     });
 
     return { success: true };
+  }
+
+  async changePassword(
+    auth: AuthContext,
+    dto: ChangePasswordDto,
+    response: Response,
+    cookieHeader?: string,
+    requestMeta?: RequestMeta,
+  ) {
+    assertPasswordsMatch(dto.newPassword, dto.confirmNewPassword);
+    const { tenant, user } = await this.resolveTenantAndUserById(
+      auth.tenantId,
+      auth.userId,
+    );
+
+    if (!user.passwordHash) {
+      throw new BadRequestException('Current password is incorrect.');
+    }
+
+    const currentPasswordMatches = await bcrypt.compare(
+      dto.currentPassword,
+      user.passwordHash,
+    );
+
+    if (!currentPasswordMatches) {
+      throw new BadRequestException('Current password is incorrect.');
+    }
+
+    if (await bcrypt.compare(dto.newPassword, user.passwordHash)) {
+      throw new BadRequestException(
+        'New password cannot be the same as current password.',
+      );
+    }
+
+    assertStrongPassword(
+      dto.newPassword,
+      await this.getPasswordIdentityHints(user.id, user.email),
+    );
+
+    const currentSessionId = await this.resolveRefreshSessionId(cookieHeader);
+    const logoutOtherDevices = dto.logoutOtherDevices ?? true;
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: await bcrypt.hash(
+          dto.newPassword,
+          this.configService.bcryptRounds,
+        ),
+        mustChangePassword: false,
+        failedLoginCount: 0,
+        lockedUntil: null,
+      },
+    });
+
+    if (logoutOtherDevices) {
+      await this.revokeUserSessions(user.id, {
+        exceptRefreshTokenId: currentSessionId,
+        reason: 'password_change',
+      });
+    }
+
+    await this.auditService.record({
+      action: 'change_password',
+      resource: 'auth',
+      tenantId: tenant.id,
+      userId: user.id,
+      after: {
+        logoutOtherDevices,
+        otherSessionsRevoked: logoutOtherDevices,
+      },
+      ipAddress: requestMeta?.ipAddress,
+      userAgent: requestMeta?.userAgent,
+      requestId: requestMeta?.requestId,
+    });
+
+    this.clearAccessCookie(response);
+
+    return {
+      success: true,
+      message: logoutOtherDevices
+        ? 'Password changed successfully. For your security, other sessions have been signed out.'
+        : 'Password changed successfully.',
+    };
   }
 
   async requestMfaSetup(auth: AuthContext) {
@@ -845,6 +949,7 @@ export class AuthService {
     userId: string,
     purpose: OtpPurpose,
     code: string,
+    invalidMessage = 'Invalid or expired verification code',
   ) {
     const otpCode = await this.prisma.otpCode.findFirst({
       where: {
@@ -861,7 +966,7 @@ export class AuthService {
     });
 
     if (otpCode?.codeHash !== hashOtpCode(code)) {
-      throw new UnauthorizedException('Invalid or expired verification code');
+      throw new UnauthorizedException(invalidMessage);
     }
 
     await this.prisma.otpCode.update({
@@ -909,16 +1014,86 @@ export class AuthService {
     }
   }
 
-  private async revokeUserSessions(userId: string) {
+  private async revokeUserSessions(
+    userId: string,
+    options: {
+      exceptRefreshTokenId?: string | null;
+      reason?: string;
+    } = {},
+  ) {
     await this.prisma.refreshToken.updateMany({
       where: {
         userId,
         revokedAt: null,
+        ...(options.exceptRefreshTokenId
+          ? { id: { not: options.exceptRefreshTokenId } }
+          : {}),
       },
       data: {
         revokedAt: new Date(),
+        ...(options.reason ? { revokedReason: options.reason } : {}),
       },
     });
+  }
+
+  private async resolveRefreshSessionId(cookieHeader?: string) {
+    const rawToken = parseCookie(cookieHeader, this.getRefreshCookieName());
+    if (!rawToken) {
+      return null;
+    }
+
+    const session = await this.prisma.refreshToken.findFirst({
+      where: {
+        OR: [
+          {
+            tokenHash: hmacToken(rawToken, this.configService.tokenHashPepper),
+            hashVersion: 2,
+          },
+          { tokenHash: hashToken(rawToken), hashVersion: 1 },
+        ],
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      select: { id: true },
+    });
+
+    return session?.id ?? null;
+  }
+
+  private async getPasswordIdentityHints(userId: string, email: string | null) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        staff: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+        student: {
+          select: {
+            firstNameEn: true,
+            lastNameEn: true,
+          },
+        },
+        guardian: {
+          select: {
+            fullName: true,
+          },
+        },
+      },
+    });
+
+    return [
+      email,
+      user?.email,
+      user?.staff?.firstName,
+      user?.staff?.lastName,
+      user?.student?.firstNameEn,
+      user?.student?.lastNameEn,
+      user?.guardian?.fullName,
+    ];
   }
 
   private get userAuthInclude() {
@@ -945,6 +1120,7 @@ export class AuthService {
       tenantId: string;
       email: string | null;
       authMethod: AuthMethod;
+      mustChangePassword: boolean;
       userRoles: Array<{
         role: {
           name: string;
@@ -978,6 +1154,7 @@ export class AuthService {
       tenantSlug,
       email: user.email,
       authMethod: user.authMethod,
+      mustChangePassword: user.mustChangePassword,
       roles,
       permissions,
     };
@@ -1002,6 +1179,7 @@ export class AuthService {
       tenantSlug: authContext.tenantSlug,
       email: authContext.email,
       authMethod: authContext.authMethod,
+      mustChangePassword: authContext.mustChangePassword ?? false,
       roles: authContext.roles,
     };
 
@@ -1081,6 +1259,7 @@ export class AuthService {
         tenantSlug: authContext.tenantSlug,
         email: authContext.email,
         authMethod: authContext.authMethod,
+        mustChangePassword: authContext.mustChangePassword ?? false,
         roles: authContext.roles,
         permissions: authContext.permissions,
       },

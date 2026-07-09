@@ -17,6 +17,8 @@ const prisma = new PrismaClient({ adapter });
 
 const platformEmail = process.env.PLATFORM_SEED_EMAIL || 'admin@schoolos.io';
 const platformPassword = process.env.PLATFORM_SEED_PASSWORD || 'SchoolOS@2026';
+const platformSeedMustChangePassword =
+  process.env.PLATFORM_SEED_PASSWORD_REQUIRE_CHANGE !== 'false';
 const platformRole = 'platform_super_admin';
 
 async function main() {
@@ -56,12 +58,14 @@ async function main() {
     },
     update: {
       passwordHash,
+      mustChangePassword: platformSeedMustChangePassword,
       status: UserStatus.ACTIVE,
     },
     create: {
       tenantId: platformTenant.id,
       email: platformEmail,
       passwordHash,
+      mustChangePassword: platformSeedMustChangePassword,
       authMethod: AuthMethod.PASSWORD,
       status: UserStatus.ACTIVE,
     },

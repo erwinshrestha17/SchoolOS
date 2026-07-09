@@ -8,6 +8,7 @@ export interface AuthContext {
   tenantSlug: string;
   email: string | null;
   authMethod: AuthMethod;
+  mustChangePassword?: boolean;
   roles: string[];
   permissions: string[];
 }
@@ -18,6 +19,7 @@ export interface JwtAccessPayload {
   tenantSlug: string;
   email: string | null;
   authMethod: AuthMethod;
+  mustChangePassword?: boolean;
   roles: string[];
   iss?: string;
   aud?: string;

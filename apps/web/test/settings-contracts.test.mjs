@@ -1,30 +1,30 @@
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { describe, it } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
-const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 function read(relativePath) {
-  return readFileSync(join(webRoot, relativePath), 'utf8');
+  return readFileSync(join(webRoot, relativePath), "utf8");
 }
 
-describe('SchoolOS Settings Page Contracts', () => {
-  it('renders a school management settings console with all operational sections', () => {
-    const page = read('app/dashboard/settings/page.tsx');
+describe("SchoolOS Settings Page Contracts", () => {
+  it("renders a school management settings console with all operational sections", () => {
+    const page = read("app/dashboard/settings/page.tsx");
 
     const requiredSections = [
-      'profile',
-      'branding',
-      'academic',
-      'fees',
-      'attendance',
-      'payroll',
-      'accounting',
-      'communication',
-      'security',
-      'data',
+      "profile",
+      "branding",
+      "academic",
+      "fees",
+      "attendance",
+      "payroll",
+      "accounting",
+      "communication",
+      "security",
+      "data",
     ];
 
     for (const section of requiredSections) {
@@ -32,33 +32,37 @@ describe('SchoolOS Settings Page Contracts', () => {
     }
 
     const requiredLabels = [
-      'School Name',
-      'School Address',
-      'Contact Phone',
-      'Contact Email',
-      'PAN / Registration Number',
-      'Principal Name',
-      'Municipality',
-      'Ward Number',
-      'District',
-      'Province',
-      'School Type',
-      'iEMIS School Code',
-      'Active Fee Plan',
-      'Attendance Lock',
-      'Payroll Approval',
-      'Fiscal Year',
-      'Sensitive Staff Fields',
-      'Import / Export',
+      "School Name",
+      "School Address",
+      "Contact Phone",
+      "Contact Email",
+      "PAN / Registration Number",
+      "Principal Name",
+      "Municipality",
+      "Ward Number",
+      "District",
+      "Province",
+      "School Type",
+      "iEMIS School Code",
+      "Active Fee Plan",
+      "Attendance Lock",
+      "Payroll Approval",
+      "Fiscal Year",
+      "Sensitive Staff Fields",
+      "Import / Export",
     ];
 
     for (const label of requiredLabels) {
-      assert.match(page, new RegExp(label), `Missing field/section label: ${label}`);
+      assert.match(
+        page,
+        new RegExp(label),
+        `Missing field/section label: ${label}`,
+      );
     }
   });
 
-  it('ensures each settings section has a visible console structure', () => {
-    const page = read('app/dashboard/settings/page.tsx');
+  it("ensures each settings section has a visible console structure", () => {
+    const page = read("app/dashboard/settings/page.tsx");
 
     assert.match(page, /SettingsSidebar/);
     assert.match(page, /SectionHeader/);
@@ -66,8 +70,8 @@ describe('SchoolOS Settings Page Contracts', () => {
     assert.match(page, /EditableSettingsSection/);
   });
 
-  it('keeps school settings controls aligned to settings UI tokens', () => {
-    const page = read('app/dashboard/settings/page.tsx');
+  it("keeps school settings controls aligned to settings UI tokens", () => {
+    const page = read("app/dashboard/settings/page.tsx");
 
     assert.match(page, /color-mod-settings-accent/);
     assert.match(page, /color-mod-settings-text/);
@@ -77,33 +81,37 @@ describe('SchoolOS Settings Page Contracts', () => {
     );
   });
 
-  it('strictly separates school settings from platform settings', () => {
-    const page = read('app/dashboard/settings/page.tsx');
+  it("strictly separates school settings from platform settings", () => {
+    const page = read("app/dashboard/settings/page.tsx");
 
     const forbidden = [
-      'SaaS billing',
-      'Provider credentials',
-      'Feature flags',
-      'Subscription plans',
-      'Tenant suspension',
-      'Infrastructure health',
+      "SaaS billing",
+      "Provider credentials",
+      "Feature flags",
+      "Subscription plans",
+      "Tenant suspension",
+      "Infrastructure health",
     ];
 
     for (const item of forbidden) {
-      assert.doesNotMatch(page, new RegExp(item, 'i'), `Found platform-only term: ${item}`);
+      assert.doesNotMatch(
+        page,
+        new RegExp(item, "i"),
+        `Found platform-only term: ${item}`,
+      );
     }
   });
 
-  it('maintains tenant scoping for all settings updates', () => {
-    const page = read('app/dashboard/settings/page.tsx');
+  it("maintains tenant scoping for all settings updates", () => {
+    const page = read("app/dashboard/settings/page.tsx");
 
     assert.match(page, /api\.updateTenantSetting\(field\.key, nextValue\)/);
     assert.doesNotMatch(page, /api\.updateGlobalSetting/);
     assert.doesNotMatch(page, /tenantId: ['"]all['"]/);
   });
 
-  it('uses normalized communication chat-hour setting keys', () => {
-    const page = read('app/dashboard/settings/page.tsx');
+  it("uses normalized communication chat-hour setting keys", () => {
+    const page = read("app/dashboard/settings/page.tsx");
 
     assert.match(page, /chat_sunday_to_thursday_start/);
     assert.match(page, /chat_sunday_to_thursday_end/);
@@ -112,9 +120,9 @@ describe('SchoolOS Settings Page Contracts', () => {
     assert.doesNotMatch(page, /TODO: Backend schema normalization/);
   });
 
-  it('wires school logo branding to private File Registry APIs', () => {
-    const page = read('app/dashboard/settings/page.tsx');
-    const apiClient = read('lib/api/platform.ts');
+  it("wires school logo branding to private File Registry APIs", () => {
+    const page = read("app/dashboard/settings/page.tsx");
+    const apiClient = read("lib/api/platform.ts");
 
     assert.match(page, /data-testid="school-logo-upload-panel"/);
     assert.match(page, /TENANT_LOGO_MAX_BYTES = 1024 \* 1024/);
@@ -125,17 +133,20 @@ describe('SchoolOS Settings Page Contracts', () => {
     assert.match(page, /api\.removeSchoolLogo\(\)/);
     assert.match(page, /ConfirmDialog/);
     assert.match(page, /Private File Registry/);
-    assert.doesNotMatch(page, /Logo and Stamp uploads are managed via the File Registry \(Coming Soon\)/);
+    assert.doesNotMatch(
+      page,
+      /Logo and Stamp uploads are managed via the File Registry \(Coming Soon\)/,
+    );
     assert.match(apiClient, /uploadSchoolLogo:/);
     assert.match(apiClient, /getSchoolLogoPreview:/);
     assert.match(apiClient, /getSchoolLogoDownload:/);
     assert.match(apiClient, /removeSchoolLogo:/);
   });
 
-  it('connects Users & Access settings to live tenant user APIs', () => {
-    const page = read('app/dashboard/settings/page.tsx');
-    const usersApi = read('lib/api/users.ts');
-    const apiBarrel = read('lib/api.ts');
+  it("connects Users & Access settings to live tenant user APIs", () => {
+    const page = read("app/dashboard/settings/page.tsx");
+    const usersApi = read("lib/api/users.ts");
+    const apiBarrel = read("lib/api.ts");
 
     assert.match(page, /api\.listUsers/);
     assert.match(page, /api\.listRoleCatalog/);
@@ -152,18 +163,30 @@ describe('SchoolOS Settings Page Contracts', () => {
     assert.doesNotMatch(page, /User management backend pending/);
     assert.doesNotMatch(page, /Backend route pending/);
     assert.doesNotMatch(page, /API pending/);
-    assert.match(usersApi, /request<SchoolUserSummary\[\]>\('\/users'\)/);
-    assert.match(usersApi, /request<TenantRoleSummary\[\]>\('\/roles'\)/);
-    assert.match(usersApi, /request<PermissionCatalogItem\[\]>\('\/roles\/permissions'\)/);
-    assert.match(usersApi, /\/users\/\$\{encodeURIComponent\(userId\)\}\/status/);
-    assert.match(usersApi, /\/users\/\$\{encodeURIComponent\(userId\)\}\/reset-password/);
-    assert.match(usersApi, /\/users\/\$\{encodeURIComponent\(userId\)\}\/force-logout/);
+    assert.match(usersApi, /request<SchoolUserSummary\[\]>\(["']\/users["']\)/);
+    assert.match(usersApi, /request<TenantRoleSummary\[\]>\(["']\/roles["']\)/);
+    assert.match(
+      usersApi,
+      /request<PermissionCatalogItem\[\]>\(["']\/roles\/permissions["']\)/,
+    );
+    assert.match(
+      usersApi,
+      /\/users\/\$\{encodeURIComponent\(userId\)\}\/status/,
+    );
+    assert.match(
+      usersApi,
+      /\/users\/\$\{encodeURIComponent\(userId\)\}\/password-reset/,
+    );
+    assert.match(
+      usersApi,
+      /\/users\/\$\{encodeURIComponent\(userId\)\}\/force-logout/,
+    );
     assert.match(apiBarrel, /usersApi/);
   });
 
-  it('connects the Settings audit panel to tenant-scoped audit logs', () => {
-    const page = read('app/dashboard/settings/page.tsx');
-    const apiClient = read('lib/api/platform.ts');
+  it("connects the Settings audit panel to tenant-scoped audit logs", () => {
+    const page = read("app/dashboard/settings/page.tsx");
+    const apiClient = read("lib/api/platform.ts");
 
     assert.match(page, /api\.listTenantAuditLogs/);
     assert.match(page, /settings-audit-logs/);

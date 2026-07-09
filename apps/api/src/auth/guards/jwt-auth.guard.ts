@@ -155,6 +155,7 @@ export class JwtAuthGuard implements CanActivate {
       tenantSlug: payload.tenantSlug,
       email: user.email,
       authMethod: payload.authMethod,
+      mustChangePassword: user.mustChangePassword,
       roles: Array.from(new Set(roles)),
       permissions: Array.from(new Set(permissionKeys)),
     };

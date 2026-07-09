@@ -45,6 +45,33 @@ class AuthRepository {
     return TokenPair.fromJson(response.data as Map<String, dynamic>);
   }
 
+  Future<String> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmNewPassword,
+    bool logoutOtherDevices = true,
+  }) async {
+    final response = await client.post(
+      '/auth/change-password',
+      data: {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+        'confirmNewPassword': confirmNewPassword,
+        'logoutOtherDevices': logoutOtherDevices,
+      },
+    );
+    final data = response.data;
+    if (data is Map<String, dynamic>) {
+      final message = data['message'] as String?;
+      if (message != null && message.trim().isNotEmpty) {
+        return message;
+      }
+    }
+    return logoutOtherDevices
+        ? 'Password changed successfully. For your security, other sessions have been signed out.'
+        : 'Password changed successfully.';
+  }
+
   /// Gracefully sign out on servers
   Future<void> logout({String? refreshToken, String? installationId}) async {
     await client.post(

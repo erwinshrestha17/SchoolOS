@@ -103,6 +103,8 @@ type CanonicalSubject = {
 
 const localDemoPassword =
   process.env.SCHOOLOS_DEMO_PASSWORD ?? 'schoolos-local-demo-only';
+const demoAccountsMustChangePassword =
+  process.env.SCHOOLOS_DEMO_PASSWORDS_REQUIRE_CHANGE !== 'false';
 const schoolAdminPassword =
   process.env.SCHOOLOS_DEMO_ADMIN_PASSWORD ?? localDemoPassword;
 const principalPassword =
@@ -1064,6 +1066,7 @@ async function ensureSeedUserWithRole({
     },
     update: {
       passwordHash,
+      mustChangePassword: demoAccountsMustChangePassword,
       authMethod: AuthMethod.PASSWORD,
       status,
       failedLoginCount: 0,
@@ -1073,6 +1076,7 @@ async function ensureSeedUserWithRole({
       tenantId,
       email,
       passwordHash,
+      mustChangePassword: demoAccountsMustChangePassword,
       authMethod: AuthMethod.PASSWORD,
       status,
     },
@@ -1726,8 +1730,7 @@ async function linkSiblingFamilies(
       const anchor = byKey.get(
         `${sectionKey(`Class ${anchorGrade}`, sectionName)}-${anchorRoll}`,
       );
-      if (!child || !anchor || child.guardianId === anchor.guardianId)
-        continue;
+      if (!child || !anchor || child.guardianId === anchor.guardianId) continue;
 
       const orphanGuardianId = child.guardianId;
       const orphanGuardianUserId = child.guardianUserId;
@@ -1742,11 +1745,19 @@ async function linkSiblingFamilies(
       });
       if (alreadyLinkedToAnchor) {
         await prisma.studentGuardian.deleteMany({
-          where: { tenantId, studentId: child.id, guardianId: orphanGuardianId },
+          where: {
+            tenantId,
+            studentId: child.id,
+            guardianId: orphanGuardianId,
+          },
         });
       } else {
         await prisma.studentGuardian.updateMany({
-          where: { tenantId, studentId: child.id, guardianId: orphanGuardianId },
+          where: {
+            tenantId,
+            studentId: child.id,
+            guardianId: orphanGuardianId,
+          },
           data: { guardianId: anchor.guardianId },
         });
       }
@@ -2585,7 +2596,7 @@ async function seedCanonicalStaffSelfService(
       LeaveRequestStatus.PENDING,
       'Medical appointment',
     ],
-    ] as const) {
+  ] as const) {
     const existing = await prisma.staffLeaveRequest.findFirst({
       where: { tenantId, staffId: staff.id, leaveType, startsOn },
     });
