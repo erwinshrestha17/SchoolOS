@@ -4,6 +4,7 @@ import type {
   AdmissionPolicyListResponse,
   AdmissionPolicyVersionSummary,
   CreateAdmissionPolicyPayload,
+  DuplicateAdmissionPolicyPayload,
   UpdateAdmissionPolicyIdentityPayload,
   UpdateAdmissionPolicyVersionPayload,
   UpsertDocumentRequirementPayload,
@@ -74,5 +75,10 @@ export const admissionPoliciesApi = {
   archive: (policyId: string) =>
     request<AdmissionPolicyDetail>(`/admissions/policies/${policyId}/archive`, {
       method: "POST",
+    }),
+  duplicate: (policyId: string, payload: DuplicateAdmissionPolicyPayload = {}) =>
+    request<AdmissionPolicyDetail>(`/admissions/policies/${policyId}/duplicate`, {
+      method: "POST",
+      json: payload,
     }),
 };

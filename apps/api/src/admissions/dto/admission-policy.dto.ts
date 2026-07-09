@@ -73,3 +73,7 @@ export class UpsertDocumentRequirementDto {
 export class ActivateAdmissionPolicyVersionDto {
   @IsString() versionId!: string;
 }
+
+export class DuplicateAdmissionPolicyDto {
+  @IsOptional() @IsString() @MaxLength(160) name?: string;
+}

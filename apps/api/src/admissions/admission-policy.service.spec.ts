@@ -177,4 +177,98 @@ describe('AdmissionPolicyService', () => {
 
     expect(prisma.admissionPolicyVersion.create).not.toHaveBeenCalled();
   });
+
+  it('duplicates a policy with its current version fields and document requirements, but never its scope', async () => {
+    const prisma = buildPrisma();
+    prisma.admissionPolicy.findFirst.mockResolvedValue({
+      id: 'policy-a',
+      name: 'Grade 5 Transfer 2083',
+      applicantType: 'TRANSFER',
+      currentVersionId: 'version-active',
+      versions: [
+        {
+          id: 'version-active',
+          status: 'ACTIVE',
+          admissionMode: 'REVIEW_REQUIRED',
+          requirePrincipalApproval: true,
+          requiredFields: ['previousSchool'],
+          documentRequirements: [
+            { documentKind: 'TRANSFER_CERTIFICATE', label: 'Transfer certificate', isRequired: true, sortOrder: 0 },
+          ],
+        },
+      ],
+    });
+    prisma.admissionPolicy.create.mockResolvedValue({ id: 'policy-copy' });
+    prisma.admissionPolicyVersion.create.mockResolvedValue({ id: 'version-copy', version: 1 });
+    const auditService = { record: jest.fn() };
+    const service = buildService(prisma, auditService);
+    jest.spyOn(service, 'get').mockResolvedValue({ id: 'policy-copy' } as any);
+
+    await service.duplicate('policy-a', {}, actor);
+
+    expect(prisma.admissionPolicy.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: 'Grade 5 Transfer 2083 (Copy)',
+          applicantType: 'TRANSFER',
+          isDefault: false,
+          status: 'DRAFT',
+        }),
+      }),
+    );
+    expect(prisma.admissionPolicy.create.mock.calls[0][0].data).not.toHaveProperty('classId');
+    expect(prisma.admissionPolicy.create.mock.calls[0][0].data).not.toHaveProperty('academicYearId');
+    expect(prisma.admissionPolicyVersion.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          policyId: 'policy-copy',
+          version: 1,
+          status: 'DRAFT',
+          admissionMode: 'REVIEW_REQUIRED',
+          requirePrincipalApproval: true,
+          requiredFields: ['previousSchool'],
+        }),
+      }),
+    );
+    expect(prisma.admissionPolicyDocumentRequirement.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            policyVersionId: 'version-copy',
+            documentKind: 'TRANSFER_CERTIFICATE',
+          }),
+        ],
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'admission_policy_duplicate',
+        resourceId: 'policy-copy',
+        after: expect.objectContaining({ duplicatedFromPolicyId: 'policy-a' }),
+      }),
+    );
+  });
+
+  it('uses a custom name when duplicating a policy', async () => {
+    const prisma = buildPrisma();
+    prisma.admissionPolicy.findFirst.mockResolvedValue({
+      id: 'policy-a',
+      name: 'Grade 5 Transfer 2083',
+      applicantType: 'BOTH',
+      currentVersionId: null,
+      versions: [],
+    });
+    prisma.admissionPolicy.create.mockResolvedValue({ id: 'policy-copy' });
+    prisma.admissionPolicyVersion.create.mockResolvedValue({ id: 'version-copy', version: 1 });
+    const service = buildService(prisma);
+    jest.spyOn(service, 'get').mockResolvedValue({ id: 'policy-copy' } as any);
+
+    await service.duplicate('policy-a', { name: 'Grade 5 Transfer 2084' }, actor);
+
+    expect(prisma.admissionPolicy.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ name: 'Grade 5 Transfer 2084' }),
+      }),
+    );
+  });
 });

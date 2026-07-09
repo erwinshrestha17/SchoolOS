@@ -1,7 +1,7 @@
 'use client';
 
 import type { AdmissionPolicySummary, AdmissionPolicyStatus } from '@schoolos/core';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -28,12 +28,20 @@ const STATUS_TONE: Record<AdmissionPolicyStatus, StatusTone> = {
 
 export function AdmissionPolicyList() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
   const canManage = hasPermissions(['admission_policy:manage']);
 
   const policiesQuery = useQuery({
     queryKey: ['admission-policies'],
     queryFn: admissionPoliciesApi.list,
+  });
+  const duplicateMutation = useMutation({
+    mutationFn: (policyId: string) => admissionPoliciesApi.duplicate(policyId, {}),
+    onSuccess: (duplicated) => {
+      void queryClient.invalidateQueries({ queryKey: ['admission-policies'] });
+      router.push(`/dashboard/settings/admissions/${duplicated.id}/edit`);
+    },
   });
   const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
@@ -62,6 +70,12 @@ export function AdmissionPolicyList() {
             Create Admission Policy
           </Button>
         </div>
+      ) : null}
+
+      {duplicateMutation.isError ? (
+        <p className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-800" role="alert">
+          This policy could not be duplicated. Please try again.
+        </p>
       ) : null}
 
       <KpiGrid>
@@ -116,7 +130,10 @@ export function AdmissionPolicyList() {
                   items={[
                     { label: 'View policy', onClick: () => router.push(`/dashboard/settings/admissions/${policy.id}`) },
                     ...(canManage
-                      ? [{ label: 'Edit policy', onClick: () => router.push(`/dashboard/settings/admissions/${policy.id}/edit`) }]
+                      ? [
+                          { label: 'Edit policy', onClick: () => router.push(`/dashboard/settings/admissions/${policy.id}/edit`) },
+                          { label: 'Duplicate policy', onClick: () => duplicateMutation.mutate(policy.id) },
+                        ]
                       : []),
                   ]}
                 />

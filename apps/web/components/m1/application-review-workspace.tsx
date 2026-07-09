@@ -34,6 +34,7 @@ const ACTIONS_REQUIRING_REASON = new Set<AdmissionCaseReviewAction>([
   "REJECT",
   "ESCALATE_TO_PRINCIPAL",
   "CLOSE",
+  "WAITLIST",
 ]);
 
 const ACTION_COPY: Record<
@@ -67,6 +68,14 @@ const ACTION_COPY: Record<
   CLOSE: {
     label: "Close case",
     confirmation: "Close case",
+  },
+  WAITLIST: {
+    label: "Waitlist",
+    confirmation: "Waitlist this applicant",
+  },
+  PROMOTE_FROM_WAITLIST: {
+    label: "Promote from waitlist",
+    confirmation: "Promote from waitlist",
   },
 };
 
@@ -266,6 +275,15 @@ export function ApplicationReviewWorkspace({
             {admissionCase.capacityStatus?.state === "FULL" ? (
               <ReviewIssue
                 title="Section capacity"
+                items={[
+                  `Capacity ${admissionCase.capacityStatus.capacity}; enrolled ${admissionCase.capacityStatus.enrolled}.`,
+                ]}
+                warning
+              />
+            ) : null}
+            {admissionCase.capacityStatus?.state === "NEARLY_FULL" ? (
+              <ReviewIssue
+                title="Section capacity is nearly full"
                 items={[
                   `Capacity ${admissionCase.capacityStatus.capacity}; enrolled ${admissionCase.capacityStatus.enrolled}.`,
                 ]}

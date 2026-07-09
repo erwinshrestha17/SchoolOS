@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { admissionPoliciesApi } from '../../lib/api/admission-policies';
 import { formatSchoolDate } from '../../lib/date-utils';
@@ -28,6 +28,10 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
   const versionsQuery = useQuery({
     queryKey: ['admission-policy-versions', policyId],
     queryFn: () => admissionPoliciesApi.listVersions(policyId),
+  });
+  const duplicateMutation = useMutation({
+    mutationFn: () => admissionPoliciesApi.duplicate(policyId, {}),
+    onSuccess: (duplicated) => router.push(`/dashboard/settings/admissions/${duplicated.id}/edit`),
   });
 
   if (policyQuery.isLoading) {
@@ -61,11 +65,22 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
           </p>
         </div>
         {canManage ? (
-          <Button type="button" onClick={() => router.push(`/dashboard/settings/admissions/${policyId}/edit`)}>
-            Edit policy
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" disabled={duplicateMutation.isPending} onClick={() => duplicateMutation.mutate()}>
+              Duplicate policy
+            </Button>
+            <Button type="button" onClick={() => router.push(`/dashboard/settings/admissions/${policyId}/edit`)}>
+              Edit policy
+            </Button>
+          </div>
         ) : null}
       </div>
+
+      {duplicateMutation.isError ? (
+        <p className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-800" role="alert">
+          This policy could not be duplicated. Please try again.
+        </p>
+      ) : null}
 
       <Tabs defaultValue="overview">
         <TabsList className="h-auto flex-wrap">

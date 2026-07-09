@@ -35,6 +35,7 @@ const QUEUES: Array<{
     icon: ClipboardCheck,
   },
   { id: "READY_TO_ADMIT", label: "Ready to Admit", icon: UserRoundCheck },
+  { id: "WAITLISTED", label: "Waitlisted", icon: AlertTriangle },
   { id: "APPROVED", label: "Approved", icon: UserRoundCheck },
   { id: "NOT_ADMITTED", label: "Not Admitted", icon: AlertTriangle },
   { id: "DOCUMENTS_PENDING", label: "Documents Pending", icon: FileWarning },

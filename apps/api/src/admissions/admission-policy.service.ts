@@ -10,10 +10,25 @@ import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateAdmissionPolicyDto,
+  DuplicateAdmissionPolicyDto,
   UpdateAdmissionPolicyIdentityDto,
   UpdateAdmissionPolicyVersionDto,
   UpsertDocumentRequirementDto,
 } from './dto/admission-policy.dto';
+
+type ResolvableVersionFields = AdmissionPolicyVersion & {
+  documentRequirements?: Array<{
+    documentKind: string;
+    label: string;
+    isRequired: boolean;
+    requiresOriginalVerification: boolean;
+    timing: string;
+    expiresAfterDays: number | null;
+    canBeWaived: boolean;
+    waivableByRoleKeys: string[];
+    sortOrder: number;
+  }>;
+};
 
 const POLICY_WITH_VERSIONS_INCLUDE = {
   versions: {
@@ -218,57 +233,11 @@ export class AdmissionPolicyService {
         policyId,
         version: nextVersionNumber,
         status: 'DRAFT',
-        admissionMode: source?.admissionMode ?? 'REVIEW_REQUIRED',
-        transferStudent: source?.transferStudent ?? null,
-        requiredFields: source?.requiredFields ?? [],
-        requireSection: source?.requireSection ?? false,
-        requireDocumentReview: source?.requireDocumentReview ?? false,
-        requireInterview: source?.requireInterview ?? false,
-        requirePrincipalApproval: source?.requirePrincipalApproval ?? false,
-        requireTransferCertificate: source?.requireTransferCertificate ?? false,
-        requirePriorMarksheet: source?.requirePriorMarksheet ?? false,
-        requireStreamOrMarksReview: source?.requireStreamOrMarksReview ?? false,
-        allowAdmissionWithDocumentsPending:
-          source?.allowAdmissionWithDocumentsPending ?? true,
-        enforceCapacityWhenAvailable: source?.enforceCapacityWhenAvailable ?? false,
-        capacityOverride: source?.capacityOverride ?? null,
-        approvalLevel: source?.approvalLevel ?? null,
-        notesForOffice: source?.notesForOffice ?? null,
         createdById: actor.userId,
+        ...this.versionFieldsFrom(source),
       },
     });
-    const sourceRequirements =
-      (source as (AdmissionPolicyVersion & { documentRequirements?: unknown[] }) | null)
-        ?.documentRequirements ?? [];
-    if (Array.isArray(sourceRequirements) && sourceRequirements.length > 0) {
-      await this.prisma.admissionPolicyDocumentRequirement.createMany({
-        data: (
-          sourceRequirements as Array<{
-            documentKind: string;
-            label: string;
-            isRequired: boolean;
-            requiresOriginalVerification: boolean;
-            timing: string;
-            expiresAfterDays: number | null;
-            canBeWaived: boolean;
-            waivableByRoleKeys: string[];
-            sortOrder: number;
-          }>
-        ).map((requirement) => ({
-          tenantId: actor.tenantId,
-          policyVersionId: draft.id,
-          documentKind: requirement.documentKind,
-          label: requirement.label,
-          isRequired: requirement.isRequired,
-          requiresOriginalVerification: requirement.requiresOriginalVerification,
-          timing: requirement.timing as never,
-          expiresAfterDays: requirement.expiresAfterDays,
-          canBeWaived: requirement.canBeWaived,
-          waivableByRoleKeys: requirement.waivableByRoleKeys,
-          sortOrder: requirement.sortOrder,
-        })),
-      });
-    }
+    await this.copyDocumentRequirements(source, draft.id, actor.tenantId);
     await this.auditService.record({
       action: 'admission_policy_draft_started',
       resource: 'admission_policy',
@@ -278,6 +247,101 @@ export class AdmissionPolicyService {
       after: { versionId: draft.id, version: draft.version },
     });
     return this.get(policyId, actor);
+  }
+
+  async duplicate(
+    policyId: string,
+    dto: DuplicateAdmissionPolicyDto,
+    actor: AuthContext,
+  ) {
+    const policy = await this.findPolicyOrThrow(policyId, actor.tenantId, {
+      versions: { include: { documentRequirements: true } },
+    });
+    const source =
+      policy.versions.find((version) => version.id === policy.currentVersionId) ??
+      policy.versions.find((version) => version.status === 'DRAFT') ??
+      null;
+
+    const copy = await this.prisma.admissionPolicy.create({
+      data: {
+        tenantId: actor.tenantId,
+        name: dto.name?.trim() || `${policy.name} (Copy)`,
+        // Scope is intentionally not carried over: a duplicated policy would
+        // otherwise silently tie for every case the source already wins,
+        // forcing disambiguation until staff re-scope it deliberately.
+        applicantType: policy.applicantType,
+        isDefault: false,
+        status: 'DRAFT',
+        createdById: actor.userId,
+        updatedById: actor.userId,
+      },
+    });
+    const version = await this.prisma.admissionPolicyVersion.create({
+      data: {
+        tenantId: actor.tenantId,
+        policyId: copy.id,
+        version: 1,
+        status: 'DRAFT',
+        createdById: actor.userId,
+        ...this.versionFieldsFrom(source),
+      },
+    });
+    await this.copyDocumentRequirements(source, version.id, actor.tenantId);
+
+    await this.auditService.record({
+      action: 'admission_policy_duplicate',
+      resource: 'admission_policy',
+      resourceId: copy.id,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: { name: copy.name, duplicatedFromPolicyId: policyId },
+    });
+    return this.get(copy.id, actor);
+  }
+
+  private versionFieldsFrom(source: ResolvableVersionFields | null) {
+    return {
+      admissionMode: source?.admissionMode ?? 'REVIEW_REQUIRED',
+      transferStudent: source?.transferStudent ?? null,
+      requiredFields: source?.requiredFields ?? [],
+      requireSection: source?.requireSection ?? false,
+      requireDocumentReview: source?.requireDocumentReview ?? false,
+      requireInterview: source?.requireInterview ?? false,
+      requirePrincipalApproval: source?.requirePrincipalApproval ?? false,
+      requireTransferCertificate: source?.requireTransferCertificate ?? false,
+      requirePriorMarksheet: source?.requirePriorMarksheet ?? false,
+      requireStreamOrMarksReview: source?.requireStreamOrMarksReview ?? false,
+      allowAdmissionWithDocumentsPending:
+        source?.allowAdmissionWithDocumentsPending ?? true,
+      enforceCapacityWhenAvailable: source?.enforceCapacityWhenAvailable ?? false,
+      capacityOverride: source?.capacityOverride ?? null,
+      approvalLevel: source?.approvalLevel ?? null,
+      notesForOffice: source?.notesForOffice ?? null,
+    };
+  }
+
+  private async copyDocumentRequirements(
+    source: ResolvableVersionFields | null,
+    targetVersionId: string,
+    tenantId: string,
+  ) {
+    const requirements = source?.documentRequirements ?? [];
+    if (requirements.length === 0) return;
+    await this.prisma.admissionPolicyDocumentRequirement.createMany({
+      data: requirements.map((requirement) => ({
+        tenantId,
+        policyVersionId: targetVersionId,
+        documentKind: requirement.documentKind,
+        label: requirement.label,
+        isRequired: requirement.isRequired,
+        requiresOriginalVerification: requirement.requiresOriginalVerification,
+        timing: requirement.timing as never,
+        expiresAfterDays: requirement.expiresAfterDays,
+        canBeWaived: requirement.canBeWaived,
+        waivableByRoleKeys: requirement.waivableByRoleKeys,
+        sortOrder: requirement.sortOrder,
+      })),
+    });
   }
 
   async upsertDocumentRequirement(
@@ -440,7 +504,7 @@ export class AdmissionPolicyService {
     });
     if (!policy) throw new NotFoundException('Admission policy not found.');
     return policy as typeof policy & {
-      versions: Array<AdmissionPolicyVersion & { documentRequirements?: unknown[] }>;
+      versions: ResolvableVersionFields[];
     };
   }
 

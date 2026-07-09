@@ -20,6 +20,7 @@ export type AdmissionCaseQueue =
   | "NEEDS_INFORMATION"
   | "WAITING_FOR_REVIEW"
   | "READY_TO_ADMIT"
+  | "WAITLISTED"
   | "APPROVED"
   | "NOT_ADMITTED"
   | "DOCUMENTS_PENDING"

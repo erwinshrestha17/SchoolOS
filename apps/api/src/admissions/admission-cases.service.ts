@@ -79,6 +79,7 @@ const REVIEW_LOCKED_STATUSES = new Set([
   'ENTRANCE_INTERVIEW',
   'APPROVED',
   'ACCEPTED',
+  'WAITLISTED',
 ]);
 const ADMITTABLE_STORAGE_STATUSES = [
   'DRAFT',
@@ -96,6 +97,7 @@ const REVIEW_ACTIONS_REQUIRING_REASON = new Set<AdmissionCaseReviewAction>([
   'REJECT',
   'ESCALATE_TO_PRINCIPAL',
   'CLOSE',
+  'WAITLIST',
 ]);
 
 const LEGACY_DISPLAY_STATUS: Partial<Record<string, AdmissionDisplayStatus>> = {
@@ -113,6 +115,7 @@ const DISPLAY_STATUSES = new Set<AdmissionDisplayStatus>([
   'NEEDS_INFORMATION',
   'READY_TO_ADMIT',
   'WAITING_FOR_REVIEW',
+  'WAITLISTED',
   'APPROVED',
   'ADMITTED',
   'NOT_ADMITTED',
@@ -124,6 +127,7 @@ type AdmissionDisplayStatus =
   | 'NEEDS_INFORMATION'
   | 'READY_TO_ADMIT'
   | 'WAITING_FOR_REVIEW'
+  | 'WAITLISTED'
   | 'APPROVED'
   | 'ADMITTED'
   | 'NOT_ADMITTED'
@@ -200,6 +204,7 @@ interface PolicyRule {
   enforceCapacityWhenAvailable?: boolean;
   requireSection?: boolean;
   requiredFields?: string[];
+  capacityOverride?: number | null;
 }
 
 interface ResolvedDocumentRequirement {
@@ -304,10 +309,14 @@ interface AdmissionCaseRecord {
 }
 
 interface CapacityStatus {
-  state: 'NOT_CONFIGURED' | 'AVAILABLE' | 'FULL';
+  state: 'NOT_CONFIGURED' | 'AVAILABLE' | 'NEARLY_FULL' | 'FULL';
   capacity: number | null;
   enrolled: number | null;
 }
+
+// A section counts as nearly full once enrollment crosses this share of
+// capacity, so office staff get a heads-up before the last seat is gone.
+const NEARLY_FULL_THRESHOLD = 0.9;
 
 interface AdmissionEvaluation {
   missingRequiredFields: string[];
@@ -340,6 +349,7 @@ interface AdmissionEvaluation {
     requireSection: boolean;
     requiredDocuments: string[];
     requiredFields: string[];
+    capacityOverride: number | null;
   };
   policy: {
     policyId: string | null;
@@ -1533,7 +1543,15 @@ export class AdmissionCasesService {
       },
     };
 
-    const nextStatus = this.reviewActionStatus(dto.action, current.status);
+    let nextStatus = this.reviewActionStatus(dto.action, current.status);
+    if (dto.action === 'PROMOTE_FROM_WAITLIST') {
+      if (this.capacityBlocksAdmission(evaluation)) {
+        throw new BadRequestException(
+          'No seats are available yet. This case remains on the waitlist.',
+        );
+      }
+      nextStatus = evaluation.suggestedStatus;
+    }
 
     await this.prisma.$transaction(async (tx) => {
       const updated = await tx.admissionApplication.updateMany({
@@ -1548,6 +1566,8 @@ export class AdmissionCasesService {
           rejectedReason:
             dto.action === 'REJECT' ? (dto.reason?.trim() ?? null) : null,
           duplicateReview: nextMetadata as Prisma.InputJsonValue,
+          policyVersionId: evaluation.policy.versionId ?? undefined,
+          policyResolutionReason: evaluation.policy.reason,
           updatedById: actor.userId,
         },
       });
@@ -1687,7 +1707,12 @@ export class AdmissionCasesService {
         duplicateCandidates: evaluation.duplicateCandidates,
       });
     }
-    const placement = await this.validatePlacement(current, actor, true);
+    const placement = await this.validatePlacement(
+      current,
+      actor,
+      true,
+      evaluation.policyRequirements.capacityOverride,
+    );
     const academicYear = placement.academicYear;
     const classroom = placement.classroom;
     const section = placement.section;
@@ -2060,7 +2085,12 @@ export class AdmissionCasesService {
       this.actorCanWaive(kind, resolved.documentRequirements, actor),
     );
 
-    const placement = await this.validatePlacement(record, actor, false);
+    const placement = await this.validatePlacement(
+      record,
+      actor,
+      false,
+      policy.capacityOverride,
+    );
     const duplicateCandidates = await this.findDuplicateCandidates(
       record,
       actor,
@@ -2111,6 +2141,7 @@ export class AdmissionCasesService {
       requireSection: policy.requireSection === true,
       requiredDocuments,
       requiredFields: [...requiredFields],
+      capacityOverride: policy.capacityOverride ?? null,
     };
     const policyRequiresReview = this.policyRequiresReview({
       policyRequirements,
@@ -2477,6 +2508,7 @@ export class AdmissionCasesService {
       enforceCapacityWhenAvailable: false,
       requireSection: false,
       requiredFields: [],
+      capacityOverride: null,
     };
   }
 
@@ -2492,6 +2524,7 @@ export class AdmissionCasesService {
     requireStreamOrMarksReview: boolean;
     allowAdmissionWithDocumentsPending: boolean;
     enforceCapacityWhenAvailable: boolean;
+    capacityOverride?: number | null;
   }): PolicyRule {
     return {
       admissionMode:
@@ -2509,6 +2542,7 @@ export class AdmissionCasesService {
       allowAdmissionWithDocumentsPending:
         version.allowAdmissionWithDocumentsPending,
       enforceCapacityWhenAvailable: version.enforceCapacityWhenAvailable,
+      capacityOverride: version.capacityOverride ?? null,
     };
   }
 
@@ -2516,6 +2550,7 @@ export class AdmissionCasesService {
     record: AdmissionCaseRecord,
     actor: AuthContext,
     throwOnInvalid: boolean,
+    capacityOverride?: number | null,
   ) {
     if (!record.academicYearId || !record.classId) {
       if (throwOnInvalid)
@@ -2585,20 +2620,28 @@ export class AdmissionCasesService {
     }
 
     let capacityStatus: CapacityStatus | null = null;
-    if (section?.capacity !== null && section?.capacity !== undefined) {
-      const enrolled = await this.prisma.enrollment.count({
-        where: {
-          tenantId: actor.tenantId,
-          academicYearId: academicYear.id,
-          sectionId: section.id,
-          status: EnrollmentStatus.ACTIVE,
-        },
-      });
-      capacityStatus = {
-        state: enrolled >= section.capacity ? 'FULL' : 'AVAILABLE',
-        capacity: section.capacity,
-        enrolled,
-      };
+    // A policy's capacityOverride is an explicit staff-set seat count for this
+    // section and takes precedence over the section's own configured
+    // capacity — it does not change what's being counted, only the ceiling.
+    if (section) {
+      const effectiveCapacity = capacityOverride ?? section.capacity ?? null;
+      if (effectiveCapacity !== null) {
+        const enrolled = await this.prisma.enrollment.count({
+          where: {
+            tenantId: actor.tenantId,
+            academicYearId: academicYear.id,
+            sectionId: section.id,
+            status: EnrollmentStatus.ACTIVE,
+          },
+        });
+        const state: CapacityStatus['state'] =
+          enrolled >= effectiveCapacity
+            ? 'FULL'
+            : enrolled >= effectiveCapacity * NEARLY_FULL_THRESHOLD
+              ? 'NEARLY_FULL'
+              : 'AVAILABLE';
+        capacityStatus = { state, capacity: effectiveCapacity, enrolled };
+      }
     }
 
     return {
@@ -2850,11 +2893,18 @@ export class AdmissionCasesService {
       return [];
     }
 
+    if (displayStatus === 'WAITLISTED') {
+      return ['PROMOTE_FROM_WAITLIST', 'CLOSE'];
+    }
+
     const actions: AdmissionCaseReviewAction[] = ['ASSIGN_REVIEWER'];
     if (
       ['DRAFT', 'NEEDS_INFORMATION', 'READY_TO_ADMIT'].includes(displayStatus)
     ) {
       actions.push('MARK_READY_FOR_REVIEW', 'CLOSE');
+      if (this.capacityBlocksAdmission(evaluation)) {
+        actions.push('WAITLIST');
+      }
       return actions;
     }
 
@@ -2882,6 +2932,9 @@ export class AdmissionCasesService {
       ) {
         actions.push('APPROVE');
       }
+      if (this.capacityBlocksAdmission(evaluation)) {
+        actions.push('WAITLIST');
+      }
     }
 
     return actions;
@@ -2899,6 +2952,8 @@ export class AdmissionCasesService {
       REJECT: 'NOT_ADMITTED',
       ESCALATE_TO_PRINCIPAL: 'WAITING_FOR_REVIEW',
       CLOSE: 'CLOSED',
+      WAITLIST: 'WAITLISTED',
+      PROMOTE_FROM_WAITLIST: currentStatus,
     };
     return statusByAction[action];
   }
@@ -2921,6 +2976,7 @@ export class AdmissionCasesService {
   ) {
     if (record.convertedStudentId || displayStatus === 'ADMITTED')
       return 'Open student profile';
+    if (displayStatus === 'WAITLISTED') return 'Promote from waitlist';
     if (displayStatus === 'APPROVED') return 'Finalize admission';
     if (evaluation.missingRequiredFields.length > 0)
       return 'Complete required information';
@@ -2930,7 +2986,7 @@ export class AdmissionCasesService {
     )
       return 'Add required documents';
     if (this.capacityBlocksAdmission(evaluation))
-      return 'Choose another section';
+      return 'Add to waitlist';
     if (
       evaluation.policyRequirements.requireInterview &&
       !evaluation.assessmentSession

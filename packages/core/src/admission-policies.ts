@@ -151,6 +151,10 @@ export type UpdateAdmissionPolicyVersionPayload = Partial<{
   notesForOffice: string;
 }>;
 
+export type DuplicateAdmissionPolicyPayload = {
+  name?: string;
+};
+
 export type UpsertDocumentRequirementPayload = {
   documentKind: string;
   label: string;

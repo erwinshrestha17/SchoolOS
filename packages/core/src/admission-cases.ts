@@ -8,6 +8,7 @@ export const ADMISSION_CASE_DISPLAY_STATUSES = [
   "NEEDS_INFORMATION",
   "READY_TO_ADMIT",
   "WAITING_FOR_REVIEW",
+  "WAITLISTED",
   "APPROVED",
   "ADMITTED",
   "NOT_ADMITTED",
@@ -30,6 +31,8 @@ export const ADMISSION_CASE_REVIEW_ACTIONS = [
   "REJECT",
   "ESCALATE_TO_PRINCIPAL",
   "CLOSE",
+  "WAITLIST",
+  "PROMOTE_FROM_WAITLIST",
 ] as const;
 
 export const ADMISSION_ASSESSMENT_TABS = [
@@ -251,6 +254,7 @@ export type AdmissionCaseEligibility = {
     requireSection: boolean;
     requiredDocuments: string[];
     requiredFields: string[];
+    capacityOverride: number | null;
   };
   policy: AdmissionPolicyResolution;
   canAdmitDirectly: boolean;
@@ -266,7 +270,7 @@ export type AdmissionCaseEligibility = {
     message: string | null;
   };
   capacityStatus: {
-    state: "NOT_CONFIGURED" | "AVAILABLE" | "FULL";
+    state: "NOT_CONFIGURED" | "AVAILABLE" | "NEARLY_FULL" | "FULL";
     capacity: number | null;
     enrolled: number | null;
   } | null;

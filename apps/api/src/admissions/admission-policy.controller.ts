@@ -19,6 +19,7 @@ import { AdmissionPolicyService } from './admission-policy.service';
 import {
   ActivateAdmissionPolicyVersionDto,
   CreateAdmissionPolicyDto,
+  DuplicateAdmissionPolicyDto,
   UpdateAdmissionPolicyIdentityDto,
   UpdateAdmissionPolicyVersionDto,
   UpsertDocumentRequirementDto,
@@ -144,5 +145,15 @@ export class AdmissionPolicyController {
   @Permissions('admission_policy:manage')
   archive(@Param('policyId') policyId: string, @CurrentAuth() actor: AuthContext) {
     return this.admissionPolicyService.archive(policyId, actor);
+  }
+
+  @Post(':policyId/duplicate')
+  @Permissions('admission_policy:manage')
+  duplicate(
+    @Param('policyId') policyId: string,
+    @Body() dto: DuplicateAdmissionPolicyDto,
+    @CurrentAuth() actor: AuthContext,
+  ) {
+    return this.admissionPolicyService.duplicate(policyId, dto, actor);
   }
 }

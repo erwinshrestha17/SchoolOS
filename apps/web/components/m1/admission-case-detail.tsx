@@ -288,6 +288,15 @@ export function AdmissionCaseDetail({
               ]}
             />
           ) : null}
+          {admissionCase.capacityStatus?.state === "NEARLY_FULL" ? (
+            <Issue
+              title="Section capacity is nearly full"
+              warning
+              items={[
+                `Capacity: ${admissionCase.capacityStatus.capacity}; enrolled: ${admissionCase.capacityStatus.enrolled}.`,
+              ]}
+            />
+          ) : null}
           {!admissionCase.missingRequiredFields.length &&
           !admissionCase.missingRequiredDocuments.length &&
           !admissionCase.duplicateRisk &&
@@ -365,7 +374,9 @@ export function AdmissionCaseDetail({
               ? "Request information"
               : reviewAction === "APPROVE"
                 ? "Approve this admission case"
-                : "Review this admission"
+                : reviewAction === "WAITLIST"
+                  ? "Waitlist this applicant"
+                  : "Review this admission"
           }
           description="A reason is recorded in the admission audit history."
         >
@@ -453,6 +464,32 @@ export function AdmissionCaseDetail({
             >
               <AlertTriangle className="h-4 w-4" />
               Do not admit
+            </Button>
+          ) : null}
+          {availableReviewActions.has("WAITLIST") ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setReviewAction("WAITLIST")}
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Waitlist
+            </Button>
+          ) : null}
+          {availableReviewActions.has("PROMOTE_FROM_WAITLIST") ? (
+            <Button
+              type="button"
+              disabled={reviewMutation.isPending}
+              onClick={() =>
+                reviewMutation.mutate({ action: "PROMOTE_FROM_WAITLIST" })
+              }
+            >
+              {reviewMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <UserRoundCheck className="h-4 w-4" />
+              )}
+              Promote from waitlist
             </Button>
           ) : null}
           {canFinalize ? (

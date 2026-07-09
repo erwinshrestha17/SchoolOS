@@ -23,7 +23,7 @@ const DOCUMENT_LIBRARY = [
   'Recommendation letter',
 ];
 
-function toDocumentKind(label: string) {
+export function toDocumentKind(label: string) {
   return label.trim().replace(/[\s-]+/g, '_').toUpperCase();
 }
 
