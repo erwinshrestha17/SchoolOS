@@ -161,6 +161,7 @@ model Tenant {
   admissionImportBatches        AdmissionImportBatch[]
   admissionImportRows           AdmissionImportRow[]
   admissionApplications         AdmissionApplication[]
+  admissionAssessmentSessions   AdmissionAssessmentSession[]
   admissionPolicies              AdmissionPolicy[]
   admissionPolicyVersions        AdmissionPolicyVersion[]
   admissionPolicyDocumentRequirements AdmissionPolicyDocumentRequirement[]

@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
@@ -19,7 +20,12 @@ import {
   CreateAdmissionCaseDto,
   DirectAdmitAdmissionCaseDto,
   FinalizeAdmissionCaseDto,
+  ListAdmissionAssessmentCandidatesDto,
+  ListAdmissionAssessmentSessionsDto,
+  ListDocumentRequestsDto,
+  RecordAdmissionAssessmentResultDto,
   ReviewAdmissionCaseDto,
+  ScheduleAdmissionAssessmentDto,
   UpdateAdmissionCaseDto,
   WaiveCaseDocumentDto,
 } from './dto/admission-case.dto';
@@ -29,6 +35,47 @@ import {
 @Entitlement('module.students')
 export class AdmissionCasesController {
   constructor(private readonly admissionCasesService: AdmissionCasesService) {}
+
+  @Get('document-requests')
+  @Permissions('enrollments:read', 'students:read', 'guardians:read')
+  listDocumentRequests(
+    @Query() query: ListDocumentRequestsDto,
+    @CurrentAuth() actor: AuthContext,
+  ) {
+    return this.admissionCasesService.listDocumentRequests(query, actor);
+  }
+
+  @Get('assessment-sessions')
+  @Permissions('enrollments:read', 'students:read', 'guardians:read')
+  listAssessmentSessions(
+    @Query() query: ListAdmissionAssessmentSessionsDto,
+    @CurrentAuth() actor: AuthContext,
+  ) {
+    return this.admissionCasesService.listAssessmentSessions(query, actor);
+  }
+
+  @Get('assessment-candidates')
+  @Permissions('enrollments:read', 'students:read', 'guardians:read')
+  listAssessmentCandidates(
+    @Query() query: ListAdmissionAssessmentCandidatesDto,
+    @CurrentAuth() actor: AuthContext,
+  ) {
+    return this.admissionCasesService.listAssessmentCandidates(query, actor);
+  }
+
+  @Post('assessment-sessions/:assessmentSessionId/result')
+  @Permissions('students:manage_lifecycle')
+  recordAssessmentResult(
+    @Param('assessmentSessionId') assessmentSessionId: string,
+    @Body() dto: RecordAdmissionAssessmentResultDto,
+    @CurrentAuth() actor: AuthContext,
+  ) {
+    return this.admissionCasesService.recordAssessmentResult(
+      assessmentSessionId,
+      dto,
+      actor,
+    );
+  }
 
   @Post('cases')
   @Permissions('enrollments:create', 'students:create', 'guardians:create')
@@ -65,6 +112,20 @@ export class AdmissionCasesController {
     @CurrentAuth() actor: AuthContext,
   ) {
     return this.admissionCasesService.updateCase(admissionCaseId, dto, actor);
+  }
+
+  @Post('cases/:admissionCaseId/assessment-session')
+  @Permissions('students:manage_lifecycle')
+  scheduleAssessmentSession(
+    @Param('admissionCaseId') admissionCaseId: string,
+    @Body() dto: ScheduleAdmissionAssessmentDto,
+    @CurrentAuth() actor: AuthContext,
+  ) {
+    return this.admissionCasesService.scheduleAssessmentSession(
+      admissionCaseId,
+      dto,
+      actor,
+    );
   }
 
   @Post('cases/:admissionCaseId/documents/waive')

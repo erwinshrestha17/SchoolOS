@@ -1,4 +1,7 @@
-import type { AdmissionPolicyResolution } from "./admission-policies.js";
+import type {
+  AdmissionDocumentTiming,
+  AdmissionPolicyResolution,
+} from "./admission-policies.js";
 
 export const ADMISSION_CASE_DISPLAY_STATUSES = [
   "DRAFT",
@@ -29,11 +32,44 @@ export const ADMISSION_CASE_REVIEW_ACTIONS = [
   "CLOSE",
 ] as const;
 
+export const ADMISSION_ASSESSMENT_TABS = [
+  "TODAY",
+  "UPCOMING",
+  "AWAITING_RESULTS",
+] as const;
+
+export const ADMISSION_ASSESSMENT_MODES = [
+  "IN_PERSON",
+  "PHONE",
+  "ONLINE",
+  "WRITTEN",
+] as const;
+
+export const ADMISSION_ASSESSMENT_STATUSES = [
+  "SCHEDULED",
+  "COMPLETED",
+  "CANCELLED",
+] as const;
+
+export const ADMISSION_ASSESSMENT_RESULTS = [
+  "PASSED",
+  "NEEDS_FOLLOW_UP",
+  "FAILED",
+  "NO_SHOW",
+] as const;
+
 export type AdmissionCaseDisplayStatus =
   (typeof ADMISSION_CASE_DISPLAY_STATUSES)[number];
 export type AdmissionCaseSource = (typeof ADMISSION_CASE_SOURCES)[number];
 export type AdmissionCaseReviewAction =
   (typeof ADMISSION_CASE_REVIEW_ACTIONS)[number];
+export type AdmissionAssessmentTab = (typeof ADMISSION_ASSESSMENT_TABS)[number];
+export type AdmissionAssessmentMode =
+  (typeof ADMISSION_ASSESSMENT_MODES)[number];
+export type AdmissionAssessmentStatus =
+  (typeof ADMISSION_ASSESSMENT_STATUSES)[number];
+export type AdmissionAssessmentResult =
+  (typeof ADMISSION_ASSESSMENT_RESULTS)[number];
 
 export type AdmissionCaseDocumentReference = {
   fileId: string;
@@ -51,6 +87,130 @@ export type AdmissionCaseDocumentWaiver = {
 export type WaiveCaseDocumentPayload = {
   documentKind: string;
   reason?: string;
+};
+
+export type AdmissionDocumentRequestMissingDocument = {
+  documentKind: string;
+  label: string;
+  timing: AdmissionDocumentTiming;
+  requiresOriginalVerification: boolean;
+  canBeWaived: boolean;
+};
+
+export type AdmissionDocumentRequestItem = {
+  admissionCaseId: string;
+  admittedStudentId: string | null;
+  applicantName: string;
+  guardianFullName: string | null;
+  guardianPhone: string | null;
+  classId: string | null;
+  className: string | null;
+  displayStatus: AdmissionCaseDisplayStatus;
+  policyId: string | null;
+  policyName: string | null;
+  missingDocuments: AdmissionDocumentRequestMissingDocument[];
+  daysPending: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdmissionDocumentRequestSummary = {
+  casesWithRequests: number;
+  totalMissingDocuments: number;
+  beforeReviewDocuments: number;
+  beforeEnrollmentDocuments: number;
+  casesWithoutGuardianPhone: number;
+  oldestDaysPending: number;
+};
+
+export type AdmissionDocumentRequestPage = {
+  items: AdmissionDocumentRequestItem[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  scanComplete: boolean;
+  summary: AdmissionDocumentRequestSummary;
+};
+
+export type AdmissionAssessmentSessionSummary = {
+  id: string;
+  admissionCaseId: string;
+  applicantName: string;
+  guardianFullName: string | null;
+  guardianPhone: string | null;
+  classId: string | null;
+  className: string | null;
+  displayStatus: AdmissionCaseDisplayStatus;
+  policyId: string | null;
+  policyName: string | null;
+  status: AdmissionAssessmentStatus;
+  scheduledAt: string;
+  durationMinutes: number;
+  mode: AdmissionAssessmentMode;
+  location: string | null;
+  notes: string | null;
+  interviewerUserId: string | null;
+  result: AdmissionAssessmentResult | null;
+  resultNotes: string | null;
+  resultScore: number | null;
+  resultRecordedAt: string | null;
+  resultRecordedById: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdmissionAssessmentCandidate = {
+  admissionCaseId: string;
+  applicantName: string;
+  guardianFullName: string | null;
+  guardianPhone: string | null;
+  classId: string | null;
+  className: string | null;
+  displayStatus: AdmissionCaseDisplayStatus;
+  policyId: string | null;
+  policyName: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdmissionAssessmentWorkspaceSummary = {
+  today: number;
+  upcoming: number;
+  awaitingResults: number;
+  needsScheduling: number;
+};
+
+export type AdmissionAssessmentSessionPage = {
+  items: AdmissionAssessmentSessionSummary[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  summary: AdmissionAssessmentWorkspaceSummary;
+};
+
+export type AdmissionAssessmentCandidatePage = {
+  items: AdmissionAssessmentCandidate[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+};
+
+export type ScheduleAdmissionAssessmentPayload = {
+  bsDate: string;
+  startTime: string;
+  durationMinutes?: number;
+  mode?: AdmissionAssessmentMode;
+  location?: string;
+  notes?: string;
+};
+
+export type RecordAdmissionAssessmentResultPayload = {
+  result: AdmissionAssessmentResult;
+  score?: number;
+  notes?: string;
 };
 
 export type AdmissionCaseEligibility = {
@@ -111,6 +271,7 @@ export type AdmissionCaseEligibility = {
     enrolled: number | null;
   } | null;
   nextActionLabel: string;
+  assessmentSession: AdmissionAssessmentSessionSummary | null;
 };
 
 export type AdmissionCaseReviewHistoryItem = {

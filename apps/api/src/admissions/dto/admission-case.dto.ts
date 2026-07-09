@@ -8,15 +8,22 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { Gender } from '@prisma/client';
+import { AdmissionDocumentTiming, Gender } from '@prisma/client';
 import {
+  ADMISSION_ASSESSMENT_MODES,
+  ADMISSION_ASSESSMENT_RESULTS,
+  ADMISSION_ASSESSMENT_TABS,
   ADMISSION_CASE_REVIEW_ACTIONS,
+  type AdmissionAssessmentMode,
+  type AdmissionAssessmentResult,
+  type AdmissionAssessmentTab,
   type AdmissionCaseReviewAction,
 } from '@schoolos/core';
 import {
@@ -246,6 +253,144 @@ export class FinalizeAdmissionCaseDto extends DirectAdmitAdmissionCaseDto {}
 export class WaiveCaseDocumentDto {
   @IsString() @MaxLength(80) documentKind!: string;
   @IsOptional() @IsString() @MinLength(5) @MaxLength(1000) reason?: string;
+}
+
+export class ListDocumentRequestsDto {
+  @IsOptional()
+  @IsString()
+  policyId?: string;
+
+  @IsOptional()
+  @IsString()
+  classId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  documentKind?: string;
+
+  @IsOptional()
+  @IsEnum(AdmissionDocumentTiming)
+  timing?: AdmissionDocumentTiming;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(3650)
+  @Type(() => Number)
+  minDaysPending?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  page?: number = 1;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @Type(() => Number)
+  limit?: number = 25;
+}
+
+export class ListAdmissionAssessmentSessionsDto {
+  @IsOptional()
+  @IsIn(ADMISSION_ASSESSMENT_TABS)
+  tab?: AdmissionAssessmentTab = 'TODAY';
+
+  @IsOptional()
+  @IsString()
+  policyId?: string;
+
+  @IsOptional()
+  @IsString()
+  classId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  page?: number = 1;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @Type(() => Number)
+  limit?: number = 25;
+}
+
+export class ListAdmissionAssessmentCandidatesDto {
+  @IsOptional()
+  @IsString()
+  policyId?: string;
+
+  @IsOptional()
+  @IsString()
+  classId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  page?: number = 1;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @Type(() => Number)
+  limit?: number = 25;
+}
+
+export class ScheduleAdmissionAssessmentDto {
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  bsDate!: string;
+
+  @IsString()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  startTime!: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(15)
+  @Max(240)
+  @Type(() => Number)
+  durationMinutes?: number;
+
+  @IsOptional()
+  @IsIn(ADMISSION_ASSESSMENT_MODES)
+  mode?: AdmissionAssessmentMode;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  location?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  notes?: string;
+}
+
+export class RecordAdmissionAssessmentResultDto {
+  @IsIn(ADMISSION_ASSESSMENT_RESULTS)
+  result!: AdmissionAssessmentResult;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  @Type(() => Number)
+  score?: number;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(5)
+  @MaxLength(1000)
+  notes?: string;
 }
 
 export class ReviewAdmissionCaseDto {

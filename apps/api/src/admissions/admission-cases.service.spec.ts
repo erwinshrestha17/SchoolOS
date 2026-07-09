@@ -116,11 +116,20 @@ function buildPrisma(overrides: Record<string, any> = {}) {
     },
     admissionApplication: {
       findFirst: jest.fn().mockResolvedValue(admissionCase),
+      findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
       update: jest
         .fn()
         .mockResolvedValue({ ...admissionCase, status: 'ADMITTED' }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    admissionAssessmentSession: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+      upsert: jest.fn(),
+      update: jest.fn(),
     },
     academicYear: {
       findFirst: jest.fn().mockResolvedValue({ id: 'year-a', name: '2082/83' }),
@@ -303,6 +312,335 @@ describe('AdmissionCasesService', () => {
       expect.objectContaining({
         data: expect.objectContaining({ status: 'WAITING_FOR_REVIEW' }),
       }),
+    );
+  });
+
+  it('lists timing-aware missing document requests including admitted follow-ups', async () => {
+    const nowSpy = jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(new Date('2026-07-10T00:00:00.000Z').getTime());
+    const policyVersion = {
+      ...defaultPolicyVersion,
+      documentRequirements: [
+        {
+          documentKind: 'BIRTH_CERTIFICATE',
+          label: 'Birth certificate',
+          isRequired: true,
+          timing: 'BEFORE_REVIEW',
+          requiresOriginalVerification: true,
+          canBeWaived: false,
+          waivableByRoleKeys: [],
+        },
+        {
+          documentKind: 'PHOTO',
+          label: 'Photo',
+          isRequired: true,
+          timing: 'BEFORE_ENROLLMENT',
+          requiresOriginalVerification: false,
+          canBeWaived: false,
+          waivableByRoleKeys: [],
+        },
+      ],
+    };
+    const admittedWithFollowUp = {
+      ...admissionCase,
+      status: 'ADMITTED',
+      convertedStudentId: 'student-a',
+      policyVersionId: null,
+      createdAt: new Date('2026-07-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-07-08T00:00:00.000Z'),
+      duplicateReview: {
+        followUps: [
+          {
+            code: 'DOCUMENTS_PENDING',
+            label: 'Add missing student documents',
+            blocking: false,
+          },
+        ],
+      },
+    };
+    const prisma = buildPrisma({
+      admissionApplication: {
+        findMany: jest.fn().mockResolvedValue([admittedWithFollowUp]),
+      },
+      admissionPolicy: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'policy-default',
+            name: 'School Default',
+            isDefault: true,
+            academicYearId: null,
+            classId: null,
+            gradeBand: null,
+            source: null,
+            applicantType: 'BOTH',
+            currentVersionId: 'version-default',
+            currentVersion: policyVersion,
+          },
+        ]),
+      },
+      class: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 'class-a', name: 'Grade 5', level: 5 }]),
+      },
+    });
+    const service = buildService(prisma);
+
+    try {
+      const result = await service.listDocumentRequests(
+        { timing: 'BEFORE_REVIEW', minDaysPending: 7 },
+        actor,
+      );
+
+      expect(result.total).toBe(1);
+      expect(result.summary).toEqual(
+        expect.objectContaining({
+          casesWithRequests: 1,
+          totalMissingDocuments: 1,
+          beforeReviewDocuments: 1,
+          beforeEnrollmentDocuments: 0,
+          oldestDaysPending: 9,
+        }),
+      );
+      expect(result.items[0]).toEqual(
+        expect.objectContaining({
+          admissionCaseId: 'case-a',
+          admittedStudentId: 'student-a',
+          className: 'Grade 5',
+          displayStatus: 'ADMITTED',
+          missingDocuments: [
+            expect.objectContaining({
+              documentKind: 'BIRTH_CERTIFICATE',
+              timing: 'BEFORE_REVIEW',
+              requiresOriginalVerification: true,
+            }),
+          ],
+        }),
+      );
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('lists interview-required admission cases that still need scheduling', async () => {
+    const interviewCase = {
+      ...admissionCase,
+      status: 'WAITING_FOR_REVIEW',
+    };
+    const prisma = buildPrisma({
+      admissionApplication: {
+        findMany: jest.fn().mockResolvedValue([interviewCase]),
+      },
+      class: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 'class-a', name: 'Grade 5', level: 5 }]),
+      },
+    });
+    mockPolicy(prisma, {
+      admissionMode: 'REVIEW_REQUIRED',
+      requireInterview: true,
+    });
+    const service = buildService(prisma);
+
+    const result = await service.listAssessmentCandidates({}, actor);
+
+    expect(prisma.admissionApplication.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-a',
+          assessmentSessions: { none: {} },
+        }),
+      }),
+    );
+    expect(result.total).toBe(1);
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        admissionCaseId: 'case-a',
+        applicantName: 'Aarav Shrestha',
+        className: 'Grade 5',
+        policyName: 'School Default',
+      }),
+    );
+  });
+
+  it('schedules a policy-required assessment in NPT and audits the lifecycle change', async () => {
+    const nowSpy = jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(new Date('2026-07-10T00:00:00.000Z').getTime());
+    const scheduledSession = {
+      id: 'assessment-a',
+      tenantId: 'tenant-a',
+      admissionCaseId: 'case-a',
+      status: 'SCHEDULED',
+      scheduledAt: new Date('2026-07-17T04:15:00.000Z'),
+      durationMinutes: 45,
+      mode: 'IN_PERSON',
+      location: 'Room 2',
+      notes: 'Meet admission coordinator.',
+      interviewerUserId: 'user-a',
+      result: null,
+      resultNotes: null,
+      resultScore: null,
+      resultRecordedAt: null,
+      resultRecordedById: null,
+      createdById: 'user-a',
+      updatedById: 'user-a',
+      createdAt: new Date('2026-07-10T00:00:00.000Z'),
+      updatedAt: new Date('2026-07-10T00:00:00.000Z'),
+    };
+    const prisma = buildPrisma();
+    mockPolicy(prisma, {
+      admissionMode: 'REVIEW_REQUIRED',
+      requireInterview: true,
+    });
+    prisma.admissionAssessmentSession.upsert.mockResolvedValue(
+      scheduledSession,
+    );
+    prisma.admissionAssessmentSession.findFirst.mockResolvedValue({
+      ...scheduledSession,
+      admissionCase: { ...admissionCase, status: 'WAITING_FOR_REVIEW' },
+    });
+    const auditService = { record: jest.fn() };
+    const service = buildService(prisma, { auditService });
+
+    try {
+      const result = await service.scheduleAssessmentSession(
+        'case-a',
+        {
+          bsDate: '2083-04-01',
+          startTime: '10:00',
+          durationMinutes: 45,
+          location: 'Room 2',
+          notes: 'Meet admission coordinator.',
+        },
+        actor,
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'assessment-a',
+          admissionCaseId: 'case-a',
+          status: 'SCHEDULED',
+          mode: 'IN_PERSON',
+        }),
+      );
+      expect(prisma.admissionAssessmentSession.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            tenantId: 'tenant-a',
+            admissionCaseId: 'case-a',
+            scheduledAt: expect.any(Date),
+            durationMinutes: 45,
+            interviewerUserId: 'user-a',
+          }),
+        }),
+      );
+      expect(prisma.admissionApplication.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'case-a' },
+          data: expect.objectContaining({
+            status: 'WAITING_FOR_REVIEW',
+            policyVersionId: 'version-default',
+          }),
+        }),
+      );
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'admission_assessment_schedule',
+          tenantId: 'tenant-a',
+          resourceId: 'assessment-a',
+          after: expect.objectContaining({ admissionCaseId: 'case-a' }),
+        }),
+        prisma,
+      );
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('records an assessment result once and keeps the admission case open for review', async () => {
+    const scheduledSession = {
+      id: 'assessment-a',
+      tenantId: 'tenant-a',
+      admissionCaseId: 'case-a',
+      status: 'SCHEDULED',
+      scheduledAt: new Date('2026-07-09T04:15:00.000Z'),
+      durationMinutes: 30,
+      mode: 'IN_PERSON',
+      location: null,
+      notes: null,
+      interviewerUserId: 'user-a',
+      result: null,
+      resultNotes: null,
+      resultScore: null,
+      resultRecordedAt: null,
+      resultRecordedById: null,
+      createdById: 'user-a',
+      updatedById: 'user-a',
+      createdAt: new Date('2026-07-08T00:00:00.000Z'),
+      updatedAt: new Date('2026-07-08T00:00:00.000Z'),
+    };
+    const completedSession = {
+      ...scheduledSession,
+      status: 'COMPLETED',
+      result: 'PASSED',
+      resultScore: 82,
+      resultRecordedAt: new Date('2026-07-09T05:00:00.000Z'),
+      resultRecordedById: 'user-a',
+    };
+    const prisma = buildPrisma();
+    prisma.admissionAssessmentSession.findFirst
+      .mockResolvedValueOnce({
+        ...scheduledSession,
+        admissionCase: { ...admissionCase, status: 'WAITING_FOR_REVIEW' },
+      })
+      .mockResolvedValueOnce({
+        ...completedSession,
+        admissionCase: { ...admissionCase, status: 'WAITING_FOR_REVIEW' },
+      });
+    prisma.admissionAssessmentSession.update.mockResolvedValue(
+      completedSession,
+    );
+    const auditService = { record: jest.fn() };
+    const service = buildService(prisma, { auditService });
+
+    const result = await service.recordAssessmentResult(
+      'assessment-a',
+      { result: 'PASSED', score: 82 },
+      actor,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: 'assessment-a',
+        result: 'PASSED',
+        resultScore: 82,
+      }),
+    );
+    expect(prisma.admissionAssessmentSession.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'assessment-a' },
+        data: expect.objectContaining({
+          status: 'COMPLETED',
+          result: 'PASSED',
+          resultScore: 82,
+          resultRecordedById: 'user-a',
+        }),
+      }),
+    );
+    expect(prisma.admissionApplication.update).not.toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'admission_assessment_result',
+        resourceId: 'assessment-a',
+        after: expect.objectContaining({
+          result: 'PASSED',
+          resultScore: 82,
+        }),
+      }),
+      prisma,
     );
   });
 
@@ -550,6 +888,38 @@ describe('AdmissionCasesService', () => {
     expect(auditService.record).not.toHaveBeenCalled();
   });
 
+  it('blocks approval while a policy-required interview has no passed result', async () => {
+    const waitingCase = {
+      ...admissionCase,
+      status: 'WAITING_FOR_REVIEW',
+    };
+    const prisma = buildPrisma({
+      admissionApplication: {
+        findFirst: jest.fn().mockResolvedValue(waitingCase),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    });
+    mockPolicy(prisma, {
+      admissionMode: 'REVIEW_REQUIRED',
+      requireInterview: true,
+    });
+    const auditService = { record: jest.fn() };
+    const service = buildService(prisma, { auditService });
+
+    await expect(
+      service.reviewCase(
+        'case-a',
+        {
+          action: 'APPROVE',
+          reason: 'Application is otherwise ready.',
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.admissionApplication.updateMany).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
   it('records a reasoned approval with tenant and concurrency predicates in one transaction', async () => {
     const waitingCase = {
       ...admissionCase,
@@ -758,7 +1128,10 @@ describe('AdmissionCasesService', () => {
 
     await service.waiveCaseDocument(
       'case-a',
-      { documentKind: 'TRANSFER_CERTIFICATE', reason: 'Original verified at the desk.' },
+      {
+        documentKind: 'TRANSFER_CERTIFICATE',
+        reason: 'Original verified at the desk.',
+      },
       actor,
     );
 
@@ -809,7 +1182,9 @@ describe('AdmissionCasesService', () => {
 
     const result = await service.getCase('case-a', actor);
 
-    expect(result.missingRequiredDocuments).not.toContain('TRANSFER_CERTIFICATE');
+    expect(result.missingRequiredDocuments).not.toContain(
+      'TRANSFER_CERTIFICATE',
+    );
     expect(result.waivedDocuments).toEqual([
       expect.objectContaining({ documentKind: 'TRANSFER_CERTIFICATE' }),
     ]);
@@ -891,7 +1266,9 @@ describe('AdmissionCasesService', () => {
       }),
     );
     expect(auditService.record).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'admission_case_document_waiver_removed' }),
+      expect.objectContaining({
+        action: 'admission_case_document_waiver_removed',
+      }),
     );
 
     const bare = buildPrisma();

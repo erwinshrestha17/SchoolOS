@@ -380,12 +380,43 @@ model AdmissionApplication {
 
   tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   policyVersion AdmissionPolicyVersion? @relation(fields: [policyVersionId], references: [id], onDelete: SetNull)
+  assessmentSessions AdmissionAssessmentSession[]
 
   @@index([tenantId, status, createdAt])
   @@index([tenantId, classId, status])
   @@index([tenantId, guardianPhone])
   @@index([tenantId, convertedStudentId])
   @@index([tenantId, policyVersionId])
+}
+
+model AdmissionAssessmentSession {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  admissionCaseId    String
+  status             String   @default("SCHEDULED")
+  scheduledAt        DateTime
+  durationMinutes    Int      @default(30)
+  mode               String   @default("IN_PERSON")
+  location           String?
+  notes              String?  @db.Text
+  interviewerUserId  String?
+  result             String?
+  resultNotes        String?  @db.Text
+  resultScore        Int?
+  resultRecordedAt   DateTime?
+  resultRecordedById String?
+  createdById        String?
+  updatedById        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  admissionCase AdmissionApplication @relation(fields: [admissionCaseId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, admissionCaseId])
+  @@index([tenantId, status, scheduledAt])
+  @@index([tenantId, interviewerUserId, scheduledAt])
+  @@index([tenantId, admissionCaseId])
 }
 
 model StudentDocumentExpiryTemplate {

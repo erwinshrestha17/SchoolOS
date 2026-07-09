@@ -8,6 +8,13 @@ const read = (path) => readFileSync(join(webRoot, path), "utf8");
 
 test("M1 workspaces expose real route-backed operations", () => {
   const api = read("lib/api/students.ts");
+  const caseApi = read("lib/api/admission-cases.ts");
+  const documentRequestCenter = read(
+    "components/m1/document-request-center.tsx",
+  );
+  const assessmentWorkspace = read(
+    "components/m1/assessment-interview-workspace.tsx",
+  );
   const documentsWorkspace = read(
     "components/m1/student-documents-workspace.tsx",
   );
@@ -22,6 +29,7 @@ test("M1 workspaces expose real route-backed operations", () => {
   );
   const routes = [
     "app/dashboard/admissions/documents/page.tsx",
+    "app/dashboard/admissions/assessments/page.tsx",
     "app/dashboard/admissions/duplicates/page.tsx",
     "app/dashboard/admissions/iemis/page.tsx",
     "app/dashboard/admissions/qr/page.tsx",
@@ -31,10 +39,41 @@ test("M1 workspaces expose real route-backed operations", () => {
     .join("\n");
 
   assert.match(routes, /StudentDocumentsWorkspace/);
+  assert.match(routes, /DocumentRequestCenter/);
+  assert.match(routes, /AssessmentInterviewWorkspace/);
   assert.match(routes, /DuplicateCandidatesWorkspace/);
   assert.match(routes, /IemisReadinessWorkspace/);
   assert.match(routes, /QrIdWorkspace/);
   assert.match(routes, /redirect\('\/dashboard\/admissions'\)/);
+  assert.match(caseApi, /\/admissions\/document-requests/);
+  assert.match(caseApi, /AdmissionDocumentRequestPage/);
+  assert.match(caseApi, /\/admissions\/assessment-sessions/);
+  assert.match(caseApi, /\/admissions\/assessment-candidates/);
+  assert.match(
+    caseApi,
+    /\/admissions\/cases\/\$\{admissionCaseId\}\/assessment-session/,
+  );
+  assert.match(caseApi, /AdmissionAssessmentSessionPage/);
+  assert.match(
+    documentRequestCenter,
+    /admissionCasesApi\.listDocumentRequests/,
+  );
+  assert.match(documentRequestCenter, /policyId/);
+  assert.match(documentRequestCenter, /classId/);
+  assert.match(documentRequestCenter, /minDaysPending/);
+  assert.match(documentRequestCenter, /Send reminders/);
+  assert.match(
+    documentRequestCenter,
+    /Notification delivery is not enabled for this admissions workspace yet/,
+  );
+  assert.match(assessmentWorkspace, /formatBsDateForInput/);
+  assert.match(assessmentWorkspace, /formatBsDateTime/);
+  assert.match(assessmentWorkspace, /listAssessmentSessions/);
+  assert.match(assessmentWorkspace, /listAssessmentCandidates/);
+  assert.match(assessmentWorkspace, /scheduleAssessmentSession/);
+  assert.match(assessmentWorkspace, /recordAssessmentResult/);
+  assert.match(assessmentWorkspace, /AWAITING_RESULTS/);
+  assert.doesNotMatch(assessmentWorkspace, /datetime-local/);
   assert.match(api, /\/students\/duplicates\/merge/);
   assert.match(api, /\/admissions\/applications/);
   assert.match(api, /updateAdmissionApplicationStatus/);
@@ -285,16 +324,19 @@ test("M1 high-risk workflows remain server controlled and protected", () => {
   // "Not admit" is a hard-to-reverse decision on a real applicant: it must
   // use the shared destructive-confirmation dialog, not the same inline
   // reason panel as the reversible Approve/Request-information actions.
-  assert.match(admissionCase, /import { ConfirmDialog } from "..\/ui\/confirm-dialog"/);
+  assert.match(
+    admissionCase,
+    /import { ConfirmDialog } from "..\/ui\/confirm-dialog"/,
+  );
   assert.match(admissionCase, /variant="destructive"/);
   assert.match(admissionCase, /rejectDialogOpen/);
   assert.match(admissionCase, /<ConfirmDialog/);
   assert.match(admissionCase, /Do not admit this applicant\?/);
-  assert.match(admissionCase, /confirmDisabled=\{rejectReason\.trim\(\)\.length < 5\}/);
   assert.match(
     admissionCase,
-    /reviewMutation\.mutate\(\{\s*action: "REJECT"/,
+    /confirmDisabled=\{rejectReason\.trim\(\)\.length < 5\}/,
   );
+  assert.match(admissionCase, /reviewMutation\.mutate\(\{\s*action: "REJECT"/);
 });
 
 test("M1 student roster uses backend summary, safe filters, and paginated roster contract", () => {
@@ -321,9 +363,11 @@ test("M1 Admissions overview shows a real, actionable, honest KPI grid", () => {
 
   // Uses the same bounded, permission-filtered operational-summary contract
   // already computed backend-side, not a browser total or a fake placeholder.
-  assert.match(page, /api\.getModuleSummary\('students'\)/);
+  assert.match(page, /api\.getModuleSummary\(["']students["']\)/);
+  assert.match(page, /admissionCasesApi\.listDocumentRequests/);
+  assert.match(page, /\/dashboard\/admissions\/assessments/);
   assert.match(page, /applicationsNeedingReview/);
-  assert.match(page, /unverifiedDocuments/);
+  assert.match(page, /totalMissingDocuments/);
   assert.match(page, /duplicateCandidates/);
   assert.match(page, /iemisReadinessBlockers/);
 
@@ -331,8 +375,8 @@ test("M1 Admissions overview shows a real, actionable, honest KPI grid", () => {
   // must never render as a fabricated 0. Loading uses the shared KpiCard
   // skeleton (loading prop), not the literal word "Loading" as a value.
   assert.match(page, /loading=\{summaryQuery\.isLoading\}/);
-  assert.match(page, /return 'Unavailable'/);
-  assert.doesNotMatch(page, /isLoading\) return 'Loading'/);
+  assert.match(page, /return ["']Unavailable["']/);
+  assert.doesNotMatch(page, /isLoading\) return ["']Loading["']/);
 
   // Every card opens a real, existing filtered queue.
   assert.match(page, /href="\/dashboard\/admissions"/);
@@ -364,7 +408,9 @@ test("student directory row actions use the shared keyboard-accessible ActionMen
 
 test("admission case review actions have consistent visual risk hierarchy across both review surfaces", () => {
   const caseDetail = read("components/m1/admission-case-detail.tsx");
-  const reviewWorkspace = read("components/m1/application-review-workspace.tsx");
+  const reviewWorkspace = read(
+    "components/m1/application-review-workspace.tsx",
+  );
 
   // Approve is the common, positive path — it must read as the primary
   // action (no explicit variant = default/filled), not the same visual
@@ -377,10 +423,7 @@ test("admission case review actions have consistent visual risk hierarchy across
   // Reject ("Do not admit") must be visually destructive in both places
   // real applicants can be rejected from, not just one.
   assert.match(caseDetail, /variant="destructive"/);
-  assert.match(
-    reviewWorkspace,
-    /action === "REJECT"\s*\n\s*\? "destructive"/,
-  );
+  assert.match(reviewWorkspace, /action === "REJECT"\s*\n\s*\? "destructive"/);
 
   // Wording must match within a single flow: the button that opens the
   // confirm dialog and the dialog's own confirm label must agree.
