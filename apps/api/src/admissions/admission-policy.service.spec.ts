@@ -29,6 +29,11 @@ function buildPrisma(overrides: Record<string, any> = {}) {
       upsert: jest.fn(),
       deleteMany: jest.fn(),
     },
+    approvalPolicy: {
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
     admissionApplication: { count: jest.fn().mockResolvedValue(0) },
     academicYear: { findFirst: jest.fn().mockResolvedValue({ id: 'year-a' }) },
     class: { findFirst: jest.fn().mockResolvedValue({ id: 'class-a' }) },
@@ -270,5 +275,157 @@ describe('AdmissionPolicyService', () => {
         data: expect.objectContaining({ name: 'Grade 5 Transfer 2084' }),
       }),
     );
+  });
+
+  describe('approval chain', () => {
+    it('creates an ApprovalPolicy on the first save and links it to the draft version', async () => {
+      const prisma = buildPrisma();
+      prisma.admissionPolicyVersion.findFirst.mockResolvedValue({
+        id: 'version-draft',
+        policyId: 'policy-a',
+        status: 'DRAFT',
+        approvalPolicyId: null,
+      });
+      prisma.approvalPolicy.create.mockResolvedValue({ id: 'approval-policy-a' });
+      const service = buildService(prisma);
+      jest.spyOn(service, 'get').mockResolvedValue({ id: 'policy-a' } as any);
+
+      await service.replaceApprovalChain(
+        'policy-a',
+        'version-draft',
+        { stages: [{ approverRole: 'vice_principal' }, { approverRole: 'principal' }] },
+        actor,
+      );
+
+      expect(prisma.approvalPolicy.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            workflowType: 'ADMISSION_CASE',
+            name: 'admission-policy-version:version-draft',
+            minApprovals: 2,
+            approverRoles: ['vice_principal', 'principal'],
+            approverPermissions: ['', ''],
+          }),
+        }),
+      );
+      expect(prisma.admissionPolicyVersion.update).toHaveBeenCalledWith({
+        where: { id: 'version-draft' },
+        data: { approvalPolicyId: 'approval-policy-a' },
+      });
+      expect(prisma.approvalPolicy.update).not.toHaveBeenCalled();
+    });
+
+    it('replaces the existing ApprovalPolicy in place on a second save (no duplicate rows)', async () => {
+      const prisma = buildPrisma();
+      prisma.admissionPolicyVersion.findFirst.mockResolvedValue({
+        id: 'version-draft',
+        policyId: 'policy-a',
+        status: 'DRAFT',
+        approvalPolicyId: 'approval-policy-a',
+      });
+      const service = buildService(prisma);
+      jest.spyOn(service, 'get').mockResolvedValue({ id: 'policy-a' } as any);
+
+      await service.replaceApprovalChain(
+        'policy-a',
+        'version-draft',
+        { minApprovals: 1, stages: [{ approverRole: 'principal' }] },
+        actor,
+      );
+
+      expect(prisma.approvalPolicy.create).not.toHaveBeenCalled();
+      expect(prisma.approvalPolicy.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'approval-policy-a' },
+          data: expect.objectContaining({
+            minApprovals: 1,
+            approverRoles: ['principal'],
+          }),
+        }),
+      );
+    });
+
+    it('rejects editing the approval chain on a non-draft version', async () => {
+      const prisma = buildPrisma();
+      prisma.admissionPolicyVersion.findFirst.mockResolvedValue({
+        id: 'version-active',
+        policyId: 'policy-a',
+        status: 'ACTIVE',
+        approvalPolicyId: null,
+      });
+      const service = buildService(prisma);
+
+      await expect(
+        service.replaceApprovalChain(
+          'policy-a',
+          'version-active',
+          { stages: [{ approverRole: 'principal' }] },
+          actor,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.approvalPolicy.create).not.toHaveBeenCalled();
+    });
+
+    it('clears the FK and deletes the ApprovalPolicy row on delete', async () => {
+      const prisma = buildPrisma();
+      prisma.admissionPolicyVersion.findFirst.mockResolvedValue({
+        id: 'version-draft',
+        policyId: 'policy-a',
+        status: 'DRAFT',
+        approvalPolicyId: 'approval-policy-a',
+      });
+      const service = buildService(prisma);
+      jest.spyOn(service, 'get').mockResolvedValue({ id: 'policy-a' } as any);
+
+      await service.deleteApprovalChain('policy-a', 'version-draft', actor);
+
+      expect(prisma.admissionPolicyVersion.update).toHaveBeenCalledWith({
+        where: { id: 'version-draft' },
+        data: { approvalPolicyId: null },
+      });
+      expect(prisma.approvalPolicy.delete).toHaveBeenCalledWith({
+        where: { id: 'approval-policy-a' },
+      });
+    });
+
+    it('clones the approval chain into a new ApprovalPolicy row when starting a new draft', async () => {
+      const prisma = buildPrisma();
+      prisma.admissionPolicy.findFirst.mockResolvedValue({
+        id: 'policy-a',
+        currentVersionId: 'version-active',
+        versions: [
+          {
+            id: 'version-active',
+            status: 'ACTIVE',
+            approvalPolicy: {
+              id: 'approval-policy-source',
+              minApprovals: 1,
+              approverRoles: ['principal'],
+              approverPermissions: [''],
+            },
+          },
+        ],
+      });
+      prisma.admissionPolicyVersion.create.mockResolvedValue({ id: 'version-draft', version: 2 });
+      prisma.approvalPolicy.create.mockResolvedValue({ id: 'approval-policy-clone' });
+      const service = buildService(prisma);
+      jest.spyOn(service, 'get').mockResolvedValue({ id: 'policy-a' } as any);
+
+      await service.startDraftVersion('policy-a', actor);
+
+      expect(prisma.approvalPolicy.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            name: 'admission-policy-version:version-draft',
+            minApprovals: 1,
+            approverRoles: ['principal'],
+          }),
+        }),
+      );
+      expect(prisma.admissionPolicyVersion.update).toHaveBeenCalledWith({
+        where: { id: 'version-draft' },
+        data: { approvalPolicyId: 'approval-policy-clone' },
+      });
+    });
   });
 });

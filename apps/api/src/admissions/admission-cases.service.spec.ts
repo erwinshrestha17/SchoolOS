@@ -178,6 +178,8 @@ function buildPrisma(overrides: Record<string, any> = {}) {
     },
     studentDocument: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
     fileAsset: { findMany: jest.fn().mockResolvedValue([]) },
+    approvalRequest: { findFirst: jest.fn().mockResolvedValue(null) },
+    approvalPolicy: { findUnique: jest.fn().mockResolvedValue(null) },
     auditLog: { create: jest.fn().mockResolvedValue({ id: 'audit-a' }) },
     user: { findFirst: jest.fn() },
     $transaction: jest.fn(async (callback: any) => callback(prisma)),
@@ -194,6 +196,11 @@ function buildService(prisma: any, dependencies: Record<string, any> = {}) {
     dependencies.fileRegistryService ?? { getFileMetadata: jest.fn() },
     dependencies.studentRecordsService ?? {
       attachRegisteredAdmissionDocuments: jest.fn(),
+    },
+    dependencies.approvalWorkflowService ?? {
+      createRequest: jest.fn(),
+      decide: jest.fn(),
+      registerFinalAction: jest.fn(),
     },
   );
 }
@@ -1280,5 +1287,173 @@ describe('AdmissionCasesService', () => {
         actor,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  describe('multi-tier approval chain', () => {
+    const waitingCase = { ...admissionCase, status: 'WAITING_FOR_REVIEW' };
+    const stageActor = {
+      tenantId: 'tenant-a',
+      userId: 'user-vp',
+      roles: ['vice_principal'],
+      permissions: ['students:manage_lifecycle'],
+    } as any;
+
+    it('starts a new approval chain on the first APPROVE click and leaves the case WAITING_FOR_REVIEW', async () => {
+      const prisma = buildPrisma({
+        admissionApplication: {
+          findFirst: jest.fn().mockResolvedValue(waitingCase),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        approvalPolicy: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'approval-policy-x',
+            approverRoles: ['vice_principal', 'principal'],
+            approverPermissions: ['', ''],
+          }),
+        },
+      });
+      mockPolicy(prisma, {
+        admissionMode: 'REVIEW_REQUIRED',
+        approvalPolicyId: 'approval-policy-x',
+      });
+      const approvalWorkflowService = {
+        createRequest: jest.fn().mockResolvedValue({ id: 'request-a' }),
+        decide: jest.fn().mockResolvedValue({ status: 'PENDING' }),
+        registerFinalAction: jest.fn(),
+      };
+      const service = buildService(prisma, { approvalWorkflowService });
+
+      await service.reviewCase(
+        'case-a',
+        { action: 'APPROVE', reason: 'Reviewed and ready for stage 1.' },
+        stageActor,
+      );
+
+      expect(approvalWorkflowService.createRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workflowType: 'ADMISSION_CASE',
+          policyId: 'approval-policy-x',
+          targetModule: 'admissions',
+          targetType: 'AdmissionApplication',
+          targetId: 'case-a',
+        }),
+        stageActor,
+      );
+      expect(approvalWorkflowService.decide).toHaveBeenCalledWith(
+        'request-a',
+        expect.objectContaining({ decision: 'APPROVE' }),
+        stageActor,
+      );
+      expect(prisma.admissionApplication.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects APPROVE from an actor who does not hold the current stage role', async () => {
+      const prisma = buildPrisma({
+        admissionApplication: {
+          findFirst: jest.fn().mockResolvedValue(waitingCase),
+        },
+        approvalPolicy: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'approval-policy-x',
+            approverRoles: ['vice_principal'],
+            approverPermissions: [''],
+          }),
+        },
+      });
+      mockPolicy(prisma, {
+        admissionMode: 'REVIEW_REQUIRED',
+        approvalPolicyId: 'approval-policy-x',
+      });
+      const approvalWorkflowService = {
+        createRequest: jest.fn(),
+        decide: jest.fn(),
+        registerFinalAction: jest.fn(),
+      };
+      const service = buildService(prisma, { approvalWorkflowService });
+      const otherActor = { ...stageActor, roles: ['teacher'] };
+
+      await expect(
+        service.reviewCase(
+          'case-a',
+          { action: 'APPROVE', reason: 'Trying to approve without the role.' },
+          otherActor,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(approvalWorkflowService.createRequest).not.toHaveBeenCalled();
+    });
+
+    it('advances an in-progress chain via decide() when the current stage approver approves', async () => {
+      const prisma = buildPrisma({
+        admissionApplication: {
+          findFirst: jest.fn().mockResolvedValue(waitingCase),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        approvalRequest: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'request-a',
+            steps: [
+              {
+                sequence: 1,
+                status: 'APPROVED',
+                approverRole: 'vice_principal',
+                approverPermission: null,
+              },
+              {
+                sequence: 2,
+                status: 'PENDING',
+                approverRole: 'principal',
+                approverPermission: null,
+              },
+            ],
+          }),
+        },
+      });
+      mockPolicy(prisma, {
+        admissionMode: 'REVIEW_REQUIRED',
+        approvalPolicyId: 'approval-policy-x',
+      });
+      const approvalWorkflowService = {
+        createRequest: jest.fn(),
+        decide: jest.fn().mockResolvedValue({ status: 'APPROVED' }),
+        registerFinalAction: jest.fn(),
+      };
+      const service = buildService(prisma, { approvalWorkflowService });
+      const principalActor = {
+        ...stageActor,
+        userId: 'user-principal',
+        roles: ['principal'],
+      };
+
+      await service.reviewCase(
+        'case-a',
+        { action: 'APPROVE', reason: 'Final sign-off.' },
+        principalActor,
+      );
+
+      expect(approvalWorkflowService.createRequest).not.toHaveBeenCalled();
+      expect(approvalWorkflowService.decide).toHaveBeenCalledWith(
+        'request-a',
+        expect.objectContaining({ decision: 'APPROVE' }),
+        principalActor,
+      );
+      expect(prisma.admissionApplication.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('still gates legacy requirePrincipalApproval on principal/platform_super_admin only when no chain is configured', async () => {
+      const prisma = buildPrisma();
+      mockPolicy(prisma, {
+        admissionMode: 'REVIEW_REQUIRED',
+        requirePrincipalApproval: true,
+      });
+      const service = buildService(prisma);
+
+      await expect(
+        service.reviewCase(
+          'case-a',
+          { action: 'APPROVE', reason: 'Reviewed.' },
+          { ...stageActor, roles: ['vice_principal'] },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
   });
 });

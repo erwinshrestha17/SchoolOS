@@ -65,6 +65,12 @@ export const approvalWorkflowCatalog = [
     targetType: 'support_override',
     defaultFinalActionKey: 'platform.support_override.apply',
   },
+  {
+    workflowType: ApprovalWorkflowType.ADMISSION_CASE,
+    module: 'admissions',
+    targetType: 'admission_application',
+    defaultFinalActionKey: 'admissions.case.approve',
+  },
 ] as const;
 
 export const initialAutomationRuleCatalog = [

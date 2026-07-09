@@ -119,7 +119,13 @@ export function AdmissionPolicyList() {
           },
           { header: 'Documents', cell: (policy) => `${policy.requiredDocumentCount} required` },
           { header: 'Assessment', cell: (policy) => policy.assessment },
-          { header: 'Approval', cell: (policy) => policy.approvalLevel ?? 'Front-desk' },
+          {
+            header: 'Approval',
+            cell: (policy) =>
+              policy.approvalChainSummary
+                ? `${policy.approvalChainSummary.stageCount} stage${policy.approvalChainSummary.stageCount === 1 ? '' : 's'}`
+                : 'Front-desk',
+          },
           { header: 'Status', cell: (policy) => <StatusBadge status={policy.status} tone={STATUS_TONE[policy.status]} /> },
           { header: 'Last updated', cell: (policy) => formatSchoolDate(policy.updatedAt) },
           {

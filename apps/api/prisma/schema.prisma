@@ -878,6 +878,7 @@ enum ApprovalWorkflowType {
   DOCUMENT_DELETION_ARCHIVE
   EMERGENCY_HIGH_IMPACT_NOTICE
   PLATFORM_SUPPORT_OVERRIDE
+  ADMISSION_CASE
 }
 
 enum ApprovalRequestStatus {
@@ -1758,7 +1759,7 @@ model AdmissionPolicyVersion {
   allowAdmissionWithDocumentsPending Boolean               @default(true)
   enforceCapacityWhenAvailable       Boolean               @default(false)
   capacityOverride                   Int?
-  approvalLevel                      String?
+  approvalPolicyId                   String?               @unique
   notesForOffice                     String?               @db.Text
   activatedAt                        DateTime?
   activatedById                      String?
@@ -1770,6 +1771,7 @@ model AdmissionPolicyVersion {
   currentOf            AdmissionPolicy?                     @relation("CurrentPolicyVersion")
   createdBy            User?                                @relation("CreatedAdmissionPolicyVersions", fields: [createdById], references: [id], onDelete: SetNull)
   activatedBy          User?                                @relation("ActivatedAdmissionPolicyVersions", fields: [activatedById], references: [id], onDelete: SetNull)
+  approvalPolicy       ApprovalPolicy?                      @relation(fields: [approvalPolicyId], references: [id], onDelete: SetNull)
   documentRequirements AdmissionPolicyDocumentRequirement[]
   applications         AdmissionApplication[]
 
@@ -1818,9 +1820,10 @@ model ApprovalPolicy {
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
-  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  createdBy User?             @relation("CreatedApprovalPolicies", fields: [createdById], references: [id], onDelete: SetNull)
-  requests  ApprovalRequest[]
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy              User?                   @relation("CreatedApprovalPolicies", fields: [createdById], references: [id], onDelete: SetNull)
+  requests               ApprovalRequest[]
+  admissionPolicyVersion AdmissionPolicyVersion?
 
   @@unique([tenantId, workflowType, name])
   @@index([tenantId, workflowType, isActive])

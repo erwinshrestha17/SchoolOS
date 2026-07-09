@@ -101,7 +101,14 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
               <Summary label="Grade band" value={policy.gradeBand ?? 'Any'} />
               <Summary label="Required documents" value={String(policy.requiredDocumentCount)} />
               <Summary label="Assessment" value={policy.assessment} />
-              <Summary label="Approval level" value={policy.approvalLevel ?? 'Front-desk'} />
+              <Summary
+                label="Approval"
+                value={
+                  policy.approvalChainSummary
+                    ? `${policy.approvalChainSummary.stageCount} stage${policy.approvalChainSummary.stageCount === 1 ? '' : 's'}`
+                    : 'Front-desk'
+                }
+              />
               <Summary label="Last updated" value={formatSchoolDate(policy.updatedAt)} />
             </dl>
           </SectionCard>
@@ -164,10 +171,24 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
           <SectionCard title="Decision" description="How admissions under this policy are approved.">
             <dl className="grid gap-3 sm:grid-cols-2">
               <Summary label="Admission mode" value={version?.admissionMode === 'DIRECT_ALLOWED' ? 'Direct admission allowed' : 'Review required'} />
-              <Summary label="Principal approval" value={version?.requirePrincipalApproval ? 'Required' : 'Not required'} />
+              {!version?.approvalChain ? (
+                <Summary label="Principal approval" value={version?.requirePrincipalApproval ? 'Required' : 'Not required'} />
+              ) : null}
               <Summary label="Allow admission with documents pending" value={version?.allowAdmissionWithDocumentsPending ? 'Yes' : 'No'} />
-              <Summary label="Approval level" value={version?.approvalLevel ?? 'Front-desk'} />
             </dl>
+            {version?.approvalChain ? (
+              <div className="mt-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Approval chain</p>
+                <ol className="mt-2 space-y-2">
+                  {version.approvalChain.stages.map((stage, index) => (
+                    <li key={index} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">{index + 1}</span>
+                      {stage.approverRole ?? stage.approverPermission ?? 'Principal/Admin only'}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ) : null}
             {version?.notesForOffice ? <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{version.notesForOffice}</p> : null}
           </SectionCard>
         </TabsContent>

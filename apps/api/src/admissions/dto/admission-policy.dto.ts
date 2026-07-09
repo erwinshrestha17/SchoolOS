@@ -9,6 +9,9 @@ import {
   IsString,
   MaxLength,
   Min,
+  Max,
+  ValidateNested,
+  ArrayMinSize,
 } from 'class-validator';
 import {
   AdmissionPolicyApplicantType,
@@ -51,7 +54,6 @@ export class UpdateAdmissionPolicyVersionDto {
   @IsOptional() @IsBoolean() allowAdmissionWithDocumentsPending?: boolean;
   @IsOptional() @IsBoolean() enforceCapacityWhenAvailable?: boolean;
   @IsOptional() @IsInt() @Min(0) @Type(() => Number) capacityOverride?: number;
-  @IsOptional() @IsString() @MaxLength(80) approvalLevel?: string;
   @IsOptional() @IsString() @MaxLength(2000) notesForOffice?: string;
 }
 
@@ -76,4 +78,22 @@ export class ActivateAdmissionPolicyVersionDto {
 
 export class DuplicateAdmissionPolicyDto {
   @IsOptional() @IsString() @MaxLength(160) name?: string;
+}
+
+export class ApprovalChainStageDto {
+  // ApprovalStep (created per-request by the shared approval engine) has no
+  // custom-name field of its own — it always synthesizes "Approval step N"
+  // from array position, so a stage's identity here is its role/permission,
+  // not a free-text label that would have nowhere to persist.
+  @IsOptional() @IsString() @MaxLength(160) approverRole?: string;
+  @IsOptional() @IsString() @MaxLength(160) approverPermission?: string;
+}
+
+export class UpsertApprovalChainDto {
+  @IsOptional() @IsInt() @Min(1) @Max(10) @Type(() => Number) minApprovals?: number;
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => ApprovalChainStageDto)
+  stages!: ApprovalChainStageDto[];
 }

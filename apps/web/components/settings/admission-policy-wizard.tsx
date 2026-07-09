@@ -14,6 +14,7 @@ import { admissionPoliciesApi } from '../../lib/api/admission-policies';
 import { ErrorState } from '../ui/error-state';
 import { SectionCard } from '../ui/section-card';
 import { Button } from '../ui/button';
+import { ApprovalChainBuilder } from './approval-chain-builder';
 import { DocumentChecklistBuilder, toDocumentKind } from './document-checklist-builder';
 
 const STEPS = [
@@ -47,7 +48,6 @@ type PolicyTemplateDefaults = {
   requireTransferCertificate: boolean;
   requirePriorMarksheet: boolean;
   requireStreamOrMarksReview: boolean;
-  approvalLevel: string;
   documents: string[];
 };
 
@@ -68,7 +68,6 @@ const POLICY_TEMPLATES: PolicyTemplateDefaults[] = [
     requireTransferCertificate: false,
     requirePriorMarksheet: false,
     requireStreamOrMarksReview: false,
-    approvalLevel: 'Admissions officer',
     documents: ['Birth certificate', 'Student passport photo', 'Parent/guardian citizenship'],
   },
   {
@@ -85,7 +84,6 @@ const POLICY_TEMPLATES: PolicyTemplateDefaults[] = [
     requireTransferCertificate: false,
     requirePriorMarksheet: false,
     requireStreamOrMarksReview: false,
-    approvalLevel: 'Front-desk',
     documents: ['Birth certificate', 'Student passport photo', 'Parent/guardian citizenship', 'Previous report card'],
   },
   {
@@ -102,7 +100,6 @@ const POLICY_TEMPLATES: PolicyTemplateDefaults[] = [
     requireTransferCertificate: true,
     requirePriorMarksheet: false,
     requireStreamOrMarksReview: false,
-    approvalLevel: 'Principal approval',
     documents: ['Birth certificate', 'Student passport photo', 'Parent/guardian citizenship', 'Previous report card', 'Transfer certificate', 'Character certificate'],
   },
   {
@@ -119,7 +116,6 @@ const POLICY_TEMPLATES: PolicyTemplateDefaults[] = [
     requireTransferCertificate: false,
     requirePriorMarksheet: true,
     requireStreamOrMarksReview: true,
-    approvalLevel: 'Principal approval',
     documents: ['SEE marksheet', 'Character certificate', 'Transfer certificate', 'Student passport photo', 'Parent/guardian citizenship'],
   },
   {
@@ -136,7 +132,6 @@ const POLICY_TEMPLATES: PolicyTemplateDefaults[] = [
     requireTransferCertificate: false,
     requirePriorMarksheet: false,
     requireStreamOrMarksReview: false,
-    approvalLevel: 'Committee review',
     documents: ['Scholarship proof', 'Residence proof', 'Recommendation letter', 'Previous report card'],
   },
 ];
@@ -163,7 +158,6 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
   const [requireStreamOrMarksReview, setRequireStreamOrMarksReview] = useState(false);
   const [allowAdmissionWithDocumentsPending, setAllowAdmissionWithDocumentsPending] = useState(true);
   const [enforceCapacityWhenAvailable, setEnforceCapacityWhenAvailable] = useState(false);
-  const [approvalLevel, setApprovalLevel] = useState('');
   const [notesForOffice, setNotesForOffice] = useState('');
   const [hydrated, setHydrated] = useState(false);
   const [localError, setLocalError] = useState('');
@@ -200,7 +194,6 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
       setRequireStreamOrMarksReview(version.requireStreamOrMarksReview);
       setAllowAdmissionWithDocumentsPending(version.allowAdmissionWithDocumentsPending);
       setEnforceCapacityWhenAvailable(version.enforceCapacityWhenAvailable);
-      setApprovalLevel(version.approvalLevel ?? '');
       setNotesForOffice(version.notesForOffice ?? '');
     }
   };
@@ -278,7 +271,6 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
     setRequireTransferCertificate(template.requireTransferCertificate);
     setRequirePriorMarksheet(template.requirePriorMarksheet);
     setRequireStreamOrMarksReview(template.requireStreamOrMarksReview);
-    setApprovalLevel(template.approvalLevel);
     setPendingTemplateDocuments(template.documents);
     setPendingTemplateVersionFields({
       requiredFields: template.requiredFields,
@@ -289,7 +281,6 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
       requireTransferCertificate: template.requireTransferCertificate,
       requirePriorMarksheet: template.requirePriorMarksheet,
       requireStreamOrMarksReview: template.requireStreamOrMarksReview,
-      approvalLevel: template.approvalLevel,
     });
   }
 
@@ -325,7 +316,6 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
         requireStreamOrMarksReview,
         allowAdmissionWithDocumentsPending,
         enforceCapacityWhenAvailable,
-        approvalLevel: approvalLevel || undefined,
         notesForOffice: notesForOffice || undefined,
       }),
   });
@@ -577,10 +567,6 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
                 <option value="REVIEW_REQUIRED">Review required</option>
               </select>
             </label>
-            <label className="block space-y-2 text-sm font-bold text-slate-700">
-              <span>Approval level</span>
-              <input className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={approvalLevel} onChange={(event) => setApprovalLevel(event.target.value)} placeholder="e.g. Principal approval" />
-            </label>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <Toggle checked={requireDocumentReview} label="Require document review" onChange={setRequireDocumentReview} />
@@ -596,6 +582,15 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
             <span>Notes for office staff</span>
             <textarea className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" rows={3} value={notesForOffice} onChange={(event) => setNotesForOffice(event.target.value)} />
           </label>
+          {policyId && draftVersion ? (
+            <div className="mt-5 border-t border-slate-100 pt-4">
+              <ApprovalChainBuilder
+                policyId={policyId}
+                versionId={draftVersion.id}
+                chain={draftVersion.approvalChain}
+              />
+            </div>
+          ) : null}
         </SectionCard>
       ) : null}
 
@@ -606,7 +601,6 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
             <Summary label="Applies to" value={[classId && (classesQuery.data ?? []).find((c) => c.id === classId)?.name, academicYearId && (academicYearsQuery.data ?? []).find((y) => y.id === academicYearId)?.name, gradeBand, applicantType !== 'BOTH' ? applicantType : null].filter(Boolean).join(', ') || 'All admissions'} />
             <Summary label="Required documents" value={`${documentRequirements.length} required`} />
             <Summary label="Admission mode" value={admissionMode === 'DIRECT_ALLOWED' ? 'Direct admission allowed' : 'Review required'} />
-            <Summary label="Approval level" value={approvalLevel || 'Front-desk'} />
           </dl>
           {activateMutation.isSuccess ? (
             <p className="mt-4 flex items-center gap-2 rounded-xl border border-success-200 bg-success-50 p-3 text-sm font-semibold text-success-800">

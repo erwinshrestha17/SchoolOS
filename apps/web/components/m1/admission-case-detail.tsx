@@ -309,6 +309,25 @@ export function AdmissionCaseDetail({
         </div>
       </SectionCard>
 
+      {admissionCase.displayStatus === "WAITING_FOR_REVIEW" &&
+      admissionCase.approvalChain ? (
+        <SectionCard
+          title="Approval chain"
+          description="This admission needs sequential sign-off before it can be finalized."
+        >
+          <p className="text-sm font-semibold text-slate-800">
+            Stage {admissionCase.approvalChain.currentStageIndex ?? 1}
+            {admissionCase.approvalChain.totalStages
+              ? ` of ${admissionCase.approvalChain.totalStages}`
+              : ""}
+            {" — waiting on "}
+            {admissionCase.approvalChain.currentStageRole ??
+              admissionCase.approvalChain.currentStagePermission ??
+              "principal/admin"}
+          </p>
+        </SectionCard>
+      ) : null}
+
       {admissionCase.missingRequiredFields.length > 0 ? (
         <AdmissionCaseMissingDetails
           admissionCase={admissionCase}

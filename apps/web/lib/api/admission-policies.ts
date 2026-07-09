@@ -7,6 +7,7 @@ import type {
   DuplicateAdmissionPolicyPayload,
   UpdateAdmissionPolicyIdentityPayload,
   UpdateAdmissionPolicyVersionPayload,
+  UpsertApprovalChainPayload,
   UpsertDocumentRequirementPayload,
 } from "@schoolos/core";
 import { request } from "./client";
@@ -81,4 +82,18 @@ export const admissionPoliciesApi = {
       method: "POST",
       json: payload,
     }),
+  replaceApprovalChain: (
+    policyId: string,
+    versionId: string,
+    payload: UpsertApprovalChainPayload,
+  ) =>
+    request<AdmissionPolicyDetail>(
+      `/admissions/policies/${policyId}/versions/${versionId}/approval-chain`,
+      { method: "PUT", json: payload },
+    ),
+  deleteApprovalChain: (policyId: string, versionId: string) =>
+    request<AdmissionPolicyDetail>(
+      `/admissions/policies/${policyId}/versions/${versionId}/approval-chain`,
+      { method: "DELETE" },
+    ),
 };

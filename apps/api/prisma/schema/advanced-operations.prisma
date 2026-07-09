@@ -13,9 +13,10 @@ model ApprovalPolicy {
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
-  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  createdBy User?             @relation("CreatedApprovalPolicies", fields: [createdById], references: [id], onDelete: SetNull)
-  requests  ApprovalRequest[]
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy              User?                   @relation("CreatedApprovalPolicies", fields: [createdById], references: [id], onDelete: SetNull)
+  requests               ApprovalRequest[]
+  admissionPolicyVersion AdmissionPolicyVersion?
 
   @@unique([tenantId, workflowType, name])
   @@index([tenantId, workflowType, isActive])

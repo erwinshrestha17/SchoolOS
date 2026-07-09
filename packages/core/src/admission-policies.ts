@@ -36,6 +36,7 @@ export type AdmissionPolicyResolution = {
   reason: string;
   ambiguous: boolean;
   candidates: AdmissionPolicyResolutionCandidate[];
+  approvalPolicyId: string | null;
 };
 
 export type AdmissionPolicyDocumentRequirement = {
@@ -49,6 +50,17 @@ export type AdmissionPolicyDocumentRequirement = {
   canBeWaived: boolean;
   waivableByRoleKeys: string[];
   sortOrder: number;
+};
+
+export type AdmissionApprovalChainStage = {
+  approverRole: string | null;
+  approverPermission: string | null;
+};
+
+export type AdmissionApprovalChain = {
+  approvalPolicyId: string;
+  minApprovals: number;
+  stages: AdmissionApprovalChainStage[];
 };
 
 export type AdmissionPolicyVersionSummary = {
@@ -69,7 +81,7 @@ export type AdmissionPolicyVersionSummary = {
   allowAdmissionWithDocumentsPending: boolean;
   enforceCapacityWhenAvailable: boolean;
   capacityOverride: number | null;
-  approvalLevel: string | null;
+  approvalChain: AdmissionApprovalChain | null;
   notesForOffice: string | null;
   activatedAt: string | null;
   createdAt: string;
@@ -91,7 +103,7 @@ export type AdmissionPolicySummary = {
   admissionMode: "DIRECT_ALLOWED" | "REVIEW_REQUIRED";
   requiredDocumentCount: number;
   assessment: string;
-  approvalLevel: string | null;
+  approvalChainSummary: { stageCount: number; minApprovals: number } | null;
 };
 
 export type AdmissionPolicyListResponse = {
@@ -147,7 +159,6 @@ export type UpdateAdmissionPolicyVersionPayload = Partial<{
   allowAdmissionWithDocumentsPending: boolean;
   enforceCapacityWhenAvailable: boolean;
   capacityOverride: number;
-  approvalLevel: string;
   notesForOffice: string;
 }>;
 
@@ -165,4 +176,9 @@ export type UpsertDocumentRequirementPayload = {
   canBeWaived?: boolean;
   waivableByRoleKeys?: string[];
   sortOrder?: number;
+};
+
+export type UpsertApprovalChainPayload = {
+  minApprovals?: number;
+  stages: AdmissionApprovalChainStage[];
 };

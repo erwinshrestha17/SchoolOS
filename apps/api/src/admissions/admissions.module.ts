@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AdvancedOperationsModule } from '../advanced-operations/advanced-operations.module';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { FinanceModule } from '../finance/finance.module';
@@ -36,6 +37,7 @@ import { UsageModule } from '../usage/usage.module';
     StorageModule,
     FileRegistryModule,
     UsageModule,
+    AdvancedOperationsModule,
   ],
   controllers: [
     AdmissionsController,

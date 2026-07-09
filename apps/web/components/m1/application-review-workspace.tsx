@@ -290,6 +290,14 @@ export function ApplicationReviewWorkspace({
                 warning
               />
             ) : null}
+            {admissionCase.approvalChain ? (
+              <ReviewIssue
+                title="Approval chain"
+                items={[
+                  `Stage ${admissionCase.approvalChain.currentStageIndex ?? 1}${admissionCase.approvalChain.totalStages ? ` of ${admissionCase.approvalChain.totalStages}` : ""} — waiting on ${admissionCase.approvalChain.currentStageRole ?? admissionCase.approvalChain.currentStagePermission ?? "principal/admin"}.`,
+                ]}
+              />
+            ) : null}
           </div>
         </section>
 

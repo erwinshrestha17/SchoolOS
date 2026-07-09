@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
@@ -22,6 +23,7 @@ import {
   DuplicateAdmissionPolicyDto,
   UpdateAdmissionPolicyIdentityDto,
   UpdateAdmissionPolicyVersionDto,
+  UpsertApprovalChainDto,
   UpsertDocumentRequirementDto,
 } from './dto/admission-policy.dto';
 
@@ -127,6 +129,36 @@ export class AdmissionPolicyController {
       policyId,
       versionId,
       requirementId,
+      actor,
+    );
+  }
+
+  @Put(':policyId/versions/:versionId/approval-chain')
+  @Permissions('admission_policy:manage')
+  replaceApprovalChain(
+    @Param('policyId') policyId: string,
+    @Param('versionId') versionId: string,
+    @Body() dto: UpsertApprovalChainDto,
+    @CurrentAuth() actor: AuthContext,
+  ) {
+    return this.admissionPolicyService.replaceApprovalChain(
+      policyId,
+      versionId,
+      dto,
+      actor,
+    );
+  }
+
+  @Delete(':policyId/versions/:versionId/approval-chain')
+  @Permissions('admission_policy:manage')
+  deleteApprovalChain(
+    @Param('policyId') policyId: string,
+    @Param('versionId') versionId: string,
+    @CurrentAuth() actor: AuthContext,
+  ) {
+    return this.admissionPolicyService.deleteApprovalChain(
+      policyId,
+      versionId,
       actor,
     );
   }

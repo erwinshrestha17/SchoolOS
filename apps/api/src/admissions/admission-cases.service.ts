@@ -4,10 +4,14 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import {
   AdmissionAssessmentSession,
+  ApprovalDecisionType,
+  ApprovalRequestStatus,
+  ApprovalStepStatus,
   EnrollmentStatus,
   FileStatus,
   Gender,
@@ -28,6 +32,7 @@ import {
   type AdmissionCaseReviewAction,
 } from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
+import { ApprovalWorkflowService } from '../advanced-operations/approval-workflow.service';
 import { AuditService } from '../audit/audit.service';
 import { ConfigService } from '../config/config.service';
 import { encryptSensitiveField } from '../common/security/field-encryption';
@@ -205,6 +210,7 @@ interface PolicyRule {
   requireSection?: boolean;
   requiredFields?: string[];
   capacityOverride?: number | null;
+  approvalPolicyId?: string | null;
 }
 
 interface ResolvedDocumentRequirement {
@@ -358,6 +364,7 @@ interface AdmissionEvaluation {
     reason: string;
     ambiguous: boolean;
     candidates: ResolvedPolicyCandidate[];
+    approvalPolicyId: string | null;
   };
   canAdmitDirectly: boolean;
   canOverrideDuplicate: boolean;
@@ -375,17 +382,51 @@ interface AdmissionEvaluation {
   suggestedStatus: AdmissionDisplayStatus;
   nextActionLabel: string;
   assessmentSession: AdmissionAssessmentSessionSummary | null;
+  approvalChain: {
+    approvalPolicyId: string;
+    activeRequestId: string | null;
+    currentStageIndex: number | null;
+    totalStages: number | null;
+    currentStageRole: string | null;
+    currentStagePermission: string | null;
+  } | null;
 }
 
 @Injectable()
-export class AdmissionCasesService {
+export class AdmissionCasesService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
     private readonly fileRegistryService: FileRegistryService,
     private readonly studentRecordsService: StudentRecordsService,
+    private readonly approvalWorkflowService: ApprovalWorkflowService,
   ) {}
+
+  onModuleInit() {
+    this.approvalWorkflowService.registerFinalAction('admissions.case.approve', {
+      apply: async ({ tenantId, targetId, actor }) => {
+        if (tenantId !== actor.tenantId) {
+          throw new ForbiddenException(
+            'Approval action is outside the active tenant.',
+          );
+        }
+        await this.prisma.admissionApplication.update({
+          where: { id: targetId },
+          data: { status: 'APPROVED', updatedById: actor.userId },
+        });
+        await this.auditService.record({
+          action: 'admission_case_approval_chain_completed',
+          resource: 'admission_case',
+          resourceId: targetId,
+          tenantId,
+          userId: actor.userId,
+          after: { status: 'APPROVED' },
+        });
+        return { status: 'APPROVED' };
+      },
+    });
+  }
 
   async createCase(dto: CreateAdmissionCaseDto, actor: AuthContext) {
     const metadata = this.mergeMetadata({}, dto);
@@ -1481,8 +1522,10 @@ export class AdmissionCasesService {
     }
 
     const evaluation = await this.evaluate(current, actor);
+    const hasApprovalChain = evaluation.policy.approvalPolicyId != null;
     if (dto.action === 'APPROVE') {
       if (
+        !hasApprovalChain &&
         evaluation.requiresApproval &&
         !actor.roles.some((role) =>
           ['principal', 'platform_super_admin'].includes(role),
@@ -1522,6 +1565,41 @@ export class AdmissionCasesService {
       throw new ConflictException(
         `The ${this.reviewActionLabel(dto.action)} action is not available while this case is ${this.displayStatus(current.status).toLowerCase().replaceAll('_', ' ')}.`,
       );
+    }
+
+    // A configured approval chain hands the actual status transition to the
+    // shared approval-workflow engine: the request is created (if needed) and
+    // this stage decided in one click, and once every stage is APPROVED the
+    // engine synchronously invokes the registered final-action executor
+    // (onModuleInit below), which flips the case to APPROVED itself. This
+    // bypasses the generic metadata/status transaction below entirely, since
+    // by the time control returns here the case row may already have been
+    // written by that executor — reusing the stale `current.status` as an
+    // optimistic-concurrency guard in a second write would spuriously fail.
+    if (dto.action === 'APPROVE' && hasApprovalChain) {
+      const requestId =
+        evaluation.approvalChain?.activeRequestId ??
+        (
+          await this.approvalWorkflowService.createRequest(
+            {
+              workflowType: 'ADMISSION_CASE',
+              policyId: evaluation.policy.approvalPolicyId!,
+              title: `Admission approval: ${current.firstNameEn} ${current.lastNameEn}`,
+              reason: dto.reason!.trim(),
+              targetModule: 'admissions',
+              targetType: 'AdmissionApplication',
+              targetId: current.id,
+              idempotencyKey: `admission-case-approve:${current.id}:${current.updatedAt.toISOString()}`,
+            },
+            actor,
+          )
+        ).id;
+      await this.approvalWorkflowService.decide(
+        requestId,
+        { decision: ApprovalDecisionType.APPROVE, reason: dto.reason?.trim() },
+        actor,
+      );
+      return this.getCase(current.id, actor);
     }
 
     const metadata = this.readMetadata(current.duplicateReview);
@@ -1989,7 +2067,12 @@ export class AdmissionCasesService {
       assessmentSession: evaluation.assessmentSession,
       classSection: evaluation.classSection,
       capacityStatus: evaluation.capacityStatus,
-      nextActionLabel: this.nextActionLabel(record, evaluation, displayStatus),
+      nextActionLabel: this.nextActionLabel(
+        record,
+        evaluation,
+        displayStatus,
+        actor,
+      ),
       followUps: metadata.followUps ?? this.followUps(metadata, evaluation),
       review: {
         reviewerUserId: metadata.review?.reviewerUserId ?? null,
@@ -2118,6 +2201,13 @@ export class AdmissionCasesService {
           policyName: resolved.policyName,
         })
       : null;
+    const approvalChain = policy.approvalPolicyId
+      ? await this.loadApprovalChainState(
+          policy.approvalPolicyId,
+          record.id,
+          actor.tenantId,
+        )
+      : null;
     const duplicateRisk = duplicateCandidates.length > 0;
     const documentBlocksAdmission =
       missingRequiredDocuments.length > 0 &&
@@ -2186,6 +2276,7 @@ export class AdmissionCasesService {
         reason: resolved.reason,
         ambiguous: resolved.ambiguous,
         candidates: resolved.candidates,
+        approvalPolicyId: policy.approvalPolicyId ?? null,
       },
       canAdmitDirectly,
       canOverrideDuplicate,
@@ -2206,7 +2297,85 @@ export class AdmissionCasesService {
       suggestedStatus,
       nextActionLabel: canAdmitDirectly ? 'Admit student' : 'Review admission',
       assessmentSession: formattedAssessmentSession,
+      approvalChain,
     };
+  }
+
+  private async loadApprovalChainState(
+    approvalPolicyId: string,
+    admissionCaseId: string,
+    tenantId: string,
+  ): Promise<AdmissionEvaluation['approvalChain']> {
+    const request = await this.prisma.approvalRequest.findFirst({
+      where: {
+        tenantId,
+        targetModule: 'admissions',
+        targetType: 'AdmissionApplication',
+        targetId: admissionCaseId,
+        status: { in: [ApprovalRequestStatus.PENDING, ApprovalRequestStatus.APPROVED] },
+      },
+      include: { steps: { orderBy: { sequence: 'asc' } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (request) {
+      const currentStep = request.steps.find(
+        (step) => step.status === ApprovalStepStatus.PENDING,
+      );
+      return {
+        approvalPolicyId,
+        activeRequestId: request.id,
+        currentStageIndex: currentStep?.sequence ?? request.steps.length,
+        totalStages: request.steps.length,
+        currentStageRole: currentStep?.approverRole ?? null,
+        currentStagePermission: currentStep?.approverPermission ?? null,
+      };
+    }
+    // No request started yet — describe stage 1 so the UI can show and gate
+    // on "who needs to approve first" before the chain formally begins. The
+    // first APPROVE click creates the request AND decides this stage in one
+    // step (see reviewCase()), so this doubles as the actionability gate.
+    const policy = await this.prisma.approvalPolicy.findUnique({
+      where: { id: approvalPolicyId },
+    });
+    const roles = Array.isArray(policy?.approverRoles)
+      ? (policy.approverRoles as unknown[]).map((role) =>
+          typeof role === 'string' && role ? role : null,
+        )
+      : [];
+    const permissions = Array.isArray(policy?.approverPermissions)
+      ? (policy.approverPermissions as unknown[]).map((permission) =>
+          typeof permission === 'string' && permission ? permission : null,
+        )
+      : [];
+    return {
+      approvalPolicyId,
+      activeRequestId: null,
+      currentStageIndex: 1,
+      totalStages: Math.max(roles.length, permissions.length, 1),
+      currentStageRole: roles[0] ?? null,
+      currentStagePermission: permissions[0] ?? null,
+    };
+  }
+
+  private canActorDecideCurrentStage(
+    evaluation: AdmissionEvaluation,
+    actor: AuthContext,
+  ): boolean {
+    if (actor.roles.includes('admin') || actor.roles.includes('principal')) {
+      return true;
+    }
+    const chain = evaluation.approvalChain;
+    if (!chain) return false;
+    if (chain.currentStageRole && actor.roles.includes(chain.currentStageRole)) {
+      return true;
+    }
+    if (
+      chain.currentStagePermission &&
+      actor.permissions.includes(chain.currentStagePermission)
+    ) {
+      return true;
+    }
+    return false;
   }
 
   private async resolvePolicy(
@@ -2509,6 +2678,7 @@ export class AdmissionCasesService {
       requireSection: false,
       requiredFields: [],
       capacityOverride: null,
+      approvalPolicyId: null,
     };
   }
 
@@ -2525,6 +2695,7 @@ export class AdmissionCasesService {
     allowAdmissionWithDocumentsPending: boolean;
     enforceCapacityWhenAvailable: boolean;
     capacityOverride?: number | null;
+    approvalPolicyId?: string | null;
   }): PolicyRule {
     return {
       admissionMode:
@@ -2543,6 +2714,7 @@ export class AdmissionCasesService {
         version.allowAdmissionWithDocumentsPending,
       enforceCapacityWhenAvailable: version.enforceCapacityWhenAvailable,
       capacityOverride: version.capacityOverride ?? null,
+      approvalPolicyId: version.approvalPolicyId ?? null,
     };
   }
 
@@ -2915,16 +3087,17 @@ export class AdmissionCasesService {
         'ESCALATE_TO_PRINCIPAL',
         'CLOSE',
       );
-      const principalApprovalAllowed =
-        !evaluation.requiresApproval ||
-        actor.roles.some((role) =>
-          ['principal', 'platform_super_admin'].includes(role),
-        );
+      const approvalGatePassed = evaluation.approvalChain
+        ? this.canActorDecideCurrentStage(evaluation, actor)
+        : !evaluation.requiresApproval ||
+          actor.roles.some((role) =>
+            ['principal', 'platform_super_admin'].includes(role),
+          );
       const documentBlock =
         evaluation.missingRequiredDocuments.length > 0 &&
         !evaluation.policyRequirements.allowAdmissionWithDocumentsPending;
       if (
-        principalApprovalAllowed &&
+        approvalGatePassed &&
         evaluation.missingRequiredFields.length === 0 &&
         !documentBlock &&
         !this.capacityBlocksAdmission(evaluation) &&
@@ -2973,6 +3146,7 @@ export class AdmissionCasesService {
     record: AdmissionCaseRecord,
     evaluation: AdmissionEvaluation,
     displayStatus: AdmissionDisplayStatus,
+    actor: AuthContext,
   ) {
     if (record.convertedStudentId || displayStatus === 'ADMITTED')
       return 'Open student profile';
@@ -3003,6 +3177,16 @@ export class AdmissionCasesService {
     )
       return 'Record assessment decision';
     if (evaluation.duplicateRisk) return 'Review duplicate warning';
+    if (displayStatus === 'WAITING_FOR_REVIEW' && evaluation.approvalChain) {
+      const chain = evaluation.approvalChain;
+      const stageLabel = chain.currentStageRole ?? chain.currentStagePermission;
+      const stageProgress = chain.totalStages
+        ? ` — stage ${chain.currentStageIndex} of ${chain.totalStages}`
+        : '';
+      return this.canActorDecideCurrentStage(evaluation, actor)
+        ? `Approve${stageProgress}${stageLabel ? ` (${stageLabel})` : ''}`
+        : `Waiting on ${stageLabel ?? 'principal/admin'}`;
+    }
     if (evaluation.requiresReview) return 'Send for review';
     return 'Admit student';
   }

@@ -216,6 +216,15 @@ export type RecordAdmissionAssessmentResultPayload = {
   notes?: string;
 };
 
+export type AdmissionCaseApprovalChainState = {
+  approvalPolicyId: string;
+  activeRequestId: string | null;
+  currentStageIndex: number | null;
+  totalStages: number | null;
+  currentStageRole: string | null;
+  currentStagePermission: string | null;
+};
+
 export type AdmissionCaseEligibility = {
   missingRequiredFields: string[];
   missingRequiredDocuments: string[];
@@ -276,6 +285,7 @@ export type AdmissionCaseEligibility = {
   } | null;
   nextActionLabel: string;
   assessmentSession: AdmissionAssessmentSessionSummary | null;
+  approvalChain: AdmissionCaseApprovalChainState | null;
 };
 
 export type AdmissionCaseReviewHistoryItem = {

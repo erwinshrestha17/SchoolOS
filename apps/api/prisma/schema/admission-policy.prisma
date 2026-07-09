@@ -47,7 +47,7 @@ model AdmissionPolicyVersion {
   allowAdmissionWithDocumentsPending Boolean               @default(true)
   enforceCapacityWhenAvailable       Boolean               @default(false)
   capacityOverride                   Int?
-  approvalLevel                      String?
+  approvalPolicyId                   String?               @unique
   notesForOffice                     String?               @db.Text
   activatedAt                        DateTime?
   activatedById                      String?
@@ -59,6 +59,7 @@ model AdmissionPolicyVersion {
   currentOf            AdmissionPolicy?                     @relation("CurrentPolicyVersion")
   createdBy            User?                                @relation("CreatedAdmissionPolicyVersions", fields: [createdById], references: [id], onDelete: SetNull)
   activatedBy          User?                                @relation("ActivatedAdmissionPolicyVersions", fields: [activatedById], references: [id], onDelete: SetNull)
+  approvalPolicy       ApprovalPolicy?                      @relation(fields: [approvalPolicyId], references: [id], onDelete: SetNull)
   documentRequirements AdmissionPolicyDocumentRequirement[]
   applications         AdmissionApplication[]
 

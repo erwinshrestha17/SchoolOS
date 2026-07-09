@@ -4,7 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { AdmissionPolicyVersion } from '@prisma/client';
+import type { AdmissionPolicyVersion, ApprovalPolicy } from '@prisma/client';
+import { ApprovalWorkflowType } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,8 +14,11 @@ import {
   DuplicateAdmissionPolicyDto,
   UpdateAdmissionPolicyIdentityDto,
   UpdateAdmissionPolicyVersionDto,
+  UpsertApprovalChainDto,
   UpsertDocumentRequirementDto,
 } from './dto/admission-policy.dto';
+
+const APPROVAL_CHAIN_FINAL_ACTION_KEY = 'admissions.case.approve';
 
 type ResolvableVersionFields = AdmissionPolicyVersion & {
   documentRequirements?: Array<{
@@ -28,14 +32,41 @@ type ResolvableVersionFields = AdmissionPolicyVersion & {
     waivableByRoleKeys: string[];
     sortOrder: number;
   }>;
+  approvalPolicy?: ApprovalPolicy | null;
 };
 
 const POLICY_WITH_VERSIONS_INCLUDE = {
   versions: {
     orderBy: { version: 'desc' as const },
-    include: { documentRequirements: { orderBy: { sortOrder: 'asc' as const } } },
+    include: {
+      documentRequirements: { orderBy: { sortOrder: 'asc' as const } },
+      approvalPolicy: true,
+    },
   },
 };
+
+function toApprovalChainShape(approvalPolicy: ApprovalPolicy | null | undefined) {
+  if (!approvalPolicy) return null;
+  const roles = Array.isArray(approvalPolicy.approverRoles)
+    ? (approvalPolicy.approverRoles as unknown[]).map((role) =>
+        typeof role === 'string' ? role : null,
+      )
+    : [];
+  const permissions = Array.isArray(approvalPolicy.approverPermissions)
+    ? (approvalPolicy.approverPermissions as unknown[]).map((permission) =>
+        typeof permission === 'string' ? permission : null,
+      )
+    : [];
+  const stageCount = Math.max(roles.length, permissions.length, 1);
+  return {
+    approvalPolicyId: approvalPolicy.id,
+    minApprovals: approvalPolicy.minApprovals,
+    stages: Array.from({ length: stageCount }, (_, index) => ({
+      approverRole: roles[index] || null,
+      approverPermission: permissions[index] || null,
+    })),
+  };
+}
 
 @Injectable()
 export class AdmissionPolicyService {
@@ -49,7 +80,7 @@ export class AdmissionPolicyService {
       where: { tenantId: actor.tenantId, archivedAt: null },
       include: {
         currentVersion: {
-          include: { documentRequirements: true },
+          include: { documentRequirements: true, approvalPolicy: true },
         },
       },
       orderBy: { updatedAt: 'desc' },
@@ -83,16 +114,19 @@ export class AdmissionPolicyService {
       actor.tenantId,
       POLICY_WITH_VERSIONS_INCLUDE,
     );
+    const versions = policy.versions.map((version) => ({
+      ...version,
+      approvalChain: toApprovalChainShape(version.approvalPolicy),
+    }));
     const draftVersion =
-      policy.versions.find((version) => version.status === 'DRAFT') ?? null;
+      versions.find((version) => version.status === 'DRAFT') ?? null;
     const currentVersion =
-      policy.versions.find((version) => version.id === policy.currentVersionId) ??
-      null;
+      versions.find((version) => version.id === policy.currentVersionId) ?? null;
     return {
       ...this.toSummary({ ...policy, currentVersion }),
       currentVersion,
       draftVersion,
-      versions: policy.versions,
+      versions,
     };
   }
 
@@ -238,6 +272,7 @@ export class AdmissionPolicyService {
       },
     });
     await this.copyDocumentRequirements(source, draft.id, actor.tenantId);
+    await this.copyApprovalChain(source, draft.id, actor.tenantId, actor.userId);
     await this.auditService.record({
       action: 'admission_policy_draft_started',
       resource: 'admission_policy',
@@ -287,6 +322,7 @@ export class AdmissionPolicyService {
       },
     });
     await this.copyDocumentRequirements(source, version.id, actor.tenantId);
+    await this.copyApprovalChain(source, version.id, actor.tenantId, actor.userId);
 
     await this.auditService.record({
       action: 'admission_policy_duplicate',
@@ -315,7 +351,6 @@ export class AdmissionPolicyService {
         source?.allowAdmissionWithDocumentsPending ?? true,
       enforceCapacityWhenAvailable: source?.enforceCapacityWhenAvailable ?? false,
       capacityOverride: source?.capacityOverride ?? null,
-      approvalLevel: source?.approvalLevel ?? null,
       notesForOffice: source?.notesForOffice ?? null,
     };
   }
@@ -342,6 +377,114 @@ export class AdmissionPolicyService {
         sortOrder: requirement.sortOrder,
       })),
     });
+  }
+
+  private async copyApprovalChain(
+    source: ResolvableVersionFields | null,
+    targetVersionId: string,
+    tenantId: string,
+    userId: string,
+  ) {
+    const sourceChain = source?.approvalPolicy;
+    if (!sourceChain) return;
+    const created = await this.prisma.approvalPolicy.create({
+      data: {
+        tenantId,
+        workflowType: ApprovalWorkflowType.ADMISSION_CASE,
+        name: `admission-policy-version:${targetVersionId}`,
+        minApprovals: sourceChain.minApprovals,
+        approverRoles: sourceChain.approverRoles as never,
+        approverPermissions: sourceChain.approverPermissions as never,
+        finalActionKey: APPROVAL_CHAIN_FINAL_ACTION_KEY,
+        createdById: userId,
+      },
+    });
+    await this.prisma.admissionPolicyVersion.update({
+      where: { id: targetVersionId },
+      data: { approvalPolicyId: created.id },
+    });
+  }
+
+  async replaceApprovalChain(
+    policyId: string,
+    versionId: string,
+    dto: UpsertApprovalChainDto,
+    actor: AuthContext,
+  ) {
+    const version = await this.findDraftVersionOrThrow(
+      policyId,
+      versionId,
+      actor.tenantId,
+    );
+    const approverRoles = dto.stages.map((stage) => stage.approverRole ?? '');
+    const approverPermissions = dto.stages.map(
+      (stage) => stage.approverPermission ?? '',
+    );
+    const minApprovals = dto.minApprovals ?? dto.stages.length;
+
+    if (!version.approvalPolicyId) {
+      const created = await this.prisma.approvalPolicy.create({
+        data: {
+          tenantId: actor.tenantId,
+          workflowType: ApprovalWorkflowType.ADMISSION_CASE,
+          name: `admission-policy-version:${version.id}`,
+          minApprovals,
+          approverRoles: approverRoles as never,
+          approverPermissions: approverPermissions as never,
+          finalActionKey: APPROVAL_CHAIN_FINAL_ACTION_KEY,
+          createdById: actor.userId,
+        },
+      });
+      await this.prisma.admissionPolicyVersion.update({
+        where: { id: version.id },
+        data: { approvalPolicyId: created.id },
+      });
+    } else {
+      await this.prisma.approvalPolicy.update({
+        where: { id: version.approvalPolicyId },
+        data: {
+          minApprovals,
+          approverRoles: approverRoles as never,
+          approverPermissions: approverPermissions as never,
+        },
+      });
+    }
+
+    await this.auditService.record({
+      action: 'admission_policy_update_approval_chain',
+      resource: 'admission_policy',
+      resourceId: policyId,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: { versionId: version.id, stageCount: dto.stages.length, minApprovals },
+    });
+    return this.get(policyId, actor);
+  }
+
+  async deleteApprovalChain(policyId: string, versionId: string, actor: AuthContext) {
+    const version = await this.findDraftVersionOrThrow(
+      policyId,
+      versionId,
+      actor.tenantId,
+    );
+    if (version.approvalPolicyId) {
+      await this.prisma.admissionPolicyVersion.update({
+        where: { id: version.id },
+        data: { approvalPolicyId: null },
+      });
+      await this.prisma.approvalPolicy.delete({
+        where: { id: version.approvalPolicyId },
+      });
+    }
+    await this.auditService.record({
+      action: 'admission_policy_delete_approval_chain',
+      resource: 'admission_policy',
+      resourceId: policyId,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: { versionId: version.id },
+    });
+    return this.get(policyId, actor);
   }
 
   async upsertDocumentRequirement(
@@ -519,7 +662,7 @@ export class AdmissionPolicyService {
     if (!version) throw new NotFoundException('Policy version not found.');
     if (version.status !== 'DRAFT') {
       throw new BadRequestException(
-        'Document requirements can only be edited on a draft version.',
+        'This can only be edited on a draft version.',
       );
     }
     return version;
@@ -539,10 +682,11 @@ export class AdmissionPolicyService {
     updatedAt: Date;
     currentVersion?: {
       admissionMode: string;
-      approvalLevel: string | null;
+      requirePrincipalApproval: boolean;
       requireInterview: boolean;
       requireDocumentReview: boolean;
       documentRequirements?: unknown[];
+      approvalPolicy?: ApprovalPolicy | null;
     } | null;
   }) {
     return {
@@ -568,7 +712,15 @@ export class AdmissionPolicyService {
         : policy.currentVersion?.requireDocumentReview
           ? 'Document review'
           : 'No assessment required',
-      approvalLevel: policy.currentVersion?.approvalLevel ?? null,
+      approvalChainSummary: (() => {
+        const chain = toApprovalChainShape(policy.currentVersion?.approvalPolicy);
+        if (chain) {
+          return { stageCount: chain.stages.length, minApprovals: chain.minApprovals };
+        }
+        return policy.currentVersion?.requirePrincipalApproval
+          ? { stageCount: 1, minApprovals: 1 }
+          : null;
+      })(),
     };
   }
 }
