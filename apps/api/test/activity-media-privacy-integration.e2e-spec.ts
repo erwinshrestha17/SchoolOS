@@ -256,7 +256,14 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
         after: expect.objectContaining({ attachmentCount: 1 }),
       }),
     );
-    expect(eventEmitter.emit).toHaveBeenCalledWith('feed.post.created', post);
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'feed.post.created',
+      expect.objectContaining({
+        id: post.id,
+        classId: post.classId,
+        sectionId: post.sectionId,
+      }),
+    );
   });
 
   it('scopes parent feed to own child/class posts and excludes unrelated tagged student posts', async () => {

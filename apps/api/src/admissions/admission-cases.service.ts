@@ -404,28 +404,31 @@ export class AdmissionCasesService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    this.approvalWorkflowService.registerFinalAction('admissions.case.approve', {
-      apply: async ({ tenantId, targetId, actor }) => {
-        if (tenantId !== actor.tenantId) {
-          throw new ForbiddenException(
-            'Approval action is outside the active tenant.',
-          );
-        }
-        await this.prisma.admissionApplication.update({
-          where: { id: targetId },
-          data: { status: 'APPROVED', updatedById: actor.userId },
-        });
-        await this.auditService.record({
-          action: 'admission_case_approval_chain_completed',
-          resource: 'admission_case',
-          resourceId: targetId,
-          tenantId,
-          userId: actor.userId,
-          after: { status: 'APPROVED' },
-        });
-        return { status: 'APPROVED' };
+    this.approvalWorkflowService.registerFinalAction(
+      'admissions.case.approve',
+      {
+        apply: async ({ tenantId, targetId, actor }) => {
+          if (tenantId !== actor.tenantId) {
+            throw new ForbiddenException(
+              'Approval action is outside the active tenant.',
+            );
+          }
+          await this.prisma.admissionApplication.update({
+            where: { id: targetId },
+            data: { status: 'APPROVED', updatedById: actor.userId },
+          });
+          await this.auditService.record({
+            action: 'admission_case_approval_chain_completed',
+            resource: 'admission_case',
+            resourceId: targetId,
+            tenantId,
+            userId: actor.userId,
+            after: { status: 'APPROVED' },
+          });
+          return { status: 'APPROVED' };
+        },
       },
-    });
+    );
   }
 
   async createCase(dto: CreateAdmissionCaseDto, actor: AuthContext) {
@@ -2312,7 +2315,9 @@ export class AdmissionCasesService implements OnModuleInit {
         targetModule: 'admissions',
         targetType: 'AdmissionApplication',
         targetId: admissionCaseId,
-        status: { in: [ApprovalRequestStatus.PENDING, ApprovalRequestStatus.APPROVED] },
+        status: {
+          in: [ApprovalRequestStatus.PENDING, ApprovalRequestStatus.APPROVED],
+        },
       },
       include: { steps: { orderBy: { sequence: 'asc' } } },
       orderBy: { createdAt: 'desc' },
@@ -2366,7 +2371,10 @@ export class AdmissionCasesService implements OnModuleInit {
     }
     const chain = evaluation.approvalChain;
     if (!chain) return false;
-    if (chain.currentStageRole && actor.roles.includes(chain.currentStageRole)) {
+    if (
+      chain.currentStageRole &&
+      actor.roles.includes(chain.currentStageRole)
+    ) {
       return true;
     }
     if (
@@ -3159,8 +3167,7 @@ export class AdmissionCasesService implements OnModuleInit {
       !evaluation.policyRequirements.allowAdmissionWithDocumentsPending
     )
       return 'Add required documents';
-    if (this.capacityBlocksAdmission(evaluation))
-      return 'Add to waitlist';
+    if (this.capacityBlocksAdmission(evaluation)) return 'Add to waitlist';
     if (
       evaluation.policyRequirements.requireInterview &&
       !evaluation.assessmentSession

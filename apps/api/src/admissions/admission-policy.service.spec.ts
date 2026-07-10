@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { AdmissionPolicyService } from './admission-policy.service';
 
 const actor = {
@@ -50,8 +54,14 @@ function buildService(prisma: any, auditService = { record: jest.fn() }) {
 describe('AdmissionPolicyService', () => {
   it('creates a policy with a first draft version', async () => {
     const prisma = buildPrisma();
-    prisma.admissionPolicy.create.mockResolvedValue({ id: 'policy-a', name: 'Grade 5 Transfer' });
-    prisma.admissionPolicyVersion.create.mockResolvedValue({ id: 'version-a', version: 1 });
+    prisma.admissionPolicy.create.mockResolvedValue({
+      id: 'policy-a',
+      name: 'Grade 5 Transfer',
+    });
+    prisma.admissionPolicyVersion.create.mockResolvedValue({
+      id: 'version-a',
+      version: 1,
+    });
     prisma.admissionPolicy.findFirst.mockResolvedValue({
       id: 'policy-a',
       name: 'Grade 5 Transfer',
@@ -63,15 +73,28 @@ describe('AdmissionPolicyService', () => {
     await service.create({ name: 'Grade 5 Transfer' }, actor);
 
     expect(prisma.admissionPolicy.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ name: 'Grade 5 Transfer', status: 'DRAFT' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: 'Grade 5 Transfer',
+          status: 'DRAFT',
+        }),
+      }),
     );
     expect(prisma.admissionPolicyVersion.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ policyId: 'policy-a', version: 1, status: 'DRAFT' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          policyId: 'policy-a',
+          version: 1,
+          status: 'DRAFT',
+        }),
+      }),
     );
   });
 
   it('rejects a policy scoped to a class outside the tenant', async () => {
-    const prisma = buildPrisma({ class: { findFirst: jest.fn().mockResolvedValue(null) } });
+    const prisma = buildPrisma({
+      class: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
     const service = buildService(prisma);
 
     await expect(
@@ -123,7 +146,10 @@ describe('AdmissionPolicyService', () => {
     expect(prisma.admissionPolicy.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'policy-a' },
-        data: expect.objectContaining({ currentVersionId: 'version-new', status: 'ACTIVE' }),
+        data: expect.objectContaining({
+          currentVersionId: 'version-new',
+          status: 'ACTIVE',
+        }),
       }),
     );
   });
@@ -137,9 +163,9 @@ describe('AdmissionPolicyService', () => {
     });
     const service = buildService(prisma);
 
-    await expect(service.activate('policy-a', 'version-old', actor)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.activate('policy-a', 'version-old', actor),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('throws not found when activating a version id that does not belong to the policy', async () => {
@@ -151,17 +177,22 @@ describe('AdmissionPolicyService', () => {
     });
     const service = buildService(prisma);
 
-    await expect(service.activate('policy-a', 'version-missing', actor)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.activate('policy-a', 'version-missing', actor),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('refuses to archive the school default policy', async () => {
     const prisma = buildPrisma();
-    prisma.admissionPolicy.findFirst.mockResolvedValue({ id: 'policy-a', isDefault: true });
+    prisma.admissionPolicy.findFirst.mockResolvedValue({
+      id: 'policy-a',
+      isDefault: true,
+    });
     const service = buildService(prisma);
 
-    await expect(service.archive('policy-a', actor)).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.archive('policy-a', actor)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
     expect(prisma.admissionPolicy.update).not.toHaveBeenCalled();
   });
 
@@ -198,13 +229,21 @@ describe('AdmissionPolicyService', () => {
           requirePrincipalApproval: true,
           requiredFields: ['previousSchool'],
           documentRequirements: [
-            { documentKind: 'TRANSFER_CERTIFICATE', label: 'Transfer certificate', isRequired: true, sortOrder: 0 },
+            {
+              documentKind: 'TRANSFER_CERTIFICATE',
+              label: 'Transfer certificate',
+              isRequired: true,
+              sortOrder: 0,
+            },
           ],
         },
       ],
     });
     prisma.admissionPolicy.create.mockResolvedValue({ id: 'policy-copy' });
-    prisma.admissionPolicyVersion.create.mockResolvedValue({ id: 'version-copy', version: 1 });
+    prisma.admissionPolicyVersion.create.mockResolvedValue({
+      id: 'version-copy',
+      version: 1,
+    });
     const auditService = { record: jest.fn() };
     const service = buildService(prisma, auditService);
     jest.spyOn(service, 'get').mockResolvedValue({ id: 'policy-copy' } as any);
@@ -221,8 +260,12 @@ describe('AdmissionPolicyService', () => {
         }),
       }),
     );
-    expect(prisma.admissionPolicy.create.mock.calls[0][0].data).not.toHaveProperty('classId');
-    expect(prisma.admissionPolicy.create.mock.calls[0][0].data).not.toHaveProperty('academicYearId');
+    expect(
+      prisma.admissionPolicy.create.mock.calls[0][0].data,
+    ).not.toHaveProperty('classId');
+    expect(
+      prisma.admissionPolicy.create.mock.calls[0][0].data,
+    ).not.toHaveProperty('academicYearId');
     expect(prisma.admissionPolicyVersion.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -235,7 +278,9 @@ describe('AdmissionPolicyService', () => {
         }),
       }),
     );
-    expect(prisma.admissionPolicyDocumentRequirement.createMany).toHaveBeenCalledWith(
+    expect(
+      prisma.admissionPolicyDocumentRequirement.createMany,
+    ).toHaveBeenCalledWith(
       expect.objectContaining({
         data: [
           expect.objectContaining({
@@ -264,11 +309,18 @@ describe('AdmissionPolicyService', () => {
       versions: [],
     });
     prisma.admissionPolicy.create.mockResolvedValue({ id: 'policy-copy' });
-    prisma.admissionPolicyVersion.create.mockResolvedValue({ id: 'version-copy', version: 1 });
+    prisma.admissionPolicyVersion.create.mockResolvedValue({
+      id: 'version-copy',
+      version: 1,
+    });
     const service = buildService(prisma);
     jest.spyOn(service, 'get').mockResolvedValue({ id: 'policy-copy' } as any);
 
-    await service.duplicate('policy-a', { name: 'Grade 5 Transfer 2084' }, actor);
+    await service.duplicate(
+      'policy-a',
+      { name: 'Grade 5 Transfer 2084' },
+      actor,
+    );
 
     expect(prisma.admissionPolicy.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -286,14 +338,21 @@ describe('AdmissionPolicyService', () => {
         status: 'DRAFT',
         approvalPolicyId: null,
       });
-      prisma.approvalPolicy.create.mockResolvedValue({ id: 'approval-policy-a' });
+      prisma.approvalPolicy.create.mockResolvedValue({
+        id: 'approval-policy-a',
+      });
       const service = buildService(prisma);
       jest.spyOn(service, 'get').mockResolvedValue({ id: 'policy-a' } as any);
 
       await service.replaceApprovalChain(
         'policy-a',
         'version-draft',
-        { stages: [{ approverRole: 'vice_principal' }, { approverRole: 'principal' }] },
+        {
+          stages: [
+            { approverRole: 'vice_principal' },
+            { approverRole: 'principal' },
+          ],
+        },
         actor,
       );
 
@@ -406,8 +465,13 @@ describe('AdmissionPolicyService', () => {
           },
         ],
       });
-      prisma.admissionPolicyVersion.create.mockResolvedValue({ id: 'version-draft', version: 2 });
-      prisma.approvalPolicy.create.mockResolvedValue({ id: 'approval-policy-clone' });
+      prisma.admissionPolicyVersion.create.mockResolvedValue({
+        id: 'version-draft',
+        version: 2,
+      });
+      prisma.approvalPolicy.create.mockResolvedValue({
+        id: 'approval-policy-clone',
+      });
       const service = buildService(prisma);
       jest.spyOn(service, 'get').mockResolvedValue({ id: 'policy-a' } as any);
 

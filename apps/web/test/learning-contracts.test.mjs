@@ -36,10 +36,10 @@ describe('M13 Learning frontend contracts', () => {
     const layout = read('app/dashboard/layout.tsx');
     const sidebar = read('components/layout/sidebar.tsx');
 
-    assert.match(layout, /prefix:\s*'\/dashboard\/learning'/);
-    assert.match(layout, /'learning:read'/);
-    assert.match(layout, /'learning:launch'/);
-    assert.match(layout, /return 'learning'/);
+    assert.match(layout, /prefix:\s*['"]\/dashboard\/learning['"]/);
+    assert.match(layout, /['"]learning:read['"]/);
+    assert.match(layout, /['"]learning:launch['"]/);
+    assert.match(layout, /return ['"]learning['"]/);
 
     assert.match(sidebar, /label:\s*'Learning'/);
     assert.match(sidebar, /href:\s*'\/dashboard\/learning'/);

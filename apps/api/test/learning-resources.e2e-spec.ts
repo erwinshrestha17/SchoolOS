@@ -62,7 +62,7 @@ describe('Learning resources (E2E)', () => {
       entityId: 'activity-a',
       objectKey: 'tenant-a/learning/file-a.pdf',
       bucket: 'private',
-      fileName: 'fractions.pdf',
+      originalFilename: 'fractions.pdf',
       mimeType: 'application/pdf',
       sizeBytes: 128,
       checksum: 'checksum',

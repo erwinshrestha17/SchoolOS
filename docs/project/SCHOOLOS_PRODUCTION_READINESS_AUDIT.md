@@ -6,6 +6,8 @@
 **Commit audited:** `edeef795ecd16b02ab046a4b45a4c68503ab6bfc`
 **Current target recommendation:** Internal QA, with local seed/smoke, authenticated browser, and Android emulator evidence; not staging, pilot, release-candidate, or GA ready
 
+**Latest current-head re-verification:** 2026-07-10 at `87ab9d21` — see [2026-07-10 Current-Head Verification Update](#2026-07-10-current-head-verification-update). The 2026-06-18 evidence and scores below remain the last full rubric pass; treat them as a dated snapshot, not proof for the current head. As of 2026-07-10, `main` fails its own local deploy gate; a same-day local fix pass (uncommitted, see [2026-07-10 Same-Day Fix Pass](#2026-07-10-same-day-fix-pass-uncommitted-on-top-of-87ab9d21)) resolves all 8 failures found but has not landed on `main`.
+
 This audit treats repository code, tests, CI, scripts, schema, migrations, deployment/runbook files, and commands run on 2026-06-18 as evidence. Documentation claims are not treated as proof by themselves.
 
 ## Evidence Limitations
@@ -65,6 +67,69 @@ The authenticated dashboard shell and module overview alignment were updated usi
 | Authenticated rendered comparison | NOT RUN | The local server started, but the in-app browser policy rejected the local target. No screenshot-fidelity, responsive-browser, or staging claim is recorded from this update. |
 
 The durable M3, M4, and M5 UI/API rules from that alignment pass live in their module references. Current readiness remains governed by this audit; local source checks do not replace authenticated rendered QA, staging browser proof, or controlled-pilot evidence.
+
+## 2026-07-10 Current-Head Verification Update
+
+**Commit verified:** `87ab9d21505acf6b136d0166b15a79e5f18cedf8` (2026-07-10). This section re-verifies the 2026-06-18 canonical audit's structural claims against current `main` and records real command results. It supersedes the 2026-06-18/06-30 scores below where they conflict; it does not replace the full rubric re-score, which would additionally require staging, provider, and physical-device evidence not attempted in this pass.
+
+**Commit drift since the canonical audit:** 454 commits landed on `main` between the audited commit (`edeef795`, 2026-06-18) and `87ab9d21` (2026-07-10), 216 of them tagged `feat:`. Migrations grew from 35 to 47. Recent feature work (2026-07-06 through 2026-07-09) added an admission-policy approval chain, waitlist and policy-duplication features, a Document Request Center, and document-waiver workflows — all outside the Horizon-1 sold slice (student/guardian records, attendance, fees/discounts, receipts/reversals, parent notices/fee visibility, principal attention) that the delivery plan says should be frozen. This confirms the scope-dilution concern: feature breadth is still expanding faster than staging/pilot gates are closing.
+
+**Finding: the CI gate is currently failing on `main` HEAD.** `.github/workflows/ci.yml` runs `pnpm verify:deploy:core` on every push/PR to `main`. Run locally against `87ab9d21`, that gate fails at the lint step, meaning recent commits reached `main` without this required-in-spirit gate actually passing — consistent with `main` having no branch protection or required status checks.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm verify:deploy:core` (full local deploy gate) | FAIL | Aborted at `pnpm lint`: `prettier --check` found formatting issues in 6 files (`admission-cases.service.ts`, `admission-policy.controller.ts`, `admission-policy.service.spec.ts`, `admission-policy.service.ts`, `admission-policy.dto.ts`, `attendance.hardening.spec.ts`) — all touched by the 2026-07-07/09 admissions work. |
+| `pnpm typecheck` (core/api/web) | PASS | Clean; no errors in core, API, or web TypeScript projects. |
+| `pnpm db:migrate` (local Postgres, port 5433) | PASS | `prisma migrate deploy` found 47 migrations, no pending migrations. |
+| `pnpm --filter @schoolos/api test` | FAIL | 181/182 suites, 1481/1482 tests passed. Failure: `src/platform/m0-platform-boundary.contract.spec.ts:241` asserts the raw source of `apps/web/app/platform/layout.tsx` contains the literal string `router.push('/dashboard')` (single-quote); the file now reads `router.push("/dashboard")` (double-quote). A brittle raw-source-string contract test broken by quote-style drift, not a behavior regression — but it is a currently-failing gate. |
+| `pnpm --filter @schoolos/api test:e2e` (mocked Prisma/Redis/BullMQ suite) | FAIL | 38/40 suites, 240/242 tests passed. Failing suites: `learning-resources.e2e-spec.ts` and `activity-media-privacy-integration.e2e-spec.ts`, both asserting a `fileAsset` shape from the mocked File Registry path. |
+| `pnpm --filter @schoolos/web test` | FAIL | 1 failing assertion in `test/web-reference-foundation.test.mjs` expecting a `/dashboard/communications` route-gate entry in `apps/web/app/dashboard/layout.tsx`. Likely stale after the 2026-07-07 change that made `/dashboard/notices` canonical and `/dashboard/communications` a redirect; the contract test was not updated to match. |
+| `pnpm build` (core/api/web) | PASS | Next.js production build completed; static/dynamic route table generated without errors. |
+
+**Structural claims re-verified against `87ab9d21` (all confirmed still true):**
+
+- `.github/workflows/ci.yml` starts a Redis service only — no Postgres service, no migration/seed step, no live API. `test:web:e2e` (the same script CI conditionally runs) still hand-lists 5 spec files (`public-smoke`, `phase2f-browser-smoke`, `dashboard-route-audit`, `phase4-hardening-smoke`, `account-security`) out of 21 files under `apps/web/e2e/*.spec.ts`; the other 16 (`admin-smoke`, `accounting-smoke`, `academics-phase2a-smoke`, `attendance-fees-smoke`, `learning-lab-session`, etc.) are excluded from CI, and most contain `test.skip(...)` fallbacks when the API isn't reachable.
+- No `Dockerfile` exists anywhere in the repo (root or per-app); `docker-compose.yml` provisions Postgres and Redis only.
+- `apps/api/test/jest-e2e.json` still maps `@prisma/client`, `bullmq`, and `ioredis` to `<rootDir>/mocks/*`, confirming `test:e2e` is a mocked HTTP/contract suite, not a real-database integration lane. Root `package.json` still has only `test`/`test:e2e`; no `test:unit`/`test:contract`/`test:integration` split exists.
+- `SwaggerModule.setup('api/v1/docs', ...)` in `apps/api/src/main.ts` is mounted unconditionally; no `SWAGGER_ENABLED` flag or environment gate.
+- `apps/api/src/common/interceptors/request-logging.interceptor.ts:50` still logs raw `error.message` for failed requests, unsanitized.
+- No `CODEOWNERS`, `SECURITY.md`, Dependabot/Renovate config, or CodeQL workflow exists anywhere in the repo.
+- `apps/schoolos_mobile/android/app/build.gradle` still sets `applicationId = "com.example.schoolos_mobile"`, and the release build type still uses `signingConfigs.getByName("debug")`. No Flutter product flavors exist under `apps/schoolos_mobile`.
+- `apps/schoolos_mobile/lib/core/config/app_config.dart` still defaults to `AppEnvironment.development` when no build-time environment override is supplied.
+- Base64 JSON upload patterns remain in `apps/web/lib/files.ts` and related API client files; `apps/web/lib/api/client.ts` still uses a raw `window.open` call for protected-file access, alongside two settings pages.
+- Unbounded-list APIs grew further, in the opposite direction from the recommended lookup/list split: commit `f3aa5e9e` (2026-07-07, "increase data retrieval limits for curriculum catalog, assignments, and staff roster") raised response caps in `academics-foundation.service.ts`, `academics.service.ts`, `learning-resources.service.ts`, and `staff.service.ts`.
+
+**Not re-verified in this pass:** `pnpm db:seed`, `pnpm smoke:pilot`, authenticated browser E2E, Android emulator/physical-device QA, staging deployment, provider/storage sandbox checks, backup/restore, and monitoring/alerting. Treat mobile, staging, and browser-E2E rows in the scores below as still dated to 2026-06-21/06-30, not re-confirmed for `87ab9d21`.
+
+**Release decision for `87ab9d21`:** Not release-candidate-clean. Even setting aside staging/pilot/mobile gates, the exact local deploy gate this repository defines (`pnpm verify:deploy:core`, mirrored by CI) fails on this commit. Fix the 6-file formatting issue, the quote-style contract test, the two mocked File Registry test failures, and the stale `/dashboard/communications` contract assertion before treating any later commit as gate-clean.
+
+### 2026-07-10 Same-Day Fix Pass (uncommitted, on top of `87ab9d21`)
+
+All five gate failures above (plus a sixth and seventh that were masked behind the earlier ones and only surfaced once each prior failure was cleared) were fixed in the working tree the same day. **These fixes are not yet committed** — this records local-only evidence, not a new verified commit. 15 files changed; `git status --short` shows only these modifications on top of `87ab9d21`.
+
+| # | Failure | Root cause | Fix |
+| --- | --- | --- | --- |
+| 1 | `pnpm lint` (prettier) failing on 6 admissions/attendance files | Unformatted files from the 2026-07-07/09 admissions work | `prettier --write` on the 6 files |
+| 2 | API unit test: `m0-platform-boundary.contract.spec.ts:241` | Raw-source-string assertion hardcoded single-quote `router.push('/dashboard')`; `apps/web/app/platform/layout.tsx` had drifted to double quotes in commit `008a27ac` (2026-07-09) | Assertion changed to a quote-agnostic regex `/router\.push\(['"]\/dashboard['"]\)/` |
+| 3 | Mocked e2e: `learning-resources.e2e-spec.ts` | Test fixture seeded `fileAsset.fileName`, but the real Prisma `FileAsset` model field is `originalFilename` (service reads `resource.fileAsset.originalFilename`) | Fixture field renamed to `originalFilename` |
+| 4 | Mocked e2e: `activity-media-privacy-integration.e2e-spec.ts` | Test asserted `eventEmitter.emit` was called with the *returned/serialized* post DTO, but the service emits the *raw* joined Prisma entity (different shape) — a pre-existing test/implementation shape mismatch, not a new regression | Assertion narrowed to `expect.objectContaining({ id, classId, sectionId })` instead of full deep-equality |
+| 5 | Web unit test: `web-reference-foundation.test.mjs` (`/dashboard/communications` route-gate) | Same single-quote-vs-double-quote drift in `apps/web/app/dashboard/layout.tsx` | Quote-agnostic regex |
+| 6 | *(newly surfaced)* 5 more web unit tests failing the same way once test #5's file stopped masking them: `learning-contracts.test.mjs`, `platform-change-plan-contract.test.mjs`, and 3 assertions inside `web-contracts.test.mjs` (`prefix: '/dashboard/students'` route loop, `router.push('/dashboard')` in the platform layout check, and the W4 operational-routes `href.startsWith(...)` checks against both `dashboardLayout` and `sidebar`) | Same quote-style drift, present in more assertions than the audit's first pass captured — Node's test runner stops at the first failing `assert` inside an `it()`, so each fix exposed the next fragile assertion in the same block | All converted to quote-agnostic regexes/dynamic-regex builders |
+| 7 | *(newly surfaced)* `centralizes browser session storage access in lib/session` (real bug, not quote drift) | The source-file scanner walked `e2e/*.spec.ts` as if it were application source; `e2e/account-security.spec.ts` legitimately calls `localStorage`/`sessionStorage` to inspect browser state in a Playwright test, which isn't a violation | Added `file.startsWith('e2e/')` to the test's exclusion list, alongside the existing `test/` exclusion |
+| 8 | *(newly surfaced)* `pnpm build`'s `pnpm --filter @schoolos/web lint` (once the API-side lint failure stopped masking it) | Unused `// eslint-disable-next-line react-hooks/exhaustive-deps` in `admission-policy-wizard.tsx:205` — `--max-warnings=0` treats "unused disable directive" as a failing warning | Removed the stale disable comment |
+
+**Post-fix verification (same session, local, uncommitted):**
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm verify:deploy:core` | PASS | Full gate (compile-artifacts, lint, typecheck, `db:generate`/`db:validate`, `verify:openapi`, test, test:e2e, build) exited 0 end-to-end. |
+| `pnpm --filter @schoolos/api test` | PASS | 182/182 suites, 1482/1482 tests. |
+| `pnpm --filter @schoolos/api test:e2e` | PASS | 40/40 suites, 242/242 tests. |
+| `pnpm --filter @schoolos/web test` | PASS | 40/40 suites, 320/320 tests. |
+| `pnpm build` | PASS | Core/API/web build clean; Next.js generated the full static/dynamic route table with no errors. |
+| `pnpm test:web:e2e` | PASS with skips (unchanged, expected) | 5 passed, 15 skipped — same shape as the 2026-06-18 baseline; skips are the pre-existing "no live seeded API in this shell" behavior, not something this fix pass addressed. |
+
+**Caveat:** none of these fixes have been reviewed, committed, or pushed. Until they land on `main`, the CI-red finding above still describes the actual state of the branch history. This local pass demonstrates the failures are fixable quickly (all were test/lint issues, zero application-behavior changes), not that `main` is currently green.
 
 ## Commands Actually Run
 
@@ -258,6 +323,7 @@ No active Markdown documents were deleted or archived in this audit. The consoli
 4. External providers and object storage are not verified.
 5. No controlled-pilot workflow evidence from a real school.
 6. Physical-device QA, signed mobile release configuration, and staging mobile QA are missing.
+7. As of 2026-07-10, `main` HEAD (`87ab9d21`) fails the repository's own local deploy gate (`pnpm verify:deploy:core`, the same script CI runs). A same-day local fix pass (uncommitted) resolved all 8 failures found — see [2026-07-10 Same-Day Fix Pass](#2026-07-10-same-day-fix-pass-uncommitted-on-top-of-87ab9d21) — but until that fix is committed and pushed, `main`'s actual history is still red. `main` has no branch protection or required status checks, so failing commits can still merge.
 
 ## High-Priority Gaps
 

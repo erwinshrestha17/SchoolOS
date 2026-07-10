@@ -326,27 +326,27 @@ describe("SchoolOS web production contracts", () => {
     for (const source of [dashboardLayout, sidebar]) {
       assert.match(
         source,
-        /href\.startsWith\('\/dashboard\/timetable'\)\) return 'timetable'/,
+        /href\.startsWith\(['"]\/dashboard\/timetable['"]\)\) return ['"]timetable['"]/,
       );
       assert.match(
         source,
-        /href\.startsWith\('\/dashboard\/hr'\)\) return 'hr'/,
+        /href\.startsWith\(['"]\/dashboard\/hr['"]\)\) return ['"]hr['"]/,
       );
       assert.match(
         source,
-        /href\.startsWith\('\/dashboard\/payroll'\)\) return 'hr'/,
+        /href\.startsWith\(['"]\/dashboard\/payroll['"]\)\) return ['"]hr['"]/,
       );
       assert.match(
         source,
-        /href\.startsWith\('\/dashboard\/library'\)\) return 'library'/,
+        /href\.startsWith\(['"]\/dashboard\/library['"]\)\) return ['"]library['"]/,
       );
       assert.match(
         source,
-        /href\.startsWith\('\/dashboard\/transport'\)\) return 'transport'/,
+        /href\.startsWith\(['"]\/dashboard\/transport['"]\)\) return ['"]transport['"]/,
       );
       assert.match(
         source,
-        /href\.startsWith\('\/dashboard\/canteen'\)\) return 'canteen'/,
+        /href\.startsWith\(['"]\/dashboard\/canteen['"]\)\) return ['"]canteen['"]/,
       );
     }
   });
@@ -678,7 +678,7 @@ describe("SchoolOS web production contracts", () => {
       layout,
       /platform_super_admin|platform_support|platform_billing_admin/,
     );
-    assert.match(layout, /router\.push\('\/dashboard'\)/);
+    assert.match(layout, /router\.push\(['"]\/dashboard['"]\)/);
   });
 
   it("does not keep raw demo replacement IDs in production-facing forms", () => {
@@ -701,7 +701,11 @@ describe("SchoolOS web production contracts", () => {
     const files = sourceFiles(".");
 
     for (const file of files) {
-      if (file === "lib/session.ts" || file.startsWith("test/")) {
+      if (
+        file === "lib/session.ts" ||
+        file.startsWith("test/") ||
+        file.startsWith("e2e/")
+      ) {
         continue;
       }
 
@@ -885,7 +889,7 @@ describe("SchoolOS web production contracts", () => {
     for (const route of requiredRoutes) {
       assert.match(
         layout,
-        new RegExp(`prefix: '${route.replaceAll("/", "\\/")}'`),
+        new RegExp(`prefix: ['"]${route.replaceAll("/", "\\/")}['"]`),
       );
     }
   });

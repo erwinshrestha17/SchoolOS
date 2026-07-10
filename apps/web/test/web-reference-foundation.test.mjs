@@ -76,7 +76,7 @@ describe('reference dashboard foundation', () => {
     const layout = read('app/dashboard/layout.tsx');
     const sidebar = read('components/layout/sidebar.tsx');
 
-    assert.match(layout, /prefix: '\/dashboard\/operations'/);
+    assert.match(layout, /prefix: ['"]\/dashboard\/operations['"]/);
     assert.doesNotMatch(sidebar, /href: '\/dashboard\/operations'/);
     for (const helper of [
       'libraryApi.getOverdueBooksReport',
@@ -100,7 +100,7 @@ describe('reference dashboard foundation', () => {
     // /dashboard/notices is the single canonical M12 overview; the older
     // /dashboard/communications route now redirects there so there is only
     // one KPI-fetching "home" experience for this module.
-    assert.match(layout, /prefix: '\/dashboard\/communications'/);
+    assert.match(layout, /prefix: ['"]\/dashboard\/communications['"]/);
     assert.match(sidebar, /href: '\/dashboard\/notices'/);
     assert.match(communications, /redirect\('\/dashboard\/notices'\)/);
     assert.match(noticesWorkspace, /communicationsApi\.getCommunicationsSummary/);

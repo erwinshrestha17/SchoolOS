@@ -251,7 +251,11 @@ describe('Platform tenant subscription change workflow contracts', () => {
     ]) {
       assert.match(
         shell,
-        new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+        new RegExp(
+          expected
+            .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            .replace(/'/g, `['"]`),
+        ),
       );
     }
 

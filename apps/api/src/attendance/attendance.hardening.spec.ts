@@ -257,9 +257,7 @@ describe('Attendance Hardening', () => {
       );
       expect(isRegistered).toBe(true);
 
-      expect(systemRolePermissions.admin).toContain(
-        'attendance:override_lock',
-      );
+      expect(systemRolePermissions.admin).toContain('attendance:override_lock');
       expect(systemRolePermissions.principal).toContain(
         'attendance:override_lock',
       );

@@ -202,7 +202,6 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
     if (hydrated || !policyQuery.data) return;
     hydrateFrom(policyQuery.data);
     setHydrated(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [policyQuery.data, hydrated]);
 
   const startDraftMutation = useMutation({

@@ -31,7 +31,9 @@ import {
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.students')
 export class AdmissionPolicyController {
-  constructor(private readonly admissionPolicyService: AdmissionPolicyService) {}
+  constructor(
+    private readonly admissionPolicyService: AdmissionPolicyService,
+  ) {}
 
   @Get()
   @Permissions('admission_policy:read')
@@ -175,7 +177,10 @@ export class AdmissionPolicyController {
 
   @Post(':policyId/archive')
   @Permissions('admission_policy:manage')
-  archive(@Param('policyId') policyId: string, @CurrentAuth() actor: AuthContext) {
+  archive(
+    @Param('policyId') policyId: string,
+    @CurrentAuth() actor: AuthContext,
+  ) {
     return this.admissionPolicyService.archive(policyId, actor);
   }
 

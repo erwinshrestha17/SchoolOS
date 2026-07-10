@@ -17,14 +17,20 @@ import {
   AdmissionPolicyApplicantType,
   AdmissionDocumentTiming,
 } from '@prisma/client';
-import { ADMISSION_GRADE_BANDS, ADMISSION_MODES, ADMISSION_SOURCES } from './admission-case.dto';
+import {
+  ADMISSION_GRADE_BANDS,
+  ADMISSION_MODES,
+  ADMISSION_SOURCES,
+} from './admission-case.dto';
 
 export class CreateAdmissionPolicyDto {
   @IsString() @MaxLength(160) name!: string;
   @IsOptional() @IsString() academicYearId?: string;
   @IsOptional() @IsString() classId?: string;
   @IsOptional() @IsIn(ADMISSION_GRADE_BANDS) gradeBand?: string;
-  @IsOptional() @IsEnum(AdmissionPolicyApplicantType) applicantType?: AdmissionPolicyApplicantType;
+  @IsOptional()
+  @IsEnum(AdmissionPolicyApplicantType)
+  applicantType?: AdmissionPolicyApplicantType;
   @IsOptional() @IsEnum(ADMISSION_SOURCES) source?: string;
 }
 
@@ -33,7 +39,9 @@ export class UpdateAdmissionPolicyIdentityDto {
   @IsOptional() @IsString() academicYearId?: string;
   @IsOptional() @IsString() classId?: string;
   @IsOptional() @IsIn(ADMISSION_GRADE_BANDS) gradeBand?: string;
-  @IsOptional() @IsEnum(AdmissionPolicyApplicantType) applicantType?: AdmissionPolicyApplicantType;
+  @IsOptional()
+  @IsEnum(AdmissionPolicyApplicantType)
+  applicantType?: AdmissionPolicyApplicantType;
   @IsOptional() @IsEnum(ADMISSION_SOURCES) source?: string;
 }
 
@@ -62,7 +70,9 @@ export class UpsertDocumentRequirementDto {
   @IsString() @MaxLength(160) label!: string;
   @IsOptional() @IsBoolean() isRequired?: boolean;
   @IsOptional() @IsBoolean() requiresOriginalVerification?: boolean;
-  @IsOptional() @IsEnum(AdmissionDocumentTiming) timing?: AdmissionDocumentTiming;
+  @IsOptional()
+  @IsEnum(AdmissionDocumentTiming)
+  timing?: AdmissionDocumentTiming;
   @IsOptional() @IsInt() @Min(0) @Type(() => Number) expiresAfterDays?: number;
   @IsOptional() @IsBoolean() canBeWaived?: boolean;
   @IsOptional()
@@ -90,7 +100,12 @@ export class ApprovalChainStageDto {
 }
 
 export class UpsertApprovalChainDto {
-  @IsOptional() @IsInt() @Min(1) @Max(10) @Type(() => Number) minApprovals?: number;
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  @Type(() => Number)
+  minApprovals?: number;
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

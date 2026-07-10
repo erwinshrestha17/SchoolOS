@@ -238,7 +238,7 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
     it('non-platform users are redirected to dashboard', () => {
       const layout = read('../web/app/platform/layout.tsx');
 
-      expect(layout).toContain("router.push('/dashboard')");
+      expect(layout).toMatch(/router\.push\(['"]\/dashboard['"]\)/);
     });
 
     it('frontend platform API calls use /platform/ prefix consistently', () => {
