@@ -409,7 +409,7 @@ export class MobilePrincipalService implements OnModuleInit {
         subtitle: staffName(request.staff),
         detail: `${decimalToNumber(request.days)} days leave`,
         status: request.status,
-        severity: 'high',
+        severity: 'high' as Severity,
         timestamp: toIso(request.createdAt),
         owner: 'Principal',
         nextAction: 'Review leave request',
@@ -424,7 +424,7 @@ export class MobilePrincipalService implements OnModuleInit {
         ),
         detail: request.reason,
         status: request.status,
-        severity: 'medium',
+        severity: 'medium' as Severity,
         timestamp: toIso(request.requestedAt),
         owner: 'Principal',
         nextAction: 'Review correction',
@@ -439,7 +439,7 @@ export class MobilePrincipalService implements OnModuleInit {
         ),
         detail: request.reason,
         status: request.status,
-        severity: 'high',
+        severity: 'high' as Severity,
         timestamp: toIso(request.createdAt),
         owner: 'Principal',
         nextAction: 'Review publish blocker',
@@ -451,10 +451,9 @@ export class MobilePrincipalService implements OnModuleInit {
         subtitle: request.targetType,
         detail: request.reason,
         status: request.status,
-        severity:
-          request.workflowType === 'EMERGENCY_HIGH_IMPACT_NOTICE'
-            ? 'critical'
-            : 'medium',
+        severity: (request.workflowType === 'EMERGENCY_HIGH_IMPACT_NOTICE'
+          ? 'critical'
+          : 'medium') as Severity,
         timestamp: toIso(request.createdAt),
         owner: 'Principal',
         nextAction: 'Review request',
@@ -469,7 +468,9 @@ export class MobilePrincipalService implements OnModuleInit {
           subtitle: notice.title,
           detail: audienceLabel(notice.audienceType),
           status: 'PENDING',
-          severity: notice.priority === 'EMERGENCY' ? 'critical' : 'medium',
+          severity: (notice.priority === 'EMERGENCY'
+            ? 'critical'
+            : 'medium') as Severity,
           timestamp: toIso(notice.createdAt),
           owner: 'Principal',
           nextAction: 'Review notice',
@@ -917,7 +918,7 @@ export class MobilePrincipalService implements OnModuleInit {
           title: row.label,
           subtitle: 'Attendance not submitted',
           detail: 'No attendance recorded today',
-          severity: 'critical',
+          severity: 'critical' as Severity,
         })),
       ],
       studentFollowUps,
@@ -984,7 +985,7 @@ export class MobilePrincipalService implements OnModuleInit {
         title: staffName(row.staff),
         subtitle: row.note ?? row.leaveType ?? 'Staff attendance',
         status: row.status,
-        severity: row.status === 'ABSENT' ? 'high' : 'medium',
+        severity: (row.status === 'ABSENT' ? 'high' : 'medium') as Severity,
         timestamp: toIso(row.createdAt),
         nextAction: 'Review staff coverage',
       })),
@@ -995,7 +996,7 @@ export class MobilePrincipalService implements OnModuleInit {
         subtitle: `${row.leaveType} leave`,
         detail: `${decimalToNumber(row.days)} days`,
         status: row.status,
-        severity: row.status === 'PENDING' ? 'high' : 'medium',
+        severity: (row.status === 'PENDING' ? 'high' : 'medium') as Severity,
         timestamp: toIso(row.createdAt),
         nextAction: 'Review leave coverage',
       })),
@@ -1127,7 +1128,7 @@ export class MobilePrincipalService implements OnModuleInit {
           title: `${row.student.class?.name ?? 'Class'} overdue collection`,
           detail: formatNpr(decimalToNumber(row.totalAmount)),
           status: 'High',
-          severity: 'high',
+          severity: 'high' as Severity,
         })),
         ...financeApprovals.slice(0, 3).map((row) => ({
           id: row.id,
@@ -1135,7 +1136,7 @@ export class MobilePrincipalService implements OnModuleInit {
           title: `${financeApprovalTitle(row.type)} - ${studentName(row.payment.student)}`,
           detail: formatNpr(decimalToNumber(row.amount ?? row.payment.amount)),
           status: 'Pending',
-          severity: 'medium',
+          severity: 'medium' as Severity,
         })),
         ...(cashierClose?.varianceAmount
           ? [
@@ -1353,7 +1354,9 @@ export class MobilePrincipalService implements OnModuleInit {
       subtitle: 'Escalation context is restricted on mobile',
       detail: row.reason,
       status: row.status,
-      severity: row.status === ChatEscalationStatus.RESOLVED ? 'low' : 'high',
+      severity: (row.status === ChatEscalationStatus.RESOLVED
+        ? 'low'
+        : 'high') as Severity,
       timestamp: toIso(row.createdAt),
       owner:
         row.escalatedToUserId === actor.userId
@@ -2757,7 +2760,7 @@ export class MobilePrincipalService implements OnModuleInit {
           type: 'staff_coverage',
           title: item.title,
           subtitle: item.detail,
-          severity: 'high',
+          severity: 'high' as Severity,
           nextAction: 'Review staff coverage',
           timestamp: nowIso(),
           route: '/principal/staff-absence',

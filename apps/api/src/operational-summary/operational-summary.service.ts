@@ -411,7 +411,7 @@ export class OperationalSummaryService {
                 },
               },
               'Review absent students',
-              '/dashboard/attendance/daily',
+              '/dashboard/attendance/register',
             ),
             this.def(
               'lateToday',
@@ -427,7 +427,7 @@ export class OperationalSummaryService {
                 },
               },
               'Review late arrivals',
-              '/dashboard/attendance/daily',
+              '/dashboard/attendance/register',
             ),
             this.def(
               'pendingCorrections',
@@ -445,7 +445,7 @@ export class OperationalSummaryService {
                 submittedAt: null,
               },
               'Complete pending attendance registers',
-              '/dashboard/attendance/daily',
+              '/dashboard/attendance/register',
             ),
           ],
       m3_fees: [
@@ -463,7 +463,7 @@ export class OperationalSummaryService {
             dueDate: { lt: day.startUtc },
           },
           'Review overdue fee follow-up',
-          '/dashboard/fees/dues',
+          '/dashboard/fees/invoices',
         ),
         this.def('invoicesDueToday', 'invoice', {
           tenantId,
@@ -478,7 +478,7 @@ export class OperationalSummaryService {
             refundDate: { gte: day.startUtc, lt: day.endExclusiveUtc },
           },
           'Review refunds',
-          '/dashboard/fees/reversals',
+          '/dashboard/fees/adjustments',
         ),
         this.def('billingRunsToday', 'feeBillingRun', {
           tenantId,
@@ -629,7 +629,7 @@ export class OperationalSummaryService {
                 homework: { assignedByStaffId: teacherScope?.staffId },
               },
               'Review homework submissions',
-              '/dashboard/homework/submissions',
+              '/dashboard/homework/review',
             ),
             this.def('todayTimetablePeriods', 'timetableSlot', {
               tenantId,
@@ -778,7 +778,7 @@ export class OperationalSummaryService {
             locationPings: { none: { recordedAt: { gte: staleGpsAt } } },
           },
           'Review GPS freshness',
-          '/dashboard/transport/gps-quality',
+          '/dashboard/transport/live-status',
         ),
         this.def(
           'vehicleDocumentRisks',
@@ -841,7 +841,7 @@ export class OperationalSummaryService {
           'accountingPeriod',
           { tenantId, status: { in: ['OPEN', 'LOCKED'] } },
           'Review period close status',
-          '/dashboard/accounting/period-close',
+          '/dashboard/accounting/fiscal-periods',
         ),
       ],
       m10_communications: [
@@ -855,14 +855,14 @@ export class OperationalSummaryService {
           'notificationDelivery',
           { tenantId, status: { in: ['FAILED', 'RETRY_PENDING'] } },
           'Review failed notice deliveries',
-          '/dashboard/notices/delivery',
+          '/dashboard/notices/deliveries',
         ),
         this.def(
           'unreadNoticeRecipients',
           'notificationDelivery',
           { tenantId, noticeId: { not: null }, readReceipts: { none: {} } },
           'Follow up on unread notices',
-          '/dashboard/notices/delivery',
+          '/dashboard/notices/deliveries',
         ),
         this.def(
           'highImpactNoticesAwaitingPublication',
@@ -1006,7 +1006,7 @@ export class OperationalSummaryService {
           OR: scope.classSectionScopes,
         },
         'Complete your pending attendance registers',
-        '/dashboard/attendance/daily',
+        '/dashboard/attendance/register',
       ),
     ];
   }

@@ -987,7 +987,7 @@ describe("SchoolOS web production contracts", () => {
     );
     assert.match(dashboard, /DashboardCommandCenter/);
     assert.match(dashboard, /severityPresentation/);
-    assert.match(dashboard, /Needs attention today/);
+    assert.match(dashboard, /Pending Approvals & Alerts/);
     assert.match(dashboard, /Today at a glance/);
     assert.match(dashboard, /Module readiness/);
     assert.match(dashboard, /["']\/dashboard\/fees["']/);

@@ -35,12 +35,13 @@ describe('dashboard command center', () => {
     const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
 
     for (const marker of [
-      'Needs attention today',
+      'Pending Approvals & Alerts',
       'Today at a glance',
       'Run today’s school workflows',
-      'Academic readiness',
+      'Academic snapshot',
       'Department queues',
       'Recent activity',
+      'Recent notices',
       'Module readiness',
       'DashboardUnavailableState',
     ]) {
@@ -48,6 +49,86 @@ describe('dashboard command center', () => {
     }
 
     assert.doesNotMatch(commandCenter, /title="Operational summary"/);
+  });
+
+  it('moves Pending Approvals into the context rail as a compact real-data panel, not a full-width banner', () => {
+    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+
+    assert.match(commandCenter, /function PendingApprovalsPanel/);
+    assert.match(commandCenter, /function PendingApprovalRow/);
+    assert.doesNotMatch(commandCenter, /function AttentionCenter/);
+    assert.doesNotMatch(commandCenter, /function AttentionCard/);
+    // Every row must resolve through the same safe-route allowlist as
+    // everything else — no arbitrary href from backend attention payloads.
+    assert.match(
+      commandCenter,
+      /const directHref = safeRoute\(\{\s*\n\s*key: item\.key,/,
+    );
+  });
+
+  it('renders Recent Notices from the real M12 notices list, permission-gated, never a hardcoded count', () => {
+    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+
+    assert.match(commandCenter, /function RecentNoticesPanel/);
+    assert.match(commandCenter, /queryFn: api\.listNotices/);
+    assert.match(commandCenter, /hasPermissions\(\["notices:read"\]\)/);
+    assert.match(commandCenter, /if \(!canReadNotices\) return null;/);
+    assert.match(commandCenter, /import \{ PriorityBadge \} from "\.\.\/forms\/communications-form"/);
+    assert.doesNotMatch(commandCenter, /notice\.body/);
+  });
+
+  it('shows Today\'s Timetable using the real ISO weekday convention, not JS getDay()', () => {
+    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+
+    assert.match(commandCenter, /function TodaysTimetablePanel/);
+    assert.match(commandCenter, /function currentNepalIsoWeekday/);
+    // Confirmed from the timetable builder's own DAYS array: 1=Monday, not
+    // JS's Date.getDay() 0=Sunday convention (a mismatch a sibling teacher
+    // dashboard component actually has — do not copy that bug here). Built
+    // from getNepalNow() calendar fields, not Intl.DateTimeFormat, per the
+    // no-browser-local-date-rendering contract in date-utils-contract.test.mjs.
+    assert.match(commandCenter, /const now = getNepalNow\(\);/);
+    assert.match(commandCenter, /jsWeekday === 0 \? 7 : jsWeekday/);
+    assert.doesNotMatch(commandCenter, /new Intl\.DateTimeFormat/);
+    assert.match(commandCenter, /queryFn: \(\) => api\.listTimetable\(\{ dayOfWeek, limit: 50 \}\)/);
+    assert.match(commandCenter, /hasPermissions\(\["timetable:read"\]\)/);
+    assert.match(commandCenter, /if \(!canReadTimetable\) return null;/);
+    assert.match(commandCenter, /No classes are scheduled for today\./);
+  });
+
+  it('shows a radial gauge only for the one metric with a genuine real ratio (attendance)', () => {
+    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+
+    assert.match(commandCenter, /function RadialGauge/);
+    assert.match(commandCenter, /function computeAttendanceRate/);
+    assert.match(
+      commandCenter,
+      /ringPercent=\{\s*\n\s*summary\.module === "m2_attendance" \? attendanceRate : null/,
+    );
+  });
+
+  it('derives the attendance rate only from two real backend numbers, never invented', () => {
+    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+
+    assert.match(
+      commandCenter,
+      /typeof presentToday === "number" &&\s*\n\s*typeof expectedStudents === "number" &&\s*\n\s*expectedStudents > 0/,
+    );
+    assert.match(commandCenter, /Math\.round\(\(presentToday \/ expectedStudents\) \* 100\)/);
+  });
+
+  it('renders a real, bounded quick-action icon grid instead of a generic action list', () => {
+    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+
+    assert.match(commandCenter, /function QuickActionsSection/);
+    assert.match(commandCenter, /Jump into a workflow/);
+    // Every tile must come from the real, permission-filtered nextActions
+    // list and resolve through the same safe-route allowlist as the rest of
+    // the dashboard — never an invented action or an arbitrary href.
+    assert.match(commandCenter, /dashboard\.nextActions/);
+    assert.match(commandCenter, /\.slice\(0, 6\)/);
+    assert.match(commandCenter, /function quickActionPresentation/);
+    assert.doesNotMatch(commandCenter, /function NextActionsPanel/);
   });
 
   it('uses current product labels for visible module names', () => {
@@ -63,5 +144,24 @@ describe('dashboard command center', () => {
     ]) {
       assert.ok(commandCenter.includes(label), `Missing visible product label: ${label}`);
     }
+  });
+
+  it('uses the School Overview header copy with a single role-aware primary action', () => {
+    const page = read('app/dashboard/page.tsx');
+
+    assert.match(page, /title="School Overview"/);
+    assert.match(page, /Daily operating snapshot for your school/);
+
+    // The backend already orders nextActions by priority for the session,
+    // so the header's one primary action must be the first authorized entry
+    // from that real list, not a generic control like refresh — refresh
+    // moves next to the "Updated ..." timestamp where it belongs.
+    assert.match(page, /const \[primaryNextAction, \.\.\.remainingNextActions\] = safeNextActions/);
+    assert.match(page, /primaryNextAction\.action\.label/);
+    assert.match(page, /primaryNextAction\.href/);
+    assert.doesNotMatch(
+      page,
+      /primaryAction=\{\s*<RefreshSummaryButton/,
+    );
   });
 });

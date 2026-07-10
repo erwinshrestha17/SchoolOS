@@ -450,6 +450,19 @@ button.shell-card:hover {
     transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-slide-in,
+  .animate-scale-in,
+  .sidebar-transition,
+  .sidebar-label,
+  .sidebar-overlay,
+  .dropdown-menu {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 .sidebar-label {
   transition: opacity 0.2s ease, width 0.2s ease;
   white-space: nowrap;

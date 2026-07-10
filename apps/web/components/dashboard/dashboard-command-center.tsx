@@ -2,12 +2,17 @@
 
 import {
   formatBsDateTime,
+  getNepalNow,
+  type NoticeSummary,
   type OperationalAttentionItem,
   type OperationalDashboardSummary,
   type OperationalModuleSummary,
+  type OperationalNextAction,
   type OperationalSummaryMetricValue,
   type OperationalSummaryModule,
+  type TimetableSlotSummary,
 } from "@schoolos/core";
+import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowRight,
@@ -20,17 +25,22 @@ import {
   GraduationCap,
   Landmark,
   Library,
+  Megaphone,
   MessageSquare,
   Receipt,
   School,
+  Settings,
   Utensils,
   Users,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { api } from "../../lib/api";
 import { prioritizeByAttention } from "../../lib/dashboard/prioritize-by-attention";
 import { cn } from "../../lib/utils";
+import { PriorityBadge } from "../forms/communications-form";
+import { useSession } from "../session-provider";
 import { resolveOperationalSummaryAction } from "../ui/operational-summary";
 import { SectionCard } from "../ui/section-card";
 
@@ -255,6 +265,7 @@ export function DashboardCommandCenter({
     (item) => item.count > 0,
   );
   const pulseCards = buildPulseCards(dashboard, moduleMap);
+  const attendanceRate = computeAttendanceRate(moduleMap);
   // Within each section, whichever module most urgently needs attention
   // today leads — a cashier's Daily operations naturally opens on Fees when
   // collections are overdue, a teacher's on Attendance when a register is
@@ -271,20 +282,15 @@ export function DashboardCommandCenter({
   );
 
   return (
-    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
       <div className="min-w-0 space-y-6">
-        <AttentionCenter
-          attentionItems={attentionItems}
-          moduleMap={moduleMap}
-        />
-
         <DashboardSection
           eyebrow="School pulse"
           title="Today at a glance"
           description="Live, permission-filtered signals from the school day."
         >
           {pulseCards.length ? (
-            <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {pulseCards.map((card) => (
                 <PulseCard key={card.label} card={card} />
               ))}
@@ -295,7 +301,7 @@ export function DashboardCommandCenter({
         </DashboardSection>
 
         <DashboardSection
-          eyebrow="Daily operations"
+          eyebrow="Today's operations"
           title="Run today’s school workflows"
           description="Open the operational workspace that needs your attention without loading full lists here."
         >
@@ -305,6 +311,9 @@ export function DashboardCommandCenter({
                 <OperationalWorkspaceCard
                   key={summary.module}
                   summary={summary}
+                  ringPercent={
+                    summary.module === "m2_attendance" ? attendanceRate : null
+                  }
                 />
               ))}
             </div>
@@ -315,7 +324,7 @@ export function DashboardCommandCenter({
 
         <DashboardSection
           eyebrow="Academics & learning"
-          title="Academic readiness"
+          title="Academic snapshot"
           description="Teaching, assessment, timetable, and controlled learning-session status."
         >
           {academicModules.length ? (
@@ -348,53 +357,148 @@ export function DashboardCommandCenter({
             <DashboardUnavailableState message="No department work queues are available for your current access." />
           )}
         </DashboardSection>
+
+        <QuickActionsSection dashboard={dashboard} />
       </div>
 
       <aside
         aria-label="Dashboard context"
         className="space-y-6 xl:sticky xl:top-6"
       >
-        <NextActionsPanel dashboard={dashboard} />
+        <PendingApprovalsPanel
+          attentionItems={attentionItems}
+          moduleMap={moduleMap}
+        />
+        <TodaysTimetablePanel />
         <RecentActivityPanel dashboard={dashboard} />
+        <RecentNoticesPanel />
         <SystemReadinessPanel modules={dashboard.modules} />
       </aside>
     </div>
   );
 }
 
-function AttentionCenter({
+// Maps an approved dashboard route to the module it belongs to purely for
+// icon/color presentation — every route here already exists in
+// APPROVED_DASHBOARD_ROUTES (operational-summary.tsx); this list only
+// decides which real MODULE_DEFINITIONS icon a quick-action tile shows.
+const QUICK_ACTION_ROUTE_MODULES: Array<[string, OperationalSummaryModule]> = [
+  ["/dashboard/admissions", "m1_students"],
+  ["/dashboard/students", "m1_students"],
+  ["/dashboard/attendance", "m2_attendance"],
+  ["/dashboard/fees", "m3_fees"],
+  ["/dashboard/academics", "m4_academics"],
+  ["/dashboard/activity", "m5_activity"],
+  ["/dashboard/homework", "m6_homework_timetable"],
+  ["/dashboard/timetable", "m6_homework_timetable"],
+  ["/dashboard/hr", "m7_hr_payroll"],
+  ["/dashboard/payroll", "m7_hr_payroll"],
+  ["/dashboard/library", "m8a_library"],
+  ["/dashboard/transport", "m8b_transport"],
+  ["/dashboard/canteen", "m8c_canteen"],
+  ["/dashboard/accounting", "m9_accounting"],
+  ["/dashboard/notices", "m10_communications"],
+  ["/dashboard/learning", "m12_learning"],
+];
+
+function quickActionPresentation(href: string): {
+  icon: LucideIcon;
+  accentClass: string;
+} {
+  const match = QUICK_ACTION_ROUTE_MODULES.find(([prefix]) => href.startsWith(prefix));
+  if (match) {
+    const definition = MODULE_DEFINITIONS[match[1]];
+    return { icon: definition.icon, accentClass: definition.accentClass };
+  }
+  return { icon: Settings, accentClass: "text-slate-600 bg-slate-50 border-slate-200" };
+}
+
+function QuickActionsSection({
+  dashboard,
+}: {
+  dashboard: OperationalDashboardSummary;
+}) {
+  const actions = dashboard.nextActions
+    .map((action) => ({ action, href: safeRoute(action) }))
+    .filter(
+      (item): item is { action: OperationalNextAction; href: string } =>
+        Boolean(item.href),
+    )
+    .slice(0, 6);
+
+  return (
+    <DashboardSection
+      eyebrow="Quick actions"
+      title="Jump into a workflow"
+      description="Bounded, permission-filtered shortcuts to what needs doing next — every tile opens a real authorized workspace."
+    >
+      {actions.length ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {actions.map(({ action, href }) => {
+            const { icon: Icon, accentClass } = quickActionPresentation(href);
+            return (
+              <Link
+                key={`${action.key}-${href}`}
+                href={href}
+                className="group flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-center transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2"
+              >
+                <span
+                  className={cn(
+                    "inline-flex rounded-xl border p-3",
+                    accentClass,
+                  )}
+                >
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <span className="text-sm font-bold leading-5 text-slate-900">
+                  {action.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      ) : (
+        <DashboardUnavailableState message="No additional quick actions are available for your current access." />
+      )}
+    </DashboardSection>
+  );
+}
+
+function PendingApprovalsPanel({
   attentionItems,
   moduleMap,
 }: {
   attentionItems: OperationalDashboardSummary["attentionItems"];
   moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>;
 }) {
+  const items = attentionItems.slice(0, 6);
+
   return (
     <SectionCard
-      title="Needs attention today"
+      title="Pending Approvals & Alerts"
       description={
-        attentionItems.length
+        items.length
           ? "Start with the issues that can affect today’s school operations."
-          : "No school-wide items currently need attention."
+          : "No approvals or alerts need your attention right now."
       }
       headerAction={
-        attentionItems.length ? (
-          <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">
+        items.length ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800">
             <CircleAlert className="h-3.5 w-3.5" aria-hidden="true" />
-            {attentionItems.length} to review
+            {items.length}
           </span>
         ) : (
-          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">
-            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-            All clear
-          </span>
+          <CheckCircle2
+            className="h-5 w-5 text-emerald-500"
+            aria-hidden="true"
+          />
         )
       }
     >
-      {attentionItems.length ? (
-        <div className="grid gap-3 md:grid-cols-2">
-          {attentionItems.slice(0, 5).map((item) => (
-            <AttentionCard
+      {items.length ? (
+        <div className="space-y-2">
+          {items.map((item) => (
+            <PendingApprovalRow
               key={`${item.module}-${item.key}`}
               item={item}
               moduleSummary={moduleMap.get(item.module)}
@@ -402,29 +506,21 @@ function AttentionCenter({
           ))}
         </div>
       ) : (
-        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-5">
-          <div className="flex items-start gap-3">
-            <CheckCircle2
-              className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600"
-              aria-hidden="true"
-            />
-            <div>
-              <p className="font-semibold text-slate-900">
-                No immediate school-wide issues are reported.
-              </p>
-              <p className="mt-1 text-sm leading-6 text-slate-600">
-                Continue with the daily workspaces below, or refresh this view
-                when new activity is expected.
-              </p>
-            </div>
-          </div>
+        <div className="flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+          <CheckCircle2
+            className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600"
+            aria-hidden="true"
+          />
+          <p className="text-sm leading-5 text-slate-700">
+            No school-wide items currently need attention.
+          </p>
         </div>
       )}
     </SectionCard>
   );
 }
 
-function AttentionCard({
+function PendingApprovalRow({
   item,
   moduleSummary,
 }: {
@@ -432,6 +528,7 @@ function AttentionCard({
   moduleSummary: OperationalModuleSummary | undefined;
 }) {
   const definition = MODULE_DEFINITIONS[item.module];
+  const Icon = definition.icon;
   const presentation = severityPresentation[item.severity];
   const directHref = safeRoute({
     key: item.key,
@@ -439,50 +536,48 @@ function AttentionCard({
     route: item.action,
   });
   const fallbackAction = moduleSummary ? firstSafeAction(moduleSummary) : null;
-  const action = directHref
-    ? { label: "Review", href: directHref }
-    : fallbackAction;
+  const href = directHref ?? fallbackAction?.href ?? null;
 
-  return (
-    <article
-      className={cn(
-        "rounded-2xl border p-4 transition-shadow hover:shadow-sm",
-        presentation.className,
-      )}
-    >
-      <div className="flex items-start gap-3">
-        <AlertTriangle
-          className={cn("mt-0.5 h-5 w-5 shrink-0", presentation.iconClassName)}
+  const content = (
+    <>
+      <span
+        className={cn(
+          "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border",
+          presentation.className,
+        )}
+      >
+        <Icon
+          className={cn("h-4 w-4", presentation.iconClassName)}
           aria-hidden="true"
         />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-600">
-              {presentation.label}
-            </span>
-            <span className="text-xs font-semibold text-slate-500">
-              {definition.shortLabel}
-            </span>
-          </div>
-          <p className="mt-2 text-sm font-bold leading-5 text-slate-950">
-            {item.label}
-          </p>
-          <p className="mt-1 text-sm leading-5 text-slate-600">
-            {formatNumber(item.count)} item{item.count === 1 ? "" : "s"} to
-            review in {definition.shortLabel}.
-          </p>
-          {action ? (
-            <Link
-              href={action.href}
-              className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold text-[var(--primary)] transition hover:text-[var(--primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2"
-            >
-              {action.label}
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          ) : null}
-        </div>
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-bold text-slate-900">
+          {item.label}
+        </p>
+        <p className="mt-0.5 truncate text-xs font-medium text-slate-500">
+          {formatNumber(item.count)} {item.count === 1 ? "item" : "items"}{" "}
+          pending in {definition.shortLabel}
+        </p>
       </div>
-    </article>
+      {href ? (
+        <ArrowRight
+          className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]"
+          aria-hidden="true"
+        />
+      ) : null}
+    </>
+  );
+
+  const className =
+    "group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 transition hover:border-slate-300 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2";
+
+  return href ? (
+    <Link href={href} className={className}>
+      {content}
+    </Link>
+  ) : (
+    <div className={className}>{content}</div>
   );
 }
 
@@ -493,7 +588,7 @@ function PulseCard({ card }: { card: PulseCard }) {
       <div className="flex items-start justify-between gap-3">
         <span
           className={cn(
-            "inline-flex rounded-xl border p-2.5",
+            "inline-flex rounded-xl border p-3",
             card.accentClass,
           )}
         >
@@ -501,18 +596,18 @@ function PulseCard({ card }: { card: PulseCard }) {
         </span>
         {card.href ? (
           <ArrowRight
-            className="mt-1 h-4 w-4 text-slate-400"
+            className="mt-1 h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]"
             aria-hidden="true"
           />
         ) : null}
       </div>
-      <p className="mt-5 text-xs font-bold uppercase tracking-wide text-slate-500">
+      <p className="mt-6 text-xs font-bold uppercase tracking-wide text-slate-500">
         {card.label}
       </p>
-      <p className="mt-2 text-2xl font-black tracking-tight text-slate-950">
+      <p className="mt-2 text-3xl font-black tracking-tight text-slate-950">
         {card.value}
       </p>
-      <p className="mt-1 text-sm leading-5 text-slate-600">
+      <p className="mt-1.5 text-sm leading-5 text-slate-600">
         {card.description}
       </p>
       {card.href ? (
@@ -524,7 +619,7 @@ function PulseCard({ card }: { card: PulseCard }) {
   );
 
   const className =
-    "group rounded-2xl border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2";
+    "group rounded-2xl border border-slate-200 bg-white p-6 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2";
 
   return card.href ? (
     <Link href={card.href} className={className}>
@@ -538,9 +633,11 @@ function PulseCard({ card }: { card: PulseCard }) {
 function OperationalWorkspaceCard({
   summary,
   compact = false,
+  ringPercent = null,
 }: {
   summary: OperationalModuleSummary;
   compact?: boolean;
+  ringPercent?: number | null;
 }) {
   const definition = MODULE_DEFINITIONS[summary.module];
   const Icon = definition.icon;
@@ -569,7 +666,12 @@ function OperationalWorkspaceCard({
             </p>
           </div>
         </div>
-        {summary.status === "partial" ? (
+        {ringPercent !== null ? (
+          <RadialGauge
+            percent={ringPercent}
+            colorClass="text-emerald-500"
+          />
+        ) : summary.status === "partial" ? (
           <CircleAlert
             className="h-5 w-5 shrink-0 text-amber-500"
             aria-label="Some information is unavailable"
@@ -710,45 +812,143 @@ function WorkQueueCard({ summary }: { summary: OperationalModuleSummary }) {
   );
 }
 
-function NextActionsPanel({
-  dashboard,
-}: {
-  dashboard: OperationalDashboardSummary;
-}) {
-  const actions = dashboard.nextActions
-    .map((action) => ({ label: action.label, href: safeRoute(action) }))
-    .filter((action): action is SafeAction => Boolean(action.href))
-    .slice(0, 5);
+/**
+ * ISO weekday (1=Monday ... 7=Sunday), matching the real dayOfWeek
+ * convention confirmed from the timetable builder UI
+ * (components/timetable/tabs/timetable-builder-tab.tsx's DAYS array), not
+ * JavaScript's Date.getDay() (0=Sunday ... 6=Saturday) — a mismatch that
+ * would silently show the wrong day's schedule. Built from getNepalNow()'s
+ * already-Nepal-local calendar fields (pure calendar arithmetic, not
+ * .toLocaleString()/Intl.DateTimeFormat rendering) per this codebase's rule
+ * that dashboard/component code must go through the shared Nepal-date
+ * utilities rather than ad-hoc browser-local formatting.
+ */
+function currentNepalIsoWeekday(): number {
+  const now = getNepalNow();
+  const jsWeekday = new Date(Date.UTC(now.year, now.month - 1, now.day)).getUTCDay();
+  return jsWeekday === 0 ? 7 : jsWeekday;
+}
+
+function currentNepalTimeHHmm(): string {
+  const now = getNepalNow();
+  return `${String(now.hour).padStart(2, "0")}:${String(now.minute).padStart(2, "0")}`;
+}
+
+function formatTimeRangeLabel(startsAt: string, endsAt: string): string {
+  return `${formatClockTime(startsAt)} – ${formatClockTime(endsAt)}`;
+}
+
+function formatClockTime(value: string): string {
+  const [hourText, minuteText] = value.split(":");
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return value;
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const twelveHour = hour % 12 || 12;
+  return `${twelveHour}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
+
+type TimetableSlotStatus = "ongoing" | "upcoming" | "completed";
+
+function timetableSlotStatus(
+  slot: TimetableSlotSummary,
+  nowHHmm: string,
+): TimetableSlotStatus {
+  if (nowHHmm >= slot.startsAt && nowHHmm < slot.endsAt) return "ongoing";
+  if (nowHHmm < slot.startsAt) return "upcoming";
+  return "completed";
+}
+
+const timetableStatusPresentation: Record<
+  TimetableSlotStatus,
+  { label: string; className: string }
+> = {
+  ongoing: { label: "Ongoing", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" },
+  upcoming: { label: "Upcoming", className: "bg-blue-50 text-blue-700 ring-1 ring-blue-100" },
+  completed: { label: "Completed", className: "bg-slate-100 text-slate-500 ring-1 ring-slate-200" },
+};
+
+function TodaysTimetablePanel() {
+  const { hasPermissions, status } = useSession();
+  const canReadTimetable = hasPermissions(["timetable:read"]);
+  const dayOfWeek = currentNepalIsoWeekday();
+
+  // Admin/principal roles get the school-wide (not single-class) timetable
+  // from this endpoint when classId is omitted — confirmed against
+  // apps/api/src/timetable/timetable.service.ts's isPrivilegedTimetableActor
+  // scoping before wiring this up.
+  const timetableQuery = useQuery({
+    queryKey: ["dashboard-todays-timetable", dayOfWeek],
+    queryFn: () => api.listTimetable({ dayOfWeek, limit: 50 }),
+    enabled: status === "authenticated" && canReadTimetable,
+    staleTime: 60_000,
+  });
+
+  if (!canReadTimetable) return null;
+
+  const nowHHmm = currentNepalTimeHHmm();
+  const slots = (timetableQuery.data?.items ?? [])
+    .slice()
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+    .slice(0, 6);
 
   return (
     <SectionCard
-      title="Open a workspace"
-      description="Continue with an authorized school workflow."
-      className="overflow-hidden"
+      title="Today’s timetable"
+      description="Scheduled periods for the current school day."
+      headerAction={
+        <Link
+          href="/dashboard/timetable"
+          className="text-xs font-bold text-[var(--primary)] hover:text-[var(--primary-dark)]"
+        >
+          View full timetable
+        </Link>
+      }
       noPadding
     >
-      {actions.length ? (
+      {timetableQuery.isLoading ? (
+        <div className="p-5 text-sm text-slate-500">
+          Loading today’s timetable…
+        </div>
+      ) : timetableQuery.isError ? (
+        <DashboardUnavailableState
+          message="Today’s timetable is temporarily unavailable."
+          compact
+        />
+      ) : slots.length ? (
         <div className="divide-y divide-slate-100">
-          {actions.map((action) => (
-            <Link
-              key={`${action.label}-${action.href}`}
-              href={action.href}
-              className="group flex items-center gap-3 px-5 py-4 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 lg:px-6"
-            >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">{action.label}</span>
-              <ArrowRight
-                className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]"
-                aria-hidden="true"
-              />
-            </Link>
-          ))}
+          {slots.map((slot) => {
+            const presentation =
+              timetableStatusPresentation[timetableSlotStatus(slot, nowHHmm)];
+            const classLabel = [slot.class?.name, slot.section?.name]
+              .filter(Boolean)
+              .join(" – ");
+            return (
+              <div key={slot.id} className="flex items-start gap-3 px-5 py-3 lg:px-6">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-slate-900">
+                    {slot.subject?.name ?? "Period"}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs font-medium text-slate-500">
+                    {formatTimeRangeLabel(slot.startsAt, slot.endsAt)}
+                    {classLabel ? ` · ${classLabel}` : ""}
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full px-2.5 py-1 text-[0.65rem] font-bold uppercase",
+                    presentation.className,
+                  )}
+                >
+                  {presentation.label}
+                </span>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <DashboardUnavailableState
-          message="No additional dashboard actions are available for your current access."
+          message="No classes are scheduled for today."
           compact
         />
       )}
@@ -812,6 +1012,101 @@ function RecentActivityPanel({
         />
       )}
     </SectionCard>
+  );
+}
+
+function RecentNoticesPanel() {
+  const { hasPermissions, status } = useSession();
+  const canReadNotices = hasPermissions(["notices:read"]);
+
+  // Real M12 notices list (title/priority/audience type/publish time, no
+  // recipient or delivery data) — not the generic notification-center inbox.
+  // Reuses the same shared query key as the Notices workspace so repeat
+  // visits don't refetch.
+  const noticesQuery = useQuery({
+    queryKey: ["notices-list"],
+    queryFn: api.listNotices,
+    enabled: status === "authenticated" && canReadNotices,
+    staleTime: 60_000,
+  });
+
+  if (!canReadNotices) return null;
+
+  const notices = (noticesQuery.data ?? [])
+    .slice()
+    .sort((a, b) =>
+      (b.publishedAt ?? b.scheduledFor ?? b.createdAt ?? "").localeCompare(
+        a.publishedAt ?? a.scheduledFor ?? a.createdAt ?? "",
+      ),
+    )
+    .slice(0, 5);
+
+  return (
+    <SectionCard
+      title="Recent notices"
+      description="The latest published and scheduled school notices."
+      headerAction={
+        <Megaphone className="h-5 w-5 text-slate-400" aria-hidden="true" />
+      }
+      noPadding
+    >
+      {noticesQuery.isLoading ? (
+        <div className="p-5 text-sm text-slate-500">
+          Loading recent notices…
+        </div>
+      ) : noticesQuery.isError ? (
+        <DashboardUnavailableState
+          message="Recent notices are temporarily unavailable."
+          compact
+        />
+      ) : notices.length ? (
+        <div className="divide-y divide-slate-100">
+          {notices.map((notice) => (
+            <RecentNoticeRow key={notice.id} notice={notice} />
+          ))}
+        </div>
+      ) : (
+        <DashboardUnavailableState
+          message="No notices have been published recently."
+          compact
+        />
+      )}
+    </SectionCard>
+  );
+}
+
+function RecentNoticeRow({ notice }: { notice: NoticeSummary }) {
+  const timestamp =
+    notice.publishedAt ?? notice.scheduledFor ?? notice.createdAt ?? null;
+  const isScheduled = !notice.publishedAt && Boolean(notice.scheduledFor);
+
+  return (
+    <Link
+      href={`/dashboard/notices/${notice.id}`}
+      className="group flex items-start gap-3 px-5 py-4 transition hover:bg-slate-50 lg:px-6"
+    >
+      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-100 bg-rose-50 text-rose-700">
+        <Megaphone className="h-4 w-4" aria-hidden="true" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-bold leading-5 text-slate-900">
+          {notice.title}
+        </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          <PriorityBadge priority={notice.priority} />
+          {isScheduled ? (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.65rem] font-bold uppercase text-slate-600">
+              Scheduled
+            </span>
+          ) : null}
+        </div>
+        {timestamp ? (
+          <time className="mt-1.5 block text-xs text-slate-500" dateTime={timestamp}>
+            {formatBsDateTime(timestamp)}
+          </time>
+        ) : null}
+      </div>
+    </Link>
   );
 }
 
@@ -918,11 +1213,12 @@ function buildPulseCards(
 
   const presentToday = metric(attendance, "presentToday");
   const expectedStudents = metric(attendance, "expectedStudents");
+  const attendanceRate = computeAttendanceRate(moduleMap);
   if (presentToday !== null || expectedStudents !== null) {
     cards.push({
       label: "Attendance",
       value: hasMeaningfulValue(presentToday)
-        ? `${formatMetric("presentToday", presentToday)} present`
+        ? `${formatMetric("presentToday", presentToday)} present${attendanceRate !== null ? ` · ${attendanceRate}%` : ""}`
         : "Not started",
       description:
         expectedStudents !== null
@@ -1017,6 +1313,85 @@ function metric(
   key: string,
 ): OperationalSummaryMetricValue | null {
   return summary?.summary[key] ?? null;
+}
+
+/**
+ * A simple ratio of two real backend numbers (present/expected students) —
+ * not a projection, trend, or invented target — safe to render as a percent
+ * since both inputs are the attendance module's own point-in-time figures.
+ * Shared by the pulse card and the Attendance operations card's ring so both
+ * show the same honest number.
+ */
+function computeAttendanceRate(
+  moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>,
+): number | null {
+  const presentToday = metric(moduleMap.get("m2_attendance"), "presentToday");
+  const expectedStudents = metric(
+    moduleMap.get("m2_attendance"),
+    "expectedStudents",
+  );
+  return typeof presentToday === "number" &&
+    typeof expectedStudents === "number" &&
+    expectedStudents > 0
+    ? Math.round((presentToday / expectedStudents) * 100)
+    : null;
+}
+
+function RadialGauge({
+  percent,
+  size = 56,
+  strokeWidth = 5,
+  colorClass,
+}: {
+  percent: number;
+  size?: number;
+  strokeWidth?: number;
+  colorClass: string;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(100, percent));
+  const offset = circumference * (1 - clamped / 100);
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      className="shrink-0"
+      role="img"
+      aria-label={`${clamped}%`}
+    >
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        strokeWidth={strokeWidth}
+        className="fill-none stroke-slate-100"
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        strokeWidth={strokeWidth}
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        className={cn("fill-none stroke-current transition-all duration-500", colorClass)}
+      />
+      <text
+        x="50%"
+        y="50%"
+        textAnchor="middle"
+        dominantBaseline="middle"
+        className="fill-slate-900 font-black"
+        style={{ fontSize: size * 0.26 }}
+      >
+        {clamped}%
+      </text>
+    </svg>
+  );
 }
 
 function firstSafeAction(summary: OperationalModuleSummary): SafeAction | null {

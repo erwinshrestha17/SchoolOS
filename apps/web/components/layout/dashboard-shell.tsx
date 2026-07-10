@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import type { OperationalSummaryRouteModule } from '@schoolos/core';
 import { CommandPalette } from './command-palette';
@@ -41,12 +41,16 @@ const MODULE_LANDING_SUMMARIES: Record<string, OperationalSummaryRouteModule> = 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const { session, status } = useSession();
   const pathname = usePathname();
   const summaryModule = MODULE_LANDING_SUMMARIES[pathname];
 
   function closeMobileNavigation() {
     setMobileOpen(false);
+    // Return focus to the trigger that opened the drawer instead of losing
+    // it to the (now removed) overlay, matching standard dialog behavior.
+    mobileMenuButtonRef.current?.focus();
   }
 
   if (status === 'loading') {
@@ -79,7 +83,10 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <SupportOverrideBanner />
-        <TopBar onMobileMenuToggle={() => setMobileOpen(!mobileOpen)} />
+        <TopBar
+          onMobileMenuToggle={() => setMobileOpen(!mobileOpen)}
+          mobileMenuButtonRef={mobileMenuButtonRef}
+        />
 
         <main
           id="dashboard-main"

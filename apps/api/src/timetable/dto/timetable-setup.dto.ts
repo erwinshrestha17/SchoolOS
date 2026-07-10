@@ -427,6 +427,13 @@ export class WorkloadQueryDto {
   @IsOptional()
   @IsString()
   versionId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  @Min(1)
+  @Max(7)
+  dayOfWeek?: number;
 }
 
 export class SubstitutionQueryDto extends PaginatedQueryDto {

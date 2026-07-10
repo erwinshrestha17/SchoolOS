@@ -1392,6 +1392,7 @@ export class TimetableService {
           ? { academicYearId: query.academicYearId }
           : {}),
         ...(query.versionId ? { versionId: query.versionId } : {}),
+        ...(query.dayOfWeek ? { dayOfWeek: query.dayOfWeek } : {}),
       },
       include: timetableSlotInclude(),
       orderBy: [{ dayOfWeek: 'asc' }, { startsAt: 'asc' }],

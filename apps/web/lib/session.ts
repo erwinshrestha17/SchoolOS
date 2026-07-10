@@ -175,6 +175,20 @@ export function hasAllPermissions(
   return permissions.every((permission) => hasPermission(session, permission));
 }
 
+/**
+ * ANY-match permission check shared by nav visibility (sidebar.tsx) and
+ * route gating (app/dashboard/layout.tsx) so both stay in sync instead of
+ * maintaining two separate implementations of the same "does the session
+ * hold at least one of these alternative permissions" rule.
+ */
+export function hasAnyPermission(
+  session: BrowserSession | null,
+  permissions: PermissionKey[],
+) {
+  if (permissions.length === 0) return true;
+  return permissions.some((permission) => hasPermission(session, permission));
+}
+
 export function getSupportOverrideTenantId(): string | null {
   if (typeof window === 'undefined') return null;
   return window.sessionStorage.getItem('x-schoolos-tenant-id');

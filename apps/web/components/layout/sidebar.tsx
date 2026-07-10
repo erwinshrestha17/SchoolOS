@@ -1,16 +1,16 @@
 'use client';
 
 import type { PermissionKey } from '@schoolos/core';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
   Bus,
   Calculator,
   CalendarCheck,
   CalendarDays,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleUserRound,
@@ -32,8 +32,10 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import { api } from '../../lib/api';
 import { useEntitlements } from '../entitlements-provider';
 import { useSession } from '../session-provider';
+import { hasAnyPermission } from '../../lib/session';
 import { cn } from '../../lib/utils';
 
 export type NavItem = {
@@ -96,6 +98,10 @@ function getRequiredModuleForHref(href: string): string | null {
   if (href.startsWith('/dashboard/homework')) return 'homework';
   if (href.startsWith('/dashboard/learning')) return 'learning';
   if (href.startsWith('/dashboard/fees')) return 'fees';
+  // '/dashboard/finance' is a legacy alias route for Fees & Receipts (see
+  // activeWhen on the Fees nav item below); direct navigation there must
+  // still gate on the same module entitlement as '/dashboard/fees'.
+  if (href.startsWith('/dashboard/finance')) return 'fees';
   if (href.startsWith('/dashboard/accounting')) return 'accounting';
   if (href.startsWith('/dashboard/hr')) return 'hr';
   if (href.startsWith('/dashboard/payroll')) return 'hr';
@@ -334,10 +340,30 @@ export function Sidebar({
   const { session } = useSession();
   const { hasModule } = useEntitlements();
 
+  // A real, permission-gated unread count for the Notices nav badge — reuses
+  // the same query key as the topbar's NotificationBell, so TanStack Query
+  // dedupes the fetch instead of issuing a second network request. Badge
+  // failure/loading must not block navigation, so it silently falls back to
+  // "no badge" rather than surfacing an error state.
+  const canReadNotifications = hasAnyPermission(session, ['notices:read']);
+  const notificationCenterQuery = useQuery({
+    queryKey: ['notification-center'],
+    queryFn: api.getNotificationCenter,
+    enabled: canReadNotifications,
+    refetchInterval: 60_000,
+  });
+  const unreadNoticesBadge = formatBadgeCount(notificationCenterQuery.data?.unreadCount ?? 0);
+
   const visibleGroups = dashboardNavGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => canDisplayNavItem(item, session, hasModule)),
+      items: group.items
+        .filter((item) => canDisplayNavItem(item, session, hasModule))
+        .map((item) =>
+          item.href === '/dashboard/notices'
+            ? { ...item, badge: unreadNoticesBadge }
+            : item,
+        ),
     }))
     .filter((group) => group.items.length > 0);
 
@@ -355,17 +381,30 @@ export function Sidebar({
   const roleLabel = formatRole(session?.user.roles[0] ?? 'school_user');
   const userLabel = session?.user.email ?? 'Signed-in school user';
 
+  const mobilePanelRef = useRef<HTMLDivElement>(null);
+
+  // Escape-to-close must work regardless of which element inside the drawer
+  // currently has focus, and opening the drawer should move focus into it
+  // (dashboard-shell.tsx returns focus to the menu trigger on close).
+  useEffect(() => {
+    if (!mobileOpen) return;
+    mobilePanelRef.current?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onMobileClose();
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [mobileOpen, onMobileClose]);
+
   return (
     <>
       {mobileOpen && (
         <div
           className="sidebar-overlay lg:hidden"
           onClick={onMobileClose}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              onMobileClose();
-            }
-          }}
           role="button"
           tabIndex={0}
           aria-label="Close navigation menu"
@@ -373,8 +412,13 @@ export function Sidebar({
       )}
 
       <aside
+        ref={mobilePanelRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="School operations navigation"
         className={cn(
-          'fixed inset-y-0 left-0 z-50 lg:hidden sidebar-transition',
+          'fixed inset-y-0 left-0 z-50 lg:hidden sidebar-transition focus:outline-none',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -428,27 +472,6 @@ function SidebarContent({
   onMobileClose: () => void;
   onToggle?: () => void;
 }) {
-  const activeGroupLabel = useMemo(
-    () =>
-      groups.find((group) => group.items.some((item) => item.href === activeHref))
-        ?.label,
-    [groups, activeHref],
-  );
-
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    () => new Set(activeGroupLabel ? [activeGroupLabel] : []),
-  );
-
-  useEffect(() => {
-    if (!activeGroupLabel) return;
-    setExpandedGroups((current) => {
-      if (current.has(activeGroupLabel)) return current;
-      const next = new Set(current);
-      next.add(activeGroupLabel);
-      return next;
-    });
-  }, [activeGroupLabel]);
-
   const [query, setQuery] = useState('');
   const normalizedQuery = query.trim().toLowerCase();
   const isSearching = normalizedQuery.length > 0;
@@ -464,18 +487,6 @@ function SidebarContent({
       }))
       .filter((group) => group.items.length > 0);
   }, [groups, isSearching, normalizedQuery]);
-
-  function toggleGroup(label: string) {
-    setExpandedGroups((current) => {
-      const next = new Set(current);
-      if (next.has(label)) {
-        next.delete(label);
-      } else {
-        next.add(label);
-      }
-      return next;
-    });
-  }
 
   return (
     <div
@@ -576,17 +587,8 @@ function SidebarContent({
             <NavGroupSection
               key={group.label}
               collapsed={collapsed}
-              expanded={isSearching || expandedGroups.has(group.label)}
               group={group}
               activeHref={activeHref}
-              onExpand={() => {
-                if (collapsed && onToggle) {
-                  onToggle();
-                  setExpandedGroups((current) => new Set(current).add(group.label));
-                  return;
-                }
-                toggleGroup(group.label);
-              }}
               onMobileClose={onMobileClose}
             />
           ),
@@ -616,43 +618,40 @@ function SidebarContent({
         <div
           className={cn(
             'mt-2 flex items-center gap-2.5 rounded-xl px-2.5 py-2',
-            collapsed ? 'justify-center' : 'bg-slate-50',
+            collapsed ? 'flex-col justify-center' : 'bg-slate-50',
           )}
         >
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-600">
             <CircleUserRound size={18} aria-hidden="true" />
           </div>
           {!collapsed && (
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-bold text-slate-800" title={userLabel}>
                 {userLabel}
               </p>
               <p className="truncate text-[0.68rem] font-medium text-slate-500">{roleLabel}</p>
             </div>
           )}
-        </div>
 
-        {onToggle && (
-          <button
-            type="button"
-            onClick={onToggle}
-            className={cn(
-              'mt-2 flex min-h-10 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 focus:ring-offset-white',
-              collapsed && 'justify-center px-0',
-            )}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {collapsed ? (
-              <ChevronRight size={20} className="shrink-0" aria-hidden="true" />
-            ) : (
-              <>
-                <ChevronLeft size={20} className="shrink-0" aria-hidden="true" />
-                <span>Collapse sidebar</span>
-              </>
-            )}
-          </button>
-        )}
+          {onToggle && (
+            <button
+              type="button"
+              onClick={onToggle}
+              className={cn(
+                'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 focus:ring-offset-white',
+                collapsed && 'mt-1',
+              )}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {collapsed ? (
+                <ChevronRight size={18} className="shrink-0" aria-hidden="true" />
+              ) : (
+                <ChevronLeft size={18} className="shrink-0" aria-hidden="true" />
+              )}
+            </button>
+          )}
+        </div>
       </footer>
     </div>
   );
@@ -660,77 +659,34 @@ function SidebarContent({
 
 function NavGroupSection({
   collapsed,
-  expanded,
   group,
   activeHref,
-  onExpand,
   onMobileClose,
 }: {
   collapsed: boolean;
-  expanded: boolean;
   group: NavGroup;
   activeHref: string | null;
-  onExpand: () => void;
   onMobileClose: () => void;
 }) {
-  const GroupIcon = group.icon;
-  const active = group.items.some((item) => item.href === activeHref);
-
   return (
     <section className="mb-1 last:mb-0">
-      <button
-        type="button"
-        className={cn(
-          'group flex min-h-9 w-full items-center gap-3 rounded-lg px-2.5 py-1.5 transition-colors duration-150 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 focus:ring-offset-white',
-          collapsed && 'justify-center px-0',
-        )}
-        aria-expanded={!collapsed ? expanded : undefined}
-        aria-label={collapsed ? group.label : undefined}
-        title={collapsed ? group.label : undefined}
-        onClick={onExpand}
-      >
-        <GroupIcon
-          size={17}
-          className={cn(
-            'shrink-0 transition-colors',
-            active ? 'text-[var(--primary)]' : 'text-slate-500 group-hover:text-slate-700',
-          )}
-          aria-hidden="true"
-        />
-        <span
-          className={cn(
-            'min-w-0 flex-1 truncate text-left text-[0.68rem] font-extrabold uppercase tracking-[0.06em] transition-all duration-200',
-            active ? 'text-slate-700' : 'text-slate-500',
-            collapsed ? 'w-0 overflow-hidden opacity-0' : 'opacity-100',
-          )}
-        >
+      {!collapsed ? (
+        <p className="truncate px-2.5 pb-1.5 pt-3 text-left text-[0.68rem] font-extrabold uppercase tracking-[0.06em] text-slate-500 first:pt-0">
           {group.label}
-        </span>
-        {!collapsed ? (
-          <ChevronDown
-            size={14}
-            className={cn(
-              'shrink-0 text-slate-400 transition-transform duration-200',
-              expanded && 'rotate-180',
-            )}
-            aria-hidden="true"
-          />
-        ) : null}
-      </button>
-
-      {!collapsed && expanded ? (
-        <div className="mt-0.5 space-y-0.5 border-l border-slate-100 pl-3">
-          {group.items.map((item) => (
-            <NavEntry
-              key={item.href}
-              collapsed={false}
-              item={item}
-              activeHref={activeHref}
-              onMobileClose={onMobileClose}
-            />
-          ))}
-        </div>
+        </p>
       ) : null}
+
+      <div className="space-y-0.5">
+        {group.items.map((item) => (
+          <NavEntry
+            key={item.href}
+            collapsed={collapsed}
+            item={item}
+            activeHref={activeHref}
+            onMobileClose={onMobileClose}
+          />
+        ))}
+      </div>
     </section>
   );
 }
@@ -805,11 +761,8 @@ export function canDisplayNavItem(
   session: ReturnType<typeof useSession>['session'],
   hasModule: (module: string) => boolean,
 ) {
-  if (item.permissions?.length) {
-    const permissionSet = new Set(session?.user.permissions ?? []);
-    if (!item.permissions.some((permission) => permissionSet.has(permission))) {
-      return false;
-    }
+  if (item.permissions?.length && !hasAnyPermission(session, item.permissions)) {
+    return false;
   }
 
   const moduleKeys = item.moduleKeys ?? (() => {
@@ -854,6 +807,11 @@ function computeActiveHref(items: NavItem[], pathname: string | null): string | 
 
 function isActiveNavItem(item: NavItem, activeHref: string | null) {
   return item.href === activeHref;
+}
+
+function formatBadgeCount(count: number): number | string | undefined {
+  if (!count || count <= 0) return undefined;
+  return count > 99 ? '99+' : count;
 }
 
 function formatRole(role: string) {

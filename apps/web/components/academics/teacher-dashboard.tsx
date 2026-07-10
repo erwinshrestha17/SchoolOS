@@ -1,6 +1,6 @@
 'use client';
 
-import { formatBsDate } from '@schoolos/core';
+import { formatBsDate, getNepalNow } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useSession } from '../session-provider';
@@ -9,6 +9,19 @@ import { LoadingState } from '@/components/ui/loading-state';
 import { BookOpen, Clock, CheckCircle2, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
+/**
+ * ISO weekday (1=Monday ... 7=Sunday), matching the real dayOfWeek
+ * convention (components/timetable/tabs/timetable-builder-tab.tsx's DAYS
+ * array), not JavaScript's Date.getDay() (0=Sunday ... 6=Saturday). Built
+ * from getNepalNow()'s Nepal-local calendar fields rather than the
+ * browser's local Date.
+ */
+function currentNepalIsoWeekday(): number {
+  const now = getNepalNow();
+  const jsWeekday = new Date(Date.UTC(now.year, now.month - 1, now.day)).getUTCDay();
+  return jsWeekday === 0 ? 7 : jsWeekday;
+}
+
 export function TeacherDashboard() {
   const { session } = useSession();
   const staffId = (session?.user as { staffId?: string } | undefined)?.staffId;
@@ -16,7 +29,7 @@ export function TeacherDashboard() {
   const timetableQuery = useQuery({
     queryKey: ['teacher-timetable-today', staffId],
     queryFn: () => {
-      const dayOfWeek = new Date().getDay();
+      const dayOfWeek = currentNepalIsoWeekday();
       return api.getTeacherTimetable(staffId!, { dayOfWeek });
     },
     enabled: !!staffId,

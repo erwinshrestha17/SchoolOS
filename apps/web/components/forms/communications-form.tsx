@@ -1618,7 +1618,7 @@ function ScheduleOption({
   );
 }
 
-function PriorityBadge({ priority }: { priority: string }) {
+export function PriorityBadge({ priority }: { priority: string }) {
   const className =
     priority === "EMERGENCY"
       ? "bg-red-50 text-red-700 ring-red-100"

@@ -422,8 +422,11 @@ export const academicsApi = {
       method: 'POST',
       json: body,
     }),
-  listTimetable: (params?: { classId?: string | null }) =>
-    request<TimetableSlotPage>(withQuery('/timetable', params ?? {})),
+  listTimetable: (params?: {
+    classId?: string | null;
+    dayOfWeek?: number;
+    limit?: number;
+  }) => request<TimetableSlotPage>(withQuery('/timetable', params ?? {})),
   getTeacherTimetable: (
     teacherId: string,
     params?: { dayOfWeek?: number; academicYearId?: string },

@@ -15,7 +15,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type RefObject } from "react";
 
 import { Avatar } from "../ui/avatar";
 import { cn } from "../../lib/utils";
@@ -23,9 +23,10 @@ import { Badge } from "../ui/badge";
 
 export type HeaderProps = {
   onMobileMenuToggle: () => void;
+  mobileMenuButtonRef?: RefObject<HTMLButtonElement | null>;
 };
 
-export function Header({ onMobileMenuToggle }: HeaderProps) {
+export function Header({ onMobileMenuToggle, mobileMenuButtonRef }: HeaderProps) {
   const router = useRouter();
   const { hasPermissions, session, status, logout } = useSession();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -73,6 +74,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-slate-200 bg-white/95 px-4 shadow-sm shadow-slate-200/40 backdrop-blur-md lg:px-8">
       <button
+        ref={mobileMenuButtonRef}
         type="button"
         onClick={onMobileMenuToggle}
         className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 lg:hidden"

@@ -58,6 +58,8 @@ interface ListIssuesQuery extends PaginationQuery {
   staffId?: string;
 }
 
+const DEFAULT_LOAN_PERIOD_DAYS = 14;
+
 @Injectable()
 export class LibraryService {
   constructor(
@@ -556,7 +558,11 @@ export class LibraryService {
           copyId: copy.id,
           borrowerStudentId: dto.borrowerStudentId ?? null,
           borrowerStaffId: dto.borrowerStaffId ?? null,
-          dueAt: new Date(dto.dueAt),
+          dueAt: dto.dueAt
+            ? new Date(dto.dueAt)
+            : new Date(
+                Date.now() + DEFAULT_LOAN_PERIOD_DAYS * 24 * 60 * 60 * 1000,
+              ),
           notes: dto.notes ?? null,
         },
       });
