@@ -61,7 +61,7 @@ export class BrandingDocumentsService {
           dto[field as keyof UpdateBrandingDocumentsDto] !== undefined,
       )
       .map(([field, key]) => ({
-        key: key as TenantSettingKey,
+        key,
         value: normalize(dto[field as keyof UpdateBrandingDocumentsDto]),
       }));
 

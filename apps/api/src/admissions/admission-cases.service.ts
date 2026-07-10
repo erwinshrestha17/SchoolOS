@@ -1106,7 +1106,7 @@ export class AdmissionCasesService implements OnModuleInit {
                 REVIEW_LOCKED_STATUSES.has(record.status)) &&
               record.policyVersionId,
           )
-          .map((record) => record.policyVersionId as string),
+          .map((record) => record.policyVersionId!),
       ),
     ];
     const [policies, classes, pinnedVersions] = await Promise.all([
@@ -2961,8 +2961,7 @@ export class AdmissionCasesService implements OnModuleInit {
         reasons.push('Nepali family name matches.');
       }
       if (
-        guardianName &&
-        linkedGuardianName?.trim().toLowerCase() === guardianName.toLowerCase()
+        linkedGuardianName?.trim().toLowerCase() === guardianName?.toLowerCase()
       ) {
         reasons.push('Guardian name matches an existing guardian.');
       }

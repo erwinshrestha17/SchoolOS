@@ -902,7 +902,7 @@ describe('FinanceService - Hardening', () => {
         totalAmount: new Prisma.Decimal(6780),
       });
 
-      const accountingPostingService = service['accountingPostingService'];
+      const accountingPostingService = service.accountingPostingService;
 
       await service.createInvoiceAdjustment(
         'i-adj-1',

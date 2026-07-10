@@ -1,7 +1,17 @@
 import { DevelopmentalMilestoneStatus } from '@prisma/client';
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateDevelopmentalMilestoneDto {
+  @IsOptional()
+  @IsUUID()
+  clientSubmissionId?: string;
+
   @IsString()
   classId!: string;
 

@@ -54,7 +54,7 @@ export class DocumentTemplateService {
             tenantId: actor.tenantId,
             version: 1,
             body: dto.body,
-            mergeFields: mergeFields as Prisma.InputJsonValue,
+            mergeFields,
             headerConfig: dto.headerConfig as Prisma.InputJsonValue | undefined,
             footerConfig: dto.footerConfig as Prisma.InputJsonValue | undefined,
             activatedAt: new Date(),

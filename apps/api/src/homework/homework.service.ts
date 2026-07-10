@@ -2570,9 +2570,11 @@ function parseRequiredDate(value: string, fieldName: string) {
 function isRecurringHomeworkCreateResult(value: unknown): value is {
   recurrenceSeriesId: string | null;
   occurrenceCount: number;
-  items: Prisma.HomeworkAssignmentGetPayload<{
-    include: ReturnType<typeof homeworkAssignmentInclude>;
-  }>[];
+  items: Array<
+    Prisma.HomeworkAssignmentGetPayload<{
+      include: ReturnType<typeof homeworkAssignmentInclude>;
+    }>
+  >;
 } {
   return (
     typeof value === 'object' &&

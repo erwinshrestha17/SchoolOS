@@ -329,5 +329,96 @@ void main() {
         ),
       ).called(1);
     });
+
+    test('passes category and month filters to the activity feed endpoint', () async {
+      when(
+        () => apiClient.get<dynamic>(
+          '/mobile/students/child-1/activity-feed',
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(
+            path: '/mobile/students/child-1/activity-feed',
+          ),
+          data: {'items': <dynamic>[]},
+        ),
+      );
+
+      await repository.getActivityFeedForChild(
+        'child-1',
+        category: 'LEARNING',
+        month: '2026-07',
+      );
+
+      verify(
+        () => apiClient.get<dynamic>(
+          '/mobile/students/child-1/activity-feed',
+          queryParameters: {
+            'take': '20',
+            'category': 'LEARNING',
+            'month': '2026-07',
+          },
+        ),
+      ).called(1);
+    });
+
+    test('submits a reaction as the authenticated guardian only', () async {
+      when(
+        () => apiClient.post<dynamic>(
+          '/activity-feed/posts/post-1/reactions',
+          data: {'reaction': 'HEART', 'guardianId': 'guardian-1'},
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(
+            path: '/activity-feed/posts/post-1/reactions',
+          ),
+          data: {'id': 'reaction-1'},
+        ),
+      );
+
+      await repository.submitActivityReaction(
+        postId: 'post-1',
+        guardianId: 'guardian-1',
+        reaction: 'HEART',
+      );
+
+      verify(
+        () => apiClient.post<dynamic>(
+          '/activity-feed/posts/post-1/reactions',
+          data: {'reaction': 'HEART', 'guardianId': 'guardian-1'},
+        ),
+      ).called(1);
+    });
+
+    test('maps developmental milestones for the linked child', () async {
+      when(
+        () => apiClient.get<dynamic>(
+          '/activity-feed/milestones',
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/activity-feed/milestones'),
+          data: [
+            {
+              'id': 'milestone-1',
+              'domain': 'Motor skills',
+              'milestone': 'Uses classroom materials independently',
+              'status': 'PROGRESSING',
+              'observedAt': '2026-06-01T00:00:00.000Z',
+              'observationNote': 'Needs occasional prompting.',
+            },
+          ],
+        ),
+      );
+
+      final milestones = await repository.getMilestonesForChild('child-1');
+
+      expect(milestones, hasLength(1));
+      expect(milestones.single.domain, 'Motor skills');
+      expect(milestones.single.status, 'PROGRESSING');
+    });
   });
 }

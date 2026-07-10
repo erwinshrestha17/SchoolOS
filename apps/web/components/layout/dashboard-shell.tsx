@@ -19,9 +19,12 @@ import { SupportOverrideBanner } from '../platform/SupportOverrideBanner';
 // with different numbers for the same concept) before the module header
 // even appeared. Keep the generic summary only for landing pages that do
 // not yet have their own KPI grid.
+// Activity now renders its own full operational summary panel directly in
+// its overview page (see app/dashboard/activity/page.tsx), matching the
+// students/attendance/fees pattern described above — do not also list it
+// here or the summary will render twice.
 const MODULE_LANDING_SUMMARIES: Record<string, OperationalSummaryRouteModule> = {
   '/dashboard/academics': 'academics',
-  '/dashboard/activity': 'activity',
   '/dashboard/homework': 'homework-timetable',
   '/dashboard/timetable': 'homework-timetable',
   '/dashboard/hr': 'hr-payroll',

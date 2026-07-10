@@ -482,7 +482,7 @@ export class AssessmentRetakesService {
   private async getMutableRetake(
     assessmentRetakeId: string,
     actor: AuthContext,
-    allowed: AssessmentRetakeStatus | ReadonlyArray<AssessmentRetakeStatus>,
+    allowed: AssessmentRetakeStatus | readonly AssessmentRetakeStatus[],
   ) {
     const retake = await this.prisma.assessmentRetake.findFirst({
       where: { id: assessmentRetakeId, tenantId: actor.tenantId },

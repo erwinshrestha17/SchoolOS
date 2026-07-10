@@ -5926,10 +5926,7 @@ export class FinanceService {
     }
 
     const providerName = readiness.provider?.name;
-    if (
-      !providerName ||
-      providerName.toLowerCase() !== dto.provider.toLowerCase()
-    ) {
+    if (providerName?.toLowerCase() !== dto.provider.toLowerCase()) {
       throw new BadRequestException(
         'Requested payment provider is not enabled.',
       );

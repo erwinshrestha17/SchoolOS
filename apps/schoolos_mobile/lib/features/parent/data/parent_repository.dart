@@ -306,11 +306,19 @@ class ParentRepository {
   Future<List<ParentActivityItem>> getActivityFeedForChild(
     String childId, {
     int take = 20,
+    String? category,
+    String? month,
   }) async {
+    final cacheKey =
+        'parent_activity_${childId}_${take}_${category ?? ''}_${month ?? ''}';
     final data = await _getMap(
       '/mobile/students/$childId/activity-feed',
-      queryParameters: {'take': '$take'},
-      cacheKey: 'parent_activity_${childId}_$take',
+      queryParameters: {
+        'take': '$take',
+        if (category != null && category.isNotEmpty) 'category': category,
+        if (month != null && month.isNotEmpty) 'month': month,
+      },
+      cacheKey: cacheKey,
     );
     final items = data['items'] as List<dynamic>? ?? const [];
 
@@ -318,6 +326,52 @@ class ParentRepository {
         .whereType<Map<String, dynamic>>()
         .map(ParentActivityItem.fromJson)
         .toList();
+  }
+
+  Future<void> submitActivityReaction({
+    required String postId,
+    required String guardianId,
+    required String reaction,
+  }) async {
+    await _client.post<dynamic>(
+      '/activity-feed/posts/${Uri.encodeComponent(postId)}/reactions',
+      data: {'reaction': reaction, 'guardianId': guardianId},
+    );
+  }
+
+  Future<List<ParentMilestone>> getMilestonesForChild(
+    String childId, {
+    String? month,
+  }) async {
+    const cacheKeyPrefix = 'parent_milestones_';
+    final cacheKey = '$cacheKeyPrefix${childId}_${month ?? ''}';
+    try {
+      final response = await _client.get<dynamic>(
+        '/activity-feed/milestones',
+        queryParameters: {
+          'studentId': childId,
+          if (month != null && month.isNotEmpty) 'month': month,
+        },
+      );
+      final items = response.data is List
+          ? response.data as List<dynamic>
+          : const <dynamic>[];
+      await cache?.write(cacheKey, {'items': items});
+      return items
+          .whereType<Map<String, dynamic>>()
+          .map(ParentMilestone.fromJson)
+          .toList();
+    } on AppException catch (error) {
+      if (error is! NetworkException && error is! TimeoutException) rethrow;
+      final cached = cache?.read(cacheKey);
+      if (cached == null) rethrow;
+      final items =
+          cached.withMetadata()['items'] as List<dynamic>? ?? const [];
+      return items
+          .whereType<Map<String, dynamic>>()
+          .map(ParentMilestone.fromJson)
+          .toList();
+    }
   }
 
   Future<Uint8List> getActivityPreview(String previewPath) async {

@@ -90,7 +90,7 @@ export class DescriptiveAnalyticsService {
           },
         },
         update: {
-          metrics: metrics as Prisma.InputJsonValue,
+          metrics,
           sourceHash: JSON.stringify(metrics),
           generatedAt: new Date(),
         },
@@ -100,7 +100,7 @@ export class DescriptiveAnalyticsService {
           summaryDate,
           scopeType: 'tenant',
           scopeId: actor.tenantId,
-          metrics: metrics as Prisma.InputJsonValue,
+          metrics,
           sourceHash: JSON.stringify(metrics),
         },
       });

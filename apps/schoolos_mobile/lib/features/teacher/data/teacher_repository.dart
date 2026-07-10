@@ -424,6 +424,7 @@ class TeacherRepository {
   }
 
   Future<void> createMilestone({
+    required String clientSubmissionId,
     required TeacherActivityScope scope,
     required String studentId,
     required String domain,
@@ -431,20 +432,30 @@ class TeacherRepository {
     required String status,
     String? observationNote,
   }) async {
-    await _client.post(
-      '/mobile/teacher/activity/milestones',
-      data: {
-        'classId': scope.classId,
-        if (scope.sectionId != null) 'sectionId': scope.sectionId,
-        'studentId': studentId,
-        'domain': domain.trim(),
-        'milestone': milestone.trim(),
-        'status': status,
-        if (observationNote != null && observationNote.trim().isNotEmpty)
-          'observationNote': observationNote.trim(),
-        'observedAt': DateTime.now().toUtc().toIso8601String(),
-      },
-    );
+    final data = {
+      'clientSubmissionId': clientSubmissionId,
+      'classId': scope.classId,
+      if (scope.sectionId != null) 'sectionId': scope.sectionId,
+      'studentId': studentId,
+      'domain': domain.trim(),
+      'milestone': milestone.trim(),
+      'status': status,
+      if (observationNote != null && observationNote.trim().isNotEmpty)
+        'observationNote': observationNote.trim(),
+      'observedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        await _client.post('/mobile/teacher/activity/milestones', data: data);
+        return;
+      } on AppException catch (error) {
+        final retryable =
+            error is NetworkException || error is TimeoutException;
+        if (!retryable || attempt == 1) rethrow;
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+      }
+    }
   }
 
   Future<TeacherTimetableSnapshot> getTimetable({

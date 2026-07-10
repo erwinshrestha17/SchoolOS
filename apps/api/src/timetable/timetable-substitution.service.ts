@@ -58,9 +58,11 @@ export class TimetableSubstitutionService {
       throw new ConflictException('Leave end date cannot be before start date');
     }
 
-    const created: Prisma.TimetableSubstitutionGetPayload<{
-      include: ReturnType<typeof substitutionInclude>;
-    }>[] = [];
+    const created: Array<
+      Prisma.TimetableSubstitutionGetPayload<{
+        include: ReturnType<typeof substitutionInclude>;
+      }>
+    > = [];
 
     for (const date of eachDateInclusive(startsOn, endsOn)) {
       const dayOfWeek = toTimetableDayOfWeek(date);

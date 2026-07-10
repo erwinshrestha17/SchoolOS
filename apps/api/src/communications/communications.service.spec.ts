@@ -1213,4 +1213,35 @@ describe('CommunicationsService', () => {
       }),
     );
   });
+
+  it('scopes delivery listing to the requested sourceType and activityPostId when provided', async () => {
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+
+    await service.listDeliveries(actor, {
+      sourceType: 'activity_post',
+      activityPostId: 'post-1',
+    });
+
+    expect(prisma.notificationDelivery.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: 'tenant-1',
+          sourceType: 'activity_post',
+          activityPostId: 'post-1',
+        },
+      }),
+    );
+  });
+
+  it('omits sourceType and activityPostId filters when not provided, preserving prior behavior', async () => {
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+
+    await service.listDeliveries(actor);
+
+    expect(prisma.notificationDelivery.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId: 'tenant-1' },
+      }),
+    );
+  });
 });

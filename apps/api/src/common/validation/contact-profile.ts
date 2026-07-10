@@ -20,7 +20,7 @@ export function optionalPersonName(
   value: string | null | undefined,
   field: string,
 ): string | null {
-  if (value === null || value === undefined || !value.trim()) return null;
+  if (!value?.trim()) return null;
   return requirePersonName(value, field);
 }
 
@@ -35,7 +35,7 @@ export function requireProfileEmail(value: string): string {
 export function optionalProfileEmail(
   value: string | null | undefined,
 ): string | null {
-  if (value === null || value === undefined || !value.trim()) return null;
+  if (!value?.trim()) return null;
   return requireProfileEmail(value);
 }
 
@@ -52,7 +52,7 @@ export function requireNepalPhone(value: string): string {
 export function optionalNepalPhone(
   value: string | null | undefined,
 ): string | null {
-  if (value === null || value === undefined || !value.trim()) return null;
+  if (!value?.trim()) return null;
   return requireNepalPhone(value);
 }
 

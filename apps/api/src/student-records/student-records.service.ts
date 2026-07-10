@@ -118,8 +118,7 @@ export class StudentRecordsService {
         },
       });
       if (
-        !asset ||
-        asset.status !== FileStatus.UPLOADED ||
+        asset?.status !== FileStatus.UPLOADED ||
         asset.module !== 'admissions' ||
         (asset.entityId !== input.admissionCaseId &&
           (asset.entityId !== null || asset.uploadedByUserId !== input.userId))

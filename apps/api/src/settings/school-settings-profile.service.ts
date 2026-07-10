@@ -72,7 +72,7 @@ export class SchoolSettingsProfileService {
     const updates = Object.entries(schoolProfileKeyMap)
       .filter(([field]) => dto[field] !== undefined)
       .map(([field, key]) => ({
-        key: key as TenantSettingKey,
+        key,
         value: normalize(dto[field as keyof UpdateSchoolProfileDto]),
       }));
 

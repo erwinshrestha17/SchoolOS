@@ -495,9 +495,18 @@ export class CommunicationsService {
     return event;
   }
 
-  async listDeliveries(actor: AuthContext) {
+  async listDeliveries(
+    actor: AuthContext,
+    filters?: { sourceType?: string; activityPostId?: string },
+  ) {
     return this.prisma.notificationDelivery.findMany({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        ...(filters?.sourceType ? { sourceType: filters.sourceType } : {}),
+        ...(filters?.activityPostId
+          ? { activityPostId: filters.activityPostId }
+          : {}),
+      },
       include: {
         guardian: true,
         student: true,

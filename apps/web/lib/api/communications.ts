@@ -147,8 +147,13 @@ export const communicationsApi = {
   listEvents: () => request<EventSummary[]>("/events"),
   createEvent: (body: JsonBody) =>
     request<EventSummary>("/events", { method: "POST", json: body }),
-  listNotificationDeliveries: () =>
-    request<NotificationDelivery[]>("/communications/deliveries"),
+  listNotificationDeliveries: (params?: {
+    sourceType?: string | null;
+    activityPostId?: string | null;
+  }) =>
+    request<NotificationDelivery[]>(
+      withQuery("/communications/deliveries", params ?? {}),
+    ),
   getNotificationDeliveryAnalytics: () =>
     request<NotificationDeliveryAnalytics>(
       "/communications/deliveries/analytics",

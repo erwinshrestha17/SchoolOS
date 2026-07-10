@@ -92,6 +92,7 @@ model NotificationDelivery {
   @@index([tenantId, status, channel])
   @@index([tenantId, noticeId, status, createdAt])
   @@index([tenantId, recipientUserId, status, createdAt])
+  @@index([tenantId, activityPostId], map: "notification_delivery_activity_post_idx")
 }
 
 model NotificationReadReceipt {

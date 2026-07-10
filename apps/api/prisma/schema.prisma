@@ -1664,21 +1664,22 @@ model ActivityReaction {
 }
 
 model DevelopmentalMilestone {
-  id              String                       @id @default(uuid())
-  tenantId        String
-  classId         String
-  sectionId       String?
-  studentId       String
-  domain          String
-  milestone       String
-  status          DevelopmentalMilestoneStatus
-  observationNote String?
-  photoObjectKey  String?
-  photoUrl        String?
-  observedAt      DateTime
-  createdById     String?
-  createdAt       DateTime                     @default(now())
-  updatedAt       DateTime                     @updatedAt
+  id                 String                       @id @default(uuid())
+  tenantId           String
+  classId            String
+  sectionId          String?
+  studentId          String
+  domain             String
+  milestone          String
+  status             DevelopmentalMilestoneStatus
+  observationNote    String?
+  photoObjectKey     String?
+  photoUrl           String?
+  observedAt         DateTime
+  createdById        String?
+  clientSubmissionId String?
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   class   Class    @relation(fields: [classId], references: [id], onDelete: Restrict)
@@ -1687,6 +1688,7 @@ model DevelopmentalMilestone {
 
   @@index([tenantId, studentId, observedAt])
   @@index([tenantId, classId, sectionId])
+  @@unique([tenantId, createdById, clientSubmissionId], map: "developmental_milestone_client_submission_key")
 }
 
 model MoodLog {
@@ -3162,6 +3164,7 @@ model NotificationDelivery {
   @@index([tenantId, status, channel])
   @@index([tenantId, noticeId, status, createdAt])
   @@index([tenantId, recipientUserId, status, createdAt])
+  @@index([tenantId, activityPostId], map: "notification_delivery_activity_post_idx")
 }
 
 model NotificationReadReceipt {

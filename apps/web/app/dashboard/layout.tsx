@@ -255,6 +255,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }, [pathname, router, status]);
 
   useEffect(() => {
+    if (
+      session?.user.mustChangePassword &&
+      pathname !== "/dashboard/account-security"
+    ) {
+      router.replace("/dashboard/account-security");
+    }
+  }, [pathname, router, session?.user.mustChangePassword]);
+
+  useEffect(() => {
     if (status !== "loading") {
       setShowSlowSessionHelp(false);
       return;
@@ -341,7 +350,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     session.user.mustChangePassword &&
     pathname !== "/dashboard/account-security"
   ) {
-    router.replace("/dashboard/account-security");
     return (
       <DashboardShell>
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-950">

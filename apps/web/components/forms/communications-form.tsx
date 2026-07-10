@@ -190,7 +190,7 @@ export function CommunicationsForm({
   });
   const deliveriesQuery = useQuery({
     queryKey: ["notification-deliveries"],
-    queryFn: api.listNotificationDeliveries,
+    queryFn: () => api.listNotificationDeliveries(),
   });
   const noticesQuery = useQuery({
     queryKey: ["notices"],

@@ -20,6 +20,9 @@ export class CreateMobileTeacherActivityPostDto extends CreateActivityPostDto {
 
 export class CreateMobileTeacherMilestoneDto {
   @IsUUID()
+  clientSubmissionId!: string;
+
+  @IsUUID()
   classId!: string;
 
   @IsOptional()

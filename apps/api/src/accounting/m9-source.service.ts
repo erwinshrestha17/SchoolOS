@@ -7,9 +7,9 @@ import {
   type M9AccountingSourceModule,
 } from './dto/m9-accounting.dto';
 
-type AccountingSourceMappingDelegate = {
+interface AccountingSourceMappingDelegate {
   findMany(args: { where: { tenantId: string } }): Promise<unknown[]>;
-};
+}
 
 type PrismaWithAccountingSourceMapping = PrismaService & {
   accountingSourceMapping?: AccountingSourceMappingDelegate;
@@ -85,7 +85,7 @@ export class M9SourceService {
   }
 }
 
-type SourceEntry = {
+interface SourceEntry {
   id: string;
   entryNumber: string | null;
   sourceModule: string | null;
@@ -97,7 +97,7 @@ type SourceEntry = {
       type: string;
     };
   }>;
-};
+}
 
 const FINANCE_SOURCE_TYPES: readonly JournalSourceType[] = [
   JournalSourceType.FEE_PAYMENT,

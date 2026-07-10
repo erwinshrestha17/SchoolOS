@@ -53,9 +53,7 @@ export class SectionsService {
       studentCount: section._count.students,
       // Lets teacher-facing screens default to the caller's own section
       // without exposing staff ids to the browser.
-      isAssignedClassTeacher: Boolean(
-        staff && section.classTeacherId === staff.id,
-      ),
+      isAssignedClassTeacher: Boolean(section.classTeacherId === staff?.id),
       isAssignedSubjectTeacher: subjectAssignments.some(
         (assignment) =>
           assignment.sectionId === section.id ||

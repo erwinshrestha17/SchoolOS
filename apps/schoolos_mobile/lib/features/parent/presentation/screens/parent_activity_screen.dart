@@ -13,6 +13,15 @@ import '../../application/parent_providers.dart';
 import '../../domain/parent_models.dart';
 import '../widgets/parent_state_view.dart';
 
+const _activityCategories = <String>[
+  'LEARNING',
+  'OUTDOOR_PLAY',
+  'ART_AND_CRAFT',
+  'CELEBRATION',
+  'SPORTS',
+  'GENERAL',
+];
+
 class ParentActivityScreen extends ConsumerWidget {
   const ParentActivityScreen({super.key});
 
@@ -21,6 +30,15 @@ class ParentActivityScreen extends ConsumerWidget {
     final state = ref.watch(parentControllerProvider);
     final controller = ref.read(parentControllerProvider.notifier);
     final childId = state.selectedChildId;
+    String? guardianId;
+    if (childId != null) {
+      for (final child in state.children) {
+        if (child.id == childId) {
+          guardianId = child.guardianId;
+          break;
+        }
+      }
+    }
 
     return RoleShellScaffold(
       role: 'PARENT',
@@ -36,20 +54,37 @@ class ParentActivityScreen extends ConsumerWidget {
                 message: 'Select a child before viewing activity.',
                 icon: Icons.auto_awesome_rounded,
               )
-            : _ActivityContent(childId: childId),
+            : _ActivityContent(childId: childId, guardianId: guardianId),
       ),
     );
   }
 }
 
-class _ActivityContent extends ConsumerWidget {
-  const _ActivityContent({required this.childId});
+class _ActivityContent extends ConsumerStatefulWidget {
+  const _ActivityContent({required this.childId, required this.guardianId});
 
   final String childId;
+  final String? guardianId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final activity = ref.watch(parentActivityFeedProvider(childId));
+  ConsumerState<_ActivityContent> createState() => _ActivityContentState();
+}
+
+class _ActivityContentState extends ConsumerState<_ActivityContent> {
+  String? _category;
+  String? _month;
+
+  @override
+  Widget build(BuildContext context) {
+    final filter = ParentActivityFeedFilter(
+      childId: widget.childId,
+      category: _category,
+      month: _month,
+    );
+    final activity = ref.watch(parentActivityFeedFilteredProvider(filter));
+    final milestones = ref.watch(
+      parentMilestonesProvider(ParentMilestonesFilter(childId: widget.childId)),
+    );
 
     return activity.when(
       loading: () => const Padding(
@@ -64,46 +99,196 @@ class _ActivityContent extends ConsumerWidget {
       ),
       error: (error, _) => AppExceptionView(
         error: error,
-        onRetry: () => ref.invalidate(parentActivityFeedProvider(childId)),
+        onRetry: () =>
+            ref.invalidate(parentActivityFeedFilteredProvider(filter)),
       ),
       data: (items) => RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(parentActivityFeedProvider(childId));
-          await ref.read(parentActivityFeedProvider(childId).future);
+          ref.invalidate(parentActivityFeedFilteredProvider(filter));
+          await ref.read(parentActivityFeedFilteredProvider(filter).future);
         },
-        child: items.isEmpty
-            ? ListView(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                children: const [
-                  AppEmptyState(
-                    title: 'No activity yet',
-                    message:
-                        'Class activities and milestones will appear here after approval.',
-                    icon: Icons.auto_awesome_rounded,
-                  ),
-                ],
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          children: [
+            _FilterBar(
+              category: _category,
+              month: _month,
+              onCategoryChanged: (value) => setState(() => _category = value),
+              onMonthChanged: (value) => setState(() => _month = value),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _MilestoneSummaryCard(milestonesAsync: milestones),
+            const SizedBox(height: AppSpacing.md),
+            if (items.isEmpty)
+              const AppEmptyState(
+                title: 'No activity yet',
+                message:
+                    'Class activities and milestones will appear here after approval.',
+                icon: Icons.auto_awesome_rounded,
               )
-            : ListView(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                children: [
-                  for (final item in items) ...[
-                    _ActivityCard(item: item),
-                    const SizedBox(height: AppSpacing.md),
-                  ],
-                ],
-              ),
+            else
+              for (final item in items) ...[
+                _ActivityCard(item: item, guardianId: widget.guardianId),
+                const SizedBox(height: AppSpacing.md),
+              ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _ActivityCard extends ConsumerWidget {
-  const _ActivityCard({required this.item});
+class _FilterBar extends StatelessWidget {
+  const _FilterBar({
+    required this.category,
+    required this.month,
+    required this.onCategoryChanged,
+    required this.onMonthChanged,
+  });
 
-  final ParentActivityItem item;
+  final String? category;
+  final String? month;
+  final ValueChanged<String?> onCategoryChanged;
+  final ValueChanged<String?> onMonthChanged;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          DropdownButton<String?>(
+            value: category,
+            hint: const Text('All categories'),
+            underline: const SizedBox.shrink(),
+            onChanged: onCategoryChanged,
+            items: [
+              const DropdownMenuItem(
+                value: null,
+                child: Text('All categories'),
+              ),
+              for (final value in _activityCategories)
+                DropdownMenuItem(value: value, child: Text(_labelize(value))),
+            ],
+          ),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.calendar_month_rounded, size: 18),
+            label: Text(month ?? 'Any month'),
+            onPressed: () async {
+              final now = DateTime.now();
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: now,
+                firstDate: DateTime(now.year - 3),
+                lastDate: now,
+              );
+              if (picked != null) {
+                onMonthChanged(
+                  '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}',
+                );
+              }
+            },
+          ),
+          if (category != null || month != null)
+            TextButton(
+              onPressed: () {
+                onCategoryChanged(null);
+                onMonthChanged(null);
+              },
+              child: const Text('Clear'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MilestoneSummaryCard extends StatelessWidget {
+  const _MilestoneSummaryCard({required this.milestonesAsync});
+
+  final AsyncValue<List<ParentMilestone>> milestonesAsync;
+
+  @override
+  Widget build(BuildContext context) {
+    return milestonesAsync.when(
+      loading: () => const AppSkeleton(width: double.infinity, height: 88),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (milestones) {
+        if (milestones.isEmpty) return const SizedBox.shrink();
+        final recent = milestones.take(3).toList();
+        return AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.emoji_events_rounded,
+                    color: AppColors.parentAccent,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    'Recent milestones',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              for (final milestone in recent)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                  child: Text(
+                    '${milestone.milestone} · ${_labelize(milestone.domain)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ActivityCard extends ConsumerStatefulWidget {
+  const _ActivityCard({required this.item, required this.guardianId});
+
+  final ParentActivityItem item;
+  final String? guardianId;
+
+  @override
+  ConsumerState<_ActivityCard> createState() => _ActivityCardState();
+}
+
+class _ActivityCardState extends ConsumerState<_ActivityCard> {
+  bool _reacting = false;
+
+  Future<void> _react(String reaction) async {
+    final guardianId = widget.guardianId;
+    if (guardianId == null || _reacting) return;
+    setState(() => _reacting = true);
+    try {
+      await ref
+          .read(parentRepositoryProvider)
+          .submitActivityReaction(
+            postId: widget.item.id,
+            guardianId: guardianId,
+            reaction: reaction,
+          );
+    } catch (_) {
+      // Reaction failures are non-critical; the UI simply stays unchanged.
+    } finally {
+      if (mounted) setState(() => _reacting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
     final previewable = item.attachments.where(
       (attachment) => attachment.canPreview,
     );
@@ -158,12 +343,36 @@ class _ActivityCard extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: AppSpacing.md),
-          Text(
-            '${item.attachmentCount} attachments • ${item.reactionCount} reactions',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.slate500,
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            children: [
+              Text(
+                '${item.attachmentCount} attachments',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.slate500,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              if (widget.guardianId != null)
+                for (final reaction in const ['HEART', 'CLAP', 'STAR'])
+                  IconButton(
+                    tooltip: _labelize(reaction),
+                    onPressed: _reacting ? null : () => _react(reaction),
+                    icon: Icon(switch (reaction) {
+                      'HEART' => Icons.favorite_rounded,
+                      'CLAP' => Icons.front_hand_rounded,
+                      _ => Icons.star_rounded,
+                    }, size: 20),
+                  )
+              else
+                Text(
+                  '${item.reactionCount} reactions',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.slate500,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+            ],
           ),
         ],
       ),

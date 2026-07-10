@@ -458,22 +458,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             location != AppRoutes.studentSession) {
           return AppRoutes.studentSession;
         }
-        if (_isParentRoute(location) && role != MobileRole.parent) {
+        if (isParentRoute(location) && role != MobileRole.parent) {
           return AppRoutes.home;
         }
-        if (_isStudentRoute(location) && role != MobileRole.student) {
+        if (isStudentRoute(location) && role != MobileRole.student) {
           return AppRoutes.home;
         }
-        if (_isTeacherRoute(location) && role != MobileRole.teacher) {
+        if (isTeacherRoute(location) && role != MobileRole.teacher) {
           return AppRoutes.home;
         }
-        if (_isDriverRoute(location) && role != MobileRole.driver) {
+        if (isDriverRoute(location) && role != MobileRole.driver) {
           return AppRoutes.home;
         }
-        if (_isStaffRoute(location) && role != MobileRole.staff) {
+        if (isStaffRoute(location) && role != MobileRole.staff) {
           return AppRoutes.home;
         }
-        if (_isPrincipalRoute(location) && role != MobileRole.principal) {
+        if (isPrincipalRoute(location) && role != MobileRole.principal) {
           return AppRoutes.home;
         }
         if (location == AppRoutes.adminHome && role != MobileRole.admin) {
@@ -506,7 +506,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-bool _isStudentRoute(String location) {
+@visibleForTesting
+bool isStudentRoute(String location) {
   return location == AppRoutes.studentSession ||
       location == AppRoutes.studentHome ||
       location == AppRoutes.studentAttendance ||
@@ -515,14 +516,16 @@ bool _isStudentRoute(String location) {
       location == AppRoutes.studentLearning;
 }
 
-bool _isStaffRoute(String location) {
+@visibleForTesting
+bool isStaffRoute(String location) {
   return location == AppRoutes.staffHome ||
       location == AppRoutes.staffAttendance ||
       location == AppRoutes.staffLeave ||
       location == AppRoutes.staffPayslips;
 }
 
-bool _isPrincipalRoute(String location) {
+@visibleForTesting
+bool isPrincipalRoute(String location) {
   return location == AppRoutes.principalToday ||
       location == AppRoutes.principalAttention ||
       location == AppRoutes.principalApprovals ||
@@ -542,14 +545,16 @@ bool _isPrincipalRoute(String location) {
       location == AppRoutes.principalLibrary;
 }
 
-bool _isDriverRoute(String location) {
+@visibleForTesting
+bool isDriverRoute(String location) {
   return location == AppRoutes.driverHome ||
       location == AppRoutes.driverRoute ||
       location == AppRoutes.driverStudents ||
       location == AppRoutes.driverHistory;
 }
 
-bool _isTeacherRoute(String location) {
+@visibleForTesting
+bool isTeacherRoute(String location) {
   return location == AppRoutes.teacherHome ||
       location == AppRoutes.teacherClasses ||
       location.startsWith('/teacher/class/') ||
@@ -557,6 +562,7 @@ bool _isTeacherRoute(String location) {
       location.startsWith('${AppRoutes.teacherAttendance}/') ||
       location == AppRoutes.teacherHomework ||
       location == AppRoutes.teacherHomeworkCreate ||
+      location == AppRoutes.teacherActivity ||
       location == AppRoutes.teacherMessages ||
       location.startsWith('/teacher/messages/') ||
       location == AppRoutes.teacherTimetable ||
@@ -565,7 +571,8 @@ bool _isTeacherRoute(String location) {
       location == AppRoutes.teacherPayslips;
 }
 
-bool _isParentRoute(String location) {
+@visibleForTesting
+bool isParentRoute(String location) {
   return location == AppRoutes.parentHome ||
       location == AppRoutes.parentChildren ||
       location.startsWith('/parent/child/') ||

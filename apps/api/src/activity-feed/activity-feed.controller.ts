@@ -85,6 +85,8 @@ export class ActivityFeedController {
     @Query('category') category?: string,
     @Query('month') month?: string,
     @Query('status') status?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
   ) {
     return this.activityFeedService.listPosts(auth, {
       studentId,
@@ -93,6 +95,8 @@ export class ActivityFeedController {
       category,
       month,
       status,
+      limit,
+      offset,
     });
   }
 
@@ -103,11 +107,15 @@ export class ActivityFeedController {
     @Query('studentId') studentId?: string,
     @Query('category') category?: string,
     @Query('month') month?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
   ) {
     return this.activityFeedService.listPosts(auth, {
       studentId,
       category,
       month,
+      limit,
+      offset,
     });
   }
 

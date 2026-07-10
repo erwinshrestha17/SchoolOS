@@ -94,11 +94,67 @@ final parentActivityFeedProvider = FutureProvider.autoDispose
           .getActivityFeedForChild(childId);
     });
 
+class ParentActivityFeedFilter {
+  const ParentActivityFeedFilter({
+    required this.childId,
+    this.category,
+    this.month,
+  });
+
+  final String childId;
+  final String? category;
+  final String? month;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ParentActivityFeedFilter &&
+      other.childId == childId &&
+      other.category == category &&
+      other.month == month;
+
+  @override
+  int get hashCode => Object.hash(childId, category, month);
+}
+
+final parentActivityFeedFilteredProvider = FutureProvider.autoDispose
+    .family<List<ParentActivityItem>, ParentActivityFeedFilter>((ref, filter) {
+      return ref
+          .watch(parentRepositoryProvider)
+          .getActivityFeedForChild(
+            filter.childId,
+            category: filter.category,
+            month: filter.month,
+          );
+    });
+
 final parentActivityPreviewProvider = FutureProvider.autoDispose
     .family<Uint8List, String>((ref, previewPath) {
       return ref
           .watch(parentRepositoryProvider)
           .getActivityPreview(previewPath);
+    });
+
+class ParentMilestonesFilter {
+  const ParentMilestonesFilter({required this.childId, this.month});
+
+  final String childId;
+  final String? month;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ParentMilestonesFilter &&
+      other.childId == childId &&
+      other.month == month;
+
+  @override
+  int get hashCode => Object.hash(childId, month);
+}
+
+final parentMilestonesProvider = FutureProvider.autoDispose
+    .family<List<ParentMilestone>, ParentMilestonesFilter>((ref, filter) {
+      return ref
+          .watch(parentRepositoryProvider)
+          .getMilestonesForChild(filter.childId, month: filter.month);
     });
 
 final parentTransportProvider = FutureProvider.autoDispose

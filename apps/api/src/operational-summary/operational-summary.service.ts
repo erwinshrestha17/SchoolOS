@@ -15,13 +15,16 @@ import {
 
 type Day = ReturnType<typeof getNepalSchoolDay>;
 type SummaryModule = Exclude<OperationalSummaryModule, 'm11_intelligence'>;
-type DelegateRow = { id: string; createdAt: Date };
-type ModelDelegate = {
+interface DelegateRow {
+  id: string;
+  createdAt: Date;
+}
+interface ModelDelegate {
   count(args?: unknown): Promise<number>;
   findMany?(args?: unknown): Promise<DelegateRow[]>;
   aggregate?(args?: unknown): Promise<unknown>;
-};
-type MetricDefinition = {
+}
+interface MetricDefinition {
   key: string;
   model: string;
   where: Record<string, unknown>;
@@ -30,18 +33,18 @@ type MetricDefinition = {
     action: string;
     severity?: OperationalAttentionItem['severity'];
   };
-};
-type Metric = {
+}
+interface Metric {
   key: string;
   value: number | string | null;
   failed: boolean;
   attention?: OperationalAttentionItem;
-};
-type TeacherScope = {
+}
+interface TeacherScope {
   staffId: string;
   subjectIds: string[];
   classSectionScopes: Array<{ classId: string; sectionId: string | null }>;
-};
+}
 
 const MODULE_CONFIG: Record<
   SummaryModule,
@@ -73,7 +76,7 @@ const MODULE_CONFIG: Record<
   },
   m5_activity: {
     entitlement: 'activity',
-    permissions: ['activity:read', 'activity:manage'],
+    permissions: ['activity_feed:read', 'activity_feed:moderate'],
     route: '/dashboard/activity',
     label: 'Activity',
   },
@@ -377,11 +380,7 @@ export class OperationalSummaryService {
         ),
       ],
       m2_attendance: teacherOnly
-        ? this.teacherAttendanceDefinitions(
-            actor,
-            day,
-            teacherScope as TeacherScope,
-          )
+        ? this.teacherAttendanceDefinitions(actor, day, teacherScope!)
         : [
             this.def('expectedStudents', 'student', {
               tenantId,
@@ -565,12 +564,17 @@ export class OperationalSummaryService {
                 status: 'PENDING_APPROVAL',
               },
               'Review your pending activity posts',
-              '/dashboard/activity/pending',
+              '/dashboard/activity/moderation',
             ),
             this.def('myPublishedPostsToday', 'activityPost', {
               tenantId,
               createdById: actor.userId,
               publishedAt: { gte: day.startUtc, lt: day.endExclusiveUtc },
+            }),
+            this.def('myDraftPosts', 'activityPost', {
+              tenantId,
+              createdById: actor.userId,
+              status: 'DRAFT',
             }),
           ]
         : [
@@ -579,11 +583,15 @@ export class OperationalSummaryService {
               'activityPost',
               { tenantId, status: 'PENDING_APPROVAL' },
               'Review activity moderation',
-              '/dashboard/activity/pending',
+              '/dashboard/activity/moderation',
             ),
             this.def('publishedToday', 'activityPost', {
               tenantId,
               publishedAt: { gte: day.startUtc, lt: day.endExclusiveUtc },
+            }),
+            this.def('draftCount', 'activityPost', {
+              tenantId,
+              status: 'DRAFT',
             }),
             this.def(
               'failedMediaProcessing',
@@ -591,6 +599,17 @@ export class OperationalSummaryService {
               { tenantId, processingStatus: 'FAILED' },
               'Review failed activity media',
               '/dashboard/activity/gallery',
+            ),
+            this.def(
+              'failedDeliveries',
+              'notificationDelivery',
+              {
+                tenantId,
+                activityPostId: { not: null },
+                status: { in: ['FAILED', 'RETRY_PENDING'] },
+              },
+              'Review failed activity deliveries',
+              '/dashboard/activity/deliveries',
             ),
           ],
       m6_homework_timetable: teacherOnly

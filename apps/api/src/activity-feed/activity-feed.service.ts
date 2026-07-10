@@ -96,6 +96,8 @@ export class ActivityFeedService {
       category?: string;
       month?: string;
       status?: string;
+      limit?: number;
+      offset?: number;
     } = {},
   ) {
     const monthRange = filters.month ? getMonthRange(filters.month) : null;
@@ -165,7 +167,8 @@ export class ActivityFeedService {
         reactions: true,
       },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
-      take: 50,
+      take: filters.limit ?? 50,
+      skip: filters.offset ?? 0,
     });
 
     const mediaAccess = await this.resolveActorMediaAccess(actor);
@@ -1622,22 +1625,56 @@ export class ActivityFeedService {
       );
     }
 
-    const milestone = await this.prisma.developmentalMilestone.create({
-      data: {
-        tenantId: actor.tenantId,
-        classId: dto.classId,
-        sectionId: dto.sectionId ?? null,
-        studentId: dto.studentId,
-        domain: dto.domain,
-        milestone: dto.milestone,
-        status: dto.status,
-        observationNote: dto.observationNote ?? null,
-        photoObjectKey: dto.photoObjectKey ?? dto.photoUrl ?? null,
-        photoUrl: null,
-        observedAt: new Date(dto.observedAt),
-        createdById: actor.userId,
-      },
-    });
+    if (dto.clientSubmissionId) {
+      const existing = await this.prisma.developmentalMilestone.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          createdById: actor.userId,
+          clientSubmissionId: dto.clientSubmissionId,
+        },
+      });
+      if (existing) {
+        return existing;
+      }
+    }
+
+    let milestone;
+    try {
+      milestone = await this.prisma.developmentalMilestone.create({
+        data: {
+          tenantId: actor.tenantId,
+          classId: dto.classId,
+          sectionId: dto.sectionId ?? null,
+          studentId: dto.studentId,
+          domain: dto.domain,
+          milestone: dto.milestone,
+          status: dto.status,
+          observationNote: dto.observationNote ?? null,
+          photoObjectKey: dto.photoObjectKey ?? dto.photoUrl ?? null,
+          photoUrl: null,
+          observedAt: new Date(dto.observedAt),
+          createdById: actor.userId,
+          clientSubmissionId: dto.clientSubmissionId,
+        },
+      });
+    } catch (error) {
+      if (dto.clientSubmissionId && isDatabaseErrorCode(error, 'P2002')) {
+        const existing = await this.prisma.developmentalMilestone.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            createdById: actor.userId,
+            clientSubmissionId: dto.clientSubmissionId,
+          },
+        });
+        if (existing) {
+          return existing;
+        }
+        throw new ConflictException(
+          'This milestone submission is already being processed',
+        );
+      }
+      throw error;
+    }
 
     await this.auditService.record({
       action: 'create',

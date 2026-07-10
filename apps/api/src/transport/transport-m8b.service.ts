@@ -21,7 +21,7 @@ import { TransportService } from './transport.service';
 
 type GpsLabel = 'fresh' | 'delayed' | 'stale' | 'missing';
 
-type RedisCommandClient = {
+interface RedisCommandClient {
   set(
     key: string,
     value: string,
@@ -34,9 +34,9 @@ type RedisCommandClient = {
   incr?: (key: string) => Promise<unknown>;
   keys?: (pattern: string) => Promise<string[]>;
   get?: (key: string) => Promise<string | null>;
-};
+}
 
-type OneDayRouteChangeRecord = {
+interface OneDayRouteChangeRecord {
   id: string;
   tenantId: string;
   studentId: string;
@@ -52,12 +52,12 @@ type OneDayRouteChangeRecord = {
   createdById: string;
   createdAt: string;
   status: 'ACTIVE_ONE_DAY_CHANGE';
-};
+}
 
-type MaintenanceReminderVehicle = {
+interface MaintenanceReminderVehicle {
   id: string;
   registrationNumber: string;
-};
+}
 
 @Injectable()
 export class TransportM8bService {
@@ -727,9 +727,7 @@ export class TransportM8bService {
     if (typeof redis.keys !== 'function' || typeof redis.get !== 'function') {
       return [] as Array<{ tripId: string; reason: string; count: number }>;
     }
-    const keys = (await redis.keys(
-      `transport:${tenantId}:gps:rejected:*`,
-    )) as string[];
+    const keys = await redis.keys(`transport:${tenantId}:gps:rejected:*`);
     const rows = [] as Array<{ tripId: string; reason: string; count: number }>;
     for (const key of keys.slice(0, 500)) {
       const count = Number((await redis.get(key)) ?? 0);

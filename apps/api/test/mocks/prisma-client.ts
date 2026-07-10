@@ -6,11 +6,11 @@ class Decimal {
       value instanceof Decimal ? value.numericValue : Number(value);
   }
 
-  static max(...values: Array<number | string | Decimal>) {
+  static max(...values: (number | string | Decimal)[]) {
     return new Decimal(Math.max(...values.map(decimalToNumber)));
   }
 
-  static min(...values: Array<number | string | Decimal>) {
+  static min(...values: (number | string | Decimal)[]) {
     return new Decimal(Math.min(...values.map(decimalToNumber)));
   }
 

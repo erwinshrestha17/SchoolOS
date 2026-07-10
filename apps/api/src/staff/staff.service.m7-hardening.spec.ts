@@ -218,11 +218,11 @@ describe('StaffService M7 HR hardening', () => {
 function buildService(
   options: {
     staff?: Record<string, unknown> | null;
-    staffList?: Array<Record<string, unknown>>;
+    staffList?: Record<string, unknown>[];
     staffCount?: number;
-    leaveBalances?: Array<Record<string, unknown>>;
+    leaveBalances?: Record<string, unknown>[];
     leaveRequest?: Record<string, unknown> | null;
-    payrollRuns?: Array<Record<string, unknown>>;
+    payrollRuns?: Record<string, unknown>[];
   } = {},
 ) {
   const prisma = {

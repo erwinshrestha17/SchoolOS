@@ -21,6 +21,7 @@ class GuardianChild {
     required this.relationship,
     this.academicYearStartsOn,
     this.academicYearEndsOn,
+    this.guardianId,
   });
 
   final String id;
@@ -31,6 +32,7 @@ class GuardianChild {
   final String relationship;
   final String? academicYearStartsOn;
   final String? academicYearEndsOn;
+  final String? guardianId;
 
   factory GuardianChild.fromJson(Map<String, dynamic> json) {
     return GuardianChild(
@@ -42,6 +44,7 @@ class GuardianChild {
       relationship: json['relationship'] as String? ?? 'Child',
       academicYearStartsOn: json['academicYearStartsOn'] as String?,
       academicYearEndsOn: json['academicYearEndsOn'] as String?,
+      guardianId: json['guardianId'] as String?,
     );
   }
 }
@@ -902,6 +905,35 @@ class ParentActivityAttachment {
       sizeBytes: _asInt(json['sizeBytes']),
       processingStatus: json['processingStatus'] as String? ?? 'PENDING',
       previewPath: json['previewPath'] as String? ?? '',
+    );
+  }
+}
+
+class ParentMilestone {
+  const ParentMilestone({
+    required this.id,
+    required this.domain,
+    required this.milestone,
+    required this.status,
+    required this.observedAt,
+    this.observationNote,
+  });
+
+  final String id;
+  final String domain;
+  final String milestone;
+  final String status;
+  final String observedAt;
+  final String? observationNote;
+
+  factory ParentMilestone.fromJson(Map<String, dynamic> json) {
+    return ParentMilestone(
+      id: json['id'] as String? ?? '',
+      domain: json['domain'] as String? ?? '',
+      milestone: json['milestone'] as String? ?? '',
+      status: json['status'] as String? ?? 'PROGRESSING',
+      observedAt: json['observedAt'] as String? ?? '',
+      observationNote: json['observationNote'] as String?,
     );
   }
 }

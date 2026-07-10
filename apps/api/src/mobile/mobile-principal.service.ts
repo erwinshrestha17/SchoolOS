@@ -252,6 +252,7 @@ export class MobilePrincipalService implements OnModuleInit {
       feeItems,
       escalationItems,
       academicsItems,
+      activityItems,
     ] = await Promise.all([
       modules.attendance ? this.attendanceAttention(actor) : [],
       modules.hr ? this.staffAttention(actor) : [],
@@ -260,6 +261,7 @@ export class MobilePrincipalService implements OnModuleInit {
       modules.fees ? this.feeAttention(actor) : [],
       this.escalationAttention(actor),
       modules.exams ? this.academicsAttention(actor) : [],
+      modules.activity ? this.activityAttention(actor) : [],
     ]);
 
     let items = [
@@ -270,6 +272,7 @@ export class MobilePrincipalService implements OnModuleInit {
       ...feeItems,
       ...escalationItems,
       ...academicsItems,
+      ...activityItems,
     ].sort(compareAttention);
 
     const normalizedFilter = filter.toLowerCase();
@@ -406,7 +409,7 @@ export class MobilePrincipalService implements OnModuleInit {
         subtitle: staffName(request.staff),
         detail: `${decimalToNumber(request.days)} days leave`,
         status: request.status,
-        severity: 'high' as Severity,
+        severity: 'high',
         timestamp: toIso(request.createdAt),
         owner: 'Principal',
         nextAction: 'Review leave request',
@@ -421,7 +424,7 @@ export class MobilePrincipalService implements OnModuleInit {
         ),
         detail: request.reason,
         status: request.status,
-        severity: 'medium' as Severity,
+        severity: 'medium',
         timestamp: toIso(request.requestedAt),
         owner: 'Principal',
         nextAction: 'Review correction',
@@ -436,7 +439,7 @@ export class MobilePrincipalService implements OnModuleInit {
         ),
         detail: request.reason,
         status: request.status,
-        severity: 'high' as Severity,
+        severity: 'high',
         timestamp: toIso(request.createdAt),
         owner: 'Principal',
         nextAction: 'Review publish blocker',
@@ -448,9 +451,10 @@ export class MobilePrincipalService implements OnModuleInit {
         subtitle: request.targetType,
         detail: request.reason,
         status: request.status,
-        severity: (request.workflowType === 'EMERGENCY_HIGH_IMPACT_NOTICE'
-          ? 'critical'
-          : 'medium') as Severity,
+        severity:
+          request.workflowType === 'EMERGENCY_HIGH_IMPACT_NOTICE'
+            ? 'critical'
+            : 'medium',
         timestamp: toIso(request.createdAt),
         owner: 'Principal',
         nextAction: 'Review request',
@@ -465,9 +469,7 @@ export class MobilePrincipalService implements OnModuleInit {
           subtitle: notice.title,
           detail: audienceLabel(notice.audienceType),
           status: 'PENDING',
-          severity: (notice.priority === 'EMERGENCY'
-            ? 'critical'
-            : 'medium') as Severity,
+          severity: notice.priority === 'EMERGENCY' ? 'critical' : 'medium',
           timestamp: toIso(notice.createdAt),
           owner: 'Principal',
           nextAction: 'Review notice',
@@ -915,7 +917,7 @@ export class MobilePrincipalService implements OnModuleInit {
           title: row.label,
           subtitle: 'Attendance not submitted',
           detail: 'No attendance recorded today',
-          severity: 'critical' as Severity,
+          severity: 'critical',
         })),
       ],
       studentFollowUps,
@@ -982,7 +984,7 @@ export class MobilePrincipalService implements OnModuleInit {
         title: staffName(row.staff),
         subtitle: row.note ?? row.leaveType ?? 'Staff attendance',
         status: row.status,
-        severity: (row.status === 'ABSENT' ? 'high' : 'medium') as Severity,
+        severity: row.status === 'ABSENT' ? 'high' : 'medium',
         timestamp: toIso(row.createdAt),
         nextAction: 'Review staff coverage',
       })),
@@ -993,7 +995,7 @@ export class MobilePrincipalService implements OnModuleInit {
         subtitle: `${row.leaveType} leave`,
         detail: `${decimalToNumber(row.days)} days`,
         status: row.status,
-        severity: (row.status === 'PENDING' ? 'high' : 'medium') as Severity,
+        severity: row.status === 'PENDING' ? 'high' : 'medium',
         timestamp: toIso(row.createdAt),
         nextAction: 'Review leave coverage',
       })),
@@ -1125,7 +1127,7 @@ export class MobilePrincipalService implements OnModuleInit {
           title: `${row.student.class?.name ?? 'Class'} overdue collection`,
           detail: formatNpr(decimalToNumber(row.totalAmount)),
           status: 'High',
-          severity: 'high' as Severity,
+          severity: 'high',
         })),
         ...financeApprovals.slice(0, 3).map((row) => ({
           id: row.id,
@@ -1133,7 +1135,7 @@ export class MobilePrincipalService implements OnModuleInit {
           title: `${financeApprovalTitle(row.type)} - ${studentName(row.payment.student)}`,
           detail: formatNpr(decimalToNumber(row.amount ?? row.payment.amount)),
           status: 'Pending',
-          severity: 'medium' as Severity,
+          severity: 'medium',
         })),
         ...(cashierClose?.varianceAmount
           ? [
@@ -1351,9 +1353,7 @@ export class MobilePrincipalService implements OnModuleInit {
       subtitle: 'Escalation context is restricted on mobile',
       detail: row.reason,
       status: row.status,
-      severity: (row.status === ChatEscalationStatus.RESOLVED
-        ? 'low'
-        : 'high') as Severity,
+      severity: row.status === ChatEscalationStatus.RESOLVED ? 'low' : 'high',
       timestamp: toIso(row.createdAt),
       owner:
         row.escalatedToUserId === actor.userId
@@ -2639,6 +2639,7 @@ export class MobilePrincipalService implements OnModuleInit {
       canteen: enabled.has('canteen'),
       library: enabled.has('library'),
       notices: enabled.has('notices'),
+      activity: enabled.has('activity'),
       reports: true,
       tasks: true,
       classroomWalkthroughs: enabled.has('exams'),
@@ -2756,7 +2757,7 @@ export class MobilePrincipalService implements OnModuleInit {
           type: 'staff_coverage',
           title: item.title,
           subtitle: item.detail,
-          severity: 'high' as Severity,
+          severity: 'high',
           nextAction: 'Review staff coverage',
           timestamp: nowIso(),
           route: '/principal/staff-absence',
@@ -2775,7 +2776,7 @@ export class MobilePrincipalService implements OnModuleInit {
         type: 'transport',
         title: route.title,
         subtitle: route.status,
-        severity: 'high' as Severity,
+        severity: 'high',
         nextAction: 'Review transport status',
         timestamp: nowIso(),
         route: '/principal/transport-alerts',
@@ -2791,9 +2792,7 @@ export class MobilePrincipalService implements OnModuleInit {
             type: 'notice',
             title: 'High-impact notice awaiting approval',
             subtitle: notice.subject,
-            severity: (notice.priority === 'EMERGENCY'
-              ? 'critical'
-              : 'medium') as Severity,
+            severity: notice.priority === 'EMERGENCY' ? 'critical' : 'medium',
             nextAction: 'Review emergency notice',
             timestamp: nowIso(),
             route: '/principal/notices',
@@ -2809,11 +2808,72 @@ export class MobilePrincipalService implements OnModuleInit {
       type: item.type,
       title: item.title,
       subtitle: item.detail,
-      severity: item.severity as Severity,
+      severity: item.severity,
       nextAction: 'Review fees snapshot',
       timestamp: nowIso(),
       route: '/principal/fees-snapshot',
     }));
+  }
+
+  private async activityAttention(
+    actor: AuthContext,
+  ): Promise<PrincipalItem[]> {
+    const tenantId = actor.tenantId;
+    const [pendingModeration, failedDeliveries, failedMediaProcessing] =
+      await Promise.all([
+        this.prisma.activityPost.count({
+          where: { tenantId, status: 'PENDING_APPROVAL' },
+        }),
+        this.prisma.notificationDelivery.count({
+          where: {
+            tenantId,
+            activityPostId: { not: null },
+            status: { in: ['FAILED', 'RETRY_PENDING'] },
+          },
+        }),
+        this.prisma.activityAttachment.count({
+          where: { tenantId, processingStatus: 'FAILED' },
+        }),
+      ]);
+
+    const items: PrincipalItem[] = [];
+    if (pendingModeration > 0) {
+      items.push({
+        id: 'activity-pending-moderation',
+        type: 'activity',
+        title: 'Activity posts awaiting moderation',
+        subtitle: `${pendingModeration} post${pendingModeration === 1 ? '' : 's'} pending approval`,
+        severity: pendingModeration >= 10 ? 'high' : 'medium',
+        nextAction: 'Review in the web moderation queue',
+        timestamp: nowIso(),
+      });
+    }
+    if (failedDeliveries > 0) {
+      items.push({
+        id: 'activity-failed-deliveries',
+        type: 'activity',
+        title: 'Failed activity guardian deliveries',
+        subtitle:
+          failedDeliveries === 1
+            ? '1 delivery failed'
+            : `${failedDeliveries} deliveries failed`,
+        severity: 'medium',
+        nextAction: 'Review in the web deliveries workspace',
+        timestamp: nowIso(),
+      });
+    }
+    if (failedMediaProcessing > 0) {
+      items.push({
+        id: 'activity-failed-media',
+        type: 'activity',
+        title: 'Activity media failed to process',
+        subtitle: `${failedMediaProcessing} attachment${failedMediaProcessing === 1 ? '' : 's'} failed`,
+        severity: 'low',
+        nextAction: 'Review in the web gallery',
+        timestamp: nowIso(),
+      });
+    }
+    return items;
   }
 
   private async escalationAttention(
@@ -2822,7 +2882,7 @@ export class MobilePrincipalService implements OnModuleInit {
     const escalations = await this.getEscalations(actor, 'open');
     return escalations.items.map((item) => ({
       ...item,
-      severity: item.severity as Severity,
+      severity: item.severity,
       route: '/principal/escalations',
     }));
   }
@@ -2852,7 +2912,7 @@ export class MobilePrincipalService implements OnModuleInit {
         row.reportCard.section?.name,
       ),
       detail: row.reason,
-      severity: 'high' as Severity,
+      severity: 'high',
       timestamp: toIso(row.createdAt),
       nextAction: 'Review publish blockers',
       route: '/principal/academics-readiness',

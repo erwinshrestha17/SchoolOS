@@ -12,8 +12,10 @@ import {
 
 export function ModuleOperationalSummary({
   module,
+  compact = true,
 }: {
   module: OperationalSummaryRouteModule;
+  compact?: boolean;
 }) {
   const summaryQuery = useQuery({
     queryKey: ['operational-module-summary', module],
@@ -29,7 +31,7 @@ export function ModuleOperationalSummary({
 
   return (
     <div className="mb-6">
-      <OperationalSummaryPanel summary={summaryQuery.data} module={module} compact />
+      <OperationalSummaryPanel summary={summaryQuery.data} module={module} compact={compact} />
       <div className="mt-2 flex justify-end">
         <RefreshSummaryButton onClick={() => void summaryQuery.refetch()} />
       </div>

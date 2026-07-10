@@ -8,7 +8,7 @@ import type {
 } from '@schoolos/core';
 import { PrismaService } from '../prisma/prisma.service';
 
-type ProviderRecord = {
+interface ProviderRecord {
   id: string;
   type: ProviderType;
   name: string;
@@ -18,7 +18,7 @@ type ProviderRecord = {
   validationStatus: string | null;
   lastValidatedAt: Date | string | null;
   updatedAt: Date | string;
-};
+}
 
 const NOTIFICATION_PROVIDER_TYPES = {
   sms: 'SMS',
@@ -229,7 +229,7 @@ export class SchoolSettingsIntegrationsService {
     }
 
     const provider = await this.findProvider(
-      NOTIFICATION_PROVIDER_TYPES[channel] as ProviderType,
+      NOTIFICATION_PROVIDER_TYPES[channel],
       true,
     );
     if (!provider) {

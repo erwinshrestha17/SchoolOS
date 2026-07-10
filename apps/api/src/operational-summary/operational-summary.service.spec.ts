@@ -31,6 +31,18 @@ describe('OperationalSummaryService', () => {
     paymentRefund: { count: jest.fn().mockResolvedValue(0) },
     feeBillingRun: { count: jest.fn().mockResolvedValue(0) },
     cashierClose: { count: jest.fn().mockResolvedValue(0) },
+    activityPost: {
+      count: jest.fn().mockResolvedValue(0),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    activityAttachment: { count: jest.fn().mockResolvedValue(0) },
+    notificationDelivery: { count: jest.fn().mockResolvedValue(0) },
+    staff: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'staff-1' }),
+    },
+    subjectTeacherAssignment: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   } as unknown as PrismaService;
 
   const entitlements = {
@@ -138,5 +150,44 @@ describe('OperationalSummaryService', () => {
         route: '/dashboard/fees',
       },
     ]);
+  });
+
+  // Regression guard: m5_activity previously gated canView on
+  // 'activity:read'/'activity:manage', permission strings no real role is
+  // ever granted (roles carry 'activity_feed:read'/'activity_feed:moderate'
+  // instead), so the summary silently reported locked/unavailable for
+  // every actor. See apps/web/app/dashboard/activity/page.tsx history.
+  it('grants canView for an admin actor holding activity_feed:moderate', async () => {
+    entitlements.getEntitlements.mockResolvedValue({
+      modules: ['activity'],
+    } as never);
+    const adminActor: AuthContext = {
+      ...actor,
+      roles: ['admin'],
+      permissions: ['activity_feed:moderate'],
+    };
+
+    const summary = await service.getModuleSummary('m5_activity', adminActor);
+
+    expect(summary.permissions).toEqual({ canView: true });
+    expect(summary.status).not.toBe('permissionDenied');
+    expect(summary.status).not.toBe('locked');
+  });
+
+  it('grants canView for a teacher actor holding only activity_feed:read', async () => {
+    entitlements.getEntitlements.mockResolvedValue({
+      modules: ['activity'],
+    } as never);
+    const teacherActor: AuthContext = {
+      ...actor,
+      roles: ['teacher'],
+      permissions: ['activity_feed:read'],
+    };
+
+    const summary = await service.getModuleSummary('m5_activity', teacherActor);
+
+    expect(summary.permissions).toEqual({ canView: true });
+    expect(summary.status).not.toBe('permissionDenied');
+    expect(summary.status).not.toBe('locked');
   });
 });

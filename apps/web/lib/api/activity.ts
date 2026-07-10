@@ -2,6 +2,7 @@ import type {
   ActivityGalleryItem,
   ActivityPost,
   ActivityReaction,
+  ActivityReactionAnalytics,
   DevelopmentalMilestone,
   MoodLog,
 } from '@schoolos/core';
@@ -38,6 +39,8 @@ export const activityApi = {
     category?: string | null;
     month?: string | null;
     status?: string | null;
+    limit?: number | null;
+    offset?: number | null;
   }) =>
     request<ActivityPost[]>(
       withQuery('/activity-feed/posts', params ?? {}),
@@ -122,15 +125,23 @@ export const activityApi = {
     await downloadBlob(response, fileName);
   },
   createActivityPost: (body: JsonBody) =>
-    request('/activity-feed/posts', { method: 'POST', json: body }),
+    request<ActivityPost>('/activity-feed/posts', {
+      method: 'POST',
+      json: body,
+    }),
   createActivityReaction: (postId: string, body: JsonBody) =>
     request<ActivityReaction>(
       `/activity-feed/posts/${encodeURIComponent(postId)}/reactions`,
       { method: 'POST', json: body },
     ),
+  getReactionAnalytics: () =>
+    request<ActivityReactionAnalytics>('/activity-feed/reactions/analytics'),
   listMoodLogs: () => request<MoodLog[]>('/activity-feed/mood-logs'),
   createMoodLog: (body: JsonBody) =>
-    request('/activity-feed/mood-logs', { method: 'POST', json: body }),
+    request<MoodLog>('/activity-feed/mood-logs', {
+      method: 'POST',
+      json: body,
+    }),
   listDevelopmentalMilestones: (params?: {
     studentId?: string | null;
     month?: string | null;
@@ -138,6 +149,20 @@ export const activityApi = {
     request<DevelopmentalMilestone[]>(
       withQuery('/activity-feed/milestones', params ?? {}),
     ),
+  listMilestoneTemplates: (params?: {
+    stage?: string | null;
+    domain?: string | null;
+  }) =>
+    request<
+      Array<{
+        key: string;
+        stage: string;
+        domain: string;
+        milestone: string;
+        suggestedStatus: string;
+        observationPrompt: string;
+      }>
+    >(withQuery('/activity-feed/milestone-templates', params ?? {})),
   createDevelopmentalMilestone: (body: JsonBody) =>
     request<DevelopmentalMilestone>('/activity-feed/milestones', {
       method: 'POST',

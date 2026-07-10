@@ -50,6 +50,7 @@ class _TeacherActivityScreenState extends ConsumerState<TeacherActivityScreen> {
   int _studentPage = 0;
   int _studentTotalPages = 0;
   String? _submissionId;
+  String? _milestoneSubmissionId;
   String? _message;
   bool _messageIsError = false;
 
@@ -663,12 +664,14 @@ class _TeacherActivityScreenState extends ConsumerState<TeacherActivityScreen> {
 
     setState(() {
       _submitting = true;
+      _milestoneSubmissionId ??= _newUuid();
       _clearMessage();
     });
     try {
       await ref
           .read(teacherRepositoryProvider)
           .createMilestone(
+            clientSubmissionId: _milestoneSubmissionId!,
             scope: scope,
             studentId: _selectedStudentIds.single,
             domain: _domainController.text,
@@ -682,13 +685,27 @@ class _TeacherActivityScreenState extends ConsumerState<TeacherActivityScreen> {
       _observationController.clear();
       setState(() {
         _selectedStudentIds.clear();
+        _milestoneSubmissionId = null;
+        _retryPending = false;
         _message = 'Milestone saved.';
         _messageIsError = false;
+      });
+    } on AppException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _retryPending = error is NetworkException || error is TimeoutException;
+        _message = _retryPending
+            ? 'Milestone status is unknown. Retry to confirm this submission.'
+            : 'Milestone could not be saved.';
+        _messageIsError = true;
+        if (!_retryPending) _milestoneSubmissionId = null;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _message = 'Milestone could not be saved.';
+        _retryPending = true;
+        _message =
+            'Milestone status is unknown. Retry to confirm this submission.';
         _messageIsError = true;
       });
     } finally {

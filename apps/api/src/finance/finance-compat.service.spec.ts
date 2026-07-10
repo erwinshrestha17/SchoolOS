@@ -250,7 +250,7 @@ function buildReceiptForVerification(
     receiptNumber?: string;
     reversedAt?: Date | null;
     reversalReason?: string | null;
-    refunds?: Array<{ amount: Prisma.Decimal }>;
+    refunds?: { amount: Prisma.Decimal }[];
   } = {},
 ) {
   return {

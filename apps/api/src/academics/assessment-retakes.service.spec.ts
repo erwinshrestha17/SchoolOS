@@ -103,7 +103,7 @@ describe('AssessmentRetakesService', () => {
         findMany: jest.fn(),
       },
       reportCardCorrectionRequest: { findFirst: jest.fn() },
-      $transaction: jest.fn((operations: Array<Promise<unknown>>) =>
+      $transaction: jest.fn((operations: Promise<unknown>[]) =>
         Promise.all(operations),
       ),
     };

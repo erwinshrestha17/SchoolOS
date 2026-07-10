@@ -23,11 +23,11 @@ export function m9DateKey(date: Date) {
   return `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, '0')}${String(date.getUTCDate()).padStart(2, '0')}`;
 }
 
-type M9NamedBalanceRow = {
+interface M9NamedBalanceRow {
   name?: string | null;
   code?: string | null;
   balance?: number | string | { toString(): string } | null;
-};
+}
 
 export function sumM9RowsByName(rows: M9NamedBalanceRow[], pattern: RegExp) {
   return Math.abs(

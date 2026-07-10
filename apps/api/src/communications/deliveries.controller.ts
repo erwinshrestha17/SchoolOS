@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
@@ -21,8 +29,15 @@ export class DeliveriesController {
 
   @Get()
   @Permissions('communications:read_deliveries')
-  listDeliveries(@CurrentAuth() auth: AuthContext) {
-    return this.communicationsService.listDeliveries(auth);
+  listDeliveries(
+    @CurrentAuth() auth: AuthContext,
+    @Query('sourceType') sourceType?: string,
+    @Query('activityPostId') activityPostId?: string,
+  ) {
+    return this.communicationsService.listDeliveries(auth, {
+      sourceType,
+      activityPostId,
+    });
   }
 
   @Get('analytics')

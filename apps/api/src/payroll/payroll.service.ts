@@ -1741,8 +1741,7 @@ export class PayrollService {
     const job = await this.payrollQueue.getJob(jobId);
 
     if (
-      !job ||
-      job.name !== 'regeneratePayslip' ||
+      job?.name !== 'regeneratePayslip' ||
       job.data.tenantId !== actor.tenantId ||
       job.data.payrollRunId !== runId ||
       job.data.payslipId !== payslipId
@@ -2939,14 +2938,14 @@ function addDaysUtc(date: Date, days: number) {
   return next;
 }
 
-type MinimalStaff = {
+interface MinimalStaff {
   id: string;
   employeeId?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   department?: string | null;
   designation?: string | null;
-};
+}
 
 function serializeStaff(staff?: MinimalStaff | null) {
   if (!staff) {

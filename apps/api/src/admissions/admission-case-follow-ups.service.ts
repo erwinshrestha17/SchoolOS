@@ -3,9 +3,9 @@ import { Prisma } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 
-type CaseMetadata = {
+interface CaseMetadata {
   followUps?: Array<{ code: string; label: string; blocking: boolean }>;
-};
+}
 
 @Injectable()
 export class AdmissionCaseFollowUpsService {
@@ -40,7 +40,7 @@ export class AdmissionCaseFollowUpsService {
 
   private metadata(value: Prisma.JsonValue | null): CaseMetadata {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
-      ? (value as CaseMetadata)
+      ? value
       : {};
   }
 }

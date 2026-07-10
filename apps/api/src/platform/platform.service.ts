@@ -2069,7 +2069,7 @@ export class PlatformService {
       checkedAt,
     );
 
-    if (!provider || !provider.enabled || baseReadiness.status !== 'READY') {
+    if (!provider?.enabled || baseReadiness.status !== 'READY') {
       return baseReadiness;
     }
 

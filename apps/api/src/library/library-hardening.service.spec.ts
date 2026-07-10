@@ -200,10 +200,10 @@ describe('LibraryHardeningService M8A workflows', () => {
 function buildService(
   options: {
     fine?: ReturnType<typeof buildFine>;
-    payments?: Array<{ amount: Prisma.Decimal; paidAt: Date }>;
+    payments?: { amount: Prisma.Decimal; paidAt: Date }[];
     issue?: ReturnType<typeof buildIssue>;
     settings?: Record<string, unknown>;
-    holidays?: Array<{ calendarDate: Date }>;
+    holidays?: { calendarDate: Date }[];
     copy?: ReturnType<typeof buildCopy>;
     fileRegistryService?: { registerGeneratedFile: jest.Mock };
   } = {},

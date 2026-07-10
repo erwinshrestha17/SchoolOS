@@ -177,6 +177,49 @@ void main() {
       '/9j/2Q==',
     );
   });
+
+  test(
+    'retries a transient milestone submission with the same idempotency key',
+    () async {
+      var attempts = 0;
+      when(
+        () => apiClient.post<dynamic>(
+          '/mobile/teacher/activity/milestones',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer((_) async {
+        attempts += 1;
+        if (attempts == 1) {
+          throw const NetworkException();
+        }
+        return Response(
+          requestOptions: RequestOptions(path: 'activity/milestones'),
+          data: {'id': 'milestone-1'},
+        );
+      });
+
+      await repository.createMilestone(
+        clientSubmissionId: '6731ea4f-5c37-4b16-bb72-955abbadc31b',
+        scope: activityScope,
+        studentId: 'student-1',
+        domain: 'Motor skills',
+        milestone: 'Uses classroom materials independently',
+        status: 'PROGRESSING',
+      );
+
+      final captured = verify(
+        () => apiClient.post<dynamic>(
+          '/mobile/teacher/activity/milestones',
+          data: captureAny(named: 'data'),
+        ),
+      ).captured.cast<Map<String, dynamic>>();
+      expect(captured, hasLength(2));
+      expect(
+        captured.map((payload) => payload['clientSubmissionId']).toSet(),
+        {'6731ea4f-5c37-4b16-bb72-955abbadc31b'},
+      );
+    },
+  );
 }
 
 const activityScope = TeacherActivityScope(

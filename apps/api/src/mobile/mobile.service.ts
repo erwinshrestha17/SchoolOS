@@ -1,9 +1,15 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { FileStatus, PaymentMethod, type Student } from '@prisma/client';
+import {
+  ActivityCategory,
+  FileStatus,
+  PaymentMethod,
+  type Student,
+} from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { isParentOnly } from '../common/security/parent-scope';
 import { PrismaService } from '../prisma/prisma.service';
@@ -38,6 +44,7 @@ interface MobileStudentRow extends Student {
     relation: string;
     isPrimary: boolean;
     guardian: {
+      id: string;
       userId: string | null;
     };
   }>;
@@ -103,6 +110,7 @@ export class MobileService {
           include: {
             guardian: {
               select: {
+                id: true,
                 userId: true,
               },
             },
@@ -988,13 +996,20 @@ export class MobileService {
     studentId: string,
     actor: AuthContext,
     take?: string,
+    category?: string,
+    month?: string,
   ) {
     const student = await this.getAccessibleStudent(studentId, actor);
+    const monthRange = month ? parseMonthRange(month) : null;
     const items = await this.prisma.activityPost.findMany({
       where: {
         tenantId: actor.tenantId,
         status: 'APPROVED',
         softDeletedAt: null,
+        ...(category ? { category: category as ActivityCategory } : {}),
+        ...(monthRange
+          ? { publishedAt: { gte: monthRange.start, lt: monthRange.end } }
+          : {}),
         OR: [
           { audienceType: 'ALL' },
           { audienceType: 'STUDENT', studentTags: { some: { studentId } } },
@@ -1703,6 +1718,7 @@ export class MobileService {
           include: {
             guardian: {
               select: {
+                id: true,
                 userId: true,
               },
             },
@@ -2004,6 +2020,25 @@ function boundedTake(value: string | undefined, fallback: number) {
   return Math.min(Math.floor(parsed), 50);
 }
 
+function parseMonthRange(month: string) {
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    throw new BadRequestException('month must use YYYY-MM format');
+  }
+
+  const [yearText, monthText] = month.split('-');
+  const year = Number(yearText);
+  const monthIndex = Number(monthText) - 1;
+
+  if (monthIndex < 0 || monthIndex > 11) {
+    throw new BadRequestException('month must use YYYY-MM format');
+  }
+
+  return {
+    start: new Date(Date.UTC(year, monthIndex, 1)),
+    end: new Date(Date.UTC(year, monthIndex + 1, 1)),
+  };
+}
+
 function money(value: unknown): number {
   if (value === null || value === undefined) {
     return 0;
@@ -2069,5 +2104,6 @@ function toMobileStudent(student: MobileStudentRow) {
     academicYearStartsOn: toIso(student.enrollments[0]?.academicYear.startsOn),
     academicYearEndsOn: toIso(student.enrollments[0]?.academicYear.endsOn),
     relationship: guardianLink?.relation ?? 'Self',
+    guardianId: guardianLink?.guardian?.id ?? null,
   };
 }

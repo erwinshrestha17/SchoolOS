@@ -77,9 +77,8 @@ export class ApprovalWorkflowService {
         name: dto.name.trim(),
         description: dto.description?.trim() || null,
         minApprovals: dto.minApprovals ?? 1,
-        approverRoles: (dto.approverRoles ?? []) as Prisma.InputJsonValue,
-        approverPermissions: (dto.approverPermissions ??
-          []) as Prisma.InputJsonValue,
+        approverRoles: dto.approverRoles ?? [],
+        approverPermissions: dto.approverPermissions ?? [],
         finalActionKey: dto.finalActionKey?.trim() || null,
         createdById: actor.userId,
       },

@@ -63,8 +63,7 @@ export class SchoolSettingsWorkspaceController {
       configured.has(key as never),
     );
     const brandingReady =
-      configured.has('school_logo' as never) &&
-      configured.has('branding_primary_color' as never);
+      configured.has('school_logo') && configured.has('branding_primary_color');
     const calendarReady = academicCalendar.academicYears.some(
       (year) => year.isCurrent,
     );

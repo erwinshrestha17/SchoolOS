@@ -92,9 +92,11 @@ export class AcademicsFoundationService {
         },
       });
 
-      const components: Prisma.AssessmentComponentGetPayload<{
-        include: { subject: true };
-      }>[] = [];
+      const components: Array<
+        Prisma.AssessmentComponentGetPayload<{
+          include: { subject: true };
+        }>
+      > = [];
       for (const subject of subjects) {
         for (const component of resolveTemplateComponents(template, subject)) {
           components.push(
@@ -738,12 +740,12 @@ interface AssessmentTemplate {
   }>;
 }
 
-type TemplateSubject = {
+interface TemplateSubject {
   hasPractical: boolean;
   theoryMarks: number | null;
   practicalMarks: number | null;
   passMarks: number | null;
-};
+}
 
 const ASSESSMENT_TEMPLATE_CATALOG: AssessmentTemplate[] = [
   {

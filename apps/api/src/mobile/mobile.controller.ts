@@ -225,8 +225,16 @@ export class MobileController {
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,
     @Query('take') take?: string,
+    @Query('category') category?: string,
+    @Query('month') month?: string,
   ) {
-    return this.mobileService.getStudentActivityFeed(studentId, auth, take);
+    return this.mobileService.getStudentActivityFeed(
+      studentId,
+      auth,
+      take,
+      category,
+      month,
+    );
   }
 
   @Get('students/:id/homework')

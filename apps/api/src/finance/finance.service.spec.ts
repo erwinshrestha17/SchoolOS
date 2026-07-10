@@ -2402,15 +2402,15 @@ function buildService(options: {
   fileRegistryService?: unknown;
   communicationsService?: unknown;
 }) {
-  const seededInvoices = (options.invoices ?? []) as Array<{
+  const seededInvoices = (options.invoices ?? []) as {
     totalAmount?: Prisma.Decimal | number | string;
-    payments?: Array<{
+    payments?: {
       amount?: Prisma.Decimal | number | string;
-      refunds?: Array<{
+      refunds?: {
         amount?: Prisma.Decimal | number | string;
-      }>;
-    }>;
-  }>;
+      }[];
+    }[];
+  }[];
   const prisma = {
     student: {
       findFirst: jest.fn().mockResolvedValue(options.student ?? null),

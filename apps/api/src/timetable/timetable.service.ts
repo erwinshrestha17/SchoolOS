@@ -1858,7 +1858,7 @@ export class TimetableService {
     const staff = await this.ensureStaff(actor, staffId);
     if (isTeacherActor(actor) && !isPrivilegedTimetableActor(actor)) {
       const actorStaff = await this.resolveActorStaff(actor);
-      if (!actorStaff || actorStaff.id !== staffId) {
+      if (actorStaff?.id !== staffId) {
         throw new ForbiddenException(
           'Teachers can only view their own timetable workload',
         );

@@ -1150,6 +1150,7 @@ describe('MobileService', () => {
           academicYearStartsOn: '2025-04-14T00:00:00.000Z',
           academicYearEndsOn: '2026-04-13T00:00:00.000Z',
           relationship: 'Daughter',
+          guardianId: 'guardian-1',
         },
       ],
     });
@@ -1213,6 +1214,7 @@ describe('MobileService', () => {
           academicYearStartsOn: '2025-04-14T00:00:00.000Z',
           academicYearEndsOn: '2026-04-13T00:00:00.000Z',
           relationship: 'Daughter',
+          guardianId: 'guardian-1',
         },
       ],
     });
