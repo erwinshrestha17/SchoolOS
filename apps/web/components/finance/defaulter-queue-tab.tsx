@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { SectionCard } from "@/components/ui/section-card";
@@ -11,6 +11,7 @@ import { Loader2, Send, Download, Check, AlertCircle } from "lucide-react";
 export function DefaulterQueueTab() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const classId = searchParams.get("defaulterClassId") ?? "";
@@ -74,7 +75,7 @@ export function DefaulterQueueTab() {
       else params.set(key, String(value));
     }
     if (!("defaulterPage" in updates)) params.delete("defaulterPage");
-    router.replace(`/dashboard/finance?${params.toString()}`, {
+    router.replace(`${pathname}?${params.toString()}`, {
       scroll: false,
     });
     setSelectedInvoiceIds([]);

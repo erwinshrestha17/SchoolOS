@@ -3012,7 +3012,7 @@ function FinesPanel({
                 <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                   {linkedInvoiceId && (
                     <Link
-                      href={`/dashboard/finance?invoiceId=${encodeURIComponent(linkedInvoiceId)}`}
+                      href={`/dashboard/fees/collect?invoiceId=${encodeURIComponent(linkedInvoiceId)}`}
                       className="btn-secondary"
                       data-testid="library-fine-open-invoice"
                     >

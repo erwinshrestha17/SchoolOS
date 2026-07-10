@@ -181,7 +181,7 @@ export function StudentProfilePanel({
                 </div>
               ))}
               <Link
-                href="/dashboard/finance"
+                href="/dashboard/fees"
                 className="inline-flex min-h-11 items-center justify-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white"
               >
                 Collect Fee

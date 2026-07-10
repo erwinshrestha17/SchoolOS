@@ -265,7 +265,7 @@ describe("SchoolOS web production contracts", () => {
     assert.match(panel, /StudentProfilePanelProps/);
     assert.match(panel, /student:\s*StudentProfile/);
     assert.match(panel, /onOpenPdf\(student\.id, kind\)/);
-    assert.match(panel, /href="\/dashboard\/finance"/);
+    assert.match(panel, /href="\/dashboard\/fees"/);
     assert.match(panel, /bg-\[var\(--primary-soft\)\]/);
     assert.match(panel, /text-\[var\(--primary-dark\)\]/);
     assert.doesNotMatch(
@@ -610,7 +610,7 @@ describe("SchoolOS web production contracts", () => {
       "buildSourceDrilldown",
       "Open source record",
       "Source route unavailable",
-      "/dashboard/finance?invoiceId=",
+      "/dashboard/fees/collect?invoiceId=",
       "/dashboard/canteen/pos?saleId=",
       "/dashboard/library?fineId=",
       "/dashboard/hr/payroll?runId=",
@@ -862,7 +862,7 @@ describe("SchoolOS web production contracts", () => {
       "/dashboard/students",
       "/dashboard/admissions",
       "/dashboard/attendance",
-      "/dashboard/finance",
+      "/dashboard/fees",
       "/dashboard/activity",
       "/dashboard/notices",
       "/dashboard/academics",
@@ -1100,7 +1100,7 @@ describe("SchoolOS web production contracts", () => {
     assert.match(studentDirectory, /student-iemis-readiness-list/);
     assert.match(studentDirectory, /Fix Profile/);
     assert.match(studentDirectory, /onOpenPdf\(student\.id, 'id-card'\)/);
-    assert.match(studentDirectory, /\/dashboard\/finance\?studentId=/);
+    assert.match(studentDirectory, /\/dashboard\/fees\/collect\?studentId=/);
     assert.match(
       studentDirectory,
       /\/dashboard\/students\/\$\{encodeURIComponent\(student\.id\)\}/,
@@ -1212,7 +1212,7 @@ describe("SchoolOS web production contracts", () => {
 
     assert.match(
       financeAndActivityTabs,
-      /href=\{`\/dashboard\/finance\?studentId=/,
+      /href=\{`\/dashboard\/fees\/collect\?studentId=/,
     );
     assert.match(financeAndActivityTabs, /Invoice date not recorded/);
     assert.match(financeAndActivityTabs, /Publish date not recorded/);
@@ -1959,12 +1959,12 @@ describe("SchoolOS web production contracts", () => {
 
   it("routes linked canteen meal-plan invoices into the finance counter", () => {
     const canteenWorkspace = read("components/canteen/canteen-workspace.tsx");
-    const financePage = read("app/dashboard/finance/page.tsx");
+    const financePage = read("components/finance/fees-workspace.tsx");
     const collectionSection = read("components/finance/collection-section.tsx");
     const collectionCounter = read("components/finance/collection-counter.tsx");
 
     assert.match(canteenWorkspace, /Open invoice/);
-    assert.match(canteenWorkspace, /\/dashboard\/finance\?invoiceId=/);
+    assert.match(canteenWorkspace, /\/dashboard\/fees\/collect\?invoiceId=/);
     assert.match(financePage, /useSearchParams/);
     assert.match(financePage, /initialInvoiceId/);
     assert.match(collectionSection, /initialInvoiceId/);

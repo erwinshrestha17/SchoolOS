@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { SectionCard } from "@/components/ui/section-card";
@@ -16,9 +16,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-export function DiscountsWaiversTab() {
+export function DiscountsWaiversTab({
+  mode = "all",
+}: {
+  mode?: "all" | "discounts" | "waivers";
+}) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const discountPage = Math.max(
     1,
@@ -90,6 +95,7 @@ export function DiscountsWaiversTab() {
         limit: 25,
         search: discountSearch || undefined,
       }),
+    enabled: mode !== "waivers",
   });
 
   const waiversQuery = useQuery({
@@ -100,6 +106,7 @@ export function DiscountsWaiversTab() {
         limit: 25,
         search: waiverSearch || undefined,
       }),
+    enabled: mode !== "discounts",
   });
 
   const updateUrl = (updates: Record<string, string | number>) => {
@@ -110,7 +117,7 @@ export function DiscountsWaiversTab() {
     }
     if ("discountSearch" in updates) params.delete("discountPage");
     if ("waiverSearch" in updates) params.delete("waiverPage");
-    router.replace(`/dashboard/finance?${params.toString()}`, {
+    router.replace(`${pathname}?${params.toString()}`, {
       scroll: false,
     });
   };
@@ -212,7 +219,7 @@ export function DiscountsWaiversTab() {
       {/* Creation Forms */}
       <div className="space-y-8">
         {/* Discount Rule Form */}
-        <SectionCard
+        {mode !== "waivers" ? <SectionCard
           title="Create Discount Rule"
           description="Setup automatic discounts (e.g. Sibling or Scholarship rules) to be applied on billing runs."
         >
@@ -437,10 +444,10 @@ export function DiscountsWaiversTab() {
                 </p>
               )}
           </form>
-        </SectionCard>
+        </SectionCard> : null}
 
         {/* Waiver Form */}
-        <SectionCard
+        {mode !== "discounts" ? <SectionCard
           title="Issue Fee Waiver"
           description="Grant a manual or specific fee waiver to an outstanding invoice."
         >
@@ -595,13 +602,13 @@ export function DiscountsWaiversTab() {
               )}
             </button>
           </form>
-        </SectionCard>
+        </SectionCard> : null}
       </div>
 
       {/* Lists Overview */}
       <div className="space-y-8">
         {/* Discounts List */}
-        <SectionCard title="Active Discount Rules">
+        {mode !== "waivers" ? <SectionCard title="Active Discount Rules">
           <input
             value={discountSearch}
             onChange={(event) =>
@@ -676,10 +683,10 @@ export function DiscountsWaiversTab() {
               />
             </div>
           )}
-        </SectionCard>
+        </SectionCard> : null}
 
         {/* Waivers List */}
-        <SectionCard title="Recent Approved Waivers">
+        {mode !== "discounts" ? <SectionCard title="Recent Approved Waivers">
           <input
             value={waiverSearch}
             onChange={(event) =>
@@ -721,13 +728,13 @@ export function DiscountsWaiversTab() {
                           <div className="flex flex-col">
                             <span className="font-bold text-slate-700">
                               {item.invoiceId
-                                ? `Inv #${item.invoiceId.slice(0, 8)}`
-                                : "Whole Invoice"}
+                                ? "Invoice-scoped waiver"
+                                : "Student fee waiver"}
                             </span>
                             <span className="text-[10px] text-slate-500 font-semibold">
                               {item.studentId
-                                ? `ID: ${item.studentId.slice(0, 8)}`
-                                : "Student"}
+                                ? "Student record protected"
+                                : "Student unavailable"}
                             </span>
                           </div>
                         </td>
@@ -751,10 +758,10 @@ export function DiscountsWaiversTab() {
               />
             </div>
           )}
-        </SectionCard>
+        </SectionCard> : null}
       </div>
 
-      <Dialog open={isConfirmingWaiver} onOpenChange={setIsConfirmingWaiver}>
+      {mode !== "discounts" ? <Dialog open={isConfirmingWaiver} onOpenChange={setIsConfirmingWaiver}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>Confirm fee waiver</DialogTitle>
@@ -787,7 +794,7 @@ export function DiscountsWaiversTab() {
             </button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog> : null}
     </div>
   );
 }

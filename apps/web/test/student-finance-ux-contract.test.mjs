@@ -16,24 +16,21 @@ describe('Student profile to finance collection UX contract', () => {
     assert.match(detail, /enabled: Boolean\(studentId\)/);
     assert.match(header, /feeClearance && !feeClearance\.cleared && feeClearance\.outstandingAmount > 0/);
     assert.match(header, /label: 'Collect fees'/);
-    assert.match(header, /\/dashboard\/finance\?studentId=\$\{encodeURIComponent\(student\.id\)\}&source=student-profile/);
+    assert.match(header, /\/dashboard\/fees\/collect\?studentId=\$\{encodeURIComponent\(student\.id\)\}&source=student-profile/);
     assert.match(header, /label: 'View fee history'/);
     assert.doesNotMatch(header, /items=\{\[\s*\{\s*label: 'Collect fees'[\s\S]*router\.push/);
   });
 
   it('keeps finance collection contextual for selected students', () => {
-    const page = read('app/dashboard/finance/page.tsx');
+    const page = read('components/finance/fees-workspace.tsx');
     const section = read('components/finance/collection-section.tsx');
     const counter = read('components/finance/collection-counter.tsx');
     const financeApi = read('lib/api/finance.ts');
 
     assert.match(financeApi, /\/fees\/students\/\$\{encodeURIComponent\(studentId\)\}\/collection-context/);
-    assert.match(page, /if \(studentId && canCollectPayments\) \{\s*setActiveTab\(["']collection["']\);/);
-    assert.match(page, /enabled: canCollectPayments && Boolean\(studentId\)/);
-    assert.match(page, /studentId \? null : \(\s*<KpiGrid/);
-    assert.match(page, /params\.delete\(["']studentId["']\)/);
-    assert.match(page, /params\.delete\(["']source["']\)/);
-    assert.match(page, /params\.delete\(["']invoiceId["']\)/);
+    assert.match(page, /section === "collect" && canCollect/);
+    assert.match(page, /enabled: Boolean\(studentId\)/);
+    assert.match(page, /updateUrl\(\{ studentId: null, source: null, invoiceId: null \}\)/);
     assert.match(page, /key=\{studentId \? `student-\$\{studentId\}` : ["']invoice-search["']\}/);
     assert.match(section, /isStudentContextMode\s*\?\s*\(studentCollectionContext\?\.invoices \?\? \[\]\)/);
     assert.match(counter, /Collecting fees for:\s*\{studentContext\.name\}/);

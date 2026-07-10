@@ -484,7 +484,7 @@ function buildSourceDrilldown(entry: JournalEntryView) {
   }
 
   if (moduleName === "FINANCE" || sourceType === "INVOICE") {
-    return { href: `/dashboard/finance?invoiceId=${sourceId}` };
+    return { href: `/dashboard/fees/collect?invoiceId=${sourceId}` };
   }
 
   return null;

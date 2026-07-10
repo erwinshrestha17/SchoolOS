@@ -35,6 +35,16 @@ function sourceFiles(relativeDir) {
 describe('Typography Standardization Contract', () => {
   const files = sourceFiles('app').concat(sourceFiles('components'));
 
+  it('keeps the root Inter font on-demand during client-side filter navigation', () => {
+    const rootLayout = readFileSync(join(webRoot, 'app/layout.tsx'), 'utf8');
+
+    assert.match(
+      rootLayout,
+      /Inter\(\{[\s\S]*preload:\s*false,[\s\S]*variable:\s*['"]--font-sans['"]/,
+      'Root Inter must not emit a repeated font preload during client-side URL filter updates.',
+    );
+  });
+
   it('prohibits font-serif and arbitrary font-family classes', () => {
     for (const file of files) {
       const content = readFileSync(join(webRoot, file), 'utf8');

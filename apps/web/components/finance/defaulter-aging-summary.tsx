@@ -1,14 +1,15 @@
 'use client';
 
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import { Clock, ChevronRight, Download, TrendingUp } from 'lucide-react';
+import { Clock, ChevronRight, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LoadingState } from '@/components/ui/loading-state';
 
 export function DefaulterAgingSummary() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const defaultersQuery = useQuery({
     queryKey: ['defaulters'],
@@ -18,7 +19,7 @@ export function DefaulterAgingSummary() {
   const viewBucket = (bucketKey: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('defaulterAgingBucket', bucketKey);
-    router.push(`/dashboard/finance?${params.toString()}`, { scroll: false });
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
     document
       .getElementById('defaulter-queue')
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -49,10 +50,10 @@ export function DefaulterAgingSummary() {
   };
 
   const bucketData = [
-    { label: '0-30 Days', key: '0-30', color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-    { label: '31-60 Days', key: '31-60', color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100' },
-    { label: '61-90 Days', key: '61-90', color: 'text-orange-500', bg: 'bg-orange-50', border: 'border-orange-100' },
-    { label: '90+ Days', key: '90+', color: 'text-rose-500', bg: 'bg-rose-50', border: 'border-rose-100' },
+    { label: '0-30 days', severity: 'Recent', key: '0-30', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+    { label: '31-60 days', severity: 'Follow-up', key: '31-60', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-100' },
+    { label: '61-90 days', severity: 'High priority', key: '61-90', color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-100' },
+    { label: '90+ days', severity: 'Critical', key: '90+', color: 'text-rose-700', bg: 'bg-rose-50', border: 'border-rose-100' },
   ] as const;
 
   return (
@@ -98,8 +99,7 @@ export function DefaulterAgingSummary() {
               <div className="flex flex-col items-end">
                 <span className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest">{b.label}</span>
                 <div className="flex items-center gap-1 mt-1">
-                   <TrendingUp size={10} className={b.color} />
-                   <span className={cn("text-[0.65rem] font-bold", b.color)}>Critical</span>
+                   <span className={cn("text-xs font-semibold", b.color)}>{b.severity}</span>
                 </div>
               </div>
             </div>
@@ -121,7 +121,7 @@ export function DefaulterAgingSummary() {
                  View List
                  <ChevronRight size={12} />
                </button>
-               <div className={cn("h-1.5 w-1.5 rounded-full animate-pulse", b.color.replace('text', 'bg'))} />
+               <span className={cn("text-xs font-semibold", b.color)}>{b.label}</span>
             </div>
           </div>
         ))}

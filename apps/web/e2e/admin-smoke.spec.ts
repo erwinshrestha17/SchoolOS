@@ -35,7 +35,7 @@ test.describe.serial('SchoolOS Web Admin Smoke Tests', () => {
     const navItems = [
       { name: /Students/i, url: /\/students/ },
       { name: /Attendance/i, url: /\/attendance/ },
-      { name: /^Fees$/i, url: /\/fees/ },
+      { name: /Fees & Receipts/i, url: /\/fees/ },
       { name: /HR/i, url: /\/payroll/ },
       { name: /Notices/i, url: /\/notices/ },
     ];
@@ -47,15 +47,15 @@ test.describe.serial('SchoolOS Web Admin Smoke Tests', () => {
   });
 
   test('Finance: Collection counter and invoice selection', async ({ page }) => {
-    await page.goto('/dashboard/finance');
-    await expect(page.getByRole('heading', { name: /Fee Collection/i })).toBeVisible();
+    await page.goto('/dashboard/fees/collect');
+    await expect(page.getByRole('heading', { name: /Collect payment/i })).toBeVisible();
     
     // Check for the polished search input
-    const searchInput = page.getByPlaceholder(/Search student by name or ID/i);
+    const searchInput = page.getByPlaceholder(/Find student or invoice/i);
     await expect(searchInput).toBeVisible();
     
     // Verify collection cards (assuming data exists)
-    await expect(page.getByText(/Recent Collections/i)).toBeVisible();
+    await expect(page.getByText(/Student Discovery|Selected Student/i)).toBeVisible();
   });
 
   test('Attendance: Roster loading and interactions', async ({ page }) => {

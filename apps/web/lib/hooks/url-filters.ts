@@ -5,7 +5,7 @@
  *
  * The convention across this app's list pages was to hand-roll
  * "clone URLSearchParams, mutate, router.replace" in every page (see the
- * original apps/web/app/dashboard/finance/page.tsx). This factors that out
+ * original M3 finance workspace). This factors that out
  * so every list page gets consistent, shareable-link, back-button-safe
  * filter state for free.
  */

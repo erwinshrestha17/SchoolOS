@@ -64,8 +64,15 @@ const dashboardRouteGates: RouteGate[] = [
     permissions: [
       "fees:manage",
       "fees:bill",
+      "fees:discount",
+      "fees:adjust",
       "payments:collect",
+      "payments:refund",
+      "payments:reverse",
+      "payments:close",
       "receipts:read",
+      "receipts:manage",
+      "ledger:read",
     ],
   },
   {
@@ -74,8 +81,15 @@ const dashboardRouteGates: RouteGate[] = [
     permissions: [
       "fees:manage",
       "fees:bill",
+      "fees:discount",
+      "fees:adjust",
       "payments:collect",
+      "payments:refund",
+      "payments:reverse",
+      "payments:close",
       "receipts:read",
+      "receipts:manage",
+      "ledger:read",
     ],
   },
   {
@@ -189,6 +203,7 @@ function getRequiredModuleForHref(href: string): string | null {
   if (href.startsWith("/dashboard/homework")) return "homework";
   if (href.startsWith("/dashboard/learning")) return "learning";
   if (href.startsWith("/dashboard/fees")) return "fees";
+  if (href.startsWith("/dashboard/finance")) return "fees";
   if (href.startsWith("/dashboard/accounting")) return "accounting";
   if (href.startsWith("/dashboard/hr")) return "hr";
   if (href.startsWith("/dashboard/payroll")) return "hr";

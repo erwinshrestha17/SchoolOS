@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatBsDateTime, getNepalSchoolDay } from "@schoolos/core";
 import { ErrorState } from "@/components/ui/error-state";
 import {
@@ -33,6 +33,7 @@ import {
 export function CashierCloseSection() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const closePage = Math.max(
     1,
@@ -105,7 +106,7 @@ export function CashierCloseSection() {
     const params = new URLSearchParams(searchParams.toString());
     if (page <= 1) params.delete("closePage");
     else params.set("closePage", String(page));
-    router.replace(`/dashboard/finance?${params.toString()}`, {
+    router.replace(`${pathname}?${params.toString()}`, {
       scroll: false,
     });
   };
@@ -139,6 +140,22 @@ export function CashierCloseSection() {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      <ol className="grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-4" aria-label="Cashier close steps">
+        {[
+          "Review backend totals",
+          "Enter counted values",
+          "Explain variance",
+          "Confirm immutable close",
+        ].map((label, index) => (
+          <li key={label} className="flex min-h-14 items-center gap-3 bg-white px-4 text-sm font-semibold text-slate-700">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-mod-fees-bg)] text-xs font-bold text-[var(--color-mod-fees-text)]">
+              {index + 1}
+            </span>
+            {label}
+          </li>
+        ))}
+      </ol>
+
       <div className="grid gap-6 md:grid-cols-3">
         <CollectionStat
           label="Total Collection"
@@ -248,6 +265,7 @@ export function CashierCloseSection() {
                 step="0.01"
                 value={actualCashAmount}
                 onChange={(event) => setActualCashAmount(event.target.value)}
+                onWheel={(event) => event.currentTarget.blur()}
                 placeholder={`Expected ${expectedCashAmount.toFixed(2)}`}
                 className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm font-bold"
               />

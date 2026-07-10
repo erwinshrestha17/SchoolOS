@@ -34,8 +34,8 @@ describe("global topbar search (students + invoices)", () => {
     assert.doesNotMatch(search, /\/notices\?/);
   });
 
-  it("routes invoice results through the existing finance page contract, not a new route", () => {
-    assert.match(search, /\/dashboard\/finance\?\$\{params\.toString\(\)\}/);
+  it("routes invoice results through the canonical fees collection contract", () => {
+    assert.match(search, /\/dashboard\/fees\/collect\?\$\{params\.toString\(\)\}/);
     assert.match(search, /params\.set\('invoiceId', entry\.invoice\.id\)/);
   });
 

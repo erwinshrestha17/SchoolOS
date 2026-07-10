@@ -42,8 +42,8 @@ test.describe('Phase 1B navigation smoke', () => {
     await expect(page.getByRole('heading', { name: /Academics/i })).toBeVisible();
 
     // Finance
-    await page.goto('/dashboard/finance');
-    await expect(page.getByRole('heading', { name: /Fee Collection/i })).toBeVisible();
+    await page.goto('/dashboard/fees');
+    await expect(page.getByRole('heading', { name: /Fees & Receipts/i })).toBeVisible();
 
     // Notices
     await page.goto('/dashboard/notices');

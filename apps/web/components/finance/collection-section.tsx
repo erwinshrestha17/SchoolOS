@@ -170,10 +170,10 @@ export function CollectionSection({
               <p className="text-sm font-black tracking-tight text-success-900">
                 Payment collected successfully
               </p>
-              <p className="mt-0.5 text-xs font-bold uppercase tracking-widest text-success-700">
+              <p className="mt-0.5 text-sm font-semibold text-success-800 tabular-nums">
                 {lastReceipt.disposition === "REPLAYED"
-                  ? `Existing payment returned safely · Receipt #${lastReceipt.receiptNumber}`
-                  : `Receipt #${lastReceipt.receiptNumber} confirmed`}
+                  ? `Safely replayed · ${lastReceipt.receiptNumber ? `Receipt ${lastReceipt.receiptNumber}` : "Receipt pending"} · ${lastReceipt.method} · NPR ${lastReceipt.amount.toLocaleString("en-NP")}`
+                  : `${lastReceipt.receiptNumber ? `Receipt ${lastReceipt.receiptNumber}` : "Receipt pending"} · ${lastReceipt.method} · NPR ${lastReceipt.amount.toLocaleString("en-NP")}`}
               </p>
               {lastReceipt.receiptFileStatus !== "AVAILABLE" ? (
                 <p className="mt-1 text-xs font-semibold text-warning-700">
@@ -189,12 +189,12 @@ export function CollectionSection({
               className="flex items-center gap-2 rounded-xl border border-success-100 bg-white px-6 py-3 text-xs font-bold text-success-700 shadow-sm transition-all hover:bg-success-100 active:scale-95"
             >
               <Printer size={16} />
-              Open Receipt
+              Open protected receipt
             </button>
             <button
               onClick={() => setLastReceipt(null)}
               className="p-3 text-success-400 transition-colors hover:text-success-600"
-              aria-label="Dismiss receipt success message"
+              aria-label="Collect another payment"
             >
               <X size={20} />
             </button>

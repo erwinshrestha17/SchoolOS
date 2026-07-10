@@ -636,7 +636,7 @@ export function StudentDirectory({
                     </Link>
                     <Link
                       onClick={(event) => event.stopPropagation()}
-                      href={`/dashboard/finance?studentId=${encodeURIComponent(student.id)}`}
+                      href={`/dashboard/fees/collect?studentId=${encodeURIComponent(student.id)}`}
                       className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[0.7rem] font-bold text-slate-700 transition hover:bg-slate-50"
                     >
                       <Wallet size={14} />

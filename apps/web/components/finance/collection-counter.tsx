@@ -14,9 +14,10 @@ import {
   MapPin,
   Phone,
   Receipt,
-  Printer,
   AlertCircle,
   Loader2,
+  ArrowLeft,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "../ui/input";
@@ -25,10 +26,9 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
+import { Button } from "../ui/button";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import type {
@@ -71,6 +71,13 @@ const formatCurrency = (amount: number) => {
 };
 
 const formatDate = (value: string) => formatBsDate(value);
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: "Cash",
+  BANK: "Bank deposit",
+  TRANSFER: "Online transfer",
+  MOBILE: "Mobile wallet",
+};
 
 export function CollectionCounter({
   onSearch,
@@ -204,13 +211,13 @@ export function CollectionCounter({
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
+      <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
         <SectionCard
           title={studentContext ? "Selected Student" : "Student Discovery"}
           description={
             studentContext
               ? "Outstanding invoices for this student only"
-              : "Search by name, ID or invoice number"
+              : "Search by student name, student ID or invoice number"
           }
         >
           <div className="space-y-6">
@@ -239,22 +246,22 @@ export function CollectionCounter({
               </div>
             ) : null}
 
-            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="max-h-[620px] space-y-2 overflow-y-auto pr-1 custom-scrollbar">
               {invoices.map((inv) => (
                 <button
                   key={inv.id}
                   onClick={() => handleSelectInvoice(inv)}
                   className={cn(
-                    "w-full flex items-start justify-between p-5 rounded-2xl border transition-all duration-300 group",
+                    "group flex w-full items-start justify-between rounded-xl border p-4 transition-colors",
                     selectedInvoiceId === inv.id
-                      ? "bg-[var(--color-mod-fees-bg)] border-[var(--color-mod-fees-border)] text-[var(--color-mod-fees-text)] shadow-sm translate-x-1"
+                      ? "border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)] text-[var(--color-mod-fees-text)]"
                       : "bg-white border-slate-100 hover:border-[var(--color-mod-fees-border)] text-slate-900 hover:bg-[var(--color-mod-fees-bg)]",
                   )}
                 >
                   <div className="flex gap-4">
                     <div
                       className={cn(
-                        "h-12 w-12 rounded-2xl flex items-center justify-center transition-colors",
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors",
                         selectedInvoiceId === inv.id
                           ? "bg-white text-[var(--color-mod-fees-accent)]"
                           : "bg-slate-50 text-slate-400 group-hover:bg-white",
@@ -393,8 +400,8 @@ export function CollectionCounter({
               ) : null}
 
               <SectionCard
-                title="Collection Detail"
-                description="Review breakdown and finalize payment collection."
+                title="Payment review"
+                description="Review the selected invoice, enter the tender, then confirm one payment."
                 headerAction={
                   <div className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-fees-bg)] border border-[var(--color-mod-fees-border)] px-4 py-2 text-[0.65rem] font-black text-[var(--color-mod-fees-text)] uppercase tracking-widest">
                     <Receipt size={14} />
@@ -403,7 +410,7 @@ export function CollectionCounter({
                 }
               >
                 <div className="space-y-8">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div className="grid grid-cols-2 gap-4 rounded-xl border border-slate-200 bg-slate-50 p-5 md:grid-cols-4">
                     <StatItem
                       label="Total Billed"
                       value={
@@ -444,12 +451,12 @@ export function CollectionCounter({
                       <h5 className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-1">
                         Fee Breakdown
                       </h5>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                         {invoiceDetailQuery.data.lines?.map(
                           (item: InvoiceDetailLine) => (
                             <div
                               key={item.id}
-                              className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl"
+                              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-3.5"
                             >
                               <span className="text-xs font-bold text-slate-700">
                                 {item.feeHeadName || "Fee head not set"}
@@ -464,13 +471,13 @@ export function CollectionCounter({
                     </div>
                   )}
 
-                  <div className="grid gap-8 2xl:grid-cols-2">
+                  <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="space-y-6">
                       <div className="space-y-3">
-                        <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">
+                        <label className="ml-1 text-xs font-semibold text-slate-600">
                           Collection Amount
                         </label>
-                        <div className="group flex h-20 items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/50 px-5 transition-all focus-within:bg-white focus-within:ring-4 focus-within:ring-[var(--color-mod-fees-accent)]/10">
+                        <div className="group flex h-16 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 transition focus-within:ring-2 focus-within:ring-[var(--color-mod-fees-accent)]">
                           <span className="shrink-0 text-sm font-black text-slate-400 transition-colors group-focus-within:text-[var(--color-mod-fees-accent)]">
                             NPR
                           </span>
@@ -483,14 +490,14 @@ export function CollectionCounter({
                             // changes the value — unacceptable for money.
                             onWheel={(e) => e.currentTarget.blur()}
                             aria-label="Collection amount in NPR"
-                            className="h-full w-full min-w-0 border-0 bg-transparent p-0 text-3xl font-black text-slate-900 shadow-none outline-none focus:shadow-none focus:ring-0"
+                            className="h-full w-full min-w-0 border-0 bg-transparent p-0 text-2xl font-bold text-slate-950 shadow-none outline-none focus:shadow-none focus:ring-0"
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">
+                          <label className="ml-1 text-xs font-semibold text-slate-600">
                             Reference #
                           </label>
                           <Input
@@ -501,7 +508,7 @@ export function CollectionCounter({
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">
+                          <label className="ml-1 text-xs font-semibold text-slate-600">
                             Remarks
                           </label>
                           <Input
@@ -515,7 +522,7 @@ export function CollectionCounter({
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">
+                      <label className="ml-1 text-xs font-semibold text-slate-600">
                         Payment Method
                       </label>
                       <div className="grid grid-cols-2 gap-3">
@@ -523,22 +530,22 @@ export function CollectionCounter({
                           {
                             id: "CASH",
                             icon: <Banknote size={18} />,
-                            label: "Cash Payment",
+                            label: "Cash",
                           },
                           {
                             id: "BANK",
                             icon: <CreditCard size={18} />,
-                            label: "Bank Deposit",
+                            label: "Bank",
                           },
                           {
                             id: "TRANSFER",
                             icon: <History size={18} />,
-                            label: "Online Transfer",
+                            label: "Transfer",
                           },
                           {
                             id: "MOBILE",
                             icon: <CreditCard size={18} />,
-                            label: "Mobile Wallet",
+                            label: "Wallet",
                           },
                         ].map((m) => (
                           <button
@@ -546,7 +553,7 @@ export function CollectionCounter({
                             onClick={() => setMethod(m.id)}
                             aria-pressed={method === m.id}
                             className={cn(
-                              "flex items-center gap-3 p-3 rounded-2xl border-2 transition-all duration-300",
+                              "flex min-h-11 items-center gap-2 rounded-lg border p-2.5 transition-colors",
                               method === m.id
                                 ? "bg-[var(--color-mod-fees-bg)] border-[var(--color-mod-fees-border)] text-[var(--color-mod-fees-text)] shadow-sm"
                                 : "bg-white border-slate-100 text-slate-600 hover:border-[var(--color-mod-fees-border)]",
@@ -569,17 +576,17 @@ export function CollectionCounter({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-8 border-t border-slate-100">
-                    <div className="flex items-center gap-2 text-slate-400">
+                  <div className="flex flex-col gap-4 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-2 text-warning-800">
                       <AlertCircle size={16} />
-                      <span className="text-[0.65rem] font-bold">
-                        Collect exactly NPR {amount.toLocaleString()}
+                      <span className="max-w-md text-xs font-medium leading-5">
+                        Confirmed payments require an authorized refund or reversal for any correction.
                       </span>
                     </div>
                     <div className="flex items-center gap-4">
                       <button
                         onClick={() => setSelectedInvoiceId(null)}
-                        className="px-8 py-3 text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors"
+                        className="min-h-11 px-4 text-sm font-semibold text-slate-600 hover:text-slate-950"
                       >
                         Reset selection
                       </button>
@@ -592,12 +599,10 @@ export function CollectionCounter({
                           amount <= 0 ||
                           amount > invoiceDetailQuery.data.outstandingAmount
                         }
-                        className="flex items-center gap-3 whitespace-nowrap rounded-2xl bg-[var(--color-mod-fees-accent)] px-8 py-4 text-sm font-black text-white shadow-sm transition-all hover:bg-[var(--color-mod-fees-text)] active:scale-95 disabled:opacity-50"
+                        className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-lg bg-[var(--color-mod-fees-accent)] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50"
                       >
                         <CheckSquare size={20} />
-                        {isSubmitting
-                          ? "Recording Payment..."
-                          : "Finalize & Print Receipt"}
+                        {isSubmitting ? "Recording payment..." : "Review payment"}
                       </button>
                     </div>
                   </div>
@@ -605,7 +610,7 @@ export function CollectionCounter({
               </SectionCard>
             </div>
           ) : (
-            <div className="h-[700px] rounded-2xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-center p-12 bg-slate-50/20">
+            <div className="flex min-h-[460px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center">
               <div className="h-24 w-24 rounded-2xl bg-white shadow-sm flex items-center justify-center text-slate-300 mb-8 border border-slate-50">
                 <Wallet size={48} />
               </div>
@@ -629,61 +634,112 @@ export function CollectionCounter({
                 </button>
               ) : null}
 
-              <div className="mt-12 grid grid-cols-3 gap-6 opacity-30 grayscale">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="h-12 w-12 rounded-2xl bg-white flex items-center justify-center">
-                    <User size={24} />
-                  </div>
-                  <span className="text-[0.6rem] font-black uppercase tracking-widest">
-                    Select
-                  </span>
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                  <div className="h-12 w-12 rounded-2xl bg-white flex items-center justify-center">
-                    <Banknote size={24} />
-                  </div>
-                  <span className="text-[0.6rem] font-black uppercase tracking-widest">
-                    Process
-                  </span>
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                  <div className="h-12 w-12 rounded-2xl bg-white flex items-center justify-center">
-                    <Printer size={24} />
-                  </div>
-                  <span className="text-[0.6rem] font-black uppercase tracking-widest">
-                    Receipt
-                  </span>
-                </div>
-              </div>
             </div>
           )}
         </div>
       </div>
 
       <Dialog open={isConfirmingPayment} onOpenChange={setIsConfirmingPayment}>
-        <DialogContent className="max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Confirm payment collection</DialogTitle>
-            <DialogDescription>
-              Confirm {formatCurrency(amount)} by {method} for invoice{" "}
-              {selectedInvoice?.invoiceNumber}. The backend will apply one
-              idempotent payment and issue one receipt.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="rounded-xl border border-warning-100 bg-warning-50 p-4 text-xs font-semibold text-warning-800">
-            Check the student, invoice, amount, method, and reference before
-            continuing. Confirmed payments can only be corrected through an
-            authorized refund or reversal.
+        <DialogContent className="w-full max-w-2xl rounded-2xl bg-white">
+          <div className="shrink-0 px-5 pb-4 pt-5 sm:px-8 sm:pb-6 sm:pt-8">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)] text-[var(--color-mod-fees-text)]">
+                <ShieldCheck className="h-6 w-6" aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <DialogTitle className="text-xl leading-7 tracking-tight sm:text-2xl">
+                  Review payment
+                </DialogTitle>
+                <DialogDescription className="mt-1.5 max-w-xl leading-6 text-slate-600">
+                  Check the details below. SchoolOS will record one payment and
+                  issue one receipt.
+                </DialogDescription>
+              </div>
+            </div>
           </div>
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={() => setIsConfirmingPayment(false)}
-              className="rounded-xl px-4 py-2 text-sm font-bold text-slate-600"
+
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-4 sm:px-8 sm:pb-8">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Student
+                  </p>
+                  <p className="mt-1 truncate text-base font-bold text-slate-950">
+                    {invoiceDetailQuery.data?.student.name ||
+                      studentContext?.name ||
+                      selectedInvoice?.student?.name ||
+                      "Student name not set"}
+                  </p>
+                </div>
+                <p className="shrink-0 text-sm font-semibold text-slate-600">
+                  {invoiceDetailQuery.data?.student.studentSystemId ||
+                    studentContext?.studentSystemId ||
+                    "Student ID not set"}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2">
+                <PaymentReviewItem
+                  label="Invoice"
+                  value={selectedInvoice?.invoiceNumber || "Not selected"}
+                />
+                <PaymentReviewItem
+                  label="Payment method"
+                  value={PAYMENT_METHOD_LABELS[method] || method}
+                  className="border-t border-slate-200 sm:border-l sm:border-t-0"
+                />
+                <PaymentReviewItem
+                  label="Amount to collect"
+                  value={formatCurrency(amount)}
+                  emphasized
+                  className="border-t border-slate-200"
+                />
+                <PaymentReviewItem
+                  label="Reference"
+                  value={reference.trim() || "Not provided"}
+                  className="border-t border-slate-200 sm:border-l"
+                />
+                <PaymentReviewItem
+                  label="Outstanding before"
+                  value={
+                    invoiceDetailQuery.data
+                      ? formatCurrency(invoiceDetailQuery.data.outstandingAmount)
+                      : "Unavailable"
+                  }
+                  className="border-t border-slate-200"
+                />
+                <PaymentReviewItem
+                  label="Balance after confirmation"
+                  value="Available after backend confirmation"
+                  className="border-t border-slate-200 sm:border-l"
+                />
+              </div>
+            </div>
+
+            <div
+              className="flex items-start gap-3 rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3 text-warning-900 sm:py-3.5"
+              aria-label="Payment correction notice"
             >
-              Review again
-            </button>
-            <button
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+              <p className="text-sm font-medium leading-5">
+                This payment posts immediately. Any correction requires an
+                authorized refund or reversal.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-3.5 sm:px-8 sm:py-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsConfirmingPayment(false)}
+              className="min-w-0 flex-1 gap-2 rounded-xl border-slate-300 sm:flex-none"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden />
+              Back to payment
+            </Button>
+            <Button
               type="button"
               disabled={!selectedInvoice || isSubmitting}
               onClick={() => {
@@ -697,13 +753,43 @@ export function CollectionCounter({
                   remarks,
                 );
               }}
-              className="rounded-xl bg-[var(--color-mod-fees-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+              className="min-w-0 flex-1 gap-2 rounded-xl !bg-[var(--color-mod-fees-accent)] hover:!bg-[var(--color-mod-fees-text)] sm:flex-none"
             >
-              Confirm payment
-            </button>
-          </DialogFooter>
+              <Receipt className="h-4 w-4" aria-hidden />
+              Confirm and issue receipt
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function PaymentReviewItem({
+  label,
+  value,
+  className,
+  emphasized = false,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+  emphasized?: boolean;
+}) {
+  return (
+    <div className={cn("min-w-0 px-4 py-3.5 sm:px-5 sm:py-4", className)}>
+      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        {label}
+      </p>
+      <p
+        className={cn(
+          "mt-1.5 break-words text-sm font-bold text-slate-950",
+          emphasized &&
+            "text-xl tracking-tight text-[var(--color-mod-fees-text)]",
+        )}
+      >
+        {value}
+      </p>
     </div>
   );
 }

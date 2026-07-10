@@ -48,7 +48,7 @@ export function FeesTab({ studentId, invoices }: FeesTabProps) {
                
                <div className="space-y-3 pt-4 border-t border-slate-100">
                   <Link 
-                    href={`/dashboard/finance?studentId=${encodeURIComponent(studentId)}`}
+                    href={`/dashboard/fees/collect?studentId=${encodeURIComponent(studentId)}`}
                     className="group flex min-h-12 items-center justify-between rounded-xl border border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-bg)] p-4 text-[var(--color-mod-admissions-text)] transition hover:border-[var(--color-mod-admissions-accent)] hover:bg-white"
                   >
                     <div className="flex items-center gap-3">

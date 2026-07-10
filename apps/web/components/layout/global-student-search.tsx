@@ -128,7 +128,7 @@ export function GlobalStudentSearch() {
     if (entry.invoice.studentId) {
       params.set('studentId', entry.invoice.studentId);
     }
-    router.push(`/dashboard/finance?${params.toString()}`);
+    router.push(`/dashboard/fees/collect?${params.toString()}`);
   }
 
   const placeholder = canSearchInvoices

@@ -42,13 +42,13 @@ describe("recently-viewed is actually recorded on the three real detail views", 
   });
 
   it("records an invoice view once the invoice is resolved from real collection context data", () => {
-    const page = read("app/dashboard/finance/page.tsx");
+    const page = read("components/finance/fees-workspace.tsx");
     assert.match(page, /useRecentlyViewed/);
     assert.match(page, /kind: "invoice"/);
     // Must come from the real backend response, not be fabricated from the URL alone.
     assert.match(
       page,
-      /studentCollectionContextQuery\.data\?\.invoices\.find/,
+      /studentContextQuery\.data\?\.invoices\.find/,
     );
   });
 

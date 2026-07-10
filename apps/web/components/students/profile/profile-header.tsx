@@ -66,7 +66,7 @@ export function ProfileHeader({
         icon: <Wallet size={16} />,
         onClick: () =>
           router.push(
-            `/dashboard/finance?studentId=${encodeURIComponent(student.id)}&source=student-profile`,
+            `/dashboard/fees/collect?studentId=${encodeURIComponent(student.id)}&source=student-profile`,
           ),
       }
     : isFeeClearanceLoading

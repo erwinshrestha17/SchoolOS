@@ -855,7 +855,7 @@ export function CanteenWorkspace({
                       <div className="flex flex-wrap gap-2">
                         {enrollment.feeInvoiceId ? (
                           <Link
-                            href={`/dashboard/finance?invoiceId=${encodeURIComponent(enrollment.feeInvoiceId)}`}
+                            href={`/dashboard/fees/collect?invoiceId=${encodeURIComponent(enrollment.feeInvoiceId)}`}
                             className="btn-secondary"
                           >
                             Open invoice

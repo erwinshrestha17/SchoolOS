@@ -7,15 +7,22 @@ import { FilterBar } from "@/components/ui/filter-bar";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { ReceiptVerificationPanel } from "./receipt-verification-panel";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ErrorState } from "@/components/ui/error-state";
 import { SearchInput } from "@/components/ui/search-input";
 import { ReprintDialog } from "./reprint-dialog";
 import { useSession } from "@/components/session-provider";
+import { formatBsDateTime } from "@schoolos/core";
+import { StatusBadge } from "@/components/ui/status-badge";
 
-export function LedgerSection() {
+export function LedgerSection({
+  mode = "all",
+}: {
+  mode?: "all" | "invoices" | "receipts";
+}) {
   const { hasPermissions } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const search = searchParams.get("ledgerSearch") ?? "";
   const status = searchParams.get("ledgerStatus") ?? "";
@@ -40,6 +47,7 @@ export function LedgerSection() {
         sortBy: "issuedAt",
         sortDirection: "desc",
       }),
+    enabled: mode !== "receipts",
   });
   const receiptsQuery = useQuery({
     queryKey: ["receipts", receiptPage, receiptSearch],
@@ -49,6 +57,7 @@ export function LedgerSection() {
         limit: 25,
         search: receiptSearch || undefined,
       }),
+    enabled: mode !== "invoices",
   });
   const openReceiptMutation = useMutation({
     mutationFn: (receiptNumber: string) => api.openReceiptPdf(receiptNumber),
@@ -63,16 +72,24 @@ export function LedgerSection() {
       params.delete("ledgerPage");
     }
     if ("receiptSearch" in updates) params.delete("receiptPage");
-    router.replace(`/dashboard/finance?${params.toString()}`, {
+    router.replace(`${pathname}?${params.toString()}`, {
       scroll: false,
     });
   };
 
   return (
     <div className="space-y-6">
-      <ReceiptVerificationPanel />
+      {mode === "receipts" ? (
+        <nav aria-label="Receipt center sections" className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2">
+          <a href="#receipt-history" className="inline-flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">Receipt history</a>
+          <a href="#verify-receipt" className="inline-flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">Verify receipt</a>
+          <a href="#receipt-history" className="inline-flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">Reprint audit</a>
+        </nav>
+      ) : null}
 
-      <FilterBar label="Ledger Filters">
+      {mode !== "invoices" ? <div id="verify-receipt"><ReceiptVerificationPanel /></div> : null}
+
+      {mode !== "receipts" ? <FilterBar label="Invoice filters">
         <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
           <SearchInput
             label="Search billing history"
@@ -96,11 +113,11 @@ export function LedgerSection() {
             <option value="VOID">Void</option>
           </select>
         </div>
-      </FilterBar>
+      </FilterBar> : null}
 
-      <SectionCard
+      {mode !== "receipts" ? <SectionCard
         title="Billing History"
-        description="Comprehensive list of all invoices and their current status."
+        description="Server-paginated invoices and their current backend status."
       >
         {invoicesQuery.isError ? (
           <ErrorState
@@ -137,9 +154,9 @@ export function LedgerSection() {
             </div>
           </div>
         ) : null}
-      </SectionCard>
+      </SectionCard> : null}
 
-      <SectionCard
+      {mode !== "invoices" ? <div id="receipt-history"><SectionCard
         title="Receipt History"
         description="Tenant-scoped protected receipts with server-side search and paging."
       >
@@ -163,51 +180,60 @@ export function LedgerSection() {
           />
         ) : receiptsQuery.data?.items.length ? (
           <div className="space-y-3">
-            {receiptsQuery.data.items.map((receipt) => (
-              <div
-                key={receipt.id}
-                className="flex flex-col justify-between gap-3 rounded-xl border border-slate-100 p-4 sm:flex-row sm:items-center"
-              >
-                <div>
-                  <p className="text-sm font-black text-slate-900">
-                    {receipt.receiptNumber}
-                  </p>
-                  <p className="mt-1 text-xs font-semibold text-slate-500">
-                    {receipt.student?.name ?? "Student"} ·{" "}
-                    {receipt.invoiceNumber ?? "Invoice unavailable"}
-                  </p>
-                  <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                    Protected file: {receipt.fileStatus}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={openReceiptMutation.isPending}
-                    onClick={() =>
-                      openReceiptMutation.mutate(receipt.receiptNumber)
-                    }
-                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold disabled:opacity-40"
-                  >
-                    Open protected receipt
-                  </button>
-                  {hasPermissions(["receipts:manage"]) ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSelectedReceipt({
-                          id: receipt.id,
-                          receiptNumber: receipt.receiptNumber,
-                        })
-                      }
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold"
-                    >
-                      Reprint
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            ))}
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full min-w-[920px] text-left text-sm">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3">Receipt</th>
+                    <th className="px-4 py-3">Student</th>
+                    <th className="px-4 py-3">Invoice</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
+                    <th className="px-4 py-3">Method</th>
+                    <th className="px-4 py-3">Issued</th>
+                    <th className="px-4 py-3">File</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 tabular-nums">
+                  {receiptsQuery.data.items.map((receipt) => (
+                    <tr key={receipt.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3.5 font-semibold text-slate-950">{receipt.receiptNumber}</td>
+                      <td className="px-4 py-3.5 text-slate-700">{receipt.student?.name ?? "Student unavailable"}</td>
+                      <td className="px-4 py-3.5 text-slate-600">{receipt.invoiceNumber ?? "Unavailable"}</td>
+                      <td className="px-4 py-3.5 text-right font-semibold text-slate-950">
+                        {typeof receipt.amount === "number"
+                          ? new Intl.NumberFormat("en-NP", { style: "currency", currency: "NPR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(receipt.amount)
+                          : "Unavailable"}
+                      </td>
+                      <td className="px-4 py-3.5 text-slate-600">{receipt.method ?? "Unavailable"}</td>
+                      <td className="px-4 py-3.5 text-slate-600">{formatBsDateTime(receipt.issuedAt)}</td>
+                      <td className="px-4 py-3.5"><StatusBadge status={receipt.fileStatus} /></td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            disabled={openReceiptMutation.isPending}
+                            onClick={() => openReceiptMutation.mutate(receipt.receiptNumber)}
+                            className="min-h-10 rounded-lg border border-slate-200 px-3 text-xs font-semibold disabled:opacity-40"
+                          >
+                            Open protected receipt
+                          </button>
+                          {hasPermissions(["receipts:manage"]) ? (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedReceipt({ id: receipt.id, receiptNumber: receipt.receiptNumber })}
+                              className="min-h-10 rounded-lg border border-slate-200 px-3 text-xs font-semibold"
+                            >
+                              Prepare reprint
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {openReceiptMutation.isError ? (
               <p className="rounded-xl border border-warning-100 bg-warning-50 p-3 text-xs font-bold text-warning-800">
                 {openReceiptMutation.error instanceof Error
@@ -246,7 +272,7 @@ export function LedgerSection() {
             No receipts match the current filters.
           </p>
         )}
-      </SectionCard>
+      </SectionCard></div> : null}
 
       {selectedReceipt ? (
         <ReprintDialog

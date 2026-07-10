@@ -1,12 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { DataTable } from "@/components/ui/data-table";
-import { Printer } from "lucide-react";
+import { Eye, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ReprintDialog } from "./reprint-dialog";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatBsDate } from "@schoolos/core";
+import { Drawer } from "@/components/ui/drawer";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { ErrorState } from "@/components/ui/error-state";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 interface Invoice {
   id: string;
@@ -15,6 +20,7 @@ interface Invoice {
   dueDate: string;
   totalAmount: number;
   paidAmount?: number;
+  outstandingAmount?: number;
   status: string;
   receiptId?: string | null;
   receiptNumber?: string | null;
@@ -40,10 +46,36 @@ const formatCurrency = (amount: number) => {
 const formatDate = (value: string) => formatBsDate(value);
 
 export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const selectedInvoiceId = searchParams.get("invoiceId");
   const [selectedReceipt, setSelectedReceipt] = useState<{
     id: string;
     number: string;
   } | null>(null);
+  const invoiceDetailQuery = useQuery({
+    queryKey: ["invoice-detail", selectedInvoiceId],
+    queryFn: () => api.getInvoiceDetail(selectedInvoiceId!),
+    enabled: Boolean(selectedInvoiceId),
+  });
+
+  const setSelectedInvoice = (invoiceId: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (invoiceId) params.set("invoiceId", invoiceId);
+    else params.delete("invoiceId");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+
+  useEffect(() => {
+    if (isLoading || !selectedInvoiceId) return;
+    if (!invoices.some((invoice) => invoice.id === selectedInvoiceId)) {
+      setSelectedInvoice(null);
+    }
+    // setSelectedInvoice is intentionally derived from current URL state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoices, isLoading, selectedInvoiceId]);
 
   const columns = [
     {
@@ -104,6 +136,16 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
       ),
     },
     {
+      header: "Outstanding",
+      cell: (inv: Invoice) => (
+        <span className="block text-right text-sm font-bold text-slate-950 tabular-nums">
+          {typeof inv.outstandingAmount === "number"
+            ? formatCurrency(inv.outstandingAmount)
+            : "Unavailable"}
+        </span>
+      ),
+    },
+    {
       header: "Status",
       cell: (inv: Invoice) => (
         <StatusBadge status={inv.status} className="h-6" />
@@ -113,6 +155,14 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
       header: "Actions",
       cell: (inv: Invoice) => (
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+            onClick={() => setSelectedInvoice(inv.id)}
+          >
+            <Eye size={15} aria-hidden />
+            View
+          </button>
           {inv.receiptNumber && (
             <button
               type="button"
@@ -153,6 +203,132 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
           onClose={() => setSelectedReceipt(null)}
         />
       )}
+
+      <Drawer
+        isOpen={Boolean(selectedInvoiceId)}
+        onClose={() => setSelectedInvoice(null)}
+        title={invoiceDetailQuery.data?.invoiceNumber ?? "Invoice detail"}
+        description="Backend-owned invoice, payment, waiver, receipt, and handoff context."
+        width="lg"
+      >
+        {invoiceDetailQuery.isLoading ? (
+          <div className="space-y-3" aria-label="Loading invoice detail">
+            <div className="h-28 animate-pulse rounded-xl bg-slate-100" />
+            <div className="h-72 animate-pulse rounded-xl bg-slate-100" />
+          </div>
+        ) : invoiceDetailQuery.isError ? (
+          <ErrorState
+            title="Invoice detail could not load"
+            message="Close this panel or retry. No finance value has been calculated in the browser."
+            onRetry={() => void invoiceDetailQuery.refetch()}
+            className="min-h-64"
+          />
+        ) : invoiceDetailQuery.data ? (
+          <InvoiceDetailContent detail={invoiceDetailQuery.data} />
+        ) : null}
+      </Drawer>
+    </div>
+  );
+}
+
+function InvoiceDetailContent({
+  detail,
+}: {
+  detail: Awaited<ReturnType<typeof api.getInvoiceDetail>>;
+}) {
+  return (
+    <div className="space-y-6">
+      <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <p className="text-base font-semibold text-slate-950">{detail.student.name}</p>
+        <p className="mt-1 text-sm text-slate-600">
+          {detail.student.studentSystemId} · {detail.student.className}
+          {detail.student.sectionName ? ` · ${detail.student.sectionName}` : ""}
+        </p>
+        {detail.student.guardianName ? (
+          <p className="mt-2 text-xs text-slate-500">
+            Guardian: {detail.student.guardianName}
+            {detail.student.guardianPhone ? ` · ${detail.student.guardianPhone}` : ""}
+          </p>
+        ) : null}
+      </section>
+
+      <dl className="grid gap-3 sm:grid-cols-2">
+        <InvoiceFact label="Status" value={detail.status} />
+        <InvoiceFact label="Due date" value={formatDate(detail.dueDate)} />
+        <InvoiceFact label="Total" value={formatCurrency(detail.totalAmount)} />
+        <InvoiceFact label="Paid" value={formatCurrency(detail.paidAmount)} />
+        <InvoiceFact label="Waived" value={formatCurrency(detail.totalWaivedAmount)} />
+        <InvoiceFact label="Outstanding" value={formatCurrency(detail.outstandingAmount)} emphasized />
+      </dl>
+
+      <section>
+        <h3 className="text-sm font-semibold text-slate-950">Invoice line items</h3>
+        <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
+          {detail.lines.map((line) => (
+            <div key={line.id} className="flex items-start justify-between gap-4 border-b border-slate-100 px-4 py-3 last:border-0">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{line.feeHeadName}</p>
+                <p className="mt-0.5 text-xs text-slate-500">{line.periodLabel || line.description}</p>
+              </div>
+              <p className="text-sm font-semibold text-slate-950 tabular-nums">{formatCurrency(line.netAmount)}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-sm font-semibold text-slate-950">Payments and correction chain</h3>
+        {detail.payments.length ? (
+          <div className="mt-3 space-y-3">
+            {detail.payments.map((payment) => (
+              <div key={payment.id} className="rounded-xl border border-slate-200 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-950">{payment.receipt?.receiptNumber ?? "Receipt pending"}</p>
+                    <p className="mt-1 text-xs text-slate-500">{payment.method} · {formatDate(payment.paidAt)}</p>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-950 tabular-nums">{formatCurrency(payment.netAmount)}</p>
+                </div>
+                {payment.refunds.length ? (
+                  <div className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-600">
+                    {payment.refunds.map((refund) => (
+                      <p key={refund.id}>{refund.refundNumber} · {formatCurrency(refund.amount)} · {refund.reason}</p>
+                    ))}
+                  </div>
+                ) : null}
+                <p className="mt-3 text-xs text-slate-500">
+                  Accounting handoff: {payment.journalEntryNumber ?? "Not available in current response"}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-600">No payments are recorded for this invoice.</p>
+        )}
+      </section>
+
+      {detail.waivers.length ? (
+        <section>
+          <h3 className="text-sm font-semibold text-slate-950">Waivers</h3>
+          <div className="mt-3 space-y-2">
+            {detail.waivers.map((waiver) => (
+              <div key={waiver.id} className="rounded-xl border border-slate-200 p-3 text-sm">
+                <div className="flex justify-between gap-4"><span>{waiver.feeHeadName ?? "Invoice waiver"}</span><span className="font-semibold tabular-nums">{formatCurrency(waiver.amount)}</span></div>
+                <p className="mt-1 text-xs text-slate-500">{waiver.reason}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function InvoiceFact({ label, value, emphasized = false }: { label: string; value: string; emphasized?: boolean }) {
+  return (
+    <div className={`rounded-xl border p-3 ${emphasized ? "border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)]" : "border-slate-200 bg-white"}`}>
+      <dt className="text-xs text-slate-500">{label}</dt>
+      <dd className="mt-1 text-sm font-semibold text-slate-950 tabular-nums">{value}</dd>
     </div>
   );
 }

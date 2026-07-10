@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
 export default function FinanceCashierCloseRedirect() {
-  redirect('/dashboard/finance');
+  redirect('/dashboard/fees/cashier-close');
 }

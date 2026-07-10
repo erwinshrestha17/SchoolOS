@@ -51,7 +51,7 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
       { route: '/dashboard/students', visible: /Student Directory/i },
       { route: '/dashboard/admissions', visible: /Admissions|New admission|Applications Needing Review/i },
       { route: '/dashboard/attendance', visible: /Attendance Roster|Smart Attendance/i },
-      { route: '/dashboard/finance', visible: /Collection Counter|Find student or invoice/i },
+      { route: '/dashboard/fees/collect', visible: /Collect payment|Find student or invoice/i },
       { route: '/dashboard/academics', visible: /Academics|Active Exam Terms|Workflow Readiness/i },
       { route: '/dashboard/accounting', visible: /Fiscal Status|Financial Reporting Hub/i },
       { route: '/dashboard/reports', visible: /Reports & Exports|Recent Exports|Module Locked/i },

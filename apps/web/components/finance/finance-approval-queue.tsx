@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FinanceApprovalRequestView } from "@schoolos/core";
 import { formatBsDate } from "@schoolos/core";
 import { AlertCircle, CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 import { useSession } from "@/components/session-provider";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,7 @@ const money = (value: number) =>
 export function FinanceApprovalQueue() {
   const { hasPermissions } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const page = Math.max(
@@ -111,7 +112,7 @@ export function FinanceApprovalQueue() {
     ) {
       params.delete("approvalPage");
     }
-    router.replace(`/dashboard/finance?${params.toString()}`, {
+    router.replace(`${pathname}?${params.toString()}`, {
       scroll: false,
     });
   };
