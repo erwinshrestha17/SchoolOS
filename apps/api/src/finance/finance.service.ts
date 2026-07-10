@@ -81,6 +81,8 @@ import { ReversePaymentDto } from './dto/reverse-payment.dto';
 import { DuesQueryDto } from './dto/dues-query.dto';
 import { FeeAgingBucket, ListDefaultersDto } from './dto/list-defaulters.dto';
 import { FinanceDashboardSummaryQueryDto } from './dto/finance-dashboard-summary-query.dto';
+import { FinanceReportQueryDto } from './dto/finance-report-query.dto';
+import { StudentFeeLedgerQueryDto } from './dto/student-fee-ledger-query.dto';
 import {
   BaseFinanceListQueryDto,
   ListBillingRunsQueryDto,
@@ -203,6 +205,28 @@ type CashierCloseWithUsers = Prisma.CashierCloseGetPayload<{
     closedBy: true;
   };
 }>;
+
+interface CollectionStudentSearchRow {
+  id: string;
+  studentSystemId: string;
+  firstNameEn: string;
+  lastNameEn: string;
+  className: string;
+  sectionName: string | null;
+  guardianName: string | null;
+  guardianPhone: string | null;
+  openInvoiceCount: bigint;
+  totalOutstanding: Prisma.Decimal;
+}
+
+interface PaymentMethodReportRow {
+  method: PaymentMethod;
+  paymentCount: bigint;
+  refundCount: bigint;
+  grossAmount: Prisma.Decimal;
+  refundedAmount: Prisma.Decimal;
+  netAmount: Prisma.Decimal;
+}
 
 @Injectable()
 export class FinanceService {
@@ -1628,8 +1652,67 @@ export class FinanceService {
     };
   }
 
-  async getCollectionReport(actor: AuthContext) {
+  async getCollectionReport(
+    actor: AuthContext,
+    query: FinanceReportQueryDto = {},
+  ) {
     assertFinancePermission(actor, 'fees:manage');
+    const period = resolveOptionalFinanceReportPeriod(query);
+    const invoiceWhere: Prisma.InvoiceWhereInput = {
+      tenantId: actor.tenantId,
+      ...(period
+        ? {
+            issuedAt: {
+              gte: period.startUtc,
+              lt: period.endExclusiveUtc,
+            },
+          }
+        : {}),
+    };
+    const paymentWhere: Prisma.PaymentWhereInput = {
+      tenantId: actor.tenantId,
+      status: PaymentStatus.SUCCESS,
+      ...(period
+        ? {
+            paidAt: {
+              gte: period.startUtc,
+              lt: period.endExclusiveUtc,
+            },
+          }
+        : {}),
+    };
+    const refundWhere: Prisma.PaymentRefundWhereInput = {
+      tenantId: actor.tenantId,
+      ...(period
+        ? {
+            refundDate: {
+              gte: period.startUtc,
+              lt: period.endExclusiveUtc,
+            },
+          }
+        : {}),
+    };
+    const waiverWhere: Prisma.FeeWaiverWhereInput = {
+      tenantId: actor.tenantId,
+      status: 'APPROVED',
+      ...(period
+        ? {
+            createdAt: {
+              gte: period.startUtc,
+              lt: period.endExclusiveUtc,
+            },
+          }
+        : {}),
+    };
+    const paymentDateSql = period
+      ? Prisma.sql`AND "paidAt" >= ${period.startUtc} AND "paidAt" < ${period.endExclusiveUtc}`
+      : Prisma.empty;
+    const refundDateSql = period
+      ? Prisma.sql`AND "refundDate" >= ${period.startUtc} AND "refundDate" < ${period.endExclusiveUtc}`
+      : Prisma.empty;
+    const invoiceDateSql = period
+      ? Prisma.sql`AND i."issuedAt" >= ${period.startUtc} AND i."issuedAt" < ${period.endExclusiveUtc}`
+      : Prisma.empty;
     const [
       invoiceAggregate,
       paymentAggregate,
@@ -1641,22 +1724,19 @@ export class FinanceService {
       feeHeadWiseRows,
     ] = await Promise.all([
       this.prisma.invoice.aggregate({
-        where: { tenantId: actor.tenantId },
+        where: invoiceWhere,
         _sum: { totalAmount: true },
       }),
       this.prisma.payment.aggregate({
-        where: {
-          tenantId: actor.tenantId,
-          status: PaymentStatus.SUCCESS,
-        },
+        where: paymentWhere,
         _sum: { amount: true },
       }),
       this.prisma.paymentRefund.aggregate({
-        where: { tenantId: actor.tenantId },
+        where: refundWhere,
         _sum: { amount: true },
       }),
       this.prisma.feeWaiver.aggregate({
-        where: { tenantId: actor.tenantId, status: 'APPROVED' },
+        where: waiverWhere,
         _sum: { amount: true },
       }),
       this.prisma.$queryRaw<Array<{ month: string; amount: Prisma.Decimal }>>(
@@ -1665,6 +1745,7 @@ export class FinanceService {
                  COALESCE(SUM("amount"), 0) AS "amount"
           FROM "Payment"
           WHERE "tenantId" = ${actor.tenantId} AND "status" = 'SUCCESS'
+          ${paymentDateSql}
           GROUP BY date_trunc('month', "paidAt")
           ORDER BY date_trunc('month', "paidAt") ASC
         `,
@@ -1675,6 +1756,7 @@ export class FinanceService {
                  COALESCE(SUM("amount"), 0) AS "amount"
           FROM "PaymentRefund"
           WHERE "tenantId" = ${actor.tenantId}
+          ${refundDateSql}
           GROUP BY date_trunc('month', "refundDate")
           ORDER BY date_trunc('month', "refundDate") ASC
         `,
@@ -1688,6 +1770,7 @@ export class FinanceService {
         JOIN "Student" s ON s."id" = i."studentId" AND s."tenantId" = i."tenantId"
         JOIN "Class" c ON c."id" = s."classId" AND c."tenantId" = i."tenantId"
         WHERE i."tenantId" = ${actor.tenantId}
+        ${invoiceDateSql}
         GROUP BY c."id", c."name"
         ORDER BY c."name" ASC
       `),
@@ -1697,8 +1780,10 @@ export class FinanceService {
         SELECT f."name" AS "feeHeadName",
                COALESCE(SUM(l."totalAmount"), 0) AS "amount"
         FROM "InvoiceLine" l
+        JOIN "Invoice" i ON i."id" = l."invoiceId" AND i."tenantId" = l."tenantId"
         JOIN "FeeHead" f ON f."id" = l."feeHeadId" AND f."tenantId" = l."tenantId"
         WHERE l."tenantId" = ${actor.tenantId}
+        ${invoiceDateSql}
         GROUP BY f."id", f."name"
         ORDER BY f."name" ASC
       `),
@@ -1743,6 +1828,91 @@ export class FinanceService {
         feeHeadName: row.feeHeadName,
         amount: decimalOrZero(row.amount).toFixed(2),
       })),
+      period: period
+        ? {
+            fromDate: period.fromDate,
+            toDate: period.toDate,
+            timeZone: NEPAL_TIME_ZONE,
+          }
+        : null,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  async getPaymentMethodReport(
+    actor: AuthContext,
+    query: FinanceReportQueryDto = {},
+  ) {
+    assertFinancePermission(actor, 'fees:manage');
+    const period = resolveOptionalFinanceReportPeriod(query);
+    const paymentDateSql = period
+      ? Prisma.sql`AND p."paidAt" >= ${period.startUtc} AND p."paidAt" < ${period.endExclusiveUtc}`
+      : Prisma.empty;
+    const refundDateSql = period
+      ? Prisma.sql`AND r."refundDate" >= ${period.startUtc} AND r."refundDate" < ${period.endExclusiveUtc}`
+      : Prisma.empty;
+
+    const rows = await this.prisma.$queryRaw<PaymentMethodReportRow[]>(
+      Prisma.sql`
+        WITH method_events AS (
+          SELECT
+            p."method",
+            COUNT(p."id")::bigint AS "paymentCount",
+            0::bigint AS "refundCount",
+            COALESCE(SUM(p."amount"), 0) AS "grossAmount",
+            0::decimal AS "refundedAmount"
+          FROM "Payment" p
+          WHERE p."tenantId" = ${actor.tenantId}
+            AND p."status" = 'SUCCESS'
+            ${paymentDateSql}
+          GROUP BY p."method"
+
+          UNION ALL
+
+          SELECT
+            p."method",
+            0::bigint AS "paymentCount",
+            COUNT(r."id")::bigint AS "refundCount",
+            0::decimal AS "grossAmount",
+            COALESCE(SUM(r."amount"), 0) AS "refundedAmount"
+          FROM "PaymentRefund" r
+          INNER JOIN "Payment" p
+            ON p."id" = r."paymentId"
+           AND p."tenantId" = r."tenantId"
+          WHERE r."tenantId" = ${actor.tenantId}
+            ${refundDateSql}
+          GROUP BY p."method"
+        )
+        SELECT
+          "method",
+          SUM("paymentCount")::bigint AS "paymentCount",
+          SUM("refundCount")::bigint AS "refundCount",
+          SUM("grossAmount") AS "grossAmount",
+          SUM("refundedAmount") AS "refundedAmount",
+          SUM("grossAmount") - SUM("refundedAmount") AS "netAmount"
+        FROM method_events
+        GROUP BY "method"
+        ORDER BY "method" ASC
+      `,
+    );
+
+    return {
+      rows: rows.map((row) => ({
+        method: row.method,
+        paymentCount: Number(row.paymentCount),
+        refundCount: Number(row.refundCount),
+        grossAmount: decimalOrZero(row.grossAmount).toFixed(2),
+        refundedAmount: decimalOrZero(row.refundedAmount).toFixed(2),
+        netAmount: decimalOrZero(row.netAmount).toFixed(2),
+      })),
+      period: period
+        ? {
+            fromDate: period.fromDate,
+            toDate: period.toDate,
+            timeZone: NEPAL_TIME_ZONE,
+          }
+        : null,
+      generatedAt: new Date().toISOString(),
     };
   }
 
@@ -2550,6 +2720,219 @@ export class FinanceService {
     };
   }
 
+  async searchCollectionStudents(
+    query: string | undefined,
+    actor: AuthContext,
+  ) {
+    assertFinancePermission(actor, 'payments:collect');
+    const normalizedQuery = query?.trim();
+
+    if (!normalizedQuery || normalizedQuery.length < 2) {
+      return { items: [], generatedAt: new Date().toISOString() };
+    }
+
+    const likeQuery = `%${normalizedQuery.replace(/[%_]/g, '\\$&')}%`;
+    const rows = await this.prisma.$queryRaw<CollectionStudentSearchRow[]>(
+      Prisma.sql`
+        WITH invoice_balances AS (
+          SELECT
+            i."id",
+            i."studentId",
+            GREATEST(
+              i."totalAmount" - COALESCE(payment_totals."netPaid", 0),
+              0
+            ) AS "outstanding"
+          FROM "Invoice" i
+          LEFT JOIN LATERAL (
+            SELECT COALESCE(
+              SUM(p."amount" - COALESCE(refund_totals."amount", 0)),
+              0
+            ) AS "netPaid"
+            FROM "Payment" p
+            LEFT JOIN LATERAL (
+              SELECT COALESCE(SUM(pr."amount"), 0) AS "amount"
+              FROM "PaymentRefund" pr
+              WHERE pr."tenantId" = p."tenantId"
+                AND pr."paymentId" = p."id"
+            ) refund_totals ON TRUE
+            WHERE p."tenantId" = i."tenantId"
+              AND p."invoiceId" = i."id"
+              AND p."status" = 'SUCCESS'
+          ) payment_totals ON TRUE
+          WHERE i."tenantId" = ${actor.tenantId}
+            AND i."status" IN ('ISSUED', 'PARTIAL')
+        )
+        SELECT
+          s."id",
+          s."studentSystemId",
+          s."firstNameEn",
+          s."lastNameEn",
+          c."name" AS "className",
+          sec."name" AS "sectionName",
+          primary_guardian."fullName" AS "guardianName",
+          primary_guardian."primaryPhone" AS "guardianPhone",
+          COUNT(ib."id")::bigint AS "openInvoiceCount",
+          SUM(ib."outstanding") AS "totalOutstanding"
+        FROM "Student" s
+        INNER JOIN "Class" c
+          ON c."id" = s."classId"
+         AND c."tenantId" = s."tenantId"
+        LEFT JOIN "Section" sec
+          ON sec."id" = s."sectionId"
+         AND sec."tenantId" = s."tenantId"
+        INNER JOIN invoice_balances ib
+          ON ib."studentId" = s."id"
+         AND ib."outstanding" > 0
+        LEFT JOIN LATERAL (
+          SELECT g."fullName", g."primaryPhone"
+          FROM "StudentGuardian" sg
+          INNER JOIN "Guardian" g
+            ON g."id" = sg."guardianId"
+           AND g."tenantId" = sg."tenantId"
+          WHERE sg."tenantId" = s."tenantId"
+            AND sg."studentId" = s."id"
+          ORDER BY sg."isPrimary" DESC, sg."createdAt" ASC
+          LIMIT 1
+        ) primary_guardian ON TRUE
+        WHERE s."tenantId" = ${actor.tenantId}
+          AND (
+            s."studentSystemId" ILIKE ${likeQuery} ESCAPE '\\'
+            OR s."firstNameEn" ILIKE ${likeQuery} ESCAPE '\\'
+            OR s."lastNameEn" ILIKE ${likeQuery} ESCAPE '\\'
+            OR CONCAT(s."firstNameEn", ' ', s."lastNameEn") ILIKE ${likeQuery} ESCAPE '\\'
+            OR COALESCE(primary_guardian."primaryPhone", '') ILIKE ${likeQuery} ESCAPE '\\'
+            OR EXISTS (
+              SELECT 1
+              FROM "Invoice" search_invoice
+              WHERE search_invoice."tenantId" = s."tenantId"
+                AND search_invoice."studentId" = s."id"
+                AND search_invoice."invoiceNumber" ILIKE ${likeQuery} ESCAPE '\\'
+            )
+          )
+        GROUP BY
+          s."id",
+          s."studentSystemId",
+          s."firstNameEn",
+          s."lastNameEn",
+          c."name",
+          sec."name",
+          primary_guardian."fullName",
+          primary_guardian."primaryPhone"
+        HAVING SUM(ib."outstanding") > 0
+        ORDER BY
+          CASE
+            WHEN s."studentSystemId" ILIKE ${`${normalizedQuery}%`} THEN 0
+            ELSE 1
+          END,
+          s."firstNameEn" ASC,
+          s."lastNameEn" ASC
+        LIMIT 20
+      `,
+    );
+
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        studentSystemId: row.studentSystemId,
+        name: `${row.firstNameEn} ${row.lastNameEn}`.trim(),
+        className: row.className,
+        sectionName: row.sectionName,
+        guardianName: row.guardianName,
+        guardianPhone: row.guardianPhone,
+        openInvoiceCount: Number(row.openInvoiceCount),
+        totalOutstanding: decimalOrZero(row.totalOutstanding).toFixed(2),
+      })),
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  async searchLedgerStudents(query: string | undefined, actor: AuthContext) {
+    assertFinancePermission(actor, 'ledger:read');
+    const normalizedQuery = query?.trim();
+
+    if (!normalizedQuery || normalizedQuery.length < 2) {
+      return { items: [], generatedAt: new Date().toISOString() };
+    }
+
+    const students = await this.prisma.student.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        invoices: { some: { tenantId: actor.tenantId } },
+        OR: [
+          {
+            studentSystemId: {
+              contains: normalizedQuery,
+              mode: 'insensitive',
+            },
+          },
+          {
+            firstNameEn: {
+              contains: normalizedQuery,
+              mode: 'insensitive',
+            },
+          },
+          {
+            lastNameEn: {
+              contains: normalizedQuery,
+              mode: 'insensitive',
+            },
+          },
+          {
+            invoices: {
+              some: {
+                tenantId: actor.tenantId,
+                invoiceNumber: {
+                  contains: normalizedQuery,
+                  mode: 'insensitive',
+                },
+              },
+            },
+          },
+          {
+            guardianLinks: {
+              some: {
+                tenantId: actor.tenantId,
+                guardian: {
+                  tenantId: actor.tenantId,
+                  primaryPhone: {
+                    contains: normalizedQuery,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            },
+          },
+        ],
+      },
+      include: {
+        class: true,
+        sectionRef: true,
+        guardianLinks: {
+          include: { guardian: true },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          take: 1,
+        },
+        _count: { select: { invoices: true } },
+      },
+      orderBy: [{ firstNameEn: 'asc' }, { lastNameEn: 'asc' }],
+      take: 20,
+    });
+
+    return {
+      items: students.map((student) => ({
+        id: student.id,
+        studentSystemId: student.studentSystemId,
+        name: formatStudentName(student),
+        className: student.class.name,
+        sectionName: student.sectionRef?.name ?? null,
+        guardianName: student.guardianLinks[0]?.guardian.fullName ?? null,
+        guardianPhone: student.guardianLinks[0]?.guardian.primaryPhone ?? null,
+        invoiceCount: student._count.invoices,
+      })),
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   async getStudentFeeLedger(
     studentId: string,
     actor: AuthContext,
@@ -2822,6 +3205,66 @@ export class FinanceService {
       totalRefunded: Number(totalRefunded),
       outstandingBalance: Math.max(0, Number(outstandingBalance)),
       rows,
+    };
+  }
+
+  async getStudentFeeLedgerPage(
+    studentId: string,
+    query: StudentFeeLedgerQueryDto,
+    actor: AuthContext,
+  ) {
+    assertFinancePermission(actor, 'ledger:read');
+
+    if (Boolean(query.fromDate) !== Boolean(query.toDate)) {
+      throw new BadRequestException(
+        'Both fromDate and toDate are required for a student ledger range.',
+      );
+    }
+
+    const period =
+      query.fromDate && query.toDate
+        ? resolveFinanceSummaryPeriod(
+            { fromDate: query.fromDate, toDate: query.toDate },
+            NEPAL_TIME_ZONE,
+          )
+        : null;
+    const ledger = await this.getStudentFeeLedger(studentId, actor, {
+      academicYearId: query.academicYearId,
+      status: query.invoiceStatus,
+    });
+    const matchingRows = ledger.rows.filter((row) => {
+      const rowDate = new Date(row.date);
+      return (
+        (!period ||
+          (rowDate >= period.startUtc && rowDate < period.endExclusiveUtc)) &&
+        (!query.transactionType || row.type === query.transactionType)
+      );
+    });
+    const orderedRows =
+      query.sortDirection === 'asc'
+        ? matchingRows
+        : [...matchingRows].reverse();
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 25;
+    const skip = (page - 1) * limit;
+    const rows = orderedRows.slice(skip, skip + limit);
+
+    return {
+      ...ledger,
+      rows,
+      total: matchingRows.length,
+      page,
+      limit,
+      hasNextPage: skip + rows.length < matchingRows.length,
+      filters: {
+        fromDate: query.fromDate ?? null,
+        toDate: query.toDate ?? null,
+        academicYearId: query.academicYearId ?? null,
+        invoiceStatus: query.invoiceStatus ?? null,
+        transactionType: query.transactionType ?? null,
+        sortDirection: query.sortDirection ?? 'desc',
+      },
+      generatedAt: new Date().toISOString(),
     };
   }
 
@@ -8326,6 +8769,22 @@ function startOfToday() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return today;
+}
+
+function resolveOptionalFinanceReportPeriod(query: FinanceReportQueryDto) {
+  if (!query.fromDate && !query.toDate) {
+    return null;
+  }
+  if (!query.fromDate || !query.toDate) {
+    throw new BadRequestException(
+      'Both fromDate and toDate are required for a finance report range.',
+    );
+  }
+
+  return resolveFinanceSummaryPeriod(
+    { fromDate: query.fromDate, toDate: query.toDate },
+    NEPAL_TIME_ZONE,
+  );
 }
 
 function resolveFinanceSummaryPeriod(

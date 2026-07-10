@@ -31,7 +31,8 @@ describe('Student profile to finance collection UX contract', () => {
     assert.match(page, /section === "collect" && canCollect/);
     assert.match(page, /enabled: Boolean\(studentId\)/);
     assert.match(page, /updateUrl\(\{ studentId: null, source: null, invoiceId: null \}\)/);
-    assert.match(page, /key=\{studentId \? `student-\$\{studentId\}` : ["']invoice-search["']\}/);
+    assert.match(page, /<CollectionStudentDiscovery/);
+    assert.match(page, /key=\{`student-\$\{studentId\}`\}/);
     assert.match(section, /isStudentContextMode\s*\?\s*\(studentCollectionContext\?\.invoices \?\? \[\]\)/);
     assert.match(counter, /Collecting fees for:\s*\{studentContext\.name\}/);
     assert.match(counter, /\{studentContext\.studentSystemId\}/);

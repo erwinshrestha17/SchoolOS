@@ -101,7 +101,48 @@ describe("M3 fees workspace contract", () => {
     assert.match(discounts, /waiverPage/);
     assert.match(closes, /closePage/);
     assert.match(studentLedger, /searchParams\.get\("page"\)/);
-    assert.match(studentLedger, /listInvoicesPage/);
+    assert.match(studentLedger, /searchLedgerStudents/);
+    assert.match(studentLedger, /getStudentFeeLedgerPage/);
+    assert.match(studentLedger, /transactionType/);
+    assert.match(studentLedger, /invoiceStatus/);
+  });
+
+  it("uses a purpose-limited cashier discovery contract with backend outstanding totals", () => {
+    const workspace = read("components/finance/fees-workspace.tsx");
+    const discovery = read("components/finance/collection-student-discovery.tsx");
+    const financeApi = read("lib/api/finance.ts");
+
+    assert.match(workspace, /searchCollectionStudents/);
+    assert.match(workspace, /getInvoiceDetail\(initialInvoiceId\)/);
+    assert.match(discovery, /student name, student ID, invoice number, or guardian phone/i);
+    assert.match(discovery, /student\.totalOutstanding/);
+    assert.match(discovery, /student\.openInvoiceCount/);
+    assert.doesNotMatch(discovery, /\.reduce\(/);
+    assert.match(financeApi, /fees\/collection-students/);
+  });
+
+  it("offers all seven report categories without browser-owned totals", () => {
+    const reports = read("components/finance/finance-report-workspace.tsx");
+    const financeApi = read("lib/api/finance.ts");
+
+    for (const label of [
+      "Collections",
+      "Dues",
+      "Defaulter aging",
+      "Payment methods",
+      "Cashier closes",
+      "Adjustments",
+      "Receipts",
+    ]) {
+      assert.match(reports, new RegExp(`label: "${label}"`));
+    }
+    assert.match(reports, /getCollectionReport/);
+    assert.match(reports, /getPaymentMethodReport/);
+    assert.match(reports, /listCashierClosesPage/);
+    assert.match(reports, /listFinanceApprovalRequests/);
+    assert.match(reports, /BsDateField/);
+    assert.doesNotMatch(reports, /\.reduce\(/);
+    assert.match(financeApi, /fees\/reports\/payment-methods/);
   });
 
   it("keeps payment writes idempotent and protected receipt access authenticated", () => {

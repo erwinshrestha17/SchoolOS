@@ -1529,6 +1529,39 @@ export type StudentCollectionContext = {
   }>;
 };
 
+export type CollectionStudentSearchResult = {
+  id: string;
+  studentSystemId: string;
+  name: string;
+  className: string;
+  sectionName: string | null;
+  guardianName: string | null;
+  guardianPhone: string | null;
+  openInvoiceCount: number;
+  totalOutstanding: FinanceMoneyAmount;
+};
+
+export type CollectionStudentSearchResponse = {
+  items: CollectionStudentSearchResult[];
+  generatedAt: string;
+};
+
+export type LedgerStudentSearchResult = {
+  id: string;
+  studentSystemId: string;
+  name: string;
+  className: string;
+  sectionName: string | null;
+  guardianName: string | null;
+  guardianPhone: string | null;
+  invoiceCount: number;
+};
+
+export type LedgerStudentSearchResponse = {
+  items: LedgerStudentSearchResult[];
+  generatedAt: string;
+};
+
 export type InvoiceDetailLine = {
   id: string;
   feeHeadId: string;
@@ -1637,7 +1670,7 @@ export type InvoiceDetail = {
 export type StudentFeeLedgerRow = {
   id: string;
   date: string;
-  type: "INVOICE" | "PAYMENT" | "WAIVER" | "REFUND";
+  type: "INVOICE" | "PAYMENT" | "WAIVER" | "REFUND" | "REVERSAL";
   reference: string;
   description: string;
   debit: number;
@@ -1668,6 +1701,22 @@ export type StudentFeeLedger = {
   totalRefunded: number;
   outstandingBalance: number;
   rows: StudentFeeLedgerRow[];
+};
+
+export type StudentFeeLedgerPage = StudentFeeLedger & {
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  filters: {
+    fromDate: string | null;
+    toDate: string | null;
+    academicYearId: string | null;
+    invoiceStatus: string | null;
+    transactionType: StudentFeeLedgerRow["type"] | null;
+    sortDirection: "asc" | "desc";
+  };
+  generatedAt: string;
 };
 
 export type PaymentReceipt = {
@@ -1885,6 +1934,29 @@ export type FeeCollectionReport = {
     feeHeadName: string;
     amount: FinanceMoneyAmount;
   }>;
+  period: {
+    fromDate: string;
+    toDate: string;
+    timeZone: string;
+  } | null;
+  generatedAt: string;
+};
+
+export type PaymentMethodReport = {
+  rows: Array<{
+    method: string;
+    paymentCount: number;
+    refundCount: number;
+    grossAmount: FinanceMoneyAmount;
+    refundedAmount: FinanceMoneyAmount;
+    netAmount: FinanceMoneyAmount;
+  }>;
+  period: {
+    fromDate: string;
+    toDate: string;
+    timeZone: string;
+  } | null;
+  generatedAt: string;
 };
 
 export type DefaulterSummary = {

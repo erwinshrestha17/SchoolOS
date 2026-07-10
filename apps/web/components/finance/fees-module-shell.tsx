@@ -91,7 +91,7 @@ const moreNavigation: FeesNavigationItem[] = [
     href: "/dashboard/fees/ledgers",
     label: "Student ledgers",
     icon: FileText,
-    permissions: ["fees:manage"],
+    permissions: ["ledger:read"],
   },
   {
     href: "/dashboard/fees/reports",

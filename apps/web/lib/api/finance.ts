@@ -1,11 +1,13 @@
 import type {
   CashierClosePreview,
   CashierCloseSummary,
+  CollectionStudentSearchResponse,
   DefaulterReminderResult,
   DefaulterSummary,
   DiscountRule,
   FeeBillingRun,
   FeeBillingRunPage,
+  FeeCollectionReport,
   FinanceApprovalRequestPage,
   FinanceDashboardSummary,
   FeeHeadSummary,
@@ -13,7 +15,9 @@ import type {
   InvoiceDetail,
   InvoiceSummary,
   InvoiceSummaryPage,
+  LedgerStudentSearchResponse,
   PaymentGatewayReadiness,
+  PaymentMethodReport,
   PaymentRefundPayload,
   PaymentRefundSummary,
   ReceiptView,
@@ -21,7 +25,7 @@ import type {
   ReportDefinition,
   ReportExportRequest,
   StudentCollectionContext,
-  StudentFeeLedger,
+  StudentFeeLedgerPage,
   WaiverRecord,
   DiscountRulePage,
   WaiverRecordPage,
@@ -202,8 +206,35 @@ export const financeApi = {
   getInvoiceDetail: (invoiceId: string) =>
     request<InvoiceDetail>(`/fees/invoices/${encodeURIComponent(invoiceId)}`),
   getStudentFeeLedger: (studentId: string) =>
-    request<StudentFeeLedger>(
+    request<StudentFeeLedgerPage>(
       `/fees/students/${encodeURIComponent(studentId)}/ledger`,
+    ),
+  getStudentFeeLedgerPage: (
+    studentId: string,
+    params?: {
+      page?: number;
+      limit?: number;
+      fromDate?: string;
+      toDate?: string;
+      academicYearId?: string;
+      invoiceStatus?: string;
+      transactionType?: string;
+      sortDirection?: "asc" | "desc";
+    },
+  ) =>
+    request<StudentFeeLedgerPage>(
+      withQuery(
+        `/fees/students/${encodeURIComponent(studentId)}/ledger`,
+        params ?? {},
+      ),
+    ),
+  searchCollectionStudents: (q: string) =>
+    request<CollectionStudentSearchResponse>(
+      withQuery("/fees/collection-students", { q }),
+    ),
+  searchLedgerStudents: (q: string) =>
+    request<LedgerStudentSearchResponse>(
+      withQuery("/fees/ledger-students", { q }),
     ),
   getStudentCollectionContext: (studentId: string) =>
     request<StudentCollectionContext>(
@@ -257,6 +288,14 @@ export const financeApi = {
         month: params?.month ? String(params.month) : undefined,
         year: params?.year ? String(params.year) : undefined,
       }),
+    ),
+  getCollectionReport: (params?: { fromDate?: string; toDate?: string }) =>
+    request<FeeCollectionReport>(
+      withQuery("/fees/reports/collections", params ?? {}),
+    ),
+  getPaymentMethodReport: (params?: { fromDate?: string; toDate?: string }) =>
+    request<PaymentMethodReport>(
+      withQuery("/fees/reports/payment-methods", params ?? {}),
     ),
   listDiscountsPage: (params?: {
     page?: number;

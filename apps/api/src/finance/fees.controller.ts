@@ -27,6 +27,9 @@ import { VoidInvoiceDto } from './dto/void-invoice.dto';
 import { DuesQueryDto } from './dto/dues-query.dto';
 import { ListDefaultersDto } from './dto/list-defaulters.dto';
 import { FinanceDashboardSummaryQueryDto } from './dto/finance-dashboard-summary-query.dto';
+import { FinanceReportQueryDto } from './dto/finance-report-query.dto';
+import { SearchCollectionStudentsDto } from './dto/search-collection-students.dto';
+import { StudentFeeLedgerQueryDto } from './dto/student-fee-ledger-query.dto';
 import {
   ListBillingRunsQueryDto,
   ListDiscountRulesQueryDto,
@@ -106,13 +109,32 @@ export class FeesController {
     return this.financeService.getStudentCollectionContext(studentId, auth);
   }
 
-  @Get('students/:studentId/ledger')
-  @Permissions('fees:manage')
-  getStudentFeeLedger(
-    @Param('studentId') studentId: string,
+  @Get('collection-students')
+  @Permissions('payments:collect')
+  searchCollectionStudents(
+    @Query() query: SearchCollectionStudentsDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.financeService.getStudentFeeLedger(studentId, auth);
+    return this.financeService.searchCollectionStudents(query.q, auth);
+  }
+
+  @Get('ledger-students')
+  @Permissions('ledger:read')
+  searchLedgerStudents(
+    @Query() query: SearchCollectionStudentsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.searchLedgerStudents(query.q, auth);
+  }
+
+  @Get('students/:studentId/ledger')
+  @Permissions('ledger:read')
+  getStudentFeeLedger(
+    @Param('studentId') studentId: string,
+    @Query() query: StudentFeeLedgerQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.getStudentFeeLedgerPage(studentId, query, auth);
   }
 
   @Post('invoices/:id/void')
@@ -189,8 +211,20 @@ export class FeesController {
 
   @Get('reports/collections')
   @Permissions('fees:manage')
-  getCollectionReport(@CurrentAuth() auth: AuthContext) {
-    return this.financeService.getCollectionReport(auth);
+  getCollectionReport(
+    @Query() query: FinanceReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.getCollectionReport(auth, query);
+  }
+
+  @Get('reports/payment-methods')
+  @Permissions('fees:manage')
+  getPaymentMethodReport(
+    @Query() query: FinanceReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.getPaymentMethodReport(auth, query);
   }
 
   @Get('reports/dues')
