@@ -372,7 +372,6 @@ export function DashboardCommandCenter({
         <TodaysTimetablePanel />
         <RecentActivityPanel dashboard={dashboard} />
         <RecentNoticesPanel />
-        <SystemReadinessPanel modules={dashboard.modules} />
       </aside>
     </div>
   );
@@ -1110,51 +1109,6 @@ function RecentNoticeRow({ notice }: { notice: NoticeSummary }) {
   );
 }
 
-function SystemReadinessPanel({
-  modules,
-}: {
-  modules: OperationalModuleSummary[];
-}) {
-  const visibleModules = modules
-    .filter((module) => module.status !== "permissionDenied")
-    .slice(0, 8);
-
-  return (
-    <SectionCard
-      title="Module readiness"
-      description="A compact view of the enabled school workspaces."
-      noPadding
-    >
-      <div className="divide-y divide-slate-100">
-        {visibleModules.map((module) => {
-          const definition = MODULE_DEFINITIONS[module.module];
-          const readiness = readinessPresentation(module.status);
-          return (
-            <div
-              key={module.module}
-              className="flex items-center gap-3 px-5 py-3.5 lg:px-6"
-            >
-              <span
-                className={cn(
-                  "h-2.5 w-2.5 shrink-0 rounded-full",
-                  readiness.dotClassName,
-                )}
-                aria-hidden="true"
-              />
-              <span className="min-w-0 flex-1 text-sm font-semibold text-slate-700">
-                {definition.shortLabel}
-              </span>
-              <span className="shrink-0 text-xs font-bold text-slate-500">
-                {readiness.label}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </SectionCard>
-  );
-}
-
 function DashboardSection({
   eyebrow,
   title,
@@ -1472,16 +1426,6 @@ function workspaceDescription(
     return "Current operational information is available below.";
   }
   return "No outstanding operational work is currently reported.";
-}
-
-function readinessPresentation(status: OperationalModuleSummary["status"]) {
-  return {
-    ready: { label: "Available", dotClassName: "bg-emerald-500" },
-    empty: { label: "Clear", dotClassName: "bg-slate-400" },
-    partial: { label: "Partial", dotClassName: "bg-amber-500" },
-    locked: { label: "Not enabled", dotClassName: "bg-slate-300" },
-    permissionDenied: { label: "Access limited", dotClassName: "bg-slate-300" },
-  }[status];
 }
 
 function formatRecentDate(value: string) {

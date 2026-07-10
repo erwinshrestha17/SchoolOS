@@ -989,7 +989,6 @@ describe("SchoolOS web production contracts", () => {
     assert.match(dashboard, /severityPresentation/);
     assert.match(dashboard, /Pending Approvals & Alerts/);
     assert.match(dashboard, /Today at a glance/);
-    assert.match(dashboard, /Module readiness/);
     assert.match(dashboard, /["']\/dashboard\/fees["']/);
     assert.doesNotMatch(dashboard, /["']\/dashboard\/finance["']/);
     assert.doesNotMatch(
@@ -1037,7 +1036,6 @@ describe("SchoolOS web production contracts", () => {
       "components/dashboard/dashboard-command-center.tsx",
     ]);
 
-    assert.match(dashboard, /Module readiness/);
     assert.match(dashboard, /No daily-operation summaries are available/);
     assert.match(dashboard, /No recent operational activity is available/);
     assert.match(dashboard, /\?\? \[\]/);

@@ -42,7 +42,6 @@ describe('dashboard command center', () => {
       'Department queues',
       'Recent activity',
       'Recent notices',
-      'Module readiness',
       'DashboardUnavailableState',
     ]) {
       assert.ok(commandCenter.includes(marker), `Missing dashboard section: ${marker}`);
