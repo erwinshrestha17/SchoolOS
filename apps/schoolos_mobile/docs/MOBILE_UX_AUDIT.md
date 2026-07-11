@@ -1,6 +1,6 @@
 # SchoolOS Mobile — Phase 1 UX/Responsiveness/Size Audit
 
-**Status:** Snapshot as of 2026-07-11, main branch (commits through `52c68cba`). Updated after Phase 5 real-device verification.
+**Status:** Snapshot as of 2026-07-11, main branch (commits through `0f83563a`). Updated after Phase 5 real-device verification and removal of the parent-teacher chat feature.
 
 **Scope:** `apps/schoolos_mobile`, Parent / Teacher / Principal personas only, per `docs/DESIGN_SYSTEM.md` and the mobile companion-app brief. Driver/Staff/Admin/Student surfaces are noted where they share code with the three in-scope personas, but were not independently audited.
 
@@ -8,13 +8,11 @@
 
 ---
 
-## 0. Scope-boundary finding — needs a product decision
+## 0. Scope-boundary finding — RESOLVED
 
-Walking the Parent and Teacher personas live on a real device (Phase 5) surfaced a fully-built, working **parent-teacher direct chat feature**: Parent's Quick Actions include "Message teacher" → `ParentChatScreen` ("Start chat" CTA, thread UI); Teacher's Today screen includes a "Messages" card and a full Messages tab with parent threads, quiet-hours-aware reply composer, and a "Your message has been sent, the class teacher usually replies during school chat hours: Sunday-Thursday 4-7 PM..." confirmation. This is a complete, real feature, not a stub.
+Walking the Parent and Teacher personas live on a real device (Phase 5) surfaced a fully-built, working **parent-teacher direct chat feature**: Parent's Quick Actions included "Message teacher" → `ParentChatScreen` ("Start chat" CTA, thread UI); Teacher's Today screen had a "Messages" card and a full Messages tab with parent threads, quiet-hours-aware reply composer, and a "Your message has been sent, the class teacher usually replies during school chat hours: Sunday-Thursday 4-7 PM..." confirmation. This directly contradicted the brief's *"Do not add: Parent-teacher direct chat"* boundary.
 
-**The brief's Product Boundaries section explicitly says:** *"Do not add: Parent-teacher direct chat."*
-
-This isn't something introduced during this audit — the feature already existed in the codebase before this session's work began. I'm flagging it because it's a direct, unambiguous conflict between the written product boundary and what's actually shipped, and it's not my call whether to remove it, keep it, or treat the boundary as outdated. Worth a decision before this goes further, since every fix in this doc assumes the current feature set is the intended one.
+**Removed in commit `0f83563a`**: both screens, all routes and deep-link entries, both bottom-nav/quick-action entry points, all providers/repository methods/domain models on both sides, and the now-unused `TeacherQuietHoursBanner` widget. Teacher's bottom nav is now 4 items (Today, Attendance, Homework, Profile). Parent's "Help & Support" (previously routed to chat) now shows "Contact your school administrator," matching the pattern Teacher's own Help & Support entry already used. Verified live on-device on both personas post-removal: no crashes, quick-action grids render correctly with the remaining tiles. `flutter analyze` clean, 136/136 tests passing.
 
 ---
 
