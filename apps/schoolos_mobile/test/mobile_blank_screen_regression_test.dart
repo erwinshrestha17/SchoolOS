@@ -1462,7 +1462,8 @@ void main() {
             date: DateTime(2026, 6, 19),
             className: 'Grade 10 - Science and Technology Section',
             sectionName: 'Diamond',
-            subjectName: 'Advanced Computer Science and Programming Fundamentals',
+            subjectName:
+                'Advanced Computer Science and Programming Fundamentals',
             room: 'Senior Block Laboratory Room 3B',
             startsAt: '09:00',
             endsAt: '09:45',
@@ -1545,10 +1546,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining('Guardian Association'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Guardian Association'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

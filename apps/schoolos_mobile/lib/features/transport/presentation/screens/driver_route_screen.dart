@@ -361,9 +361,9 @@ class _StudentTile extends StatelessWidget {
                       _studentMeta(student),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: AppColors.slate500),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.slate500,
+                      ),
                     ),
                   ],
                 ),

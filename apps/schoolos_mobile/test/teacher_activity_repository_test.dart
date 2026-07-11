@@ -214,10 +214,9 @@ void main() {
         ),
       ).captured.cast<Map<String, dynamic>>();
       expect(captured, hasLength(2));
-      expect(
-        captured.map((payload) => payload['clientSubmissionId']).toSet(),
-        {'6731ea4f-5c37-4b16-bb72-955abbadc31b'},
-      );
+      expect(captured.map((payload) => payload['clientSubmissionId']).toSet(), {
+        '6731ea4f-5c37-4b16-bb72-955abbadc31b',
+      });
     },
   );
 }

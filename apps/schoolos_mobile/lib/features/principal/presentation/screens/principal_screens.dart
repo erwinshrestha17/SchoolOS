@@ -82,7 +82,7 @@ class _PrincipalAttentionScreenState
               onChanged: (value) => setState(() => filter = value),
             ),
             const SizedBox(height: AppSpacing.md),
-            _SummaryStrip(
+            _SummaryCards(
               values: [
                 _SummaryValue(
                   'Critical',
@@ -1764,59 +1764,6 @@ class _SummaryCards extends StatelessWidget {
   }
 }
 
-class _SummaryStrip extends StatelessWidget {
-  const _SummaryStrip({required this.values});
-  final List<_SummaryValue> values;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Row(
-        children: [
-          for (final value in values) ...[
-            Expanded(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _IconBubble(icon: value.icon, color: value.color, size: 44),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          value.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.slate600,
-                          ),
-                        ),
-                        Text(
-                          '${value.value}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(
-                                color: value.color,
-                                fontWeight: FontWeight.w900,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _ItemList extends StatelessWidget {
   const _ItemList({
     required this.items,
@@ -1973,9 +1920,7 @@ class _MenuGroup extends StatelessWidget {
                           ),
                           title: Text(
                             item.title,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
                           trailing: const Icon(Icons.chevron_right_rounded),
                           onTap: () => context.go(item.route),
@@ -2049,10 +1994,10 @@ class _QuickAction extends StatelessWidget {
 }
 
 class _IconBubble extends StatelessWidget {
-  const _IconBubble({required this.icon, required this.color, this.size = 50});
+  const _IconBubble({required this.icon, required this.color});
   final IconData icon;
   final Color color;
-  final double size;
+  static const double size = 50;
 
   @override
   Widget build(BuildContext context) {

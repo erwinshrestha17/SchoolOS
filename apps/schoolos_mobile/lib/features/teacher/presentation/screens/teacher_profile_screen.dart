@@ -204,10 +204,7 @@ class _MenuTile extends StatelessWidget {
           icon,
           color: locked ? AppColors.slate400 : AppColors.primary,
         ),
-        title: Text(
-          label,
-          style: const TextStyle(fontWeight: FontWeight.w800),
-        ),
+        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
         subtitle: Text(subtitle),
         trailing: locked
             ? const Icon(Icons.lock_outline_rounded, size: 18)

@@ -330,38 +330,41 @@ void main() {
       ).called(1);
     });
 
-    test('passes category and month filters to the activity feed endpoint', () async {
-      when(
-        () => apiClient.get<dynamic>(
-          '/mobile/students/child-1/activity-feed',
-          queryParameters: any(named: 'queryParameters'),
-        ),
-      ).thenAnswer(
-        (_) async => Response(
-          requestOptions: RequestOptions(
-            path: '/mobile/students/child-1/activity-feed',
+    test(
+      'passes category and month filters to the activity feed endpoint',
+      () async {
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/students/child-1/activity-feed',
+            queryParameters: any(named: 'queryParameters'),
           ),
-          data: {'items': <dynamic>[]},
-        ),
-      );
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/students/child-1/activity-feed',
+            ),
+            data: {'items': <dynamic>[]},
+          ),
+        );
 
-      await repository.getActivityFeedForChild(
-        'child-1',
-        category: 'LEARNING',
-        month: '2026-07',
-      );
+        await repository.getActivityFeedForChild(
+          'child-1',
+          category: 'LEARNING',
+          month: '2026-07',
+        );
 
-      verify(
-        () => apiClient.get<dynamic>(
-          '/mobile/students/child-1/activity-feed',
-          queryParameters: {
-            'take': '20',
-            'category': 'LEARNING',
-            'month': '2026-07',
-          },
-        ),
-      ).called(1);
-    });
+        verify(
+          () => apiClient.get<dynamic>(
+            '/mobile/students/child-1/activity-feed',
+            queryParameters: {
+              'take': '20',
+              'category': 'LEARNING',
+              'month': '2026-07',
+            },
+          ),
+        ).called(1);
+      },
+    );
 
     test('submits a reaction as the authenticated guardian only', () async {
       when(
