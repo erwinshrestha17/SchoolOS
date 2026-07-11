@@ -301,6 +301,7 @@ void main() {
     );
 
     expect(find.text('Teacher Today Body'), findsOneWidget);
+    expect(find.text('Operational snapshot'), findsNothing);
     expect(find.text('Today'), findsOneWidget);
     expect(find.text('Attendance'), findsOneWidget);
     expect(find.text('Homework'), findsOneWidget);
@@ -400,6 +401,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Namaste, Erwin'), findsOneWidget);
+    expect(find.text("Aarav's school day"), findsOneWidget);
+    expect(find.text('Operational snapshot'), findsNothing);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('Homework').last);

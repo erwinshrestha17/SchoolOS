@@ -16,6 +16,7 @@ class RoleShellScaffold extends StatelessWidget {
     required this.body,
     this.title = 'SchoolOS Mobile',
     this.floatingActionButton,
+    this.showAppBar = true,
   });
 
   final String role;
@@ -23,6 +24,7 @@ class RoleShellScaffold extends StatelessWidget {
   final Widget body;
   final String title;
   final Widget? floatingActionButton;
+  final bool showAppBar;
 
   @override
   Widget build(BuildContext context) {
@@ -32,34 +34,37 @@ class RoleShellScaffold extends StatelessWidget {
         ? _summaryPersonaForRole(role)
         : null;
     final isStudent = role.toUpperCase() == 'STUDENT';
+    final compactNavigation = MediaQuery.sizeOf(context).width < 360;
 
     return AppScaffold(
-      appBar: AppBar(
-        title: Text(title),
-        actions: isStudent
-            ? const []
-            : [
-                IconButton(
-                  tooltip: 'Notifications',
-                  onPressed: () => context.go(AppRoutes.notifications),
-                  icon: const Icon(Icons.notifications_none_rounded),
-                ),
-                IconButton(
-                  tooltip: 'Profile',
-                  onPressed: () => context.go(
-                    role.toUpperCase() == 'TEACHER'
-                        ? AppRoutes.teacherProfile
-                        : AppRoutes.profile,
-                  ),
-                  icon: const Icon(Icons.account_circle_rounded),
-                ),
-                IconButton(
-                  tooltip: 'Settings',
-                  onPressed: () => context.go(AppRoutes.settings),
-                  icon: const Icon(Icons.settings_rounded),
-                ),
-              ],
-      ),
+      appBar: showAppBar
+          ? AppBar(
+              title: Text(title),
+              actions: isStudent
+                  ? const []
+                  : [
+                      IconButton(
+                        tooltip: 'Notifications',
+                        onPressed: () => context.go(AppRoutes.notifications),
+                        icon: const Icon(Icons.notifications_none_rounded),
+                      ),
+                      IconButton(
+                        tooltip: 'Profile',
+                        onPressed: () => context.go(
+                          role.toUpperCase() == 'TEACHER'
+                              ? AppRoutes.teacherProfile
+                              : AppRoutes.profile,
+                        ),
+                        icon: const Icon(Icons.account_circle_rounded),
+                      ),
+                      IconButton(
+                        tooltip: 'Settings',
+                        onPressed: () => context.go(AppRoutes.settings),
+                        icon: const Icon(Icons.settings_rounded),
+                      ),
+                    ],
+            )
+          : null,
       floatingActionButton: floatingActionButton,
       bottomNavigationBar: items.length < 2
           ? null
@@ -69,38 +74,49 @@ class RoleShellScaffold extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(AppRadius.xxl),
-                  child: NavigationBar(
-                    selectedIndex: safeIndex,
-                    height: 68,
-                    backgroundColor:
-                        Theme.of(context).brightness == Brightness.dark
-                        ? AppColors.overlayDark
-                        : Colors.white,
-                    indicatorColor: _roleColor(role).withValues(alpha: 0.14),
-                    labelBehavior:
-                        NavigationDestinationLabelBehavior.alwaysShow,
-                    onDestinationSelected: (index) {
-                      final item = items[index];
-                      if (item.route != null) {
-                        context.go(item.route!);
-                        return;
-                      }
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '${item.label} is not available in this mobile workspace yet.',
+                  child: NavigationBarTheme(
+                    data: NavigationBarThemeData(
+                      labelTextStyle: WidgetStatePropertyAll(
+                        TextStyle(
+                          fontSize: compactNavigation ? 10 : 12,
+                          letterSpacing: compactNavigation ? -0.35 : 0,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    child: NavigationBar(
+                      selectedIndex: safeIndex,
+                      height: 68,
+                      backgroundColor:
+                          Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.overlayDark
+                          : Colors.white,
+                      indicatorColor: _roleColor(role).withValues(alpha: 0.14),
+                      labelBehavior:
+                          NavigationDestinationLabelBehavior.alwaysShow,
+                      onDestinationSelected: (index) {
+                        final item = items[index];
+                        if (item.route != null) {
+                          context.go(item.route!);
+                          return;
+                        }
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '${item.label} is not available in this mobile workspace yet.',
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                    destinations: [
-                      for (final item in items)
-                        NavigationDestination(
-                          icon: Icon(item.icon),
-                          selectedIcon: Icon(item.selectedIcon),
-                          label: item.label,
-                        ),
-                    ],
+                        );
+                      },
+                      destinations: [
+                        for (final item in items)
+                          NavigationDestination(
+                            icon: Icon(item.icon),
+                            selectedIcon: Icon(item.selectedIcon),
+                            label: item.label,
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -121,7 +137,6 @@ class RoleShellScaffold extends StatelessWidget {
 
   static OperationalMobilePersona? _summaryPersonaForRole(String role) {
     return switch (role.toUpperCase()) {
-      'TEACHER' => OperationalMobilePersona.teacher,
       'DRIVER' => OperationalMobilePersona.driver,
       'STAFF' => OperationalMobilePersona.staff,
       'ADMIN' || 'PRINCIPAL' => OperationalMobilePersona.principal,

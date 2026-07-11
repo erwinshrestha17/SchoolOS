@@ -14,6 +14,7 @@ import 'package:schoolos_mobile/features/parent/presentation/screens/parent_cale
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_canteen_screen.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_consents_screen.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_fees_receipts_screen.dart';
+import 'package:schoolos_mobile/features/parent/presentation/screens/parent_fees_screen.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_library_screen.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_report_cards_screen.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_transport_screen.dart';
@@ -183,10 +184,148 @@ class _ParentScreenApiClient extends ApiClient {
   };
 }
 
+class _ParentBigFeesApiClient extends ApiClient {
+  _ParentBigFeesApiClient() : super(tokenStorage: _TestTokenStorage());
+
+  @override
+  Future<Response<T>> get<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
+    return Response<T>(
+      data: _payload(path) as T,
+      requestOptions: RequestOptions(path: path),
+    );
+  }
+
+  Map<String, dynamic> _payload(String path) {
+    if (path == '/mobile/me/students') {
+      return {
+        'items': [_child],
+      };
+    }
+    if (path == '/mobile/me/dashboard') {
+      return _dashboard;
+    }
+    if (path == '/mobile/students/child-1/profile') {
+      return {
+        'profile': {
+          'studentSystemId': 'STU-001',
+          'privacy': {
+            'photoUsageConsent': false,
+            'dataProcessingConsent': true,
+          },
+        },
+      };
+    }
+    if (path == '/mobile/students/child-1/payment-gateway-readiness') {
+      return {
+        'enabled': true,
+        'status': 'ready',
+        'provider': 'ESEWA',
+        'providers': ['ESEWA'],
+        'sandbox': true,
+        'message': 'Sandbox payments are enabled for this school.',
+      };
+    }
+    return {};
+  }
+
+  static const _child = {
+    'id': 'child-1',
+    'name': 'Aaradhya Chaudhary Shrestha',
+    'classSection': 'Grade 10 - Science and Technology Section - Diamond',
+    'rollNumber': '7',
+    'academicYear': '2026',
+    'relationship': 'Daughter',
+  };
+
+  static const _dashboard = {
+    'selectedStudent': _child,
+    'attendance': {
+      'today': {'label': 'Present today'},
+    },
+    'homework': {'pendingCount': 0, 'nextDueAt': null},
+    'fees': {
+      'totalOutstanding': 12345678,
+      'paidAmount': 1234567,
+      'totalAmount': 13580245,
+      'overdueCount': 1,
+      'nextDueDate': '2026-06-25T00:00:00.000Z',
+      'recentInvoices': [
+        {
+          'id': 'invoice-1',
+          'invoiceNumber': 'INV-2026-TRIMESTER-3-ANNUAL-TUITION-AND-TRANSPORT',
+          'status': 'ISSUED',
+          'totalAmount': 12345678,
+          'paidAmount': 0,
+          'outstandingAmount': 12345678,
+          'isOverdue': true,
+          'receipts': [],
+        },
+      ],
+      'recentReceipts': [],
+    },
+    'notices': {'unreadCount': 0},
+    'transport': {
+      'activeTrip': {
+        'studentStatus': 'WAITING',
+        'route': {'name': 'Route A'},
+      },
+    },
+    'canteen': {
+      'wallet': {'balance': 450, 'isLowBalance': false},
+    },
+    'latestActivity': {'title': 'Class update', 'caption': 'Learning update'},
+    'modules': {
+      'attendance': true,
+      'fees': true,
+      'homework': true,
+      'activity': true,
+      'transport': true,
+      'canteen': true,
+    },
+  };
+}
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
+
+  testWidgets(
+    'parent fees screen handles large currency values and long invoice numbers without overflow',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final sharedPrefs = await SharedPreferences.getInstance();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appPreferencesServiceProvider.overrideWithValue(
+              AppPreferencesService(sharedPrefs),
+            ),
+            apiClientProvider.overrideWithValue(_ParentBigFeesApiClient()),
+          ],
+          child: MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(textScaler: TextScaler.linear(1.3)),
+              child: const ParentFeesScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('NPR 12345678'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   test('parent notice state tracks local read acknowledgement only', () {
     final controller = ParentFeatureController();

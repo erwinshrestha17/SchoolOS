@@ -76,6 +76,55 @@ describe('dashboard command center', () => {
     assert.doesNotMatch(commandCenter, /notice\.body/);
   });
 
+  it('builds the six-card KPI strip only from real backend fields, full-width above both columns', () => {
+    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+
+    for (const label of [
+      'Active Students',
+      'Present Today',
+      'Collected Today',
+      'Pending Approvals',
+      'Staff Present',
+      'Overdue Fees',
+    ]) {
+      assert.ok(commandCenter.includes(`label: "${label}"`), `Missing KPI card: ${label}`);
+    }
+
+    // Staff Present and Overdue Fees needed two new real backend metrics
+    // (staffPresentToday, overdueFeesAmount) added 2026-07-10 specifically so
+    // these cards would be honest instead of omitted or faked.
+    assert.match(commandCenter, /metric\(hr, "staffPresentToday"\)/);
+    assert.match(commandCenter, /metric\(fees, "overdueFeesAmount"\)/);
+
+    // Pending Approvals sums real attentionItems already on the payload —
+    // no second query — and has no href since it has no single destination.
+    assert.match(
+      commandCenter,
+      /attentionItems\.reduce\(\s*\n\s*\(sum, item\) => sum \+ item\.count,/,
+    );
+
+    assert.match(commandCenter, /cards\.slice\(0, 6\)/);
+    assert.match(commandCenter, /sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6/);
+
+    // The KPI strip must render outside/above the two-column
+    // main-content/aside grid so it spans the full page width, not just the
+    // narrower left column.
+    const returnIndex = commandCenter.indexOf('return (');
+    const pulseIndex = commandCenter.indexOf('School pulse');
+    const twoColumnGridIndex = commandCenter.indexOf(
+      "xl:grid-cols-[minmax(0,1fr)_24rem]",
+    );
+    assert.ok(returnIndex < pulseIndex && pulseIndex < twoColumnGridIndex);
+  });
+
+  it('adds real backend fields for staff present and overdue fee amount instead of omitting the KPIs', () => {
+    const service = read('../api/src/operational-summary/operational-summary.service.ts');
+
+    assert.match(service, /this\.def\('staffPresentToday', 'staffAttendance'/);
+    assert.match(service, /function overdueFeesAmountMetric|private async overdueFeesAmountMetric/);
+    assert.match(service, /Math\.max\(0, invoiceTotal - paidTotal \+ refundTotal\)/);
+  });
+
   it('shows Today\'s Timetable using the real ISO weekday convention, not JS getDay()', () => {
     const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
 

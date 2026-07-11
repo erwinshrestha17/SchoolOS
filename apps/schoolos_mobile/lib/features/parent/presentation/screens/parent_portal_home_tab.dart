@@ -75,334 +75,218 @@ class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
       );
     }
 
-    return ListView(
-      key: const PageStorageKey('parent-home'),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-      children: [
-        Text(
-          'Namaste, ${_firstName(widget.data.parentName)}',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            color: ParentPortalColors.navy,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 5),
-        Row(
-          children: [
-            const Icon(
-              Icons.family_restroom_rounded,
-              size: 17,
-              color: ParentPortalColors.muted,
+    return RefreshIndicator(
+      onRefresh: () => ref.refresh(parentPortalDataProvider.future),
+      child: ListView(
+        key: const PageStorageKey('parent-home'),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+        children: [
+          Text(
+            'Namaste, ${_firstName(widget.data.parentName)}',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: ParentPortalColors.navy,
+              fontWeight: FontWeight.w900,
             ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                '${activeChild.name} • ${activeChild.classSection} • ${activeChild.attendanceTime}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: ParentPortalColors.muted,
+          ),
+          const SizedBox(height: 5),
+          Row(
+            children: [
+              const Icon(
+                Icons.family_restroom_rounded,
+                size: 17,
+                color: ParentPortalColors.muted,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '${activeChild.name} • ${activeChild.classSection} • ${activeChild.attendanceTime}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: ParentPortalColors.muted,
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: ParentPortalColors.orangeSoft,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: ParentPortalColors.orange.withValues(alpha: .45),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (linkedCount > 1) ...[
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final child in widget.data.children) ...[
+                    ChildSelectorChip(
+                      label: child.name.split(' ').first,
+                      selected: activeChild.id == child.id,
+                      onSelected: () => _selectChild(child.id),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ],
               ),
             ),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+            const SizedBox(height: 16),
+          ] else
+            const SizedBox(height: 8),
+          if (actions.isNotEmpty) ...[
+            PortalCard(
+              color: ParentPortalColors.orangeSoft,
+              borderColor: ParentPortalColors.orange.withValues(alpha: .35),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.error_outline_rounded,
-                    size: 17,
-                    color: ParentPortalColors.orange,
+                  Row(
+                    children: [
+                      AvatarInitials(
+                        name: activeChild.name,
+                        radius: 21,
+                        backgroundColor: Colors.white,
+                        foregroundColor: ParentPortalColors.orange,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '${activeChild.name} needs your attention',
+                          style: const TextStyle(
+                            color: ParentPortalColors.navy,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 7),
-                  Text(
-                    actions.isEmpty
-                        ? 'No urgent item'
-                        : '${actions.length} item${actions.length == 1 ? '' : 's'} need attention',
-                    style: TextStyle(
-                      color: ParentPortalColors.orange,
-                      fontWeight: FontWeight.w800,
+                  const SizedBox(height: 14),
+                  for (var index = 0; index < actions.length; index++) ...[
+                    if (index > 0) const SizedBox(height: 9),
+                    _AttentionLine(
+                      icon: actions[index].icon,
+                      text: actions[index].label,
+                      onTap: () => context.push(actions[index].route),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => context.push(actions.first.route),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: ParentPortalColors.orange,
+                      ),
+                      child: const Text('Review now'),
                     ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: 24),
+          ],
+          ParentSectionHeader(
+            title: '${activeChild.name.split(' ').first}\'s school day',
           ),
-        ),
-        const SizedBox(height: 16),
-        if (linkedCount > 1) ...[
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final child in widget.data.children) ...[
-                  ChildSelectorChip(
-                    label: child.name.split(' ').first,
-                    selected: activeChild.id == child.id,
-                    onSelected: () => _selectChild(child.id),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-              ],
-            ),
+          const SizedBox(height: 10),
+          ParentChildCard(
+            child: activeChild,
+            compact: true,
+            onTap: () =>
+                context.push(AppRoutes.parentChildDetail(activeChild.id)),
+          ),
+          const SizedBox(height: 12),
+          const ParentSectionHeader(title: 'Quick actions'),
+          const SizedBox(height: 10),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.55,
+            children: [
+              ActionTile(
+                icon: Icons.fact_check_outlined,
+                title: 'Attendance',
+                color: ParentPortalColors.orange,
+                onTap: () => context.push(AppRoutes.parentAttendance),
+              ),
+              ActionTile(
+                icon: Icons.chat_bubble_outline_rounded,
+                title: 'Message teacher',
+                color: ParentPortalColors.purple,
+                onTap: () => context.push(AppRoutes.parentChat),
+              ),
+              ActionTile(
+                icon: Icons.payments_outlined,
+                title: 'Pay fees',
+                color: ParentPortalColors.orange,
+                onTap: () => context.push(AppRoutes.parentFees),
+              ),
+              ActionTile(
+                icon: Icons.calendar_month_outlined,
+                title: 'School calendar',
+                color: ParentPortalColors.blue,
+                onTap: () => context.push(AppRoutes.parentCalendar),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
-        ] else
-          const SizedBox(height: 20),
-        ParentSectionHeader(
-          title: '${activeChild.name.split(' ').first} today',
-        ),
-        const SizedBox(height: 10),
-        PortalCard(
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: SummaryMetric(
-                      icon: Icons.fact_check_outlined,
-                      value: _attendanceMetric(activeChild),
-                      label: 'attendance',
-                      color: ParentPortalColors.green,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: SummaryMetric(
-                      icon: Icons.menu_book_outlined,
-                      value: '${activeChild.homeworkPending}',
-                      label: 'homework due',
-                      color: ParentPortalColors.purple,
-                    ),
-                  ),
-                ],
+          const ParentSectionHeader(title: 'Latest update'),
+          const SizedBox(height: 10),
+          if (visibleUpdates.isEmpty)
+            const PortalCard(child: Text('No updates from school yet.'))
+          else
+            PortalCard(
+              onTap: () => context.push(
+                visibleUpdates.first.route ?? AppRoutes.parentUpdates,
               ),
-              const SizedBox(height: 18),
-              Row(
+              child: Row(
                 children: [
-                  Expanded(
-                    child: SummaryMetric(
-                      icon: Icons.notifications_none_rounded,
-                      value: '${activeChild.unreadUpdates}',
-                      label: 'unread update',
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: ParentPortalColors.blueSoft,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.event_outlined,
                       color: ParentPortalColors.blue,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: SummaryMetric(
-                      icon: Icons.directions_bus_outlined,
-                      value: _transportMetric(activeChild),
-                      label: 'transport',
-                      color: ParentPortalColors.orange,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              SummaryMetric(
-                icon: Icons.account_balance_wallet_outlined,
-                value: _feesMetric(activeChild),
-                label: activeChild.feesDue > 0 ? 'fees due' : 'fees paid',
-                color: activeChild.feesDue > 0
-                    ? ParentPortalColors.orange
-                    : ParentPortalColors.green,
-              ),
-              const Divider(height: 28),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.info_outline_rounded,
-                    size: 18,
-                    color: ParentPortalColors.muted,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Summaries refresh from school records. Pull down when you need the latest update.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: ParentPortalColors.muted,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        if (actions.isNotEmpty) ...[
-          PortalCard(
-            color: ParentPortalColors.orangeSoft,
-            borderColor: ParentPortalColors.orange.withValues(alpha: .35),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    AvatarInitials(
-                      name: activeChild.name,
-                      radius: 21,
-                      backgroundColor: Colors.white,
-                      foregroundColor: ParentPortalColors.orange,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '${activeChild.name} needs your attention',
-                        style: const TextStyle(
-                          color: ParentPortalColors.navy,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          visibleUpdates.first.title,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: ParentPortalColors.navy,
+                                fontWeight: FontWeight.w800,
+                              ),
                         ),
-                      ),
+                        Text(
+                          visibleUpdates.first.body,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        Text(
+                          visibleUpdates.first.metadata,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: ParentPortalColors.muted),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                for (var index = 0; index < actions.length; index++) ...[
-                  if (index > 0) const SizedBox(height: 9),
-                  _AttentionLine(
-                    icon: actions[index].icon,
-                    text: actions[index].label,
-                    onTap: () => context.push(actions[index].route),
                   ),
+                  const ListChevron(),
                 ],
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () => context.push(actions.first.route),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: ParentPortalColors.orange,
-                    ),
-                    child: const Text('Review now'),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
         ],
-        const ParentSectionHeader(title: 'Children at a glance'),
-        const SizedBox(height: 10),
-        ParentChildCard(
-          child: activeChild,
-          compact: true,
-          onTap: () =>
-              context.push(AppRoutes.parentChildDetail(activeChild.id)),
-        ),
-        const SizedBox(height: 12),
-        const SizedBox(height: 12),
-        const ParentSectionHeader(title: 'Quick actions'),
-        const SizedBox(height: 10),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 1.55,
-          children: [
-            ActionTile(
-              icon: Icons.fact_check_outlined,
-              title: 'Attendance',
-              color: ParentPortalColors.orange,
-              onTap: () => context.push(AppRoutes.parentAttendance),
-            ),
-            ActionTile(
-              icon: Icons.chat_bubble_outline_rounded,
-              title: 'Message teacher',
-              color: ParentPortalColors.purple,
-              onTap: () => context.push(AppRoutes.parentChat),
-            ),
-            ActionTile(
-              icon: Icons.payments_outlined,
-              title: 'Pay fees',
-              color: ParentPortalColors.orange,
-              onTap: () => context.push(AppRoutes.parentFees),
-            ),
-            ActionTile(
-              icon: Icons.calendar_month_outlined,
-              title: 'School calendar',
-              color: ParentPortalColors.blue,
-              onTap: () => context.push(AppRoutes.parentCalendar),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        const ParentSectionHeader(title: 'Latest update'),
-        const SizedBox(height: 10),
-        if (visibleUpdates.isEmpty)
-          const PortalCard(child: Text('No updates from school yet.'))
-        else
-          PortalCard(
-            onTap: () => context.push(
-              visibleUpdates.first.route ?? AppRoutes.parentUpdates,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: ParentPortalColors.blueSoft,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(
-                    Icons.event_outlined,
-                    color: ParentPortalColors.blue,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        visibleUpdates.first.title,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              color: ParentPortalColors.navy,
-                              fontWeight: FontWeight.w800,
-                            ),
-                      ),
-                      Text(
-                        visibleUpdates.first.body,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      Text(
-                        visibleUpdates.first.metadata,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: ParentPortalColors.muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const ListChevron(),
-              ],
-            ),
-          ),
-      ],
+      ),
     );
   }
 
@@ -512,34 +396,6 @@ List<_ParentAction> _actionsFor(ParentPortalChild child) {
   }
 
   return actions;
-}
-
-String _attendanceMetric(ParentPortalChild child) {
-  final value = child.attendance.trim();
-  if (value.isEmpty) return 'No data yet';
-  return value
-      .replaceFirst(RegExp(r'\s+today$', caseSensitive: false), '')
-      .trim();
-}
-
-String _transportMetric(ParentPortalChild child) {
-  final text = '${child.transport} ${child.transportDetail ?? ''}'
-      .toLowerCase();
-  if (text.contains('locked')) return 'Locked';
-  if (text.contains('stale')) return 'GPS stale';
-  if (text.contains('delayed')) return 'Delayed';
-  if (text.contains('unavailable')) return 'Unavailable';
-  if (text.contains('no transport') || text.contains('no active')) {
-    return 'None';
-  }
-  return 'Active';
-}
-
-String _feesMetric(ParentPortalChild child) {
-  if (child.feesDue <= 0) {
-    return 'Paid';
-  }
-  return 'NPR ${child.feesDue.toStringAsFixed(0)}';
 }
 
 String _firstName(String value) {

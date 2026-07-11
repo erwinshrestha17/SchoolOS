@@ -21,6 +21,7 @@ import {
   CalendarClock,
   CheckCircle2,
   CircleAlert,
+  ClipboardList,
   Clock3,
   GraduationCap,
   Landmark,
@@ -30,8 +31,9 @@ import {
   Receipt,
   School,
   Settings,
-  Utensils,
+  UserCheck,
   Users,
+  Utensils,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -210,6 +212,8 @@ const METRIC_LABELS: Record<string, string> = {
   overdueInvoices: "Overdue invoices",
   invoicesDueToday: "Invoices due today",
   cashierVarianceRisks: "Cashier variance risks",
+  overdueFeesAmount: "Overdue fees",
+  staffPresentToday: "Staff present today",
   marksOpen: "Open marks entries",
   pendingMarkLocks: "Pending mark locks",
   reportCardPublishBlockers: "Report-card blockers",
@@ -282,24 +286,25 @@ export function DashboardCommandCenter({
   );
 
   return (
-    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
-      <div className="min-w-0 space-y-6">
-        <DashboardSection
-          eyebrow="School pulse"
-          title="Today at a glance"
-          description="Live, permission-filtered signals from the school day."
-        >
-          {pulseCards.length ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {pulseCards.map((card) => (
-                <PulseCard key={card.label} card={card} />
-              ))}
-            </div>
-          ) : (
-            <DashboardUnavailableState message="Today’s school pulse is not available yet. You can still open the operational workspaces below." />
-          )}
-        </DashboardSection>
+    <div className="space-y-6">
+      <DashboardSection
+        eyebrow="School pulse"
+        title="Today at a glance"
+        description="Live, permission-filtered signals from the school day."
+      >
+        {pulseCards.length ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            {pulseCards.map((card) => (
+              <PulseCard key={card.label} card={card} />
+            ))}
+          </div>
+        ) : (
+          <DashboardUnavailableState message="Today’s school pulse is not available yet. You can still open the operational workspaces below." />
+        )}
+      </DashboardSection>
 
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <div className="min-w-0 space-y-6">
         <DashboardSection
           eyebrow="Today's operations"
           title="Run today’s school workflows"
@@ -373,6 +378,7 @@ export function DashboardCommandCenter({
         <RecentActivityPanel dashboard={dashboard} />
         <RecentNoticesPanel />
       </aside>
+      </div>
     </div>
   );
 }
@@ -1155,6 +1161,14 @@ function DashboardUnavailableState({
   );
 }
 
+/**
+ * The top KPI strip. Exactly six candidate cards, matching the reference
+ * layout — but each one only renders when its real backend field(s) exist;
+ * a missing metric drops the card rather than showing a fake 0. No card
+ * here reports a value the backend didn't compute (see overdueFeesAmount /
+ * staffPresentToday added to operational-summary.service.ts 2026-07-10
+ * specifically so these two cards would be real instead of omitted).
+ */
 function buildPulseCards(
   dashboard: OperationalDashboardSummary,
   moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>,
@@ -1162,21 +1176,35 @@ function buildPulseCards(
   const cards: PulseCard[] = [];
   const attendance = moduleMap.get("m2_attendance");
   const fees = moduleMap.get("m3_fees");
-  const academics = moduleMap.get("m4_academics");
-  const transport = moduleMap.get("m8b_transport");
+  const hr = moduleMap.get("m7_hr_payroll");
 
-  const presentToday = metric(attendance, "presentToday");
   const expectedStudents = metric(attendance, "expectedStudents");
   const attendanceRate = computeAttendanceRate(moduleMap);
-  if (presentToday !== null || expectedStudents !== null) {
+  if (expectedStudents !== null) {
     cards.push({
-      label: "Attendance",
+      label: "Active Students",
+      value: formatMetric("expectedStudents", expectedStudents),
+      description:
+        attendanceRate !== null
+          ? `${attendanceRate}% present today.`
+          : "Active students in the current school record.",
+      icon: Users,
+      accentClass: "text-blue-700 bg-blue-50 border-blue-100",
+      href: attendance ? (firstSafeAction(attendance)?.href ?? null) : null,
+      actionLabel: "Open attendance",
+    });
+  }
+
+  const presentToday = metric(attendance, "presentToday");
+  if (presentToday !== null) {
+    cards.push({
+      label: "Present Today",
       value: hasMeaningfulValue(presentToday)
-        ? `${formatMetric("presentToday", presentToday)} present${attendanceRate !== null ? ` · ${attendanceRate}%` : ""}`
+        ? formatMetric("presentToday", presentToday)
         : "Not started",
       description:
-        expectedStudents !== null
-          ? `${formatMetric("expectedStudents", expectedStudents)} active students in the current school record.`
+        attendanceRate !== null
+          ? `${attendanceRate}% of enrolled.`
           : "Attendance data is available for today.",
       icon: CalendarClock,
       accentClass: MODULE_DEFINITIONS.m2_attendance.accentClass,
@@ -1187,13 +1215,10 @@ function buildPulseCards(
 
   const collectedToday = metric(fees, "collectedTodayAmount");
   const paymentCount = metric(fees, "paymentCountToday");
-  if (collectedToday !== null || paymentCount !== null) {
+  if (collectedToday !== null) {
     cards.push({
-      label: "Collections",
-      value:
-        collectedToday !== null
-          ? formatMetric("collectedTodayAmount", collectedToday)
-          : "No collection total",
+      label: "Collected Today",
+      value: formatMetric("collectedTodayAmount", collectedToday),
       description:
         paymentCount !== null
           ? `${formatMetric("paymentCountToday", paymentCount)} confirmed payment${paymentCount === 1 ? "" : "s"} today.`
@@ -1205,46 +1230,63 @@ function buildPulseCards(
     });
   }
 
-  const marksOpen = metric(academics, "marksOpen");
-  const reportCardBlockers = metric(academics, "reportCardPublishBlockers");
-  if (marksOpen !== null || reportCardBlockers !== null) {
+  // A real sum across every module's attentionItems (already fetched, not
+  // a second query) — honest because both the total and the category count
+  // are real numbers, but it has no single destination route, so the card
+  // is informational (no href) rather than pointing at one arbitrary module.
+  const attentionItems = dashboard.attentionItems.filter((item) => item.count > 0);
+  if (attentionItems.length) {
+    const pendingApprovalsTotal = attentionItems.reduce(
+      (sum, item) => sum + item.count,
+      0,
+    );
     cards.push({
-      label: "Academic readiness",
-      value: hasMeaningfulValue(marksOpen)
-        ? `${formatMetric("marksOpen", marksOpen)} open`
-        : "No open marks",
-      description:
-        reportCardBlockers !== null
-          ? `${formatMetric("reportCardPublishBlockers", reportCardBlockers)} report-card blocker${reportCardBlockers === 1 ? "" : "s"} reported.`
-          : "Academic summary is available for review.",
-      icon: GraduationCap,
-      accentClass: MODULE_DEFINITIONS.m4_academics.accentClass,
-      href: academics ? (firstSafeAction(academics)?.href ?? null) : null,
-      actionLabel: "Open academics",
+      label: "Pending Approvals",
+      value: formatNumber(pendingApprovalsTotal),
+      description: "Requires your action across "
+        + `${attentionItems.length} categor${attentionItems.length === 1 ? "y" : "ies"}.`,
+      icon: ClipboardList,
+      accentClass: "text-rose-700 bg-rose-50 border-rose-100",
+      href: null,
+      actionLabel: "",
     });
   }
 
-  const activeTrips = metric(transport, "activeTripsToday");
-  const delayedTrips = metric(transport, "delayedTrips");
-  if (activeTrips !== null || delayedTrips !== null) {
+  const staffPresentToday = metric(hr, "staffPresentToday");
+  const staffOnLeave = metric(hr, "staffOnApprovedLeaveToday");
+  if (staffPresentToday !== null) {
     cards.push({
-      label: "Transport",
-      value:
-        activeTrips !== null
-          ? `${formatMetric("activeTripsToday", activeTrips)} active`
-          : "No active trips",
+      label: "Staff Present",
+      value: formatMetric("staffPresentToday", staffPresentToday),
       description:
-        delayedTrips !== null
-          ? `${formatMetric("delayedTrips", delayedTrips)} delayed trip${delayedTrips === 1 ? "" : "s"} reported.`
-          : "Transport information is available for today.",
-      icon: Bus,
-      accentClass: MODULE_DEFINITIONS.m8b_transport.accentClass,
-      href: transport ? (firstSafeAction(transport)?.href ?? null) : null,
-      actionLabel: "Open transport",
+        staffOnLeave !== null
+          ? `${formatMetric("staffOnApprovedLeaveToday", staffOnLeave)} on approved leave today.`
+          : "Staff attendance is available for today.",
+      icon: UserCheck,
+      accentClass: "text-purple-700 bg-purple-50 border-purple-100",
+      href: hr ? (firstSafeAction(hr)?.href ?? null) : null,
+      actionLabel: "Open HR & Payroll",
     });
   }
 
-  return cards.slice(0, 4);
+  const overdueFeesAmount = metric(fees, "overdueFeesAmount");
+  const overdueInvoices = metric(fees, "overdueInvoices");
+  if (overdueFeesAmount !== null) {
+    cards.push({
+      label: "Overdue Fees",
+      value: formatMetric("overdueFeesAmount", overdueFeesAmount),
+      description:
+        overdueInvoices !== null
+          ? `${formatMetric("overdueInvoices", overdueInvoices)} overdue invoice${overdueInvoices === 1 ? "" : "s"}.`
+          : "Overdue fee information is available for today.",
+      icon: CircleAlert,
+      accentClass: "text-red-700 bg-red-50 border-red-100",
+      href: fees ? (firstSafeAction(fees)?.href ?? null) : null,
+      actionLabel: "Open fees",
+    });
+  }
+
+  return cards.slice(0, 6);
 }
 
 function orderedModules(

@@ -22,12 +22,16 @@ class SectionHeader extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: isDark ? Colors.white : AppColors.slate800,
-            letterSpacing: 0.0,
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: isDark ? Colors.white : AppColors.slate800,
+              letterSpacing: 0.0,
+            ),
           ),
         ),
         if (actionLabel != null && onActionPressed != null)

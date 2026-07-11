@@ -15,6 +15,7 @@ import '../../../../shared/widgets/status_chip.dart';
 import '../../../attendance/application/attendance_providers.dart';
 import '../../../attendance/domain/attendance_models.dart';
 import '../../../teacher/application/teacher_providers.dart';
+import '../../../teacher/domain/teacher_models.dart';
 import '../../../teacher/presentation/widgets/teacher_app_widgets.dart';
 
 class TeacherDashboard extends ConsumerWidget {
@@ -27,6 +28,9 @@ class TeacherDashboard extends ConsumerWidget {
     final controller = ref.read(teacherAttendanceControllerProvider.notifier);
     final noticeSummary = ref.watch(teacherNoticeSummaryProvider);
     final messages = ref.watch(teacherMessagesProvider);
+    final homework = ref.watch(
+      teacherHomeworkProvider(const TeacherHomeworkQuery()),
+    );
     final teacherName = _firstName(user?.name ?? 'Teacher');
     final roleLabel = _roleLabel(user?.roles ?? const [], user?.role);
 
@@ -34,12 +38,16 @@ class TeacherDashboard extends ConsumerWidget {
       role: 'TEACHER',
       selectedIndex: 0,
       title: 'Today',
+      showAppBar: false,
       body: RefreshIndicator(
         onRefresh: () async {
           await Future.wait([
             controller.load(),
             ref.refresh(teacherMessagesProvider.future),
             ref.refresh(teacherNoticeSummaryProvider.future),
+            ref.refresh(
+              teacherHomeworkProvider(const TeacherHomeworkQuery()).future,
+            ),
           ]);
         },
         child: TeacherScreenFrame(
@@ -106,34 +114,31 @@ class TeacherDashboard extends ConsumerWidget {
                       ),
                       const SizedBox(height: AppSpacing.md),
                     ],
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TeacherTaskCard(
-                            title: 'Homework',
-                            subtitle:
-                                'Create/review is waiting for mobile DTO confirmation.',
-                            icon: Icons.menu_book_rounded,
-                            iconColor: AppColors.teacherAccent,
-                            onTap: () => context.go(AppRoutes.teacherHomework),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: TeacherTaskCard(
-                            title: 'Messages',
-                            subtitle: messages.when(
-                              data: (value) =>
-                                  '${value.threads.length} parent thread(s)',
-                              error: (_, _) => 'Unavailable',
-                              loading: () => 'Loading',
-                            ),
-                            icon: Icons.chat_bubble_rounded,
-                            iconColor: AppColors.info,
-                            onTap: () => context.go(AppRoutes.teacherMessages),
-                          ),
-                        ),
-                      ],
+                    TeacherTaskCard(
+                      title: 'Homework',
+                      subtitle: homework.when(
+                        data: (value) => value.toReview > 0
+                            ? '${value.toReview} submission(s) awaiting review'
+                            : '${value.total} active assignment(s)',
+                        error: (_, _) => 'Homework is unavailable right now',
+                        loading: () => 'Loading assigned homework',
+                      ),
+                      icon: Icons.menu_book_rounded,
+                      iconColor: AppColors.teacherAccent,
+                      onTap: () => context.go(AppRoutes.teacherHomework),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    TeacherTaskCard(
+                      title: 'Messages',
+                      subtitle: messages.when(
+                        data: (value) =>
+                            '${value.threads.length} parent thread(s)',
+                        error: (_, _) => 'Messages are unavailable right now',
+                        loading: () => 'Loading conversations',
+                      ),
+                      icon: Icons.chat_bubble_rounded,
+                      iconColor: AppColors.info,
+                      onTap: () => context.go(AppRoutes.teacherMessages),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     TeacherTaskCard(

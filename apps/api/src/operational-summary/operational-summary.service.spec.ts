@@ -27,8 +27,18 @@ describe('OperationalSummaryService', () => {
       findMany: recentRows,
       aggregate: sumResult,
     },
-    invoice: { count: jest.fn().mockResolvedValue(0) },
-    paymentRefund: { count: jest.fn().mockResolvedValue(0) },
+    invoice: {
+      count: jest.fn().mockResolvedValue(0),
+      aggregate: jest
+        .fn()
+        .mockResolvedValue({ _sum: { totalAmount: { toString: () => '500.00' } } }),
+    },
+    paymentRefund: {
+      count: jest.fn().mockResolvedValue(0),
+      aggregate: jest
+        .fn()
+        .mockResolvedValue({ _sum: { amount: { toString: () => '0.00' } } }),
+    },
     feeBillingRun: { count: jest.fn().mockResolvedValue(0) },
     cashierClose: { count: jest.fn().mockResolvedValue(0) },
     activityPost: {
@@ -84,6 +94,10 @@ describe('OperationalSummaryService', () => {
 
     expect(summary.status).toBe('ready');
     expect(summary.summary.collectedTodayAmount).toBe('125.50');
+    // overdueFeesAmount = max(0, invoiceTotal - paidTotal + refundTotal)
+    // = max(0, 500.00 - 125.50 + 0.00) = 374.50, mirroring FinanceService's
+    // outstanding-balance formula for the fees workspace.
+    expect(summary.summary.overdueFeesAmount).toBe('374.50');
     expect(summary.schoolDay).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(summary.generatedAt).toMatch(/Z$/);
 

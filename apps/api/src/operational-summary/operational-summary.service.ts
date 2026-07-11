@@ -684,6 +684,11 @@ export class OperationalSummaryService {
             ),
           ],
       m7_hr_payroll: [
+        this.def('staffPresentToday', 'staffAttendance', {
+          tenantId,
+          attendanceDate: { gte: day.startUtc, lt: day.endExclusiveUtc },
+          status: 'PRESENT',
+        }),
         this.def('staffOnApprovedLeaveToday', 'staffLeaveRequest', {
           tenantId,
           status: 'APPROVED',
@@ -949,6 +954,7 @@ export class OperationalSummaryService {
     );
     if (module === 'm3_fees') {
       metrics.unshift(
+        await this.overdueFeesAmountMetric(tenantId, day),
         await this.decimalMetric(
           'collectedTodayAmount',
           'payment',
@@ -1277,6 +1283,62 @@ export class OperationalSummaryService {
         value: result._sum?.[field]?.toString() ?? '0',
         failed: false,
       };
+    } catch {
+      return { key, value: null, failed: true };
+    }
+  }
+
+  /**
+   * Same outstanding-balance formula FinanceService uses for the fees
+   * workspace (invoice total - successful payments + refunds, floored at 0)
+   * — replicated here rather than imported to keep this service's existing
+   * self-contained, generic-delegate style instead of coupling it to
+   * FinanceService's Prisma-typed internals.
+   */
+  private async overdueFeesAmountMetric(
+    tenantId: string,
+    day: { startUtc: Date },
+  ): Promise<Metric> {
+    const key = 'overdueFeesAmount';
+    const overdueInvoiceWhere = {
+      tenantId,
+      status: { in: ['ISSUED', 'PARTIAL'] },
+      dueDate: { lt: day.startUtc },
+    };
+    const invoiceDelegate = this.delegate('invoice');
+    const paymentDelegate = this.delegate('payment');
+    const refundDelegate = this.delegate('paymentRefund');
+    if (
+      !invoiceDelegate?.aggregate ||
+      !paymentDelegate?.aggregate ||
+      !refundDelegate?.aggregate
+    ) {
+      return { key, value: null, failed: true };
+    }
+    try {
+      const [invoiceAgg, paymentAgg, refundAgg] = (await Promise.all([
+        invoiceDelegate.aggregate({
+          where: overdueInvoiceWhere,
+          _sum: { totalAmount: true },
+        }),
+        paymentDelegate.aggregate({
+          where: { tenantId, status: 'SUCCESS', invoice: overdueInvoiceWhere },
+          _sum: { amount: true },
+        }),
+        refundDelegate.aggregate({
+          where: {
+            tenantId,
+            payment: { status: 'SUCCESS', invoice: overdueInvoiceWhere },
+          },
+          _sum: { amount: true },
+        }),
+      ])) as Array<{ _sum?: Record<string, { toString(): string } | null> }>;
+
+      const invoiceTotal = Number(invoiceAgg._sum?.totalAmount?.toString() ?? '0');
+      const paidTotal = Number(paymentAgg._sum?.amount?.toString() ?? '0');
+      const refundTotal = Number(refundAgg._sum?.amount?.toString() ?? '0');
+      const overdueAmount = Math.max(0, invoiceTotal - paidTotal + refundTotal);
+      return { key, value: overdueAmount.toFixed(2), failed: false };
     } catch {
       return { key, value: null, failed: true };
     }

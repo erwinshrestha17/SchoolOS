@@ -3,10 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/constants/app_routes.dart';
-import '../../features/operational_summary/domain/operational_summary_models.dart';
-import '../../features/operational_summary/presentation/operational_summary_card.dart';
 import '../../features/parent/application/parent_portal_providers.dart';
-import '../../features/parent/domain/parent_portal_models.dart';
 import '../../features/parent/presentation/screens/parent_portal_children_tab.dart';
 import '../../features/parent/presentation/screens/parent_portal_home_tab.dart';
 import '../../features/parent/presentation/screens/parent_portal_homework_tab.dart';
@@ -32,13 +29,7 @@ class SchoolOsAppShell extends ConsumerStatefulWidget {
 class _SchoolOsAppShellState extends ConsumerState<SchoolOsAppShell> {
   late int selectedIndex = widget.initialIndex.clamp(0, 4);
 
-  static const titles = [
-    'SchoolOS Mobile',
-    'Children',
-    'Homework',
-    'Notices',
-    'More',
-  ];
+  static const titles = ['Today', 'Children', 'Homework', 'Notices', 'More'];
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +51,7 @@ class _SchoolOsAppShellState extends ConsumerState<SchoolOsAppShell> {
           data: (portal) => IndexedStack(
             index: selectedIndex,
             children: [
-              _ParentHomeWithSummary(data: portal),
+              ParentPortalHomeTab(data: portal),
               ParentPortalChildrenTab(data: portal),
               ParentPortalHomeworkTab(
                 data: portal,
@@ -110,27 +101,6 @@ class _SchoolOsAppShellState extends ConsumerState<SchoolOsAppShell> {
         setState(() => selectedIndex = 4);
         return;
     }
-  }
-}
-
-class _ParentHomeWithSummary extends StatelessWidget {
-  const _ParentHomeWithSummary({required this.data});
-
-  final ParentPortalData data;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: OperationalSummaryCard(
-            persona: OperationalMobilePersona.parent,
-          ),
-        ),
-        Expanded(child: ParentPortalHomeTab(data: data)),
-      ],
-    );
   }
 }
 

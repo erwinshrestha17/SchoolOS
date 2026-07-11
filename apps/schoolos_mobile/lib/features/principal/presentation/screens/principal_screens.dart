@@ -562,44 +562,68 @@ class _DashboardBody extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _CacheBanner(data: data),
-        Text.rich(
-          TextSpan(
+        AppCard(
+          onTap: () => context.go(AppRoutes.principalAttention),
+          child: Row(
             children: [
-              TextSpan(
-                text: '${data['attentionCount'] ?? 0}',
-                style: const TextStyle(
-                  color: AppColors.info,
-                  fontWeight: FontWeight.w900,
+              const _IconBubble(
+                icon: Icons.priority_high_rounded,
+                color: AppColors.warning,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${data['attentionCount'] ?? 0} items need attention',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppColors.slate900,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const Text(
+                      'Review today\'s highest-priority school issues',
+                      style: TextStyle(
+                        color: AppColors.slate500,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const TextSpan(text: ' items need attention today'),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.slate400,
+              ),
             ],
-          ),
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: AppColors.slate600,
-            fontWeight: FontWeight.w700,
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 0.95,
-          crossAxisSpacing: AppSpacing.md,
-          mainAxisSpacing: AppSpacing.md,
-          children: [
-            for (final card in _list(data['cards']))
-              _MetricCard(
-                title: _string(card['label']),
-                value: _string(card['value']),
-                detail: _string(card['detail']),
-                icon: _iconFor(_string(card['key'])),
-                color: _tone(_string(card['tone'])),
-                locked: card['locked'] == true,
-                onTap: () => _go(context, _string(card['route'])),
-              ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compactPhone = constraints.maxWidth < 360;
+            return GridView.count(
+              crossAxisCount: compactPhone ? 1 : 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: compactPhone ? 2.0 : 1.05,
+              crossAxisSpacing: AppSpacing.md,
+              mainAxisSpacing: AppSpacing.md,
+              children: [
+                for (final card in _list(data['cards']))
+                  _MetricCard(
+                    title: _string(card['label']),
+                    value: _string(card['value']),
+                    detail: _string(card['detail']),
+                    icon: _iconFor(_string(card['key'])),
+                    color: _tone(_string(card['tone'])),
+                    locked: card['locked'] == true,
+                    onTap: () => _go(context, _string(card['route'])),
+                  ),
+              ],
+            );
+          },
         ),
         const SizedBox(height: AppSpacing.xl),
         SectionHeader(
@@ -1482,33 +1506,11 @@ class _PrincipalHeader extends StatelessWidget {
               ],
             ),
           ),
-          Stack(
-            children: [
-              IconButton(
-                color: Colors.white,
-                onPressed: () => context.go(AppRoutes.notifications),
-                icon: const Icon(Icons.notifications_none_rounded, size: 30),
-              ),
-              Positioned(
-                right: 6,
-                top: 6,
-                child: Container(
-                  padding: const EdgeInsets.all(5),
-                  decoration: const BoxDecoration(
-                    color: AppColors.danger,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text(
-                    '!',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          IconButton(
+            tooltip: 'Notifications',
+            color: Colors.white,
+            onPressed: () => context.go(AppRoutes.notifications),
+            icon: const Icon(Icons.notifications_none_rounded, size: 30),
           ),
           IconButton(
             color: Colors.white,
@@ -1621,42 +1623,73 @@ class _MetricCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCard(
       onTap: locked ? null : onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: _IconBubble(
-              icon: icon,
-              color: locked ? AppColors.slate400 : color,
-            ),
-          ),
-          const Spacer(),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            locked ? 'Locked' : value,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: locked ? AppColors.slate500 : color,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Text(
-            locked ? 'Module not enabled' : detail,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.slate500,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final horizontal = constraints.maxWidth > 240;
+          final details = Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: horizontal
+                ? CrossAxisAlignment.start
+                : CrossAxisAlignment.center,
+            children: [
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: horizontal ? TextAlign.left : TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                locked ? 'Locked' : value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: horizontal ? TextAlign.left : TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: locked ? AppColors.slate500 : color,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                locked ? 'Module not enabled' : detail,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: horizontal ? TextAlign.left : TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.slate500,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          );
+          final iconBubble = _IconBubble(
+            icon: icon,
+            color: locked ? AppColors.slate400 : color,
+          );
+          if (horizontal) {
+            return Row(
+              children: [
+                iconBubble,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(child: details),
+                if (!locked)
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.slate400,
+                  ),
+              ],
+            );
+          }
+          return Column(
+            children: [
+              Align(alignment: Alignment.centerLeft, child: iconBubble),
+              const Spacer(),
+              details,
+            ],
+          );
+        },
       ),
     );
   }
@@ -1676,48 +1709,51 @@ class _SummaryCards extends StatelessWidget {
             : constraints.maxWidth < 720
             ? 2
             : values.length.clamp(1, 3);
-        return GridView.count(
-          crossAxisCount: crossAxisCount,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: crossAxisCount == 1 ? 3.1 : 1.55,
-          crossAxisSpacing: AppSpacing.md,
-          mainAxisSpacing: AppSpacing.md,
+        const spacing = AppSpacing.md;
+        final itemWidth =
+            (constraints.maxWidth - spacing * (crossAxisCount - 1)) /
+            crossAxisCount;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
           children: values
               .map(
-                (value) => AppCard(
-                  child: Row(
-                    children: [
-                      _IconBubble(icon: value.icon, color: value.color),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              value.label,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.slate700,
+                (value) => SizedBox(
+                  width: itemWidth,
+                  child: AppCard(
+                    child: Row(
+                      children: [
+                        _IconBubble(icon: value.icon, color: value.color),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                value.label,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.slate700,
+                                ),
                               ),
-                            ),
-                            Text(
-                              '${value.value}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(
-                                    color: value.color,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                            ),
-                          ],
+                              Text(
+                                '${value.value}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.headlineSmall
+                                    ?.copyWith(
+                                      color: value.color,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               )
@@ -1744,25 +1780,32 @@ class _SummaryStrip extends StatelessWidget {
                 children: [
                   _IconBubble(icon: value.icon, color: value.color, size: 44),
                   const SizedBox(width: AppSpacing.sm),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        value.label,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.slate600,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          value.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.slate600,
+                          ),
                         ),
-                      ),
-                      Text(
-                        '${value.value}',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              color: value.color,
-                              fontWeight: FontWeight.w900,
-                            ),
-                      ),
-                    ],
+                        Text(
+                          '${value.value}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                color: value.color,
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

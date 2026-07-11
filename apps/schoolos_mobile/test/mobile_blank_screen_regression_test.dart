@@ -23,6 +23,7 @@ import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_ac
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_class_hub_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_homework_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_messages_screen.dart';
+import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_timetable_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/widgets/teacher_app_widgets.dart';
 
 class _MockTeacherRepository extends Mock implements TeacherRepository {}
@@ -79,6 +80,66 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets('principal today stays overflow-free on a compact phone', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final sharedPrefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPreferencesServiceProvider.overrideWithValue(
+            AppPreferencesService(sharedPrefs),
+          ),
+          tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authProvider.overrideWith((ref) {
+            return _FakeAuthNotifier(
+              ref.watch(tokenStorageServiceProvider),
+              ref.watch(authRepositoryProvider),
+              ref.watch(appPreferencesServiceProvider),
+            );
+          }),
+          principalDashboardProvider.overrideWith((ref) async {
+            return {
+              'attentionCount': 8,
+              'cards': [
+                {
+                  'key': 'attendance',
+                  'label': 'Attendance Risk',
+                  'value': '24',
+                  'detail': 'classes',
+                  'tone': 'warning',
+                  'route': AppRoutes.principalAttendanceRisk,
+                },
+                {
+                  'key': 'staff',
+                  'label': 'Staff Absence',
+                  'value': '0',
+                  'detail': 'staff today',
+                  'tone': 'success',
+                  'route': AppRoutes.principalStaffAbsence,
+                },
+              ],
+              'alerts': <Map<String, dynamic>>[],
+              'quickActions': <Map<String, dynamic>>[],
+              'recentUpdates': <Map<String, dynamic>>[],
+            };
+          }),
+        ],
+        child: const MaterialApp(home: PrincipalTodayScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Principal Today'), findsOneWidget);
+    expect(find.text('Attendance Risk'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('principal approvals paints populated approval content', (
@@ -936,6 +997,294 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Please call me back'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'principal approvals review action stays overflow-free at large text scale',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final sharedPrefs = await SharedPreferences.getInstance();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appPreferencesServiceProvider.overrideWithValue(
+              AppPreferencesService(sharedPrefs),
+            ),
+            tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+            authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+            authProvider.overrideWith((ref) {
+              return _FakeAuthNotifier(
+                ref.watch(tokenStorageServiceProvider),
+                ref.watch(authRepositoryProvider),
+                ref.watch(appPreferencesServiceProvider),
+              );
+            }),
+            principalApprovalsProvider.overrideWith((ref, status) async {
+              return {
+                'summary': {'pending': 12, 'urgent': 3, 'today': 5},
+                'items': [
+                  {
+                    'id': 'leave-1',
+                    'type': 'leave',
+                    'title':
+                        'Extended maternity and medical leave request requiring principal sign-off',
+                    'subtitle': 'Bishwanath Prasad Chaudhary Shrestha',
+                    'detail': '45 days leave',
+                    'status': 'PENDING',
+                    'severity': 'high',
+                  },
+                ],
+              };
+            }),
+          ],
+          child: MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(textScaler: TextScaler.linear(1.3)),
+              child: const PrincipalApprovalsScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Approvals'), findsWidgets);
+      expect(find.text('Review'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'principal attention center stays overflow-free on a compact phone at large text scale',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final sharedPrefs = await SharedPreferences.getInstance();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appPreferencesServiceProvider.overrideWithValue(
+              AppPreferencesService(sharedPrefs),
+            ),
+            tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+            authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+            authProvider.overrideWith((ref) {
+              return _FakeAuthNotifier(
+                ref.watch(tokenStorageServiceProvider),
+                ref.watch(authRepositoryProvider),
+                ref.watch(appPreferencesServiceProvider),
+              );
+            }),
+            principalAttentionProvider.overrideWith((ref, filter) async {
+              return {
+                'summary': {'critical': 9999, 'high': 128, 'medium': 4321},
+                'items': [
+                  {
+                    'id': 'item-1',
+                    'type': 'attendance',
+                    'title':
+                        'Grade 10 Science and Technology Section Diamond attendance follow-up required',
+                    'subtitle':
+                        'Bishwanath Prasad Chaudhary Shrestha Guardian Association',
+                    'detail': 'Escalated 3 days ago',
+                    'status': 'CRITICAL',
+                    'severity': 'critical',
+                  },
+                ],
+              };
+            }),
+          ],
+          child: MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(textScaler: TextScaler.linear(1.3)),
+              child: const PrincipalAttentionScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Attention Center'), findsWidgets);
+      expect(
+        find.textContaining('attendance follow-up required'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'principal fee snapshot handles large currency values and long labels without overflow',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final sharedPrefs = await SharedPreferences.getInstance();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appPreferencesServiceProvider.overrideWithValue(
+              AppPreferencesService(sharedPrefs),
+            ),
+            tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+            authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+            authProvider.overrideWith((ref) {
+              return _FakeAuthNotifier(
+                ref.watch(tokenStorageServiceProvider),
+                ref.watch(authRepositoryProvider),
+                ref.watch(appPreferencesServiceProvider),
+              );
+            }),
+            principalSnapshotProvider.overrideWith((ref, key) async {
+              return {
+                'metrics': {
+                  'collected': 'Rs. 1,23,45,678.50',
+                  'pending': 'Rs. 45,67,890.00',
+                  'overdue': 'Rs. 12,34,567.00',
+                },
+                'watchlist': [
+                  {
+                    'id': 'watch-1',
+                    'title':
+                        'Aaradhya Chaudhary Shrestha - Grade 10 Science and Technology Section',
+                    'subtitle': 'Overdue since last trimester',
+                    'detail': 'Rs. 9,87,654.00 outstanding',
+                    'status': 'OVERDUE',
+                  },
+                ],
+                'collectionTrend': [
+                  {'label': 'This month', 'amount': 'Rs. 1,23,45,678.50'},
+                ],
+              };
+            }),
+          ],
+          child: const MaterialApp(
+            home: PrincipalSnapshotScreen(
+              snapshotKey: 'fees',
+              title: 'Fees Snapshot',
+              subtitle: 'Read-only school finance overview',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Fees Snapshot'), findsOneWidget);
+      expect(find.textContaining('Rs. 1,23,45,678.50'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'teacher timetable stays overflow-free on a compact phone with long labels',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final snapshot = TeacherTimetableSnapshot(
+        rangeStart: DateTime(2026, 6, 15),
+        rangeEnd: DateTime(2026, 6, 19),
+        items: [
+          TeacherTimetableItem(
+            id: 'period-1',
+            date: DateTime(2026, 6, 19),
+            className: 'Grade 10 - Science and Technology Section',
+            sectionName: 'Diamond',
+            subjectName: 'Advanced Computer Science and Programming Fundamentals',
+            room: 'Senior Block Laboratory Room 3B',
+            startsAt: '09:00',
+            endsAt: '09:45',
+            status: 'SUBSTITUTED',
+            substitution: const TeacherTimetableSubstitution(
+              id: 'sub-1',
+              date: null,
+              status: 'ASSIGNED',
+              reason: 'Approved medical leave for the assigned subject teacher',
+              role: 'SUBSTITUTE',
+              className: 'Grade 10 - Science and Technology Section',
+              sectionName: 'Diamond',
+              subjectName:
+                  'Advanced Computer Science and Programming Fundamentals',
+              startsAt: '09:00',
+              endsAt: '09:45',
+              absentTeacherName: 'Bishwanath Prasad Chaudhary Shrestha',
+              substituteTeacherName: 'Erwin Kumar Shrestha',
+            ),
+          ),
+        ],
+        substitutions: const [],
+        lastUpdated: DateTime(2026, 6, 19, 8),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            teacherTimetableProvider.overrideWith((ref) async => snapshot),
+          ],
+          child: const MaterialApp(home: TeacherTimetableScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Science and Technology Section'),
+        findsWidgets,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'teacher messages list stays overflow-free on a compact phone with long thread text',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final snapshot = TeacherMessagesSnapshot(
+        threads: const [
+          TeacherMessageThread(
+            id: 'thread-2',
+            title: 'Bishwanath Prasad Chaudhary Guardian Association',
+            context:
+                'Aaradhya Chaudhary Shrestha • Grade 10 - Science and Technology Section • Diamond',
+            preview:
+                'Thank you very much for the detailed update about the upcoming examination schedule and syllabus coverage',
+            updatedAt: null,
+            status: 'ESCALATED',
+          ),
+        ],
+        availability: const TeacherChatAvailability(
+          isAvailable: false,
+          notice:
+              'Messaging is restricted outside school hours per the communication policy',
+          sla: 'Replies within 24 hours on working days',
+        ),
+        lastUpdated: DateTime(2026, 6, 19, 8),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            teacherMessagesProvider.overrideWith((ref) async => snapshot),
+          ],
+          child: const MaterialApp(home: TeacherMessagesScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Guardian Association'),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     },
   );
