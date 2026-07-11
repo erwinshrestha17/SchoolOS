@@ -105,9 +105,10 @@ class _SchoolOsAppShellState extends ConsumerState<SchoolOsAppShell> {
 }
 
 class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
-  const AppTopBar({super.key, required this.title});
+  const AppTopBar({super.key, required this.title, this.leading});
 
   final String title;
+  final Widget? leading;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -117,6 +118,7 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
     final portal = ref.watch(parentPortalDataProvider).valueOrNull;
     final parentName = portal?.parentName ?? 'Parent';
     return AppBar(
+      leading: leading,
       title: Text(
         title,
         style: const TextStyle(

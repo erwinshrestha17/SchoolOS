@@ -14,15 +14,26 @@ class ParentDetailScaffold extends StatelessWidget {
     required this.title,
     required this.selectedIndex,
     required this.body,
+    this.onBack,
   });
   final String title;
   final int selectedIndex;
   final Widget body;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: ParentPortalColors.page,
-    appBar: AppTopBar(title: title),
+    appBar: AppTopBar(
+      title: title,
+      leading: onBack == null
+          ? null
+          : IconButton(
+              tooltip: 'Back',
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_back_rounded),
+            ),
+    ),
     body: SafeArea(top: false, child: body),
     bottomNavigationBar: SchoolOsBottomNavigation(
       selectedIndex: selectedIndex,
