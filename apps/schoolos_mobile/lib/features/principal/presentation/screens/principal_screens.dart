@@ -1576,24 +1576,36 @@ class _PrincipalBottomNav extends StatelessWidget {
             ),
           ],
         ),
-        child: NavigationBar(
-          height: 70,
-          elevation: 0,
-          selectedIndex: selectedIndex,
-          backgroundColor: Colors.transparent,
-          indicatorColor: AppColors.infoLight,
-          onDestinationSelected: (index) => context.go(destinations[index].$4),
-          destinations: [
-            for (var index = 0; index < destinations.length; index += 1)
-              NavigationDestination(
-                icon: Icon(destinations[index].$1),
-                selectedIcon: Icon(
-                  destinations[index].$2,
-                  color: AppColors.infoDark,
-                ),
-                label: destinations[index].$3,
+        child: NavigationBarTheme(
+          data: const NavigationBarThemeData(
+            labelTextStyle: WidgetStatePropertyAll(
+              TextStyle(
+                fontSize: 10,
+                letterSpacing: -0.35,
+                fontWeight: FontWeight.w600,
               ),
-          ],
+            ),
+          ),
+          child: NavigationBar(
+            height: 70,
+            elevation: 0,
+            selectedIndex: selectedIndex,
+            backgroundColor: Colors.transparent,
+            indicatorColor: AppColors.infoLight,
+            onDestinationSelected: (index) =>
+                context.go(destinations[index].$4),
+            destinations: [
+              for (var index = 0; index < destinations.length; index += 1)
+                NavigationDestination(
+                  icon: Icon(destinations[index].$1),
+                  selectedIcon: Icon(
+                    destinations[index].$2,
+                    color: AppColors.infoDark,
+                  ),
+                  label: destinations[index].$3,
+                ),
+            ],
+          ),
         ),
       ),
     );
