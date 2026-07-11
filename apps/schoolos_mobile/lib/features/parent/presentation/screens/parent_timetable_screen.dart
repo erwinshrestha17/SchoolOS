@@ -7,10 +7,10 @@ import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
-import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/section_header.dart';
 import '../../application/parent_providers.dart';
 import '../../domain/parent_models.dart';
+import '../widgets/parent_detail_widgets.dart';
 import '../widgets/parent_state_view.dart';
 
 class ParentTimetableScreen extends ConsumerWidget {
@@ -33,10 +33,9 @@ class ParentTimetableScreen extends ConsumerWidget {
     final isStudent = role.toUpperCase() == 'STUDENT';
     final showAllChildren = !isStudent && state.children.length > 1;
 
-    return RoleShellScaffold(
-      role: role,
-      selectedIndex: selectedIndex,
+    return ParentDetailScaffold(
       title: title,
+      selectedIndex: selectedIndex,
       body: ParentStateView(
         status: state.status,
         message: state.message,

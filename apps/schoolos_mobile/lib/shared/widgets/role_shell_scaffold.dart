@@ -166,45 +166,6 @@ class RoleShellScaffold extends StatelessWidget {
 
   static List<_RoleNavItem> _itemsForRole(String role) {
     switch (role.toUpperCase()) {
-      case 'PARENT':
-        return const [
-          _RoleNavItem(
-            label: 'Home',
-            icon: Icons.home_outlined,
-            selectedIcon: Icons.home_rounded,
-            route: AppRoutes.parentHome,
-          ),
-          _RoleNavItem(
-            label: 'Children',
-            icon: Icons.face_outlined,
-            selectedIcon: Icons.face_rounded,
-            route: AppRoutes.parentChildren,
-          ),
-          _RoleNavItem(
-            label: 'Attendance',
-            icon: Icons.fact_check_outlined,
-            selectedIcon: Icons.fact_check_rounded,
-            route: AppRoutes.parentAttendance,
-          ),
-          _RoleNavItem(
-            label: 'Homework',
-            icon: Icons.assignment_outlined,
-            selectedIcon: Icons.assignment_rounded,
-            route: AppRoutes.parentHomework,
-          ),
-          _RoleNavItem(
-            label: 'Notices',
-            icon: Icons.campaign_outlined,
-            selectedIcon: Icons.campaign_rounded,
-            route: AppRoutes.notices,
-          ),
-          _RoleNavItem(
-            label: 'More',
-            icon: Icons.grid_view_outlined,
-            selectedIcon: Icons.grid_view_rounded,
-            route: AppRoutes.parentMore,
-          ),
-        ];
       case 'TEACHER':
         return const [
           _RoleNavItem(

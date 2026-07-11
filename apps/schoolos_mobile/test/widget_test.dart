@@ -187,31 +187,6 @@ void main() {
     expect(find.text('PARENT'), findsOneWidget);
   });
 
-  testWidgets('RoleShellScaffold renders parent mobile navigation', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [testOperationalSummaryOverride],
-        child: const MaterialApp(
-          home: RoleShellScaffold(
-            role: 'PARENT',
-            selectedIndex: 0,
-            body: Center(child: Text('Parent Home Body')),
-          ),
-        ),
-      ),
-    );
-
-    expect(find.text('Parent Home Body'), findsOneWidget);
-    expect(find.text('Home'), findsOneWidget);
-    expect(find.text('Children'), findsOneWidget);
-    expect(find.text('Attendance'), findsOneWidget);
-    expect(find.text('Homework'), findsOneWidget);
-    expect(find.text('Notices'), findsOneWidget);
-    expect(find.text('More'), findsOneWidget);
-  });
-
   testWidgets('RoleShellScaffold limits student navigation to session entry', (
     WidgetTester tester,
   ) async {

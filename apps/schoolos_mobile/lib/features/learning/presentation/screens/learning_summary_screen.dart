@@ -8,10 +8,10 @@ import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
-import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/section_header.dart';
 import '../../../../shared/widgets/status_chip.dart';
 import '../../../parent/application/parent_providers.dart';
+import '../../../parent/presentation/widgets/parent_detail_widgets.dart';
 import '../../../parent/presentation/widgets/parent_state_view.dart';
 import '../../application/learning_providers.dart';
 import '../../domain/learning_summary_models.dart';
@@ -35,10 +35,9 @@ class LearningSummaryScreen extends ConsumerWidget {
     final childId = state.selectedChildId;
     final isStudent = role.toUpperCase() == 'STUDENT';
 
-    return RoleShellScaffold(
-      role: role,
-      selectedIndex: selectedIndex,
+    return ParentDetailScaffold(
       title: title,
+      selectedIndex: selectedIndex,
       body: ParentStateView(
         status: state.status,
         message: state.message,

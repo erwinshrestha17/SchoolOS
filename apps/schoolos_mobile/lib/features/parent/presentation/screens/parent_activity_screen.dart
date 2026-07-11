@@ -8,9 +8,9 @@ import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
-import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../application/parent_providers.dart';
 import '../../domain/parent_models.dart';
+import '../widgets/parent_detail_widgets.dart';
 import '../widgets/parent_state_view.dart';
 
 const _activityCategories = <String>[
@@ -40,10 +40,9 @@ class ParentActivityScreen extends ConsumerWidget {
       }
     }
 
-    return RoleShellScaffold(
-      role: 'PARENT',
-      selectedIndex: 5,
+    return ParentDetailScaffold(
       title: 'Activity',
+      selectedIndex: 5,
       body: ParentStateView(
         status: state.status,
         message: state.message,
