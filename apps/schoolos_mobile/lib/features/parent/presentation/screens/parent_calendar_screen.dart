@@ -17,6 +17,15 @@ class ParentCalendarScreen extends ConsumerStatefulWidget {
 
 class _ParentCalendarScreenState extends ConsumerState<ParentCalendarScreen> {
   late BsDate visibleMonth = NepaliBsCalendar.fromAd(DateTime.now());
+  late BsDate selectedDay = _defaultSelectedDay(visibleMonth);
+
+  static BsDate _defaultSelectedDay(BsDate month) {
+    final today = NepaliBsCalendar.today();
+    if (today.year == month.year && today.month == month.month) {
+      return today;
+    }
+    return BsDate(year: month.year, month: month.month, day: 1);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +49,25 @@ class _ParentCalendarScreenState extends ConsumerState<ParentCalendarScreen> {
                     item.bs.month == visibleMonth.month,
               )
               .toList();
+          final dayMarkers = markers
+              .where(
+                (item) =>
+                    item.bs.year == selectedDay.year &&
+                    item.bs.month == selectedDay.month &&
+                    item.bs.day == selectedDay.day,
+              )
+              .toList();
+          final selectedAd = selectedDay.gregorianDate;
+          final upcoming =
+              markers
+                  .where((item) => item.bs.gregorianDate.isAfter(selectedAd))
+                  .toList()
+                ..sort(
+                  (a, b) => a.bs.gregorianDate.compareTo(b.bs.gregorianDate),
+                );
+          final childNames = {
+            for (final child in data.children) child.id: child.name,
+          };
           return RefreshIndicator(
             onRefresh: () async {
               ref.invalidate(parentPortalDataProvider);
@@ -52,16 +80,37 @@ class _ParentCalendarScreenState extends ConsumerState<ParentCalendarScreen> {
                   month: visibleMonth,
                   onPrevious: () => setState(() {
                     visibleMonth = _addMonths(visibleMonth, -1);
+                    selectedDay = _defaultSelectedDay(visibleMonth);
                   }),
                   onNext: () => setState(() {
                     visibleMonth = _addMonths(visibleMonth, 1);
+                    selectedDay = _defaultSelectedDay(visibleMonth);
                   }),
                   canGoPrevious: _compareMonth(visibleMonth, bounds.$1) > 0,
                   canGoNext: _compareMonth(visibleMonth, bounds.$2) < 0,
                   academicYearLabel: _academicYearLabel(data),
                 ),
                 const SizedBox(height: 12),
-                _MonthGrid(month: visibleMonth, markers: visibleMarkers),
+                _MonthGrid(
+                  month: visibleMonth,
+                  markers: visibleMarkers,
+                  selectedDay: selectedDay,
+                  onDaySelected: (day) => setState(() {
+                    selectedDay = BsDate(
+                      year: visibleMonth.year,
+                      month: visibleMonth.month,
+                      day: day,
+                    );
+                  }),
+                ),
+                const SizedBox(height: 14),
+                _SelectedDayCard(
+                  day: selectedDay,
+                  isHoliday: _isHolidayBs(selectedDay),
+                  dayMarkers: dayMarkers,
+                  upcoming: upcoming.take(5).toList(),
+                  childNames: childNames,
+                ),
                 const SizedBox(height: 18),
                 const ParentSectionHeader(title: 'This month'),
                 const SizedBox(height: 10),
@@ -157,10 +206,17 @@ class _CalendarHeader extends StatelessWidget {
 }
 
 class _MonthGrid extends StatelessWidget {
-  const _MonthGrid({required this.month, required this.markers});
+  const _MonthGrid({
+    required this.month,
+    required this.markers,
+    required this.selectedDay,
+    required this.onDaySelected,
+  });
 
   final BsDate month;
   final List<_CalendarMarker> markers;
+  final BsDate selectedDay;
+  final ValueChanged<int> onDaySelected;
 
   @override
   Widget build(BuildContext context) {
@@ -169,9 +225,11 @@ class _MonthGrid extends StatelessWidget {
       year: month.year,
       month: month.month,
       day: 1,
-    ).approximateAdDate;
+    ).gregorianDate;
     final leading = firstAd.weekday % 7;
     final cells = leading + days;
+    final isSelectedMonth =
+        selectedDay.year == month.year && selectedDay.month == month.month;
 
     return PortalCard(
       child: Column(
@@ -206,7 +264,7 @@ class _MonthGrid extends StatelessWidget {
                 month: month.month,
                 day: day,
               );
-              final adDate = date.approximateAdDate;
+              final adDate = date.gregorianDate;
               final dayMarkers = markers
                   .where((item) => item.bs.day == day)
                   .toList();
@@ -216,7 +274,9 @@ class _MonthGrid extends StatelessWidget {
                 day: day,
                 isToday: isToday,
                 isHoliday: isHoliday,
+                isSelected: isSelectedMonth && selectedDay.day == day,
                 markers: dayMarkers,
+                onTap: () => onDaySelected(day),
               );
             },
           ),
@@ -262,51 +322,77 @@ class _DayCell extends StatelessWidget {
     required this.day,
     required this.isToday,
     required this.isHoliday,
+    required this.isSelected,
     required this.markers,
+    required this.onTap,
   });
 
   final int day;
   final bool isToday;
   final bool isHoliday;
+  final bool isSelected;
   final List<_CalendarMarker> markers;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: isToday ? ParentPortalColors.greenSoft : Colors.transparent,
+    final textColor = isSelected
+        ? Colors.white
+        : isHoliday
+        ? ParentPortalColors.red
+        : ParentPortalColors.navy;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(14),
-        border: isToday
-            ? Border.all(color: ParentPortalColors.green.withValues(alpha: .4))
-            : null,
-      ),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '$day',
-              style: TextStyle(
-                color: isHoliday
-                    ? ParentPortalColors.red
-                    : ParentPortalColors.navy,
-                fontWeight: isToday ? FontWeight.w900 : FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 5),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 3,
-              runSpacing: 3,
+        child: Container(
+          margin: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? ParentPortalColors.green
+                : isToday
+                ? ParentPortalColors.greenSoft
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            border: !isSelected && isToday
+                ? Border.all(
+                    color: ParentPortalColors.green.withValues(alpha: .4),
+                  )
+                : null,
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (isHoliday) const _MiniDot(ParentPortalColors.red),
-                for (final marker in markers.take(4)) _MiniDot(marker.color),
+                Text(
+                  '$day',
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: isToday || isSelected
+                        ? FontWeight.w900
+                        : FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 3,
+                  runSpacing: 3,
+                  children: [
+                    if (isHoliday)
+                      _MiniDot(
+                        isSelected ? Colors.white : ParentPortalColors.red,
+                      ),
+                    for (final marker in markers.take(4))
+                      _MiniDot(isSelected ? Colors.white : marker.color),
+                  ],
+                ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -367,12 +453,23 @@ class _ChildCalendarSection extends StatelessWidget {
 }
 
 class _MarkerRow extends StatelessWidget {
-  const _MarkerRow({required this.marker});
+  const _MarkerRow({
+    required this.marker,
+    this.childName,
+    this.showDate = true,
+  });
 
   final _CalendarMarker marker;
+  final String? childName;
+  final bool showDate;
 
   @override
   Widget build(BuildContext context) {
+    final prefixParts = <String>[
+      ?childName,
+      if (showDate) '${marker.bs.day} ${marker.bs.monthName}',
+    ];
+    final prefix = prefixParts.join(' • ');
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -380,11 +477,105 @@ class _MarkerRow extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            '${marker.bs.day} ${marker.bs.monthName}: ${marker.title}',
+            prefix.isEmpty ? marker.title : '$prefix: ${marker.title}',
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SelectedDayCard extends StatelessWidget {
+  const _SelectedDayCard({
+    required this.day,
+    required this.isHoliday,
+    required this.dayMarkers,
+    required this.upcoming,
+    required this.childNames,
+  });
+
+  final BsDate day;
+  final bool isHoliday;
+  final List<_CalendarMarker> dayMarkers;
+  final List<_CalendarMarker> upcoming;
+  final Map<String, String> childNames;
+
+  @override
+  Widget build(BuildContext context) {
+    final adDate = day.gregorianDate;
+    final showChildName = childNames.length > 1;
+    return PortalCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${day.day} ${day.monthName} ${day.year}',
+                      style: const TextStyle(
+                        color: ParentPortalColors.navy,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      _weekdayName(adDate.weekday),
+                      style: const TextStyle(color: ParentPortalColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+              if (isHoliday)
+                const StatusBadge(
+                  label: 'Holiday',
+                  color: ParentPortalColors.red,
+                  backgroundColor: ParentPortalColors.redSoft,
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (dayMarkers.isEmpty)
+            Text(
+              isHoliday
+                  ? 'No school on this day.'
+                  : 'No school items on this day.',
+              style: const TextStyle(color: ParentPortalColors.muted),
+            )
+          else
+            for (final marker in dayMarkers) ...[
+              _MarkerRow(
+                marker: marker,
+                showDate: false,
+                childName: showChildName ? childNames[marker.childId] : null,
+              ),
+              const SizedBox(height: 8),
+            ],
+          if (upcoming.isNotEmpty) ...[
+            const Divider(height: 24),
+            const Text(
+              'Coming up',
+              style: TextStyle(
+                color: ParentPortalColors.navy,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (final marker in upcoming) ...[
+              _MarkerRow(
+                marker: marker,
+                childName: showChildName ? childNames[marker.childId] : null,
+              ),
+              const SizedBox(height: 8),
+            ],
+          ],
+        ],
+      ),
     );
   }
 }
@@ -528,6 +719,20 @@ BsDate _addMonths(BsDate value, int delta) {
 bool _sameDay(DateTime a, DateTime b) {
   return a.year == b.year && a.month == b.month && a.day == b.day;
 }
+
+bool _isHolidayBs(BsDate day) => day.gregorianDate.weekday == DateTime.saturday;
+
+const _weekdayNames = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+
+String _weekdayName(int weekday) => _weekdayNames[weekday - 1];
 
 (BsDate, BsDate) _academicBounds(ParentPortalData data) {
   final starts = data.children

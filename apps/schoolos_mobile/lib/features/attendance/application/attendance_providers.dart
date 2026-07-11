@@ -14,13 +14,14 @@ final attendanceRepositoryProvider = Provider<AttendanceRepository>((ref) {
   );
 });
 
+typedef AttendanceMonthQuery = ({String studentId, int year, int month});
+
 final parentAttendanceProvider = FutureProvider.autoDispose
-    .family<AttendanceViewData, String>((ref, studentId) async {
+    .family<AttendanceViewData, AttendanceMonthQuery>((ref, query) async {
       final repository = ref.watch(attendanceRepositoryProvider);
-      final now = DateTime.now();
       final snapshot = await repository.getParentAttendanceSnapshot(
-        studentId,
-        now,
+        query.studentId,
+        DateTime(query.year, query.month),
       );
       return AttendanceViewData(
         summary: snapshot.summary,

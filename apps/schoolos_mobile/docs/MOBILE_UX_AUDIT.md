@@ -112,6 +112,10 @@ All three verified fixed with a before/after screenshot on-device, not just a re
 
 **Takeaway:** adversarial widget testing (this audit's primary method) is good at catching crashes but can miss "renders without crashing but is illegible" — that class of bug needs actual visual inspection, ideally on a real device/emulator, not just `tester.takeException()`. Bug #13 is the starkest example: it happens in completely ordinary use, at default settings, on a normal-sized phone — no adversarial conditions needed, and no widget test in this audit's suite happened to use an 11-character title in that exact card. The `ListTile` tap-feedback gap noted above is the same category of "compiles clean, tests green, but wrong in practice." The Parent 6-tab nav-count miss (Section 5) and the parent-teacher chat scope conflict (Section 0) are further examples of things only surfaced by actually running the app, not reading the code.
 
+### Investigated and confirmed non-issue: "stretching" on Parent Home when scrolling past Quick actions (2026-07-11)
+
+Reported live on-device: content visibly stretches when scrolling down past "Quick actions." Measured with a controlled overscroll drag + pixel-edge comparison against a settled screenshot at the same scroll depth: every inter-element gap grows 13–47% while the drag is held, snapping back instantly on release. This is Flutter's **default Android 12+ `StretchingOverscrollIndicator`** — `MaterialApp.router` (`app.dart:35`) sets no `scrollBehavior`, and no `ScrollBehavior`/`ScrollConfiguration` override exists anywhere in the codebase, so every scrollable list app-wide inherits the platform-default stretch effect. It's most noticeable on Parent Home specifically because that screen's content is short and ends well before the bottom nav, so an ordinary scroll immediately hits the boundary. Confirmed with the user this is desired native Android behavior — **no code change made**; flagging here so it isn't mistaken for a live bug and re-investigated later.
+
 ---
 
 ## 4. Accessibility problems
