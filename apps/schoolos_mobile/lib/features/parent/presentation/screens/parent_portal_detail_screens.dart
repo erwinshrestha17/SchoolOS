@@ -123,43 +123,59 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
               const SizedBox(height: 20),
               const ParentSectionHeader(title: 'Quick actions'),
               const SizedBox(height: 10),
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 1.65,
-                children: [
-                  ActionTile(
-                    icon: Icons.how_to_reg_rounded,
-                    label: 'Attendance',
-                    color: ParentPortalColors.green,
-                    onTap: () => context.push(
-                      AppRoutes.parentChildAttendanceDetail(portalChild.id),
-                    ),
-                  ),
-                  ActionTile(
-                    icon: Icons.assignment_rounded,
-                    label: 'Homework',
-                    color: ParentPortalColors.purple,
-                    onTap: () => context.go(
-                      '${AppRoutes.parentHomework}?child=${portalChild.id}',
-                    ),
-                  ),
-                  ActionTile(
-                    icon: Icons.forum_rounded,
-                    label: 'Message teacher',
-                    color: ParentPortalColors.purple,
-                    onTap: () => context.push(AppRoutes.parentChat),
-                  ),
-                  ActionTile(
-                    icon: Icons.credit_card_rounded,
-                    label: 'Fees',
-                    color: ParentPortalColors.green,
-                    onTap: () => context.push(AppRoutes.parentFees),
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  const spacing = 10.0;
+                  final itemWidth = (constraints.maxWidth - spacing) / 2;
+                  return Wrap(
+                    spacing: spacing,
+                    runSpacing: spacing,
+                    children: [
+                      SizedBox(
+                        width: itemWidth,
+                        child: ActionTile(
+                          icon: Icons.how_to_reg_rounded,
+                          label: 'Attendance',
+                          color: ParentPortalColors.green,
+                          onTap: () => context.push(
+                            AppRoutes.parentChildAttendanceDetail(
+                              portalChild.id,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: itemWidth,
+                        child: ActionTile(
+                          icon: Icons.assignment_rounded,
+                          label: 'Homework',
+                          color: ParentPortalColors.purple,
+                          onTap: () => context.go(
+                            '${AppRoutes.parentHomework}?child=${portalChild.id}',
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: itemWidth,
+                        child: ActionTile(
+                          icon: Icons.forum_rounded,
+                          label: 'Message teacher',
+                          color: ParentPortalColors.purple,
+                          onTap: () => context.push(AppRoutes.parentChat),
+                        ),
+                      ),
+                      SizedBox(
+                        width: itemWidth,
+                        child: ActionTile(
+                          icon: Icons.credit_card_rounded,
+                          label: 'Fees',
+                          color: ParentPortalColors.green,
+                          onTap: () => context.push(AppRoutes.parentFees),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 20),
               const ParentSectionHeader(title: 'At school'),

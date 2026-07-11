@@ -15,6 +15,7 @@ import 'package:schoolos_mobile/features/parent/presentation/screens/parent_cant
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_consents_screen.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_fees_receipts_screen.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_fees_screen.dart';
+import 'package:schoolos_mobile/features/parent/presentation/screens/parent_portal_home_tab.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_library_screen.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_report_cards_screen.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_transport_screen.dart';
@@ -478,4 +479,159 @@ void main() {
     expect(find.textContaining('Pending API'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'parent calendar day grid stays overflow-free at max text scale with many markers',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final sharedPrefs = await SharedPreferences.getInstance();
+      final now = DateTime.now();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appPreferencesServiceProvider.overrideWithValue(
+              AppPreferencesService(sharedPrefs),
+            ),
+            parentPortalDataProvider.overrideWith(
+              (ref) async => ParentPortalData(
+                parentName: 'Parent',
+                schoolName: 'School',
+                lastUpdated: now,
+                children: [
+                  ParentPortalChild(
+                    id: 'child-1',
+                    name: 'Aaradhya Chaudhary Shrestha',
+                    classSection: 'Grade 10 - Diamond',
+                    teacher: 'Class teacher',
+                    attendance: 'Present today',
+                    attendanceTime: 'Updated now',
+                    transport: 'Route A',
+                    homework: 'Pending',
+                    updates: 'Unread',
+                    feesDue: 987654,
+                    nextFeeDueDate: now.toIso8601String(),
+                  ),
+                  const ParentPortalChild(
+                    id: 'child-2',
+                    name: 'Bishwanath Shrestha',
+                    classSection: 'Grade 5 - B',
+                    teacher: 'Class teacher',
+                    attendance: 'Present today',
+                    attendanceTime: 'Updated now',
+                    transport: 'Route B',
+                    homework: 'Pending',
+                    updates: 'Unread',
+                  ),
+                ],
+                homework: [
+                  ParentPortalHomework(
+                    id: 'hw-1',
+                    childId: 'child-1',
+                    childName: 'Aaradhya',
+                    classSection: 'Grade 10 - Diamond',
+                    subject: 'Science',
+                    title: 'Lab report',
+                    dueLabel: 'Today',
+                    dueAt: now,
+                    status: 'PENDING',
+                    attachmentCount: 0,
+                    teacher: 'Teacher',
+                  ),
+                  ParentPortalHomework(
+                    id: 'hw-2',
+                    childId: 'child-2',
+                    childName: 'Bishwanath',
+                    classSection: 'Grade 5 - B',
+                    subject: 'Math',
+                    title: 'Worksheet',
+                    dueLabel: 'Today',
+                    dueAt: now,
+                    status: 'PENDING',
+                    attachmentCount: 0,
+                    teacher: 'Teacher',
+                  ),
+                ],
+                updates: [
+                  ParentPortalUpdate(
+                    id: 'update-1',
+                    category: ParentUpdateCategory.event,
+                    title: 'School event today',
+                    body: 'Details',
+                    metadata: 'School - now',
+                    createdAt: now,
+                  ),
+                ],
+              ),
+            ),
+          ],
+          child: MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(textScaler: TextScaler.linear(1.5)),
+              child: const ParentCalendarScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('BS Calendar'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'parent home quick actions grid stays overflow-free at max text scale',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final data = ParentPortalData(
+        parentName: 'Parent',
+        schoolName: 'School',
+        lastUpdated: DateTime(2026, 1, 1),
+        activeChildId: 'child-1',
+        children: const [
+          ParentPortalChild(
+            id: 'child-1',
+            name: 'Aaradhya Chaudhary Shrestha',
+            classSection: 'Grade 10 - Diamond',
+            teacher: 'Class teacher',
+            attendance: 'Present today',
+            attendanceTime: 'Updated now',
+            transport: 'Route A',
+            homework: 'No pending homework',
+            updates: 'No unread updates',
+          ),
+        ],
+        homework: const [],
+        updates: const [],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(textScaler: TextScaler.linear(1.5)),
+              child: Scaffold(body: ParentPortalHomeTab(data: data)),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Message teacher'),
+        220,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Quick actions'), findsOneWidget);
+      expect(find.text('Message teacher'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

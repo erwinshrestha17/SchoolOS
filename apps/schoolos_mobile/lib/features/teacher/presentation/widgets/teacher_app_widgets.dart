@@ -195,12 +195,18 @@ class TeacherTaskCard extends StatelessWidget {
             ),
           ),
           if (value != null) ...[
-            const SizedBox(width: AppSpacing.md),
-            Text(
-              value!,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: iconColor,
-                fontWeight: FontWeight.w900,
+            const SizedBox(width: AppSpacing.sm),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 56),
+              child: Text(
+                value!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: iconColor,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
           ] else if (status != null) ...[

@@ -196,39 +196,53 @@ class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
           const SizedBox(height: 12),
           const ParentSectionHeader(title: 'Quick actions'),
           const SizedBox(height: 10),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.55,
-            children: [
-              ActionTile(
-                icon: Icons.fact_check_outlined,
-                title: 'Attendance',
-                color: ParentPortalColors.orange,
-                onTap: () => context.push(AppRoutes.parentAttendance),
-              ),
-              ActionTile(
-                icon: Icons.chat_bubble_outline_rounded,
-                title: 'Message teacher',
-                color: ParentPortalColors.purple,
-                onTap: () => context.push(AppRoutes.parentChat),
-              ),
-              ActionTile(
-                icon: Icons.payments_outlined,
-                title: 'Pay fees',
-                color: ParentPortalColors.orange,
-                onTap: () => context.push(AppRoutes.parentFees),
-              ),
-              ActionTile(
-                icon: Icons.calendar_month_outlined,
-                title: 'School calendar',
-                color: ParentPortalColors.blue,
-                onTap: () => context.push(AppRoutes.parentCalendar),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const spacing = 12.0;
+              final itemWidth = (constraints.maxWidth - spacing) / 2;
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: [
+                  SizedBox(
+                    width: itemWidth,
+                    child: ActionTile(
+                      icon: Icons.fact_check_outlined,
+                      title: 'Attendance',
+                      color: ParentPortalColors.orange,
+                      onTap: () => context.push(AppRoutes.parentAttendance),
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: ActionTile(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      title: 'Message teacher',
+                      color: ParentPortalColors.purple,
+                      onTap: () => context.push(AppRoutes.parentChat),
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: ActionTile(
+                      icon: Icons.payments_outlined,
+                      title: 'Pay fees',
+                      color: ParentPortalColors.orange,
+                      onTap: () => context.push(AppRoutes.parentFees),
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: ActionTile(
+                      icon: Icons.calendar_month_outlined,
+                      title: 'School calendar',
+                      color: ParentPortalColors.blue,
+                      onTap: () => context.push(AppRoutes.parentCalendar),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 24),
           const ParentSectionHeader(title: 'Latest update'),

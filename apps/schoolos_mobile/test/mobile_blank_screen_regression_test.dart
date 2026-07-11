@@ -142,6 +142,67 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'principal today quick actions grid stays overflow-free at max text scale',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final sharedPrefs = await SharedPreferences.getInstance();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appPreferencesServiceProvider.overrideWithValue(
+              AppPreferencesService(sharedPrefs),
+            ),
+            tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+            authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+            authProvider.overrideWith((ref) {
+              return _FakeAuthNotifier(
+                ref.watch(tokenStorageServiceProvider),
+                ref.watch(authRepositoryProvider),
+                ref.watch(appPreferencesServiceProvider),
+              );
+            }),
+            principalDashboardProvider.overrideWith((ref) async {
+              return {
+                'attentionCount': 3,
+                'cards': <Map<String, dynamic>>[],
+                'alerts': <Map<String, dynamic>>[],
+                'quickActions': [
+                  {
+                    'label': 'Approve pending leave requests',
+                    'icon': 'approvals',
+                    'enabled': true,
+                    'route': AppRoutes.principalApprovals,
+                  },
+                  {
+                    'label': 'Send emergency notice',
+                    'icon': 'notice',
+                    'enabled': true,
+                    'route': AppRoutes.principalNotices,
+                  },
+                ],
+                'recentUpdates': <Map<String, dynamic>>[],
+              };
+            }),
+          ],
+          child: MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(textScaler: TextScaler.linear(1.5)),
+              child: const PrincipalTodayScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Principal Today'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('principal approvals paints populated approval content', (
     tester,
   ) async {
@@ -777,6 +838,75 @@ void main() {
     expect(find.textContaining('API not confirmed'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'teacher homework metric cards stay overflow-free at large text scale with big counts',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final snapshot = TeacherHomeworkSnapshot(
+        items: [
+          TeacherHomeworkItem(
+            id: 'homework-1',
+            title: 'Fractions practice',
+            instructions: 'Complete questions 1 to 10.',
+            className: 'Grade 3',
+            sectionName: 'A',
+            subjectName: 'Mathematics',
+            dueDate: DateTime(2026, 6, 20),
+            status: 'DRAFT',
+            submissionRequired: true,
+            attachmentCount: 0,
+            submissions: const TeacherHomeworkCounts(
+              total: 999,
+              submitted: 500,
+              reviewed: 100,
+              toReview: 999,
+              notSubmitted: 499,
+            ),
+          ),
+        ],
+        scopes: const [
+          TeacherHomeworkScope(
+            id: 'year-1:class-1:section-1:subject-1',
+            academicYearId: 'year-1',
+            academicYearName: '2082',
+            classId: 'class-1',
+            className: 'Grade 3',
+            sectionId: 'section-1',
+            sectionName: 'A',
+            subjectId: 'subject-1',
+            subjectName: 'Mathematics',
+          ),
+        ],
+        total: 999,
+        lastUpdated: DateTime(2026, 6, 19, 8),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            teacherHomeworkProvider.overrideWith(
+              (ref, status) async => snapshot,
+            ),
+          ],
+          child: MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(textScaler: TextScaler.linear(1.3)),
+              child: const TeacherHomeworkScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Assignments'), findsOneWidget);
+      expect(find.text('To review'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('teacher homework create mode preselects selected class scope', (
     tester,

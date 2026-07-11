@@ -145,30 +145,41 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TeacherTaskCard(
-                        title: 'Assignments',
-                        subtitle: query.hasClassContext
-                            ? 'For selected class'
-                            : 'Assigned to your classes',
-                        icon: Icons.school_rounded,
-                        iconColor: AppColors.success,
-                        value: '${snapshot.total}',
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: TeacherTaskCard(
-                        title: 'To review',
-                        subtitle: 'Submitted work',
-                        icon: Icons.rate_review_rounded,
-                        iconColor: AppColors.warning,
-                        value: '${snapshot.toReview}',
-                      ),
-                    ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final assignmentsCard = TeacherTaskCard(
+                      title: 'Assignments',
+                      subtitle: query.hasClassContext
+                          ? 'For selected class'
+                          : 'Assigned to your classes',
+                      icon: Icons.school_rounded,
+                      iconColor: AppColors.success,
+                      value: '${snapshot.total}',
+                    );
+                    final toReviewCard = TeacherTaskCard(
+                      title: 'To review',
+                      subtitle: 'Submitted work',
+                      icon: Icons.rate_review_rounded,
+                      iconColor: AppColors.warning,
+                      value: '${snapshot.toReview}',
+                    );
+                    if (constraints.maxWidth < 360) {
+                      return Column(
+                        children: [
+                          assignmentsCard,
+                          const SizedBox(height: AppSpacing.md),
+                          toReviewCard,
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: assignmentsCard),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(child: toReviewCard),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 if (snapshot.scopes.isEmpty)
@@ -1088,7 +1099,14 @@ class _Meta extends StatelessWidget {
       children: [
         Icon(icon, size: 16, color: AppColors.slate500),
         const SizedBox(width: 4),
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
       ],
     );
   }

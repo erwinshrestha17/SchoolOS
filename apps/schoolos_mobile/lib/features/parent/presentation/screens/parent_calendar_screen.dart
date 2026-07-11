@@ -281,29 +281,33 @@ class _DayCell extends StatelessWidget {
             ? Border.all(color: ParentPortalColors.green.withValues(alpha: .4))
             : null,
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            '$day',
-            style: TextStyle(
-              color: isHoliday
-                  ? ParentPortalColors.red
-                  : ParentPortalColors.navy,
-              fontWeight: isToday ? FontWeight.w900 : FontWeight.w700,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '$day',
+              style: TextStyle(
+                color: isHoliday
+                    ? ParentPortalColors.red
+                    : ParentPortalColors.navy,
+                fontWeight: isToday ? FontWeight.w900 : FontWeight.w700,
+              ),
             ),
-          ),
-          const SizedBox(height: 5),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 3,
-            runSpacing: 3,
-            children: [
-              if (isHoliday) const _MiniDot(ParentPortalColors.red),
-              for (final marker in markers.take(4)) _MiniDot(marker.color),
-            ],
-          ),
-        ],
+            const SizedBox(height: 5),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 3,
+              runSpacing: 3,
+              children: [
+                if (isHoliday) const _MiniDot(ParentPortalColors.red),
+                for (final marker in markers.take(4)) _MiniDot(marker.color),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -397,7 +401,14 @@ class _LegendDot extends StatelessWidget {
     children: [
       _MiniDot(color),
       const SizedBox(width: 5),
-      Text(label, style: const TextStyle(color: ParentPortalColors.muted)),
+      Flexible(
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: ParentPortalColors.muted),
+        ),
+      ),
     ],
   );
 }
