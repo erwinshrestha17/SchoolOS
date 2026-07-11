@@ -78,29 +78,40 @@ class TeacherProfileScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: TeacherTaskCard(
-                  title: 'Assigned',
-                  subtitle: 'Class/subject scopes',
-                  icon: Icons.school_rounded,
-                  iconColor: AppColors.success,
-                  value: '${attendance.classes.length}',
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: TeacherTaskCard(
-                  title: 'Notices',
-                  subtitle: 'Unread',
-                  icon: Icons.campaign_rounded,
-                  iconColor: AppColors.teacherAccent,
-                  value: '${noticeSummary.valueOrNull?.unreadCount ?? 0}',
-                  onTap: () => context.go(AppRoutes.notices),
-                ),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final assignedCard = TeacherTaskCard(
+                title: 'Assigned',
+                subtitle: 'Class/subject scopes',
+                icon: Icons.school_rounded,
+                iconColor: AppColors.success,
+                value: '${attendance.classes.length}',
+              );
+              final noticesCard = TeacherTaskCard(
+                title: 'Notices',
+                subtitle: 'Unread',
+                icon: Icons.campaign_rounded,
+                iconColor: AppColors.teacherAccent,
+                value: '${noticeSummary.valueOrNull?.unreadCount ?? 0}',
+                onTap: () => context.go(AppRoutes.notices),
+              );
+              if (constraints.maxWidth < 360) {
+                return Column(
+                  children: [
+                    assignedCard,
+                    const SizedBox(height: AppSpacing.md),
+                    noticesCard,
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: assignedCard),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(child: noticesCard),
+                ],
+              );
+            },
           ),
           const SizedBox(height: AppSpacing.lg),
           AppCard(
@@ -184,19 +195,25 @@ class _MenuTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      enabled: !locked,
-      minVerticalPadding: AppSpacing.md,
-      leading: Icon(
-        icon,
-        color: locked ? AppColors.slate400 : AppColors.primary,
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        enabled: !locked,
+        minVerticalPadding: AppSpacing.md,
+        leading: Icon(
+          icon,
+          color: locked ? AppColors.slate400 : AppColors.primary,
+        ),
+        title: Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        subtitle: Text(subtitle),
+        trailing: locked
+            ? const Icon(Icons.lock_outline_rounded, size: 18)
+            : const Icon(Icons.chevron_right_rounded),
+        onTap: locked ? null : onTap,
       ),
-      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
-      subtitle: Text(subtitle),
-      trailing: locked
-          ? const Icon(Icons.lock_outline_rounded, size: 18)
-          : const Icon(Icons.chevron_right_rounded),
-      onTap: locked ? null : onTap,
     );
   }
 }

@@ -170,33 +170,44 @@ class AdminDashboard extends ConsumerWidget {
           const SizedBox(height: AppSpacing.xl),
           const SectionHeader(title: 'Quick access'),
           const SizedBox(height: AppSpacing.sm),
-          GridView.count(
-            crossAxisCount: 3,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: AppSpacing.md,
-            mainAxisSpacing: AppSpacing.md,
-            childAspectRatio: 1.0,
-            children: [
-              QuickActionCard(
-                title: 'Notices',
-                icon: Icons.campaign_rounded,
-                color: AppColors.danger,
-                onTap: () => context.go(AppRoutes.notices),
-              ),
-              QuickActionCard(
-                title: 'Alerts',
-                icon: Icons.notifications_active_rounded,
-                color: AppColors.primary,
-                onTap: () => context.go(AppRoutes.notifications),
-              ),
-              QuickActionCard(
-                title: 'Settings',
-                icon: Icons.settings_rounded,
-                color: AppColors.info,
-                onTap: () => context.go(AppRoutes.settings),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const spacing = AppSpacing.md;
+              final itemWidth = (constraints.maxWidth - 2 * spacing) / 3;
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: [
+                  SizedBox(
+                    width: itemWidth,
+                    child: QuickActionCard(
+                      title: 'Notices',
+                      icon: Icons.campaign_rounded,
+                      color: AppColors.danger,
+                      onTap: () => context.go(AppRoutes.notices),
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: QuickActionCard(
+                      title: 'Alerts',
+                      icon: Icons.notifications_active_rounded,
+                      color: AppColors.primary,
+                      onTap: () => context.go(AppRoutes.notifications),
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: QuickActionCard(
+                      title: 'Settings',
+                      icon: Icons.settings_rounded,
+                      color: AppColors.info,
+                      onTap: () => context.go(AppRoutes.settings),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),

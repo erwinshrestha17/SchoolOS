@@ -65,7 +65,7 @@ class DashboardCard extends StatelessWidget {
                     ),
                     if (currentBadge != null) ...[
                       const SizedBox(width: AppSpacing.sm),
-                      currentBadge,
+                      Flexible(child: currentBadge),
                     ],
                   ],
                 ),

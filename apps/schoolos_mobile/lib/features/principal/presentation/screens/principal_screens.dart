@@ -1964,17 +1964,22 @@ class _MenuGroup extends StatelessWidget {
                 for (final item in visible)
                   Column(
                     children: [
-                      ListTile(
-                        leading: _IconBubble(
-                          icon: item.icon,
-                          color: item.color,
+                      Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          leading: _IconBubble(
+                            icon: item.icon,
+                            color: item.color,
+                          ),
+                          title: Text(
+                            item.title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => context.go(item.route),
                         ),
-                        title: Text(
-                          item.title,
-                          style: const TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () => context.go(item.route),
                       ),
                       if (item != visible.last) const Divider(height: 1),
                     ],

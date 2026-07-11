@@ -199,33 +199,44 @@ class StaffDashboard extends ConsumerWidget {
             const SectionHeader(title: "HR Services"),
             const SizedBox(height: AppSpacing.sm),
 
-            GridView.count(
-              crossAxisCount: 3,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: AppSpacing.md,
-              mainAxisSpacing: AppSpacing.md,
-              childAspectRatio: 1.0,
-              children: [
-                QuickActionCard(
-                  title: 'Payslips',
-                  icon: Icons.receipt_long_rounded,
-                  color: AppColors.success,
-                  onTap: () => context.go(AppRoutes.staffPayslips),
-                ),
-                QuickActionCard(
-                  title: 'Leave',
-                  icon: Icons.edit_calendar_rounded,
-                  color: AppColors.warning,
-                  onTap: () => context.go(AppRoutes.staffLeave),
-                ),
-                QuickActionCard(
-                  title: 'Attendance',
-                  icon: Icons.fact_check_rounded,
-                  color: AppColors.primary,
-                  onTap: () => context.go(AppRoutes.staffAttendance),
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const spacing = AppSpacing.md;
+                final itemWidth = (constraints.maxWidth - 2 * spacing) / 3;
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: [
+                    SizedBox(
+                      width: itemWidth,
+                      child: QuickActionCard(
+                        title: 'Payslips',
+                        icon: Icons.receipt_long_rounded,
+                        color: AppColors.success,
+                        onTap: () => context.go(AppRoutes.staffPayslips),
+                      ),
+                    ),
+                    SizedBox(
+                      width: itemWidth,
+                      child: QuickActionCard(
+                        title: 'Leave',
+                        icon: Icons.edit_calendar_rounded,
+                        color: AppColors.warning,
+                        onTap: () => context.go(AppRoutes.staffLeave),
+                      ),
+                    ),
+                    SizedBox(
+                      width: itemWidth,
+                      child: QuickActionCard(
+                        title: 'Attendance',
+                        icon: Icons.fact_check_rounded,
+                        color: AppColors.primary,
+                        onTap: () => context.go(AppRoutes.staffAttendance),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),

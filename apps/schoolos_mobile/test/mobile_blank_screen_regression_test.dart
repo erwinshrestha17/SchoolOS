@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:schoolos_mobile/app/constants/app_routes.dart';
 import 'package:schoolos_mobile/core/auth/auth_provider.dart';
 import 'package:schoolos_mobile/core/auth/data/auth_repository.dart';
+import 'package:schoolos_mobile/core/auth/models/auth_user.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
 import 'package:schoolos_mobile/core/storage/app_preferences_service.dart';
 import 'package:schoolos_mobile/core/storage/token_storage_service.dart';
@@ -14,8 +15,14 @@ import 'package:schoolos_mobile/features/attendance/application/attendance_provi
 import 'package:schoolos_mobile/features/attendance/data/attendance_repository.dart';
 import 'package:schoolos_mobile/features/attendance/domain/attendance_models.dart';
 import 'package:schoolos_mobile/features/attendance/presentation/screens/teacher_attendance_screen.dart';
+import 'package:schoolos_mobile/features/dashboard/presentation/role_dashboards/admin_dashboard.dart';
+import 'package:schoolos_mobile/features/dashboard/presentation/role_dashboards/staff_dashboard.dart';
+import 'package:schoolos_mobile/features/operational_summary/application/operational_summary_providers.dart';
+import 'package:schoolos_mobile/features/operational_summary/domain/operational_summary_models.dart';
 import 'package:schoolos_mobile/features/principal/application/principal_providers.dart';
 import 'package:schoolos_mobile/features/principal/presentation/screens/principal_screens.dart';
+import 'package:schoolos_mobile/features/staff/application/staff_providers.dart';
+import 'package:schoolos_mobile/features/staff/domain/staff_models.dart';
 import 'package:schoolos_mobile/features/teacher/application/teacher_providers.dart';
 import 'package:schoolos_mobile/features/teacher/data/teacher_repository.dart';
 import 'package:schoolos_mobile/features/teacher/domain/teacher_models.dart';
@@ -23,6 +30,7 @@ import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_ac
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_class_hub_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_homework_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_messages_screen.dart';
+import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_profile_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_timetable_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/widgets/teacher_app_widgets.dart';
 
@@ -54,6 +62,52 @@ class _FakeAuthNotifier extends AuthNotifier {
   @override
   Future<void> loadSession() async {
     state = AuthState(status: AuthStatus.authenticated, role: 'principal');
+  }
+}
+
+class _FakeTeacherAuthNotifier extends AuthNotifier {
+  _FakeTeacherAuthNotifier(
+    super.tokenStorage,
+    super.authRepository,
+    super.appPrefs,
+  );
+
+  @override
+  Future<void> loadSession() async {
+    state = AuthState(
+      status: AuthStatus.authenticated,
+      role: 'TEACHER',
+      user: const AuthUser(
+        id: 'teacher-1',
+        name: 'Bishwanath Prasad Chaudhary Shrestha',
+        email: 'bishwanath.chaudhary.shrestha@example-school.edu.np',
+        role: 'TEACHER',
+      ),
+    );
+  }
+}
+
+class _FakeRoleAuthNotifier extends AuthNotifier {
+  _FakeRoleAuthNotifier(
+    super.tokenStorage,
+    super.authRepository,
+    super.appPrefs, {
+    required this.role,
+    required this.name,
+    required this.email,
+  });
+
+  final String role;
+  final String name;
+  final String email;
+
+  @override
+  Future<void> loadSession() async {
+    state = AuthState(
+      status: AuthStatus.authenticated,
+      role: role,
+      user: AuthUser(id: '$role-1', name: name, email: email, role: role),
+    );
   }
 }
 
@@ -1313,6 +1367,86 @@ void main() {
   );
 
   testWidgets(
+    'teacher profile summary cards stay overflow-free at large text scale with big counts',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final sharedPrefs = await SharedPreferences.getInstance();
+      final repository = _MockAttendanceRepository();
+      when(() => repository.getTeacherToday(any())).thenAnswer(
+        (_) async => TeacherTodaySnapshot(
+          date: DateTime(2026, 6, 19),
+          periods: const [],
+          classes: List.generate(
+            15,
+            (index) => TeacherClassSection(
+              id: 'year-1:class-$index:section-1',
+              academicYearId: 'year-1',
+              classId: 'class-$index',
+              sectionId: 'section-1',
+              name: 'Grade $index - A',
+              subject: 'Mathematics',
+            ),
+          ),
+          pendingAttendanceCount: 1,
+          lastUpdated: DateTime(2026, 6, 19, 8),
+        ),
+      );
+      final controller = TeacherAttendanceController(
+        repository: repository,
+        isOnline: true,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appPreferencesServiceProvider.overrideWithValue(
+              AppPreferencesService(sharedPrefs),
+            ),
+            tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+            authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+            authProvider.overrideWith((ref) {
+              return _FakeTeacherAuthNotifier(
+                ref.watch(tokenStorageServiceProvider),
+                ref.watch(authRepositoryProvider),
+                ref.watch(appPreferencesServiceProvider),
+              );
+            }),
+            teacherAttendanceControllerProvider.overrideWith(
+              (ref) => controller,
+            ),
+            teacherNoticeSummaryProvider.overrideWith(
+              (ref) async => TeacherNoticeSummary(
+                unreadCount: 999,
+                lastUpdated: DateTime(2026, 6, 19, 8),
+              ),
+            ),
+          ],
+          child: MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(textScaler: TextScaler.linear(1.5)),
+              child: const TeacherProfileScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      await tester.scrollUntilVisible(
+        find.text('Assigned'),
+        220,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Assigned'), findsOneWidget);
+      expect(find.text('Notices'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'teacher timetable stays overflow-free on a compact phone with long labels',
     (tester) async {
       tester.view.physicalSize = const Size(320, 700);
@@ -1415,6 +1549,142 @@ void main() {
         find.textContaining('Guardian Association'),
         findsOneWidget,
       );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'staff dashboard quick actions grid stays overflow-free on a compact '
+    'phone at large text scale',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final sharedPrefs = await SharedPreferences.getInstance();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appPreferencesServiceProvider.overrideWithValue(
+              AppPreferencesService(sharedPrefs),
+            ),
+            tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+            authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+            authProvider.overrideWith((ref) {
+              return _FakeRoleAuthNotifier(
+                ref.watch(tokenStorageServiceProvider),
+                ref.watch(authRepositoryProvider),
+                ref.watch(appPreferencesServiceProvider),
+                role: 'STAFF',
+                name: 'Bishwanath Prasad Chaudhary Shrestha',
+                email: 'bishwanath.chaudhary.shrestha@example-school.edu.np',
+              );
+            }),
+            staffProfileProvider.overrideWith(
+              (ref) async => const StaffProfile(
+                id: 'staff-1',
+                employeeId: 'EMP-1',
+                name: 'Bishwanath Prasad Chaudhary Shrestha',
+                department: 'Administration',
+                designation: 'Office Assistant',
+              ),
+            ),
+            staffAttendanceProvider.overrideWith((ref) async => const []),
+            staffLeaveRequestsProvider.overrideWith((ref) async => const []),
+            staffPayslipsProvider.overrideWith((ref) async => const []),
+            operationalSummaryProvider(
+              OperationalMobilePersona.staff,
+            ).overrideWith(
+              (ref) async => const OperationalMobileSummary(
+                persona: OperationalMobilePersona.staff,
+                generatedAt: '',
+                schoolDay: '',
+                status: OperationalSummaryStatus.empty,
+                metrics: {},
+                attentionItems: [],
+              ),
+            ),
+          ],
+          child: MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(textScaler: TextScaler.linear(1.5)),
+              child: const StaffDashboard(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Payslips'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Payslips'), findsOneWidget);
+      expect(find.text('Leave'), findsWidgets);
+      expect(find.text('Attendance'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'admin dashboard quick actions grid stays overflow-free on a compact '
+    'phone at large text scale',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final sharedPrefs = await SharedPreferences.getInstance();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appPreferencesServiceProvider.overrideWithValue(
+              AppPreferencesService(sharedPrefs),
+            ),
+            tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+            authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+            authProvider.overrideWith((ref) {
+              return _FakeRoleAuthNotifier(
+                ref.watch(tokenStorageServiceProvider),
+                ref.watch(authRepositoryProvider),
+                ref.watch(appPreferencesServiceProvider),
+                role: 'ADMIN',
+                name: 'Bishwanath Prasad Chaudhary Shrestha',
+                email: 'bishwanath.chaudhary.shrestha@example-school.edu.np',
+              );
+            }),
+            operationalSummaryProvider(
+              OperationalMobilePersona.principal,
+            ).overrideWith(
+              (ref) async => const OperationalMobileSummary(
+                persona: OperationalMobilePersona.principal,
+                generatedAt: '',
+                schoolDay: '',
+                status: OperationalSummaryStatus.empty,
+                metrics: {},
+                attentionItems: [],
+              ),
+            ),
+          ],
+          child: MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(textScaler: TextScaler.linear(1.5)),
+              child: const AdminDashboard(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Quick access'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Notices'), findsWidgets);
+      expect(find.text('Alerts'), findsWidgets);
+      expect(find.text('Settings'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
