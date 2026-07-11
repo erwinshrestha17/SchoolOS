@@ -8,6 +8,16 @@
 
 ---
 
+## 0. Scope-boundary finding — needs a product decision
+
+Walking the Parent and Teacher personas live on a real device (Phase 5) surfaced a fully-built, working **parent-teacher direct chat feature**: Parent's Quick Actions include "Message teacher" → `ParentChatScreen` ("Start chat" CTA, thread UI); Teacher's Today screen includes a "Messages" card and a full Messages tab with parent threads, quiet-hours-aware reply composer, and a "Your message has been sent, the class teacher usually replies during school chat hours: Sunday-Thursday 4-7 PM..." confirmation. This is a complete, real feature, not a stub.
+
+**The brief's Product Boundaries section explicitly says:** *"Do not add: Parent-teacher direct chat."*
+
+This isn't something introduced during this audit — the feature already existed in the codebase before this session's work began. I'm flagging it because it's a direct, unambiguous conflict between the written product boundary and what's actually shipped, and it's not my call whether to remove it, keep it, or treat the boundary as outdated. Worth a decision before this goes further, since every fix in this doc assumes the current feature set is the intended one.
+
+---
+
 ## 1. Persona flow maps
 
 ### Parent
@@ -90,18 +100,19 @@ All 10 were confirmed by a failing widget test before the fix, and a passing one
 
 **A second, unrelated bug class found via the same testing process:** `ListTile.onTap` inside an opaque `AppCard` (no intervening `Material`) makes tap ink-splash feedback invisible — a real accessibility/feedback issue, not overflow. Found and fixed in `teacher_profile_screen.dart` `_MenuTile` and `principal_screens.dart` `_MenuGroup`. The codebase already has the correct pattern elsewhere (`_StudentSummaryRow` wraps in `Material(color: transparent)`) — these two just missed it. **Not exhaustively audited** — there are ~20 more `ListTile` call sites across the app; only the two found via test execution were fixed. Worth a dedicated pass if tap-feedback consistency matters.
 
-### Phase 5 addendum — 2 more bugs found only by real-device testing
+### Phase 5 addendum — 3 more bugs found only by real-device testing
 
-Widget tests simulate layout accurately but can miss things a real device surfaces immediately. Verified on a Pixel 10 Pro emulator (Android, arm64) at 360×640 (smallest matrix entry) and at the OS's real accessibility text-scale setting (`Settings → font_scale`, not a simulated `TextScaler` — the actual system setting):
+Widget tests simulate layout accurately but can miss things a real device surfaces immediately. Verified on a Pixel 10 Pro emulator (Android, arm64) at 360×640 (smallest matrix entry), at native ~427×952dp (large-phone matrix entry), and at the OS's real accessibility text-scale setting (`Settings → font_scale`, not a simulated `TextScaler` — the actual system setting), logged in live as both Principal, Parent, and Teacher:
 
 | # | Location | What real-device testing caught that widget tests didn't | Fix |
 |---|---|---|---|
 | 11 | `principal_screens.dart` `_SummaryStrip` (Attention Center Critical/High/Medium) | The earlier ellipsis fix (bug #1 above) prevented the *crash*, but on an actual 360px phone at **normal 1.0x text scale** — not even scaled up — completely ordinary labels ("Critical", "Medium") rendered as "Critic…"/"Medi…", illegible in totally normal use. Adversarial tests only assert `no exception`; they don't catch "renders but is unreadable." | Replaced `_SummaryStrip` with the already-Wrap-based `_SummaryCards` (same shared component as fix #2) and deleted the now-dead class |
 | 12 | `principal_screens.dart` `_PrincipalBottomNav` | At real OS text scale 1.3x, "Approvals" wrapped to "Approval"/"s" on two lines. This nav bar is Principal-specific (not `RoleShellScaffold`, which Teacher/Parent use and which already has compact label sizing) — it was simply missed when that fix was applied elsewhere | Applied the same `NavigationBarTheme` compact-label treatment `RoleShellScaffold` already uses |
+| 13 | `teacher_app_widgets.dart` `TeacherTaskCard` title | Logged in live as Teacher, opened the Homework tab: "Assignments" truncated to "Assignme…" at **normal 1.0x scale on a native ~427dp-wide device** — not a compact-width or large-text edge case at all, just the everyday Homework screen. The fixed-size icon + bounded value text left too little room for an 11-character title on one line in the 2-column card layout. | Changed title `maxLines` from 1 to 2, so it wraps ("Assignmen"/"ts") instead of truncating. Wrap point isn't beautiful but no information is lost — same trade-off already accepted for #11 |
 
-Both verified fixed with a before/after screenshot on-device, not just a re-run test. Commits `44b1d635`, `52c68cba`.
+All three verified fixed with a before/after screenshot on-device, not just a re-run test. Commits `44b1d635`, `52c68cba`, `8e8bfd6d`.
 
-**Takeaway:** adversarial widget testing (this audit's primary method) is good at catching crashes but can miss "renders without crashing but is illegible" — that class of bug needs actual visual inspection, ideally on a real device/emulator, not just `tester.takeException()`. The `ListTile` tap-feedback gap noted above is the same category of "compiles clean, tests green, but wrong in practice."
+**Takeaway:** adversarial widget testing (this audit's primary method) is good at catching crashes but can miss "renders without crashing but is illegible" — that class of bug needs actual visual inspection, ideally on a real device/emulator, not just `tester.takeException()`. Bug #13 is the starkest example: it happens in completely ordinary use, at default settings, on a normal-sized phone — no adversarial conditions needed, and no widget test in this audit's suite happened to use an 11-character title in that exact card. The `ListTile` tap-feedback gap noted above is the same category of "compiles clean, tests green, but wrong in practice." The Parent 6-tab nav-count miss (Section 5) and the parent-teacher chat scope conflict (Section 0) are further examples of things only surfaced by actually running the app, not reading the code.
 
 ---
 
@@ -115,9 +126,8 @@ Both verified fixed with a before/after screenshot on-device, not just a re-run 
 
 ## 5. Navigation problems
 
-- **Bottom-nav item counts:** Parent (`SchoolOsAppShell`), Teacher, and Principal shells all use exactly 5 primary items, matching the brief's recommended structure and the "≤5 items" rule.
-- **One dead-code inconsistency found:** `RoleShellScaffold._itemsForRole('PARENT')` defines a *different*, 6-item nav set (Home, Children, Attendance, Homework, Notices, More) than what `SchoolOsAppShell` actually shows. Verified via `grep` that `RoleShellScaffold` is never invoked with `role: 'PARENT'` anywhere in the codebase — **this is unreachable dead code, not a live bug.** Worth deleting so a future edit doesn't accidentally wire it up and reintroduce the inconsistency.
-- Role/permission-gated navigation, deep-link re-authorization, and logout state-clearing were not independently re-verified this pass (prior session memory notes these were addressed earlier; not re-confirmed here — treat as unverified until re-checked).
+- **Bottom-nav item counts — corrected after live-device testing.** Teacher and Principal shells use exactly 5 primary items, matching the brief. **Parent does not: it has 6 live bottom-nav items** (Home, Children, Attendance, Homework, Notices, More), exceeding the brief's own "avoid more than five" rule and not matching its recommended Parent structure (5 items, no separate Notices tab). This was **missed by static code review** — I initially (incorrectly) concluded via `grep` that a 6-item nav list (`RoleShellScaffold._itemsForRole('PARENT')`) was unreachable dead code, since that specific class is indeed never invoked with `role: 'PARENT'`. What I missed: `SchoolOsAppShell` has its **own separate** custom bottom-nav widget, `SchoolOsBottomNavigation` (in `school_os_app_shell.dart`), with a hardcoded 6-item list — a different code path entirely, and very much live. Confirmed by walking the Parent persona on a real device: all 6 tabs render and work (Attendance pushes to a standalone screen rather than being an `IndexedStack` tab, which is why the shell's own `titles` list only has 5 entries — that list is just the app-bar title per tab, not the bottom-nav item count). **This needs a product decision, not a code fix**: which item to cut/merge to get to 5, or whether 6 is acceptable here. The originally-flagged `RoleShellScaffold._itemsForRole('PARENT')` dead code is a separate, smaller, still-valid finding — safe to delete.
+- Role/permission-gated navigation, deep-link re-authorization, and logout state-clearing were not independently re-verified this pass (prior session memory notes these were addressed earlier; not re-confirmed here — treat as unverified until re-checked). Sign-out was verified working live this pass (Parent persona → Profile → Sign Out → returns cleanly to login).
 
 ---
 
@@ -179,6 +189,12 @@ These are honest in-app messages already written by the team acknowledging a mis
 
 ## 10. Summary
 
-12 real overflow/accessibility/tap-feedback bugs found and fixed across this audit (commits `59aeb79b`, `8037889f`, `ef3ab420`, `44b1d635`, `52c68cba`) — 10 from adversarial widget testing, 2 more (bugs #11–12) found only by actually running the app on a real device/emulator, which is itself a finding: widget tests alone weren't sufficient. One dead-code navigation inconsistency found (safe to delete, not urgent). One meaningful size win shipped (−23% on the most common Android ABI) by removing confirmed-unused dependencies (commit `7a098a70`). Full Phase 5 verification checklist (`pub get`, `dart format`, `analyze`, `test`, debug APK, release AAB) passes clean; iOS build fails immediately due to incomplete Xcode, not a code issue. Two open items need a decision from you, not more code archaeology: the stale "Needs mobile timetable DTO" label, and whether Principal's raw-JSON-map pattern is intentional.
+13 real overflow/accessibility/tap-feedback bugs found and fixed across this audit (commits `59aeb79b`, `8037889f`, `ef3ab420`, `44b1d635`, `52c68cba`, `8e8bfd6d`) — 10 from adversarial widget testing, 3 more (bugs #11–13) found only by actually running the app on a real device/emulator as all three in-scope personas, which is itself a finding: widget tests alone weren't sufficient, and bug #13 happened in completely ordinary use with no adversarial conditions at all. One meaningful size win shipped (−23% on the most common Android ABI) by removing confirmed-unused dependencies (commit `7a098a70`). Full Phase 5 verification checklist (`pub get`, `dart format`, `analyze`, `test`, debug APK, release AAB) passes clean; iOS build fails immediately due to incomplete Xcode, not a code issue.
 
-**Not done this pass, needed before claiming "production-ready":** accessibility scanner/screen-reader pass, real performance profiling, iOS build/size (blocked on tooling — needs a full Xcode install), and login-gated real-device QA beyond Principal (this session's device testing authenticated as Principal only; Parent and Teacher personas were verified via widget tests but not walked on-device).
+**Two things need a decision from you, not more code archaeology:**
+1. **The parent-teacher chat feature (Section 0) directly contradicts the brief's "Do not add" list.** This is the highest-priority open item in this doc.
+2. **Parent's bottom nav has 6 items, not 5** (Section 5) — my Phase 1 conclusion that this was dead code was wrong; it's live and violates the brief's own nav-count guidance.
+
+Smaller open items: the stale "Needs mobile timetable DTO" label, whether Principal's raw-JSON-map pattern is intentional, and the now-safe-to-delete actually-dead `RoleShellScaffold._itemsForRole('PARENT')` code.
+
+**Not done this pass, needed before claiming "production-ready":** accessibility scanner/screen-reader pass, real performance profiling, iOS build/size (blocked on tooling — needs a full Xcode install).
