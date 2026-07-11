@@ -1,6 +1,6 @@
 # SchoolOS Mobile — Phase 1 UX/Responsiveness/Size Audit
 
-**Status:** Snapshot as of 2026-07-11, main branch (commits through `7a098a70`).
+**Status:** Snapshot as of 2026-07-11, main branch (commits through `52c68cba`). Updated after Phase 5 real-device verification.
 
 **Scope:** `apps/schoolos_mobile`, Parent / Teacher / Principal personas only, per `docs/DESIGN_SYSTEM.md` and the mobile companion-app brief. Driver/Staff/Admin/Student surfaces are noted where they share code with the three in-scope personas, but were not independently audited.
 
@@ -90,6 +90,19 @@ All 10 were confirmed by a failing widget test before the fix, and a passing one
 
 **A second, unrelated bug class found via the same testing process:** `ListTile.onTap` inside an opaque `AppCard` (no intervening `Material`) makes tap ink-splash feedback invisible — a real accessibility/feedback issue, not overflow. Found and fixed in `teacher_profile_screen.dart` `_MenuTile` and `principal_screens.dart` `_MenuGroup`. The codebase already has the correct pattern elsewhere (`_StudentSummaryRow` wraps in `Material(color: transparent)`) — these two just missed it. **Not exhaustively audited** — there are ~20 more `ListTile` call sites across the app; only the two found via test execution were fixed. Worth a dedicated pass if tap-feedback consistency matters.
 
+### Phase 5 addendum — 2 more bugs found only by real-device testing
+
+Widget tests simulate layout accurately but can miss things a real device surfaces immediately. Verified on a Pixel 10 Pro emulator (Android, arm64) at 360×640 (smallest matrix entry) and at the OS's real accessibility text-scale setting (`Settings → font_scale`, not a simulated `TextScaler` — the actual system setting):
+
+| # | Location | What real-device testing caught that widget tests didn't | Fix |
+|---|---|---|---|
+| 11 | `principal_screens.dart` `_SummaryStrip` (Attention Center Critical/High/Medium) | The earlier ellipsis fix (bug #1 above) prevented the *crash*, but on an actual 360px phone at **normal 1.0x text scale** — not even scaled up — completely ordinary labels ("Critical", "Medium") rendered as "Critic…"/"Medi…", illegible in totally normal use. Adversarial tests only assert `no exception`; they don't catch "renders but is unreadable." | Replaced `_SummaryStrip` with the already-Wrap-based `_SummaryCards` (same shared component as fix #2) and deleted the now-dead class |
+| 12 | `principal_screens.dart` `_PrincipalBottomNav` | At real OS text scale 1.3x, "Approvals" wrapped to "Approval"/"s" on two lines. This nav bar is Principal-specific (not `RoleShellScaffold`, which Teacher/Parent use and which already has compact label sizing) — it was simply missed when that fix was applied elsewhere | Applied the same `NavigationBarTheme` compact-label treatment `RoleShellScaffold` already uses |
+
+Both verified fixed with a before/after screenshot on-device, not just a re-run test. Commits `44b1d635`, `52c68cba`.
+
+**Takeaway:** adversarial widget testing (this audit's primary method) is good at catching crashes but can miss "renders without crashing but is illegible" — that class of bug needs actual visual inspection, ideally on a real device/emulator, not just `tester.takeException()`. The `ListTile` tap-feedback gap noted above is the same category of "compiles clean, tests green, but wrong in practice."
+
 ---
 
 ## 4. Accessibility problems
@@ -124,6 +137,8 @@ All 10 were confirmed by a failing widget test before the fix, and a passing one
 | Split APK x86_64 | 30.8 MB | 23.4 MB | −24% |
 
 arm64-v8a now sits at 21.8 MB, comfortably inside the brief's 25–35 MB "preferred" Android guardrail.
+
+A plain multi-ABI `flutter build appbundle --release` (the actual Play Console upload artifact, no `--target-platform` restriction) is **59.3 MB** — this is the upload size, not the per-device download size. Play's dynamic delivery serves only the matching ABI slice per device, which is what the single-ABI numbers above approximate; there's no `bundletool` available in this environment to get Play's exact per-device figure (downloading it wasn't attempted — installing and running new executables from the internet is outside what this session does without explicit sign-off).
 
 **iOS: not measured.** Xcode is only a Command Line Tools install on the machine used for this audit (`xcodebuild -version` fails; `flutter doctor` flags it incomplete). No iOS build, archive, or size estimate is possible without a full Xcode install on a Mac.
 
@@ -164,6 +179,6 @@ These are honest in-app messages already written by the team acknowledging a mis
 
 ## 10. Summary
 
-10 real overflow/accessibility bugs found and fixed this pass (commits `59aeb79b`, `8037889f`, `ef3ab420`), all backed by adversarial tests that now guard against regression. One dead-code navigation inconsistency found (safe to delete, not urgent). One meaningful size win shipped (−23% on the most common Android ABI) by removing confirmed-unused dependencies (commit `7a098a70`). Two open items need a decision from you, not more code archaeology: the stale "Needs mobile timetable DTO" label, and whether Principal's raw-JSON-map pattern is intentional.
+12 real overflow/accessibility/tap-feedback bugs found and fixed across this audit (commits `59aeb79b`, `8037889f`, `ef3ab420`, `44b1d635`, `52c68cba`) — 10 from adversarial widget testing, 2 more (bugs #11–12) found only by actually running the app on a real device/emulator, which is itself a finding: widget tests alone weren't sufficient. One dead-code navigation inconsistency found (safe to delete, not urgent). One meaningful size win shipped (−23% on the most common Android ABI) by removing confirmed-unused dependencies (commit `7a098a70`). Full Phase 5 verification checklist (`pub get`, `dart format`, `analyze`, `test`, debug APK, release AAB) passes clean; iOS build fails immediately due to incomplete Xcode, not a code issue. Two open items need a decision from you, not more code archaeology: the stale "Needs mobile timetable DTO" label, and whether Principal's raw-JSON-map pattern is intentional.
 
-**Not done this pass, needed before claiming "production-ready":** accessibility scanner/screen-reader pass, real performance profiling, iOS size measurement (blocked on tooling), and the full device-matrix/physical-device QA the brief calls for (Phase 5).
+**Not done this pass, needed before claiming "production-ready":** accessibility scanner/screen-reader pass, real performance profiling, iOS build/size (blocked on tooling — needs a full Xcode install), and login-gated real-device QA beyond Principal (this session's device testing authenticated as Principal only; Parent and Teacher personas were verified via widget tests but not walked on-device).
