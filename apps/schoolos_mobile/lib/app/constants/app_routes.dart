@@ -30,7 +30,6 @@ class AppRoutes {
   static const parentCanteen = '/parent/more/canteen-wallet';
   static const parentConsents = '/parent/more/consents';
   static const parentLibrary = '/parent/more/library';
-  static const parentChat = '/parent/chat';
   static const parentMore = '/parent/more';
   static const studentSession = '/student/session';
   static const studentHome = '/student/home';
@@ -45,8 +44,6 @@ class AppRoutes {
   static const teacherActivity = '/teacher/activity';
   static const teacherHomework = '/teacher/homework';
   static const teacherHomeworkCreate = '/teacher/homework/create';
-  static const teacherMessages = '/teacher/messages';
-  static const teacherMessageThread = '/teacher/messages/:threadId';
   static const teacherTimetable = '/teacher/timetable';
   static const teacherProfile = '/teacher/profile';
   static const teacherLeave = '/teacher/leave';
@@ -101,7 +98,4 @@ class AppRoutes {
     };
     return Uri(path: teacherHomework, queryParameters: query).toString();
   }
-
-  static String teacherMessageThreadDetail(String threadId) =>
-      '/teacher/messages/${Uri.encodeComponent(threadId)}';
 }

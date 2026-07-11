@@ -13,27 +13,9 @@ final teacherRepositoryProvider = Provider<TeacherRepository>((ref) {
   );
 });
 
-final teacherMessagesProvider =
-    FutureProvider.autoDispose<TeacherMessagesSnapshot>((ref) async {
-      final repository = ref.watch(teacherRepositoryProvider);
-      final snapshot = await repository.getMessages();
-      final isOnline = ref.watch(connectivityProvider);
-      return TeacherMessagesSnapshot(
-        threads: snapshot.threads,
-        availability: snapshot.availability,
-        lastUpdated: snapshot.lastUpdated,
-        fromCache: snapshot.fromCache || !isOnline,
-      );
-    });
-
 final teacherNoticeSummaryProvider =
     FutureProvider.autoDispose<TeacherNoticeSummary>((ref) async {
       return ref.watch(teacherRepositoryProvider).getNoticeSummary();
-    });
-
-final teacherMessageDetailProvider = FutureProvider.autoDispose
-    .family<TeacherMessageDetail, String>((ref, threadId) async {
-      return ref.watch(teacherRepositoryProvider).getMessageDetail(threadId);
     });
 
 final teacherHomeworkProvider = FutureProvider.autoDispose

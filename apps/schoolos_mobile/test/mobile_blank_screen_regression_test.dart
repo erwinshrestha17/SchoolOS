@@ -24,17 +24,13 @@ import 'package:schoolos_mobile/features/principal/presentation/screens/principa
 import 'package:schoolos_mobile/features/staff/application/staff_providers.dart';
 import 'package:schoolos_mobile/features/staff/domain/staff_models.dart';
 import 'package:schoolos_mobile/features/teacher/application/teacher_providers.dart';
-import 'package:schoolos_mobile/features/teacher/data/teacher_repository.dart';
 import 'package:schoolos_mobile/features/teacher/domain/teacher_models.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_activity_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_class_hub_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_homework_screen.dart';
-import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_messages_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_profile_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_timetable_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/widgets/teacher_app_widgets.dart';
-
-class _MockTeacherRepository extends Mock implements TeacherRepository {}
 
 class _MockAttendanceRepository extends Mock implements AttendanceRepository {}
 
@@ -1129,63 +1125,6 @@ void main() {
   });
 
   testWidgets(
-    'teacher message reply surfaces a retry-able error instead of failing silently',
-    (tester) async {
-      const thread = TeacherMessageThread(
-        id: 'thread-1',
-        title: 'Sunita Rai',
-        context: 'Asha Rai • Grade 3 - A',
-        preview: 'Thank you',
-        updatedAt: null,
-        status: 'OPEN',
-      );
-      const availability = TeacherChatAvailability(
-        isAvailable: true,
-        notice: 'Available now',
-        sla: 'Replies within 24 hours',
-      );
-      final detail = TeacherMessageDetail(
-        thread: thread,
-        messages: const [],
-        availability: availability,
-      );
-      final repository = _MockTeacherRepository();
-      when(
-        () => repository.sendMessage(any(), any()),
-      ).thenThrow(Exception('network down'));
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            teacherRepositoryProvider.overrideWithValue(repository),
-            teacherMessageDetailProvider(
-              thread.id,
-            ).overrideWith((ref) async => detail),
-          ],
-          child: const MaterialApp(
-            home: TeacherMessageThreadScreen(threadId: 'thread-1'),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.enterText(find.byType(TextField), 'Please call me back');
-      await tester.tap(find.byIcon(Icons.send_rounded));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      expect(
-        find.text(
-          'Reply could not be sent. Check your connection and try again.',
-        ),
-        findsOneWidget,
-      );
-      expect(find.text('Please call me back'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets(
     'principal approvals review action stays overflow-free at large text scale',
     (tester) async {
       tester.view.physicalSize = const Size(320, 700);
@@ -1503,50 +1442,6 @@ void main() {
         find.textContaining('Science and Technology Section'),
         findsWidgets,
       );
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets(
-    'teacher messages list stays overflow-free on a compact phone with long thread text',
-    (tester) async {
-      tester.view.physicalSize = const Size(320, 700);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final snapshot = TeacherMessagesSnapshot(
-        threads: const [
-          TeacherMessageThread(
-            id: 'thread-2',
-            title: 'Bishwanath Prasad Chaudhary Guardian Association',
-            context:
-                'Aaradhya Chaudhary Shrestha • Grade 10 - Science and Technology Section • Diamond',
-            preview:
-                'Thank you very much for the detailed update about the upcoming examination schedule and syllabus coverage',
-            updatedAt: null,
-            status: 'ESCALATED',
-          ),
-        ],
-        availability: const TeacherChatAvailability(
-          isAvailable: false,
-          notice:
-              'Messaging is restricted outside school hours per the communication policy',
-          sla: 'Replies within 24 hours on working days',
-        ),
-        lastUpdated: DateTime(2026, 6, 19, 8),
-      );
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            teacherMessagesProvider.overrideWith((ref) async => snapshot),
-          ],
-          child: const MaterialApp(home: TeacherMessagesScreen()),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('Guardian Association'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

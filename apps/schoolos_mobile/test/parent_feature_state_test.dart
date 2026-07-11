@@ -625,12 +625,12 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.scrollUntilVisible(
-        find.text('Message teacher'),
+        find.text('Pay fees'),
         220,
         scrollable: find.byType(Scrollable).first,
       );
       expect(find.text('Quick actions'), findsOneWidget);
-      expect(find.text('Message teacher'), findsOneWidget);
+      expect(find.text('Pay fees'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

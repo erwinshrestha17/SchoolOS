@@ -172,20 +172,6 @@ final parentLibraryProvider = FutureProvider.autoDispose
       return ref.watch(parentRepositoryProvider).getLibraryForChild(childId);
     });
 
-final parentTeacherThreadsProvider = FutureProvider.autoDispose
-    .family<ParentTeacherThreadPage, String?>((ref, childId) {
-      return ref
-          .watch(parentRepositoryProvider)
-          .getParentTeacherThreads(childId: childId);
-    });
-
-final parentTeacherMessagesProvider = FutureProvider.autoDispose
-    .family<List<ParentTeacherMessage>, String>((ref, threadId) {
-      return ref
-          .watch(parentRepositoryProvider)
-          .getParentTeacherMessages(threadId);
-    });
-
 class ParentState {
   const ParentState({
     this.status = ParentDataStatus.loading,

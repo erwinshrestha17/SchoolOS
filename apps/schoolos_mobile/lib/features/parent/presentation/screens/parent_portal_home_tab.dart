@@ -216,15 +216,6 @@ class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
                   SizedBox(
                     width: itemWidth,
                     child: ActionTile(
-                      icon: Icons.chat_bubble_outline_rounded,
-                      title: 'Message teacher',
-                      color: ParentPortalColors.purple,
-                      onTap: () => context.push(AppRoutes.parentChat),
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: ActionTile(
                       icon: Icons.payments_outlined,
                       title: 'Pay fees',
                       color: ParentPortalColors.orange,

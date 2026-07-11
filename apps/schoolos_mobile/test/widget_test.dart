@@ -305,8 +305,8 @@ void main() {
     expect(find.text('Today'), findsOneWidget);
     expect(find.text('Attendance'), findsOneWidget);
     expect(find.text('Homework'), findsOneWidget);
-    expect(find.text('Messages'), findsOneWidget);
     expect(find.text('Profile'), findsOneWidget);
+    expect(find.text('Messages'), findsNothing);
     expect(find.text('Classes'), findsNothing);
     expect(find.text('More'), findsNothing);
   });

@@ -289,42 +289,4 @@ void main() {
     expect(canteen.activeMealPlans.single.name, 'Lunch');
     expect(canteen.menuItems.single.allergenTags, ['gluten']);
   });
-
-  test('maps parent teacher chat threads and messages', () {
-    final page = ParentTeacherThreadPage.fromJson({
-      'total': 1,
-      'items': [
-        {
-          'id': 'thread-1',
-          'studentId': 'child-1',
-          'status': 'OPEN',
-          'student': {
-            'firstNameEn': 'Asha',
-            'lastNameEn': 'Rai',
-            'class': {'name': 'Grade 4'},
-            'sectionRef': {'name': 'A'},
-          },
-          'classTeacher': {'firstName': 'Sita', 'lastName': 'Adhikari'},
-          'sla': 'Usually replies within 1 school day.',
-          'latestMessages': [
-            {
-              'id': 'message-1',
-              'threadId': 'thread-1',
-              'senderUserId': 'guardian-user-1',
-              'senderRole': 'PARENT',
-              'message': 'Please call me.',
-              'priority': 'NORMAL',
-              'status': 'SENT',
-            },
-          ],
-        },
-      ],
-    });
-
-    expect(page.total, 1);
-    expect(page.items.single.studentName, 'Asha Rai');
-    expect(page.items.single.classSection, 'Grade 4 - A');
-    expect(page.items.single.teacherName, 'Sita Adhikari');
-    expect(page.items.single.latestMessage?.isParentSender, isTrue);
-  });
 }

@@ -7,7 +7,6 @@ import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/status_chip.dart';
 import '../../../../shared/widgets/user_avatar.dart';
-import '../../domain/teacher_models.dart';
 
 class TeacherPersonaHeader extends StatelessWidget {
   const TeacherPersonaHeader({
@@ -217,48 +216,6 @@ class TeacherTaskCard extends StatelessWidget {
             const SizedBox(width: AppSpacing.xs),
             const Icon(Icons.chevron_right_rounded, color: AppColors.slate500),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class TeacherQuietHoursBanner extends StatelessWidget {
-  const TeacherQuietHoursBanner({super.key, required this.availability});
-
-  final TeacherChatAvailability availability;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      hasShadow: false,
-      color: availability.isAvailable
-          ? AppColors.successLight
-          : AppColors.primaryLight,
-      border: Border.all(
-        color: availability.isAvailable
-            ? AppColors.success.withValues(alpha: 0.22)
-            : AppColors.primary.withValues(alpha: 0.18),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            availability.isAvailable
-                ? Icons.mark_chat_read_rounded
-                : Icons.nights_stay_rounded,
-            color: availability.isAvailable
-                ? AppColors.success
-                : AppColors.primary,
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Text(
-              availability.notice,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
         ],
       ),
     );

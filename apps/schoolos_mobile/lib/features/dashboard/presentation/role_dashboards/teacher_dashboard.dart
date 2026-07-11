@@ -27,7 +27,6 @@ class TeacherDashboard extends ConsumerWidget {
     final state = ref.watch(teacherAttendanceControllerProvider);
     final controller = ref.read(teacherAttendanceControllerProvider.notifier);
     final noticeSummary = ref.watch(teacherNoticeSummaryProvider);
-    final messages = ref.watch(teacherMessagesProvider);
     final homework = ref.watch(
       teacherHomeworkProvider(const TeacherHomeworkQuery()),
     );
@@ -43,7 +42,6 @@ class TeacherDashboard extends ConsumerWidget {
         onRefresh: () async {
           await Future.wait([
             controller.load(),
-            ref.refresh(teacherMessagesProvider.future),
             ref.refresh(teacherNoticeSummaryProvider.future),
             ref.refresh(
               teacherHomeworkProvider(const TeacherHomeworkQuery()).future,
@@ -126,19 +124,6 @@ class TeacherDashboard extends ConsumerWidget {
                       icon: Icons.menu_book_rounded,
                       iconColor: AppColors.teacherAccent,
                       onTap: () => context.go(AppRoutes.teacherHomework),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    TeacherTaskCard(
-                      title: 'Messages',
-                      subtitle: messages.when(
-                        data: (value) =>
-                            '${value.threads.length} parent thread(s)',
-                        error: (_, _) => 'Messages are unavailable right now',
-                        loading: () => 'Loading conversations',
-                      ),
-                      icon: Icons.chat_bubble_rounded,
-                      iconColor: AppColors.info,
-                      onTap: () => context.go(AppRoutes.teacherMessages),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     TeacherTaskCard(

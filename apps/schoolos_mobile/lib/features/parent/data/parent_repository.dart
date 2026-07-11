@@ -521,63 +521,6 @@ class ParentRepository {
     return ParentProtectedFileDownload(fileName: fileName, filePath: file.path);
   }
 
-  Future<ParentTeacherThreadPage> getParentTeacherThreads({
-    String? childId,
-  }) async {
-    final response = await _client.get(
-      '/messaging/parent-teacher/threads',
-      queryParameters: {
-        if (childId != null && childId.isNotEmpty) 'studentId': childId,
-        'limit': '25',
-      },
-    );
-    final data = response.data as Map<String, dynamic>;
-    return ParentTeacherThreadPage.fromJson(data);
-  }
-
-  Future<ParentTeacherThread> openParentTeacherThread(String childId) async {
-    final response = await _client.post(
-      '/messaging/parent-teacher/threads',
-      data: {'studentId': childId},
-    );
-    final data = response.data as Map<String, dynamic>;
-    return ParentTeacherThread.fromJson(
-      data['thread'] as Map<String, dynamic>? ?? const {},
-    );
-  }
-
-  Future<List<ParentTeacherMessage>> getParentTeacherMessages(
-    String threadId,
-  ) async {
-    final response = await _client.get(
-      '/messaging/parent-teacher/threads/$threadId/messages',
-      queryParameters: {'limit': '50'},
-    );
-    final data = response.data as Map<String, dynamic>;
-    final items = data['items'] as List<dynamic>? ?? const [];
-
-    return items
-        .whereType<Map<String, dynamic>>()
-        .map(ParentTeacherMessage.fromJson)
-        .toList();
-  }
-
-  Future<ParentTeacherSendResult> sendParentTeacherMessage({
-    required String threadId,
-    required String message,
-  }) async {
-    final response = await _client.post(
-      '/messaging/parent-teacher/threads/$threadId/messages',
-      data: {'message': message},
-    );
-    final data = response.data as Map<String, dynamic>;
-    return ParentTeacherSendResult.fromJson(data);
-  }
-
-  Future<void> markParentTeacherThreadRead(String threadId) async {
-    await _client.patch('/messaging/parent-teacher/threads/$threadId/read');
-  }
-
   Future<Map<String, dynamic>> _getMap(
     String path, {
     required String cacheKey,

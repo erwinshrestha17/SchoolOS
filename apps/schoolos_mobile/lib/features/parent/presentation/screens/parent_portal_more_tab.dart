@@ -147,8 +147,14 @@ class ParentPortalMoreTab extends ConsumerWidget {
               SettingsMenuItem(
                 icon: Icons.help_outline_rounded,
                 title: 'Help & Support',
-                subtitle: 'School office and app support',
-                onTap: () => context.push(AppRoutes.parentChat),
+                subtitle: 'Contact your school administrator',
+                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'For help, please contact your school administrator directly.',
+                    ),
+                  ),
+                ),
               ),
               const Divider(),
               SettingsMenuItem(

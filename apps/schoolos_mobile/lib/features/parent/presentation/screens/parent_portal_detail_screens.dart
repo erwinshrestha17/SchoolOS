@@ -158,15 +158,6 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                       SizedBox(
                         width: itemWidth,
                         child: ActionTile(
-                          icon: Icons.forum_rounded,
-                          label: 'Message teacher',
-                          color: ParentPortalColors.purple,
-                          onTap: () => context.push(AppRoutes.parentChat),
-                        ),
-                      ),
-                      SizedBox(
-                        width: itemWidth,
-                        child: ActionTile(
                           icon: Icons.credit_card_rounded,
                           label: 'Fees',
                           color: ParentPortalColors.green,
@@ -505,31 +496,20 @@ class _ParentPortalHomeworkDetailScreenState
                 ),
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: item.attachmentCount == 0
-                          ? null
-                          : () => _attachmentListSheet(
-                              context,
-                              item.childId,
-                              item.id,
-                              attachments,
-                            ),
-                      icon: const Icon(Icons.description_rounded),
-                      label: const Text('Open attachments'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => context.push(AppRoutes.parentChat),
-                      icon: const Icon(Icons.forum_rounded),
-                      label: const Text('Message teacher'),
-                    ),
-                  ),
-                ],
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: item.attachmentCount == 0
+                      ? null
+                      : () => _attachmentListSheet(
+                          context,
+                          item.childId,
+                          item.id,
+                          attachments,
+                        ),
+                  icon: const Icon(Icons.description_rounded),
+                  label: const Text('Open attachments'),
+                ),
               ),
               const SizedBox(height: 10),
               SizedBox(

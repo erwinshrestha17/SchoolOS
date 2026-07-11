@@ -226,12 +226,6 @@ class RoleShellScaffold extends StatelessWidget {
             route: AppRoutes.teacherHomework,
           ),
           _RoleNavItem(
-            label: 'Messages',
-            icon: Icons.chat_bubble_outline_rounded,
-            selectedIcon: Icons.chat_bubble_rounded,
-            route: AppRoutes.teacherMessages,
-          ),
-          _RoleNavItem(
             label: 'Profile',
             icon: Icons.account_circle_outlined,
             selectedIcon: Icons.account_circle_rounded,

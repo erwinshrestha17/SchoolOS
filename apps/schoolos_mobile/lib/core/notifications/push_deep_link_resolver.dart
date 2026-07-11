@@ -69,7 +69,6 @@ class PushDeepLinkResolver {
       AppRoutes.parentFeesReceipts,
       AppRoutes.parentActivity,
       AppRoutes.parentTransport,
-      AppRoutes.parentChat,
       AppRoutes.parentChildAttendanceDetail(childId),
     };
 
@@ -92,7 +91,6 @@ const _teacherRoutes = {
   AppRoutes.teacherHome,
   AppRoutes.teacherAttendance,
   AppRoutes.teacherHomework,
-  AppRoutes.teacherMessages,
   AppRoutes.teacherTimetable,
 };
 

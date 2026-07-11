@@ -27,7 +27,7 @@ class TeacherProfileScreen extends ConsumerWidget {
 
     return RoleShellScaffold(
       role: 'TEACHER',
-      selectedIndex: 4,
+      selectedIndex: 3,
       title: 'Profile',
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),

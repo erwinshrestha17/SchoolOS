@@ -17,7 +17,6 @@ import '../features/attendance/presentation/screens/teacher_attendance_screen.da
 import '../features/teacher/presentation/screens/teacher_class_hub_screen.dart';
 import '../features/teacher/presentation/screens/teacher_activity_screen.dart';
 import '../features/teacher/presentation/screens/teacher_homework_screen.dart';
-import '../features/teacher/presentation/screens/teacher_messages_screen.dart';
 import '../features/teacher/presentation/screens/teacher_profile_screen.dart';
 import '../features/teacher/presentation/screens/teacher_timetable_screen.dart';
 import '../features/learning/presentation/screens/learning_summary_screen.dart';
@@ -28,7 +27,6 @@ import '../features/notices/presentation/screens/notification_center_screen.dart
 import '../features/parent/presentation/screens/parent_activity_screen.dart';
 import '../features/parent/presentation/screens/parent_calendar_screen.dart';
 import '../features/parent/presentation/screens/parent_canteen_screen.dart';
-import '../features/parent/presentation/screens/parent_chat_screen.dart';
 import '../features/parent/presentation/screens/parent_consents_screen.dart';
 import '../features/parent/presentation/screens/parent_fees_screen.dart';
 import '../features/parent/presentation/screens/parent_fees_receipts_screen.dart';
@@ -186,10 +184,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ParentLibraryScreen(),
       ),
       GoRoute(
-        path: AppRoutes.parentChat,
-        builder: (context, state) => const ParentChatScreen(),
-      ),
-      GoRoute(
         path: AppRoutes.parentMore,
         builder: (context, state) => const SchoolOsAppShell(initialIndex: 4),
       ),
@@ -255,16 +249,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.teacherActivity,
         builder: (context, state) => const TeacherActivityScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.teacherMessages,
-        builder: (context, state) => const TeacherMessagesScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.teacherMessageThread,
-        builder: (context, state) => TeacherMessageThreadScreen(
-          threadId: state.pathParameters['threadId'] ?? '',
-        ),
       ),
       GoRoute(
         path: AppRoutes.teacherTimetable,
@@ -563,8 +547,6 @@ bool isTeacherRoute(String location) {
       location == AppRoutes.teacherHomework ||
       location == AppRoutes.teacherHomeworkCreate ||
       location == AppRoutes.teacherActivity ||
-      location == AppRoutes.teacherMessages ||
-      location.startsWith('/teacher/messages/') ||
       location == AppRoutes.teacherTimetable ||
       location == AppRoutes.teacherProfile ||
       location == AppRoutes.teacherLeave ||
@@ -592,6 +574,5 @@ bool isParentRoute(String location) {
       location == AppRoutes.parentCanteen ||
       location == AppRoutes.parentConsents ||
       location == AppRoutes.parentLibrary ||
-      location == AppRoutes.parentChat ||
       location == AppRoutes.parentMore;
 }
