@@ -11,15 +11,12 @@ import {
 } from "@schoolos/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertTriangle,
-  CalendarDays,
   CheckCircle2,
   ChevronRight,
   ClipboardCheck,
   FileWarning,
   Loader2,
   Search,
-  UserRound,
 } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
@@ -27,7 +24,6 @@ import { api } from "../../lib/api";
 import { Button } from "../ui/button";
 import { EmptyState } from "../ui/empty-state";
 import { ErrorState } from "../ui/error-state";
-import { KpiCard, KpiGrid } from "../ui/kpi-card";
 import { LoadingState } from "../ui/loading-state";
 import { StatusBadge } from "../ui/status-badge";
 
@@ -156,15 +152,6 @@ export function AdmissionsPipeline() {
   });
 
   const filteredCount = applicationsQuery.data?.total ?? 0;
-  const duplicateWarnings = applications.filter(
-    (application) => (application.duplicateReview?.matches?.length ?? 0) > 0,
-  ).length;
-  const staleOnPage = applications.filter(
-    (application) =>
-      Date.now() - new Date(application.updatedAt).getTime() >
-      7 * 24 * 60 * 60 * 1000,
-  ).length;
-
   if (classesQuery.isError || academicYearsQuery.isError) {
     return (
       <ErrorState
@@ -180,37 +167,6 @@ export function AdmissionsPipeline() {
 
   return (
     <div className="space-y-5">
-      <KpiGrid className="sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          title="Matching applications"
-          value={filteredCount}
-          icon={<ClipboardCheck size={18} />}
-          tone="info"
-          description="Backend total for the current filters"
-        />
-        <KpiCard
-          title="Duplicate warnings"
-          value={duplicateWarnings}
-          icon={<AlertTriangle size={18} />}
-          tone={duplicateWarnings ? "warning" : "success"}
-          description="Warnings on this page; no aggregate contract"
-        />
-        <KpiCard
-          title="No update in 7 days"
-          value={staleOnPage}
-          icon={<CalendarDays size={18} />}
-          tone={staleOnPage ? "warning" : "success"}
-          description="Derived age label for this page, not an official KPI"
-        />
-        <KpiCard
-          title="Admission workflow"
-          value="One case"
-          icon={<UserRound size={18} />}
-          tone="neutral"
-          description="New admissions continue through one unified case"
-        />
-      </KpiGrid>
-
       <div className="grid min-h-[580px] gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="space-y-4 border-b border-slate-100 bg-slate-50/70 p-4">

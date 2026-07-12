@@ -49,16 +49,31 @@ const primaryNavigation: FeesNavigationItem[] = [
     permissions: ["payments:collect"],
   },
   {
-    href: "/dashboard/fees/billing",
-    label: "Billing",
-    icon: ClipboardCheck,
-    permissions: ["fees:bill"],
+    href: "/dashboard/fees/invoices",
+    label: "Invoices",
+    icon: FileText,
+    permissions: ["payments:collect"],
   },
   {
     href: "/dashboard/fees/receipts",
     label: "Receipts",
     icon: Receipt,
     permissions: ["receipts:read"],
+  },
+  {
+    href: "/dashboard/fees/cashier-close",
+    label: "Cashier Close",
+    icon: History,
+    permissions: ["payments:close"],
+  },
+];
+
+const moreNavigation: FeesNavigationItem[] = [
+  {
+    href: "/dashboard/fees/billing",
+    label: "Billing runs",
+    icon: ClipboardCheck,
+    permissions: ["fees:bill"],
   },
   {
     href: "/dashboard/fees/adjustments",
@@ -71,21 +86,6 @@ const primaryNavigation: FeesNavigationItem[] = [
       "fees:adjust",
       "fees:discount",
     ],
-  },
-  {
-    href: "/dashboard/fees/cashier-close",
-    label: "Cashier Close",
-    icon: History,
-    permissions: ["payments:close"],
-  },
-];
-
-const moreNavigation: FeesNavigationItem[] = [
-  {
-    href: "/dashboard/fees/invoices",
-    label: "Invoices",
-    icon: FileText,
-    permissions: ["payments:collect"],
   },
   {
     href: "/dashboard/fees/ledgers",

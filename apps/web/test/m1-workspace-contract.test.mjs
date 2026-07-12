@@ -339,15 +339,18 @@ test("M1 high-risk workflows remain server controlled and protected", () => {
   assert.match(admissionCase, /reviewMutation\.mutate\(\{\s*action: "REJECT"/);
 });
 
-test("M1 student roster uses backend summary, safe filters, and paginated roster contract", () => {
+test("M1 student roster uses a focused backend summary, safe filters, and paginated roster contract", () => {
   const page = read("app/dashboard/students/page.tsx");
   const directory = read("components/forms/student-directory.tsx");
 
   assert.match(page, /api\.getStudentModuleSummary\(filters\)/);
   assert.match(page, /limit: STUDENT_ROSTER_PAGE_SIZE/);
-  assert.match(directory, /summary\?\.pendingApplications/);
   assert.match(directory, /summary\?\.missingDocuments/);
-  assert.match(directory, /summary\?\.qrActive/);
+  assert.match(directory, /summary\?\.duplicateCandidates/);
+  assert.match(directory, /summary\?\.iemisIssues/);
+  assert.equal((directory.match(/<KpiCard/g) ?? []).length, 4);
+  assert.doesNotMatch(directory, /title="Pending Applications"/);
+  assert.doesNotMatch(directory, /title="QR Active"/);
   assert.match(directory, /Page \{currentPage\} of \{totalPages\}/);
   assert.match(directory, /value="ARCHIVED"/);
   assert.match(directory, /value="MERGED"/);
@@ -355,6 +358,14 @@ test("M1 student roster uses backend summary, safe filters, and paginated roster
     directory,
     /value="INACTIVE"|value="WITHDRAWN"|value="DEACTIVATED"|value="GRADUATED"/,
   );
+});
+
+test("M1 application queue keeps page-derived and decorative metrics out of the workspace", () => {
+  const pipeline = read("components/admissions/admissions-pipeline.tsx");
+
+  assert.doesNotMatch(pipeline, /<KpiGrid|<KpiCard/);
+  assert.doesNotMatch(pipeline, /No update in 7 days|Admission workflow/);
+  assert.match(pipeline, /matching applications/);
 });
 
 test("M1 Admissions overview shows a real, actionable, honest KPI grid", () => {

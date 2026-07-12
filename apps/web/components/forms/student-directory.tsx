@@ -228,20 +228,13 @@ export function StudentDirectory({
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             title="Active Students"
             value={summary?.activeStudents ?? 0}
             icon={<Users size={20} />}
             tone="info"
             description="Server total for active records."
-          />
-          <KpiCard
-            title="Pending Applications"
-            value={summary?.pendingApplications ?? 0}
-            icon={<ClipboardCheck size={20} />}
-            tone="warning"
-            description="Server total awaiting review."
           />
           <KpiCard
             title="Missing Documents"
@@ -263,13 +256,6 @@ export function StudentDirectory({
             icon={<AlertTriangle size={20} />}
             tone={(summary?.iemisIssues ?? 0) > 0 ? 'warning' : 'success'}
             description="From backend readiness validation."
-          />
-          <KpiCard
-            title="QR Active"
-            value={summary?.qrActive ?? 0}
-            icon={<ContactRound size={20} />}
-            tone="info"
-            description={`${summary?.qrMissing ?? 0} students still need QR setup.`}
           />
         </KpiGrid>
         <div className="flex flex-wrap items-center justify-end gap-2">

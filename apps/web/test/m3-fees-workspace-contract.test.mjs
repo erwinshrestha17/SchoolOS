@@ -42,9 +42,11 @@ describe("M3 fees workspace contract", () => {
     assert.match(shell, /Fees and receipts navigation/);
     assert.match(shell, /label: "Overview"/);
     assert.match(shell, /label: "Collect"[\s\S]*"payments:collect"/);
-    assert.match(shell, /label: "Billing"[\s\S]*"fees:bill"/);
+    assert.match(shell, /primaryNavigation[\s\S]*label: "Invoices"[\s\S]*"payments:collect"/);
     assert.match(shell, /label: "Receipts"[\s\S]*"receipts:read"/);
     assert.match(shell, /label: "Cashier Close"[\s\S]*"payments:close"/);
+    assert.match(shell, /moreNavigation[\s\S]*label: "Billing runs"[\s\S]*"fees:bill"/);
+    assert.match(shell, /moreNavigation[\s\S]*label: "Adjustments"/);
     assert.match(shell, /More/);
     assert.doesNotMatch(shell, /<DashboardShell|<Sidebar/);
   });
