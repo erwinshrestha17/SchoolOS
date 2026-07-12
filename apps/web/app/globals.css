@@ -560,3 +560,50 @@ button.shell-card:hover {
   cursor: not-allowed;
   box-shadow: none;
 }
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+
+  body.attendance-register-printing * {
+    visibility: hidden !important;
+  }
+
+  body.attendance-register-printing .attendance-register-print,
+  body.attendance-register-printing .attendance-register-print * {
+    visibility: visible !important;
+  }
+
+  body.attendance-register-printing .attendance-register-print {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    border: 0;
+    box-shadow: none;
+    print-color-adjust: exact;
+  }
+
+  body.attendance-register-printing .attendance-register-print [class*="overflow"] {
+    overflow: visible !important;
+  }
+
+  body.attendance-register-printing .attendance-register-print table {
+    width: 100%;
+    table-layout: fixed;
+    font-size: 7pt;
+  }
+
+  body.attendance-register-printing .attendance-register-print th,
+  body.attendance-register-printing .attendance-register-print td {
+    position: static !important;
+    padding: 2px !important;
+    white-space: normal;
+  }
+
+  body.attendance-register-printing .attendance-register-print th:first-child,
+  body.attendance-register-printing .attendance-register-print td:first-child {
+    width: 34mm;
+  }
+}

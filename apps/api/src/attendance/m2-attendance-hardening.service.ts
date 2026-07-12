@@ -8,6 +8,7 @@ import {
   NotificationChannel,
   Prisma,
 } from '@prisma/client';
+import { getNepalSchoolDay } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
@@ -937,7 +938,7 @@ function state(code: string, label: string, persisted: boolean) {
 }
 
 function stripTime(value: Date) {
-  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  return new Date(`${getNepalSchoolDay(value).gregorianDate}T00:00:00.000Z`);
 }
 
 function dateKey(value: Date) {
@@ -945,8 +946,10 @@ function dateKey(value: Date) {
 }
 
 function isWeekend(value: Date) {
-  const day = value.getDay();
-  return day === 0 || day === 6;
+  const [year, month, day] = getNepalSchoolDay(value)
+    .gregorianDate.split('-')
+    .map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay() === 6;
 }
 
 function readNumber(value: unknown) {

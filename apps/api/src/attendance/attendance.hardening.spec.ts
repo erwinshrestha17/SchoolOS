@@ -300,6 +300,35 @@ describe('Attendance Hardening', () => {
 
   describe('New Depth Enhancements', () => {
     describe('Weekend Policy Integration', () => {
+      it('defaults Nepal schools to Saturday holiday and Sunday working day', async () => {
+        settingsService.getSetting.mockResolvedValue(null);
+        (prisma.schoolCalendarDay.findFirst as jest.Mock).mockResolvedValue(
+          null,
+        );
+
+        const saturday = await (service as any).resolveCalendarDay(
+          'tenant-1',
+          new Date('2026-07-11'),
+        );
+        const sunday = await (service as any).resolveCalendarDay(
+          'tenant-1',
+          new Date('2026-07-12'),
+        );
+
+        expect(saturday).toEqual(
+          expect.objectContaining({
+            calendarDate: '2026-07-11T00:00:00.000Z',
+            isWorkingDay: false,
+          }),
+        );
+        expect(sunday).toEqual(
+          expect.objectContaining({
+            calendarDate: '2026-07-12T00:00:00.000Z',
+            isWorkingDay: true,
+          }),
+        );
+      });
+
       it('should respect weekend_policy = SATURDAY', async () => {
         settingsService.getSetting.mockImplementation(
           async (_tenantId, key) => {

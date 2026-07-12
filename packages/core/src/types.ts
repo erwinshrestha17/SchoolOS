@@ -1276,6 +1276,9 @@ export type AttendanceAnalytics = {
   todaySummary: {
     date: string;
     sessionCount: number;
+    submittedSessionCount: number;
+    draftSessionCount: number;
+    notMarkedSessionCount: number;
     totals: AttendanceSummary['totals'];
   };
   monthlyAttendance: {

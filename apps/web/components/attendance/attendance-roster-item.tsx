@@ -139,7 +139,7 @@ export function AttendanceRosterItem({
          <button
            type="button"
            disabled={disabled}
-           onClick={() => onStatusChange('SICK_LEAVE')}
+           onClick={() => onStatusChange('EXCUSED_LEAVE')}
            className={cn(
              "flex flex-col items-center justify-center py-2 rounded-xl transition-all font-bold disabled:cursor-not-allowed",
              isLeave
@@ -147,8 +147,8 @@ export function AttendanceRosterItem({
                : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/50"
            )}
          >
-           <span className="text-xs">V</span>
-           <span className="text-[0.55rem] uppercase tracking-tighter opacity-70">Leave</span>
+           <span className="text-xs">E</span>
+           <span className="text-[0.55rem] uppercase tracking-tighter opacity-70">Leave / Excused</span>
          </button>
       </div>
 
@@ -164,31 +164,6 @@ export function AttendanceRosterItem({
             className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs font-medium outline-none transition-all placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[var(--color-mod-attendance-border)] disabled:cursor-not-allowed"
            />
            
-           {/* If Leave, show leave sub-kinds */}
-           {isLeave && (
-             <div className="flex flex-wrap gap-1.5 pt-1">
-               {[
-                 { key: 'SICK_LEAVE', label: 'Sick' },
-                 { key: 'EXCUSED_LEAVE', label: 'Excused' },
-                 { key: 'UNEXCUSED_LEAVE', label: 'Unexcused' }
-               ].map((leaveType) => (
-                 <button
-                   key={leaveType.key}
-                   type="button"
-                   disabled={disabled}
-                   onClick={() => onStatusChange(leaveType.key as AttendanceStatus)}
-                   className={cn(
-                     "px-2.5 py-1 text-[0.62rem] font-bold rounded-lg border transition-all uppercase tracking-wider disabled:cursor-not-allowed",
-                     status === leaveType.key
-                       ? "bg-info-50 border-info-100 text-info-700 font-extrabold"
-                       : "bg-white/40 border-slate-200 text-slate-500 hover:bg-white"
-                   )}
-                 >
-                   {leaveType.label}
-                 </button>
-               ))}
-             </div>
-           )}
         </div>
       )}
     </div>

@@ -9,6 +9,7 @@ import {
 import {
   BS_MONTH_NAMES_EN,
   daysInBsMonth,
+  getNepalSchoolDay,
   toGregorianDateFromBs,
 } from '@schoolos/core';
 import {
@@ -237,7 +238,7 @@ export class AttendanceService {
       this.prisma.attendanceSession.findMany({
         where: {
           tenantId: actor.tenantId,
-          attendanceDate: date,
+          attendanceDate: getNepalBusinessDateRange(date),
           OR: classScopes,
         },
         select: {
@@ -531,7 +532,7 @@ export class AttendanceService {
     const existingSession = await this.prisma.attendanceSession.findFirst({
       where: {
         tenantId: actor.tenantId,
-        attendanceDate,
+        attendanceDate: getNepalBusinessDateRange(attendanceDate),
         classId: dto.classId,
         sectionId: dto.sectionId ?? null,
       },
@@ -547,6 +548,18 @@ export class AttendanceService {
     ) {
       throw new ForbiddenException(
         'Attendance for this date is locked. Please request a correction.',
+      );
+    }
+
+    const isSyncSubmission =
+      Boolean(submissionContext) || 'deviceTimestamp' in dto;
+    if (
+      existingSession?.submittedAt &&
+      !isSyncSubmission &&
+      !actor.permissions.includes('attendance:override_lock')
+    ) {
+      throw new ConflictException(
+        'Attendance is already submitted. Please request a correction instead of editing it.',
       );
     }
 
@@ -590,25 +603,10 @@ export class AttendanceService {
       });
     }
 
-    let shouldOverwrite = true;
-    if (existingSession?.submittedAt) {
-      // 1. deviceTimestamp checks
-      const deviceTime =
-        'deviceTimestamp' in dto
-          ? new Date((dto as SyncAttendanceDto).deviceTimestamp)
-          : null;
-      if (deviceTime && existingSession.submittedAt > deviceTime) {
-        shouldOverwrite = false;
-      }
-
-      // 2. Owner match checks
-      if (
-        existingSession.submittedById &&
-        existingSession.submittedById !== actor.userId
-      ) {
-        shouldOverwrite = false;
-      }
-    }
+    // Once submitted, attendance is immutable through ordinary marking and
+    // offline replay. A sync attempt is preserved as a conflict for review;
+    // corrections remain the only path that may change the official record.
+    const shouldOverwrite = !existingSession?.submittedAt;
 
     try {
       const session = await this.prisma.$transaction(async (tx) => {
@@ -793,7 +791,7 @@ export class AttendanceService {
         const concSession = await this.prisma.attendanceSession.findFirst({
           where: {
             tenantId: actor.tenantId,
-            attendanceDate,
+            attendanceDate: getNepalBusinessDateRange(attendanceDate),
             classId: dto.classId,
             sectionId: dto.sectionId ?? null,
           },
@@ -1262,8 +1260,13 @@ export class AttendanceService {
 
     const period = resolveMonthlyRegisterPeriod(dto);
     const { startDate, endDate } = period;
+    const periodStart = getNepalBusinessDateRange(startDate).gte;
+    const periodEnd = getNepalBusinessDateRange(endDate).lt;
 
-    const [students, sessions, calendarDays, classroom, section] =
+    const periodDates = Array.from({ length: period.daysCount }, (_, index) =>
+      period.dateForDay(index + 1),
+    );
+    const [students, sessions, calendarByDate, classroom, section] =
       await Promise.all([
         this.prisma.student.findMany({
           where: {
@@ -1285,23 +1288,15 @@ export class AttendanceService {
             classId: dto.classId,
             sectionId: dto.sectionId ?? null,
             attendanceDate: {
-              gte: startDate,
-              lte: endDate,
+              gte: periodStart,
+              lt: periodEnd,
             },
           },
           include: {
             records: true,
           },
         }),
-        this.prisma.schoolCalendarDay.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            calendarDate: {
-              gte: startDate,
-              lte: endDate,
-            },
-          },
-        }),
+        this.loadCalendarDayMap(actor.tenantId, periodDates),
         this.prisma.class.findFirst({
           where: { id: dto.classId, tenantId: actor.tenantId },
           select: { name: true },
@@ -1322,10 +1317,7 @@ export class AttendanceService {
     }
 
     const sessionByDate = new Map(
-      sessions.map((s) => [s.attendanceDate.toISOString().split('T')[0], s]),
-    );
-    const calendarByDate = new Map(
-      calendarDays.map((d) => [d.calendarDate.toISOString().split('T')[0], d]),
+      sessions.map((session) => [getDateKey(session.attendanceDate), session]),
     );
 
     const daysCount = period.daysCount;
@@ -1343,12 +1335,15 @@ export class AttendanceService {
           HOLIDAY: 0,
           NOT_MARKED: 0,
           totalDays: 0,
+          workingDays: 0,
+          markedDays: 0,
+          percentage: null as number | null,
         },
       };
 
       for (let day = 1; day <= daysCount; day++) {
         const date = period.dateForDay(day);
-        const dateKey = date.toISOString().split('T')[0];
+        const dateKey = getDateKey(date);
         const session = sessionByDate.get(dateKey);
         const calendar = calendarByDate.get(dateKey);
 
@@ -1369,7 +1364,7 @@ export class AttendanceService {
           row.totals.ABSENT++;
         } else if (status === AttendanceStatus.LATE) {
           row.totals.LATE++;
-        } else if (status === AttendanceStatus.HOLIDAY) {
+        } else if (status === 'HOLIDAY') {
           row.totals.HOLIDAY++;
         } else if (
           status === AttendanceStatus.SICK_LEAVE ||
@@ -1388,8 +1383,61 @@ export class AttendanceService {
         row.totals.totalDays++;
       }
 
+      row.totals.workingDays = row.totals.totalDays - row.totals.HOLIDAY;
+      row.totals.markedDays =
+        row.totals.PRESENT +
+        row.totals.ABSENT +
+        row.totals.LATE +
+        row.totals.LEAVE;
+      row.totals.percentage =
+        row.totals.markedDays > 0
+          ? Math.round(
+              ((row.totals.PRESENT + row.totals.LATE) / row.totals.markedDays) *
+                10000,
+            ) / 100
+          : null;
+
       return row;
     });
+
+    const days = periodDates.map((date, index) => {
+      const calendar = calendarByDate.get(getDateKey(date));
+      return {
+        day: index + 1,
+        date: getDateKey(date),
+        isWorkingDay: calendar?.isWorkingDay ?? true,
+        label: calendar?.label ?? null,
+        holidayType: calendar?.holidayType ?? null,
+      };
+    });
+    const submittedDayKeys = new Set(
+      sessions
+        .filter((session) => Boolean(session.submittedAt))
+        .map((session) => getDateKey(session.attendanceDate)),
+    );
+    const draftDayKeys = new Set(
+      sessions
+        .filter((session) => !session.submittedAt)
+        .map((session) => getDateKey(session.attendanceDate)),
+    );
+    const workingDayKeys = new Set(
+      days.filter((day) => day.isWorkingDay).map((day) => day.date),
+    );
+    const registerTotals = matrix.reduce(
+      (totals, row) => {
+        totals.present += row.totals.PRESENT;
+        totals.absent += row.totals.ABSENT;
+        totals.late += row.totals.LATE;
+        totals.leave += row.totals.LEAVE;
+        return totals;
+      },
+      { present: 0, absent: 0, late: 0, leave: 0 },
+    );
+    const markedCount =
+      registerTotals.present +
+      registerTotals.absent +
+      registerTotals.late +
+      registerTotals.leave;
 
     return {
       calendar: period.calendar,
@@ -1399,6 +1447,29 @@ export class AttendanceService {
       className: classroom?.name ?? dto.classId,
       sectionName: section?.name ?? null,
       daysCount,
+      days,
+      summary: {
+        totalStudents: matrix.length,
+        workingDays: workingDayKeys.size,
+        holidayDays: days.length - workingDayKeys.size,
+        submittedDays: Array.from(submittedDayKeys).filter((date) =>
+          workingDayKeys.has(date),
+        ).length,
+        draftDays: Array.from(draftDayKeys).filter((date) =>
+          workingDayKeys.has(date),
+        ).length,
+        notMarkedDays: Array.from(workingDayKeys).filter(
+          (date) => !submittedDayKeys.has(date) && !draftDayKeys.has(date),
+        ).length,
+        totals: registerTotals,
+        attendancePercentage:
+          markedCount > 0
+            ? Math.round(
+                ((registerTotals.present + registerTotals.late) / markedCount) *
+                  10000,
+              ) / 100
+            : null,
+      },
       matrix,
     };
   }
@@ -1456,6 +1527,9 @@ export class AttendanceService {
     dto: CreateAttendanceCorrectionDto,
     actor: AuthContext,
   ) {
+    if (!dto.reason.trim()) {
+      throw new ConflictException('Attendance correction requires a reason.');
+    }
     const staff = await this.prisma.staff.findUnique({
       where: { userId: actor.userId },
       select: { id: true },
@@ -1588,15 +1662,38 @@ export class AttendanceService {
       }
     }
 
+    const resolvedRecord =
+      record ??
+      (resolvedSession
+        ? await this.prisma.attendanceRecord.findFirst({
+            where: {
+              tenantId: actor.tenantId,
+              attendanceSessionId: resolvedSession.id,
+              studentId: dto.studentId,
+            },
+            select: {
+              id: true,
+              attendanceSessionId: true,
+              status: true,
+            },
+          })
+        : null);
+
+    if (resolvedSession && !resolvedRecord) {
+      throw new NotFoundException(
+        'Student attendance record was not found in this session.',
+      );
+    }
+
     const request = await this.prisma.attendanceCorrectionRequest.create({
       data: {
         tenantId: actor.tenantId,
-        attendanceRecordId: record?.id ?? null,
+        attendanceRecordId: resolvedRecord?.id ?? null,
         attendanceSessionId: resolvedSession?.id ?? null,
         studentId: dto.studentId,
         attendanceDate,
         requestedStatus: dto.requestedStatus,
-        previousStatus: record?.status ?? null,
+        previousStatus: resolvedRecord?.status ?? null,
         reason: dto.reason.trim(),
         requestedById: actor.userId,
         status: 'PENDING',
@@ -2987,7 +3084,7 @@ export class AttendanceService {
           academicYearId: resolvedAcademicYearId,
           classId,
           sectionId: sectionId ?? null,
-          attendanceDate: parsedAttendanceDate,
+          attendanceDate: getNepalBusinessDateRange(parsedAttendanceDate),
         },
         include: {
           records: true,
@@ -3168,8 +3265,41 @@ export class AttendanceService {
     const todaySessions = sessions.filter(
       (session) => getDateKey(stripTime(session.attendanceDate)) === todayKey,
     );
+    const [activeAttendanceScopes, todayCalendarDay] = await Promise.all([
+      this.prisma.enrollment.groupBy({
+        by: ['classId', 'sectionId'],
+        where: {
+          tenantId: actor.tenantId,
+          status: EnrollmentStatus.ACTIVE,
+          academicYear: { isCurrent: true },
+          ...(teacherSectionIds
+            ? { sectionId: { in: teacherSectionIds } }
+            : {}),
+        },
+      }),
+      this.resolveCalendarDay(actor.tenantId, now),
+    ]);
+    const submittedTodayScopes = new Set(
+      todaySessions
+        .filter((session) => Boolean(session.submittedAt))
+        .map((session) => `${session.classId}:${session.sectionId ?? 'none'}`),
+    );
+    const submittedSessionCount = submittedTodayScopes.size;
+    const draftSessionCount = todaySessions.filter(
+      (session) => !session.submittedAt,
+    ).length;
+    const notMarkedSessionCount = todayCalendarDay.isWorkingDay
+      ? activeAttendanceScopes.filter(
+          (scope) =>
+            !submittedTodayScopes.has(
+              `${scope.classId}:${scope.sectionId ?? 'none'}`,
+            ),
+        ).length
+      : 0;
     const todayTotals = summarizeAttendance(
-      todaySessions.flatMap((session) => session.records),
+      todaySessions
+        .filter((session) => Boolean(session.submittedAt))
+        .flatMap((session) => session.records),
     );
 
     return {
@@ -3177,6 +3307,9 @@ export class AttendanceService {
       todaySummary: {
         date: stripTime(now).toISOString(),
         sessionCount: todaySessions.length,
+        submittedSessionCount,
+        draftSessionCount,
+        notMarkedSessionCount,
         totals: todayTotals,
       },
       monthlyAttendance: {
@@ -3261,7 +3394,7 @@ export class AttendanceService {
           academicYearId: query.academicYearId,
           classId: query.classId,
           sectionId: query.sectionId ?? null,
-          attendanceDate,
+          attendanceDate: getNepalBusinessDateRange(attendanceDate),
         },
         include: {
           records: true,
@@ -3328,35 +3461,34 @@ export class AttendanceService {
       'LATE',
       'LEAVE',
       'HOLIDAY',
-      'TOTAL',
+      'WORKING DAYS',
+      'MARKED DAYS',
+      'PERCENTAGE',
     ];
 
-    const rows = data.matrix.map(
-      (student: {
-        rollNumber?: number | string | null;
-        name: string;
-        attendance: Array<{ status: string }>;
-        totals: Record<string, number | string>;
-      }) => [
-        student.rollNumber?.toString() ?? '',
-        student.name,
-        ...student.attendance.map((a: { status: string }) => {
-          if (a.status === 'PRESENT') return 'P';
-          if (a.status === 'ABSENT') return 'A';
-          if (a.status === 'LATE') return 'L';
-          if (a.status === 'HOLIDAY') return 'H';
-          if (a.status === 'LEAVE') return 'Lv';
-          if (a.status === 'HALF_DAY') return '0.5';
-          return '-';
-        }),
-        student.totals.PRESENT.toString(),
-        student.totals.ABSENT.toString(),
-        student.totals.LATE.toString(),
-        student.totals.LEAVE.toString(),
-        student.totals.HOLIDAY.toString(),
-        student.totals.totalDays.toString(),
-      ],
-    );
+    const rows = data.matrix.map((student) => [
+      student.rollNumber?.toString() ?? '',
+      student.name,
+      ...student.attendance.map((a: { status: string }) => {
+        if (a.status === 'PRESENT') return 'P';
+        if (a.status === 'ABSENT') return 'A';
+        if (a.status === 'LATE') return 'L';
+        if (a.status === 'HOLIDAY') return 'H';
+        if (a.status === 'LEAVE') return 'Lv';
+        if (a.status === 'HALF_DAY') return '0.5';
+        return '-';
+      }),
+      student.totals.PRESENT.toString(),
+      student.totals.ABSENT.toString(),
+      student.totals.LATE.toString(),
+      student.totals.LEAVE.toString(),
+      student.totals.HOLIDAY.toString(),
+      student.totals.workingDays.toString(),
+      student.totals.markedDays.toString(),
+      student.totals.percentage === null
+        ? ''
+        : student.totals.percentage.toFixed(2),
+    ]);
 
     let content: string | Buffer;
     if (format === 'csv') {
@@ -3384,7 +3516,10 @@ export class AttendanceService {
           ),
           PRESENT: s.totals.PRESENT,
           ABSENT: s.totals.ABSENT,
-          TOTAL: s.totals.totalDays,
+          'WORKING DAYS': s.totals.workingDays,
+          'MARKED DAYS': s.totals.markedDays,
+          PERCENTAGE:
+            s.totals.percentage === null ? '' : `${s.totals.percentage}%`,
         })),
       });
     }
@@ -5183,16 +5318,23 @@ function countInclusiveDays(startsOn: Date, endsOn: Date) {
 }
 
 function stripTime(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return new Date(`${getNepalSchoolDay(date).gregorianDate}T00:00:00.000Z`);
 }
 
 function getDateKey(date: Date) {
   return stripTime(date).toISOString().slice(0, 10);
 }
 
+function getNepalBusinessDateRange(date: Date) {
+  const day = getNepalSchoolDay(date);
+  return {
+    gte: day.startUtc,
+    lt: day.endExclusiveUtc,
+  };
+}
+
 function isWeekdayWorkingDay(date: Date) {
-  const dayOfWeek = date.getDay();
-  return dayOfWeek >= 1 && dayOfWeek <= 5;
+  return getNepalWeekday(date) !== 6;
 }
 
 function isWorkingDayFallback(
@@ -5200,7 +5342,7 @@ function isWorkingDayFallback(
   weekendPolicy: string | null,
   workingDays: string[] | null,
 ): boolean {
-  const dayOfWeek = date.getDay();
+  const dayOfWeek = getNepalWeekday(date);
   const dayName = [
     'Sunday',
     'Monday',
@@ -5224,7 +5366,14 @@ function isWorkingDayFallback(
   if (Array.isArray(workingDays) && workingDays.length > 0) {
     return workingDays.includes(dayName);
   }
-  return dayOfWeek >= 1 && dayOfWeek <= 5;
+  return dayOfWeek !== 6;
+}
+
+function getNepalWeekday(date: Date) {
+  const [year, month, day] = getNepalSchoolDay(date)
+    .gregorianDate.split('-')
+    .map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
 }
 
 function classifyAttendanceSyncRejection(error: unknown) {

@@ -21,6 +21,30 @@ const actor: AuthContext = {
 };
 
 describe('M2AttendanceHardeningService', () => {
+  it('labels Nepal calendar dates without UTC day drift and treats only Saturday as the default weekend', async () => {
+    const prisma = buildPrisma();
+    prisma.schoolCalendarDay.findMany.mockResolvedValue([]);
+    const { service } = buildService(prisma);
+
+    const result = await service.getCalendarPolicy(
+      { fromDate: '2026-07-11', toDate: '2026-07-12' },
+      actor,
+    );
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        date: '2026-07-11',
+        isWorkingDay: false,
+        holidayType: 'WEEKEND',
+      }),
+      expect.objectContaining({
+        date: '2026-07-12',
+        isWorkingDay: true,
+        holidayType: null,
+      }),
+    ]);
+  });
+
   it('calculates hardened anomalies with tenant-scoped roster, calendar, exam-day, and absence checks', async () => {
     const prisma = buildPrisma();
     const { service, auditService } = buildService(prisma);

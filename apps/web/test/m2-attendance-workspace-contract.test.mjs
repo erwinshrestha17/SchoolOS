@@ -53,4 +53,56 @@ describe("M2 attendance workspace contract", () => {
       /Tooltip content="No export contract for this queue yet"[\s\S]{0,80}<Button variant="outline" disabled>/,
     );
   });
+
+  it("keeps the practical attendance workspace to five main sections", () => {
+    const workspaces = read("components/attendance/attendance-m2-workspaces.tsx");
+
+    assert.match(workspaces, /label: "Overview"/);
+    assert.match(workspaces, /label: "Mark Attendance"/);
+    assert.match(workspaces, /label: "Monthly Register"/);
+    assert.match(workspaces, /label: "Corrections"/);
+    assert.match(workspaces, /label: "Reports"/);
+    assert.doesNotMatch(workspaces, /label: "Anomalies"/);
+    assert.doesNotMatch(workspaces, /label: "Follow-ups"/);
+  });
+
+  it("uses the four pilot statuses and filters teacher choices to assignments", () => {
+    const form = read("components/forms/attendance-form.tsx");
+    const rosterItem = read("components/attendance/attendance-roster-item.tsx");
+
+    assert.match(form, /<option value="PRESENT">Present<\/option>/);
+    assert.match(form, /<option value="ABSENT">Absent<\/option>/);
+    assert.match(form, /<option value="LATE">Late<\/option>/);
+    assert.match(form, /<option value="LEAVE">Leave \/ Excused<\/option>/);
+    assert.doesNotMatch(form, /<option value="SICK_LEAVE">/);
+    assert.match(form, /isTeacherPersona[\s\S]*assignedSections[\s\S]*availableClasses/);
+    assert.match(rosterItem, /onStatusChange\('EXCUSED_LEAVE'\)/);
+    assert.doesNotMatch(rosterItem, /label: 'Unexcused'/);
+  });
+
+  it("keeps submitted attendance read-only and exposes all weak-network states", () => {
+    const form = read("components/forms/attendance-form.tsx");
+
+    assert.match(form, /disabled=\{isLocked \|\| isSubmitted\}/);
+    assert.match(form, /Attendance Submitted/);
+    assert.match(form, /Request a correction/);
+    assert.match(form, /Not synced\. Draft saved locally/);
+    assert.match(form, /Retrying attendance sync/);
+    assert.match(form, /Draft synced with SchoolOS/);
+    assert.match(form, /Sync failed\. Draft is still saved locally/);
+    assert.match(form, /Conflict found\. Review before syncing/);
+  });
+
+  it("prints backend-owned monthly register totals and never opens protected exports directly", () => {
+    const workspaces = read("components/attendance/attendance-m2-workspaces.tsx");
+    const styles = read("app/globals.css");
+
+    assert.match(workspaces, /register\.summary/);
+    assert.match(workspaces, /window\.print\(\)/);
+    assert.match(workspaces, /Print register/);
+    assert.doesNotMatch(workspaces, /window\.open\(/);
+    assert.doesNotMatch(workspaces, /function summarizeRegister/);
+    assert.match(styles, /@page[\s\S]*size: A4 landscape/);
+    assert.match(styles, /attendance-register-print/);
+  });
 });

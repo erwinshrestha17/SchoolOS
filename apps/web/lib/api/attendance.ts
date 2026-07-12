@@ -387,6 +387,28 @@ export type AttendanceMonthlyRegister = {
   className: string;
   sectionName: string | null;
   daysCount: number;
+  days: Array<{
+    day: number;
+    date: string;
+    isWorkingDay: boolean;
+    label: string | null;
+    holidayType: string | null;
+  }>;
+  summary: {
+    totalStudents: number;
+    workingDays: number;
+    holidayDays: number;
+    submittedDays: number;
+    draftDays: number;
+    notMarkedDays: number;
+    totals: {
+      present: number;
+      absent: number;
+      late: number;
+      leave: number;
+    };
+    attendancePercentage: number | null;
+  };
   matrix: Array<{
     studentId: string;
     rollNumber: string | null;
@@ -400,6 +422,9 @@ export type AttendanceMonthlyRegister = {
       HOLIDAY: number;
       NOT_MARKED: number;
       totalDays: number;
+      workingDays: number;
+      markedDays: number;
+      percentage: number | null;
     };
   }>;
 };

@@ -1,7 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatNepalTime, toBsDateFromGregorian } from "@schoolos/core";
+import {
+  formatNepalTime,
+  getNepalNow,
+  toBsDateFromGregorian,
+} from "@schoolos/core";
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -38,7 +42,8 @@ import {
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-const today = new Date().toISOString().slice(0, 10);
+const nepalNow = getNepalNow();
+const today = `${nepalNow.year}-${String(nepalNow.month).padStart(2, "0")}-${String(nepalNow.day).padStart(2, "0")}`;
 
 type AttendanceStatus =
   | "PRESENT"
@@ -51,11 +56,14 @@ type DraftSyncState =
   | "idle"
   | "saved_local"
   | "syncing"
+  | "retrying"
   | "synced"
   | "conflict"
   | "failed";
 
-const statusCycle: AttendanceStatus[] = [
+type AttendanceStatusFilter = "ALL" | "PRESENT" | "ABSENT" | "LATE" | "LEAVE";
+
+const persistedAttendanceStatuses: AttendanceStatus[] = [
   "PRESENT",
   "ABSENT",
   "LATE",
@@ -71,9 +79,8 @@ export function AttendanceForm() {
   const [classId, setClassId] = useState("");
   const [sectionId, setSectionId] = useState("");
   const [attendanceDate, setAttendanceDate] = useState(today);
-  const [statusFilter, setStatusFilter] = useState<"ALL" | AttendanceStatus>(
-    "ALL",
-  );
+  const [statusFilter, setStatusFilter] =
+    useState<AttendanceStatusFilter>("ALL");
   const [exceptions, setExceptions] = useState<
     Record<string, AttendanceStatus>
   >({});
@@ -100,6 +107,36 @@ export function AttendanceForm() {
     queryKey: ["sections"],
     queryFn: api.listSections,
   });
+  const isTeacherPersona = Boolean(
+    session?.user.roles.some((role) =>
+      ["teacher", "subject_teacher"].includes(role),
+    ) &&
+      !session?.user.roles.some((role) => ["admin", "principal"].includes(role)),
+  );
+  const assignedSections = useMemo(
+    () =>
+      (sectionsQuery.data ?? []).filter(
+        (section) =>
+          section.isAssignedClassTeacher || section.isAssignedSubjectTeacher,
+      ),
+    [sectionsQuery.data],
+  );
+  const assignedClassIds = useMemo(
+    () =>
+      new Set(
+        assignedSections
+          .map((section) => section.classId ?? section.class?.id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    [assignedSections],
+  );
+  const availableClasses = useMemo(
+    () =>
+      isTeacherPersona
+        ? (classesQuery.data ?? []).filter((item) => assignedClassIds.has(item.id))
+        : (classesQuery.data ?? []),
+    [assignedClassIds, classesQuery.data, isTeacherPersona],
+  );
 
   const rosterQuery = useQuery({
     queryKey: [
@@ -144,18 +181,22 @@ export function AttendanceForm() {
     ].join(":");
   }, [academicYearId, attendanceDate, classId, sectionId, session]);
 
-  const availableSections = (sectionsQuery.data ?? []).filter(
-    (s) => !classId || (s.classId ?? s.class?.id) === classId,
-  );
+  const availableSections = (isTeacherPersona
+    ? assignedSections
+    : (sectionsQuery.data ?? [])
+  ).filter((s) => !classId || (s.classId ?? s.class?.id) === classId);
   const roster = useMemo(
     () => rosterQuery.data?.students ?? [],
     [rosterQuery.data?.students],
   );
   const visibleRoster = useMemo(() => {
     if (statusFilter === "ALL") return roster;
-    return roster.filter(
-      (student) => (exceptions[student.id] ?? "PRESENT") === statusFilter,
-    );
+    return roster.filter((student) => {
+      const status = exceptions[student.id] ?? "PRESENT";
+      return statusFilter === "LEAVE"
+        ? ["SICK_LEAVE", "EXCUSED_LEAVE", "UNEXCUSED_LEAVE"].includes(status)
+        : status === statusFilter;
+    });
   }, [exceptions, roster, statusFilter]);
 
   useEffect(() => {
@@ -194,14 +235,11 @@ export function AttendanceForm() {
       }
     }
 
-    if (
-      (sectionsQuery.isSuccess || sectionsQuery.isError) &&
-      classesQuery.data?.[0]
-    ) {
-      setClassId(classesQuery.data[0].id);
+    if ((sectionsQuery.isSuccess || sectionsQuery.isError) && availableClasses[0]) {
+      setClassId(availableClasses[0].id);
     }
   }, [
-    classesQuery.data,
+    availableClasses,
     classId,
     sectionsQuery.data,
     sectionsQuery.isSuccess,
@@ -276,7 +314,9 @@ export function AttendanceForm() {
 
     void storeAttendanceDraft(draftKey, draft);
     setDraftSavedAt(savedAt);
-    if (draftSyncState !== "conflict") {
+    if (
+      !["conflict", "failed", "syncing", "retrying"].includes(draftSyncState)
+    ) {
       setDraftSyncState("saved_local");
     }
   }, [
@@ -371,17 +411,26 @@ export function AttendanceForm() {
     totals.total > 0 ? Math.round((totals.present / totals.total) * 100) : 0;
   const attendanceState = rosterQuery.data?.attendanceState;
   const isLocked = attendanceState?.isLocked ?? false;
+  const isSubmitted = attendanceState?.isSubmitted ?? false;
   const hasConflict = Boolean(
     attendanceState?.conflictStatus &&
       attendanceState.conflictStatus !== "NONE",
   );
   const submissionStatus = hasConflict
-    ? "CONFLICT"
+    ? "NEEDS_CORRECTION"
     : isLocked
       ? "LOCKED"
       : attendanceState?.isSubmitted
         ? "SUBMITTED"
-        : "NOT_STARTED";
+        : hasDraftChanges || draftSyncState === "saved_local"
+          ? "DRAFT"
+          : "NOT_MARKED";
+  const submissionStatusTone =
+    submissionStatus === "NEEDS_CORRECTION"
+      ? "conflict"
+      : submissionStatus === "NOT_MARKED"
+        ? "inactive"
+        : undefined;
 
   const markAllPresent = () => {
     setExceptions({});
@@ -420,7 +469,7 @@ export function AttendanceForm() {
       return;
     }
 
-    setDraftSyncState("syncing");
+    setDraftSyncState(draftSyncState === "failed" ? "retrying" : "syncing");
     await saveDraftMutation.mutateAsync(buildDraftPayload());
   };
 
@@ -434,7 +483,7 @@ export function AttendanceForm() {
       return;
     }
 
-    setDraftSyncState("syncing");
+    setDraftSyncState(draftSyncState === "failed" ? "retrying" : "syncing");
     await syncMutation.mutateAsync({
       clientSubmissionId: `web-draft-${draftKey ?? createDraftFallbackId()}`,
       deviceTimestamp: new Date().toISOString(),
@@ -581,7 +630,7 @@ export function AttendanceForm() {
               aria-label="Class"
             >
               <option value="">Select Class</option>
-              {classesQuery.data?.map((c) => (
+              {availableClasses.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
@@ -629,7 +678,7 @@ export function AttendanceForm() {
             <select
               value={statusFilter}
               onChange={(e) =>
-                setStatusFilter(e.target.value as "ALL" | AttendanceStatus)
+                setStatusFilter(e.target.value as AttendanceStatusFilter)
               }
               className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
               aria-label="Status"
@@ -638,9 +687,7 @@ export function AttendanceForm() {
               <option value="PRESENT">Present</option>
               <option value="ABSENT">Absent</option>
               <option value="LATE">Late</option>
-              <option value="SICK_LEAVE">Sick Leave</option>
-              <option value="EXCUSED_LEAVE">Excused Leave</option>
-              <option value="UNEXCUSED_LEAVE">Unexcused Leave</option>
+              <option value="LEAVE">Leave / Excused</option>
             </select>
           </div>
         </div>
@@ -655,7 +702,11 @@ export function AttendanceForm() {
               <span className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest">
                 Status:
               </span>
-              <StatusBadge status={submissionStatus} className="h-6" />
+              <StatusBadge
+                status={submissionStatus}
+                tone={submissionStatusTone}
+                className="h-6"
+              />
             </div>
             {roster.length > 0 && (
               <ActionMenu
@@ -760,18 +811,20 @@ export function AttendanceForm() {
                 className="text-warning-700"
               />
               <SummaryPill
-                label="Leave / Other"
+                label="Leave / Excused"
                 value={totals.leave}
                 className="text-info-700"
               />
             </div>
 
-            {isLocked ? (
+            {isLocked || isSubmitted ? (
               <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700">
                 <AlertCircle size={20} className="shrink-0 text-slate-500" />
                 <span>
-                  This day is locked and can no longer be edited or
-                  resubmitted here.{" "}
+                  {isLocked
+                    ? "This day is locked"
+                    : "Attendance is submitted"} and can no longer be edited
+                  or resubmitted here.{" "}
                   <Link
                     href="/dashboard/attendance/corrections"
                     className="underline hover:no-underline"
@@ -784,8 +837,7 @@ export function AttendanceForm() {
             ) : (
               <div className="rounded-xl border border-info-100 bg-info-50 px-4 py-3 text-sm text-info-800">
                 Everyone is present by default. Mark exceptions only when a
-                student is absent, late, sick leave, excused leave, or
-                unexcused leave.
+                student is absent, late, or on leave/excused.
               </div>
             )}
 
@@ -796,7 +848,7 @@ export function AttendanceForm() {
                   student={student}
                   status={exceptions[student.id] ?? "PRESENT"}
                   remark={remarks[student.id] ?? ""}
-                  disabled={isLocked}
+                  disabled={isLocked || isSubmitted}
                   onStatusChange={(status) => {
                     setHasDraftChanges(true);
                     setExceptions((current) => {
@@ -863,7 +915,8 @@ export function AttendanceForm() {
               mutation.isPending ||
               roster.length === 0 ||
               futureDateBlocked ||
-              isLocked
+              isLocked ||
+              isSubmitted
             }
             className="flex items-center gap-3 rounded-xl bg-[var(--color-mod-attendance-accent)] px-10 py-4 text-sm font-black text-white shadow-lg shadow-[var(--color-mod-attendance-border)]/40 transition-all hover:scale-105 hover:bg-[var(--color-mod-attendance-text)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
           >
@@ -872,7 +925,11 @@ export function AttendanceForm() {
             ) : (
               <Save size={20} />
             )}
-            {isLocked ? "Day Locked" : "Submit Attendance"}
+            {isLocked
+              ? "Day Locked"
+              : isSubmitted
+                ? "Attendance Submitted"
+                : "Submit Attendance"}
           </button>
         </div>
       )}
@@ -965,7 +1022,7 @@ export function AttendanceForm() {
       <ConfirmDialog
         isOpen={isConfirmOpen}
         title="Confirm Attendance Submission"
-        description={`Are you sure you want to submit attendance for Class ${classesQuery.data?.find((c) => c.id === classId)?.name ?? ""}? This will lock today's records.`}
+        description={`Are you sure you want to submit attendance for Class ${availableClasses.find((c) => c.id === classId)?.name ?? ""}? This will lock today's records.`}
         confirmLabel={mutation.isPending ? "Submitting..." : "Submit"}
         cancelLabel="Review"
         isConfirming={mutation.isPending}
@@ -1032,7 +1089,10 @@ function SummaryPill({
 }
 
 function normalizeStatus(status: string | null | undefined): AttendanceStatus {
-  if (status && statusCycle.includes(status as AttendanceStatus))
+  if (
+    status &&
+    persistedAttendanceStatuses.includes(status as AttendanceStatus)
+  )
     return status as AttendanceStatus;
   if (status === "A" || status === "ABSENT") return "ABSENT";
   if (status === "L" || status === "LATE") return "LATE";
@@ -1067,11 +1127,12 @@ function getDraftSyncLabel(
   conflictMessage: string,
 ) {
   if (state === "syncing") return "Syncing attendance draft...";
+  if (state === "retrying") return "Retrying attendance sync...";
   if (state === "synced") return "Draft synced with SchoolOS.";
   if (state === "conflict")
     return conflictMessage || "Conflict found. Review before syncing.";
   if (state === "failed") return "Sync failed. Draft is still saved locally.";
-  if (!savedAt) return "Draft saved locally.";
+  if (!savedAt) return "Not synced. Draft saved locally.";
 
-  return `Saved locally at ${formatNepalTime(savedAt)}.`;
+  return `Not synced. Draft saved locally at ${formatNepalTime(savedAt)}.`;
 }

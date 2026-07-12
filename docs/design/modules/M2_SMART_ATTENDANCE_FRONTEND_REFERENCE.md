@@ -1,7 +1,7 @@
 # M2 Smart Attendance — Frontend Web Design Reference
 
 **Status:** Active module-level frontend design reference.
-**Updated:** 2026-06-19
+**Updated:** 2026-07-12
 **Module:** M2 Smart Attendance
 **Master web source:** `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`
 **Design system:** `apps/web/docs/DESIGN_SYSTEM.md`
@@ -16,6 +16,8 @@ M2 records daily student attendance, supports assignment-scoped teacher marking,
 It replaces paper registers and untraceable edits with a quick daily workflow, explicit lock windows, auditable corrections, and trustworthy absence/late communication.
 
 For Nepal schools, it must fit class-teacher routines, school calendars, section/roll ordering, late/half-day policies, and SMS-conscious guardian alerts.
+
+The practical pilot target is a normal class completed in under one minute: everyone starts Present, the teacher marks only Absent, Late, or Leave / Excused exceptions, reviews live counts, and submits. Extra persisted leave/status values remain compatible for schools that later enable them, but they do not clutter the default pilot marking surface.
 
 ---
 
@@ -193,6 +195,8 @@ Follow [the master web design plan](../SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md) and
 /dashboard/attendance/corrections
 /dashboard/attendance/reports
 ```
+
+The primary module navigation contains only `Overview`, `Mark Attendance`, `Monthly Register`, `Corrections`, and `Reports`. Offline sync is contextual to marking. Anomalies and repeated-absence follow-up live inside Overview or Reports rather than as permanent module tabs.
 
 ### Parent Routes
 

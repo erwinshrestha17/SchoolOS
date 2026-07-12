@@ -4,12 +4,18 @@ import {
   IsOptional,
   IsUUID,
   IsNumber,
+  IsIn,
   Min,
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class GetMonthlyRegisterDto {
+  @ApiPropertyOptional({ enum: ['csv', 'pdf'] })
+  @IsIn(['csv', 'pdf'])
+  @IsOptional()
+  format?: 'csv' | 'pdf';
+
   @ApiProperty()
   @IsUUID()
   @IsNotEmpty()

@@ -178,8 +178,8 @@ describe('attendance production hardening', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           attendanceDate: {
-            gte: new Date('2024-04-13T00:00:00.000Z'),
-            lte: new Date('2024-05-13T00:00:00.000Z'),
+            gte: new Date('2024-04-12T18:15:00.000Z'),
+            lt: new Date('2024-05-13T18:15:00.000Z'),
           },
         }),
       }),
@@ -548,6 +548,145 @@ describe('attendance production hardening', () => {
       ),
     ).rejects.toThrow(ConflictException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('requires a correction instead of silently editing submitted attendance', async () => {
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
+      attendanceSession: buildAttendanceSession({
+        submittedAt: new Date('2026-04-28T04:00:00.000Z'),
+        lockAt: new Date('2099-04-29T04:00:00.000Z'),
+      }),
+    });
+
+    await expect(
+      service.submitAttendance(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [],
+        },
+        adminActor,
+      ),
+    ).rejects.toThrow(
+      'Attendance is already submitted. Please request a correction instead of editing it.',
+    );
+    expect(prisma.student.findMany).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('requires a non-blank correction reason before any correction lookup', async () => {
+    const { service, prisma } = buildService({});
+
+    await expect(
+      service.createCorrectionRequest(
+        {
+          studentId: 'student-1',
+          attendanceDate: '2026-04-28',
+          requestedStatus: AttendanceStatus.ABSENT,
+          reason: '   ',
+        },
+        teacherActor,
+      ),
+    ).rejects.toThrow('Attendance correction requires a reason.');
+    expect(prisma.attendanceCorrectionRequest.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('preserves the official previous status when correction uses session and student scope', async () => {
+    const request = {
+      id: 'correction-1',
+      previousStatus: AttendanceStatus.LATE,
+      requestedStatus: AttendanceStatus.PRESENT,
+      status: 'PENDING',
+    };
+    const { service, prisma } = buildService({
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
+      attendanceSession: {
+        id: 'session-1',
+        attendanceDate: new Date('2026-04-27T18:15:00.000Z'),
+        classId: 'class-1',
+        sectionId: 'section-1',
+        submittedAt: new Date('2026-04-28T04:00:00.000Z'),
+      },
+      attendanceRecord: {
+        id: 'record-1',
+        attendanceSessionId: 'session-1',
+        status: AttendanceStatus.LATE,
+      },
+      correctionUpdated: request,
+    });
+
+    await expect(
+      service.createCorrectionRequest(
+        {
+          attendanceSessionId: 'session-1',
+          studentId: 'student-1',
+          attendanceDate: '2026-04-28',
+          requestedStatus: AttendanceStatus.PRESENT,
+          reason: 'Teacher selected late by mistake',
+        },
+        teacherActor,
+      ),
+    ).resolves.toEqual(request);
+    expect(prisma.attendanceCorrectionRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          attendanceRecordId: 'record-1',
+          previousStatus: AttendanceStatus.LATE,
+          requestedStatus: AttendanceStatus.PRESENT,
+          reason: 'Teacher selected late by mistake',
+        }),
+      }),
+    );
+  });
+
+  it('submits a saved draft through replay-safe attendance submission and deletes it after success', async () => {
+    const draft = {
+      id: 'draft-1',
+      tenantId: adminActor.tenantId,
+      userId: adminActor.userId,
+      academicYearId: 'ay-1',
+      classId: 'class-1',
+      sectionId: 'section-1',
+      attendanceDate: new Date('2026-04-28T00:00:00.000Z'),
+      payload: {
+        exceptions: [
+          { studentId: 'student-1', status: AttendanceStatus.ABSENT },
+        ],
+      },
+    };
+    const { service, prisma } = buildService({ attendanceDraft: draft });
+    const submitSpy = jest
+      .spyOn(service, 'submitAttendance')
+      .mockResolvedValue({ sessionId: 'session-1' } as never);
+
+    await expect(service.submitDraft(draft.id, adminActor)).resolves.toEqual({
+      sessionId: 'session-1',
+    });
+    expect(submitSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        academicYearId: 'ay-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        exceptions: draft.payload.exceptions,
+      }),
+      adminActor,
+      expect.objectContaining({
+        source: 'sync_submission',
+        clientSubmissionId: 'draft-draft-1',
+      }),
+    );
+    expect(prisma.attendanceDraft.delete).toHaveBeenCalledWith({
+      where: { id: 'draft-1' },
+    });
   });
 
   it('emits attendance domain events and records child-scoped parent notifications', async () => {
@@ -1660,6 +1799,7 @@ function buildService(options: {
   students?: unknown[];
   attendanceSession?: unknown;
   attendanceRecords?: unknown[];
+  attendanceRecord?: unknown;
   finalSession?: unknown;
   attendanceSessions?: unknown[];
   priorSyncSubmission?: unknown;
@@ -1688,6 +1828,7 @@ function buildService(options: {
   reportExports?: unknown[];
   reportExportCount?: number;
   fileAssets?: unknown[];
+  attendanceDraft?: unknown;
 }) {
   const tx = {
     attendanceConflict: {
@@ -1786,7 +1927,7 @@ function buildService(options: {
       update: jest.fn().mockResolvedValue(options.updatedConflict ?? null),
     },
     attendanceRecord: {
-      findFirst: jest.fn().mockResolvedValue(null),
+      findFirst: jest.fn().mockResolvedValue(options.attendanceRecord ?? null),
       findMany: jest.fn().mockResolvedValue(options.attendanceRecords ?? []),
     },
     attendanceCorrectionRequest: {
@@ -1795,6 +1936,10 @@ function buildService(options: {
       count: jest.fn().mockResolvedValue(0),
       update: jest.fn().mockResolvedValue(options.correctionUpdated ?? null),
       create: jest.fn().mockResolvedValue(options.correctionUpdated ?? null),
+    },
+    attendanceDraft: {
+      findFirst: jest.fn().mockResolvedValue(options.attendanceDraft ?? null),
+      delete: jest.fn().mockResolvedValue(options.attendanceDraft ?? null),
     },
     reportExport: {
       findMany: jest.fn().mockResolvedValue(options.reportExports ?? []),

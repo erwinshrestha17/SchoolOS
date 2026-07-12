@@ -37,11 +37,46 @@ describe('Attendance report integration depth', () => {
     expect(register.matrix[0]).toEqual(
       expect.objectContaining({
         studentId: 'student-1',
-        totals: expect.objectContaining({ PRESENT: 1, LATE: 1 }),
+        totals: expect.objectContaining({
+          PRESENT: 2,
+          LATE: 1,
+          HOLIDAY: 6,
+          workingDays: 25,
+          markedDays: 3,
+          percentage: 100,
+        }),
       }),
     );
     expect(register.matrix[0].attendance).toEqual(
-      expect.arrayContaining([{ day: 3, status: 'HOLIDAY' }]),
+      expect.arrayContaining([
+        { day: 2, status: 'HOLIDAY' },
+        { day: 4, status: 'HOLIDAY' },
+        { day: 5, status: 'PRESENT' },
+      ]),
+    );
+    expect(register.days).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          day: 4,
+          isWorkingDay: false,
+          holidayType: 'CLOSURE',
+        }),
+        expect.objectContaining({
+          day: 5,
+          isWorkingDay: true,
+          holidayType: 'EXAM_DAY',
+        }),
+      ]),
+    );
+    expect(register.summary).toEqual(
+      expect.objectContaining({
+        workingDays: 25,
+        holidayDays: 6,
+        submittedDays: 3,
+        draftDays: 0,
+        notMarkedDays: 22,
+        attendancePercentage: 100,
+      }),
     );
 
     const csv = await service.exportMonthlyRegister(query, 'csv', actor);
@@ -51,6 +86,8 @@ describe('Attendance report integration depth', () => {
     expect(csv).toContain('"2","Sita Thapa"');
     expect(csv).toContain('PRESENT');
     expect(csv).toContain('LATE');
+    expect(csv).toContain('"WORKING DAYS"');
+    expect(csv).toContain('"PERCENTAGE"');
   });
 });
 
@@ -68,17 +105,31 @@ function makePrisma() {
       ['student-1', AttendanceStatus.PRESENT],
       ['student-2', AttendanceStatus.PRESENT],
     ]),
-    makeSession(new Date(Date.UTC(2026, 4, 2)), [
+    makeSession(new Date(Date.UTC(2026, 4, 3)), [
       ['student-1', AttendanceStatus.LATE],
+      ['student-2', AttendanceStatus.PRESENT],
+    ]),
+    makeSession(new Date(Date.UTC(2026, 4, 5)), [
+      ['student-1', AttendanceStatus.PRESENT],
       ['student-2', AttendanceStatus.PRESENT],
     ]),
   ];
   const calendarDays = [
     {
-      id: 'holiday-1',
+      id: 'closure-1',
       tenantId,
-      calendarDate: new Date(Date.UTC(2026, 4, 3)),
+      calendarDate: new Date(Date.UTC(2026, 4, 4)),
       isWorkingDay: false,
+      label: 'Unexpected closure',
+      holidayType: 'CLOSURE',
+    },
+    {
+      id: 'exam-1',
+      tenantId,
+      calendarDate: new Date(Date.UTC(2026, 4, 5)),
+      isWorkingDay: true,
+      label: 'Terminal exam',
+      holidayType: 'EXAM_DAY',
     },
   ];
 
@@ -132,6 +183,7 @@ function makePrisma() {
       classId,
       sectionId,
       attendanceDate,
+      submittedAt: new Date(attendanceDate.getTime() + 8 * 60 * 60 * 1000),
       records: rows.map(([studentId, status], index) => ({
         id: `record-${attendanceDate.getDate()}-${index}`,
         tenantId,

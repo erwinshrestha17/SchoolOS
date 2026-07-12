@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BS_MONTH_NAMES_EN,
   formatBsDateTime,
+  getNepalNow,
   toBsDateFromGregorian,
 } from "@schoolos/core";
 import {
@@ -35,9 +36,8 @@ import type {
   M2FollowUpQueue,
 } from "@/lib/api/attendance";
 import { AttendanceForm } from "@/components/forms/attendance-form";
-import { AttendanceAnalytics } from "./attendance-analytics";
-import { AttendanceConflictReview } from "./attendance-conflict-review";
 import { AttendanceCorrectionReview } from "./attendance-correction-review";
+import { useSession } from "@/components/session-provider";
 import { DashboardPageShell } from "@/components/dashboard/dashboard-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,33 +63,28 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 
-const today = new Date().toISOString().slice(0, 10);
+const nepalNow = getNepalNow();
+const today = `${nepalNow.year}-${String(nepalNow.month).padStart(2, "0")}-${String(nepalNow.day).padStart(2, "0")}`;
 const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
   .toISOString()
   .slice(0, 10);
 
 const attendanceTabs = [
   { href: "/dashboard/attendance", label: "Overview", icon: BarChart3 },
-  { href: "/dashboard/attendance/mark", label: "Today", icon: CalendarCheck },
   {
-    href: "/dashboard/attendance/register",
-    label: "Class Register",
+    href: "/dashboard/attendance/mark",
+    label: "Mark Attendance",
+    icon: CalendarCheck,
+  },
+  {
+    href: "/dashboard/attendance/register/monthly",
+    label: "Monthly Register",
     icon: FileText,
   },
   {
     href: "/dashboard/attendance/corrections",
     label: "Corrections",
     icon: ClipboardCheck,
-  },
-  {
-    href: "/dashboard/attendance/anomalies",
-    label: "Anomalies",
-    icon: ShieldAlert,
-  },
-  {
-    href: "/dashboard/attendance/follow-ups",
-    label: "Follow-ups",
-    icon: MessageSquare,
   },
   { href: "/dashboard/attendance/reports", label: "Reports", icon: Download },
 ];
@@ -100,18 +95,10 @@ export function AttendanceOverviewWorkspace() {
     queryKey: ["attendance-analytics"],
     queryFn: api.listAttendanceAnalytics,
   });
-  const anomaliesQuery = useQuery({
-    queryKey: ["attendance-anomalies"],
-    queryFn: api.listAttendanceAnomalies,
-  });
   const correctionsQuery = useQuery({
     queryKey: ["attendance-corrections", "PENDING", 1],
     queryFn: () =>
       api.listAttendanceCorrections({ status: "PENDING", limit: 10 }),
-  });
-  const conflictsQuery = useQuery({
-    queryKey: ["attendance-conflicts"],
-    queryFn: api.listAttendanceConflicts,
   });
   const followUpsQuery = useQuery({
     queryKey: ["attendance-m2-follow-ups", thirtyDaysAgo, today],
@@ -121,22 +108,6 @@ export function AttendanceOverviewWorkspace() {
 
   const analytics = analyticsQuery.data;
   const totals = analytics?.todaySummary.totals;
-  const totalMarked = totals
-    ? totals.present +
-      totals.absent +
-      totals.late +
-      totals.leave +
-      totals.sickLeave +
-      totals.excusedLeave +
-      totals.unexcusedLeave
-    : 0;
-  const attendanceRate =
-    totalMarked > 0
-      ? Math.round((totals!.present / totalMarked) * 1000) / 10
-      : null;
-  const pendingClasses =
-    anomaliesQuery.data?.anomalies.unsubmittedWorkingDays.length ?? null;
-
   return (
     <DashboardPageShell>
       <ModuleHeader
@@ -171,31 +142,55 @@ export function AttendanceOverviewWorkspace() {
           },
         ]}
       >
-        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
+        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <KpiCard
-            title="Attendance today"
+            title="Classes marked"
             loading={analyticsQuery.isLoading}
-            value={attendanceRate === null ? "Unavailable" : `${attendanceRate}%`}
-            icon={<Users size={20} />}
-            tone="info"
+            value={
+              analytics?.todaySummary.submittedSessionCount ?? "Unavailable"
+            }
+            icon={<CheckCircle2 size={20} />}
+            tone="success"
             href="/dashboard/attendance/mark"
-            description="Backend attendance analytics."
+            description="Submitted class sessions today."
           />
           <KpiCard
-            title="Classes pending"
-            loading={anomaliesQuery.isLoading}
-            value={pendingClasses ?? "Unavailable"}
+            title="Classes not marked"
+            loading={analyticsQuery.isLoading}
+            value={
+              analytics?.todaySummary.notMarkedSessionCount ?? "Unavailable"
+            }
             icon={<AlertTriangle size={20} />}
-            tone={pendingClasses ? "warning" : "neutral"}
-            href="/dashboard/attendance/anomalies"
+            tone={
+              (analytics?.todaySummary.notMarkedSessionCount ?? 0) > 0
+                ? "warning"
+                : "neutral"
+            }
+            href="/dashboard/attendance/mark"
+            description="Active class scopes awaiting submission today."
           />
           <KpiCard
-            title="Absent students"
+            title="Present"
+            loading={analyticsQuery.isLoading}
+            value={totals?.present ?? "Unavailable"}
+            icon={<Users size={20} />}
+            tone="success"
+          />
+          <KpiCard
+            title="Absent"
             loading={analyticsQuery.isLoading}
             value={totals?.absent ?? "Unavailable"}
             icon={<XCircle size={20} />}
             tone="danger"
-            href="/dashboard/attendance/follow-ups"
+            href="/dashboard/attendance/reports"
+          />
+          <KpiCard
+            title="Late"
+            loading={analyticsQuery.isLoading}
+            value={totals?.late ?? "Unavailable"}
+            icon={<FileClock size={20} />}
+            tone="warning"
+            href="/dashboard/attendance/reports"
           />
           <KpiCard
             title="Pending corrections"
@@ -219,7 +214,7 @@ export function AttendanceOverviewWorkspace() {
       <div className="space-y-6">
           <SectionCard
             title="Class Attendance Status"
-            description="Latest submitted class sessions from the attendance analytics API."
+            description="Latest class sessions from the attendance analytics API."
           >
             {analyticsQuery.isLoading ? (
               <LoadingState label="Loading class attendance status..." />
@@ -263,7 +258,7 @@ export function AttendanceOverviewWorkspace() {
                               session.submittedAt ? "success" : "warning"
                             }
                           >
-                            {session.submittedAt ? "Completed" : "Pending"}
+                            {session.submittedAt ? "Submitted" : "Draft"}
                           </Badge>
                         </TableCell>
                       </TableRow>
@@ -273,40 +268,11 @@ export function AttendanceOverviewWorkspace() {
             )}
           </SectionCard>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <TrendPanel analytics={analytics} />
-            <ActivityPanel
-              analytics={analytics}
-              correctionsTotal={correctionsQuery.data?.total ?? 0}
-            />
-          </div>
-
-          <AttendanceAnalytics
-            analytics={analytics}
-            anomalies={anomaliesQuery.data}
-            isLoadingAnomalies={anomaliesQuery.isLoading}
-            anomaliesError={
-              anomaliesQuery.isError
-                ? "Attendance anomaly checks could not load."
-                : ""
-            }
-          />
-
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div>
           <AtRiskPanel
             queue={followUpsQuery.data}
             isLoading={followUpsQuery.isLoading}
           />
-          {conflictsQuery.isLoading ? (
-            <LoadingState label="Loading conflict review queue..." />
-          ) : conflictsQuery.isError ? (
-            <ErrorState
-              title="Conflict review queue unavailable"
-              onRetry={() => void conflictsQuery.refetch()}
-            />
-          ) : (
-            <AttendanceConflictReview conflicts={conflictsQuery.data ?? []} />
-          )}
         </div>
       </div>
     </DashboardPageShell>
@@ -378,6 +344,7 @@ export function AttendanceRegisterWorkspace({
   monthly?: boolean;
 }) {
   const router = useRouter();
+  const { session } = useSession();
   const [academicYearId, setAcademicYearId] = useState("");
   const [classId, setClassId] = useState("");
   const [sectionId, setSectionId] = useState("");
@@ -396,6 +363,55 @@ export function AttendanceRegisterWorkspace({
   const sectionsQuery = useQuery({
     queryKey: ["sections"],
     queryFn: api.listSections,
+  });
+  const isTeacherPersona = Boolean(
+    session?.user.roles.includes("teacher") &&
+      !session.user.roles.some((role) => ["admin", "principal"].includes(role)),
+  );
+  const assignedSections = useMemo(
+    () =>
+      (sectionsQuery.data ?? []).filter(
+        (item) => item.isAssignedClassTeacher || item.isAssignedSubjectTeacher,
+      ),
+    [sectionsQuery.data],
+  );
+  const assignedClassIds = useMemo(
+    () =>
+      new Set(
+        assignedSections
+          .map((item) => item.classId ?? item.class?.id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    [assignedSections],
+  );
+  const availableClasses = useMemo(
+    () =>
+      isTeacherPersona
+        ? (classesQuery.data ?? []).filter((item) =>
+            assignedClassIds.has(item.id),
+          )
+        : (classesQuery.data ?? []),
+    [assignedClassIds, classesQuery.data, isTeacherPersona],
+  );
+  const availableSections = useMemo(
+    () =>
+      (isTeacherPersona ? assignedSections : (sectionsQuery.data ?? [])).filter(
+        (section) =>
+          !classId || (section.classId ?? section.class?.id) === classId,
+      ),
+    [assignedSections, classId, isTeacherPersona, sectionsQuery.data],
+  );
+  const currentRosterQuery = useQuery({
+    queryKey: ["attendance-register-current-year", classId, sectionId],
+    queryFn: () =>
+      api.getAttendanceRoster({
+        classId,
+        sectionId: sectionId || null,
+        attendanceDate: today,
+      }),
+    enabled: Boolean(
+      isTeacherPersona && academicYearsQuery.isError && classId && sectionId,
+    ),
   });
   const registerQuery = useQuery({
     queryKey: [
@@ -422,15 +438,35 @@ export function AttendanceRegisterWorkspace({
       academicYearsQuery.data?.find((item) => item.isCurrent) ??
       academicYearsQuery.data?.[0];
     if (current && !academicYearId) setAcademicYearId(current.id);
-    const firstClass = classesQuery.data?.[0];
+    const firstClass = availableClasses[0];
     if (firstClass && !classId) setClassId(firstClass.id);
-  }, [academicYearId, academicYearsQuery.data, classId, classesQuery.data]);
+  }, [academicYearId, academicYearsQuery.data, availableClasses, classId]);
+
+  useEffect(() => {
+    if (classId && !sectionId && isTeacherPersona && availableSections[0]) {
+      setSectionId(availableSections[0].id);
+    }
+  }, [availableSections, classId, isTeacherPersona, sectionId]);
+
+  useEffect(() => {
+    const resolvedYearId = currentRosterQuery.data?.academicYear.id;
+    if (resolvedYearId && !academicYearId) setAcademicYearId(resolvedYearId);
+  }, [academicYearId, currentRosterQuery.data?.academicYear.id]);
 
   const register = registerQuery.data;
-  const summary = summarizeRegister(register);
-  const availableSections = (sectionsQuery.data ?? []).filter(
-    (section) => !classId || (section.classId ?? section.class?.id) === classId,
-  );
+  const summary = register?.summary;
+  const academicYearOptions =
+    academicYearsQuery.data?.map(
+      (item) => [item.id, item.name] as [string, string],
+    ) ??
+    (currentRosterQuery.data?.academicYear
+      ? [
+          [
+            currentRosterQuery.data.academicYear.id,
+            currentRosterQuery.data.academicYear.name,
+          ] as [string, string],
+        ]
+      : []);
 
   async function exportRegister(format: "csv" | "pdf") {
     if (!academicYearId || !classId) return;
@@ -480,20 +516,25 @@ export function AttendanceRegisterWorkspace({
             icon: <ClipboardCheck size={16} />,
             onClick: () => router.push("/dashboard/attendance/corrections"),
           },
+          {
+            label: "Print register",
+            icon: <FileText size={16} />,
+            onClick: printAttendanceRegister,
+          },
         ]}
       >
         <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             title="Completed registers"
-            value={summary.completedDays}
+            value={summary?.submittedDays ?? "Unavailable"}
             icon={<CheckCircle2 size={20} />}
             tone="success"
           />
           <KpiCard
             title="Pending registers"
-            value={summary.pendingDays}
+            value={summary?.notMarkedDays ?? "Unavailable"}
             icon={<FileClock size={20} />}
-            tone={summary.pendingDays ? "warning" : "neutral"}
+            tone={(summary?.notMarkedDays ?? 0) > 0 ? "warning" : "neutral"}
           />
           <KpiCard
             title="Locked days"
@@ -505,9 +546,9 @@ export function AttendanceRegisterWorkspace({
           <KpiCard
             title="Average attendance"
             value={
-              summary.attendanceRate === null
+              summary?.attendancePercentage === null || !summary
                 ? "Unavailable"
-                : `${summary.attendanceRate}%`
+                : `${summary.attendancePercentage}%`
             }
             icon={<BarChart3 size={20} />}
             tone="info"
@@ -528,10 +569,7 @@ export function AttendanceRegisterWorkspace({
             label="Academic year"
             value={academicYearId}
             onChange={setAcademicYearId}
-            options={(academicYearsQuery.data ?? []).map((item) => [
-              item.id,
-              item.name,
-            ])}
+            options={academicYearOptions}
           />
           <SelectLike
             label="Class"
@@ -540,7 +578,7 @@ export function AttendanceRegisterWorkspace({
               setClassId(value);
               setSectionId("");
             }}
-            options={(classesQuery.data ?? []).map((item) => [
+            options={availableClasses.map((item) => [
               item.id,
               item.name,
             ])}
@@ -583,7 +621,7 @@ export function AttendanceRegisterWorkspace({
       ) : register ? (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <MonthlyMatrix register={register} />
-          <RegisterSnapshot register={register} summary={summary} />
+          <RegisterSnapshot register={register} summary={register.summary} />
         </div>
       ) : (
         <EmptyState
@@ -1649,6 +1687,7 @@ function MonthlyMatrix({ register }: { register: AttendanceMonthlyRegister }) {
       title={`${register.className}${register.sectionName ? ` / ${register.sectionName}` : ""}`}
       description={`${register.periodLabel} · Compact monthly matrix from backend register data.`}
       noPadding
+      className="attendance-register-print"
     >
       <div className="overflow-auto">
         <table className="min-w-full border-separate border-spacing-0 text-sm">
@@ -1673,6 +1712,9 @@ function MonthlyMatrix({ register }: { register: AttendanceMonthlyRegister }) {
               </th>
               <th className="border-b p-2 text-center text-xs font-black text-slate-500">
                 L
+              </th>
+              <th className="border-b p-2 text-center text-xs font-black text-slate-500">
+                %
               </th>
             </tr>
           </thead>
@@ -1705,6 +1747,11 @@ function MonthlyMatrix({ register }: { register: AttendanceMonthlyRegister }) {
                 <td className="border-b p-2 text-center font-bold text-warning-700">
                   {student.totals.LATE}
                 </td>
+                <td className="border-b p-2 text-center font-bold text-slate-700">
+                  {student.totals.percentage === null
+                    ? "-"
+                    : student.totals.percentage.toFixed(1)}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -1719,7 +1766,7 @@ function RegisterSnapshot({
   summary,
 }: {
   register: AttendanceMonthlyRegister;
-  summary: ReturnType<typeof summarizeRegister>;
+  summary: AttendanceMonthlyRegister["summary"];
 }) {
   return (
     <div className="space-y-6">
@@ -1731,16 +1778,21 @@ function RegisterSnapshot({
               `${register.className}${register.sectionName ? ` / ${register.sectionName}` : ""}`,
             ],
             ["Period", register.periodLabel],
-            ["Total students", String(register.matrix.length)],
+            ["Total students", String(summary.totalStudents)],
+            ["Working days", String(summary.workingDays)],
+            ["Holidays / closures", String(summary.holidayDays)],
+            ["Submitted days", String(summary.submittedDays)],
+            ["Draft days", String(summary.draftDays)],
+            ["Not marked days", String(summary.notMarkedDays)],
             [
               "Attendance rate",
-              summary.attendanceRate === null
+              summary.attendancePercentage === null
                 ? "Unavailable"
-                : `${summary.attendanceRate}%`,
+                : `${summary.attendancePercentage}%`,
             ],
-            ["Most absences", summary.mostAbsences],
-            ["Perfect attendance", String(summary.perfectAttendance)],
-            ["Leave days", String(summary.leaveDays)],
+            ["Absent records", String(summary.totals.absent)],
+            ["Late records", String(summary.totals.late)],
+            ["Leave records", String(summary.totals.leave)],
           ]}
         />
       </SectionCard>
@@ -2124,53 +2176,6 @@ function correctionStudentName(correction: {
   return name || correction.student?.studentSystemId || "Student record";
 }
 
-function summarizeRegister(register: AttendanceMonthlyRegister | undefined) {
-  if (!register) {
-    return {
-      completedDays: 0,
-      pendingDays: 0,
-      attendanceRate: null,
-      mostAbsences: "Unavailable",
-      perfectAttendance: 0,
-      leaveDays: 0,
-    };
-  }
-  const completedDays = new Set<number>();
-  let present = 0;
-  let marked = 0;
-  let leaveDays = 0;
-  let perfectAttendance = 0;
-  let mostAbsences = { name: "Unavailable", count: -1 };
-  for (const row of register.matrix) {
-    present += row.totals.PRESENT;
-    marked +=
-      row.totals.PRESENT +
-      row.totals.ABSENT +
-      row.totals.LATE +
-      row.totals.LEAVE;
-    leaveDays += row.totals.LEAVE;
-    if (row.totals.ABSENT === 0 && row.totals.LATE === 0)
-      perfectAttendance += 1;
-    if (row.totals.ABSENT > mostAbsences.count)
-      mostAbsences = { name: row.name, count: row.totals.ABSENT };
-    row.attendance.forEach((entry) => {
-      if (entry.status !== "NOT_MARKED") completedDays.add(entry.day);
-    });
-  }
-  return {
-    completedDays: completedDays.size,
-    pendingDays: Math.max(register.daysCount - completedDays.size, 0),
-    attendanceRate:
-      marked > 0 ? Math.round((present / marked) * 1000) / 10 : null,
-    mostAbsences:
-      mostAbsences.count > 0
-        ? `${mostAbsences.name} (${mostAbsences.count})`
-        : "Unavailable",
-    perfectAttendance,
-    leaveDays,
-  };
-}
-
 function statusShort(status: string) {
   if (status === "PRESENT") return "P";
   if (status === "ABSENT") return "A";
@@ -2178,6 +2183,14 @@ function statusShort(status: string) {
   if (status.includes("LEAVE")) return "LV";
   if (status === "HOLIDAY") return "-";
   return "-";
+}
+
+function printAttendanceRegister() {
+  const cleanup = () => document.body.classList.remove("attendance-register-printing");
+  document.body.classList.add("attendance-register-printing");
+  window.addEventListener("afterprint", cleanup, { once: true });
+  window.print();
+  window.setTimeout(cleanup, 1_000);
 }
 
 function statusColor(status: string) {
