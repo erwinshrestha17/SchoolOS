@@ -2,6 +2,7 @@
 
 import type { AttendanceCorrectionRequest } from '@schoolos/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useState } from 'react';
 import { CheckCircle2, ClipboardCheck, XCircle } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -16,6 +17,8 @@ interface AttendanceCorrectionReviewProps {
   corrections: AttendanceCorrectionRequest[];
   isLoading: boolean;
   total: number;
+  /** When provided, each card links to the full-page correction review. */
+  detailHref?: (correctionId: string) => string;
 }
 
 type ReviewAction = 'APPROVED' | 'REJECTED';
@@ -24,6 +27,7 @@ export function AttendanceCorrectionReview({
   corrections,
   isLoading,
   total,
+  detailHref,
 }: AttendanceCorrectionReviewProps) {
   const queryClient = useQueryClient();
   const [reviewReasons, setReviewReasons] = useState<Record<string, string>>(
@@ -129,6 +133,14 @@ export function AttendanceCorrectionReview({
                       {formatDateTime(correction.attendanceDate)} · Requested{' '}
                       {formatDateTime(correction.requestedAt)}
                     </p>
+                    {detailHref ? (
+                      <Link
+                        href={detailHref(correction.id)}
+                        className="mt-1 inline-block text-xs font-bold text-blue-700 hover:underline"
+                      >
+                        Open full review
+                      </Link>
+                    ) : null}
                   </div>
                   <div className="rounded-md bg-slate-50 px-3 py-2 text-right">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">

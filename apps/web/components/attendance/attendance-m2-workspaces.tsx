@@ -60,6 +60,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -90,13 +91,7 @@ const attendanceTabs = [
     label: "Follow-ups",
     icon: MessageSquare,
   },
-  {
-    href: "/dashboard/attendance/offline-drafts",
-    label: "Offline Drafts",
-    icon: Save,
-  },
   { href: "/dashboard/attendance/reports", label: "Reports", icon: Download },
-  { href: "/dashboard/settings/attendance", label: "Settings", icon: Settings },
 ];
 
 export function AttendanceOverviewWorkspace() {
@@ -165,13 +160,18 @@ export function AttendanceOverviewWorkspace() {
             onClick: () => router.push("/dashboard/attendance/reports"),
           },
           {
+            label: "Offline drafts",
+            icon: <Save size={16} />,
+            onClick: () => router.push("/dashboard/attendance/offline-drafts"),
+          },
+          {
             label: "Settings",
             icon: <Settings size={16} />,
             onClick: () => router.push("/dashboard/settings/attendance"),
           },
         ]}
       >
-        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             title="Attendance today"
             loading={analyticsQuery.isLoading}
@@ -198,14 +198,6 @@ export function AttendanceOverviewWorkspace() {
             href="/dashboard/attendance/follow-ups"
           />
           <KpiCard
-            title="Late arrivals"
-            loading={analyticsQuery.isLoading}
-            value={totals?.late ?? "Unavailable"}
-            icon={<FileClock size={20} />}
-            tone="warning"
-            href="/dashboard/attendance/follow-ups"
-          />
-          <KpiCard
             title="Pending corrections"
             loading={correctionsQuery.isLoading}
             value={correctionsQuery.data?.total ?? "Unavailable"}
@@ -214,15 +206,6 @@ export function AttendanceOverviewWorkspace() {
               (correctionsQuery.data?.total ?? 0) > 0 ? "warning" : "neutral"
             }
             href="/dashboard/attendance/corrections"
-          />
-          <KpiCard
-            title="Attendance rate"
-            value={
-              attendanceRate === null ? "Unavailable" : `${attendanceRate}%`
-            }
-            icon={<BarChart3 size={20} />}
-            tone="success"
-            href="/dashboard/attendance/reports"
           />
         </KpiGrid>
       </ModuleHeader>
@@ -233,20 +216,7 @@ export function AttendanceOverviewWorkspace() {
         variant="light"
       />
 
-      <FilterBar
-        label="Attendance Filters"
-        description="Backend summaries remain the source of truth for this overview."
-      >
-        <div className="grid gap-3 md:grid-cols-4">
-          <InputLike label="Date" value={today} />
-          <InputLike label="Class" value="All classes" />
-          <InputLike label="Section" value="All sections" />
-          <InputLike label="Status" value="All statuses" />
-        </div>
-      </FilterBar>
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
+      <div className="space-y-6">
           <SectionCard
             title="Class Attendance Status"
             description="Latest submitted class sessions from the attendance analytics API."
@@ -321,20 +291,8 @@ export function AttendanceOverviewWorkspace() {
                 : ""
             }
           />
-        </div>
 
-        <div className="space-y-6">
-          <ClassSummaryPanel analytics={analytics} />
-          <SectionCard title="Quick Actions">
-            <ActionList
-              items={[
-                ["Mark class attendance", "/dashboard/attendance/mark"],
-                ["View register", "/dashboard/attendance/register"],
-                ["Review corrections", "/dashboard/attendance/corrections"],
-                ["Follow-up queue", "/dashboard/attendance/follow-ups"],
-              ]}
-            />
-          </SectionCard>
+        <div className="grid gap-6 lg:grid-cols-2">
           <AtRiskPanel
             queue={followUpsQuery.data}
             isLoading={followUpsQuery.isLoading}
@@ -361,7 +319,15 @@ export function AttendanceMarkWorkspace() {
       <ModuleHeader
         title="Daily Attendance Marking"
         description="Mark attendance for today by class, section, and supported daily session."
-        primaryAction={<Badge variant="info">Daily scope</Badge>}
+        primaryAction={
+          <Link
+            href="/dashboard/attendance/offline-drafts"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-attendance-accent)] focus-visible:ring-offset-2"
+          >
+            <Save className="h-4 w-4" />
+            Offline drafts
+          </Link>
+        }
       />
       <ModuleTabs
         items={attendanceTabs}
@@ -630,17 +596,21 @@ export function AttendanceRegisterWorkspace({
   );
 }
 
+const AUDIT_LOG_VIEW = "AUDIT" as const;
+
 export function AttendanceCorrectionsQueueWorkspace() {
   const [status, setStatus] = useState("PENDING");
+  const showAuditLog = status === AUDIT_LOG_VIEW;
   const correctionsQuery = useQuery({
     queryKey: ["attendance-corrections", status],
-    queryFn: () =>
-      api.listAttendanceCorrections({ status: status || null, limit: 25 }),
+    queryFn: () => api.listAttendanceCorrections({ status, limit: 25 }),
+    enabled: !showAuditLog,
   });
   const auditQuery = useQuery({
     queryKey: ["attendance-m2-correction-audit", thirtyDaysAgo, today],
     queryFn: () =>
       api.listM2CorrectionAudit({ fromDate: thirtyDaysAgo, toDate: today }),
+    enabled: showAuditLog,
   });
 
   return (
@@ -658,64 +628,115 @@ export function AttendanceCorrectionsQueueWorkspace() {
             </span>
           </Tooltip>
         }
-      >
-        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-5">
-          <KpiCard
-            title="Pending requests"
-            loading={correctionsQuery.isLoading}
-            value={correctionsQuery.data?.total ?? "Unavailable"}
-            icon={<ClipboardCheck size={20} />}
-            tone="warning"
-          />
-          <KpiCard
-            title="Reviewed audit rows"
-            loading={auditQuery.isLoading}
-            value={auditQuery.data?.total ?? "Unavailable"}
-            icon={<FileText size={20} />}
-            tone="info"
-          />
-          <KpiCard
-            title="Escalated"
-            value="Unavailable"
-            icon={<AlertTriangle size={20} />}
-            tone="neutral"
-            description="No persisted escalation contract."
-          />
-          <KpiCard
-            title="Due soon"
-            value="Unavailable"
-            icon={<FileClock size={20} />}
-            tone="neutral"
-          />
-          <KpiCard
-            title="Average resolution"
-            value="Unavailable"
-            icon={<BarChart3 size={20} />}
-            tone="neutral"
-          />
-        </KpiGrid>
-      </ModuleHeader>
+      />
       <ModuleTabs
         items={attendanceTabs}
         accentColor="emerald"
         variant="light"
       />
-      <ModuleTabs
-        items={[
-          { value: "PENDING", label: "Inbox" },
-          { value: "APPROVED", label: "Reviewed" },
-          { value: "ESCALATED", label: "Escalated" },
-          { value: "", label: "Audit log" },
-        ]}
-        activeValue={status}
-        onValueChange={setStatus}
-        accentColor="emerald"
-        variant="light"
-      />
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <Tabs value={status} onValueChange={setStatus}>
+        <TabsList aria-label="Correction queue view">
+          <TabsTrigger value="PENDING">Inbox</TabsTrigger>
+          <TabsTrigger value="APPROVED">Reviewed</TabsTrigger>
+          <TabsTrigger value="ESCALATED">Escalated</TabsTrigger>
+          <TabsTrigger value={AUDIT_LOG_VIEW}>Audit log</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      {showAuditLog ? (
         <SectionCard
-          title="Correction Request Table"
+          title="Correction Audit Log"
+          description="Reviewed correction requests from the backend audit trail for the last 30 days."
+          headerAction={
+            <Badge variant="info">
+              {auditQuery.data?.total ?? 0} rows
+            </Badge>
+          }
+        >
+          {auditQuery.isLoading ? (
+            <LoadingState label="Loading correction audit trail..." />
+          ) : auditQuery.isError ? (
+            <ErrorState
+              title="Correction audit trail unavailable"
+              onRetry={() => void auditQuery.refetch()}
+            />
+          ) : (auditQuery.data?.items ?? []).length === 0 ? (
+            <EmptyState
+              title="No audit rows in this window"
+              description="Reviewed corrections from the last 30 days will appear here."
+              icon={<FileText size={32} />}
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Attendance date</TableHead>
+                  <TableHead>Change</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Reviewed</TableHead>
+                  <TableHead>Flags</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(auditQuery.data?.items ?? []).map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-bold text-slate-900">
+                      {item.fullNameEn}
+                      <div className="text-xs font-semibold text-slate-500">
+                        {item.studentSystemId}
+                      </div>
+                    </TableCell>
+                    <TableCell>{formatDate(item.attendanceDate)}</TableCell>
+                    <TableCell>
+                      {item.previousStatus ?? "No record"} →{" "}
+                      {item.requestedStatus}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          item.status === "PENDING" ? "warning" : "success"
+                        }
+                      >
+                        {item.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {item.reviewedAt
+                        ? formatDateTime(item.reviewedAt)
+                        : "Not reviewed"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {item.auditFlags.sessionLocked ? (
+                          <Badge variant="info">Locked</Badge>
+                        ) : null}
+                        {!item.auditFlags.hasReviewReason ? (
+                          <Badge variant="warning">No review reason</Badge>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </SectionCard>
+      ) : status === "PENDING" ? (
+        <AttendanceCorrectionReview
+          corrections={correctionsQuery.data?.items ?? []}
+          isLoading={correctionsQuery.isLoading}
+          total={correctionsQuery.data?.total ?? 0}
+          detailHref={(id) => `/dashboard/attendance/corrections/${id}`}
+        />
+      ) : (
+        <SectionCard
+          title={status === "APPROVED" ? "Reviewed Corrections" : "Escalated Corrections"}
           description="Server-paginated correction requests scoped by tenant and backend permissions."
+          headerAction={
+            <Badge variant="neutral">
+              {correctionsQuery.data?.total ?? 0} requests
+            </Badge>
+          }
         >
           {correctionsQuery.isLoading ? (
             <LoadingState label="Loading correction requests..." />
@@ -723,6 +744,12 @@ export function AttendanceCorrectionsQueueWorkspace() {
             <ErrorState
               title="Corrections unavailable"
               onRetry={() => void correctionsQuery.refetch()}
+            />
+          ) : (correctionsQuery.data?.items ?? []).length === 0 ? (
+            <EmptyState
+              title="No corrections in this queue"
+              description="Requests matching this status will appear here."
+              icon={<ClipboardCheck size={32} />}
             />
           ) : (
             <Table>
@@ -768,22 +795,7 @@ export function AttendanceCorrectionsQueueWorkspace() {
             </Table>
           )}
         </SectionCard>
-        <SectionCard title="Queue Summary">
-          <SummaryRows
-            rows={[
-              ["Pending", String(correctionsQuery.data?.total ?? "...")],
-              ["Escalated", "Unavailable"],
-              ["Due soon", "Unavailable"],
-              ["Policy notes", "Backend reason required"],
-            ]}
-          />
-        </SectionCard>
-      </div>
-      <AttendanceCorrectionReview
-        corrections={correctionsQuery.data?.items ?? []}
-        isLoading={correctionsQuery.isLoading}
-        total={correctionsQuery.data?.total ?? 0}
-      />
+      )}
     </DashboardPageShell>
   );
 }
@@ -1819,36 +1831,6 @@ function ActivityPanel({
   );
 }
 
-function ClassSummaryPanel({
-  analytics,
-}: {
-  analytics:
-    | Awaited<ReturnType<typeof api.listAttendanceAnalytics>>
-    | undefined;
-}) {
-  const latest = analytics?.latestSessions?.[0];
-  return (
-    <SectionCard title="Class Summary">
-      {latest ? (
-        <SummaryRows
-          rows={[
-            [
-              "Class",
-              `${latest.className}${latest.sectionName ? ` / ${latest.sectionName}` : ""}`,
-            ],
-            ["Total students", String(latest.totals.totalStudents)],
-            ["Present", String(latest.totals.present)],
-            ["Absent", String(latest.totals.absent)],
-            ["Late", String(latest.totals.late)],
-          ]}
-        />
-      ) : (
-        <p className="text-sm text-slate-500">Class summary unavailable.</p>
-      )}
-    </SectionCard>
-  );
-}
-
 function AtRiskPanel({
   queue,
   isLoading,
@@ -2027,23 +2009,6 @@ function SummaryRows({ rows }: { rows: Array<[string, string]> }) {
             {value}
           </span>
         </div>
-      ))}
-    </div>
-  );
-}
-
-function ActionList({ items }: { items: Array<[string, string]> }) {
-  return (
-    <div className="space-y-2">
-      {items.map(([label, href]) => (
-        <Link
-          key={href}
-          href={href}
-          className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-blue-700 hover:bg-slate-50"
-        >
-          {label}
-          <span aria-hidden>→</span>
-        </Link>
       ))}
     </div>
   );
