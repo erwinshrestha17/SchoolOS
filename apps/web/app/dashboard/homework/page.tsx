@@ -8,6 +8,7 @@ import {
   BarChart3,
   Bell,
   BookOpen,
+  Calendar,
   CheckCircle2,
   ClipboardCheck,
   FileText,
@@ -113,12 +114,7 @@ export default function HomeworkPage() {
     queryFn: () => api.getModuleSummary("homework-timetable"),
   });
   const operationalSummary = operationalSummaryQuery.data;
-  const isOperationalSummaryReady =
-    operationalSummary?.status === "ready" ||
-    operationalSummary?.status === "empty";
   const operationalMetric = (key: string) => {
-    if (operationalSummaryQuery.isLoading) return "Loading";
-    if (!isOperationalSummaryReady) return "Unavailable";
     const value = operationalSummary?.summary[key];
     return value === null || value === undefined ? "Unavailable" : value;
   };
@@ -480,19 +476,14 @@ export default function HomeworkPage() {
               icon: CheckCircle2,
             },
             {
+              href: "/dashboard/timetable",
+              label: "Timetable",
+              icon: Calendar,
+            },
+            {
               href: "/dashboard/timetable/builder",
-              label: "Timetable Builder",
+              label: "Builder",
               icon: Settings,
-            },
-            {
-              href: "/dashboard/timetable/conflicts",
-              label: "Conflicts",
-              icon: AlertCircle,
-            },
-            {
-              href: "/dashboard/timetable/versions",
-              label: "Versions",
-              icon: ClipboardCheck,
             },
             {
               href: "/dashboard/timetable/substitutions",
@@ -504,35 +495,15 @@ export default function HomeworkPage() {
               label: "Teacher Workload",
               icon: BarChart3,
             },
-            {
-              href: "/dashboard/timetable",
-              label: "Reports",
-              icon: ClipboardCheck,
-            },
           ]}
           accentColor="blue"
           variant="light"
         />
-        <KpiGrid className="mt-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-          <KpiCard
-            title="Homework Assigned"
-            value={
-              filters.academicYearId && completionReportQuery.data
-                ? completionRows.length
-                : "Unavailable"
-            }
-            icon={<BookOpen size={20} />}
-            tone="neutral"
-            loading={completionReportQuery.isLoading}
-            description={
-              filters.academicYearId
-                ? "Backend completion report assignments."
-                : "Select an academic year to load the report contract."
-            }
-          />
+        <KpiGrid className="mt-5 sm:grid-cols-2">
           <KpiCard
             title="Homework Due Today"
             value={operationalMetric("homeworkDueToday")}
+            loading={operationalSummaryQuery.isLoading}
             icon={<Bell size={20} />}
             tone={
               Number(operationalSummary?.summary.homeworkDueToday) > 0
@@ -543,31 +514,9 @@ export default function HomeworkPage() {
             description="Published homework due by end of today."
           />
           <KpiCard
-            title="Pending Submissions"
-            value={
-              filters.academicYearId && missingLateReportQuery.data
-                ? missingLateRows.length
-                : "Unavailable"
-            }
-            icon={<AlertCircle size={20} />}
-            tone={missingLateRows.length ? "warning" : "neutral"}
-            loading={missingLateReportQuery.isLoading}
-            description={
-              filters.academicYearId
-                ? "Backend missing/late report rows."
-                : "Select an academic year to load the report contract."
-            }
-          />
-          <KpiCard
-            title="Timetable Conflicts"
-            value="Unavailable"
-            icon={<AlertCircle size={20} />}
-            tone="neutral"
-            description="Open timetable validation for backend conflict truth."
-          />
-          <KpiCard
             title="Unassigned Substitutions"
             value={operationalMetric("unassignedSubstitutionsToday")}
+            loading={operationalSummaryQuery.isLoading}
             icon={<Users size={20} />}
             tone={
               Number(
@@ -578,13 +527,6 @@ export default function HomeworkPage() {
             }
             href="/dashboard/timetable/substitutions"
             description="Today's substitutions still needing a covering teacher."
-          />
-          <KpiCard
-            title="Teacher Workload"
-            value="Unavailable"
-            icon={<BarChart3 size={20} />}
-            tone="neutral"
-            description="Open the backend workload report."
           />
         </KpiGrid>
       </ModuleHeader>

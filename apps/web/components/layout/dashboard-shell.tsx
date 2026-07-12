@@ -13,8 +13,9 @@ import { ErrorBoundary } from '../ui/error-boundary';
 import { ModuleOperationalSummary } from '../ui/module-operational-summary';
 import { SupportOverrideBanner } from '../platform/SupportOverrideBanner';
 
-// Students, attendance, and fees already render their own module-specific,
-// backend-owned KPI grid inside the page header. Injecting the generic
+// Students, attendance, fees, academics, homework, and timetable already
+// render their own module-specific, backend-owned KPI grid inside the page
+// header. Injecting the generic
 // cross-module summary above them duplicated the same signals (sometimes
 // with different numbers for the same concept) before the module header
 // even appeared. Keep the generic summary only for landing pages that do
@@ -24,9 +25,6 @@ import { SupportOverrideBanner } from '../platform/SupportOverrideBanner';
 // students/attendance/fees pattern described above — do not also list it
 // here or the summary will render twice.
 const MODULE_LANDING_SUMMARIES: Record<string, OperationalSummaryRouteModule> = {
-  '/dashboard/academics': 'academics',
-  '/dashboard/homework': 'homework-timetable',
-  '/dashboard/timetable': 'homework-timetable',
   '/dashboard/hr': 'hr-payroll',
   '/dashboard/payroll': 'hr-payroll',
   '/dashboard/library': 'library',

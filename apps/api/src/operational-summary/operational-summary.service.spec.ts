@@ -20,6 +20,7 @@ describe('OperationalSummaryService', () => {
   const sumResult = jest.fn().mockResolvedValue({
     _sum: { amount: { toString: () => '125.50' } },
   });
+  const homeworkCount = jest.fn().mockResolvedValue(0);
 
   const prisma = {
     payment: {
@@ -29,9 +30,9 @@ describe('OperationalSummaryService', () => {
     },
     invoice: {
       count: jest.fn().mockResolvedValue(0),
-      aggregate: jest
-        .fn()
-        .mockResolvedValue({ _sum: { totalAmount: { toString: () => '500.00' } } }),
+      aggregate: jest.fn().mockResolvedValue({
+        _sum: { totalAmount: { toString: () => '500.00' } },
+      }),
     },
     paymentRefund: {
       count: jest.fn().mockResolvedValue(0),
@@ -53,6 +54,13 @@ describe('OperationalSummaryService', () => {
     subjectTeacherAssignment: {
       findMany: jest.fn().mockResolvedValue([]),
     },
+    homeworkAssignment: {
+      count: homeworkCount,
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    timetableSlot: { count: jest.fn().mockResolvedValue(0) },
+    timetableSubstitution: { count: jest.fn().mockResolvedValue(0) },
+    homeworkReminderBatch: { count: jest.fn().mockResolvedValue(0) },
   } as unknown as PrismaService;
 
   const entitlements = {
@@ -68,6 +76,7 @@ describe('OperationalSummaryService', () => {
     sumResult.mockResolvedValue({
       _sum: { amount: { toString: () => '125.50' } },
     });
+    homeworkCount.mockResolvedValue(0);
     service = new OperationalSummaryService(
       prisma,
       entitlements as unknown as EntitlementsService,
@@ -203,5 +212,33 @@ describe('OperationalSummaryService', () => {
     expect(summary.permissions).toEqual({ canView: true });
     expect(summary.status).not.toBe('permissionDenied');
     expect(summary.status).not.toBe('locked');
+  });
+
+  it('uses the persisted ASSIGNED homework status for due and overdue summaries', async () => {
+    entitlements.getEntitlements.mockResolvedValue({
+      modules: ['homework'],
+    } as never);
+    const adminActor: AuthContext = {
+      ...actor,
+      roles: ['admin'],
+      permissions: ['homework:read'],
+    };
+
+    const summary = await service.getModuleSummary(
+      'm6_homework_timetable',
+      adminActor,
+    );
+
+    expect(summary.summary.homeworkDueToday).toBe(0);
+    expect(summary.summary.overdueHomework).toBe(0);
+    expect(homeworkCount).toHaveBeenCalledTimes(2);
+    for (const [input] of homeworkCount.mock.calls) {
+      expect(input.where).toEqual(
+        expect.objectContaining({
+          tenantId: 'tenant-a',
+          status: 'ASSIGNED',
+        }),
+      );
+    }
   });
 });

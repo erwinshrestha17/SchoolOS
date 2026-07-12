@@ -617,7 +617,7 @@ export class OperationalSummaryService {
             this.def('assignedHomeworkDueToday', 'homeworkAssignment', {
               tenantId,
               assignedByStaffId: teacherScope?.staffId,
-              status: 'PUBLISHED',
+              status: 'ASSIGNED',
               dueDate: { gte: day.startUtc, lt: day.endExclusiveUtc },
             }),
             this.def(
@@ -653,13 +653,13 @@ export class OperationalSummaryService {
         : [
             this.def('homeworkDueToday', 'homeworkAssignment', {
               tenantId,
-              status: 'PUBLISHED',
+              status: 'ASSIGNED',
               dueDate: { gte: day.startUtc, lt: day.endExclusiveUtc },
             }),
             this.def(
               'overdueHomework',
               'homeworkAssignment',
-              { tenantId, status: 'PUBLISHED', dueDate: { lt: day.startUtc } },
+              { tenantId, status: 'ASSIGNED', dueDate: { lt: day.startUtc } },
               'Review overdue homework',
               '/dashboard/homework',
             ),
@@ -1334,7 +1334,9 @@ export class OperationalSummaryService {
         }),
       ])) as Array<{ _sum?: Record<string, { toString(): string } | null> }>;
 
-      const invoiceTotal = Number(invoiceAgg._sum?.totalAmount?.toString() ?? '0');
+      const invoiceTotal = Number(
+        invoiceAgg._sum?.totalAmount?.toString() ?? '0',
+      );
       const paidTotal = Number(paymentAgg._sum?.amount?.toString() ?? '0');
       const refundTotal = Number(refundAgg._sum?.amount?.toString() ?? '0');
       const overdueAmount = Math.max(0, invoiceTotal - paidTotal + refundTotal);

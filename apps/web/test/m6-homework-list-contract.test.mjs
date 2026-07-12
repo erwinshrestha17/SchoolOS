@@ -63,6 +63,7 @@ describe("M6 homework list contract", () => {
 
   it("sources the Due Today and Substitutions KPI cards from the real M6 operational summary", () => {
     const page = read("app/dashboard/homework/page.tsx");
+    const shell = read("components/layout/dashboard-shell.tsx");
 
     // The generic bounded operational-summary contract already computes
     // these two metrics — no more hardcoded "no contract exposed" text.
@@ -76,5 +77,25 @@ describe("M6 homework list contract", () => {
     assert.doesNotMatch(page, /Open the scoped substitution workspace/);
     assert.match(page, /href="\/dashboard\/homework"/);
     assert.match(page, /href="\/dashboard\/timetable\/substitutions"/);
+    assert.match(page, /loading=\{operationalSummaryQuery\.isLoading\}/);
+    assert.doesNotMatch(page, /return "Loading"/);
+    assert.doesNotMatch(page, /isOperationalSummaryReady/);
+    assert.doesNotMatch(
+      shell,
+      /'\/dashboard\/(?:homework|timetable)':\s*'homework-timetable'/,
+    );
+  });
+
+  it("keeps the M6 header within the tab and KPI budgets", () => {
+    const page = read("app/dashboard/homework/page.tsx");
+
+    assert.equal((page.match(/href: "\/dashboard\/(?:homework|timetable)/g) ?? []).length, 6);
+    assert.match(page, /label: "Timetable"/);
+    assert.doesNotMatch(page, /label: "Reports"/);
+    assert.equal((page.match(/<KpiCard/g) ?? []).length, 6);
+    assert.doesNotMatch(page, /title="Homework Assigned"/);
+    assert.doesNotMatch(page, /title="Pending Submissions"/);
+    assert.doesNotMatch(page, /title="Timetable Conflicts"/);
+    assert.doesNotMatch(page, /title="Teacher Workload"/);
   });
 });

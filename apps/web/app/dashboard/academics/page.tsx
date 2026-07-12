@@ -8,7 +8,6 @@ import {
   ClipboardList,
   FileText,
   GraduationCap,
-  History,
   Layers3,
   Lock,
   Megaphone,
@@ -41,21 +40,6 @@ const workflowSections = [
     icon: PencilLine,
   },
   {
-    title: 'Retests and make-ups',
-    description:
-      'Review requests, schedule attempts, record scores, and apply an explicit result decision.',
-    href: '/dashboard/academics/retakes',
-    action: 'Open retest queue',
-    icon: RotateCcw,
-  },
-  {
-    title: 'Lock and review',
-    description: 'Review permissioned lock or unlock requests before official result processing.',
-    href: '/dashboard/academics/locks',
-    action: 'Review locks',
-    icon: Lock,
-  },
-  {
     title: 'Report cards',
     description: 'Generate and monitor job-backed report cards, corrections, history, and protected PDFs.',
     href: '/dashboard/academics/report-cards',
@@ -63,17 +47,10 @@ const workflowSections = [
     icon: FileText,
   },
   {
-    title: 'Promotion readiness',
-    description: 'Review backend-calculated eligibility before making audited promotion decisions.',
-    href: '/dashboard/academics/promotion',
-    action: 'Review readiness',
-    icon: GraduationCap,
-  },
-  {
-    title: 'Publish results',
-    description: 'Validate readiness and control published-result visibility for approved audiences.',
-    href: '/dashboard/academics/publishing',
-    action: 'Review publishing',
+    title: 'Results and publishing',
+    description: 'Review calculated results before controlling visibility for approved audiences.',
+    href: '/dashboard/academics/results',
+    action: 'Review results',
     icon: Megaphone,
   },
 ];
@@ -86,9 +63,6 @@ export default function AcademicsOverviewPage() {
     hasPermissions(['academics:enter_marks']) ||
     hasPermissions(['marks:manage']) ||
     canManageAcademics;
-  const canManageReportCards =
-    hasPermissions(['academics:manage_report_cards']) || canManageAcademics;
-
   const summaryQuery = useQuery({
     queryKey: ['operational-summary', 'academics'],
     queryFn: () => api.getModuleSummary('academics'),
@@ -136,6 +110,11 @@ export default function AcademicsOverviewPage() {
                   onClick: () => router.push('/dashboard/academics/assessment-components'),
                 },
                 {
+                  label: 'Retest Queue',
+                  icon: <RotateCcw size={16} />,
+                  onClick: () => router.push('/dashboard/academics/retakes'),
+                },
+                {
                   label: 'Marks Lock Review',
                   icon: <Lock size={16} />,
                   onClick: () => router.push('/dashboard/academics/locks'),
@@ -147,17 +126,12 @@ export default function AcademicsOverviewPage() {
                 },
               ]
             : []),
-          ...(canManageReportCards
+          ...(canEnterMarks && !canManageAcademics
             ? [
                 {
-                  label: 'Report Card Jobs & History',
-                  icon: <History size={16} />,
-                  onClick: () => router.push('/dashboard/academics/report-cards'),
-                },
-                {
-                  label: 'Publish Results',
-                  icon: <Megaphone size={16} />,
-                  onClick: () => router.push('/dashboard/academics/publishing'),
+                  label: 'Retest Queue',
+                  icon: <RotateCcw size={16} />,
+                  onClick: () => router.push('/dashboard/academics/retakes'),
                 },
               ]
             : []),
@@ -179,7 +153,7 @@ export default function AcademicsOverviewPage() {
             value={metricValue('pendingMarkLocks')}
             icon={<Lock size={20} />}
             tone={isPositive('pendingMarkLocks') ? 'warning' : 'neutral'}
-            href="/dashboard/academics/marks"
+            href="/dashboard/academics/locks"
             description="Lock requests awaiting review."
           />
           <KpiCard
@@ -209,12 +183,12 @@ export default function AcademicsOverviewPage() {
         <ModuleTabs items={academicsWorkspaceTabs} accentColor="purple" variant="light" />
 
         <SectionCard
-          title="Academic workflow"
-          description="Move from setup to publishing through the existing tenant-scoped and permissioned M4 workspaces."
+          title="Core academic workspaces"
+          description="Open the next focused job. Marks, locks, grading, promotion, publishing, and protected PDF access remain backend-controlled across tenant-scoped and permissioned M4 workspaces."
           noPadding
         >
           <div className="divide-y divide-slate-100">
-            {workflowSections.map((section, index) => {
+            {workflowSections.map((section) => {
               const Icon = section.icon;
               return (
                 <Link
@@ -226,12 +200,7 @@ export default function AcademicsOverviewPage() {
                     <Icon size={19} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                        Step {index + 1}
-                      </span>
-                      <h2 className="text-base font-bold text-slate-950">{section.title}</h2>
-                    </div>
+                    <h2 className="text-base font-bold text-slate-950">{section.title}</h2>
                     <p className="mt-1 text-sm leading-6 text-slate-500">{section.description}</p>
                   </div>
                   <span className="hidden shrink-0 text-sm font-bold text-[var(--color-mod-academics-text)] sm:block">
@@ -243,10 +212,6 @@ export default function AcademicsOverviewPage() {
           </div>
         </SectionCard>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-6 text-slate-600">
-          <strong className="font-bold text-slate-900">Academic records remain backend-controlled.</strong>{' '}
-          Marks locks, grading, dues-aware withholding, report-card generation, corrections, publishing, and protected PDF access keep their existing API and audit rules.
-        </div>
       </div>
     </DashboardPageShell>
   );

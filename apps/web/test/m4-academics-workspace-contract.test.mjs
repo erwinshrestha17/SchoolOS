@@ -26,11 +26,33 @@ describe('M4 academics workspace contract', () => {
     assert.match(page, />\s*Enter Marks\s*</);
     assert.match(page, /moreActionItems/);
     assert.match(page, /Assessment Components/);
-    assert.match(page, /Report Card Jobs & History/);
-    assert.match(page, /Publish Results/);
-    assert.match(page, /label: 'Locks'/);
-    assert.match(page, /label: 'Promotion'/);
+    assert.match(page, /Retest Queue/);
+    assert.match(page, /Marks Lock Review/);
+    assert.match(page, /Promotion Readiness/);
     assert.match(page, /label: 'Publishing'/);
+  });
+
+  it('keeps the primary module navigation within the seven-tab budget', () => {
+    const tabs = read('components/academics/academics-tabs.tsx');
+
+    assert.equal((tabs.match(/href: '\/dashboard\/academics/g) ?? []).length, 7);
+    assert.match(tabs, /label: 'Overview'/);
+    assert.doesNotMatch(tabs, /label: 'Subjects'/);
+    assert.doesNotMatch(tabs, /label: 'Retests'|label: 'Locks'|label: 'Promotion'/);
+  });
+
+  it('keeps the overview focused on four core workspaces', () => {
+    const page = read('app/dashboard/academics/page.tsx');
+    const shell = read('components/layout/dashboard-shell.tsx');
+
+    assert.equal((page.match(/title: '/g) ?? []).length, 4);
+    assert.doesNotMatch(page, /Step \{index \+ 1\}/);
+    assert.match(page, /Core academic workspaces/);
+    assert.match(page, /href="\/dashboard\/academics\/locks"/);
+    assert.doesNotMatch(
+      shell,
+      /'\/dashboard\/academics':\s*'academics'/,
+    );
   });
 
   it('sources KPI cards from the real bounded module-summary API, not a browser total or a fake placeholder', () => {
@@ -53,6 +75,14 @@ describe('M4 academics workspace contract', () => {
     assert.doesNotMatch(page, /isLoading\) return 'Loading'/);
     assert.match(page, /'Unavailable'/);
     assert.match(page, /href="\/dashboard\/academics\/marks"/);
+    assert.match(
+      page,
+      /title="Marks Entry Open"[\s\S]{0,300}href="\/dashboard\/academics\/marks"/,
+    );
+    assert.match(
+      page,
+      /title="Mark Lock Requests"[\s\S]{0,300}href="\/dashboard\/academics\/locks"/,
+    );
     assert.match(page, /href="\/dashboard\/academics\/report-cards"/);
     assert.match(page, /href="\/dashboard\/academics\/promotion"/);
   });
