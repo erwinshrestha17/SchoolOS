@@ -100,7 +100,7 @@ export class FileRegistryService {
       resourceId: asset.id,
       tenantId: input.tenantId,
       userId: input.uploadedByUserId,
-      after: { objectKey: input.objectKey, filename: input.originalFilename },
+      after: { filename: input.originalFilename, module: input.module ?? null },
     });
 
     return asset;
@@ -449,7 +449,7 @@ export class FileRegistryService {
       resourceId: assetId,
       tenantId,
       userId,
-      after: { objectKey: asset.objectKey, filename: asset.originalFilename },
+      after: { filename: asset.originalFilename, module: asset.module ?? null },
     });
   }
 
@@ -648,6 +648,39 @@ export class FileRegistryService {
     if (studentOwnId !== null) {
       if (studentOwnId === studentId) return;
       throw new ForbiddenException('You can only view your own student files');
+    }
+
+    if (auth.roles.some((role) => TENANT_FILE_ADMIN_ROLES.includes(role))) {
+      return;
+    }
+
+    if (
+      auth.roles.includes('teacher') ||
+      auth.roles.includes('subject_teacher')
+    ) {
+      const student = await this.prisma.student.findFirst({
+        where: {
+          id: studentId,
+          tenantId: auth.tenantId,
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
+        select: { classId: true, sectionId: true },
+      });
+      const assignment = student
+        ? await this.prisma.subjectTeacherAssignment.findFirst({
+            where: {
+              tenantId: auth.tenantId,
+              staff: { userId: auth.userId },
+              classId: student.classId,
+              OR: [{ sectionId: student.sectionId }, { sectionId: null }],
+            },
+            select: { id: true },
+          })
+        : null;
+      if (assignment) return;
+      throw new ForbiddenException(
+        'This student file is outside your teaching scope',
+      );
     }
 
     if (

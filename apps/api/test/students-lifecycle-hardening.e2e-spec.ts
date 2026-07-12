@@ -24,6 +24,8 @@ import {
 } from './test-helpers';
 import { getQueueToken } from '@nestjs/bullmq';
 import { StudentQrService } from '../src/students/student-qr.service';
+import { StorageService } from '../src/storage/storage.service';
+import { FileRegistryService } from '../src/file-registry/file-registry.service';
 
 describe('Student Lifecycle Hardening (E2E)', () => {
   let app: INestApplication;
@@ -59,6 +61,67 @@ describe('Student Lifecycle Hardening (E2E)', () => {
     })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
+      .overrideProvider(StorageService)
+      .useValue({
+        checkReadiness: jest.fn(async () => true),
+        saveBufferObject: jest.fn(
+          async (input: {
+            tenantId: string;
+            prefix: string;
+            fileName: string;
+            content: Buffer;
+          }) => ({
+            provider: 'LOCAL',
+            bucket: null,
+            objectKey: `${input.tenantId}/${input.prefix}/${input.fileName}`,
+            sizeBytes: input.content.byteLength,
+            checksumSha256: 'student-qr-artifact-checksum',
+          }),
+        ),
+        saveBase64Object: jest.fn(
+          async (input: {
+            tenantId: string;
+            prefix: string;
+            fileName: string;
+            base64Content: string;
+          }) => ({
+            provider: 'LOCAL',
+            bucket: null,
+            objectKey: `${input.tenantId}/${input.prefix}/${input.fileName}`,
+            sizeBytes: Buffer.byteLength(input.base64Content, 'base64'),
+            checksumSha256: 'student-document-checksum',
+          }),
+        ),
+      })
+      .overrideProvider(FileRegistryService)
+      .useValue({
+        registerGeneratedFile: jest.fn(
+          async (input: {
+            fileName?: string;
+            originalFilename: string;
+            content: Buffer;
+          }) => ({
+            id: `file-${Math.random().toString(16).slice(2)}`,
+            originalFilename: input.originalFilename,
+            objectKey: `protected/${input.originalFilename}`,
+            sizeBytes: BigInt(input.content.byteLength),
+            storageProvider: 'LOCAL',
+          }),
+        ),
+        registerFile: jest.fn(async (input: { originalFilename: string }) => ({
+          id: `file-${Math.random().toString(16).slice(2)}`,
+          originalFilename: input.originalFilename,
+        })),
+        markUploaded: jest.fn(async (_tenantId: string, assetId: string) => ({
+          id: assetId,
+        })),
+        listFilesByEntity: jest.fn(async () => []),
+        getSignedUrl: jest.fn(
+          async (_tenantId: string, assetId: string) =>
+            `/api/v1/files/${assetId}/preview`,
+        ),
+        softDeleteFile: jest.fn(async () => undefined),
+      })
       .overrideProvider(getQueueToken('notifications'))
       .useValue(createQueueMock())
       .overrideProvider(getQueueToken('activity-media'))
@@ -513,8 +576,6 @@ describe('Student Lifecycle Hardening (E2E)', () => {
   });
 
   it('should retrieve student QR scan history from audit logs', async () => {
-    const qrService = app.get<StudentQrService>(StudentQrService);
-
     const student = await studentsService.createStudent(
       {
         firstNameEn: 'QRScan',
@@ -527,25 +588,32 @@ describe('Student Lifecycle Hardening (E2E)', () => {
       actor,
     );
 
-    const { rawToken } = await qrService.generateQr(
-      tenantId,
-      student.id,
-      actor,
-    );
+    const credential = await prisma.studentQrCredential.create({
+      data: {
+        tenantId,
+        studentId: student.id,
+        tokenHash: 'server-only-test-hash',
+        status: 'ACTIVE',
+        createdById: actor.userId,
+        updatedById: actor.userId,
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId: actor.userId,
+        action: 'QR_GENERATED',
+        resource: 'student_qr',
+        resourceId: credential.id,
+        after: { studentId: student.id },
+      },
+    });
 
-    await qrService.resolveQr(
-      tenantId,
-      rawToken!,
-      'GENERAL_STUDENT_LOOKUP' as any,
-      actor,
-    );
+    const qrService = app.get<StudentQrService>(StudentQrService);
 
     const scans = await qrService.getQrScanHistory(tenantId, student.id, actor);
-    expect(scans.map((scan) => scan.action)).toEqual([
-      'QR_RESOLVED',
-      'QR_GENERATED',
-    ]);
-    expect(scans[0].purpose).toBe('GENERAL_STUDENT_LOOKUP');
+    expect(scans.map((scan) => scan.action)).toEqual(['QR_GENERATED']);
+    expect(scans[0].purpose).toBeNull();
     expect(scans[0].success).toBe(true);
   });
 });

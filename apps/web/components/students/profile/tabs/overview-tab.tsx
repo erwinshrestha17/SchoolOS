@@ -21,7 +21,7 @@ import {
 
 type OverviewTabProps = {
   profile: StudentProfileDetail;
-  onOpenPdf: (kind: string, token?: string) => void;
+  onOpenPdf: (kind: string) => void;
   onSelectTab: (tab: 'Profile' | 'Attendance' | 'Fees' | 'Documents' | 'Guardians' | 'Activity') => void;
 };
 
@@ -292,7 +292,6 @@ export function OverviewTab({ profile, onOpenPdf, onSelectTab }: OverviewTabProp
           studentId={profile.student.id}
           studentSystemId={profile.student.studentSystemId}
           qrCredential={profile.student.qrCredential ?? null}
-          onOpenIdCard={(token) => onOpenPdf('id-card', token)}
         />
       </div>
     </div>

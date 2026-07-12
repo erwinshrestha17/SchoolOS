@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 
 type AcademicsTabProps = {
   profile: StudentProfileDetail;
-  onOpenPdf: (kind: string, token?: string) => void;
+  onOpenPdf: (kind: string) => void;
 };
 
 export function AcademicsTab({ profile, onOpenPdf }: AcademicsTabProps) {

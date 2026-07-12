@@ -6,7 +6,7 @@
 **Status:** Canonical product source of truth  
 **Owner/audience:** CEO, CTO, product management, design, backend/web/mobile engineering, QA, school leadership, finance, operations, support, and implementation agents  
 **Scope:** Product vision, target users, education-experience model, module boundaries, product requirements, cross-surface responsibilities, product priorities, success measures, and release acceptance criteria  
-**Precedence:** Business rationale is owned by `SCHOOLOS_BRD.md`; detailed functional behavior by `SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`; software and non-functional requirements by `../requirements/SCHOOLOS_SRS.md`; architecture by `../architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`; current readiness evidence by the active readiness/status documentation; release stages by `../production/SCHOOLOS_GA_RELEASE_POLICY.md`  
+**Precedence:** This document owns product purpose, personas, scope, module outcomes, user journeys, priorities, and product acceptance boundaries. Software and non-functional requirements are owned by `../requirements/SCHOOLOS_SRS.md`; architecture by `../architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`; module ownership and known gaps by `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`; release stages by `../production/SCHOOLOS_GA_RELEASE_POLICY.md`. Current work and blockers live in GitHub Issues, Milestones, or Projects; verification evidence lives in CI runs, smoke outputs, staging records, and release artifacts.
 **Out of scope:** Endpoint invention, DTO schemas, Prisma migrations, UI pixel specifications, provider credentials, pricing commitments, legal opinions, implementation-status inflation, and GA claims without evidence  
 **Last reviewed:** 2026-07-12
 
@@ -16,12 +16,12 @@
 
 This document is the canonical PRD for SchoolOS. It defines what the product is, who it serves, the outcomes it must deliver, the boundaries between backend, web, mobile, modules, and education experiences, and the evidence required before broader release claims are made.
 
-This PRD does not by itself prove that a feature is implemented, tested, staging-validated, pilot-validated, or production-ready. Implementation and readiness claims must be confirmed against code, OpenAPI/shared contracts, migrations, tests, browser/device verification, staging evidence, provider checks, backup/restore proof, and controlled-pilot results.
+This PRD does not by itself prove that a feature is implemented, tested, Staging validated, Controlled pilot validated, or released as GA / Production. Implementation and readiness claims must be confirmed against code, OpenAPI/shared contracts, migrations, tests, browser/device verification, staging evidence, provider checks, backup/restore proof, and controlled-pilot results.
 
 Current release posture:
 
 ```text
-Current evidenced stage: Internal QA ready
+Current posture: Internal QA / controlled-pilot preparation
 Not yet established: Staging validated
 Not yet established: Controlled pilot validated
 Not yet established: Release candidate
@@ -59,13 +59,9 @@ SCHOOL
 
 HIGHER_SECONDARY
   Grade 11-12 / +2
-
-BACHELOR
-  Approved higher-education product direction
-  Runtime model remains proposed until schema/contracts and evidence exist
 ```
 
-Master's is not an active institution-management pack. It is only a future higher-education extension and an allowed Student App eligibility level after explicit backend eligibility, enrollment, entitlement, tenant, role, and self-scope controls are designed and verified.
+A broad Student App is not active scope.
 
 The immediate product objective is not maximum module breadth. It is to prove that one Nepal school can safely and reliably run an agreed set of daily workflows with correct tenant isolation, role scope, financial integrity, protected files, parent trust, and operational evidence.
 
@@ -101,7 +97,7 @@ One SchoolOS platform
 + configurable education experiences
 ```
 
-SchoolOS must not create separate databases, separate student tables, separate guardian systems, separate fee ledgers, separate authentication systems, or separate mobile binaries for Preschool, School, +2, Bachelor's, or future Master's eligibility.
+SchoolOS must not create separate databases, separate student tables, separate guardian systems, separate fee ledgers, separate authentication systems, or separate mobile binaries for Preschool, School, or +2.
 
 ### 2.2 Production/GA target, evidence-based readiness
 
@@ -197,8 +193,8 @@ External wording must avoid unsupported claims of legal compliance, regulator ap
 3. Establish a trusted operational record for student, attendance, fees, receipts, academics, communication, files, and audit.
 4. Support modular packaging without weakening tenant, role, entitlement, or data boundaries.
 5. Differentiate through Nepal-first usability, fee transparency, parent trust, protected records, and practical school operations.
-6. Create a scalable foundation for Preschool, School, +2, approved Bachelor direction, controlled learning, and future intelligence without parallel systems.
-7. Move from Internal QA ready to staging, controlled pilot, release candidate, and GA only through recorded evidence.
+6. Create a scalable foundation for Preschool, School, +2, and controlled learning without parallel systems.
+7. Move from the current Internal QA / controlled-pilot preparation posture through the defined release stages only with recorded evidence.
 
 ### 5.2 Product goals
 
@@ -231,7 +227,7 @@ SchoolOS must not, in the current release boundary:
 - Provide offline payment, refund, wallet debit, payroll, accounting, report-card publishing, or platform-setting writes.
 - Build a broad Preschool-through-Grade-12 student mobile app. These students receive controlled school learning/session access only.
 - Build a public leaderboard, open student chat, harsh child labels, AI tutor, adaptive recommendations, automated punishment/risk decisions, or heavy simulations without approval.
-- Claim Bachelor runtime implementation before schema, contracts, RBAC, entitlement, seed, browser/mobile, tenant-isolation, and staging evidence exist.
+- Add Bachelor or Master's institution-management features, a broad Student App, or M14 runtime without explicit product approval.
 - Claim staging, pilot, release-candidate, production, or GA readiness from documentation or local tests alone.
 
 ---
@@ -245,7 +241,6 @@ SchoolOS must not, in the current release boundary:
 | Preschool / Montessori / Nursery / LKG / UKG | Child safety, attendance, authorized pickup, parent trust, activities, milestones, notices, fees, simple teacher workflows | Preschool experience over shared students, guardians, attendance, activity, fees, files, communication, and mobile companion |
 | School Grade 1-10 | Admissions, attendance, fees, homework, timetable, exams, CAS, report cards, library, transport, canteen, HR, notices, parent communication | Core School experience and initial controlled-pilot beachhead |
 | Higher Secondary / +2 | Programs/streams, subject combinations, theory/practical timetables, labs, projects, internal assessment, mock exams, board readiness | Configurable +2 extension over shared academics, staff, fees, files, communication, and reports |
-| Bachelor's-level institutions/programs | Departments, programs, intakes/batches, semesters, courses, faculty assignment, attendance, assignments, exams/results, fees, notices, library, student self-service | Approved product direction; runtime remains proposed until schema/contracts and release evidence exist |
 | Multi-branch or growing groups | Common controls, role separation, tenant isolation, module packaging, operator support, reporting | Multi-tenant SaaS control plane plus tenant configuration and school operations planes |
 
 ### 7.2 Education experience model
@@ -308,24 +303,6 @@ Default emphasis:
 
 No hard-coded streams or parallel +2 platform may be introduced.
 
-#### Bachelor's
-
-Approved direction:
-
-- Programs, departments, intakes/batches, semesters/terms, courses, faculty assignment, attendance, assignments, exams/results, fees, notices, library, files, and eligible self-service.
-
-Required before implementation claims:
-
-- Approved schema and migration design.
-- OpenAPI and shared contracts.
-- Tenant, role, enrollment, entitlement, and self-scope authorization.
-- Seed and test fixtures.
-- Web/mobile composition.
-- Browser/device QA.
-- Staging and controlled-pilot evidence.
-
----
-
 ## 8. Users and Jobs to Be Done
 
 | Persona | Core job | Product requirement |
@@ -346,7 +323,6 @@ Required before implementation claims:
 | Parent / guardian | Understand and act on matters for linked children | Child-scoped attendance, dues, receipts, homework, notices, activity, reports, transport, and enabled services |
 | Staff self-service user | Manage own attendance, leave, profile, payslips, and notices | Own-record-only mobile experience with protected files |
 | Student, Preschool through +2 | Participate in school-controlled learning only | Expiring session/QR access, own activity, autosave/submit, own result, no broad admin/student app |
-| Eligible Bachelor/Master student | Access own approved institutional self-service | Active-enrollment, entitlement, tenant, role, and self-scoped Student App only after contracts exist |
 | SchoolOS platform operator/support | Manage tenants, plans, providers, queues, SaaS billing, and support access | Separate `/platform/*` control plane, masked secrets, reasoned support override, audit, and expiry |
 
 ---
@@ -1019,8 +995,7 @@ Metrics must be measured from backend-owned data and interpreted within the curr
 
 ### Deferred
 
-- Bachelor runtime until schema/contracts and evidence exist.
-- Broad Student App except approved eligible higher-education enrollment.
+- Broad Student App.
 - M14 Intelligence / AI.
 - Unverified live transport map/ETA/geofence expansion.
 - Biometric attendance.
@@ -1060,7 +1035,7 @@ At minimum:
 - Monitoring/logging/alert routing is operational.
 - Rollback procedure is executable.
 
-### 18.3 Controlled-pilot-validated criteria
+### 18.3 Controlled pilot validated criteria
 
 At minimum:
 
@@ -1105,10 +1080,10 @@ SchoolOS product delivery depends on:
 | Protected-file exposure | Student/staff/finance privacy breach | File Registry-only access, short-lived/authenticated download, denial tests |
 | Provider mode represented incorrectly | False communication/payment confidence | Explicit provider state, verified callbacks, honest delivery status |
 | Mobile becomes a mini admin dashboard | Scope leakage and poor usability | Persona-first navigation and purpose-limited APIs |
-| Premature Bachelor/AI expansion | Distracts from pilot/GA blockers | Proposed/deferred labels and release-governed approval |
+| Premature inactive-scope or AI expansion | Distracts from pilot/GA blockers | Explicit non-scope labels and release-governed approval |
 | Documentation overstates readiness | Bad decisions and buyer mistrust | Evidence-based status language and release-policy precedence |
 | Weak school ownership during pilot | Operational dependency on engineering | Pilot screening, named champions, shadow mode, support/runbook readiness |
-| Hard-coded education assumptions | Poor Preschool/+2/Bachelor fit | Configurable experience context, contracts, and staged schema design |
+| Hard-coded education assumptions | Poor Preschool/School/+2 fit | Configurable experience context, contracts, and staged schema design |
 
 ---
 
@@ -1119,15 +1094,13 @@ These require explicit owner/product decision and must not be guessed in impleme
 1. Final paid-pilot institution profile, pricing cadence, and packaging.
 2. Exact Preschool authorized-pickup and care-alert schema/workflow.
 3. Exact +2 program, stream, combination, practical, project, and board-readiness model.
-4. Bachelor data model, migration strategy, permissions, web/mobile composition, and rollout sequence.
-5. Master's beyond eligibility/self-service direction.
-6. Supported payment, SMS, email, push, and object-storage providers for pilot and GA.
-7. Nepali localization depth and template ownership.
-8. Formal/IRD-ready billing boundary and external claim wording after expert validation.
-9. Education-reporting export formats and institution/authority validation.
-10. Offline-write policy beyond currently approved attendance-style idempotent workflows.
-11. Whether parent-teacher chat is enabled for the controlled pilot and under which quiet-hour/moderation policy.
-12. Any M14 Intelligence / AI proposal.
+4. Supported payment, SMS, email, push, and object-storage providers for pilot and GA.
+5. Nepali localization depth and template ownership.
+6. Formal/IRD-ready billing boundary and external claim wording after expert validation.
+7. Education-reporting export formats and institution/authority validation.
+8. Offline-write policy beyond currently approved attendance-style idempotent workflows.
+9. Whether parent-teacher chat is enabled for the controlled pilot and under which quiet-hour/moderation policy.
+10. Any M14 Intelligence / AI proposal.
 
 Unknown implementation items must be labeled precisely:
 
@@ -1151,16 +1124,13 @@ Use the active documentation hierarchy:
 
 | Question | Source of truth |
 |---|---|
-| Why is SchoolOS being built and for whom? | `SCHOOLOS_BRD.md` |
-| What product outcomes, scope, personas, modules, and boundaries are required? | This PRD |
-| How must each function behave, validate, transition, and handle edge cases? | `SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` |
+| Why is SchoolOS being built, for whom, and what product outcomes, journeys, and boundaries are required? | This PRD |
 | What software, security, API, database, performance, and operational requirements apply? | `../requirements/SCHOOLOS_SRS.md` |
 | How is the system architected and secured? | `../architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` |
 | What does each module own and what gaps exist? | `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md` |
-| What belongs on backend, web, and mobile? | `SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md` |
 | What are the release stages and GA gates? | `../production/SCHOOLOS_GA_RELEASE_POLICY.md` |
-| What is currently verified? | Active readiness/status documentation and executed command evidence |
-| How should web/mobile look and behave? | Active web/mobile design plans and module references |
+| What is currently verified? | CI runs, smoke outputs, staging records, and release artifacts |
+| Where are current work, blockers, and sequencing tracked? | GitHub Issues, Milestones, or Projects |
 | How is staging/production deployed and recovered? | `../production/SCHOOLOS_PRODUCTION_RUNBOOK.md` |
 
 ---

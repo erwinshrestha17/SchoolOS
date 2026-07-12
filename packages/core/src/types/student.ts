@@ -81,6 +81,7 @@ export type StudentProfile = {
     rotateReason?: string | null;
     revokeReason?: string | null;
     lastScannedAt: string | null;
+    fileAssetId?: string | null;
   } | null;
 };
 
@@ -132,6 +133,15 @@ export type StudentQrCredentialSummary = {
   rotateReason: string | null;
   revokeReason: string | null;
   lastScannedAt: string | null;
+  fileAssetId: string | null;
+};
+
+export type StudentCredentialArtifactResult = {
+  credential: StudentQrCredentialSummary;
+  fileAssetId: string | null;
+  fileName: string | null;
+  fileAvailable: boolean;
+  fileMessage?: string;
 };
 
 export type StudentQrStatusHistory = {
@@ -379,11 +389,9 @@ export type GeneratedStudentDocumentMeta = {
   fileName: string;
   contentType?: string | null;
   sizeBytes?: number | null;
-  pdfUrl: string;
   generatedById?: string | null;
   generatedAt?: string | null;
-  checksumSha256: string | null;
-  storageObjectKey: string | null;
+  fileAssetId?: string | null;
   signedAt: string | null;
   version: number;
   retentionUntil: string | null;
@@ -494,8 +502,6 @@ export type StudentDocument = {
   contentType: string;
   sizeBytes: number;
   provider: string;
-  objectKey?: string;
-  publicUrl?: string | null;
   notes?: string | null;
   expiryDate?: string | null;
   verifiedAt?: string | null;

@@ -8,7 +8,13 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AuthContext } from '../auth/auth.types';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
@@ -20,6 +26,9 @@ import {
   ResolveStudentQrDto,
   RotateStudentQrDto,
   RevokeStudentQrDto,
+  StudentCredentialArtifactResponseDto,
+  StudentQrCredentialResponseDto,
+  StudentQrStatusHistoryResponseDto,
 } from './dto/student-qr.dto';
 import { StudentQrService } from './student-qr.service';
 
@@ -36,11 +45,12 @@ export class StudentQrController {
   @ApiOperation({
     summary: 'Get safe student QR credential status and history',
   })
+  @ApiOkResponse({ type: StudentQrStatusHistoryResponseDto })
   async getQrStatus(
     @Param('studentId') studentId: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.studentQrService.getQrStatus(auth.tenantId, studentId);
+    return this.studentQrService.getQrStatus(auth.tenantId, studentId, auth);
   }
 
   @Get(':studentId/qr/scans')
@@ -71,8 +81,9 @@ export class StudentQrController {
   @Permissions('students:qr:generate')
   @ApiOperation({
     summary:
-      'Generate a student QR credential. Returns a printable QR image only when a new credential is issued.',
+      'Generate a student QR credential and protected ID-card artifact without returning the credential secret.',
   })
+  @ApiCreatedResponse({ type: StudentCredentialArtifactResponseDto })
   async generateQr(
     @Param('studentId') studentId: string,
     @CurrentAuth() auth: AuthContext,
@@ -85,8 +96,9 @@ export class StudentQrController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Rotate a student QR credential and return a new printable QR image',
+      'Rotate a student QR credential and replace its protected ID-card artifact',
   })
+  @ApiOkResponse({ type: StudentCredentialArtifactResponseDto })
   async rotateQr(
     @Param('studentId') studentId: string,
     @Body() dto: RotateStudentQrDto,
@@ -104,6 +116,7 @@ export class StudentQrController {
   @Permissions('students:qr:revoke')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Revoke a student QR credential' })
+  @ApiOkResponse({ type: StudentQrCredentialResponseDto })
   async revokeQr(
     @Param('studentId') studentId: string,
     @Body() dto: RevokeStudentQrDto,
@@ -133,19 +146,5 @@ export class StudentQrController {
       dto.purpose,
       auth,
     );
-  }
-
-  @Get(':studentId/qr-image')
-  @Permissions('students:qr:read')
-  @ApiOperation({
-    summary: 'Explain why QR images are one-time printable and not re-readable',
-  })
-  async getQrImageMetadata(@Param('studentId') studentId: string) {
-    return {
-      studentId,
-      qrImageAvailable: false,
-      message:
-        'Student QR raw tokens are never stored. Generate or rotate the credential to receive a one-time printable QR image.',
-    };
   }
 }

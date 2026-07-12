@@ -3,9 +3,9 @@
 **Status:** Canonical MDD catalog
 **Owner/audience:** CTO, product manager, module leads, backend/web/mobile leads, QA, security, support/operations
 **Scope:** Active M0-M14 module ownership, stage applicability, module boundaries, cross-module rules, code-evidence gap matrix, and stage-aware implementation roadmap.
-**Precedence:** Module ownership and architecture boundaries live here. Functional details remain in `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`; product intent remains in `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`; implementation sequencing remains in `../project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`; current readiness remains in `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
-**Inputs/source documents:** `../product/SCHOOLOS_BRD.md`, `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`, `SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `SCHOOLOS_NOTIFICATION_ARCHITECTURE.md`, `SCHOOLOS_PLATFORM_OPERATIONS.md`, `../requirements/SCHOOLOS_SRS.md`, repository source inspected on 2026-06-20.
-**Out-of-scope content:** Endpoint URL invention, Prisma migrations, code changes, sprint tasks not in the next-phase plan, and GA readiness claims.
+**Precedence:** This document owns module taxonomy, ownership, cross-module boundaries, existing implementation evidence, and known contract, schema, and verification gaps. Product intent is owned by `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`; software requirements by `../requirements/SCHOOLOS_SRS.md`; architecture/security by `SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`; release gates by `../production/SCHOOLOS_GA_RELEASE_POLICY.md`.
+**Inputs/source documents:** The six canonical documents listed in `../README.md` and repository source inspected on 2026-06-20. Current work and blockers belong in GitHub Issues, Milestones, or Projects; current evidence belongs in CI runs, smoke outputs, staging records, and release artifacts.
+**Out-of-scope content:** Endpoint URL invention, Prisma migrations, code changes, current sprint sequencing, and GA readiness claims.
 **Last reviewed date:** 2026-07-01
 
 ---
@@ -34,23 +34,23 @@
 
 ## 2. Module And Stage Matrix
 
-| Module | `PRESCHOOL` | `SCHOOL` Grade 1-10 | `HIGHER_SECONDARY` Grade 11-12 | `BACHELOR` proposed |
-|---|---|---|---|---|
-| M0 Platform Core | Required | Required | Required | Required; program/entitlement model needs design |
-| M1 Admissions and Student Profiles | Required, with guardians/emergency/pickup expansion | Required | Required, with stream/program context proposed | Admissions/enrollment history needs program/intake/batch design |
-| M2 Smart Attendance | Required, arrival/absence/checkout proposed | Required | Required, theory/lab attendance detail proposed | Course/session attendance needs schema/API design |
-| M3 Fees and Receipts | Required | Required | Required | Required; no offline student financial writes |
-| M4 Academics, Exams, CAS, Report Cards | Light milestones only by default | Required | Required, streams/combinations/practicals/projects proposed | Departments/programs/terms/courses/results proposed |
-| M5 Activity Feed and Milestones | Required, consent-safe activity/milestone focus | Optional/required by school policy | Optional/required for updates/projects | Usually not core |
-| M6 Homework and Timetable | Light/optional | Required | Required, theory/lab timetable proposed | Assignments/timetable by course/term proposed |
-| M7 HR and Payroll | Required for staff coverage | Required | Required | Faculty/staff assignment proposed; payroll remains web/admin |
-| M8 Library | Usually optional | Common | Common | Common where enabled |
-| M9 Transport | Where enabled | Where enabled | Where enabled | Optional by institution |
-| M10 Canteen | Optional, allergy-safe serving where enabled | Where enabled | Where enabled | Optional by institution |
-| M11 Accounting and Finance | Optional/advanced | Optional/advanced | Optional/advanced | Optional/advanced; no Student App finance operations |
-| M12 Notifications, Notices, Communication, Chat | Required, parent trust and safety | Required | Required | Required; support requests only where approved |
-| M13 Learning Layer | Teacher-led/screen-light only | Teacher-led/lab/session | Lab/project support where approved | Course/session support where approved |
-| M14 Intelligence / AI | Deferred | Deferred | Deferred | Deferred |
+| Module | `PRESCHOOL` | `SCHOOL` Grade 1-10 | `HIGHER_SECONDARY` Grade 11-12 / +2 |
+|---|---|---|---|
+| M0 Platform Core | Required | Required | Required |
+| M1 Admissions and Student Profiles | Required, with guardians/emergency/pickup expansion | Required | Required, with stream/program context proposed |
+| M2 Smart Attendance | Required, arrival/absence/checkout proposed | Required | Required, theory/lab attendance detail proposed |
+| M3 Fees and Receipts | Required | Required | Required |
+| M4 Academics, Exams, CAS, Report Cards | Light milestones only by default | Required | Required, streams/combinations/practicals/projects proposed |
+| M5 Activity Feed and Milestones | Required, consent-safe activity/milestone focus | Optional/required by school policy | Optional/required for updates/projects |
+| M6 Homework and Timetable | Light/optional | Required | Required, theory/lab timetable proposed |
+| M7 HR and Payroll | Required for staff coverage | Required | Required |
+| M8 Library | Usually optional | Common | Common |
+| M9 Transport | Where enabled | Where enabled | Where enabled |
+| M10 Canteen | Optional, allergy-safe serving where enabled | Where enabled | Where enabled |
+| M11 Accounting and Finance | Optional/advanced | Optional/advanced | Optional/advanced |
+| M12 Notifications, Notices, Communication, Chat | Required, parent trust and safety | Required | Required |
+| M13 Learning Layer | Teacher-led/screen-light only | Teacher-led/lab/session | Lab/project support where approved |
+| M14 Intelligence / AI | Deferred | Deferred | Deferred |
 
 ## 3. Cross-Module Design Rules
 
@@ -83,7 +83,7 @@ These foundations must not bypass module ownership. Approval, automation, analyt
 |---|---|---|
 | Institution legal/location/affiliation/accreditation/tax profile | M0 | M1/M3/M4/M7 reporting and billing consume a permission-filtered projection. |
 | iEMIS validation and student/guardian/enrollment completeness | M1 | May link to owning edit workflows; validation never silently changes student truth. |
-| Academic/program/result reporting dimensions | M4 | Bachelor program/term/course support remains proposed until schema/contracts exist. |
+| Academic/program/result reporting dimensions | M4 | +2 stream, subject-combination, practical, and project support remains contract-first. |
 | Staff qualification/workload reporting dimensions | M7 | Sensitive HR/payroll data is excluded unless explicitly required and permitted. |
 | Formal invoice sequences, immutable tax invoices, credit/debit notes and protected copies | M3 | Emits approved source events; does not own journals or fiscal locks. |
 | Official posting, period locks, reconciliation and accounting reports | M11 | Receives idempotent source events from M3 and other approved modules. |
@@ -114,13 +114,11 @@ These foundations must not bypass module ownership. Approval, automation, analyt
 
 | Structure | Existing model/evidence | Gap | Recommended owner | Migration impact | Security/API/Web/Mobile/Test impact |
 |---|---|---|---|---|---|
-| Tenant program offering | Tenant, plan, entitlements, module enablement exist. | No canonical `PRESCHOOL`/`SCHOOL`/`HIGHER_SECONDARY`/`BACHELOR` offering model verified. | M0 Platform Core with M1/M4 consumers. | New tenant-scoped model/indexes likely. | Backend resolver, OpenAPI/core DTO, web settings, mobile projection, tenant/module tests. |
+| Tenant program offering | Tenant, plan, entitlements, module enablement exist. | No canonical `PRESCHOOL`/`SCHOOL`/`HIGHER_SECONDARY` offering model verified. | M0 Platform Core with M1/M4 consumers. | New tenant-scoped model/indexes likely. | Backend resolver, OpenAPI/core DTO, web settings, mobile projection, tenant/module tests. |
 | Class experience profile | `Class.name`, `Class.level`, `Section.capacity` exist. | No stage/program field verified. | M0/M4 academic structure. | Backfill from class levels/names may be needed. | Web academic settings and ExperienceContext; teacher/principal/mobile filters; cross-stage assignment tests. |
 | Active enrollment stage | `Enrollment` links student/year/class/section. | No program/stage/stream link verified. | M1 with M4 academic policy. | Migration/backfill required after program/class profile design. | Parent child switch, teacher assigned context, reports, student lifecycle tests. |
 | +2 stream / subject combination | `Subject.hasPractical`, theory/practical marks, assessment components exist. | No stream/combination model verified. | M4 Academics. | New models and uniqueness/index rules likely. | OpenAPI/core contracts, web setup, report cards, parent/student views, migration replay tests. |
 | Practical/project tracking | Exam components and report cards exist. | No separate project/practical lifecycle verified. | M4 Academics, File Registry for evidence. | New models or extension of assessment components needs design. | Teacher assignment scope, protected evidence files, publication workflow, tests. |
-| Bachelor program/course/term | Demo seed text mentions Bachelor once. | No verified program, department, intake, batch, semester/term, course, faculty-assignment, or Student App self-service contract. | M0/M1/M4 with M7 faculty assignment consumers. | New schema/backfill/index plan likely. | OpenAPI/core contracts, web setup, Flutter Student App DTO, RBAC/entitlement, tenant-isolation, self-scope tests. |
-| Master eligibility | No full management model verified or approved. | Eligibility-only for future Student App; no administration pack. | Future M0/M1 eligibility design only. | No migration until separately approved. | Backend eligibility guard and self-scope tests only when contract is approved. |
 | Preschool pickup/drop | Attendance and transport exist; student emergency fields exist. | No authorized pickup, temporary pickup change, checkout exception model verified. | M1/M2 with M12 notifications; M9 only for transport trips. | New models/indexes likely. | Parent app, teacher/admin web, audit, notification, child-safety tests. |
 | Care/allergy visibility | Student medical/allergy fields and canteen allergy warnings exist. | Stage-specific care-alert permission boundary needs verification/design. | M1 data owner; M10 serving; M7 staff coverage. | May need structured care alert model later. | Narrow RBAC, mobile teacher/admin display, audit/access tests. |
 | ExperienceContext | Conceptual only. | No DTO/API/schema verified. | M0 Platform Core with all modules consuming. | Depends on offering/profile/enrollment design. | Contract-first implementation, web/mobile shell composition, permission tests. |
@@ -133,28 +131,24 @@ These foundations must not bypass module ownership. Approval, automation, analyt
 | Three experience packs are not implemented as a backend-owned resolver. | PROPOSED | No program-offering or ExperienceContext contract found. | Design schema/contracts after current smoke/staging blockers; do not fake in UI. |
 | Preschool activity/milestone foundation exists. | IMPLEMENTED_UNVERIFIED | M5 schema/services include activity posts, media, milestones, stage-filtered templates. | Verify consent-safe parent/media behavior and define preschool classroom diary UX. |
 | Preschool pickup/drop and authorized pickup are absent as verified code. | NEEDS_SCHEMA_DESIGN | No dedicated pickup/handover models found. | Design M1/M2/M12-owned workflow with audit, reason, expiry, and mobile/web surfaces. |
-| School Grade 1-10 operational modules broadly exist. | IMPLEMENTED_UNVERIFIED | API/web/mobile surfaces and tests recorded in audit. | Focus on pilot seed, authenticated browser E2E, mobile device QA, staging proof. |
+| School Grade 1-10 operational modules broadly exist. | IMPLEMENTED_UNVERIFIED | API/web/mobile surfaces and tests exist in the repository; current execution evidence was not established by this documentation pass. | Focus on pilot seed, authenticated browser E2E, mobile device QA, staging proof. |
 | +2 practical marks have partial foundation. | IMPLEMENTED_UNVERIFIED | `Subject.hasPractical`, theory/practical marks, assessment components. | Confirm contracts and report-card behavior before expanding UI. |
 | +2 streams/subject combinations/projects are not verified. | NEEDS_SCHEMA_DESIGN | Docs mention future scope; schema lacks stream/combination/project lifecycle. | Design school-configurable M4 structures and migration/index plan. |
-| Bachelor's management scope is proposed, not implemented. | PROPOSED / NEEDS_SCHEMA_DESIGN | No canonical Bachelor schema/API/shared contract/UI workflow was verified. | Design after pilot hardening with schema, OpenAPI, RBAC/entitlement, seed, tests, and staging proof. |
-| Master's management scope is not active. | NOT_ACTIVE_SCOPE | No current pack is approved. | Keep Master's to future extension and Student App eligibility only. |
 | Parent/teacher/principal mobile surfaces exist. | IMPLEMENTED_UNVERIFIED | Flutter route tree and mobile controllers/repositories. | Device QA against live seeded backend remains required. |
 | Safe file architecture exists. | IMPLEMENTED_UNVERIFIED | File Registry service/controller and web protected-file helpers. | External storage/provider/staging verification remains required. |
-| GA readiness is not achieved. | DOCUMENTED_ONLY | Readiness audit records missing staging, provider, browser auth, mobile device, smoke, backup/restore, pilot proof. | Keep current release stage Internal QA ready. |
+| GA / Production release is not established. | DOCUMENTED_ONLY | No current release artifacts establish staging, provider, browser auth, mobile device, smoke, backup/restore, and controlled-pilot proof. | Keep the current posture Internal QA / controlled-pilot preparation. |
 
 ## 7. Prioritized Implementation Roadmap
 
-This roadmap does not replace `../project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`; it adds stage-aware architecture dependencies.
+This roadmap records architecture dependencies only. Current work, blockers, and sequencing belong in GitHub Issues, Milestones, or Projects.
 
 | Priority | Work | Required proof |
 |---|---|---|
-| P0 | Preserve current evidence-based release posture and complete smokeable seed/browser/mobile/staging gates from the next-phase plan. | `pnpm smoke:pilot`, authenticated browser E2E, mobile device QA, staging migration/provider/backup evidence. |
+| P0 | Preserve the current evidence-based release posture and complete smokeable seed, browser, mobile, and staging gates tracked in GitHub. | `pnpm smoke:pilot`, authenticated browser E2E, mobile device QA, staging migration/provider/backup evidence. |
 | P1 | Design backend-owned `ExperienceContext` and program/stage data model without code changes in this pass. | Architecture decision, Prisma design, OpenAPI/core DTO plan, RBAC/tenant tests, migration/backfill plan. |
 | P1 | Preschool safety design: authorized pickup, temporary pickup change, arrival/checkout, pickup exceptions, care-alert permission boundaries. | Schema/API/UX/test design reviewed by security/product; no runtime claim until implemented. |
 | P1 | Higher Secondary design: streams/programs, subject combinations, lab/practical timetable, practical/project tracking. | Configurable schema/API design, M4 ownership, report-card/reporting impact, migration/index plan. |
-| P2 | Bachelor's design/validation phase after pilot hardening. | Schema design, OpenAPI/shared contracts, RBAC/entitlement model, tenant-isolation tests, Student App self-scope tests, seed, browser/mobile, staging proof. |
 | P2 | Stage-aware web dashboard composition over one shared shell. | Backend context contract, web route state tests, no fake totals, authenticated browser proof. |
 | P2 | Stage-aware mobile context switch for parent/teacher/principal. | Purpose-limited DTOs, device QA, offline/read-cache boundaries, child/assignment scope tests. |
 | P3 | Stage-aware reporting and operational analytics. | Server-owned summaries, pagination/index proof, queued reports, File Registry exports. |
-| Deferred | Master's full management pack. | Separate product approval; current scope is Student App eligibility/future extension only. |
 | Deferred | M14 Intelligence / AI. | Separate future approval after production-quality data, safety, privacy, human review, cost, and audit controls. |

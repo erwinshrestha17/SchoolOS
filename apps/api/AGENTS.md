@@ -4,11 +4,11 @@ Scoped rules for `apps/api`. Root `AGENTS.md` applies first.
 
 ## Read
 
-Before API work, read relevant parts of root `AGENTS.md`, `docs/architecture/SCHOOLOS_NAMING_CONVENTIONS.md`, project status/plan, FRS, SRS, SDD, MDD, platform operations, Prisma schema, touched controller/service/DTO/tests, and OpenAPI/shared contracts.
+Before API work, read relevant parts of root `AGENTS.md`, the PRD, SRS, SDD, MDD, release policy, Prisma schema, touched controller/service/DTO/tests, and OpenAPI/shared contracts. Use GitHub Issues, Milestones, or Projects for current status and sequencing.
 
 Formal requirements/design owners:
 
-- FRS: `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`
+- PRD: `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`
 - SRS: `docs/requirements/SCHOOLOS_SRS.md`
 - SDD: `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`
 - MDD: `docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`
@@ -25,7 +25,7 @@ Formal requirements/design owners:
 - Platform support override requires reason and audit.
 - Money writes are idempotent/audited; confirmed records use reversal/correction.
 - Files go through FileRegistryService and StorageService only.
-- M12 Learning stays in the learning domain; M11 AI stays roadmap unless approved.
+- M13 Learning stays in the learning domain; M14 AI stays roadmap unless approved.
 
 ## Naming and API contract rule
 

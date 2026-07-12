@@ -430,7 +430,7 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
       .expect(404);
   });
 
-  it('generates and retrieves student document PDFs over HTTP without cross-tenant access', async () => {
+  it('generates protected student document metadata over HTTP without cross-tenant access', async () => {
     const generated = await request(app.getHttpServer())
       .post('/admissions/m1/students/student-a/id-card')
       .set('x-test-tenant', tenantAId)
@@ -450,17 +450,26 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
         studentId: 'student-a',
         kind: 'id-card',
         storageObjectKey: expect.stringContaining(
-          'tenant-m1-http-a/students/student-a/generated-documents/id-card',
+          'tenant-m1-http-a/students/ST-A-id-card.pdf',
         ),
       }),
     );
     expect(JSON.stringify(generated.body)).not.toContain('secret-token-hash');
 
-    await request(app.getHttpServer())
+    const protectedArtifact = await request(app.getHttpServer())
       .get('/students/student-a/documents/ID_CARD.pdf')
       .set('x-test-tenant', tenantAId)
-      .expect(200)
-      .expect('content-type', /application\/pdf/);
+      .expect(200);
+
+    expect(protectedArtifact.body).toEqual({
+      fileAssetId: expect.any(String),
+      fileName: expect.stringMatching(/-id-card\.pdf$/),
+      mimeType: 'application/pdf',
+      fileAvailable: true,
+    });
+    expect(JSON.stringify(protectedArtifact.body)).not.toMatch(
+      /rawToken|tokenHash|objectKey|permanentUrl/,
+    );
 
     await request(app.getHttpServer())
       .get('/students/student-a/documents/ID_CARD.pdf')

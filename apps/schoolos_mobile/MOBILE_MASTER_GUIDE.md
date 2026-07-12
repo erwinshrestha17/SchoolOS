@@ -2,24 +2,20 @@
 
 **Status:** App-local pointer and guardrail
 **Updated:** 2026-07-01
-**Authoritative mobile plan:** `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`
-**Authoritative surface allocation:** `docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`
+**Authoritative product requirements:** `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`
+**Authoritative software and mobile requirements:** `docs/requirements/SCHOOLOS_SRS.md`
 **Authoritative release policy:** `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`
 
-This file stays in the Flutter app so mobile contributors can find the active mobile plan and release target quickly. Detailed persona, API, offline, state, and feature structure decisions live in the dedicated mobile app UI/UX design plan. Mobile work is evaluated against the Production / General Availability (GA) release policy, not MVP completion language.
+This file stays in the Flutter app so mobile contributors can find app-local guardrails and the release target quickly. Product behavior belongs in the PRD, software and mobile requirements in the SRS, architecture/security boundaries in the SDD, and module ownership in the MDD. Mobile work is evaluated against the Production / General Availability (GA) release policy, not MVP completion language.
 
 ## Required Read Order
 
 1. `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`
 2. `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`
-3. `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`
-4. `docs/requirements/SCHOOLOS_SRS.md`
-5. `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`
-6. `docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`
-7. `docs/product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`
-8. `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`
-9. `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md` when a mobile flow depends on a web-owned admin workflow
-10. `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` for current release evidence and blockers
+3. `docs/requirements/SCHOOLOS_SRS.md`
+4. `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`
+5. `docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`
+6. `apps/schoolos_mobile/AGENTS.md`
 
 ## Mobile Product Rules
 
@@ -33,8 +29,8 @@ This file stays in the Flutter app so mobile contributors can find the active mo
 8. Staff flows are own-staff self-service only.
 9. Preschool, Grade 1-10, and Grade 11-12 / +2 students do not get a broad Student App.
 10. Student learning access for Preschool through +2 is lab-only or controlled school-device only.
-11. Future Bachelor/Master Student App access is allowed only for active enrolled students and must be self-only, tenant-scoped, enrollment-scoped, module-entitlement-scoped, and backend-authorized.
-12. Do not use admin-shaped endpoints for parent, teacher, principal, driver, staff, lab/student-session, or future Student App screens.
+11. A broad Student App is not active scope.
+12. Do not use admin-shaped endpoints for parent, teacher, principal, driver, staff, or lab/student-session screens.
 13. Every screen needs loading, empty, error, permission-denied, module-locked, offline, and success/pending states where applicable.
 14. Protected files use authenticated download/share helpers only.
 15. Passing Flutter unit tests or a debug APK build is not mobile GA proof; supported personas require seeded backend, emulator/device, deep-link, permission-denial, logout-cache-clearing, and protected-file evidence.
@@ -73,7 +69,7 @@ flutter build apk --debug
 flutter build ios --no-codesign
 ```
 
-Use the GA policy and production-readiness audit to record which local, emulator/device, staging, and controlled-pilot gates actually passed.
+Use the GA policy and attach current local, emulator/device, staging, and controlled-pilot evidence to CI runs, smoke outputs, staging records, or release artifacts.
 
 ## Push Notification Configuration
 

@@ -26,6 +26,7 @@ import type {
   StudentProfileDetail,
   StudentModuleSummary,
   StudentQrStatusHistory,
+  StudentCredentialArtifactResult,
   StudentTransferPayload,
   UpdateStudentGuardianPayload,
   UpdateStudentProfilePayload,
@@ -34,7 +35,7 @@ import type {
 import {
   API_BASE_URL,
   JsonBody,
-  openPdfBlob,
+  openProtectedFile,
   parseApiErrorMessage,
   readFileAsBase64,
   request,
@@ -55,13 +56,12 @@ export const studentsApi = {
   archiveStudentAsAlumni: (studentId: string, body: StudentArchivePayload) => request<StudentLifecycleActionResult>(`/students/${encodeURIComponent(studentId)}/archive-alumni`, { method: 'POST', json: body as JsonBody }),
   softDeleteStudent: (studentId: string, body: StudentDeletePayload) => request<StudentLifecycleActionResult>(`/students/${encodeURIComponent(studentId)}/delete`, { method: 'POST', json: body as JsonBody }),
   revokeGeneratedStudentDocument: (studentId: string, documentId: string, body: RevokeGeneratedStudentDocumentPayload) => request(`/students/${encodeURIComponent(studentId)}/generated-documents/${encodeURIComponent(documentId)}/revoke`, { method: 'POST', json: body as JsonBody }),
-  generateStudentQr: (studentId: string) => request<{ credential: any; qrImageSvg?: string; qrImageAvailable: boolean; qrImageMessage?: string; rawToken?: string }>(`/students/${encodeURIComponent(studentId)}/qr`, { method: 'POST' }),
+  generateStudentQr: (studentId: string) => request<StudentCredentialArtifactResult>(`/students/${encodeURIComponent(studentId)}/qr`, { method: 'POST' }),
   getStudentQrStatus: (studentId: string) => request<StudentQrStatusHistory>(`/students/${encodeURIComponent(studentId)}/qr`),
   listStudentQrScans: (studentId: string) => request<StudentQrScanAudit[]>(`/students/${encodeURIComponent(studentId)}/qr/scans`),
-  rotateStudentQr: (studentId: string, body: { reason: string }) => request<{ credential: any; qrImageSvg?: string; qrImageAvailable: boolean; rawToken?: string }>(`/students/${encodeURIComponent(studentId)}/qr/rotate`, { method: 'POST', json: body }),
+  rotateStudentQr: (studentId: string, body: { reason: string }) => request<StudentCredentialArtifactResult>(`/students/${encodeURIComponent(studentId)}/qr/rotate`, { method: 'POST', json: body }),
   revokeStudentQr: (studentId: string, body: { reason: string }) => request<any>(`/students/${encodeURIComponent(studentId)}/qr/revoke`, { method: 'POST', json: body }),
   resolveStudentQr: (body: { token: string; purpose: string }) => request<any>('/students/qr/resolve', { method: 'POST', json: body }),
-  getStudentQrImageUrl: (studentId: string, token: string) => `${API_BASE_URL}/students/${encodeURIComponent(studentId)}/qr-image?token=${encodeURIComponent(token)}`,
   listAdmissions: (params?: { page?: number; limit?: number; search?: string; status?: string; academicYearId?: string; classId?: string }) => request<PaginatedResponse<AdmissionSummary>>(withQuery('/admissions', params ?? {})),
   listAdmissionApplications: (params?: { page?: number; limit?: number; search?: string; status?: AdmissionApplicationStatus; classId?: string }) => request<PaginatedResponse<AdmissionApplication>>(withQuery('/admissions/applications', params ?? {})),
   createAdmissionApplication: (body: CreateAdmissionApplicationPayload) => request<AdmissionApplication>('/admissions/applications', { method: 'POST', json: body as JsonBody }),
@@ -105,10 +105,14 @@ export const studentsApi = {
   deleteStudentDocument: (id: string) => request(`/student-documents/${id}`, { method: 'DELETE' }),
   verifyStudentDocument: (documentId: string, body: { status: 'VERIFIED' | 'REJECTED'; notes: string }) => request<{ success: boolean }>(`/student-documents/${encodeURIComponent(documentId)}/verify`, { method: 'POST', json: body }),
   archiveStudentDocument: (documentId: string, body: { reason: string }) => request<{ success: boolean }>(`/student-documents/${encodeURIComponent(documentId)}/archive`, { method: 'POST', json: body }),
-  openStudentDocumentPdf: async (studentId: string, kind: string, token?: string) => {
-    const url = new URL(`${API_BASE_URL}/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(kind)}.pdf`);
-    if (token) url.searchParams.set('token', token);
-    await openPdfBlob(await fetch(url.toString(), { credentials: 'include' }));
+  openStudentDocumentPdf: async (studentId: string, kind: string) => {
+    const artifact = await request<{
+      fileAssetId: string;
+      fileName: string;
+      mimeType: 'application/pdf';
+      fileAvailable: true;
+    }>(`/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(kind)}.pdf`);
+    await openProtectedFile(artifact.fileAssetId, { fileName: artifact.fileName });
   },
 };
 

@@ -4,14 +4,14 @@ Token-light global rules for agents. Detailed behavior lives in the active docs 
 
 ## Read only what is relevant
 
-Start with `README.md`, `docs/README.md`, `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`, `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`, and `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`. Then read the focused source for the touched area:
+Start with `README.md`, `docs/README.md`, and `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`. Then read the focused source for the touched area:
 
-- Formal business/product/requirements/design docs: `docs/product/SCHOOLOS_BRD.md`, `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `docs/requirements/SCHOOLOS_SRS.md`, `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`
-- Product/function: `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`
-- Architecture/security/platform: `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `docs/architecture/SCHOOLOS_NAMING_CONVENTIONS.md`, `docs/architecture/SCHOOLOS_PLATFORM_OPERATIONS.md`
-- Notification module: `docs/architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md`
-- Web: `docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md`, `apps/web/e2e/README.md`
-- Mobile: `docs/design/SCHOOLOS_MOBILE_APP_UI_UX_DESIGN_PLAN.md`, `apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md`
+- Product/function: `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`
+- Software/API/database/web/mobile requirements: `docs/requirements/SCHOOLOS_SRS.md`
+- Architecture/security/platform: `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`
+- Module ownership and gaps: `docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`
+- Web: `apps/web/AGENTS.md`, `apps/web/e2e/README.md`
+- Mobile: `apps/schoolos_mobile/AGENTS.md`, `apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md`
 - Deploy/staging: `docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md`
 
 Do not recreate old split plans or duplicate docs. Update the smallest active source of truth only when docs truly need changes.
@@ -20,14 +20,14 @@ Formal ownership is fixed:
 
 | Artifact | Canonical path |
 |---|---|
-| BRD | `docs/product/SCHOOLOS_BRD.md` |
 | PRD | `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md` |
-| FRS | `docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md` |
 | SRS | `docs/requirements/SCHOOLOS_SRS.md` |
 | SDD | `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` |
 | MDD | `docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md` |
+| Release policy | `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md` |
+| Production runbook | `docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md` |
 
-Use `docs/project/SCHOOLOS_DOCUMENTATION_INVENTORY.md` for active/supporting/temporary/retired/archive decisions before creating, merging, archiving, or deleting Markdown.
+Do not add Markdown when the content belongs in an existing canonical document. Track current work and blockers in GitHub Issues, Milestones, or Projects.
 
 ## Active module taxonomy
 
@@ -57,7 +57,7 @@ Inventory & Asset Management is scrapped from the active module plan. Do not add
 
 ## Product stance and release target
 
-SchoolOS is a Nepal-first multi-tenant education operating SaaS for `PRESCHOOL`, `SCHOOL`, `HIGHER_SECONDARY`, and `BACHELOR`, not a CRUD dashboard and not an MVP delivery exercise. Master's is not an active full institution-management pack; it is only a future higher-education extension and an allowed Student App eligibility level. Every change must move the supported release boundary toward **Production / General Availability (GA)**.
+SchoolOS is a Nepal-first multi-tenant education operating SaaS for `PRESCHOOL`, `SCHOOL` (Grade 1-10), and `HIGHER_SECONDARY` (Grade 11-12 / +2), not a CRUD dashboard and not an MVP delivery exercise. Bachelor and Master's institution-management features are not active scope. Every change must move the supported release boundary toward **Production / General Availability (GA)**.
 
 Use the release stages defined in `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`:
 
@@ -70,9 +70,9 @@ Release candidate
 GA / Production release
 ```
 
-Report readiness honestly. The documented current stage is Internal QA ready; SchoolOS is not GA until staging migration and provider checks, authenticated browser E2E, device QA, backup/restore proof, controlled-pilot workflows, monitoring, rollback, and release evidence pass. Passing local tests, showing a demo, or completing backend code does not establish production or GA readiness.
+Report readiness honestly. The current posture is Internal QA / controlled-pilot preparation; SchoolOS is not GA until staging migration and provider checks, authenticated browser E2E, device QA, backup/restore proof, controlled-pilot workflows, monitoring, rollback, and release evidence pass. Passing local tests, showing a demo, or completing backend code does not establish production or GA readiness.
 
-Current priorities: security/RBAC/tenant-isolation evidence; staging deployment and operational proof; browser E2E; real-API web workspaces; pilot workflows; mobile device QA; performance/backup/observability/release automation. Bachelor's design/validation comes after pilot hardening and must not be claimed implemented without schema, OpenAPI, shared-contract, RBAC, entitlement, tenant-isolation, seed, browser/mobile, and staging proof. M14 AI remains roadmap only unless explicitly approved.
+Current priorities: security/RBAC/tenant-isolation evidence; staging deployment and operational proof; browser E2E; real-API web workspaces; pilot workflows; mobile device QA; performance/backup/observability/release automation. M14 AI remains roadmap only unless explicitly approved.
 
 ## Architecture: never break
 
@@ -86,7 +86,7 @@ Current priorities: security/RBAC/tenant-isolation evidence; staging deployment 
 
 ## Naming and contract rules
 
-- Read `docs/architecture/SCHOOLOS_NAMING_CONVENTIONS.md` before adding or renaming files, folders, routes, DTOs, schema values, API clients, or web/mobile surfaces.
+- Follow the naming and contract rules in this file and the existing touched-area conventions before adding or renaming files, folders, routes, DTOs, schema values, API clients, or web/mobile surfaces.
 - New TypeScript/web paths use kebab-case; Flutter/Dart paths use lower_snake_case; framework-required filenames remain exceptions.
 - New API paths use lowercase kebab-case resource nouns, explicit route parameters such as `:studentId`, and documented domain-command routes only when CRUD is insufficient.
 - Use one canonical business term per concept. `tenantId` is the only tenancy boundary name.
@@ -113,7 +113,7 @@ Notifications: source modules emit normalized events and never call SMS/email/pu
 
 Web: one screen = one main job; real APIs only; no fake production data; server-side pagination for growing lists; states for loading/empty/error/success/permission/module locked/validation/file unavailable/queued/partial failure; high-risk actions need confirmation and reason where required. KPIs only where backend-owned, time-bound, actionable (real drill-through), and honest (never fake `0` for unavailable/locked) — see `apps/web/AGENTS.md` KPI design rule; mobile never copies web KPI grids (`apps/schoolos_mobile/AGENTS.md`).
 
-Mobile: companion app only; persona-first; purpose-limited APIs only; no admin-shaped mobile payloads; safe offline reads only; visible sync states for approved idempotent writes. Broad Student App access is permitted only for active Bachelor or Master enrollments after backend-owned eligibility, enrollment, entitlement, role, self-scope, and tenant checks exist; Preschool through Grade 12 students get controlled learning/session access only.
+Mobile: companion app only; persona-first; purpose-limited APIs only; no admin-shaped mobile payloads; safe offline reads only; visible sync states for approved idempotent writes. Students use controlled school learning/session access only; a broad Student App is not active scope.
 
 Learning: school-controlled, teacher-led, lab/session or controlled-device student access; expiring session codes/QR; parent summaries child-scoped and non-comparative; no leaderboard, open student chat, harsh labels, AI tutor, adaptive runtime, or broad home learning unless approved.
 

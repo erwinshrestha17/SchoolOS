@@ -17,7 +17,7 @@ Production / Live environment = the monitored environment where real schools run
 GA / General Availability     = the official public release suitable for onboarding supported schools beyond a controlled pilot.
 ```
 
-This policy does **not** claim that SchoolOS is GA today. Current factual readiness is owned by `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`. A feature, module, local build, seeded demo, or passing test suite is not proof of GA by itself.
+This policy does **not** claim that SchoolOS is GA today. The current default posture is **Internal QA / controlled-pilot preparation**. Current work and blockers are tracked in GitHub Issues, Milestones, or Projects; current evidence belongs in CI runs, smoke outputs, staging records, and release artifacts. A feature, module, local build, seeded demo, or passing test suite is not proof of GA by itself.
 
 ---
 
@@ -30,10 +30,7 @@ Use these terms in plans, PRs, reports, issues, release notes, and status docume
 - Staging validated
 - Controlled pilot validated
 - Release candidate
-- Production readiness
-- GA readiness
-- GA blocker
-- Production release gate
+- GA / Production release
 
 Do not use these as completion claims:
 
@@ -49,7 +46,7 @@ When evidence is missing, state the exact missing gate rather than using an opti
 
 ## 3. Product and architecture boundaries remain unchanged
 
-SchoolOS remains a Nepal-first, multi-tenant education operating SaaS for `PRESCHOOL`, `SCHOOL`, `HIGHER_SECONDARY`, and `BACHELOR` direction. Master's is not a full active management pack; it is future extension and Student App eligibility only. The GA target must preserve these boundaries:
+SchoolOS remains a Nepal-first, multi-tenant education operating SaaS for `PRESCHOOL`, `SCHOOL` (Grade 1-10), and `HIGHER_SECONDARY` (Grade 11-12 / +2). A broad Student App is not active scope. The GA target must preserve these boundaries:
 
 - Keep the NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js App Router, Flutter companion app, and shared contracts where available.
 - Keep `tenantId` as the strict tenant boundary.
@@ -58,7 +55,7 @@ SchoolOS remains a Nepal-first, multi-tenant education operating SaaS for `PRESC
 - Keep backend authorization, RBAC, tenant scope, and module entitlement as the source of truth.
 - Keep M13 Learning as a separate domain that reuses core student, staff, class, subject, timetable, communication, file, RBAC, and audit systems.
 - Keep M14 Intelligence / AI as roadmap-only until explicitly approved after the required data, review, safety, and cost controls exist.
-- Keep broad Student App access backend-authorized and limited to active Bachelor or Master enrollments; Preschool through Grade 12 remain controlled learning/session-only.
+- Keep student access backend-authorized and limited to controlled learning/session use; do not add a broad Student App.
 - Do not introduce microservices, Angular migration, broad public student mobile, unsafe offline financial operations, or unverified live-map/provider scope as a shortcut to release.
 
 ---
@@ -193,7 +190,6 @@ Local verification is necessary but insufficient for GA. GA also requires the st
 6. Flutter device QA for purpose-limited parent, teacher, staff, driver, principal, and student-session roles.
 7. Performance, retention, observability, queue/retry diagnostics, recovery, and release automation.
 8. New product scope only after GA blockers are understood, tracked, and do not weaken the supported release boundary.
-9. Later Bachelor's design/validation only after pilot hardening, with schema, OpenAPI, shared-contract, RBAC/entitlement, tenant-isolation, student self-scope, seed, browser/mobile, staging, and release evidence.
 
 ---
 
@@ -232,6 +228,6 @@ Next release action:
 ## 10. Source-of-truth relationship
 
 - This document defines the target, release terminology, and gate policy.
-- `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` owns evidence-based current readiness and scores.
-- `docs/project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md` owns the dependency-driven execution sequence.
-- The product, functional, architecture, web, mobile, and runbook documents must follow this policy without overstating current readiness.
+- GitHub Issues, Milestones, or Projects own current work, blockers, and sequencing.
+- CI runs, smoke outputs, staging records, and release artifacts own current verification evidence.
+- The PRD, SRS, architecture/security document, module catalog, and runbook must follow this policy without overstating current readiness.

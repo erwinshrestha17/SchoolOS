@@ -323,11 +323,11 @@ Rules:
 
 ## 7. M12 Notices / Communication / Chat Design Rules
 
-Use `docs/design/M10_COMMUNICATION_WEB_REFERENCE_ANALYSIS.md` as the supporting visual-reference appendix for Module 10 implementation detail. The canonical frontend guardrails in this design system still apply.
+The PRD owns communication outcomes, the SRS owns web requirements, and the Module Design Catalog owns M12 boundaries. The canonical frontend guardrails in this design system still apply.
 
-### 7.1 M10 workspace patterns
+### 7.1 M12 workspace patterns
 
-Module 10 uses four primary layout patterns:
+M12 uses four primary layout patterns:
 
 | Pattern | Used for |
 |---|---|
@@ -337,11 +337,11 @@ Module 10 uses four primary layout patterns:
 | Three-column conversation workspace | Communication inbox and parent-teacher chat. |
 | Library plus preview rail | Templates and scheduling. |
 
-Do not force a single generic table layout across all M10 screens. The selected pattern must match the primary job.
+Do not force a single generic table layout across all M12 screens. The selected pattern must match the primary job.
 
-### 7.2 M10 lifecycle states
+### 7.2 M12 lifecycle states
 
-M10 UI copy must distinguish these states where backend contracts support them:
+M12 UI copy must distinguish these states where backend contracts support them:
 
 ```text
 Draft
@@ -363,7 +363,7 @@ Archived
 
 Never label a queued or provider-accepted message as delivered.
 
-### 7.3 Required M10 status chips
+### 7.3 Required M12 status chips
 
 | Status family | Chip guidance |
 |---|---|
@@ -432,7 +432,7 @@ Parent-teacher chat and moderation screens must preserve school-safety context:
 - Report, escalate, block, resolve, reopen, and audit-note actions must be explicit, permission-gated, and audited.
 - Safety copy should warn users not to share passwords, OTPs, payment details, or other sensitive personal data in chat.
 
-### 7.8 M10 responsive behavior
+### 7.8 M12 responsive behavior
 
 Desktop references are dense operating-desk layouts. For narrower viewports:
 

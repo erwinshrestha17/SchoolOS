@@ -63,10 +63,10 @@ export function QrIdWorkspace() {
       student.qrCredential && student.qrCredential.status !== "ACTIVE",
   ).length;
 
-  async function openIdCard(studentId: string, token?: string) {
+  async function openIdCard(studentId: string) {
     setPdfError("");
     try {
-      await api.openStudentDocumentPdf(studentId, "id-card", token);
+      await api.openStudentDocumentPdf(studentId, "id-card");
     } catch (error) {
       setPdfError(
         error instanceof Error ? error.message : "ID card could not be opened.",
@@ -265,7 +265,6 @@ export function QrIdWorkspace() {
               studentId={selected.id}
               studentSystemId={selected.studentSystemId}
               qrCredential={selected.qrCredential ?? null}
-              onOpenIdCard={(token) => void openIdCard(selected.id, token)}
             />
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">

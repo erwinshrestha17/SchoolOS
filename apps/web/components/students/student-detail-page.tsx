@@ -203,10 +203,10 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     },
   });
 
-  async function openStudentPdf(kind: string, token?: string) {
+  async function openStudentPdf(kind: string) {
     setPdfError('');
     try {
-      await api.openStudentDocumentPdf(studentId, kind, token);
+      await api.openStudentDocumentPdf(studentId, kind);
     } catch (err: unknown) {
       setPdfError(err instanceof Error ? err.message : 'Failed to generate document');
     }

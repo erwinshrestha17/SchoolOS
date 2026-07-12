@@ -1,7 +1,9 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -12,19 +14,21 @@ import {
   TransportEnrollmentStatus,
 } from '@prisma/client';
 import { randomBytes } from 'crypto';
-import QRCode from 'qrcode';
 import { StudentQrResolvePurpose } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { hashToken, hmacToken } from '../auth/auth.utils';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '../config/config.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
+import { buildIdCardPdf } from '../common/pdf/simple-pdf';
 
 interface QrCredentialRecord {
   id: string;
   tenantId: string;
   studentId: string;
   tokenHash: string;
+  fileAssetId: string | null;
   status: StudentQrStatus;
   createdById: string | null;
   updatedById: string | null;
@@ -50,14 +54,15 @@ export interface SafeQrCredential {
   rotateReason: string | null;
   revokeReason: string | null;
   lastScannedAt: string | null;
+  fileAssetId: string | null;
 }
 
-export interface PrintableQrResult {
+export interface StudentCredentialArtifactResult {
   credential: SafeQrCredential;
-  qrImageSvg?: string;
-  qrImageAvailable: boolean;
-  qrImageMessage?: string;
-  rawToken?: string;
+  fileAssetId: string | null;
+  fileName: string | null;
+  fileAvailable: boolean;
+  fileMessage?: string;
 }
 
 export interface StudentQrStatusHistory {
@@ -103,6 +108,7 @@ export class StudentQrService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
+    private readonly fileRegistryService: FileRegistryService,
   ) {}
 
   /**
@@ -115,7 +121,8 @@ export class StudentQrService {
     tenantId: string,
     studentId: string,
     auth: AuthContext,
-  ): Promise<PrintableQrResult> {
+  ): Promise<StudentCredentialArtifactResult> {
+    await this.assertPersonaStudentScope(tenantId, studentId, auth);
     await this.assertActiveStudent(tenantId, studentId);
 
     const existing = await this.prisma.studentQrCredential.findFirst({
@@ -135,28 +142,66 @@ export class StudentQrService {
 
       return {
         credential: this.sanitizeCredential(existing),
-        qrImageAvailable: false,
-        qrImageMessage:
-          'An active QR credential already exists. Rotate the QR if a new printable image is required.',
+        fileAssetId: existing.fileAssetId ?? null,
+        fileName: existing.fileAssetId
+          ? this.artifactFileName(studentId)
+          : null,
+        fileAvailable: Boolean(existing.fileAssetId),
+        fileMessage: existing.fileAssetId
+          ? undefined
+          : 'The protected credential artifact is unavailable. Rotate the credential to generate a replacement.',
       };
     }
 
-    const issued = await this.issueCredential(tenantId, studentId, auth.userId);
+    let issued: Awaited<ReturnType<StudentQrService['issueCredential']>>;
+    try {
+      issued = await this.prisma.$transaction((tx) =>
+        this.issueCredential(tenantId, studentId, auth.userId, tx),
+      );
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        const active = await this.prisma.studentQrCredential.findFirst({
+          where: { tenantId, studentId, status: StudentQrStatus.ACTIVE },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (active) {
+          return {
+            credential: this.sanitizeCredential(active),
+            fileAssetId: active.fileAssetId ?? null,
+            fileName: active.fileAssetId
+              ? this.artifactFileName(studentId)
+              : null,
+            fileAvailable: Boolean(active.fileAssetId),
+            fileMessage: active.fileAssetId
+              ? undefined
+              : 'Credential generation is already in progress.',
+          };
+        }
+      }
+      throw error;
+    }
+
+    const completed = await this.completeCredentialArtifact(
+      tenantId,
+      studentId,
+      auth,
+      issued,
+    );
 
     await this.auditService.record({
       action: 'QR_GENERATED',
       resource: 'student_qr',
       tenantId,
       userId: auth.userId,
-      resourceId: issued.credential.id,
-      after: { studentId },
+      resourceId: completed.credential.id,
+      after: { studentId, fileAssetId: completed.fileAssetId },
     });
 
     return {
-      credential: this.sanitizeCredential(issued.credential),
-      qrImageSvg: await this.getQrImage(issued.rawToken),
-      qrImageAvailable: true,
-      rawToken: issued.rawToken,
+      credential: this.sanitizeCredential(completed.credential),
+      fileAssetId: completed.fileAssetId,
+      fileName: completed.fileName,
+      fileAvailable: true,
     };
   }
 
@@ -165,13 +210,14 @@ export class StudentQrService {
     studentId: string,
     auth: AuthContext,
     reason?: string,
-  ): Promise<PrintableQrResult> {
+  ): Promise<StudentCredentialArtifactResult> {
     if (!reason?.trim()) {
       throw new BadRequestException(
         'A reason is required to rotate a student QR',
       );
     }
 
+    await this.assertPersonaStudentScope(tenantId, studentId, auth);
     await this.assertActiveStudent(tenantId, studentId);
 
     const existing = await this.prisma.studentQrCredential.findFirst({
@@ -185,8 +231,13 @@ export class StudentQrService {
 
     const rotatedAt = new Date();
     const issued = await this.prisma.$transaction(async (tx) => {
-      await tx.studentQrCredential.update({
-        where: { id: existing.id },
+      const invalidated = await tx.studentQrCredential.updateMany({
+        where: {
+          id: existing.id,
+          tenantId,
+          studentId,
+          status: StudentQrStatus.ACTIVE,
+        },
         data: {
           status: StudentQrStatus.ROTATED,
           rotatedAt,
@@ -195,28 +246,53 @@ export class StudentQrService {
         },
       });
 
+      if (invalidated.count !== 1) {
+        throw new ConflictException(
+          'The QR credential changed before rotation completed. Refresh and try again.',
+        );
+      }
+
       return this.issueCredential(tenantId, studentId, auth.userId, tx);
     });
+
+    const completed = await this.completeCredentialArtifact(
+      tenantId,
+      studentId,
+      auth,
+      issued,
+    );
+
+    if (existing.fileAssetId) {
+      await this.fileRegistryService.softDeleteFile(
+        tenantId,
+        existing.fileAssetId,
+        auth.userId,
+      );
+    }
 
     await this.auditService.record({
       action: 'QR_ROTATED',
       resource: 'student_qr',
       tenantId,
       userId: auth.userId,
-      resourceId: issued.credential.id,
+      resourceId: completed.credential.id,
       before: {
         status: existing.status,
         rotatedAt: existing.rotatedAt,
         revokedAt: existing.revokedAt,
       },
-      after: { studentId, reason: reason.trim() },
+      after: {
+        studentId,
+        reason: reason.trim(),
+        fileAssetId: completed.fileAssetId,
+      },
     });
 
     return {
-      credential: this.sanitizeCredential(issued.credential),
-      qrImageSvg: await this.getQrImage(issued.rawToken),
-      qrImageAvailable: true,
-      rawToken: issued.rawToken,
+      credential: this.sanitizeCredential(completed.credential),
+      fileAssetId: completed.fileAssetId,
+      fileName: completed.fileName,
+      fileAvailable: true,
     };
   }
 
@@ -231,6 +307,8 @@ export class StudentQrService {
         'A reason is required to revoke a student QR',
       );
     }
+
+    await this.assertPersonaStudentScope(tenantId, studentId, auth);
 
     const existing = await this.prisma.studentQrCredential.findFirst({
       where: { tenantId, studentId, status: StudentQrStatus.ACTIVE },
@@ -250,6 +328,14 @@ export class StudentQrService {
         revokeReason: reason.trim(),
       },
     });
+
+    if (existing.fileAssetId) {
+      await this.fileRegistryService.softDeleteFile(
+        tenantId,
+        existing.fileAssetId,
+        auth.userId,
+      );
+    }
 
     await this.auditService.record({
       action: 'QR_REVOKED',
@@ -271,7 +357,9 @@ export class StudentQrService {
   async getQrStatus(
     tenantId: string,
     studentId: string,
+    auth: AuthContext,
   ): Promise<StudentQrStatusHistory> {
+    await this.assertPersonaStudentScope(tenantId, studentId, auth);
     await this.assertTenantStudent(tenantId, studentId);
 
     const history = await this.prisma.studentQrCredential.findMany({
@@ -293,6 +381,7 @@ export class StudentQrService {
     studentId: string,
     _actor: AuthContext,
   ) {
+    await this.assertPersonaStudentScope(tenantId, studentId, _actor);
     await this.assertTenantStudent(tenantId, studentId);
 
     const credentials = await this.prisma.studentQrCredential.findMany({
@@ -366,6 +455,7 @@ export class StudentQrService {
     studentId: string,
     _actor: AuthContext,
   ) {
+    await this.assertPersonaStudentScope(tenantId, studentId, _actor);
     await this.assertTenantStudent(tenantId, studentId);
 
     const credentials = await this.prisma.studentQrCredential.findMany({
@@ -777,15 +867,6 @@ export class StudentQrService {
     }
   }
 
-  async getQrImage(token: string) {
-    return QRCode.toString(token, {
-      type: 'svg',
-      errorCorrectionLevel: 'M',
-      margin: 1,
-      width: 128,
-    });
-  }
-
   private async assertActiveStudent(tenantId: string, studentId: string) {
     const student = await this.prisma.student.findFirst({
       where: {
@@ -814,6 +895,60 @@ export class StudentQrService {
     }
   }
 
+  private async assertPersonaStudentScope(
+    tenantId: string,
+    studentId: string,
+    auth: AuthContext,
+  ) {
+    const isParent = auth.roles.includes('parent');
+    const isTeacher =
+      auth.roles.includes('teacher') || auth.roles.includes('subject_teacher');
+    const isStudent = auth.roles.includes('student');
+
+    if (!isParent && !isTeacher && !isStudent) return;
+
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId },
+      select: {
+        id: true,
+        userId: true,
+        classId: true,
+        sectionId: true,
+        guardianLinks: {
+          select: { guardian: { select: { userId: true } } },
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    if (isStudent && student.userId === auth.userId) return;
+    if (
+      isParent &&
+      student.guardianLinks.some((link) => link.guardian.userId === auth.userId)
+    ) {
+      return;
+    }
+    if (isTeacher) {
+      const assignment = await this.prisma.subjectTeacherAssignment.findFirst({
+        where: {
+          tenantId,
+          staff: { userId: auth.userId },
+          classId: student.classId,
+          OR: [{ sectionId: student.sectionId }, { sectionId: null }],
+        },
+        select: { id: true },
+      });
+      if (assignment) return;
+    }
+
+    throw new ForbiddenException(
+      'You do not have access to this student credential',
+    );
+  }
+
   private async issueCredential(
     tenantId: string,
     studentId: string,
@@ -837,6 +972,140 @@ export class StudentQrService {
     return { credential, rawToken };
   }
 
+  private async completeCredentialArtifact(
+    tenantId: string,
+    studentId: string,
+    auth: AuthContext,
+    issued: Awaited<ReturnType<StudentQrService['issueCredential']>>,
+  ) {
+    let registeredFileAssetId: string | null = null;
+    try {
+      const student = await this.prisma.student.findFirst({
+        where: {
+          id: studentId,
+          tenantId,
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
+        include: {
+          tenant: { select: { name: true } },
+          class: { select: { name: true } },
+          sectionRef: { select: { name: true } },
+          guardianLinks: {
+            include: { guardian: true },
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+            take: 1,
+          },
+          enrollments: {
+            include: { academicYear: true, section: true },
+            orderBy: [{ createdAt: 'desc' }],
+            take: 1,
+          },
+        },
+      });
+
+      if (!student) {
+        throw new NotFoundException('Active student not found');
+      }
+
+      const enrollment = student.enrollments[0] ?? null;
+      const guardian = student.guardianLinks[0]?.guardian ?? null;
+      const fileName = this.artifactFileName(student.studentSystemId);
+      const content = buildIdCardPdf({
+        schoolName: student.tenant.name,
+        studentName: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+        studentId: student.studentSystemId,
+        className: student.class.name,
+        sectionName:
+          enrollment?.section?.name ??
+          student.sectionRef?.name ??
+          student.section,
+        rollNumber: student.rollNumber ?? enrollment?.rollNumber ?? null,
+        bloodGroup: student.bloodGroup,
+        guardianName: guardian?.fullName ?? null,
+        guardianPhone: guardian?.primaryPhone ?? null,
+        academicYear: enrollment?.academicYear?.name ?? null,
+        qrToken: issued.rawToken,
+      });
+
+      const asset = await this.fileRegistryService.registerGeneratedFile({
+        tenantId,
+        generatedByUserId: auth.userId,
+        originalFilename: fileName,
+        content,
+        mimeType: 'application/pdf',
+        module: 'students',
+        entityId: studentId,
+        metadata: {
+          kind: 'QR_ID_CARD',
+          source: 'student_qr_credential',
+          credentialId: issued.credential.id,
+          studentId,
+        },
+      });
+      registeredFileAssetId = asset.id;
+
+      await this.prisma.studentQrCredential.update({
+        where: { id: issued.credential.id },
+        data: { fileAssetId: asset.id, updatedById: auth.userId },
+      });
+
+      return {
+        credential: { ...issued.credential, fileAssetId: asset.id },
+        fileAssetId: asset.id,
+        fileName,
+      };
+    } catch (error) {
+      if (registeredFileAssetId) {
+        try {
+          await this.fileRegistryService.softDeleteFile(
+            tenantId,
+            registeredFileAssetId,
+            auth.userId,
+          );
+        } catch {
+          // Credential is revoked below even if artifact cleanup requires retry.
+        }
+      }
+      await this.prisma.studentQrCredential.updateMany({
+        where: {
+          id: issued.credential.id,
+          tenantId,
+          studentId,
+          status: StudentQrStatus.ACTIVE,
+        },
+        data: {
+          status: StudentQrStatus.REVOKED,
+          revokedAt: new Date(),
+          updatedById: auth.userId,
+          revokeReason: 'Credential artifact generation failed',
+        },
+      });
+      await this.auditService.record({
+        action: 'QR_ARTIFACT_GENERATION_FAILED',
+        resource: 'student_qr',
+        tenantId,
+        userId: auth.userId,
+        resourceId: issued.credential.id,
+        after: { studentId, failureCode: 'artifact_generation_failed' },
+      });
+      throw new InternalServerErrorException(
+        'The protected credential artifact could not be generated. No active credential was issued.',
+      );
+    }
+  }
+
+  private artifactFileName(studentReference: string) {
+    const safeReference = studentReference.replace(/[^a-zA-Z0-9_-]/g, '-');
+    return `${safeReference}-student-id-card.pdf`;
+  }
+
+  private isUniqueConstraintError(error: unknown) {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    );
+  }
+
   private sanitizeCredential(credential: QrCredentialRecord): SafeQrCredential {
     return {
       id: credential.id,
@@ -851,6 +1120,7 @@ export class StudentQrService {
       rotateReason: credential.rotateReason ?? null,
       revokeReason: credential.revokeReason ?? null,
       lastScannedAt: credential.lastScannedAt?.toISOString() ?? null,
+      fileAssetId: credential.fileAssetId ?? null,
     };
   }
 

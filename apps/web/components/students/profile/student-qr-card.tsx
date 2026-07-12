@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import type { StudentQrScanAudit } from '@/lib/api/students';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { ProtectedFileButton } from '@/components/ui/protected-file';
 import {
   AlertCircle,
   CheckCircle2,
@@ -24,13 +25,14 @@ type StudentQrCardProps = {
   studentId: string;
   studentSystemId: string;
   qrCredential?: StudentProfile['qrCredential'];
-  onOpenIdCard: (token?: string) => void;
 };
 
-export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpenIdCard }: StudentQrCardProps) {
+export function StudentQrCard({ studentId, studentSystemId, qrCredential }: StudentQrCardProps) {
   const queryClient = useQueryClient();
-  const [qrSvg, setQrSvg] = useState<string | null>(null);
-  const [rawToken, setRawToken] = useState<string | null>(null);
+  const [generatedArtifact, setGeneratedArtifact] = useState<{
+    fileAssetId: string;
+    fileName: string;
+  } | null>(null);
   const [showConfirmRotate, setShowConfirmRotate] = useState(false);
   const [showConfirmRevoke, setShowConfirmRevoke] = useState(false);
   const [rotateReason, setRotateReason] = useState('');
@@ -49,13 +51,12 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
 
   const generateMutation = useMutation({
     mutationFn: () => api.generateStudentQr(studentId),
-    onSuccess: (data: any) => {
-      if (data.qrImageSvg) {
-        setQrSvg(data.qrImageSvg);
-      }
-      if (data.rawToken) {
-        setRawToken(data.rawToken);
-      }
+    onSuccess: (data) => {
+      setGeneratedArtifact(
+        data.fileAssetId && data.fileName
+          ? { fileAssetId: data.fileAssetId, fileName: data.fileName }
+          : null,
+      );
       void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
       void queryClient.invalidateQueries({ queryKey: ['student-qr-status', studentId] });
       void queryClient.invalidateQueries({ queryKey: ['student-qr-scans', studentId] });
@@ -64,13 +65,12 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
 
   const rotateMutation = useMutation({
     mutationFn: () => api.rotateStudentQr(studentId, { reason: rotateReason }),
-    onSuccess: (data: any) => {
-      if (data.qrImageSvg) {
-        setQrSvg(data.qrImageSvg);
-      }
-      if (data.rawToken) {
-        setRawToken(data.rawToken);
-      }
+    onSuccess: (data) => {
+      setGeneratedArtifact(
+        data.fileAssetId && data.fileName
+          ? { fileAssetId: data.fileAssetId, fileName: data.fileName }
+          : null,
+      );
       setShowConfirmRotate(false);
       setRotateReason('');
       void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
@@ -82,8 +82,7 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
   const revokeMutation = useMutation({
     mutationFn: () => api.revokeStudentQr(studentId, { reason: revokeReason }),
     onSuccess: () => {
-      setQrSvg(null);
-      setRawToken(null);
+      setGeneratedArtifact(null);
       setShowConfirmRevoke(false);
       setRevokeReason('');
       void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
@@ -131,31 +130,32 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
           )}
         </div>
 
-        {qrSvg && (
+        {generatedArtifact && (
           <div className="rounded-2xl border-2 border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-soft)] p-6 text-center animate-in zoom-in-95 duration-300">
-            <div className="mx-auto mb-4 flex h-48 w-48 items-center justify-center rounded-2xl bg-white p-4 shadow-sm ring-8 ring-white/70">
-              <div
-                className="h-full w-full [&>svg]:h-full [&>svg]:w-full"
-                dangerouslySetInnerHTML={{ __html: qrSvg }}
-              />
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-white shadow-sm ring-8 ring-white/70">
+              <FileText className="h-9 w-9 text-[var(--color-mod-admissions-accent)]" />
             </div>
-            <p className="text-sm font-bold text-slate-900">New QR Identity Generated</p>
+            <p className="text-sm font-bold text-slate-900">Protected ID card generated</p>
             <p className="mt-1 text-xs text-slate-500 max-w-[240px] mx-auto">
-              Token is not stored server-side. Generate the ID card now to include this code.
+              The QR credential is embedded by the backend. Its secret is never returned to this browser.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
-               <button 
-                className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
-                onClick={() => onOpenIdCard(rawToken ?? undefined)}
-               >
-                 <FileText size={14} className="text-[var(--color-mod-admissions-accent)]" />
-                 Print ID Card
-               </button>
+              <ProtectedFileButton
+                fileAssetId={generatedArtifact.fileAssetId}
+                fileName={generatedArtifact.fileName}
+                action="preview"
+                label="Preview ID card"
+              />
+              <ProtectedFileButton
+                fileAssetId={generatedArtifact.fileAssetId}
+                fileName={generatedArtifact.fileName}
+                action="download"
+                label="Download ID card"
+              />
                <button 
                 className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)]"
                 onClick={() => {
-                  setQrSvg(null);
-                  setRawToken(null);
+                  setGeneratedArtifact(null);
                 }}
                >
                  Done
@@ -164,13 +164,33 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
           </div>
         )}
 
-        {isActive && !qrSvg && (
+        {isActive && !generatedArtifact && (
           <div className="space-y-3">
             {currentCredential?.lastScannedAt && (
               <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/30 px-4 py-2.5 text-xs text-slate-500">
                 <ShieldCheck size={14} className="text-success-500" />
                 <span>Last scanned {formatBsDate(currentCredential.lastScannedAt)}</span>
               </div>
+            )}
+            {currentCredential?.fileAssetId ? (
+              <div className="flex flex-wrap gap-2">
+                <ProtectedFileButton
+                  fileAssetId={currentCredential.fileAssetId}
+                  fileName={`${studentSystemId}-student-id-card.pdf`}
+                  action="preview"
+                  label="Preview protected ID card"
+                />
+                <ProtectedFileButton
+                  fileAssetId={currentCredential.fileAssetId}
+                  fileName={`${studentSystemId}-student-id-card.pdf`}
+                  action="download"
+                  label="Download ID card"
+                />
+              </div>
+            ) : (
+              <p className="rounded-xl border border-warning-100 bg-warning-50 px-3 py-2 text-xs font-semibold text-warning-700">
+                The protected ID-card file is unavailable. Rotate the credential to create a replacement.
+              </p>
             )}
             <div className="grid grid-cols-2 gap-3">
                <button
@@ -326,7 +346,7 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
              <p className="text-[0.6rem] font-bold uppercase tracking-wider">Audit Security Policy</p>
            </div>
            <p className="text-[0.65rem] text-slate-500 leading-relaxed">
-             QR Identity uses cryptographic hashes. Raw tokens are never stored on SchoolOS servers. Rotation generates a fresh audit trail and invalidates the previous physical card.
+             QR Identity uses protected token hashes. Credential secrets are held only in backend memory while the protected ID-card artifact is generated. Rotation invalidates the previous card and file.
            </p>
         </div>
       </div>

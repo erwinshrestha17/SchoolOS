@@ -9,6 +9,16 @@ describe('StudentQrCredential Prisma schema contract', () => {
 
   const model =
     /model StudentQrCredential \{[\s\S]*?\n\}/.exec(schema)?.[0] ?? '';
+  const protectedArtifactMigration = readFileSync(
+    join(
+      process.cwd(),
+      'prisma',
+      'migrations',
+      '20260712160000_student_qr_protected_artifact',
+      'migration.sql',
+    ),
+    'utf8',
+  );
 
   it('declares the QR credential model and status enum', () => {
     expect(schema).toContain('enum StudentQrStatus');
@@ -30,5 +40,11 @@ describe('StudentQrCredential Prisma schema contract', () => {
     expect(model).toContain('@@index([tenantId, studentId])');
     expect(model).toContain('@@index([tenantId, studentId, status])');
     expect(model).toContain('@@index([tenantId, status])');
+    expect(model).toContain('fileAssetId');
+    expect(model).toContain('@unique');
+    expect(protectedArtifactMigration).toContain(
+      '"StudentQrCredential_one_active_per_student"',
+    );
+    expect(protectedArtifactMigration).toContain(`WHERE "status" = 'ACTIVE'`);
   });
 });

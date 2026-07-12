@@ -1164,7 +1164,7 @@ describe("SchoolOS web production contracts", () => {
     assert.match(studentProfileEntry, /Section not assigned/);
     assert.match(
       studentProfileEntry,
-      /api\.openStudentDocumentPdf\(studentId, kind, token\)/,
+      /api\.openStudentDocumentPdf\(studentId, kind\)/,
     );
     assert.doesNotMatch(studentProfileEntry, /No known disability/);
     assert.doesNotMatch(
@@ -1188,7 +1188,10 @@ describe("SchoolOS web production contracts", () => {
       /api\.revokeStudentQr\(studentId, \{ reason: revokeReason \}\)/,
     );
     assert.match(studentQrCard, /color-mod-admissions-accent/);
-    assert.match(studentQrCard, /Raw tokens are never stored/);
+    assert.match(studentQrCard, /ProtectedFileButton/);
+    assert.match(studentQrCard, /fileAssetId=\{currentCredential\.fileAssetId\}/);
+    assert.match(studentQrCard, /credential secrets are held only in backend memory/i);
+    assert.doesNotMatch(studentQrCard, /rawToken|qrImageSvg|dangerouslySetInnerHTML/);
     assert.doesNotMatch(
       studentQrCard,
       /bg-slate-900|rounded-\[2rem\]|rounded-\[2\.5rem\]|rounded-\[3rem\]|shadow-slate-900|shadow-2xl|shadow-xl|N\/A|Unknown|primary-500|primary-50|primary-600|primary-700|primary-100|primary-200/,

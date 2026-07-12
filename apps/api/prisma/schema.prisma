@@ -5830,6 +5830,7 @@ model StudentQrCredential {
   tenantId      String
   studentId     String
   tokenHash     String
+  fileAssetId   String?         @unique
   status        StudentQrStatus @default(ACTIVE)
   createdById   String?
   updatedById   String?

@@ -21,12 +21,9 @@ Also read where relevant:
 
 ```text
 MOBILE_MASTER_GUIDE.md
-SchoolOS mobile design plan docs
-Web frontend design plan if the flow depends on web-owned admin setup
-Project status/plan docs
 Architecture/security docs
 SRS and MDD docs
-FRS / feature requirements docs
+PRD / feature requirements
 Existing Flutter code for the touched feature
 Existing API clients/repositories/providers for the touched feature
 OpenAPI/backend routes for the touched feature
@@ -36,10 +33,10 @@ Canonical paths:
 
 ```text
 docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
-docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
 docs/requirements/SCHOOLOS_SRS.md
 docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
 docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md
+docs/production/SCHOOLOS_GA_RELEASE_POLICY.md
 ```
 
 Do not guess contracts. If an endpoint, DTO, permission rule, offline rule, or idempotency behavior is not confirmed, mark it explicitly as needing backend verification.

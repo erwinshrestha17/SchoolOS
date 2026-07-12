@@ -3,8 +3,8 @@
 **Status:** Canonical SRS
 **Owner/audience:** CTO, lead NestJS developer, lead Next.js developer, senior Flutter developer, database designer, PostgreSQL DBA, security engineer, QA lead, DevOps/SRE, support/operations lead
 **Scope:** Software requirements, non-functional requirements, system constraints, security, performance, database, API, web, mobile, operations, quality, and evidence classification for the shared SchoolOS platform.
-**Precedence:** This SRS translates the BRD, PRD, and FRS into software constraints. It does not replace module behavior in `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, current readiness evidence in `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`, or implementation sequencing in `../project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`.
-**Inputs/source documents:** `../product/SCHOOLOS_BRD.md`, `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `../product/SCHOOLOS_BACKEND_WEB_MOBILE_FEATURE_ALLOCATION.md`, `../architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`, `../architecture/SCHOOLOS_NOTIFICATION_ARCHITECTURE.md`, `../architecture/SCHOOLOS_PLATFORM_OPERATIONS.md`, `../architecture/SCHOOLOS_NAMING_CONVENTIONS.md`, `../production/SCHOOLOS_GA_RELEASE_POLICY.md`, `../production/SCHOOLOS_PRODUCTION_RUNBOOK.md`, `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`, `../project/SCHOOLOS_NEXT_PHASE_DELIVERY_PLAN.md`, actual repository code inspected on 2026-06-20.
+**Precedence:** This SRS owns software, API, database, web, mobile, non-functional, performance, reliability, and testable requirements. Product intent is owned by `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`; architecture and security by `../architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`; module ownership and known gaps by `../architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`; release gates by `../production/SCHOOLOS_GA_RELEASE_POLICY.md`; deployment and recovery procedures by `../production/SCHOOLOS_PRODUCTION_RUNBOOK.md`.
+**Inputs/source documents:** The six canonical documents listed in `../README.md` and repository source inspected on 2026-06-20. Current work and blockers belong in GitHub Issues, Milestones, or Projects; current evidence belongs in CI runs, smoke outputs, staging records, and release artifacts.
 **Out-of-scope content:** Exact endpoint URLs for proposed APIs, Prisma migrations for proposed structures, screen-by-screen UI specs, pricing, staging secrets, deployment credentials, and GA readiness claims.
 **Last reviewed date:** 2026-07-01
 
@@ -19,12 +19,11 @@ Shared tenant-aware core
 + PRESCHOOL experience pack
 + SCHOOL experience pack
 + HIGHER_SECONDARY experience pack
-+ BACHELOR proposed experience direction
 + shared Next.js Web application
 + shared Flutter companion app
 ```
 
-Master's is not an active full management pack; it is only a future extension and a broad Student App eligibility level for enrolled Master's students.
+A broad Student App is not active scope. Product scope is defined by the PRD.
 
 The official record remains:
 
@@ -39,7 +38,7 @@ Student
 + enabled module/capability
 ```
 
-Do not create separate `PreschoolStudent`, `SchoolStudent`, `PlusTwoStudent`, `BachelorStudent`, or `MasterStudent` systems.
+Do not create separate `PreschoolStudent`, `SchoolStudent`, or `PlusTwoStudent` systems.
 
 ## 2. Verified Repository Baseline
 
@@ -58,8 +57,6 @@ This section records code evidence inspected during this documentation pass. It 
 | Program/stage resolver | NEEDS_SCHEMA_DESIGN | No canonical tenant program-offering, class stage profile, stream/combination, or `ExperienceContext` implementation was found. Current evidence is demo preschool class names and activity milestone stage filters only. |
 | Preschool pickup/handover workflow | NEEDS_SCHEMA_DESIGN | No dedicated authorized-pickup, temporary pickup change, arrival/checkout, or pickup exception model was verified. |
 | Higher Secondary streams/subject combinations/practicals/projects | NEEDS_SCHEMA_DESIGN | Subjects have practical marks and assessments; no configurable stream/subject-combination/practical/project lifecycle model was verified. |
-| Bachelor's program/course/term model | NEEDS_SCHEMA_DESIGN | Seed text references a Bachelor program, but no canonical Bachelor institution-management schema, OpenAPI contract, shared DTO, web workspace, Flutter self-service contract, or staging proof was verified. |
-| Master management pack | NOT_ACTIVE_SCOPE | No Master's administration, finance, faculty, course-management, or academic-structure implementation is approved in current scope. Master's is Student App eligibility/future extension only. |
 
 ## 3. System Architecture Requirement
 
@@ -148,7 +145,7 @@ Current repository status: **PROPOSED / NEEDS_SCHEMA_DESIGN**. Do not invent end
 | Module ownership | Endpoint ownership follows the feature module. Mobile-specific contracts must still call module services or purpose-limited mobile services with module-owned rules. |
 | Purpose-limited endpoints | Parent, teacher, principal, driver, staff self-service, and student-session endpoints return only the minimum role-scoped data needed for the workflow. |
 | Tenant scoping | Every query/mutation/job/export/report/file/mobile response includes `tenantId` scoping or platform-approved tenant override with reason and audit. |
-| Resource scoping | Parent = linked children; Preschool-+2 student = own controlled learning/session only; future Bachelor/Master Student App = own active enrollment only; teacher = assigned class/section/subject unless permitted; driver = assigned trip; staff self-service = own staff record. |
+| Resource scoping | Parent = linked children; students = own controlled learning/session only; teacher = assigned class/section/subject unless permitted; driver = assigned trip; staff self-service = own staff record. |
 | DTO validation | DTOs use validation decorators/shared schemas; runtime bootstrap keeps whitelist, transform, and forbid-non-whitelisted behavior. |
 | OpenAPI alignment | New or changed endpoints require OpenAPI and shared contract alignment before web/mobile integration. |
 | Errors | Use safe bounded error envelopes. Logs may retain stack traces server-side, but client payloads must not. |
@@ -178,7 +175,6 @@ Stage-aware dashboard requirements:
 | `PRESCHOOL` | Child safety, attendance, pickup/drop, parent concerns, fees, admissions, class coverage. |
 | `SCHOOL` | Attendance gaps, homework, timetable, exams, marks, report cards, dues, operations. |
 | `HIGHER_SECONDARY` | Stream enrollment, practicals, projects, labs, internal assessment, mock exams, workload, dues. |
-| `BACHELOR` | Programs, departments, intakes/batches, semesters/terms, courses, faculty assignment, attendance, assignments, exams/results, fees, notices, library, Student App self-service. Current status: **PROPOSED / NEEDS_SCHEMA_DESIGN**. |
 
 ## 8. Mobile Requirements
 
@@ -191,7 +187,7 @@ SchoolOS mobile remains one Flutter companion app.
 | Secure storage | Credentials and tokens use secure storage. Private read cache is safe-read only and must clear on logout/session expiry where implemented. |
 | Offline | Offline reads may show cached private data with visible freshness; writes require explicit idempotency/reconciliation. |
 | Context switching | Parent switches child and active stage; teacher switches assigned class/context; principal filters combined alerts by Preschool, School, and +2. |
-| Student App eligibility | Broad Student App routes must be hidden and backend-denied for Preschool through +2; future Bachelor/Master routes must consume backend eligibility and cannot be guarded by Flutter navigation only. |
+| Student access | Broad Student App routes must be hidden and backend-denied; controlled learning/session access must be tenant-scoped, self/session-scoped, expiring where applicable, and backend-authorized. |
 
 Mobile workflow priority:
 
@@ -231,7 +227,6 @@ Mobile workflow priority:
 | Enrollment | M1/M4 | active/promoted/transferred/withdrawn/graduated | Academic-year, class, section, and proposed stage/program scope. |
 | Class/section | M0/M4/M6 | configured/active/archived | Tenant-scoped; stage/program profile proposed. |
 | Program/stage | Proposed M0/M1/M4 | offered/enabled/assigned/retired | Needs schema design; backend-owned resolver. |
-| Bachelor program/course/term | Proposed M0/M1/M4 | proposed/enabled/active/retired | Needs schema design, OpenAPI confirmation, shared-contract confirmation, RBAC and entitlement design, tenant-isolation tests, student self-scope tests. |
 | Fee ledger | M3/M11 | planned/invoiced/paid/reversed/refunded/closed | Backend Decimal truth, idempotency, audit. |
 | Attendance | M2 | draft/submitted/locked/corrected/exported | Teacher/guardian scope enforced by backend. |
 | Files | M0 File Registry + feature owner | pending/uploaded/linked/previewed/downloaded/expired/deleted | No raw object keys or permanent private URLs in clients. |
@@ -251,7 +246,6 @@ Mobile workflow priority:
 | Teacher | Own tenant | Assigned class/section/subject unless permitted | Attendance, homework, marks, class activity, parent-teacher threads | Unassigned students/classes, finance internals, broad admin settings |
 | Parent/guardian | Own tenant through linked children | Linked children only | Child attendance, fees, receipts, notices, activity, milestones, published results | Other children, staff finance, raw object keys, private messages outside linked scope |
 | Student session Preschool-+2 | Own tenant | Own/session-scoped | Approved controlled learning/session only | Broad student app, other students, open chat, admin data |
-| Future Bachelor/Master Student App | Own tenant | Own active enrollment only | Own profile, enrollment, timetable, attendance, assignments, published grades/results, notices, fees/receipts, library status, protected documents, support where approved | Other students, staff/faculty/admin/finance/payroll/accounting actions, settings, bulk exports, publishing, corrections, cashier work, raw storage data |
 | Driver/conductor | Own tenant | Assigned trip only | Trip roster/status, route tasks, delay updates | Other routes/students, finance, staff data |
 | Staff self-service | Own tenant | Own staff record | Own attendance, leave, payslips where enabled | Other staff salary/bank/payroll records |
 
@@ -259,7 +253,7 @@ Mobile workflow priority:
 
 | Area | Requirement | Current proof boundary |
 |---|---|---|
-| Security | Tenant/RBAC/scope fail closed, safe errors, secrets masked. | Local tests recorded in audit; no full staging security review. |
+| Security | Tenant/RBAC/scope fail closed, safe errors, secrets masked. | Relevant code/tests exist; current staging security evidence was not established by this documentation pass. |
 | Tenant isolation | All records/jobs/files/caches/provider events are tenant-scoped. | Code evidence exists; pilot cross-scope proof pending. |
 | RBAC | Backend permissions and entitlements are source of truth. | Decorators/guards exist; live role walkthrough pending. |
 | Performance | Pagination, indexes, queued heavy jobs, N+1 review. | Architecture rules exist; load proof pending. |
@@ -284,7 +278,5 @@ Mobile workflow priority:
 | Higher Secondary streams/subject combinations | NEEDS_SCHEMA_DESIGN | Design configurable stream/program/combination model and migration plan. |
 | Higher Secondary projects/practicals lifecycle | NEEDS_SCHEMA_DESIGN | Design lifecycle, assessment, files, notifications, and parent/student visibility. |
 | Conceptual ExperienceContext | PROPOSED | Backend contract, OpenAPI, shared DTO, web/mobile integration, tests. |
-| Bachelor's scope | PROPOSED / NEEDS_SCHEMA_DESIGN | Schema, OpenAPI, shared contracts, RBAC/entitlement design, web/mobile contracts, seed, browser/mobile tests, tenant-isolation tests, student self-scope tests, and staging proof. |
-| Education-reporting compliance composition | PROPOSED / NEEDS_CONTRACT_DESIGN | Confirm official iEMIS/UGC/HEMIS/QAA fields, module-owned projections, validation states, protected export contracts, permissions, retention and pilot evidence. |
+| Education-reporting compliance composition | PROPOSED / NEEDS_CONTRACT_DESIGN | Confirm applicable Nepal school-reporting fields and formats, module-owned projections, validation states, protected export contracts, permissions, retention, and pilot evidence. |
 | Formal/IRD-ready billing extension | PROPOSED / NEEDS_CONTRACT_DESIGN | Confirm legal/tax policy, sequence concurrency, immutable invoice/note schema, OpenAPI/shared contracts, M11 posting, provider adapter, tenant tests and official approval boundaries. |
-| Master's scope | NOT_ACTIVE_MANAGEMENT_PACK | Keep eligibility-only until a separate full management pack is approved. |

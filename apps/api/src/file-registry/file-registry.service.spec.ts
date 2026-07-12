@@ -67,6 +67,9 @@ describe('FileRegistryService tenant scoping', () => {
       subjectTeacherAssignment: {
         findFirst: jest.fn(),
       },
+      student: {
+        findFirst: jest.fn(),
+      },
       guardian: {
         findFirst: jest.fn(),
       },
@@ -570,6 +573,48 @@ describe('FileRegistryService tenant scoping', () => {
         'file-1',
       ),
     ).rejects.toThrow('You can only view files for your linked child');
+  });
+
+  it('allows protected student files inside teacher assignment scope', async () => {
+    prisma.student.findFirst.mockResolvedValue({
+      classId: 'class-1',
+      sectionId: 'section-1',
+    });
+    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-1',
+    });
+
+    await expect(
+      service.assertFileAccessForAuth(
+        asset as any,
+        {
+          tenantId: 'tenant-1',
+          userId: 'teacher-user-1',
+          roles: ['teacher'],
+          permissions: ['students:read', 'students:qr:read'],
+        } as any,
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it('rejects protected student files outside teacher assignment scope', async () => {
+    prisma.student.findFirst.mockResolvedValue({
+      classId: 'class-1',
+      sectionId: 'section-1',
+    });
+    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.assertFileAccessForAuth(
+        asset as any,
+        {
+          tenantId: 'tenant-1',
+          userId: 'teacher-user-2',
+          roles: ['teacher'],
+          permissions: ['students:read', 'students:qr:read'],
+        } as any,
+      ),
+    ).rejects.toThrow('This student file is outside your teaching scope');
   });
 
   it('allows guardian-owned parent-teacher chat attachment access only for the linked guardian', async () => {

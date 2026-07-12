@@ -1,12 +1,12 @@
 # SchoolOS Production Runbook
 
-**Last updated:** 2026-06-26
+**Last updated:** 2026-07-12
 **Status:** Consolidated active production runbook, deployment manual, database backup/restore procedures, and pilot onboarding guidelines.  
 **Architecture:** NestJS modular monolith, PostgreSQL, Redis/BullMQ, private storage.
 
-This runbook defines the deployment and recovery procedure. It is not proof that SchoolOS is currently production-ready. Use `docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md` for current evidence, scores, blockers, and command results.
+This runbook defines deployment, recovery, and controlled-pilot operating procedures. It is not proof that any procedure has been executed or that SchoolOS has passed a release gate. The current posture is **Internal QA / controlled-pilot preparation**. Current work and blockers belong in GitHub Issues, Milestones, or Projects; current evidence belongs in CI runs, smoke outputs, staging records, and release artifacts.
 
-The deployable release boundary remains evidence-driven. Preschool, School (Grade 1-10), Higher Secondary / +2, and Bachelor's direction share one tenant-aware core. Bachelor's rollout requires later schema/OpenAPI/shared-contract/security/seed/test/staging proof before inclusion in a pilot or production deployment. Master's is not a full current management pack.
+The active education scope is Preschool, School (Grade 1-10), and Higher Secondary (Grade 11-12 / +2) over one tenant-aware core. A broad Student App and M14 Intelligence / AI runtime are not active scope.
 
 ---
 
@@ -15,7 +15,7 @@ The deployable release boundary remains evidence-driven. Preschool, School (Grad
 ### Scope
 Use this runbook for every staging or production deployment.
 The target pilot architecture is: NestJS API, Next.js dashboard, PostgreSQL, Redis/BullMQ, private local or object storage, and provider adapters in disabled/dev-log/configured mode.
-SchoolOS remains a modular monolith for the pilot stage. Angular migration, microservices, AI/ML, biometric workflows, live transport map expansion, Bachelor's runtime rollout before contract proof, and Master's administration scope are out of scope unless explicitly approved.
+SchoolOS remains a modular monolith. Angular migration, microservices, AI/ML runtime, biometric workflows, broad Student App access, and unverified live transport map expansion are out of scope unless explicitly approved.
 
 ### Server Requirements
 Recommended pilot VPS specs:
@@ -28,7 +28,7 @@ Recommended pilot VPS specs:
 
 Database and queue:
 - **Staging default:** Docker PostgreSQL and Docker Redis with persistent volumes.
-- **Production-ready:** Managed PostgreSQL and managed Redis. Redis persistence is recommended for BullMQ jobs and retries.
+- **Production target:** Managed PostgreSQL and managed Redis, with persistence appropriate for BullMQ jobs and retries.
 
 Storage:
 - Local storage is acceptable for controlled pilot if backed up. Recommended path: `/var/lib/schoolos/storage`.
@@ -81,7 +81,7 @@ EMAIL_DELIVERY_MODE=log
 EMAIL_FROM_ADDRESS=no-reply@schoolos.local
 STORAGE_PROVIDER=local
 LOCAL_STORAGE_ROOT=/var/lib/schoolos/storage
-LOCAL_STORAGE_PUBLIC_BASE_URL=/storage
+LOCAL_STORAGE_PUBLIC_BASE_URL=/protected-storage
 ```
 
 Web environment (`apps/web/.env`):
@@ -125,8 +125,9 @@ R2_ENDPOINT
 R2_ACCESS_KEY_ID
 R2_SECRET_ACCESS_KEY
 R2_REGION=auto
-R2_PUBLIC_BASE_URL
 ```
+
+Public-base variable names may be required by the current storage adapter, but they must resolve through protected application-controlled access. Never expose a private storage bucket, object key, or storage directory directly through the reverse proxy.
 
 ### Cookie, CORS, and Security Rules
 - HTTPS is mandatory for staging and production.
@@ -223,7 +224,7 @@ pnpm smoke:pilot
 
 ## 4. Database Backup & Restore Runbook
 
-Production readiness requires restorable data, not just backups that appear to exist. Treat this as the baseline operating policy.
+Release validation requires restorable data, not just backups that appear to exist. Treat this as the baseline operating procedure; it is not verified until a dated restore record exists.
 
 ### Backup Scope & Frequency
 - **Postgres:** full backup daily (and WAL archiving once live). Captures tenant records, accounting ledger, audit records, sessions, and module data.
@@ -263,9 +264,9 @@ Store backups outside the VPS as soon as possible.
 
 ---
 
-## 5. Phase 1 Onboarding & Pilot Readiness
+## 5. Controlled-Pilot Onboarding and Operations
 
-This section outlines onboarding a controlled pilot school onto the Phase 1 SchoolOS dashboard. It assumes the staging deployment has passed health checks and smoke checks.
+This section outlines onboarding a controlled-pilot school onto the agreed supported workflow slice. Use it only after staging health and smoke checks have actually passed and their evidence has been recorded.
 
 ### Local/Staging Startup Quick Reference
 1. Install dependencies:
@@ -289,10 +290,7 @@ This section outlines onboarding a controlled pilot school onto the Phase 1 Scho
    pnpm dev
    ```
 
-Seeded local accounts:
-- **Tenant:** `default-school`
-- **Admin Email:** `admin@schoolos.com` | Password: `admin123`
-- **SuperAdmin Email:** `superadmin@schoolos.com` | Password: `superadmin123`
+Use the current idempotent development seed and retrieve local QA credentials from the seed implementation or approved secure development configuration. Do not reuse seed credentials in staging or production.
 
 Expected URLs:
 - Web: `http://localhost:3000`
@@ -307,7 +305,7 @@ Expected URLs:
 - Verify notification providers are stubbed or explicitly configured.
 - Verify `FRONTEND_ORIGIN`, cookies, CORS, and HTTPS settings.
 - Verify `LOCAL_STORAGE_ROOT` exists and is backed up.
-- Run `pnpm verify:production` and `pnpm smoke:pilot` (or legacy alias `pnpm smoke:phase1`).
+- Run the applicable deployment verification and `pnpm smoke:pilot`; attach outputs to the current evidence record.
 - Run browser smoke with PDF checks.
 
 ### Staff Training Checklist
@@ -345,12 +343,12 @@ Train in this order:
 - **Activity:** Target selection clear. Upload blocks >5 images. Feed preview shows new post. Delivery record is queued.
 - **Communications:** Normal notice publishes. Emergency warning appears for emergency priority. Event creation works. Delivery records list statuses. Guardian consent capture/revoke works.
 
-### Known Pilot Limitations
-- Phase 2 academics, exams, CAS, report cards, timetable/homework, HR/payroll, and advanced accounting are not part of this pilot.
-- No full parent mobile app is included yet. No Angular dashboard migration is included yet.
-- Real SMS, FCM, and external email are disabled unless configured. Payment gateways are deferred (use cash/bank/manual).
-- AI captions/narratives are deferred.
-- Local storage is acceptable only with backups; object storage can be enabled later.
+### Controlled-Pilot Boundaries
+- The supported workflow slice must be recorded for each pilot; module presence in the repository does not prove that a workflow is pilot validated.
+- Parent mobile workflows exist in the repository, but supported-persona device QA and tenant/child-scope evidence are still required before a pilot-validation claim.
+- Real SMS, FCM, external email, payment, and object-storage modes remain unavailable unless explicitly configured and verified in a safe staging or sandbox environment.
+- M14 Intelligence / AI runtime and a broad Student App remain out of active scope.
+- Local storage is acceptable for a controlled pilot only when protected access, backup, and restore procedures are configured and evidenced.
 
 ### Support Process & Severity Levels
 - **S0 (Critical):** Data loss, cross-tenant data exposure, login unavailable, or financial corruption. Stop pilot writes and escalate immediately.

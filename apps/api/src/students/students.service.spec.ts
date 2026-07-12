@@ -862,14 +862,26 @@ describe('students lifecycle hardening', () => {
       actor,
     );
 
-    expect(Buffer.isBuffer(pdf)).toBe(true);
-    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
-    expect(storageService.saveBufferObject).toHaveBeenCalledWith({
-      tenantId: actor.tenantId,
-      prefix: `students/${student.id}/generated-documents/enrollment-confirmation`,
+    expect(pdf).toEqual({
+      fileAssetId: 'generated-file-asset',
       fileName: `${student.studentSystemId}-enrollment-confirmation.pdf`,
-      contentType: 'application/pdf',
+      mimeType: 'application/pdf',
+      fileAvailable: true,
+    });
+    expect(storageService.saveBufferObject).not.toHaveBeenCalled();
+    expect(fileRegistryService.registerGeneratedFile).toHaveBeenCalledWith({
+      tenantId: actor.tenantId,
+      generatedByUserId: actor.userId,
+      originalFilename: `${student.studentSystemId}-enrollment-confirmation.pdf`,
       content: expect.any(Buffer),
+      mimeType: 'application/pdf',
+      module: 'students',
+      entityId: student.id,
+      metadata: expect.objectContaining({
+        kind: 'enrollment-confirmation',
+        source: 'generated_student_document',
+        version: 3,
+      }),
     });
     expect(
       prisma.transaction.generatedStudentDocument.updateMany,
@@ -893,7 +905,7 @@ describe('students lifecycle hardening', () => {
         studentId: student.id,
         kind: 'enrollment-confirmation',
         generatedById: actor.userId,
-        pdfUrl: `/api/v1/students/${student.id}/documents/enrollment-confirmation.pdf`,
+        pdfUrl: '/api/v1/files/generated-file-asset/preview',
         storageObjectKey: `tenant-1/students/${student.id}/generated-documents/enrollment-confirmation/generated-doc.pdf`,
         checksumSha256: expect.any(String),
         signedAt: expect.any(Date),
@@ -907,14 +919,9 @@ describe('students lifecycle hardening', () => {
         retentionUntil: expect.any(Date),
       }),
     });
-    expect(fileRegistryService.markUploaded).toHaveBeenCalledWith(
-      actor.tenantId,
-      'generated-file-asset',
-      actor.userId,
-    );
   });
 
-  it('generates student ID cards with opaque QR payload support', async () => {
+  it('generates student ID cards without accepting credential secrets from callers', async () => {
     const student = buildStudent({
       guardianLinks: [
         {
@@ -938,15 +945,15 @@ describe('students lifecycle hardening', () => {
     const pdf = await service.generateStudentDocumentPdf(
       student.id,
       'id-card',
-      {
-        ...actor,
-        qrToken: 'schoolos_qr_opaque_test_token',
-      } as typeof actor & { qrToken: string },
+      actor,
     );
 
-    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
-    expect(pdf.toString('latin1')).not.toContain('tokenHash');
-    expect(pdf.toString('latin1')).not.toContain('student-1:tenant-1');
+    expect(pdf).toEqual({
+      fileAssetId: 'generated-file-asset',
+      fileName: `${student.studentSystemId}-id-card.pdf`,
+      mimeType: 'application/pdf',
+      fileAvailable: true,
+    });
   });
 
   it('returns a clean validation error for unsupported student document kinds', async () => {
@@ -1886,6 +1893,13 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
   const fileRegistryService = {
     registerFile: jest.fn().mockResolvedValue({ id: 'generated-file-asset' }),
     markUploaded: jest.fn().mockResolvedValue({ id: 'generated-file-asset' }),
+    registerGeneratedFile: jest.fn().mockResolvedValue({
+      id: 'generated-file-asset',
+      objectKey:
+        'tenant-1/students/student-1/generated-documents/enrollment-confirmation/generated-doc.pdf',
+      sizeBytes: BigInt(512),
+      storageProvider: 'LOCAL',
+    }),
     getSignedUrl: jest.fn(),
     listFilesByEntity: jest.fn().mockResolvedValue([]),
   };

@@ -2,7 +2,7 @@
 
 **Status:** Snapshot as of 2026-07-11, main branch (commits through `0f83563a`). Updated after Phase 5 real-device verification and removal of the parent-teacher chat feature.
 
-**Scope:** `apps/schoolos_mobile`, Parent / Teacher / Principal personas only, per `docs/DESIGN_SYSTEM.md` and the mobile companion-app brief. Driver/Staff/Admin/Student surfaces are noted where they share code with the three in-scope personas, but were not independently audited.
+**Scope:** `apps/schoolos_mobile`, Parent / Teacher / Principal personas only, per `DESIGN_SYSTEM.md` and the mobile companion-app brief. Driver/Staff/Admin/Student surfaces are noted where they share code with the three in-scope personas, but were not independently audited.
 
 **Methodology:** Direct code review of every persona screen and its shared widgets, plus adversarial Flutter widget tests (compact width 320px, text scale 1.0/1.3/1.5x) that actually rendered each screen and asserted `tester.takeException() == null`. Findings below are backed by either a passing/failing test run or a direct code citation — nothing here is inferred without checking the source. Performance (frame timing, rebuild counts, API dedup) was **not profiled** this pass; see the Performance section for why that's called out explicitly rather than guessed at.
 

@@ -14,14 +14,11 @@ Before changing web UI, routes, API clients, contracts, protected-file behavior,
 apps/web/AGENTS.md
 apps/web/docs/DESIGN_SYSTEM.md
 docs/README.md
-docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md
-docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md
-docs/product/SCHOOLOS_BRD.md
 docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md
-docs/product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md
 docs/requirements/SCHOOLOS_SRS.md
 docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md
 docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md
+docs/production/SCHOOLOS_GA_RELEASE_POLICY.md
 ```
 
 Also read the existing routes, components, API clients, OpenAPI/backend routes, shared contracts, and tests for the touched module.

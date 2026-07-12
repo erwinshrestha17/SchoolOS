@@ -6,9 +6,9 @@ import {
   Patch,
   Post,
   Query,
-  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -33,6 +33,7 @@ import { ReviewGuardianIdentityVerificationDto } from './dto/review-guardian-ide
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { UpdateStudentGuardianDto } from './dto/update-student-guardian.dto';
 import { AttendanceHistoryQueryDto } from './dto/attendance-history.dto';
+import { GeneratedStudentDocumentArtifactResponseDto } from './dto/generated-student-document-artifact.dto';
 import { sanitizeStudentProfileResponse } from './student-profile-sanitizer';
 import { StudentsService } from './students.service';
 
@@ -297,26 +298,20 @@ export class StudentsController {
 
   @Get(':id/documents/:kind.pdf')
   @Permissions('student_documents:manage')
+  @ApiOperation({
+    summary: 'Generate a protected student document artifact',
+  })
+  @ApiOkResponse({ type: GeneratedStudentDocumentArtifactResponseDto })
   async getGeneratedDocument(
     @Param('id') studentId: string,
     @Param('kind') kind: string,
-    @Query('token') token: string | undefined,
     @CurrentAuth() auth: AuthContext,
   ) {
-    const documentAuth: AuthContext & { qrToken?: string } = auth;
-    if (token) {
-      documentAuth.qrToken = token;
-    }
-    const pdf = await this.studentsService.generateStudentDocumentPdf(
+    return this.studentsService.generateStudentDocumentPdf(
       studentId,
       kind,
-      documentAuth,
+      auth,
     );
-
-    return new StreamableFile(pdf, {
-      type: 'application/pdf',
-      disposition: `inline; filename="${safePdfFileName(`${studentId}-${kind}.pdf`)}"`,
-    });
   }
 
   @Post(':id/generated-documents/:documentId/revoke')
@@ -394,8 +389,4 @@ export class StudentsController {
       auth,
     );
   }
-}
-
-function safePdfFileName(value: string) {
-  return value.replace(/[^a-zA-Z0-9._-]/g, '-');
 }

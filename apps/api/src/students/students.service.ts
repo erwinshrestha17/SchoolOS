@@ -313,6 +313,7 @@ export class StudentsService {
               revokeReason: student.qrCredentials[0].revokeReason ?? null,
               lastScannedAt:
                 student.qrCredentials[0].lastScannedAt?.toISOString() ?? null,
+              fileAssetId: student.qrCredentials[0].fileAssetId ?? null,
             }
           : null,
       })),
@@ -646,6 +647,7 @@ export class StudentsService {
             createdAt: true,
             rotatedAt: true,
             lastScannedAt: true,
+            fileAssetId: true,
           },
           take: 1,
         },
@@ -792,6 +794,7 @@ export class StudentsService {
                 student.qrCredentials[0].rotatedAt?.toISOString() ?? null,
               lastScannedAt:
                 student.qrCredentials[0].lastScannedAt?.toISOString() ?? null,
+              fileAssetId: student.qrCredentials[0].fileAssetId ?? null,
             }
           : null,
         classTeacher,
@@ -863,11 +866,8 @@ export class StudentsService {
           fileName: document.fileName,
           contentType: document.contentType,
           sizeBytes: document.sizeBytes,
-          pdfUrl: document.pdfUrl,
           generatedById: document.generatedById,
           generatedAt: document.generatedAt.toISOString(),
-          checksumSha256: document.checksumSha256,
-          storageObjectKey: document.storageObjectKey,
           signedAt: document.signedAt?.toISOString() ?? null,
           version: document.version,
           retentionUntil: document.retentionUntil?.toISOString() ?? null,
@@ -3443,20 +3443,27 @@ export class StudentsService {
       actor,
       issuedAt: signedAt,
       version,
-      qrToken: (actor as AuthContext & { qrToken?: string }).qrToken,
     });
     const checksumSha256 = createHash('sha256').update(pdf).digest('hex');
-    const stored = await this.storageService.saveBufferObject({
-      tenantId: actor.tenantId,
-      prefix: `students/${student.id}/generated-documents/${normalizedKind}`,
-      fileName,
-      contentType: 'application/pdf',
-      content: pdf,
-    });
-    const pdfUrl = `/api/v1/students/${encodeURIComponent(
-      student.id,
-    )}/documents/${encodeURIComponent(normalizedKind)}.pdf`;
-    let generatedFileAssetId: string | null = null;
+    const generatedFileAsset =
+      await this.fileRegistryService.registerGeneratedFile({
+        tenantId: actor.tenantId,
+        generatedByUserId: actor.userId,
+        originalFilename: fileName,
+        content: pdf,
+        mimeType: 'application/pdf',
+        module: 'students',
+        entityId: student.id,
+        metadata: {
+          kind: normalizedKind,
+          title: getStudentDocumentTitle(normalizedKind),
+          source: 'generated_student_document',
+          version,
+        },
+      });
+    const pdfUrl = `/api/v1/files/${encodeURIComponent(
+      generatedFileAsset.id,
+    )}/preview`;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.generatedStudentDocument.updateMany({
@@ -3479,10 +3486,10 @@ export class StudentsService {
           kind: normalizedKind,
           title: getStudentDocumentTitle(normalizedKind),
           fileName,
-          sizeBytes: stored.sizeBytes,
+          sizeBytes: Number(generatedFileAsset.sizeBytes),
           pdfUrl,
           generatedById: actor.userId,
-          storageObjectKey: stored.objectKey,
+          storageObjectKey: generatedFileAsset.objectKey,
           checksumSha256,
           signedAt,
           signatureMetadata: {
@@ -3490,8 +3497,8 @@ export class StudentsService {
             tenantSlug: actor.tenantSlug,
             generatedAt: signedAt.toISOString(),
             mode: 'internal-issued',
-            storageProvider: stored.provider,
-            storageObjectKey: stored.objectKey,
+            storageProvider: generatedFileAsset.storageProvider,
+            storageObjectKey: generatedFileAsset.objectKey,
             signerName: actor.email ?? actor.userId,
             signerRole: actor.roles[0] ?? 'school_official',
             layoutVersion: 'certificate-v2',
@@ -3505,41 +3512,12 @@ export class StudentsService {
             studentSystemId: student.studentSystemId,
             className: student.class.name,
             sectionName: student.sectionRef?.name ?? student.section ?? null,
-            storageProvider: stored.provider,
+            storageProvider: generatedFileAsset.storageProvider,
             layoutVersion: 'certificate-v2',
           },
         },
       });
-
-      const generatedFileAsset = await this.fileRegistryService.registerFile({
-        tenantId: actor.tenantId,
-        uploadedByUserId: actor.userId,
-        originalFilename: fileName,
-        objectKey: stored.objectKey,
-        mimeType: 'application/pdf',
-        sizeBytes: stored.sizeBytes,
-        provider: stored.provider,
-        bucket: stored.bucket,
-        checksumSha256: stored.checksumSha256,
-        module: 'students',
-        entityId: student.id,
-        metadata: {
-          kind: normalizedKind,
-          title: getStudentDocumentTitle(normalizedKind),
-          source: 'generated_student_document',
-          version,
-        },
-      });
-      generatedFileAssetId = generatedFileAsset.id;
     });
-
-    if (generatedFileAssetId) {
-      await this.fileRegistryService.markUploaded(
-        actor.tenantId,
-        generatedFileAssetId,
-        actor.userId,
-      );
-    }
 
     await this.auditService.record({
       action: 'generate',
@@ -3553,7 +3531,12 @@ export class StudentsService {
       },
     });
 
-    return pdf;
+    return {
+      fileAssetId: generatedFileAsset.id,
+      fileName,
+      mimeType: 'application/pdf',
+      fileAvailable: true as const,
+    };
   }
 
   async revokeGeneratedStudentDocument(
@@ -4396,9 +4379,8 @@ function buildStudentDocumentPdf(input: {
   actor: AuthContext;
   issuedAt: Date;
   version: number;
-  qrToken?: string;
 }) {
-  const { student, kind, actor, issuedAt, version, qrToken } = input;
+  const { student, kind, actor, issuedAt, version } = input;
   const latestEnrollment = student.enrollments[0];
   const primaryGuardian =
     student.guardianLinks.find((link) => link.isPrimary)?.guardian ??
@@ -4440,7 +4422,6 @@ function buildStudentDocumentPdf(input: {
       guardianName: primaryGuardian?.fullName,
       guardianPhone: primaryGuardian?.primaryPhone,
       academicYear: latestEnrollment?.academicYear.name,
-      qrToken,
     });
   }
 

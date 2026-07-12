@@ -1,4 +1,3 @@
-import { StreamableFile } from '@nestjs/common';
 import { AuthMethod } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { StudentsController } from './students.controller';
@@ -187,16 +186,18 @@ describe('StudentsController M1 contracts', () => {
     expect(result).toEqual({ lifecycleStatus: 'ARCHIVED' });
   });
 
-  it('streams generated student documents as application/pdf', async () => {
+  it('returns protected File Registry metadata for generated student documents', async () => {
     const { controller, service } = createController();
-    service.generateStudentDocumentPdf.mockResolvedValue(
-      Buffer.from('%PDF-1.4\n%%EOF'),
-    );
+    service.generateStudentDocumentPdf.mockResolvedValue({
+      fileAssetId: 'file-id-card-1',
+      fileName: 'STU-001-id-card.pdf',
+      mimeType: 'application/pdf',
+      fileAvailable: true,
+    });
 
     const result = await controller.getGeneratedDocument(
       'student-1',
       'id-card',
-      undefined,
       actor,
     );
 
@@ -205,13 +206,12 @@ describe('StudentsController M1 contracts', () => {
       'id-card',
       actor,
     );
-    expect(result).toBeInstanceOf(StreamableFile);
-    expect(result.getHeaders()).toEqual(
-      expect.objectContaining({
-        type: 'application/pdf',
-        disposition: 'inline; filename="student-1-id-card.pdf"',
-      }),
-    );
+    expect(result).toEqual({
+      fileAssetId: 'file-id-card-1',
+      fileName: 'STU-001-id-card.pdf',
+      mimeType: 'application/pdf',
+      fileAvailable: true,
+    });
   });
 
   it('delegates generated document revocation with reason payload', () => {

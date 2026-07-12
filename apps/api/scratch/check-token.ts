@@ -8,12 +8,13 @@ function hashToken(token: string) {
 }
 
 async function checkToken() {
-  const rawToken = 'a157124492f21f7ef9cec1bb31822103e885b88e36fc355cdb79cd9f3e69953bb1ce408ce2725981d611f01dc85bcd92';
-  const tokenHash = hashToken(rawToken);
-  console.log('Token Hash:', tokenHash);
+  const token = process.env.TOKEN_TO_CHECK?.trim();
+  if (!token) {
+    throw new Error('TOKEN_TO_CHECK is required');
+  }
 
   const session = await prisma.refreshToken.findUnique({
-    where: { tokenHash },
+    where: { tokenHash: hashToken(token) },
     include: {
       user: {
         include: {
@@ -56,7 +57,10 @@ async function checkToken() {
     if (!ur.role) console.log(`UserRole ${i} has no role`);
     else {
       ur.role.rolePermissions.forEach((rp, j) => {
-        if (!rp.permission) console.log(`RolePermission ${j} in role ${ur.role.name} has no permission`);
+        if (!rp.permission)
+          console.log(
+            `RolePermission ${j} in role ${ur.role.name} has no permission`,
+          );
       });
     }
   });

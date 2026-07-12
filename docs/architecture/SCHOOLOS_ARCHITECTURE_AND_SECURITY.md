@@ -3,8 +3,8 @@
 **Status:** Canonical SDD
 **Owner/audience:** CTO, lead NestJS developer, lead Next.js developer, senior Flutter developer, database designer, PostgreSQL DBA, security engineer, QA lead, DevOps/SRE, support/operations lead
 **Scope:** Architecture, service/module boundaries, data model direction, integration boundaries, runtime topology, authorization, security, files, queues, notifications, performance, backup/recovery, and operational design.
-**Precedence:** This document owns architectural rules and design constraints. Software requirements are owned by `../requirements/SCHOOLOS_SRS.md`; module design by `SCHOOLOS_MODULE_DESIGN_CATALOG.md`; product/functional behavior by `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md` and `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`; current readiness by `../project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md`.
-**Inputs/source documents:** `../product/SCHOOLOS_BRD.md`, `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`, `../product/SCHOOLOS_FUNCTIONAL_REQUIREMENTS.md`, `../requirements/SCHOOLOS_SRS.md`, `SCHOOLOS_MODULE_DESIGN_CATALOG.md`, `SCHOOLOS_NOTIFICATION_ARCHITECTURE.md`, `SCHOOLOS_PLATFORM_OPERATIONS.md`, `../production/SCHOOLOS_GA_RELEASE_POLICY.md`, repository source inspected on 2026-06-20.
+**Precedence:** This document owns runtime architecture, modular-monolith boundaries, tenant isolation, authorization, File Registry, storage adapters, queues, provider boundaries, security controls, scaling, and performance architecture. Product behavior is owned by `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`; software requirements by `../requirements/SCHOOLOS_SRS.md`; module ownership and known gaps by `SCHOOLOS_MODULE_DESIGN_CATALOG.md`; release gates by `../production/SCHOOLOS_GA_RELEASE_POLICY.md`.
+**Inputs/source documents:** The six canonical documents listed in `../README.md` and repository source inspected on 2026-06-20. Current work and blockers belong in GitHub Issues, Milestones, or Projects; current evidence belongs in CI runs, smoke outputs, staging records, and release artifacts.
 **Out-of-scope content:** Endpoint URL invention, Prisma migrations for proposed structures, UI visual detail, staging credentials, and GA readiness claims.
 **Last reviewed date:** 2026-07-01
 **Architecture:** PostgreSQL-first, NestJS modular monolith, Redis/BullMQ, private object storage, cost-aware performance budgets.
@@ -13,35 +13,13 @@
 
 ## 1. Active Module Numbering
 
-| Module | Name |
-|---|---|
-| M0 | Platform Core |
-| M1 | Admissions and Student Profiles |
-| M2 | Smart Attendance |
-| M3 | Fees and Receipts |
-| M4 | Academics, Exams, CAS, Report Cards |
-| M5 | Activity Feed and Milestones |
-| M6 | Homework and Timetable |
-| M7 | HR and Payroll |
-| M8 | Library |
-| M9 | Transport |
-| M10 | Canteen |
-| M11 | Accounting and Finance |
-| M12 | Notifications, Notices, Communication, Chat |
-| M13 | Learning Layer |
-| M14 | Intelligence / AI |
-
-`M8A`, `M8B`, and `M8C` are obsolete labels. Library, Transport, and Canteen are standalone modules.
-
-Inventory & Asset Management is not active scope.
+The canonical M0-M14 taxonomy and module ownership live in [the Module Design Catalog](SCHOOLOS_MODULE_DESIGN_CATALOG.md). This architecture applies to that taxonomy; M14 Intelligence / AI remains deferred.
 
 ---
 
 ## 1A. Stage-Aware Shared-Core Architecture
 
-SchoolOS must support `PRESCHOOL`, `SCHOOL`, `HIGHER_SECONDARY`, and `BACHELOR` direction over one shared core, not as separate products or data systems.
-
-Master's is not an active full institution-management pack. It is a future extension and an allowed Student App eligibility level only.
+SchoolOS supports `PRESCHOOL`, `SCHOOL` (Grade 1-10), and `HIGHER_SECONDARY` (Grade 11-12 / +2) over one shared core, not as separate products or data systems. A broad Student App is not active scope.
 
 The shared record model remains:
 
@@ -56,7 +34,7 @@ Student
 + enabled module/capability
 ```
 
-Current code evidence shows shared `Tenant`, `Student`, `Guardian`, `StudentGuardian`, `Enrollment`, `AcademicYear`, `Class`, `Section`, and `Subject` models. A canonical program-offering, class stage profile, Bachelor program/course/term model, Master eligibility model, stream/subject-combination model, pickup/drop workflow model, broad Student App eligibility guard, and `ExperienceContext` contract were not verified in this pass and are therefore **proposed / needs schema design** unless explicitly marked out of scope.
+Current code evidence shows shared `Tenant`, `Student`, `Guardian`, `StudentGuardian`, `Enrollment`, `AcademicYear`, `Class`, `Section`, and `Subject` models. A canonical program-offering, class stage profile, stream/subject-combination model, pickup/drop workflow model, and `ExperienceContext` contract were not verified in this pass and are therefore **proposed / needs schema design** unless explicitly marked out of scope.
 
 Backend-owned experience resolution must eventually derive from:
 
@@ -77,13 +55,12 @@ The SRS owns the conceptual system diagram, non-functional requirements, data li
 
 Required architecture guardrails for proposed stage-aware work:
 
-1. Do not add `PreschoolStudent`, `SchoolStudent`, `PlusTwoStudent`, `BachelorStudent`, `MasterStudent`, or a separate app/database.
+1. Do not add `PreschoolStudent`, `SchoolStudent`, `PlusTwoStudent`, or a separate app/database.
 2. Extend the shared tenant/student/enrollment/academic model only through reviewed schema design, migration replay, OpenAPI/shared DTO updates, web/mobile contract updates, and tests.
 3. Preschool pickup/drop, authorized pickup, temporary pickup changes, and care alerts must be narrow, auditable, and permission-scoped.
 4. Higher Secondary streams, subject combinations, practicals, projects, and lab timetables must be school-configurable, not hard-coded.
 5. Backend authorization must enforce the active experience independently of UI composition.
-6. Broad Student App authorization must be backend-owned and allowed only for active Bachelor or Master enrollments; Preschool through Grade 12 remain controlled learning/session only.
-7. Do not add Master's administration, academic structure, finance, faculty, or course-management features without separate approval.
+6. Students remain limited to backend-authorized, self/session-scoped controlled learning/session access; a broad Student App is not active scope.
 
 ## 1B. Compliance and formal-billing architecture
 
@@ -122,7 +99,7 @@ Architecture rules:
 7. M3 never writes M11 journals directly. M11 consumes approved idempotent source events and enforces fiscal locks.
 8. CBMS/provider logic stays behind an adapter. Store safe hashes/bounded diagnostics, never secrets or unrestricted raw payloads.
 9. Provider rejection and transport failure are different states. Retry requires permission, reason and audit.
-10. No UI, export or configuration label may claim UGC integration, IRD verification or CBMS certification without recorded official evidence.
+10. No UI, export, or configuration label may claim government-system integration, IRD verification, or CBMS certification without recorded official evidence.
 
 ## 2. Storage and File Registry Architecture
 
