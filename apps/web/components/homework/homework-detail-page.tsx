@@ -1111,14 +1111,16 @@ function StudentSubmissionForm({
                 className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700"
               >
                 {a.fileName}
-                <button
-                  type="button"
-                  aria-label={`Remove ${a.fileName}`}
-                  onClick={() => removeAttachment(a.id)}
-                  className="text-slate-400 hover:text-red-500"
-                >
-                  ×
-                </button>
+                <Tooltip content={`Remove ${a.fileName}`}>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${a.fileName}`}
+                    onClick={() => removeAttachment(a.id)}
+                    className="text-slate-400 hover:text-red-500"
+                  >
+                    ×
+                  </button>
+                </Tooltip>
               </span>
             ))}
           </div>

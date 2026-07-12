@@ -14,20 +14,19 @@ describe("M6 homework/timetable icon and confirmation audit", () => {
     assert.match(detail, /title="Send Reminders Now"/);
   });
 
-  it("requires confirmation before assigning homework or sending reminders from the combined timetable/homework tab", () => {
-    const tab = read("components/timetable/tabs/homework-tab.tsx");
+  it("requires confirmation before destructive or bulk homework actions on the detail page", () => {
+    // homework-tab.tsx (the combined timetable/homework tab this used to
+    // guard) was deleted in the M6 homework redesign consolidation
+    // (fuzzy-gliding-hopper.md) — its assign/cancel/bulk-action confirmation
+    // requirements now live on the consolidated homework detail page instead.
+    const detail = read("components/homework/homework-detail-page.tsx");
 
-    // Assign (making a draft live to students) and Send Reminder are both
-    // notify/publish-equivalent high-risk actions that must not fire on a
-    // single click.
-    assert.match(tab, /import \{ ConfirmDialog \} from "\.\.\/\.\.\/ui\/confirm-dialog"/);
-    assert.doesNotMatch(tab, /onClick=\{\(\)\s*=>\s*\n?\s*assignMutation\.mutate\(selectedAssignment\.id\)/);
-    assert.doesNotMatch(
-      tab,
-      /onClick=\{\(\)\s*=>\s*\n?\s*reminderMutation\.mutate\(selectedAssignment\.id\)/,
-    );
-    assert.match(tab, /setConfirmAssignment\(\{/);
-    assert.match(tab, /<ConfirmDialog/);
+    assert.match(detail, /import \{ ConfirmDialog \} from "@\/components\/ui\/confirm-dialog"/);
+    assert.doesNotMatch(detail, /onClick=\{\(\) => (cancelMutation|deleteMutation|bulkCompleteMutation)\.mutate\(\)\}/);
+    assert.match(detail, /onClick=\{\(\) => setShowCancelDialog\(true\)\}/);
+    assert.match(detail, /onClick=\{\(\) => setShowDeleteDialog\(true\)\}/);
+    assert.match(detail, /onClick=\{\(\) => setShowMarkAllDialog\(true\)\}/);
+    assert.match(detail, /<ConfirmDialog/);
   });
 
   it("requires confirmation before publishing, locking, or archiving a timetable version", () => {
@@ -60,10 +59,13 @@ describe("M6 homework/timetable icon and confirmation audit", () => {
   });
 
   it("gives the student homework attachment remove control both a tooltip and an aria-label", () => {
-    const studentTab = read("components/timetable/tabs/student-homework-tab.tsx");
+    // student-homework-tab.tsx was deleted in the M6 homework redesign
+    // consolidation; the digital-submission attachment flow it guarded now
+    // lives in homework-detail-page.tsx's StudentSubmissionForm.
+    const detail = read("components/homework/homework-detail-page.tsx");
 
-    assert.match(studentTab, /import \{ Tooltip \} from "\.\.\/\.\.\/ui\/tooltip"/);
-    assert.match(studentTab, /<Tooltip content=\{`Remove \$\{a\.fileName\}`\}>/);
-    assert.match(studentTab, /aria-label=\{`Remove \$\{a\.fileName\}`\}/);
+    assert.match(detail, /import \{ Tooltip \} from "@\/components\/ui\/tooltip"/);
+    assert.match(detail, /<Tooltip content=\{`Remove \$\{a\.fileName\}`\}>/);
+    assert.match(detail, /aria-label=\{`Remove \$\{a\.fileName\}`\}/);
   });
 });
