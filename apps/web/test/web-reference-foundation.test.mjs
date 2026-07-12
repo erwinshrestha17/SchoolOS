@@ -104,8 +104,12 @@ describe('reference dashboard foundation', () => {
     assert.match(sidebar, /href: '\/dashboard\/notices'/);
     assert.match(communications, /redirect\('\/dashboard\/notices'\)/);
     assert.match(noticesWorkspace, /communicationsApi\.getCommunicationsSummary/);
-    assert.match(noticesWorkspace, /summary\.providerStatus/);
-    assert.match(noticesWorkspace, /summary\?\.providerHealth/);
+    assert.equal((noticesWorkspace.match(/<KpiCard/g) ?? []).length, 4);
+    assert.match(
+      noticesWorkspace,
+      /router\.push\(\s*'\/dashboard\/communications\/provider-diagnostics'/,
+    );
+    assert.doesNotMatch(noticesWorkspace, /title="Provider Status"/);
     assert.doesNotMatch(noticesWorkspace, /setTimeout|setInterval/);
   });
 });

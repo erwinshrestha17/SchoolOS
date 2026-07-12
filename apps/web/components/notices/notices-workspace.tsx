@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
-  CheckCircle2,
   Clock3,
   Mail,
   MessageSquare,
@@ -95,6 +94,16 @@ export function NoticesWorkspace({
                 },
               ]
             : []),
+          ...(canCreateNotices
+            ? [
+                {
+                  label: 'Recipient Preview',
+                  icon: <Mail size={16} />,
+                  onClick: () =>
+                    router.push('/dashboard/communications/recipients'),
+                },
+              ]
+            : []),
           ...(canManageChat
             ? [
                 {
@@ -119,7 +128,7 @@ export function NoticesWorkspace({
         ]}
       >
         {variant === 'overview' ? (
-          <KpiGrid className="sm:grid-cols-2 xl:grid-cols-6">
+          <KpiGrid className="sm:grid-cols-2 xl:grid-cols-4">
             <KpiCard
               title="Sent Today"
               loading={summaryQuery.isLoading}
@@ -152,34 +161,6 @@ export function NoticesWorkspace({
               tone={(summary?.unreadHighImpactNotices ?? 0) > 0 ? 'warning' : 'neutral'}
               description="Unread urgent or emergency delivery rows."
             />
-            <KpiCard
-              title="Escalated Chats"
-              loading={summaryQuery.isLoading}
-              value={summaryValue(summary?.escalatedChatCount)}
-              icon={<ShieldAlert size={20} />}
-              tone={(summary?.escalatedChatCount ?? 0) > 0 ? 'warning' : 'neutral'}
-              description="Relationship-scoped chat escalations."
-            />
-            <KpiCard
-              title="Provider Status"
-              loading={summaryQuery.isLoading}
-              value={
-                summaryQuery.isError
-                  ? 'Unavailable'
-                  : summary
-                    ? formatProviderMode(summary.providerStatus)
-                    : 'Unavailable'
-              }
-              icon={<CheckCircle2 size={20} />}
-              tone={
-                summary?.providerHealth === 'degraded'
-                  ? 'warning'
-                  : summary?.providerHealth === 'healthy'
-                    ? 'success'
-                    : 'neutral'
-              }
-              description="Current notification delivery mode."
-            />
           </KpiGrid>
         ) : null}
       </ModuleHeader>
@@ -192,14 +173,6 @@ export function NoticesWorkspace({
             : []),
           ...(canUseChat
             ? [{ href: '/dashboard/messages', label: 'Chat' }]
-            : []),
-          ...(canCreateNotices
-            ? [
-                {
-                  href: '/dashboard/communications/recipients',
-                  label: 'Recipients',
-                },
-              ]
             : []),
           ...(canReadDeliveries
             ? [{ href: '/dashboard/notices/deliveries', label: 'Delivery Logs' }]
@@ -220,21 +193,22 @@ export function NoticesWorkspace({
                 },
               ]
             : []),
-          ...(canReadDeliveries
-            ? [
-                {
-                  href: '/dashboard/communications/provider-diagnostics',
-                  label: 'Provider Diagnostics',
-                },
-              ]
-            : []),
         ]}
         accentColor="rose"
         variant="light"
       />
 
       <div className="mt-6 space-y-6">
-        <CommunicationsForm initialSection={initialSection} />
+        <CommunicationsForm
+          initialSection={initialSection}
+          mode={
+            variant === 'composer'
+              ? 'composer'
+              : initialSection === 'Delivery Records'
+                ? 'delivery'
+                : 'overview'
+          }
+        />
         {variant === 'overview' ? (
           <>
             <NoticeDetailLinksPanel />
@@ -244,8 +218,4 @@ export function NoticesWorkspace({
       </div>
     </DashboardPageShell>
   );
-}
-
-function formatProviderMode(value: string) {
-  return value.replace('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

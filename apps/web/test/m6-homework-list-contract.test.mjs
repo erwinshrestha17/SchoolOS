@@ -98,4 +98,22 @@ describe("M6 homework list contract", () => {
     assert.doesNotMatch(page, /title="Timetable Conflicts"/);
     assert.doesNotMatch(page, /title="Teacher Workload"/);
   });
+
+  it("loads lower-page supporting tools only after explicit disclosure", () => {
+    const page = read("app/dashboard/homework/page.tsx");
+
+    assert.match(page, /type SupportingHomeworkView/);
+    assert.match(page, /Supporting homework tools/);
+    assert.match(page, /<SupportingToolButton/);
+    assert.match(page, /aria-pressed=\{selected\}/);
+    assert.match(page, /supportingView === "templates" \? \(/);
+    assert.match(page, /supportingView === "reminders" \? \(/);
+    assert.match(page, /supportingView === "reports" \? \(/);
+    assert.match(page, /enabled: supportingView === "templates"/);
+    assert.match(page, /enabled: supportingView === "reminders"/);
+    assert.match(
+      page,
+      /supportingView === "reports" && Boolean\(filters\.academicYearId\)/,
+    );
+  });
 });

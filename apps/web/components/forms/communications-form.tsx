@@ -18,11 +18,10 @@ import { Select } from "../ui/select";
 import { FormField } from "../ui/form-field";
 import { LoadingState } from "../ui/loading-state";
 import { EmptyState } from "../ui/empty-state";
-import { Tabs, TabsContent } from "../ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Badge } from "../ui/badge";
 import { FileUploader } from "../ui/file-uploader";
 import { FilterBar } from "../ui/filter-bar";
-import { ModuleTabs } from "../dashboard/module-tabs";
 import { cn } from "../../lib/utils";
 import { estimateSmsSegments } from "../../lib/sms-segments";
 import {
@@ -61,6 +60,7 @@ const consentTypes = [
 ] as const;
 
 type CommunicationSection = (typeof communicationSections)[number];
+type CommunicationWorkspaceMode = "overview" | "composer" | "delivery";
 type AudienceType = (typeof audienceTypes)[number];
 type NoticePriority = (typeof noticePriorities)[number];
 type EventType = (typeof eventTypes)[number];
@@ -137,8 +137,10 @@ const sectionMeta: Record<
 
 export function CommunicationsForm({
   initialSection = "Notices",
+  mode = "overview",
 }: {
   initialSection?: CommunicationSection;
+  mode?: CommunicationWorkspaceMode;
 }) {
   const queryClient = useQueryClient();
   const [activeSection, setActiveSection] =
@@ -179,30 +181,45 @@ export function CommunicationsForm({
   });
   const [selectedGuardianId, setSelectedGuardianId] = useState("");
   const [selectedConsentType, setSelectedConsentType] = useState("PHOTO_USAGE");
+  const visibleSections: readonly CommunicationSection[] =
+    mode === "composer"
+      ? ["Notices"]
+      : mode === "delivery"
+        ? ["Delivery Records"]
+        : ["Notices", "Events", "Consent Management"];
+  const needsClassContext =
+    (mode === "composer" && activeSection === "Notices") ||
+    activeSection === "Events";
 
   const classesQuery = useQuery({
     queryKey: ["classes"],
     queryFn: api.listClasses,
+    enabled: needsClassContext,
   });
   const sectionsQuery = useQuery({
     queryKey: ["sections"],
     queryFn: api.listSections,
+    enabled: needsClassContext,
   });
   const deliveriesQuery = useQuery({
     queryKey: ["notification-deliveries"],
     queryFn: () => api.listNotificationDeliveries(),
+    enabled: activeSection === "Delivery Records",
   });
   const noticesQuery = useQuery({
     queryKey: ["notices"],
     queryFn: api.listNotices,
+    enabled: mode === "overview" && activeSection === "Notices",
   });
   const eventsQuery = useQuery({
     queryKey: ["events"],
     queryFn: api.listEvents,
+    enabled: activeSection === "Events",
   });
   const admissionsQuery = useQuery({
     queryKey: ["admissions"],
     queryFn: () => api.listAdmissions(),
+    enabled: activeSection === "Consent Management",
   });
   const guardianConsentStatusQuery = useQuery({
     queryKey: ["guardian-consent-status", selectedGuardianId],
@@ -493,23 +510,16 @@ export function CommunicationsForm({
   return (
     <div className="space-y-6">
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-rose-700">
-              {activeMeta.badge}
-            </p>
-            <h2 className="mt-2 text-xl font-black text-slate-950">
-              {activeMeta.title}
-            </h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
-              {activeMeta.description}
-            </p>
-          </div>
-
-          <div className="max-w-md rounded-2xl border border-[var(--color-mod-notices-border)] bg-[var(--color-mod-notices-bg)] px-4 py-3 text-sm leading-6 text-[var(--color-mod-notices-text)]">
-            This workspace uses tenant-scoped backend records. Official M10
-            totals stay unavailable unless a summary contract owns them.
-          </div>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-rose-700">
+            {activeMeta.badge}
+          </p>
+          <h2 className="mt-2 text-xl font-black text-slate-950">
+            {activeMeta.title}
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+            {activeMeta.description}
+          </p>
         </div>
       </section>
 
@@ -518,20 +528,17 @@ export function CommunicationsForm({
         onValueChange={(val) => setActiveSection(val as CommunicationSection)}
         className="space-y-8"
       >
-        <div className="sticky top-4 z-20 rounded-2xl border border-slate-200 bg-white/90 p-2 shadow-sm backdrop-blur">
-          <ModuleTabs
-            items={communicationSections.map((section) => ({
-              value: section,
-              label: section,
-            }))}
-            activeValue={activeSection}
-            onValueChange={(value) =>
-              setActiveSection(value as CommunicationSection)
-            }
-            accentColor="rose"
-            variant="light"
-          />
-        </div>
+        {visibleSections.length > 1 ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+            <TabsList className="h-auto max-w-full flex-wrap justify-start bg-slate-100">
+              {visibleSections.map((section) => (
+                <TabsTrigger key={section} value={section}>
+                  {section}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+        ) : null}
 
         {deliveryStats.pending > 0 && (
           <div className="bg-[var(--color-mod-notices-bg)] border border-[var(--color-mod-notices-border)] p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-500">
@@ -545,6 +552,7 @@ export function CommunicationsForm({
 
         <TabsContent value="Notices" className="mt-0">
           <NoticesSection
+            displayMode={mode === "composer" ? "compose" : "manage"}
             notice={notice}
             setNotice={setNotice}
             classes={classes}
@@ -632,6 +640,7 @@ export function CommunicationsForm({
 }
 
 function NoticesSection({
+  displayMode,
   notice,
   setNotice,
   classes,
@@ -649,6 +658,7 @@ function NoticesSection({
   noticeError,
   noticeSuccess,
 }: {
+  displayMode: "manage" | "compose";
   notice: NoticeState;
   setNotice: Dispatch<SetStateAction<NoticeState>>;
   classes: Array<{ id: string; name: string }>;
@@ -671,13 +681,14 @@ function NoticesSection({
   const smsEstimate = estimateSmsSegments(trimmedBody);
 
   return (
-    <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
-      <div className="shell-card rounded-2xl border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <SectionHeader
-          eyebrow="Notice Composer"
-          title="Publish school notice"
-          description="Create clear, audience-targeted announcements for guardians, students, and staff."
-        />
+    <section>
+      {displayMode === "compose" ? (
+        <div className="shell-card rounded-2xl border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+          <SectionHeader
+            eyebrow="Notice Composer"
+            title="Publish school notice"
+            description="Create clear, audience-targeted announcements for guardians, students, and staff."
+          />
 
         <div className="mt-6 space-y-6">
           <FormField
@@ -920,13 +931,14 @@ function NoticesSection({
                 : "Publish notice"}
           </button>
         </div>
-      </div>
-
-      <NoticeList
-        notices={notices}
-        isLoading={noticesLoading}
-        error={noticesError}
-      />
+        </div>
+      ) : (
+        <NoticeList
+          notices={notices}
+          isLoading={noticesLoading}
+          error={noticesError}
+        />
+      )}
     </section>
   );
 }
@@ -941,7 +953,7 @@ function NoticeList({
   error: string | null;
 }) {
   return (
-    <section className="shell-card rounded-2xl border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm xl:sticky xl:top-28 xl:self-start">
+    <section className="shell-card rounded-2xl border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <SectionHeader
         eyebrow="Recent Notices"
         title="Published & scheduled notices"

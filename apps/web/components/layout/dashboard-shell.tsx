@@ -13,7 +13,8 @@ import { ErrorBoundary } from '../ui/error-boundary';
 import { ModuleOperationalSummary } from '../ui/module-operational-summary';
 import { SupportOverrideBanner } from '../platform/SupportOverrideBanner';
 
-// Students, attendance, fees, academics, homework, and timetable already
+// Students, attendance, fees, academics, homework, timetable, notices, and
+// messages already
 // render their own module-specific, backend-owned KPI grid inside the page
 // header. Injecting the generic
 // cross-module summary above them duplicated the same signals (sometimes
@@ -31,8 +32,6 @@ const MODULE_LANDING_SUMMARIES: Record<string, OperationalSummaryRouteModule> = 
   '/dashboard/transport': 'transport',
   '/dashboard/canteen': 'canteen',
   '/dashboard/accounting': 'accounting',
-  '/dashboard/notices': 'communications',
-  '/dashboard/messages': 'communications',
   '/dashboard/learning': 'learning',
 };
 

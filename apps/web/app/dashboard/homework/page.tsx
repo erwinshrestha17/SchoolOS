@@ -62,6 +62,8 @@ type HomeworkNotice = {
   tone: ToastTone;
 };
 
+type SupportingHomeworkView = "templates" | "reminders" | "reports";
+
 function formatDate(value?: string | Date | null, fallback = "Date not set") {
   if (!value) return fallback;
   try {
@@ -102,6 +104,8 @@ export default function HomeworkPage() {
     page: 1,
   });
   const [templateSearch, setTemplateSearch] = useState("");
+  const [supportingView, setSupportingView] =
+    useState<SupportingHomeworkView | null>(null);
   const [selectedHomework, setSelectedHomework] =
     useState<HomeworkAssignmentSummary | null>(null);
   const [notice, setNotice] = useState<HomeworkNotice | null>(null);
@@ -180,11 +184,13 @@ export default function HomeworkPage() {
         search: templateSearch.trim() || undefined,
         limit: 12,
       }),
+    enabled: supportingView === "templates",
   });
 
   const reminderBatchesQuery = useQuery({
     queryKey: ["homework-reminder-batches"],
     queryFn: () => api.listHomeworkReminderBatches({ limit: 5 }),
+    enabled: supportingView === "reminders",
   });
 
   const completionReportQuery = useQuery({
@@ -200,7 +206,8 @@ export default function HomeworkPage() {
         classId: filters.classId || undefined,
         sectionId: filters.sectionId || undefined,
       }),
-    enabled: Boolean(filters.academicYearId),
+    enabled:
+      supportingView === "reports" && Boolean(filters.academicYearId),
   });
 
   const missingLateReportQuery = useQuery({
@@ -214,7 +221,8 @@ export default function HomeworkPage() {
         academicYearId: filters.academicYearId,
         classId: filters.classId || undefined,
       }),
-    enabled: Boolean(filters.academicYearId),
+    enabled:
+      supportingView === "reports" && Boolean(filters.academicYearId),
   });
 
   const retryReminderMutation = useMutation({
@@ -741,7 +749,60 @@ export default function HomeworkPage() {
           )}
         </SectionCard>
 
-        <div className="grid gap-6 xl:grid-cols-2">
+        <section
+          aria-labelledby="supporting-homework-tools"
+          className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"
+        >
+          <div>
+            <p
+              id="supporting-homework-tools"
+              className="text-sm font-bold text-slate-950"
+            >
+              Supporting homework tools
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              Open a secondary workspace only when you need it. Its data loads
+              on demand.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <SupportingToolButton
+              title="Template Library"
+              description="Reuse metadata-backed assignment templates."
+              icon={<FileText className="h-5 w-5" />}
+              selected={supportingView === "templates"}
+              onClick={() =>
+                setSupportingView((current) =>
+                  current === "templates" ? null : "templates",
+                )
+              }
+            />
+            <SupportingToolButton
+              title="Reminder History"
+              description="Inspect and retry recent reminder batches."
+              icon={<Bell className="h-5 w-5" />}
+              selected={supportingView === "reminders"}
+              onClick={() =>
+                setSupportingView((current) =>
+                  current === "reminders" ? null : "reminders",
+                )
+              }
+            />
+            <SupportingToolButton
+              title="Completion Reports"
+              description="Review completion, missing, and late records."
+              icon={<BarChart3 className="h-5 w-5" />}
+              selected={supportingView === "reports"}
+              onClick={() =>
+                setSupportingView((current) =>
+                  current === "reports" ? null : "reports",
+                )
+              }
+            />
+          </div>
+        </section>
+
+        {supportingView === "templates" ? (
           <SectionCard
             title="Template Library"
             description="Browse metadata-backed homework templates with the filtered backend endpoint."
@@ -802,7 +863,9 @@ export default function HomeworkPage() {
               </div>
             )}
           </SectionCard>
+        ) : null}
 
+        {supportingView === "reminders" ? (
           <SectionCard
             title="Reminder History"
             description="Inspect the latest reminder batches and retry failed batches through the backend route."
@@ -878,12 +941,13 @@ export default function HomeworkPage() {
               </div>
             )}
           </SectionCard>
-        </div>
+        ) : null}
 
-        <SectionCard
-          title="Completion Reports"
-          description="Use backend report routes for assignment completion and missing or late submission review."
-        >
+        {supportingView === "reports" ? (
+          <SectionCard
+            title="Completion Reports"
+            description="Use backend report routes for assignment completion and missing or late submission review."
+          >
           {!filters.academicYearId ? (
             <EmptyState
               title="Select an academic year"
@@ -977,7 +1041,8 @@ export default function HomeworkPage() {
               </div>
             </div>
           )}
-        </SectionCard>
+          </SectionCard>
+        ) : null}
       </div>
 
       <HomeworkQuickViewDrawer
@@ -1161,6 +1226,41 @@ function QuickViewField({ label, value }: { label: string; value: string }) {
       </dt>
       <dd className="mt-1 text-sm font-semibold text-slate-900">{value}</dd>
     </div>
+  );
+}
+
+function SupportingToolButton({
+  title,
+  description,
+  icon,
+  selected,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  icon: ReactNode;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={`rounded-xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-homework-border)] ${
+        selected
+          ? "border-[var(--color-mod-homework-accent)] bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)] shadow-sm"
+          : "border-slate-200 bg-white text-slate-700 hover:border-[var(--color-mod-homework-border)] hover:bg-white"
+      }`}
+    >
+      <span className="flex items-center gap-2 text-sm font-bold">
+        {icon}
+        {title}
+      </span>
+      <span className="mt-2 block text-xs leading-5 text-slate-500">
+        {description}
+      </span>
+    </button>
   );
 }
 
