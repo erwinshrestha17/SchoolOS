@@ -207,7 +207,7 @@ export default function ActivityPage() {
           {
             header: 'Class / Section',
             cell: (post) =>
-              `${classNameById.get(post.classId ?? '') ?? 'Unknown class'}${
+              `${classNameById.get(post.classId ?? '') ?? 'Class not recorded'}${
                 post.sectionId ? ` / ${sectionNameById.get(post.sectionId) ?? 'Section'}` : ''
               }`,
           },

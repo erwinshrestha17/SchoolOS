@@ -37,6 +37,7 @@ const statusToneMap: Record<string, StatusTone> = {
   REJECTED: 'rejected',
   DISMISSED: 'rejected',
   FAILED: 'rejected',
+  SKIPPED: 'inactive',
   DRAFT: 'draft',
   SENT: 'published',
   DELIVERED: 'published',

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Camera, Lock, X } from 'lucide-react';
 import { api } from '../../../../lib/api';
 import { filesToBase64Payloads } from '../../../../lib/files';
@@ -48,6 +48,7 @@ function newClientSubmissionId() {
 
 export default function ActivityComposerPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>(0);
   const [post, setPost] = useState<ComposerState>({
     classId: '',
@@ -75,7 +76,14 @@ export default function ActivityComposerPage() {
 
   const postMutation = useMutation({
     mutationFn: api.createActivityPost,
-    onSuccess: (created) => {
+    onSuccess: async (created) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['activity-posts'] }),
+        queryClient.invalidateQueries({ queryKey: ['activity-gallery'] }),
+        queryClient.invalidateQueries({ queryKey: ['activity-moderation-queue'] }),
+        queryClient.invalidateQueries({ queryKey: ['parent-activity-posts'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-activity-posts'] }),
+      ]);
       router.push(`/dashboard/activity/${created.id}`);
     },
   });

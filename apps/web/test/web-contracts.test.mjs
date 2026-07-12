@@ -40,6 +40,25 @@ function sourceFiles(relativeDir) {
   return files;
 }
 
+// The M5 activity workspace was split from the retired
+// components/forms/activity-feed-form.tsx monolith into routed pages
+// (commit 7b23af3d). Contracts that pinned the old form now pin these
+// successor surfaces.
+const activitySurfaceFiles = [
+  "app/dashboard/activity/page.tsx",
+  "app/dashboard/activity/new/page.tsx",
+  "app/dashboard/activity/gallery/page.tsx",
+  "app/dashboard/activity/observations/page.tsx",
+  "app/dashboard/activity/milestones/page.tsx",
+  "app/dashboard/activity/moderation/page.tsx",
+  "app/dashboard/activity/deliveries/page.tsx",
+  "app/dashboard/activity/reports/page.tsx",
+  "app/dashboard/activity/[postId]/page.tsx",
+  "app/dashboard/activity/parent/page.tsx",
+  "components/activity/lifecycle-panel.tsx",
+  "components/activity/parent-activity-view.tsx",
+];
+
 describe("SchoolOS web production contracts", () => {
   it("uses a real test command instead of the placeholder script", () => {
     const packageJson = JSON.parse(read("package.json"));
@@ -481,7 +500,7 @@ describe("SchoolOS web production contracts", () => {
     const weeklyRequirementsList = read(
       "components/timetable/weekly-requirements-list.tsx",
     );
-    const activityForm = read("components/forms/activity-feed-form.tsx");
+    const activitySurfaces = readMany(activitySurfaceFiles);
 
     for (const label of [
       "Periods",
@@ -522,8 +541,8 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(homeworkDetailPage, /getFileView\(attachment\.fileAssetId\)/);
     assert.doesNotMatch(homeworkReviewModal, /getFileView\(attachment\.fileAssetId\)/);
     assert.doesNotMatch(studentHomeworkTab, /fileAsset\?\.publicUrl/);
-    assert.doesNotMatch(activityForm, /Private object key/);
-    assert.doesNotMatch(activityForm, /Photo Reference/);
+    assert.doesNotMatch(activitySurfaces, /Private object key/);
+    assert.doesNotMatch(activitySurfaces, /Photo Reference/);
     assert.match(teacherWorkloadTab, /teacher-workload-distribution/);
     assert.match(teacherWorkloadTab, /workloadDistribution/);
     assert.match(teacherWorkloadTab, /Bars use live timetable workload totals/);
@@ -535,7 +554,7 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(weeklyRequirementsList, /window\.confirm|alert\(/);
 
     assert.doesNotMatch(
-      `${timetableBuilder}\n${homeworkTab}\n${homeworkPage}\n${homeworkDetailPage}\n${homeworkReviewModal}\n${studentHomeworkTab}\n${teacherWorkloadTab}\n${weeklyRequirementsList}\n${activityForm}`,
+      `${timetableBuilder}\n${homeworkTab}\n${homeworkPage}\n${homeworkDetailPage}\n${homeworkReviewModal}\n${studentHomeworkTab}\n${teacherWorkloadTab}\n${weeklyRequirementsList}\n${activitySurfaces}`,
       /demo-|fake-|placeholderId/i,
     );
   });
@@ -684,7 +703,7 @@ describe("SchoolOS web production contracts", () => {
   it("does not keep raw demo replacement IDs in production-facing forms", () => {
     const formFiles = [
       "components/forms/attendance-form.tsx",
-      "components/forms/activity-feed-form.tsx",
+      "app/dashboard/activity/new/page.tsx",
       "components/forms/communications-form.tsx",
     ];
 
@@ -1859,13 +1878,13 @@ describe("SchoolOS web production contracts", () => {
     assert.match(activityPage, /Activity Feed/);
     assert.match(
       activityPage,
-      /Photo posts, student tags, mood logs, milestones/,
+      /consent-aware classroom activities/,
     );
     assert.doesNotMatch(activityPage, />\s*Transport\s*</);
   });
 
-  it("keeps activity screen wired to real M5 and M12 APIs", () => {
-    const activityForm = read("components/forms/activity-feed-form.tsx");
+  it("keeps activity screens wired to real M5 and M12 APIs", () => {
+    const activitySurfaces = readMany(activitySurfaceFiles);
     const requiredApis = [
       "api.listClasses",
       "api.listSections",
@@ -1874,16 +1893,23 @@ describe("SchoolOS web production contracts", () => {
       "api.listActivityGallery",
       "api.listMoodLogs",
       "api.listDevelopmentalMilestones",
+      "api.listMilestoneTemplates",
       "api.listNotificationDeliveries",
+      "api.listParentActivityPosts",
+      "api.previewActivityAudience",
+      "api.getActivityPost",
       "api.createActivityPost",
+      "api.updateActivityPost",
+      "api.moderateActivityPost",
+      "api.deleteActivityPost",
+      "api.restoreActivityPost",
       "api.createMoodLog",
-      "api.createActivityReaction",
       "api.createDevelopmentalMilestone",
       "filesToBase64Payloads",
     ];
 
     for (const apiCall of requiredApis) {
-      assert.match(activityForm, new RegExp(apiCall.replace(".", "\\.")));
+      assert.match(activitySurfaces, new RegExp(apiCall.replace(".", "\\.")));
     }
   });
 
@@ -2242,7 +2268,7 @@ describe("SchoolOS web production contracts", () => {
   });
 
   it("keeps activity categories and upload limits explicit", () => {
-    const activityForm = read("components/forms/activity-feed-form.tsx");
+    const composerPage = read("app/dashboard/activity/new/page.tsx");
     const categories = [
       "LEARNING",
       "OUTDOOR_PLAY",
@@ -2253,101 +2279,124 @@ describe("SchoolOS web production contracts", () => {
     ];
 
     for (const category of categories) {
-      assert.match(activityForm, new RegExp(category));
+      assert.match(composerPage, new RegExp(category));
     }
 
-    assert.match(activityForm, /Attach 1 to 5 images/);
-    assert.match(activityForm, /selectedFiles\.length > 5/);
-    assert.match(activityForm, /file\.type\.startsWith\(["']image\/["']\)/);
-    assert.match(activityForm, /10MB/);
+    assert.match(composerPage, /Attach 1 to 5 images/);
+    assert.match(composerPage, /combined\.length > 5/);
+    assert.match(composerPage, /maxImageBytes = 10 \* 1024 \* 1024/);
+    assert.match(composerPage, /file\.type\.startsWith\(["']image\/["']\)/);
+    assert.match(composerPage, /10MB/);
   });
 
-  it("preserves feed preview, media gallery, mood logs, milestones, and delivery records", () => {
-    const activityForm = read("components/forms/activity-feed-form.tsx");
+  it("preserves feed, media gallery, observations, milestones, and delivery records", () => {
+    const feedPage = read("app/dashboard/activity/page.tsx");
+    const galleryPage = read("app/dashboard/activity/gallery/page.tsx");
+    const observationsPage = read("app/dashboard/activity/observations/page.tsx");
+    const milestonesPage = read("app/dashboard/activity/milestones/page.tsx");
+    const deliveriesPage = read("app/dashboard/activity/deliveries/page.tsx");
+    const statusBadge = read("components/ui/status-badge.tsx");
     const activityApi = read("lib/api/activity.ts");
 
-    assert.match(activityForm, /Feed Preview/);
-    assert.match(activityForm, /Recent classroom moments/);
+    assert.match(feedPage, /Activity Feed & Milestones/);
+    assert.match(feedPage, /No activity posts yet/);
+    assert.match(feedPage, /Create the first classroom activity/);
+    assert.match(galleryPage, /Activity gallery/);
     assert.match(
-      activityForm,
-      /No activity posts yet\. Create the first classroom moment/,
-    );
-    assert.match(activityForm, /Media Gallery/);
-    assert.match(activityForm, /Teacher media gallery/);
-    assert.match(
-      activityForm,
+      galleryPage,
       /No activity media matches the selected filters/,
     );
-    assert.match(activityForm, /api\.previewActivityAttachment/);
-    assert.match(activityForm, /api\.downloadActivityAttachment/);
+    assert.match(galleryPage, /api\.previewActivityAttachment/);
+    assert.match(galleryPage, /api\.downloadActivityAttachment/);
     assert.match(activityApi, /previewActivityAttachment[\s\S]*openImageBlob/);
     assert.match(activityApi, /downloadActivityAttachment[\s\S]*downloadBlob/);
     assert.doesNotMatch(activityApi, /URL\.createObjectURL/);
-    assert.match(activityForm, /Daily Mood Log/);
-    assert.match(activityForm, /Mood History/);
-    assert.match(activityForm, /Montessori \/ ECE Milestones/);
-    assert.match(activityForm, /DevelopmentalMilestone/);
-    assert.match(activityForm, /Activity Delivery Records/);
-    assert.match(activityForm, /QUEUED/);
-    assert.match(activityForm, /SENT/);
-    assert.match(activityForm, /FAILED/);
-    assert.match(activityForm, /SKIPPED/);
+    assert.match(observationsPage, /New observation/);
+    assert.match(observationsPage, /Observation history/);
+    assert.match(observationsPage, /Whole-class mood/);
+    assert.match(milestonesPage, /developmental and social milestones/);
+    assert.match(milestonesPage, /DevelopmentalMilestone/);
+    assert.match(deliveriesPage, /Activity deliveries/);
+    assert.match(deliveriesPage, /sourceType: 'activity_post'/);
+    assert.match(deliveriesPage, /StatusBadge/);
+    // Delivery states render through the shared StatusBadge tone map.
+    assert.match(statusBadge, /QUEUED/);
+    assert.match(statusBadge, /SENT/);
+    assert.match(statusBadge, /FAILED/);
+    assert.match(statusBadge, /SKIPPED/);
   });
 
-  it("preserves M5 redirected workflow intent in the in-page activity tabs", () => {
+  it("routes every M5 workflow as a first-class activity page", () => {
     const activityPage = read("app/dashboard/activity/page.tsx");
-    const activityForm = read("components/forms/activity-feed-form.tsx");
-    const redirects = readMany([
-      "app/dashboard/activity/gallery/page.tsx",
-      "app/dashboard/activity/milestones/page.tsx",
-      "app/dashboard/activity/moderation/page.tsx",
-    ]);
+    const workflowRoutes = [
+      "new",
+      "moderation",
+      "gallery",
+      "observations",
+      "milestones",
+      "deliveries",
+      "reports",
+    ];
 
-    assert.match(activityPage, /searchParams\.get\('section'\)/);
-    assert.match(activityPage, /<ActivityFeedForm initialSection=\{initialSection\}/);
-    assert.match(activityForm, /initialSection\?: ActivitySection/);
-    assert.match(activityForm, /useState<ActivitySection>\(initialSection\)/);
-    assert.match(redirects, /section=Media\+Gallery/);
-    assert.match(redirects, /section=Milestones/);
-    assert.match(redirects, /section=Feed\+Preview/);
+    for (const route of workflowRoutes) {
+      assert.equal(
+        existsSync(join(webRoot, `app/dashboard/activity/${route}/page.tsx`)),
+        true,
+        `Missing activity route: ${route}`,
+      );
+      assert.match(
+        activityPage,
+        new RegExp(`/dashboard/activity/${route}`),
+        `Feed page does not link /dashboard/activity/${route}`,
+      );
+    }
   });
 
   it("does not implement AI captions or permanent public media URLs in activity feed", () => {
-    const activityForm = read("components/forms/activity-feed-form.tsx");
+    const composerPage = read("app/dashboard/activity/new/page.tsx");
+    const activitySurfaces = readMany(activitySurfaceFiles);
 
-    assert.match(activityForm, /AI captions later/);
-    assert.match(activityForm, /permanent public URLs are not shown/);
-    assert.match(activityForm, /Private media/);
+    assert.match(composerPage, /no permanent public URLs are exposed/);
+    assert.match(composerPage, /signed access only/);
+    assert.match(activitySurfaces, /Private media/);
     assert.doesNotMatch(
-      activityForm,
-      /api\.createAi|generateAi|AI caption button/,
+      activitySurfaces,
+      /api\.createAi|generateAi|AI caption/,
     );
-    assert.doesNotMatch(activityForm, /publicUrl:\s*file|URL\.createObjectURL/);
-    assert.doesNotMatch(activityForm, /replace-me/i);
+    assert.doesNotMatch(activitySurfaces, /publicUrl:\s*file|URL\.createObjectURL/);
+    assert.doesNotMatch(activitySurfaces, /replace-me/i);
   });
 
   it("keeps activity post mutations invalidating every feed surface", () => {
-    const activityForm = read("components/forms/activity-feed-form.tsx");
+    const composerPage = read("app/dashboard/activity/new/page.tsx");
     const activityDetail = read("app/dashboard/activity/[postId]/page.tsx");
 
-    for (const source of [activityForm, activityDetail]) {
+    for (const [surface, source] of [
+      ["composer", composerPage],
+      ["detail", activityDetail],
+    ]) {
       for (const marker of [
-        'queryKey: ["activity-posts"]',
-        'queryKey: ["parent-activity-posts"]',
-        'queryKey: ["dashboard-activity-posts"]',
+        /queryKey: \[["']activity-posts["']\]/,
+        /queryKey: \[["']parent-activity-posts["']\]/,
+        /queryKey: \[["']dashboard-activity-posts["']\]/,
+        /queryKey: \[["']activity-gallery["']\]/,
       ]) {
-        assert.ok(source.includes(marker), `Missing cache marker: ${marker}`);
+        assert.match(source, marker, `${surface} missing cache marker: ${marker}`);
       }
     }
-
-    assert.match(activityForm, /queryKey: \[["']activity-gallery["']\]/);
-    assert.match(activityDetail, /queryKey: \[["']activity-gallery["']\]/);
   });
 
   it("keeps M5 activity feed surfaces tokenized and production-backed", () => {
-    const surfaces = [
-      "components/forms/activity-feed-form.tsx",
+    // Utility surfaces (moderation queue, deliveries table, reports stub,
+    // parent views) use shared neutral components and carry no module theme.
+    const themedSurfaces = [
+      "app/dashboard/activity/page.tsx",
+      "app/dashboard/activity/new/page.tsx",
+      "app/dashboard/activity/gallery/page.tsx",
+      "app/dashboard/activity/observations/page.tsx",
+      "app/dashboard/activity/milestones/page.tsx",
       "app/dashboard/activity/[postId]/page.tsx",
+      "components/activity/lifecycle-panel.tsx",
     ];
     const forbidden = [
       /bg-slate-900/,
@@ -2368,13 +2417,20 @@ describe("SchoolOS web production contracts", () => {
       /mock/i,
     ];
 
-    for (const surface of surfaces) {
+    for (const surface of activitySurfaceFiles) {
       const source = read(surface);
 
-      assert.match(source, /color-mod-activity/);
       for (const pattern of forbidden) {
         assert.doesNotMatch(source, pattern, `${surface} contains ${pattern}`);
       }
+    }
+
+    for (const surface of themedSurfaces) {
+      assert.match(
+        read(surface),
+        /color-mod-activity/,
+        `${surface} is missing activity module color tokens`,
+      );
     }
   });
 
