@@ -47,7 +47,7 @@ describe("M6 homework list contract", () => {
   it("uses backend submission counts instead of a fabricated progress bar", () => {
     const page = read("app/dashboard/homework/page.tsx");
 
-    assert.match(page, /submissionSummary\?\.total/);
+    assert.match(page, /submissionSummary\.total/);
     assert.doesNotMatch(page, /row\.submissions\?\.length/);
     assert.doesNotMatch(page, /Math\.min\(100,[\s\S]*submissions/);
   });
