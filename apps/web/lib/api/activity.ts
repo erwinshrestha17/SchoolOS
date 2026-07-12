@@ -15,6 +15,12 @@ import {
   withQuery,
 } from './client';
 
+export type PhotoConsentStatus =
+  | 'ALLOWED'
+  | 'NOT_ALLOWED'
+  | 'RESTRICTED'
+  | 'NOT_RECORDED';
+
 export type ActivityAudiencePreview = {
   audienceType: 'CLASS' | 'SECTION' | 'STUDENT';
   classId: string;
@@ -23,11 +29,16 @@ export type ActivityAudiencePreview = {
   mediaConsent: {
     grantedStudentCount: number;
     blockedStudentCount: number;
+    allowedCount: number;
+    notAllowedCount: number;
+    restrictedCount: number;
+    notRecordedCount: number;
   };
   students: Array<{
     id: string;
     fullName: string;
     mediaConsentGranted: boolean;
+    mediaConsentStatus: PhotoConsentStatus;
   }>;
 };
 

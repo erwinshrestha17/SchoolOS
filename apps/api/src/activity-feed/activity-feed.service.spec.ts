@@ -206,6 +206,8 @@ describe('ActivityFeedService', () => {
           },
         },
         id: true,
+        firstNameEn: true,
+        lastNameEn: true,
       },
       where: {
         tenantId: 'tenant-1',
@@ -393,6 +395,8 @@ describe('ActivityFeedService', () => {
     prisma.student.findMany.mockResolvedValue([
       {
         id: 'student-1',
+        firstNameEn: 'Aarav',
+        lastNameEn: 'Sharma',
         guardianLinks: [
           {
             guardian: {
@@ -422,9 +426,7 @@ describe('ActivityFeedService', () => {
         },
         actor,
       ),
-    ).rejects.toThrow(
-      'Activity media cannot be uploaded for a student without active photo consent',
-    );
+    ).rejects.toThrow('photo consent declined: Aarav Sharma');
 
     expect(storageService.saveBase64Object).not.toHaveBeenCalled();
     expect(fileRegistry.registerFile).not.toHaveBeenCalled();
@@ -469,6 +471,7 @@ describe('ActivityFeedService', () => {
           studentSystemId: 'STU-001',
           fullName: 'Aarav Sharma',
           rollNumber: 1,
+          mediaConsentStatus: 'ALLOWED',
           mediaConsentGranted: true,
         },
       ],
@@ -540,14 +543,20 @@ describe('ActivityFeedService', () => {
       mediaConsent: {
         grantedStudentCount: 1,
         blockedStudentCount: 1,
+        allowedCount: 1,
+        notAllowedCount: 1,
+        restrictedCount: 0,
+        notRecordedCount: 0,
       },
       students: [
         expect.objectContaining({
           id: 'student-1',
+          mediaConsentStatus: 'ALLOWED',
           mediaConsentGranted: true,
         }),
         expect.objectContaining({
           id: 'student-2',
+          mediaConsentStatus: 'NOT_ALLOWED',
           mediaConsentGranted: false,
         }),
       ],
@@ -648,6 +657,8 @@ describe('ActivityFeedService', () => {
           },
         },
         id: true,
+        firstNameEn: true,
+        lastNameEn: true,
       },
       where: {
         tenantId: 'tenant-1',

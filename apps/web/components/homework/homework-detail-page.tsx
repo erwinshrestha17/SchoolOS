@@ -38,7 +38,7 @@ import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { HomeworkReviewModal } from "@/components/homework/homework-review-modal";
-import { formatBsDate, formatBsDateTime, type HomeworkSubmissionSummary } from "@schoolos/core";
+import { formatBsDate, formatBsDateTime } from "@schoolos/core";
 import { FormField, TextArea } from "@/components/ui/form-field";
 
 type HomeworkNotice = {
@@ -642,7 +642,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
               <TabsContent value="submissions" className="mt-6">
                 {submissionsQuery.isLoading ? (
                   <LoadingState label="Loading submissions..." />
-                ) : submissionsQuery.data?.length === 0 ? (
+                ) : (submissionsQuery.data?.items.length ?? 0) === 0 ? (
                   <EmptyState
                     title="No submissions yet"
                     description="Students haven't submitted any work for this assignment yet."
@@ -650,7 +650,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                 ) : (
                   <DataTable
                     columns={submissionColumns}
-                    data={submissionsQuery.data ?? []}
+                    data={submissionsQuery.data?.items ?? []}
                   />
                 )}
               </TabsContent>
@@ -680,8 +680,8 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                     <div className="p-6 rounded-2xl border border-slate-100 bg-white shadow-sm flex flex-col items-center justify-center text-center">
                       <Clock className="h-8 w-8 text-[var(--color-mod-homework-text)] mb-2 opacity-30" />
                       <span className="text-2xl font-black text-slate-900">
-                        {submissionsQuery.data?.filter(
-                          (s) => s.status === "PENDING",
+                        {submissionsQuery.data?.items.filter(
+                          (s) => s.status === "NOT_SUBMITTED",
                         ).length ?? 0}
                       </span>
                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -692,8 +692,8 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                       <AlertCircle className="h-8 w-8 text-red-500 mb-2 opacity-20" />
                       <span className="text-2xl font-black text-slate-900">
                         {homework.dueAt && new Date(homework.dueAt) < new Date()
-                          ? (submissionsQuery.data?.filter(
-                              (s) => s.status === "PENDING",
+                          ? (submissionsQuery.data?.items.filter(
+                              (s) => s.status === "NOT_SUBMITTED",
                             ).length ?? 0)
                           : 0}
                       </span>
@@ -704,7 +704,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                     <div className="p-6 rounded-2xl border border-slate-100 bg-white shadow-sm flex flex-col items-center justify-center text-center">
                       <CheckCircle2 className="h-8 w-8 text-emerald-500 mb-2 opacity-20" />
                       <span className="text-2xl font-black text-slate-900">
-                        {submissionsQuery.data?.filter(
+                        {submissionsQuery.data?.items.filter(
                           (s) =>
                             s.status === "SUBMITTED" || s.status === "REVIEWED",
                         ).length ?? 0}
@@ -745,7 +745,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                   Total Students
                 </span>
                 <span className="text-sm font-bold text-slate-900">
-                  {submissionsQuery.data?.length ?? 0}
+                  {submissionsQuery.data?.items.length ?? 0}
                 </span>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-slate-50">
@@ -753,12 +753,12 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                   Submission Rate
                 </span>
                 <span className="text-sm font-bold text-slate-900">
-                  {submissionsQuery.data?.length
+                  {submissionsQuery.data?.items.length
                     ? Math.round(
-                        (submissionsQuery.data.filter(
-                          (s) => s.status !== "PENDING",
+                        (submissionsQuery.data.items.filter(
+                          (s) => s.status !== "NOT_SUBMITTED",
                         ).length /
-                          submissionsQuery.data.length) *
+                          submissionsQuery.data.items.length) *
                           100,
                       )
                     : 0}
@@ -882,13 +882,12 @@ function StudentHomeworkSubmissionView({
   >(null);
 
   const submissionsQuery = useQuery({
-    queryKey: ["homework-submissions", "mine"],
-    queryFn: () => api.listHomeworkSubmissions(),
+    queryKey: ["homework-submissions", "mine", homeworkId],
+    queryFn: () => api.listHomeworkAssignmentSubmissions(homeworkId),
+    enabled: Boolean(homeworkId),
   });
 
-  const mySubmission = submissionsQuery.data?.find(
-    (s: HomeworkSubmissionSummary) => s.homeworkId === homeworkId,
-  );
+  const mySubmission = submissionsQuery.data?.items[0];
 
   async function openAttachment(attachmentId: string) {
     setAttachmentError(null);

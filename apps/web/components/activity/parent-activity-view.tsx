@@ -76,7 +76,11 @@ function ParentActivityCard({ post }: { post: ActivityPost }) {
               {post.title}
             </h2>
             <p className="mt-1 text-xs font-bold uppercase tracking-widest text-slate-400">
-              {post.publishedAt ? formatDateTime(post.publishedAt) : "Shared"}
+              {post.activityDate
+                ? formatDateTime(post.activityDate)
+                : post.publishedAt
+                  ? formatDateTime(post.publishedAt)
+                  : "Shared"}
               {post.teacherName ? ` · ${post.teacherName}` : ""}
             </p>
           </div>

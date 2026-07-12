@@ -50,8 +50,9 @@ const HOMEWORK_PAGE_SIZE = 20;
 // When a specific day is selected we can't ask the backend to filter by
 // assignedDate (no such query param exists yet), so we pull a wider window
 // and filter/paginate client-side. This is a deliberate P0 simplification —
-// see the plan at fuzzy-gliding-hopper.md for the backend follow-up.
-const DATE_FILTER_FETCH_LIMIT = 200;
+// see the plan at fuzzy-gliding-hopper.md for the backend follow-up. Capped
+// at 100 to match HomeworkQueryDto's server-side @Max(100) on `limit`.
+const DATE_FILTER_FETCH_LIMIT = 100;
 
 type ActiveTab = "today" | "all" | "completion" | "templates";
 

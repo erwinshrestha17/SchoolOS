@@ -731,6 +731,12 @@ enum ActivityPostStatus {
   ARCHIVED
 }
 
+enum ActivityPostLanguage {
+  ENGLISH
+  NEPALI
+  BOTH
+}
+
 enum PlatformPlanStatus {
   ACTIVE
   ARCHIVED

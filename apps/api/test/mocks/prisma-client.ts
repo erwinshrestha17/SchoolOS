@@ -696,6 +696,12 @@ export const ActivityPostStatus = {
   ARCHIVED: 'ARCHIVED',
 } as const;
 
+export const ActivityPostLanguage = {
+  ENGLISH: 'ENGLISH',
+  NEPALI: 'NEPALI',
+  BOTH: 'BOTH',
+} as const;
+
 export const ActivityAttachmentProcessingStatus = {
   PENDING: 'PENDING',
   PROCESSING: 'PROCESSING',

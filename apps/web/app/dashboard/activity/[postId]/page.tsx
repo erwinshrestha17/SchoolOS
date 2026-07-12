@@ -228,8 +228,20 @@ function ActivityPostDetail({
               <Badge variant="outline">{formatEnumLabel(post.status)}</Badge>
             ) : null}
             <Badge variant="outline">
-              {post.publishedAt ? formatDateTime(post.publishedAt) : "Draft"}
+              {post.activityDate
+                ? formatDateTime(post.activityDate)
+                : post.publishedAt
+                  ? formatDateTime(post.publishedAt)
+                  : "Draft"}
             </Badge>
+            {post.parentVisible === false ? (
+              <Badge variant="outline">Staff only</Badge>
+            ) : null}
+            {post.language && post.language !== "ENGLISH" ? (
+              <Badge variant="outline">
+                {post.language === "BOTH" ? "English + Nepali" : "Nepali"}
+              </Badge>
+            ) : null}
           </div>
           <div className="mt-6 whitespace-pre-wrap text-sm leading-7 text-slate-700">
             {post.caption ?? post.body ?? "No caption was added."}

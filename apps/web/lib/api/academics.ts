@@ -12,6 +12,7 @@ import type {
   ExamTermSummary,
   HomeworkAssignmentPage,
   HomeworkAssignmentSummary,
+  HomeworkSubmissionPage,
   HomeworkSubmissionSummary,
   MarkEntrySummary,
   PaginatedResponse,
@@ -826,10 +827,8 @@ export const academicsApi = {
     );
     await openHomeworkAttachmentAccess(access);
   },
-  listHomeworkSubmissions: () =>
-    request<HomeworkSubmissionSummary[]>('/homework/submissions'),
   listHomeworkAssignmentSubmissions: (homeworkId: string) =>
-    request<HomeworkSubmissionSummary[]>(
+    request<HomeworkSubmissionPage>(
       `/homework/${encodeURIComponent(homeworkId)}/submissions`,
     ),
   reviewHomeworkSubmission: (body: JsonBody) =>

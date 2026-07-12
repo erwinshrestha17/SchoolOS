@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import {
   ActivityCategory,
+  ActivityPostLanguage,
   AudienceType,
   ConsentType,
   NotificationChannel,
@@ -206,27 +207,11 @@ export class ActivityFeedService {
       });
 
       for (const student of students) {
-        let allowed = student.lifecycleStatus === 'ACTIVE';
-        if (allowed) {
-          const guardians = student.guardianLinks.map((link) => link.guardian);
-          if (guardians.length === 0) {
-            allowed = false;
-          } else {
-            let studentHasConsent = false;
-            for (const guardian of guardians) {
-              const latestConsent = guardian.consents[0];
-              if (latestConsent) {
-                if (latestConsent.granted && !latestConsent.revokedAt) {
-                  studentHasConsent = true;
-                } else {
-                  studentHasConsent = false;
-                  break;
-                }
-              }
-            }
-            allowed = studentHasConsent;
-          }
-        }
+        const allowed =
+          student.lifecycleStatus === 'ACTIVE' &&
+          isPhotoConsentAllowed(
+            derivePhotoConsentStatus(student.guardianLinks),
+          );
         consentMap.set(student.id, allowed);
       }
     }
@@ -316,26 +301,20 @@ export class ActivityFeedService {
 
     const guardianIds = new Set<string>();
     let pushRecipientCount = 0;
-    let mediaConsentGrantedCount = 0;
-    let mediaConsentBlockedCount = 0;
+    const consentCounts: Record<PhotoConsentStatus, number> = {
+      ALLOWED: 0,
+      NOT_ALLOWED: 0,
+      RESTRICTED: 0,
+      NOT_RECORDED: 0,
+    };
 
     const previewStudents = students.map((student) => {
       const recipientLinks = student.guardianLinks.filter(
         (link) => link.isPrimary || link.guardian.receivesAlerts,
       );
-      let mediaConsentGranted = false;
-      for (const link of student.guardianLinks) {
-        const latestConsent = link.guardian.consents[0];
-        if (!latestConsent) {
-          continue;
-        }
-        if (latestConsent.granted && !latestConsent.revokedAt) {
-          mediaConsentGranted = true;
-          continue;
-        }
-        mediaConsentGranted = false;
-        break;
-      }
+      const mediaConsentStatus = derivePhotoConsentStatus(
+        student.guardianLinks,
+      );
 
       for (const link of recipientLinks) {
         guardianIds.add(link.guardianId);
@@ -344,11 +323,7 @@ export class ActivityFeedService {
         }
       }
 
-      if (mediaConsentGranted) {
-        mediaConsentGrantedCount += 1;
-      } else {
-        mediaConsentBlockedCount += 1;
-      }
+      consentCounts[mediaConsentStatus] += 1;
 
       return {
         id: student.id,
@@ -356,7 +331,8 @@ export class ActivityFeedService {
         classId: student.classId,
         sectionId: student.sectionId,
         guardianRecipientCount: recipientLinks.length,
-        mediaConsentGranted,
+        mediaConsentStatus,
+        mediaConsentGranted: isPhotoConsentAllowed(mediaConsentStatus),
       };
     });
 
@@ -373,8 +349,18 @@ export class ActivityFeedService {
       guardianRecipientCount: guardianIds.size,
       pushRecipientCount,
       mediaConsent: {
-        grantedStudentCount: mediaConsentGrantedCount,
-        blockedStudentCount: mediaConsentBlockedCount,
+        // Deprecated aggregate fields kept for existing consumers; prefer the
+        // per-status counts below for the 4-state (Allowed/Not allowed/
+        // Restricted/Not recorded) breakdown.
+        grantedStudentCount: consentCounts.ALLOWED,
+        blockedStudentCount:
+          consentCounts.NOT_ALLOWED +
+          consentCounts.RESTRICTED +
+          consentCounts.NOT_RECORDED,
+        allowedCount: consentCounts.ALLOWED,
+        notAllowedCount: consentCounts.NOT_ALLOWED,
+        restrictedCount: consentCounts.RESTRICTED,
+        notRecordedCount: consentCounts.NOT_RECORDED,
       },
       students: previewStudents,
     };
@@ -451,24 +437,11 @@ export class ActivityFeedService {
           isBlockedByTags = true;
           break;
         }
-        const guardians = student.guardianLinks.map((link) => link.guardian);
-        if (guardians.length === 0) {
-          isBlockedByTags = true;
-          break;
-        }
-        let studentHasConsent = false;
-        for (const guardian of guardians) {
-          const latestConsent = guardian.consents[0];
-          if (latestConsent) {
-            if (latestConsent.granted && !latestConsent.revokedAt) {
-              studentHasConsent = true;
-            } else {
-              studentHasConsent = false;
-              break;
-            }
-          }
-        }
-        if (!studentHasConsent) {
+        if (
+          !isPhotoConsentAllowed(
+            derivePhotoConsentStatus(student.guardianLinks),
+          )
+        ) {
           isBlockedByTags = true;
           break;
         }
@@ -566,27 +539,11 @@ export class ActivityFeedService {
       });
 
       for (const student of students) {
-        let allowed = student.lifecycleStatus === 'ACTIVE';
-        if (allowed) {
-          const guardians = student.guardianLinks.map((link) => link.guardian);
-          if (guardians.length === 0) {
-            allowed = false;
-          } else {
-            let studentHasConsent = false;
-            for (const guardian of guardians) {
-              const latestConsent = guardian.consents[0];
-              if (latestConsent) {
-                if (latestConsent.granted && !latestConsent.revokedAt) {
-                  studentHasConsent = true;
-                } else {
-                  studentHasConsent = false;
-                  break;
-                }
-              }
-            }
-            allowed = studentHasConsent;
-          }
-        }
+        const allowed =
+          student.lifecycleStatus === 'ACTIVE' &&
+          isPhotoConsentAllowed(
+            derivePhotoConsentStatus(student.guardianLinks),
+          );
         consentMap.set(student.id, allowed);
       }
     }
@@ -779,13 +736,19 @@ export class ActivityFeedService {
     ]);
 
     return {
-      items: students.map((student) => ({
-        id: student.id,
-        studentSystemId: student.studentSystemId,
-        fullName: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
-        rollNumber: student.rollNumber,
-        mediaConsentGranted: hasCurrentPhotoConsent(student.guardianLinks),
-      })),
+      items: students.map((student) => {
+        const mediaConsentStatus = derivePhotoConsentStatus(
+          student.guardianLinks,
+        );
+        return {
+          id: student.id,
+          studentSystemId: student.studentSystemId,
+          fullName: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+          rollNumber: student.rollNumber,
+          mediaConsentStatus,
+          mediaConsentGranted: isPhotoConsentAllowed(mediaConsentStatus),
+        };
+      }),
       meta: {
         total,
         page,
@@ -868,6 +831,8 @@ export class ActivityFeedService {
         },
         select: {
           id: true,
+          firstNameEn: true,
+          lastNameEn: true,
           guardianLinks: {
             include: {
               guardian: {
@@ -889,13 +854,42 @@ export class ActivityFeedService {
           'One or more tagged students were not active in this class/section',
         );
       }
-      if (
-        students.some(
-          (student) => !hasCurrentPhotoConsent(student.guardianLinks),
-        )
-      ) {
+
+      const blocked = students
+        .map((student) => ({
+          name: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+          status: derivePhotoConsentStatus(student.guardianLinks),
+        }))
+        .filter((entry) => !isPhotoConsentAllowed(entry.status));
+
+      if (blocked.length > 0) {
+        const notRecorded = blocked.filter(
+          (entry) => entry.status === 'NOT_RECORDED',
+        );
+        const notAllowed = blocked.filter(
+          (entry) => entry.status === 'NOT_ALLOWED',
+        );
+        const restricted = blocked.filter(
+          (entry) => entry.status === 'RESTRICTED',
+        );
+        const parts: string[] = [];
+        if (notRecorded.length) {
+          parts.push(
+            `no photo consent on file: ${notRecorded.map((e) => e.name).join(', ')}`,
+          );
+        }
+        if (notAllowed.length) {
+          parts.push(
+            `photo consent declined: ${notAllowed.map((e) => e.name).join(', ')}`,
+          );
+        }
+        if (restricted.length) {
+          parts.push(
+            `restricted photo consent: ${restricted.map((e) => e.name).join(', ')}`,
+          );
+        }
         throw new ForbiddenException(
-          'Activity media cannot be uploaded for a student without active photo consent',
+          `Cannot tag students without active, unrestricted photo consent — ${parts.join('; ')}`,
         );
       }
     }
@@ -989,6 +983,9 @@ export class ActivityFeedService {
           title: dto.title,
           caption: dto.caption,
           askAtHome: dto.askAtHome ?? null,
+          activityDate: dto.activityDate ? new Date(dto.activityDate) : new Date(),
+          parentVisible: dto.parentVisible ?? true,
+          language: dto.language ?? ActivityPostLanguage.ENGLISH,
           category,
           audienceType,
           status: requiresApproval
@@ -1451,25 +1448,9 @@ export class ActivityFeedService {
       if (student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE) {
         return true;
       }
-
-      const guardians = student.guardianLinks.map((link) => link.guardian);
-      if (guardians.length === 0) {
-        return true;
-      }
-
-      let studentHasConsent = false;
-      for (const guardian of guardians) {
-        const latestConsent = guardian.consents[0];
-        if (latestConsent) {
-          if (latestConsent.granted && !latestConsent.revokedAt) {
-            studentHasConsent = true;
-          } else {
-            return true;
-          }
-        }
-      }
-
-      return !studentHasConsent;
+      return !isPhotoConsentAllowed(
+        derivePhotoConsentStatus(student.guardianLinks),
+      );
     });
 
     if (!blockedStudent) {
@@ -1860,6 +1841,7 @@ export class ActivityFeedService {
     }
 
     return {
+      parentVisible: true,
       OR: [
         { studentTags: { some: { studentId: { in: activeStudentIds } } } },
         ...students.flatMap((student) => {
@@ -2104,25 +2086,67 @@ function activityPostRequiresApproval(
   );
 }
 
-function hasCurrentPhotoConsent(
+type PhotoConsentStatus =
+  | 'ALLOWED'
+  | 'NOT_ALLOWED'
+  | 'RESTRICTED'
+  | 'NOT_RECORDED';
+
+/**
+ * Collapses each guardian's latest PHOTO_USAGE consent into one of four
+ * school-facing states. "Restricted" is carried in the existing
+ * GuardianConsent.metadata JSON (no schema change) so an admin can mark a
+ * granted consent as e.g. "class photos only, no individual naming" without
+ * a new consent type. If guardians disagree, the most protective state wins:
+ * any decline blocks the student outright; otherwise any restriction applies.
+ */
+function derivePhotoConsentStatus(
   guardianLinks: Array<{
     guardian: {
-      consents: Array<{ granted: boolean; revokedAt: Date | null }>;
+      consents: Array<{
+        granted: boolean;
+        revokedAt: Date | null;
+        metadata?: Prisma.JsonValue;
+      }>;
     };
   }>,
-) {
-  let granted = false;
+): PhotoConsentStatus {
+  let hasAnyRecord = false;
+  let hasDecline = false;
+  let hasRestricted = false;
+  let hasAllowed = false;
+
   for (const link of guardianLinks) {
     const latestConsent = link.guardian.consents[0];
     if (!latestConsent) {
       continue;
     }
+    hasAnyRecord = true;
+
     if (!latestConsent.granted || latestConsent.revokedAt) {
-      return false;
+      hasDecline = true;
+      continue;
     }
-    granted = true;
+
+    const metadata =
+      latestConsent.metadata && typeof latestConsent.metadata === 'object'
+        ? (latestConsent.metadata as Record<string, unknown>)
+        : null;
+    if (metadata?.restricted === true) {
+      hasRestricted = true;
+    } else {
+      hasAllowed = true;
+    }
   }
-  return granted;
+
+  if (!hasAnyRecord) return 'NOT_RECORDED';
+  if (hasDecline) return 'NOT_ALLOWED';
+  if (hasRestricted) return 'RESTRICTED';
+  return hasAllowed ? 'ALLOWED' : 'NOT_RECORDED';
+}
+
+function isPhotoConsentAllowed(status: PhotoConsentStatus) {
+  return status === 'ALLOWED';
 }
 
 function isDatabaseErrorCode(error: unknown, code: string) {

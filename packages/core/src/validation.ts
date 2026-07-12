@@ -285,6 +285,9 @@ export const activityPostFormSchema = z.object({
   title: z.string().min(2),
   caption: z.string().min(2),
   askAtHome: z.string().max(280).optional().nullable(),
+  activityDate: z.string().optional(),
+  parentVisible: z.boolean().default(true),
+  language: z.enum(['ENGLISH', 'NEPALI', 'BOTH']).default('ENGLISH'),
   category: z.enum(activityCategoryValues).default('OTHER'),
   studentIds: z.array(z.string()).default([]),
   attachments: z.array(studentDocumentFormSchema.pick({

@@ -232,6 +232,15 @@ export default function ActivityPage() {
             cell: (post) => <StatusBadge status={post.status ?? 'DRAFT'} />,
           },
           {
+            header: 'Visibility',
+            cell: (post) =>
+              post.parentVisible === false ? (
+                <StatusBadge status="STAFF_ONLY" label="Staff only" tone="inactive" />
+              ) : (
+                <StatusBadge status="PARENTS" label="Parents" tone="active" />
+              ),
+          },
+          {
             header: 'Published',
             cell: (post) =>
               post.publishedAt ? formatBsDateTime(post.publishedAt) : 'Draft',

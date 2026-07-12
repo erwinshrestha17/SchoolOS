@@ -8,6 +8,9 @@ model ActivityPost {
   title            String
   caption          String
   askAtHome        String?
+  activityDate     DateTime           @default(now())
+  parentVisible    Boolean            @default(true)
+  language         ActivityPostLanguage @default(ENGLISH)
   category         ActivityCategory   @default(GENERAL)
   audienceType     AudienceType       @default(CLASS)
   status           ActivityPostStatus @default(PENDING_APPROVAL)

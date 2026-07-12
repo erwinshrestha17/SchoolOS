@@ -55,6 +55,9 @@ export class ActivityPostLifecycleService {
         title: dto.title,
         caption: dto.caption,
         askAtHome: dto.askAtHome,
+        activityDate: dto.activityDate ? new Date(dto.activityDate) : undefined,
+        parentVisible: dto.parentVisible,
+        language: dto.language,
         editedAt: new Date(),
         editedById: actor.userId,
         status:

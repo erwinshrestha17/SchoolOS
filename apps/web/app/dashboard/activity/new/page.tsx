@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, Camera, Lock, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Camera, HelpCircle, Lock, ShieldAlert, X } from 'lucide-react';
 import { api } from '../../../../lib/api';
 import { filesToBase64Payloads } from '../../../../lib/files';
 import { cn } from '../../../../lib/utils';
@@ -44,12 +44,22 @@ const steps = ['Audience & consent', 'Content & media', 'Review & submit'] as co
 type Step = 0 | 1 | 2;
 const maxImageBytes = 10 * 1024 * 1024;
 
+const languageOptions = ['ENGLISH', 'NEPALI', 'BOTH'] as const;
+const languageLabels: Record<(typeof languageOptions)[number], string> = {
+  ENGLISH: 'English',
+  NEPALI: 'Nepali',
+  BOTH: 'English and Nepali',
+};
+
 type ComposerState = {
   classId: string;
   sectionId: string;
   title: string;
   caption: string;
   askAtHome: string;
+  activityDate: string;
+  parentVisible: boolean;
+  language: (typeof languageOptions)[number];
   category: (typeof activityCategories)[number];
   audienceMode: AudienceMode;
   studentIds: string[];
@@ -64,6 +74,12 @@ function newClientSubmissionId() {
   return `csid-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function todayIsoDate() {
+  const now = new Date();
+  const offsetMs = now.getTimezoneOffset() * 60 * 1000;
+  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
+}
+
 export default function ActivityComposerPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -74,6 +90,9 @@ export default function ActivityComposerPage() {
     title: '',
     caption: '',
     askAtHome: '',
+    activityDate: todayIsoDate(),
+    parentVisible: true,
+    language: 'ENGLISH',
     category: 'CLASSROOM_LEARNING',
     audienceMode: 'whole',
     studentIds: [],
@@ -192,6 +211,9 @@ export default function ActivityComposerPage() {
       title: post.title.trim(),
       caption: post.caption.trim(),
       askAtHome: post.askAtHome.trim() || null,
+      activityDate: post.activityDate || undefined,
+      parentVisible: post.parentVisible,
+      language: post.language,
       category: post.category,
       studentIds: post.audienceMode === 'students' ? post.studentIds : [],
       attachments,
@@ -403,15 +425,32 @@ function AudienceStep({
           </p>
           {isLoading ? (
             <LoadingState />
-          ) : mediaConsent && (mediaConsent.grantedStudentCount + mediaConsent.blockedStudentCount > 0) ? (
-            <p className="text-xs font-medium text-slate-600">
-              {mediaConsent.grantedStudentCount} of{' '}
-              {mediaConsent.grantedStudentCount + mediaConsent.blockedStudentCount} students have
-              active photo consent.
-              {mediaConsent.blockedStudentCount > 0
-                ? ` ${mediaConsent.blockedStudentCount} student${mediaConsent.blockedStudentCount === 1 ? '' : 's'} without consent won't see media in this post — switch to "Selected students" to tag individuals directly.`
-                : ''}
-            </p>
+          ) : mediaConsent && mediaConsent.allowedCount + mediaConsent.notAllowedCount + mediaConsent.restrictedCount + mediaConsent.notRecordedCount > 0 ? (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-slate-600">
+                {mediaConsent.allowedCount} of{' '}
+                {mediaConsent.allowedCount +
+                  mediaConsent.notAllowedCount +
+                  mediaConsent.restrictedCount +
+                  mediaConsent.notRecordedCount}{' '}
+                students have active, unrestricted photo consent.
+              </p>
+              {mediaConsent.notAllowedCount || mediaConsent.restrictedCount || mediaConsent.notRecordedCount ? (
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  {mediaConsent.notAllowedCount > 0
+                    ? `${mediaConsent.notAllowedCount} not allowed · `
+                    : ''}
+                  {mediaConsent.restrictedCount > 0
+                    ? `${mediaConsent.restrictedCount} restricted · `
+                    : ''}
+                  {mediaConsent.notRecordedCount > 0
+                    ? `${mediaConsent.notRecordedCount} not recorded`
+                    : ''}
+                  {' '}— none of these students will see media in this post; switch to
+                  &quot;Selected students&quot; to tag individuals directly.
+                </p>
+              ) : null}
+            </div>
           ) : null}
         </div>
       ) : (
@@ -428,11 +467,14 @@ function AudienceStep({
             ) : students.length > 0 ? (
               students.map((student) => {
                 const selected = post.studentIds.includes(student.id);
+                const consentMeta = consentStatusMeta(student.mediaConsentStatus);
+                const ConsentIcon = consentMeta?.icon;
                 return (
                   <button
                     key={student.id}
                     type="button"
                     disabled={!student.mediaConsentGranted}
+                    title={consentMeta?.label}
                     onClick={() => toggleStudent(student.id)}
                     className={cn(
                       'inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50',
@@ -441,7 +483,9 @@ function AudienceStep({
                         : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300',
                     )}
                   >
-                    {!student.mediaConsentGranted ? <Lock className="h-3.5 w-3.5" /> : null}
+                    {ConsentIcon ? (
+                      <ConsentIcon className={cn('h-3.5 w-3.5', !selected && consentMeta?.className)} />
+                    ) : null}
                     {student.fullName}
                   </button>
                 );
@@ -520,12 +564,60 @@ function ContentStep({
         </FormField>
       </div>
 
+      <div className="grid gap-6 md:grid-cols-3">
+        <FormField label="Date">
+          <Input
+            type="date"
+            value={post.activityDate}
+            onChange={(event) =>
+              setPost((current) => ({ ...current, activityDate: event.target.value }))
+            }
+          />
+        </FormField>
+        <FormField label="Language">
+          <Select
+            value={post.language}
+            onChange={(event) =>
+              setPost((current) => ({
+                ...current,
+                language: event.target.value as ComposerState['language'],
+              }))
+            }
+          >
+            {languageOptions.map((option) => (
+              <option key={option} value={option}>
+                {languageLabels[option]}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField label="Parent visibility">
+          <label className="flex h-10 items-center gap-2 text-sm font-semibold text-slate-700">
+            <input
+              type="checkbox"
+              checked={post.parentVisible}
+              onChange={(event) =>
+                setPost((current) => ({ ...current, parentVisible: event.target.checked }))
+              }
+              className="h-4 w-4 rounded border-slate-300"
+            />
+            {post.parentVisible ? 'Visible to parents' : 'Staff-only'}
+          </label>
+        </FormField>
+      </div>
+
       <FormField label="Caption">
         <TextArea
           rows={4}
           value={post.caption}
           onChange={(event) => setPost((current) => ({ ...current, caption: event.target.value }))}
-          placeholder="What happened in class today?"
+          placeholder={
+            post.language === 'BOTH'
+              ? 'Today our students participated in ________.\nआज विद्यार्थीहरूले ________ गतिविधिमा सहभागिता जनाए।'
+              : post.language === 'NEPALI'
+                ? 'आज कक्षामा के भयो?'
+                : 'What happened in class today?'
+          }
         />
       </FormField>
 
@@ -660,7 +752,13 @@ function ReviewStep({
         <ReviewFact label="Class / Section" value={`${className} / ${sectionName}`} />
         <ReviewFact label="Category" value={formatEnumLabel(post.category)} />
         <ReviewFact label="Title" value={post.title || 'Not set'} />
+        <ReviewFact label="Date" value={post.activityDate || 'Not set'} />
         <ReviewFact label="Photos" value={`${fileCount} image${fileCount === 1 ? '' : 's'}`} />
+        <ReviewFact
+          label="Parent visibility"
+          value={post.parentVisible ? 'Visible to parents' : 'Staff only'}
+        />
+        <ReviewFact label="Language" value={languageLabels[post.language]} />
       </dl>
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
@@ -720,6 +818,19 @@ function formatEnumLabel(value: string) {
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join(' ');
+}
+
+function consentStatusMeta(status: ActivityAudiencePreview['students'][number]['mediaConsentStatus']) {
+  switch (status) {
+    case 'NOT_ALLOWED':
+      return { label: 'Not allowed', icon: Lock, className: 'text-danger-600' };
+    case 'RESTRICTED':
+      return { label: 'Restricted', icon: ShieldAlert, className: 'text-warning-600' };
+    case 'NOT_RECORDED':
+      return { label: 'Not recorded', icon: HelpCircle, className: 'text-slate-400' };
+    default:
+      return null;
+  }
 }
 
 function formatFileSize(sizeBytes: number) {

@@ -1,9 +1,15 @@
-import { ActivityCategory, AudienceType } from '@prisma/client';
+import {
+  ActivityCategory,
+  ActivityPostLanguage,
+  AudienceType,
+} from '@prisma/client';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   ArrayUnique,
   IsArray,
+  IsBoolean,
+  IsDateString,
   IsEnum,
   IsOptional,
   IsString,
@@ -53,6 +59,18 @@ export class CreateActivityPostDto {
   @IsString()
   @MaxLength(280)
   askAtHome?: string;
+
+  @IsOptional()
+  @IsDateString()
+  activityDate?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  parentVisible?: boolean;
+
+  @IsOptional()
+  @IsEnum(ActivityPostLanguage)
+  language?: ActivityPostLanguage;
 
   @IsOptional()
   @IsEnum(ActivityCategory)

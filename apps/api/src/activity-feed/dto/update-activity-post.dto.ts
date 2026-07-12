@@ -1,4 +1,12 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { ActivityPostLanguage } from '@prisma/client';
+import {
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class UpdateActivityPostDto {
   @IsOptional()
@@ -15,4 +23,16 @@ export class UpdateActivityPostDto {
   @IsString()
   @MaxLength(280)
   askAtHome?: string;
+
+  @IsOptional()
+  @IsDateString()
+  activityDate?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  parentVisible?: boolean;
+
+  @IsOptional()
+  @IsEnum(ActivityPostLanguage)
+  language?: ActivityPostLanguage;
 }

@@ -22,6 +22,9 @@ export type ActivityPost = {
   caption?: string;
   askAtHome?: string | null;
   teacherName?: string | null;
+  activityDate?: string | null;
+  parentVisible?: boolean;
+  language?: 'ENGLISH' | 'NEPALI' | 'BOTH';
   category: string;
   audienceType: string;
   status?:
